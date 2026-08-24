@@ -13547,8 +13547,19 @@ questions include at least:</p>
 <td>PLAN-sticky-transfers-phase-04-failover.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>5. Push audit</td>
+<td>PLAN-sticky-transfers-phase-05-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
+<p><strong>Phase 5 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
+accumulated diff of every phase in this plan against
+<code>develop</code>, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.</p>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong><code>PLAN-remove-primary.md</code> must have landed</strong> at least

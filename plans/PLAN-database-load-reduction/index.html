@@ -13656,6 +13656,11 @@ so the phase plans do not reopen them:</p>
 <td><a href="../PLAN-database-load-reduction-phase-07-regression-detection/">PLAN-database-load-reduction-phase-07-regression-detection.md</a></td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>8. Push audit</td>
+<td>PLAN-database-load-reduction-phase-08-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <p>Phase summaries:</p>
@@ -13808,6 +13813,12 @@ adds a new fixed-rate poll, drop-in Prometheus rules and an
 stack, and a public dashboard that is no longer worse than
 our private one. The private report then becomes one
 consumer of a public mechanism.</p>
+<p><strong>Phase 8 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
+accumulated diff of every phase in this plan against
+<code>develop</code>, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the

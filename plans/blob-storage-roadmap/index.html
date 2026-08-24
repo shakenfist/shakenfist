@@ -12774,6 +12774,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-4-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13596,6 +13607,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-4-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13861,6 +13883,15 @@
 <li>BLAKE3 hashing for efficient chunk identification (schema already supports it)</li>
 <li>Content-defined chunking only for new uploads; existing blobs can be lazily re-chunked</li>
 </ul>
+<hr />
+<h3 id="phase-4-push-audit">Phase 4: Push audit<a class="headerlink" href="#phase-4-push-audit" title="Permanent link">&para;</a></h3>
+<p><strong>Goal</strong>: Run the checks in <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this
+roadmap against <code>develop</code>, rather than the last phase's diff alone, so that what the phases did
+to each other is caught.</p>
+<p><strong>Status</strong>: Not started</p>
+<p><strong>Prerequisites</strong>: Phases 1-3</p>
+<p>Findings land as their own pull request, and this roadmap is not complete until each is resolved
+or declined in writing here. If the audit finds nothing, that is recorded in one sentence.</p>
 <hr />
 <h2 id="design-decisions">Design Decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
 <h3 id="why-composite-blobs-instead-of-a-separate-contentstore">Why Composite Blobs Instead of a Separate ContentStore?<a class="headerlink" href="#why-composite-blobs-instead-of-a-separate-contentstore" title="Permanent link">&para;</a></h3>

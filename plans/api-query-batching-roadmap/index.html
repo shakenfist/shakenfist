@@ -12646,6 +12646,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-4-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13390,6 +13401,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-4-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13579,6 +13601,13 @@ related data it needs, and the API layer automatically batches those fetches.</p
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>            <span class="p">)</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="p">]</span>
 </code></pre></div>
+<h3 id="phase-4-push-audit">Phase 4: Push audit<a class="headerlink" href="#phase-4-push-audit" title="Permanent link">&para;</a></h3>
+<p>Run the checks in <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
+this roadmap against <code>develop</code>, not the last phase's diff alone -- what the
+phases did to each other is only visible in the whole. Findings land as their
+own pull request, and this roadmap is not complete until each is resolved or
+declined in writing here. If the audit finds nothing, that is recorded in one
+sentence.</p>
 <h2 id="alternative-approaches-considered">Alternative Approaches Considered<a class="headerlink" href="#alternative-approaches-considered" title="Permanent link">&para;</a></h2>
 <h3 id="denormalized-cache-tables">Denormalized Cache Tables<a class="headerlink" href="#denormalized-cache-tables" title="Permanent link">&para;</a></h3>
 <p>For frequently-accessed data like valid checksums, a denormalized table could

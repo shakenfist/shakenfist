@@ -13203,6 +13203,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-6-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13646,6 +13657,11 @@ every consumer, so that:</p>
 <td>PLAN-cluster-op-visibility-phase-05-coverage-docs.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>6. Push audit</td>
+<td>PLAN-cluster-op-visibility-phase-06-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <h3 id="phase-1b-atomic-cluster_operation_targets-writes-done-in-the-phase-1-pr">Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)<a class="headerlink" href="#phase-1b-atomic-cluster_operation_targets-writes-done-in-the-phase-1-pr" title="Permanent link">&para;</a></h3>
@@ -13786,6 +13802,13 @@ observational op does not change
   for the new column and field, <code>docs/plans/index.md</code>
   status updates.</li>
 </ul>
+<h3 id="phase-6-push-audit">Phase 6: Push audit<a class="headerlink" href="#phase-6-push-audit" title="Permanent link">&para;</a></h3>
+<p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every
+phase in this plan against <code>develop</code>, not the last phase's
+diff alone. Findings land as their own pull request, and
+the plan is not complete until each is resolved or declined
+in writing here. If the audit finds nothing, that is
+recorded in one sentence.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the

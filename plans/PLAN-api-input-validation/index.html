@@ -13649,6 +13649,11 @@ declarations are good enough to compile.</p>
 <td>Not started</td>
 <td>Enforce <code>required</code> — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936</td>
 </tr>
+<tr>
+<td>7: Push audit</td>
+<td>Not started</td>
+<td>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
+</tr>
 </tbody>
 </table>
 <h3 id="where-the-tracked-issues-stand">Where the tracked issues stand<a class="headerlink" href="#where-the-tracked-issues-stand" title="Permanent link">&para;</a></h3>

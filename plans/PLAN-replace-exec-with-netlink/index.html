@@ -13764,6 +13764,11 @@ rules. Phase 0 picks between the two nftables options.</p>
 <td>PLAN-replace-exec-with-netlink-phase-06-cleanup.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>7. Push audit</td>
+<td>PLAN-replace-exec-with-netlink-phase-07-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <p>Notes on sequencing:</p>
@@ -13818,6 +13823,13 @@ rules. Phase 0 picks between the two nftables options.</p>
   explicitly documented as "intentionally still exec'd
   because…" — for example, an in-process ARP-frame send
   might be deemed not worth the complexity for one site.</li>
+<li><strong>Phase 7 is the push audit.</strong> It runs <code>PUSH-AUDIT.md</code>
+  over the accumulated diff of every phase in this plan
+  against <code>develop</code>, not the last phase's diff alone.
+  Findings land as their own pull request, and the plan
+  is not complete until each is resolved or declined in
+  writing here. If the audit finds nothing, that is
+  recorded in one sentence.</li>
 </ul>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>

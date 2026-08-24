@@ -13325,6 +13325,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-10-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 10: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13933,6 +13944,12 @@ Recommendations are recorded inline.</p>
 <td>PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside)</td>
 <td>Complete</td>
 </tr>
+<tr>
+<td>10. Push audit</td>
+<td>all</td>
+<td>PLAN-kerbside-vdi-tokens-phase-10-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <h3 id="phase-0-decisions-and-token-format">Phase 0: Decisions and token format<a class="headerlink" href="#phase-0-decisions-and-token-format" title="Permanent link">&para;</a></h3>
@@ -14114,6 +14131,13 @@ static or hand-seeded console) is required.</p>
 <li>The SF mint path (phase 7's <code>test_vdi_tokens.py</code>) activates
   here too, once <code>KERBSIDE_URL</code> is provisioned.</li>
 </ul>
+<h3 id="phase-10-push-audit">Phase 10: Push audit<a class="headerlink" href="#phase-10-push-audit" title="Permanent link">&para;</a></h3>
+<p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase
+in this plan against each repository's default branch, not the
+last phase's diff alone. Findings land as their own pull
+request, and the plan is not complete until each is resolved
+or declined in writing here. If the audit finds nothing, that
+is recorded in one sentence.</p>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <p>None hard. This plan is independent of the BYO-MariaDB /
 remove-primary thread — it uses <code>cluster_config</code> as it exists

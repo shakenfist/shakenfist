@@ -13508,6 +13508,11 @@ decisions document.</p>
 <td>PLAN-embrace-tls-phase-07-dev-ca.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>8. Push audit</td>
+<td>PLAN-embrace-tls-phase-08-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <p>Notes on sequencing:</p>
@@ -13529,6 +13534,13 @@ decisions document.</p>
 <li><strong>Phases 3-5 are parallel-eligible</strong> once phase 2's
   pattern is established, but probably better sequenced
   serially to keep CI green.</li>
+<li><strong>Phase 8 is the push audit.</strong> It runs <code>PUSH-AUDIT.md</code>
+  over the accumulated diff of every phase in this plan
+  against <code>develop</code>, not the last phase's diff alone.
+  Findings land as their own pull request, and the plan
+  is not complete until each is resolved or declined in
+  writing here. If the audit finds nothing, that is
+  recorded in one sentence.</li>
 </ul>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <p>This plan <strong>depends on <code>PLAN-remove-primary.md</code> having

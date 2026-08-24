@@ -13719,6 +13719,11 @@ table entirely (decision D8).</p>
 <td>PLAN-scheduler-reservations-phase-08-docs.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>9. Push audit</td>
+<td>PLAN-scheduler-reservations-phase-09-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <h3 id="phase-status-notes">Phase status notes<a class="headerlink" href="#phase-status-notes" title="Permanent link">&para;</a></h3>
@@ -13893,6 +13898,12 @@ reads the new events.</p>
 capacity (including the two service classes and the
 reconciler), developer-guide write-up of the guarded-UPDATE
 idiom (D10), user-facing affinity migration notes.</p>
+<p><strong>Phase 9 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
+accumulated diff of every phase in this plan against
+<code>develop</code>, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.</p>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong><code>PLAN-sql-pushdown-filtering</code> is the existing precedent</strong>

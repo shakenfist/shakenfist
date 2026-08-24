@@ -13537,8 +13537,19 @@ look like:)</p>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>8. Push audit</td>
+<td>PLAN-recurring-operations-phase-08-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
+<p><strong>Phase 8 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
+accumulated diff of every phase in this plan against
+<code>develop</code>, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.</p>
 <p>This plan is currently in stub form. It exists primarily
 to anchor a future-work reference in
 <code>PLAN-network-facade.md</code> and to capture the framing for

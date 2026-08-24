@@ -13311,6 +13311,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -14497,6 +14514,14 @@ which features from the inventory are in scope for Phase 1.</p>
 QMP plumbing should not assume libvirt is the owner of the
 QEMU process, so that if SF ever takes over supervision the
 QMP layer above it doesn't have to change.</p>
+<h3 id="push-audit">Push audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h3>
+<p>Whatever the phase table settles into, the last phase is the
+push audit. It runs <code>PUSH-AUDIT.md</code> over the accumulated diff
+of every phase in this plan against <code>develop</code>, not the last
+phase's diff alone. Findings land as their own pull request,
+and this plan is not complete until each is resolved or
+declined in writing here. If the audit finds nothing, that is
+recorded in one sentence.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <p><em>(Placeholder — this plan is still exploratory. The
 execution model, planning effort, step-level guidance, and

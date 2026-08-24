@@ -14334,6 +14334,12 @@ not land anywhere else.</p>
 <td>TBD</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>10. Push audit</td>
+<td>shakenfist</td>
+<td>PLAN-oidc-authentication-phase-10-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Phase 0 — research and decisions.</strong> Settles open question
@@ -14446,6 +14452,12 @@ validation and no use at all for testing a flow. This phase
 stands up a real IdP in a container and drives a login
 through it headlessly, which is also the only honest test of
 phase 3's discovery and of phase 8's worked examples.</p>
+<p><strong>Phase 10 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
+accumulated diff of every phase in this plan against
+<code>develop</code>, not the last phase's diff alone. Findings land as
+their own pull request, and the plan is not complete until
+each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the

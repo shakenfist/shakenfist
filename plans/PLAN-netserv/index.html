@@ -13148,6 +13148,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13299,6 +13310,13 @@ frozen.</p>
 <li><code>PLAN-remove-syslog-forwarding.md</code> — the syslog direction that a
   per-network syslog listener would eventually serve.</li>
 </ul>
+<h3 id="push-audit">Push audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h3>
+<p>When this thoughtbubble is promoted to a real plan and phases are cut, the
+last of them is the push audit. It runs <code>PUSH-AUDIT.md</code> over the accumulated
+diff of every phase in the plan against <code>develop</code>, not the last phase's diff
+alone. Findings land as their own pull request, and the plan is not complete
+until each is resolved or declined in writing here. If the audit finds
+nothing, that is recorded in one sentence.</p>
 
 
 

@@ -13854,6 +13854,12 @@ the slot at all.</p>
 <td>Not started</td>
 <td>Docs (state machine, operator + developer guides), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below)</td>
 </tr>
+<tr>
+<td>8</td>
+<td></td>
+<td>Not started</td>
+<td>Push audit: runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
+</tr>
 </tbody>
 </table>
 <p>Each phase gets its own detailed plan file before implementation.

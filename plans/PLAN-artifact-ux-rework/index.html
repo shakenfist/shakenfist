@@ -13420,6 +13420,12 @@ resolved. A plausible decomposition, <em>for discussion only</em>:</p>
 </tr>
 </tbody>
 </table>
+<h3 id="push-audit">Push audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h3>
+<p>However the later phases are cut, the last one is the push audit. It runs
+<code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against
+<code>develop</code>, not the last phase's diff alone. Findings land as their own pull
+request, and this plan is not complete until each is resolved or declined in
+writing here. If the audit finds nothing, that is recorded in one sentence.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <p>This plan follows the standard Shaken Fist planning workflow described in
 <code>PLAN-TEMPLATE.md</code>: all implementation work is done by sub-agents, the
