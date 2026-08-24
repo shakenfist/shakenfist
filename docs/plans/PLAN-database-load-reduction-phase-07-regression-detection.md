@@ -2,9 +2,12 @@
 
 Master plan: [PLAN-database-load-reduction.md](PLAN-database-load-reduction.md)
 
-**Status: In progress.** Planned 2026-08-19 alongside phase 6, and
-re-surveyed 2026-08-25 once phase 6 landed. See "What the survey
-found" below for what that changed.
+**Status: In progress.** Planned 2026-08-19 alongside phase 6,
+re-surveyed 2026-08-25 once phase 6 landed, and implemented the same
+day. All five steps are committed and every Definition of done item
+except functional CI is checked; see "What the survey found" for what
+the re-survey changed and "What implementation found" for the two
+things the plan did not anticipate.
 
 ## Why this phase exists
 
@@ -263,6 +266,57 @@ expectation that phase 6 withdrew.
 | 7d | medium | sonnet | none | **`sf-ctl database-load`.** A subcommand in `shakenfist/client/ctl.py` (see the `@click.command()` pattern at `:180` onwards) that scrapes every `MARIADB_GATEWAY_HOSTS` entry on `MARIADB_GATEWAY_METRICS_PORT` — read from config, not hardcoded — twice over a `--window` (default 60s), diffs, and prints a table of `(operation, caller_daemon)`, measured QPS, modelled QPS from the budget for this cluster's node and instance counts, and the ratio — sorted by excess, not by absolute rate, because excess is what a deployer needs to see. Support `--json` for scripting. It must degrade honestly: if a tier node is unreachable, say which and report on the rest rather than silently under-reporting. Flag provisional entries in the output so a deployer is not told to file an issue we already have. Register it with `cli.add_command()` alongside `gateway_health` (`ctl.py:518`), which is the closest existing precedent — same shape of command, and it shows `sf-ctl` reaching the tier from a node. This is the no-monitoring-stack path from decision 5 and the thing to ask for in a bug report. |
 | 7e | medium | sonnet | none | **Fix the public dashboard and document the model.** `examples/grafana-dashboard.json` still has `etcd Traffic` and `etcd DB Size` panels for a component that no longer exists — remove them, and add per-caller database load panels driven by `database_requests_total` so the public dashboard is not strictly worse than the private one. Then add a "Understanding database load" section to `docs/operator_guide/database.md` covering: the decomposition (per-node base, per-standing-object coefficient, activity remainder) and why an absolute number is not a useful expectation; how to read `sf-ctl database-load`; where the drop-in Prometheus rules go; and what to do when a pair exceeds its budget, which is to file an issue with the `sf-ctl --json` output attached. Keep it operator-facing — the derivation and the history belong in the plan documents, and this section links to them rather than restating them. |
 
+## What implementation found
+
+Two things the plan did not anticipate, both caught by checking output
+against real data rather than by reasoning about it.
+
+**The budget's inclusion cut has to sit below the unbudgeted threshold.**
+7a derived at 0.30/s, which seemed a reasonable place to stop: 73 pairs
+carrying 93% of load, and everything below covered by the "any unbudgeted
+pair above 0.25/s is a new poll" rule. Evaluating 7c's generated rules
+against sfcbr's own one-day rates showed five pairs that would have fired
+`ShakenFistUnbudgetedDatabasePolling` immediately —
+`GetObjectsByState`/cluster, `GetNamespaceAttributes`/api,
+`GetClusterOperation`/queues, `GetDnsMasq`/net and
+`SetObjectState`/queues. None is a new poll. Each was simply under 0.30/s
+across a window averaging 18 standing instances and over 0.25/s once the
+same cluster reached 32. An inclusion cut above the threshold that
+decides what counts as new traffic can only produce that. Re-deriving at
+0.10/s takes the budget to 105 pairs and 97.2% of load, leaves the largest
+unbudgeted pair at 0.099/s, and both alerts now evaluate to nothing on
+sfcbr. Shipping rules that fire on the cluster they were derived from
+would have been the production version of the flaky-check problem in
+decision 3: an alert that always fires gets silenced, and a silenced
+alert still reads as coverage.
+
+**A CI cluster is never idle, because stestr runs the suite in
+parallel.** 7b's brief said to quiesce and measure an idle window. There
+is no idle window: other workers are creating and deleting things
+throughout, and a single window cannot tell a new polling loop from the
+test in the next worker. The check now measures two consecutive windows
+and considers only pairs that ran at the same rate in both, which is a
+better expression of what the ratchet actually knew — the question is not
+"how much load is there" but "is any of this load metronomic". The
+tolerance is wide enough that a loop with a one minute period straddling
+two sixty second windows still counts, which is asserted directly.
+
+Three smaller notes. The elected cluster daemon's contribution to the
+positive control could not be verified against production, because #3874
+merged about an hour before the measurement window closed and sfcbr had
+not deployed it — `GetNodeDaemonState`/cluster still read exactly 5/6 of
+its siblings. That entry is therefore arithmetic about the code rather
+than a fit, `tools/derive-database-load-budget.py` carries the override in
+`CODE_DERIVED_TERMS` so a re-derivation cannot silently revert it, and a
+unit test asserts it against `DAEMON_STATE_POLL_INTERVAL` itself. The
+rules generator initially rendered the *previous* budget because running
+a script in `tools/` resolves `shakenfist` from site-packages rather than
+the checkout; the drift test caught it, which is the reason it exists.
+And the whole scrape-and-model path was exercised against the live sfcbr
+tier: 201.2/s measured against 177.6/s modelled at six nodes and 32
+standing instances, nothing over budget, at a cluster shape well outside
+the range the coefficients were fitted over.
+
 ## Risks and mitigations
 
 * **The budget encodes the regression.** If 7a is derived before phase 6
@@ -311,9 +365,11 @@ expectation that phase 6 withdrew.
 ## Definition of done
 
 Each item names the check that settles it. All of these were run at
-planning time and every one currently reports "not done", which is what
-makes them worth keeping — a criterion that already passes before the
-work starts is not a criterion.
+planning time and every one reported "not done", which is what makes
+them worth keeping — a criterion that already passes before the work
+starts is not a criterion. They were all run again after
+implementation; every one passes except functional CI, which needs
+the branch pushed.
 
 * **The budget exists, validates, and ships.** `shakenfist/data/
   database_load_budget.yaml` parses; every entry carries a base or a
@@ -326,9 +382,9 @@ work starts is not a criterion.
       unzip -l /tmp/wheel/*.whl | grep database_load_budget.yaml
   ```
 
-  must print a line. *(Checked 2026-08-25: the file does not exist, and
-  the wheel build itself works — 555 entries, including
-  `shakenfist/kerbside/*.md`, which is the evidence that a git-tracked
+  must print a line. *(Done: it does. At planning time the file did not
+  exist, and the wheel carried 555 entries including
+  `shakenfist/kerbside/*.md`, which was the evidence that a git-tracked
   data file ships without a `package-data` entry.)*
 * **The budget's levels are post-phase-6.** Its `_doc` block names the
   measurement window, the cluster shape it was taken on, and the fact that
@@ -343,8 +399,9 @@ work starts is not a criterion.
 * **The check runs in PR CI, not only in the merge queue.** The new test
   is defined in `database_tier.py`'s `DatabaseTierTestsMixin`, so
   `grep -c 'def test_' shakenfist/deploy/shakenfist_ci/cluster_ci_tests/
-  test_database_tier.py` still reports 1. *(Checked 2026-08-25: reports 1
-  today.)*
+  test_database_tier.py` still reports 1. *(Done: still 1. The new check
+  is `test_no_unbudgeted_fixed_rate_database_polling`, in
+  `DatabaseTierTestsMixin`, which both suites subclass.)*
 * **The rules cannot drift from the budget.** A test regenerates
   `examples/prometheus-database-load-rules.yaml` from the committed budget
   and asserts byte equality with the committed rules, and it fails if
@@ -358,7 +415,7 @@ work starts is not a criterion.
 * **The public dashboard is no longer worse than useless.** `grep -c etcd
   examples/grafana-dashboard.json` reports 0 and `grep -c
   database_requests_total examples/grafana-dashboard.json` reports more
-  than 0. *(Checked 2026-08-25: 6 and 0 respectively.)*
+  than 0. *(Done: 0 and 1. At planning time it was 6 and 0.)*
 * **The operator can answer "is this normal for my cluster?" from the
   docs.** `docs/operator_guide/database.md` gains a load-model subsection
   after "Attributing database load to callers" (`:294`) covering the
