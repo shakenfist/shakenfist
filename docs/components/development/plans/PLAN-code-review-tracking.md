@@ -451,6 +451,29 @@ becomes yet another thing the consistency audits check for:
 4. Roll out to further codebases as first passes are scheduled.
 5. Revisit the open questions above with real experience.
 
+### Phase 5: Push audit
+
+Run `PUSH-AUDIT.md` over the accumulated diff of every phase in
+this plan against `main`, not over the last phase's diff alone --
+the interactions between phases are most of what a whole-plan
+audit is for.
+
+Phases 0--2 are already on `main`, so `git diff main` for this plan
+is empty and would read as a clean audit. Derive the range instead:
+from the merge base of phase 0's first commit to `main`, restricted
+to the paths this plan touched, and name the commit range here when
+the phase runs.
+
+Phase 4's rollout lands in other repositories, so each rollout pull
+request carries its own audit against that repository's default
+branch -- which is `develop`, not `main`, in shakenfist and ryll.
+
+Findings land as their own pull request; the plan is not complete
+until each is resolved or declined in writing, with the reason
+recorded here. If the audit finds nothing, say so in one sentence:
+that is a real result, and a run of them is the evidence for making
+this phase conditional rather than mandatory.
+
 ## Administration and logistics
 
 ### Success criteria

@@ -123,11 +123,24 @@ YAML.
 
 The workflow, and the staging fix that made it able to open a pull
 request, predate this table and were tracked inline in the sections
-above. Phase 1 is the remaining close-out.
+above. Phase 1 is the remaining close-out; phase 2 is the push
+audit that ends every master plan.
 
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | In progress |
+| 2. Push audit | [PLAN-fuzz-autofix-phase-02-push-audit.md](/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/) | Not started |
+
+### 2. Push audit
+
+This phase runs `PUSH-AUDIT.md` over this plan's accumulated
+diff against `develop` — every phase's work together, not phase 1's
+diff alone, because the workflow, the stager and its tests were built
+across separate branches and what they did to each other is only
+visible in the sum. Findings land as their own pull request against
+`develop`, and this plan is not complete until each one is fixed or
+declined in writing here, with the reason. If the audit finds nothing,
+that gets recorded in one sentence and the plan closes.
 
 ## Prompt
 
