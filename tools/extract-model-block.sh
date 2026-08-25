@@ -31,12 +31,17 @@
 #   marker mid-sentence is therefore not a terminator; this file is
 #   itself a plausible subject for an automated fix whose description
 #   would name these tokens.
-# - A code fence is stripped only when it wraps the whole block. The
-#   prompt illustrates the blocks inside fences while telling the model
-#   not to use them, so a model which copies the illustration would
-#   otherwise have its entire pull request body rendered as one
-#   preformatted lump. Stripping fences globally is not an option: a
-#   description may legitimately contain fenced code.
+# - A code fence is stripped only when it wraps the whole block, which
+#   means the first and last lines are a fence pair AND are the only
+#   fences present. The prompt illustrates the blocks inside fences
+#   while telling the model not to use them, so a model which copies
+#   the illustration would otherwise have its entire pull request body
+#   rendered as one preformatted lump. Stripping fences globally is not
+#   an option: a description may legitimately contain fenced code. Nor
+#   is testing only the first and last lines: a description which opens
+#   with one fenced block and closes with a different one would lose
+#   the outer markers of two unrelated fences, inverting every fence
+#   after the first.
 
 set -e
 
@@ -89,9 +94,16 @@ trim_blank_lines() {
 
 trim_blank_lines "${output}"
 
+# The first and last lines looking like a fence pair is not enough:
+# a description which opens with one fenced block and closes with a
+# different one would have its outer markers deleted, inverting every
+# fence after the first. The block is only a wrapped one if those two
+# lines are the ONLY fences in it.
 first=$(head -1 "${output}")
 last=$(tail -1 "${output}")
+fences=$(grep -c '^[[:space:]]*```' "${output}" || true)
 if [ "$(wc -l < "${output}")" -ge 2 ] && \
+   [ "${fences}" -eq 2 ] && \
    [[ "${first}" =~ ^\`\`\`[a-zA-Z0-9_+-]*$ ]] && \
    [ "${last}" == '```' ]
 then

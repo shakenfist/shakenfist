@@ -724,12 +724,24 @@ jobs:
           # which is unit tested in test_extract_model_block.py. The
           # parsing is subtle enough -- repeated blocks, truncated
           # blocks, fences the model was told not to emit -- that having
-          # it inline here means having it untested here. Run it from a
-          # copy outside the workspace for the same reason as the model
-          # wrapper above: Claude has just edited this checkout and may
-          # have touched tools/.
-          cp tools/extract-model-block.sh ${{ runner.temp }}/
-          cp tools/neutralise-pr-body.sh ${{ runner.temp }}/
+          # it inline here means having it untested here.
+          #
+          # These come from HEAD rather than from the workspace, which
+          # is NOT the reason the model wrapper above is copied. That
+          # one is copied before Claude runs, because bash reads a
+          # script lazily and an edit mid-run would corrupt it. Here
+          # Claude has already exited and the danger is the opposite:
+          # the fix under test may have edited these very files -- the
+          # extractor's own header calls that out as a plausible
+          # subject for an automated fix -- and the workflow must not
+          # parse the model's output with the untested version the
+          # model just wrote. Nothing is committed until the "Commit
+          # changes" step below, so HEAD is still the pre-fix tree.
+          for script in extract-model-block.sh neutralise-pr-body.sh; do
+            git show "HEAD:tools/${script}" \
+              > "${{ runner.temp }}/${script}"
+            chmod +x "${{ runner.temp }}/${script}"
+          done
 
           summary_found=false
           description_found=false
@@ -848,7 +860,16 @@ jobs:
           # and passed with --body-file. It must never be interpolated
           # into a shell string: an unquoted heredoc would execute any
           # $(...) or backticks the model happened to write.
+          #
+          # The issue reference goes FIRST, above the model prose. An
+          # unbalanced code fence in the description renders everything
+          # after it as preformatted text, and GitHub does not autolink
+          # #NNNN inside a code block -- so a trailing reference would
+          # silently stop closing the issue, with nothing about the
+          # published PR looking wrong.
           {
+            echo "Fixes #${ISSUE_NUMBER}"
+            echo
             if [ "${{ steps.extract_summary.outputs.description_found }}" == "true" ]; then
               cat ${{ runner.temp }}/pr-description.txt
             elif [ -s ${{ runner.temp }}/summary-body.txt ]; then
@@ -863,8 +884,6 @@ jobs:
               echo "the diff rather than this."
             fi
 
-            echo
-            echo "Fixes #${ISSUE_NUMBER}"
             echo
             echo "## Changes"
             echo

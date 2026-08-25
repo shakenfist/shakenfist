@@ -27,7 +27,9 @@
 #
 # Fenced code is passed through untouched: GitHub does not linkify
 # inside a fence, so there is nothing to defuse, and a description
-# quoting a decorator or an email address should survive intact.
+# quoting a decorator or an email address should survive intact. A
+# fence left open at the end of the body is closed, so it cannot run on
+# into the sections the workflow appends after it.
 
 set -e
 
@@ -84,6 +86,11 @@ awk '
     /^[[:space:]]*```/ { infence = !infence; print; next }
     infence { print; next }
     { print defuse_mentions(defuse_closes($0)) }
+
+    # A fence the model opened and never closed would otherwise run on
+    # into the sections the workflow appends after this body, rendering
+    # the diffstat and the footer as one preformatted lump.
+    END { if (infence) { print "```" } }
 ' "${target}" > "${target}.neutralised"
 
 mv "${target}.neutralised" "${target}"

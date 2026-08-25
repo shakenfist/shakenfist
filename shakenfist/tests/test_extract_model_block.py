@@ -71,6 +71,39 @@ class ExtractModelBlockTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, rc)
         self.assertEqual('Fix the thing.\n\nBody line.\n', got)
 
+    def test_two_separate_fenced_blocks_keep_their_fences(self):
+        # The wrapping-fence check must confirm the first and last lines
+        # are the ONLY fences. Testing just those two lines deletes the
+        # outer markers of two unrelated fenced blocks, which inverts
+        # every fence after the first in the published body.
+        body = (
+            '```python\n'
+            'x = 1\n'
+            '```\n'
+            '\n'
+            'Some prose here.\n'
+            '\n'
+            '```python\n'
+            'y = 2\n'
+            '```\n')
+        rc, got = self._extract('PR_DESCRIPTION', (
+            'PR_DESCRIPTION_START\n' + body + 'PR_DESCRIPTION_END\n'))
+        self.assertEqual(0, rc)
+        self.assertEqual(body, got)
+
+    def test_an_odd_number_of_fences_is_not_stripped(self):
+        # Ambiguous, so leave it alone rather than guess.
+        body = (
+            '```\n'
+            'x = 1\n'
+            '```\n'
+            '\n'
+            '```\n')
+        rc, got = self._extract('PR_DESCRIPTION', (
+            'PR_DESCRIPTION_START\n' + body + 'PR_DESCRIPTION_END\n'))
+        self.assertEqual(0, rc)
+        self.assertEqual(body, got)
+
     def test_a_second_complete_block_is_ignored(self):
         # A range match prints every occurrence, so this used to publish the
         # interior marker lines verbatim.

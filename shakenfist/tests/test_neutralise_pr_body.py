@@ -154,6 +154,17 @@ class NeutralisePrBodyTestCase(base.ShakenFistTestCase):
             'The publish step is still untested shell.\n')
         self.assertEqual(body, self._neutralise(body))
 
+    def test_an_unterminated_fence_is_closed(self):
+        # Otherwise it runs on into the diffstat and footer the workflow
+        # appends after this body, rendering them as one grey lump.
+        self.assertEqual(
+            'Before.\n\n```python\nx = 1\n```\n',
+            self._neutralise('Before.\n\n```python\nx = 1\n'))
+
+    def test_a_balanced_body_gains_no_fence(self):
+        body = 'Before.\n\n```python\nx = 1\n```\n\nAfter.\n'
+        self.assertEqual(body, self._neutralise(body))
+
     def test_a_missing_file_is_rejected(self):
         with tempfile.TemporaryDirectory() as tempdir:
             proc = subprocess.run(
