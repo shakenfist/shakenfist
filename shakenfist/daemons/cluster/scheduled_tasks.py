@@ -1022,10 +1022,31 @@ def reconcile_scheduler_capacity() -> None:
             'Scheduler capacity reconcile pass failed')
         return
 
+    # Drift is the whole point of the reconcile pass: it recomputes the
+    # used_* counters from ground truth and silently overwrites whatever
+    # the incremental admit/release path had left behind. The reply
+    # carries the per-node before/after difference, so summarise it here
+    # -- without this the pass logs membership and timing only, and a
+    # correction of a used_* counter leaves no trace at all. That made
+    # "the reconciler reports zero drift" unverifiable from logs during
+    # the phase 4a soak, which is why this exists.
+    drifted_nodes = 0
+    drift_magnitude = {resource: 0 for resource in CAPACITY_RESOURCES}
+
     seen_nodes = set()
     for node in reply['nodes']:
         node_uuid = node['node_uuid']
         seen_nodes.add(node_uuid)
+        deltas = {resource: node.get('delta_used_%s' % resource, 0)
+                  for resource in CAPACITY_RESOURCES}
+        if any(deltas.values()):
+            drifted_nodes += 1
+            for resource, delta in deltas.items():
+                drift_magnitude[resource] += abs(delta)
+            LOG.with_fields({
+                'node': node_uuid,
+                **{'delta_used_%s' % r: d for r, d in deltas.items()}
+            }).warning('Scheduler capacity counters drifted, corrected')
         for resource in CAPACITY_RESOURCES:
             SCHEDULER_CAPACITY_NODE_LIMIT.labels(
                 node=node_uuid, resource=resource).set(node[f'limit_{resource}'])
@@ -1068,5 +1089,7 @@ def reconcile_scheduler_capacity() -> None:
         'nodes_added': reply['nodes_added'],
         'nodes_removed': reply['nodes_removed'],
         'claims_expired': reply['claims_expired'],
+        'drifted_nodes': drifted_nodes,
+        **{'drift_%s' % r: m for r, m in drift_magnitude.items()},
         'duration': duration
     }).info('Scheduler capacity reconcile pass complete')

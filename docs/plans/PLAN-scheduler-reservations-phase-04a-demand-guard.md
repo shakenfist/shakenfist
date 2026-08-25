@@ -394,8 +394,8 @@ one dimension.
 | 2 | medium | opus | worktree | Live coverage, in `tests/test_mariadb_capacity_admission_live.py` beside `test_the_demand_clause_refuses_on_measured_load` (`:416`) and `test_the_demand_clause_passes_on_null_metrics` (`:436`). Two tests against a real server: a node with `cpu_schedulable = 1` and zero load admits an 8-vCPU instance (the #3813 case at the smallest supported size), and a node whose `expected_demand` already exceeds `target_load x cpu_schedulable` refuses, with the reply's demand dimension reporting `exceeded` true and the allocation dimensions all false so `demand_only` is true. Follow the file's existing fixture pattern for seeding `node_metrics` and `scheduler_node_capacity` rows; note the suite reports the server regime it ran under, and issue #3759 means CI does not exercise MariaDB 11 here. Commit subject: `tests: live coverage for the demand guard.` | Complete -- two existing live tests needed their premises restated, and the sweep landed here |
 | 3 | low | sonnet | worktree | The post-fix half of the plan corrections; the provenance corrections already landed in the planning commit and must not be redone (see *What the survey found*). In `PLAN-scheduler-reservations.md`, move the #3813 Future work entry -- including its 2026-08-22 correction -- into "Bugs fixed during this work", condensed to what a reader needs after the fact: the units error, the fix, and the phase that made it. Clear the "carries an outstanding defect" clause from the phase 3 status note now that it is false. Check the master plan's success criterion for D13 (`The D13 demand clause admits placements on a node that has real room for them, at every node size this project supports`) reads true against what shipped, and say so rather than deleting it. Commit subject: `docs: record the demand guard defect as fixed.` | Complete |
 | 4 | low | sonnet | worktree | Operator and developer documentation. In `docs/operator_guide/scheduler.md`, state what the demand term now does in one paragraph: it spreads correlated bursts by refusing nodes already at or above `SCHEDULER_TARGET_LOAD` per schedulable thread, it never refuses a node with real allocation room, and when every node is over target the waiver admits anyway rather than failing the create. Give the two constants and their measured provenance. In `docs/developer_guide/subsystem_internals.md`, update the admission-transaction description beside the placement one to carry the new clause and the `exceeded` divergence from step 1. Check `CLAUDE.md`'s scheduler capacity paragraph for anything the change falsifies and correct it if so; `ARCHITECTURE.md` and `AGENTS.md` only if the component inventory or a convention actually changed, which it should not have. Commit subject: `docs: the demand guard is a spreader, not a bound.` | Complete |
-| 5 | n/a | management session | none | Deploy to sfcbr and soak, discharging three outstanding obligations at once (E6): phase 3's step 9 soak, phase 4's step 10 operator review and soak with a real claim on a real namespace, and this phase's own validation. Run a CI burst and record, in this plan's Soak observations section: whether the demand clause now passes for some candidates and refuses others (read the `'schedule candidate refused by capacity guard'` audit events and check `enforce_demand` is true on refusals that were then admitted elsewhere); how often the P9 waiver event fires, which under E3 should be rare and only under genuine saturation; whether a burst spreads across hypervisors rather than piling on the top-ranked node; and that the reconciler reports zero drift across the burst. Then the phase 4 claim soak proper: create a claim for a namespace, run instances in it, confirm the drawdown and that `/admin/resources` and the tables agree. Phase 00a's own post-deploy question -- whether the network+database node still takes a disproportionate share -- can be observed from the same burst; record it in phase 00a's plan, not this one. | Not started -- operator |
-| 6 | low | sonnet | worktree | Close-out, after step 5 has been recorded. Set the phase 3, phase 4 and phase 4a rows to `Complete` in the master plan Execution table, remove the phase status notes that describe the soaks as outstanding, and confirm `docs/plans/index.md`'s row arithmetic is right for the new phase count (the phases column is arithmetic over the Execution table; adding 4a changes the denominator). Close #3813 with a comment naming the fix and the soak observation. Commit subject: `scheduler: close out phases 3, 4 and 4a.` | Not started -- gated on step 5 |
+| 5 | n/a | management session | none | Deploy to sfcbr and soak, discharging three outstanding obligations at once (E6): phase 3's step 9 soak, phase 4's step 10 operator review and soak with a real claim on a real namespace, and this phase's own validation. Run a CI burst and record, in this plan's Soak observations section: whether the demand clause now passes for some candidates and refuses others (read the `'schedule candidate refused by capacity guard'` audit events and check `enforce_demand` is true on refusals that were then admitted elsewhere); how often the P9 waiver event fires, which under E3 should be rare and only under genuine saturation; whether a burst spreads across hypervisors rather than piling on the top-ranked node; and that the reconciler reports zero drift across the burst. Then the phase 4 claim soak proper: create a claim for a namespace, run instances in it, confirm the drawdown and that `/admin/resources` and the tables agree. Phase 00a's own post-deploy question -- whether the network+database node still takes a disproportionate share -- can be observed from the same burst; record it in phase 00a's plan, not this one. | Complete -- deployed and soaked 2026-08-22 to 2026-08-24; the claim half needed a deliberate exercise, see the step notes |
+| 6 | low | sonnet | worktree | Close-out, after step 5 has been recorded. Set the phase 3, phase 4 and phase 4a rows to `Complete` in the master plan Execution table, remove the phase status notes that describe the soaks as outstanding, and confirm `docs/plans/index.md`'s row arithmetic is right for the new phase count (the phases column is arithmetic over the Execution table; adding 4a changes the denominator). Close #3813 with a comment naming the fix and the soak observation. Commit subject: `scheduler: close out phases 3, 4 and 4a.` | Complete |
 
 ### Step notes
 
@@ -428,6 +428,15 @@ one dimension.
   exactly 54 of the 80 cells against the pre-fix clause and seed, which
   is the figure computed from the arithmetic before any code was
   written.
+* **Step 5** could only half happen by waiting. The demand-guard
+  observations came from a 48-hour sfcbr window, as planned, and are
+  recorded in *Soak observations*. The phase 4 claim half could not:
+  nothing on sfcbr creates a namespace capacity claim on its own, so
+  the window produced zero claim requests, zero over-limit audit
+  events and zero expiries -- an absence, not a result. The pathway
+  was exercised deliberately instead, with
+  `tools/exercise-namespace-claims.py`. Waiting longer would not have
+  helped, and the plan should have said so when it wrote the step.
 * **Review round 1 (2026-08-22)** raised ten items, of which five
   changed the code. The mock database's demand comparison still
   implemented the pre-fix arithmetic, so the caller-side P9 waiver
@@ -569,7 +578,260 @@ Falsifiable, and mostly runnable:
 
 ## Soak observations
 
-_(Filled by step 5.)_
+### Pre-fix baseline (48h to 2026-08-23 06:19 UTC)
+
+Recorded before the phase 4a deploy, and not something the plan
+anticipated having. PR #3843 merged at 2026-08-22 11:26 UTC but sfcbr
+was not redeployed until 2026-08-23, so the two days of production
+traffic either side of the merge all ran the **old** clause. That makes
+this window a genuine control arm rather than a recollection, and the
+post-deploy numbers below are a measured delta rather than a judgement
+call.
+
+The window was confirmed to be pre-fix from the audit events
+themselves, not from deploy records. A refusal at 2026-08-23 06:19:17Z
+read:
+
+```
+{'dimension': 'demand', 'limit': 16.5, 'used': 9.36,
+ 'requested': 10.0, 'exceeded': True}
+```
+
+Both fields date the code. `requested: 10.0` for a 4-vCPU instance is
+2.5 per vCPU, the pre-retune `SCHEDULER_DEMAND_PER_VCPU`; the shipped
+default of 0.6 would read 2.4. And `exceeded: True` while
+`used 9.36 < limit 16.5` can only be `used + requested > limit`, the
+charged comparison this phase replaced with `charged=False`. Under the
+shipped code that node admits.
+
+**Every refusal was a demand refusal.** Across 3,904
+`schedule candidate refused by capacity guard` events, the count whose
+`exceeded` set contained any of `cpus`, `memory_mb` or `disk_gb` was
+zero:
+
+| node | cpu limit | refusals | demand-only |
+|------|-----------|----------|-------------|
+| `6046afdf` | 66 | 686 | 686 (100%) |
+| `f6b7e913` | 66 | 682 | 682 (100%) |
+| `bed5996d` | 30 | 669 | 669 (100%) |
+| `963d4df9` | 30 | 639 | 639 (100%) |
+| `f4ba9b6c` | 24 | 651 | 651 (100%) |
+| `7ce66641` | 18 | 577 | 577 (100%) |
+| **total** | | **3,904** | **3,904 (100%)** |
+
+This is #3813 stated as a measurement. The demand term was not one
+input to placement among several -- it was the *only* input that ever
+refused anything, on every node, at every size -- including the two
+largest, refusing a 4-vCPU request while holding 20 of an admissible
+66 vCPUs. The allocation dimensions the
+capacity tables exist to enforce never once bound.
+
+Consequently the P9 waiver, designed for genuine saturation, carried
+the majority of all traffic:
+
+| measure | pre-fix |
+|---------|---------|
+| placements | 1,052 |
+| P9 waivers (`enforce_demand` false) | 648 (**62%**) |
+| hourly waiver rate | 25% -- 86% |
+
+The hourly spread is worth keeping, because it sets the bar for what
+counts as evidence after the fix: an unchanged clause varies by a
+factor of three from hour to hour, so a one- or two-hour post-deploy
+sample cannot distinguish the fix from ordinary variance. The
+discriminating hours are the busy ones -- 2026-08-22 22:00Z placed 72
+instances at an 82% waiver rate.
+
+Placement concentrated on the two largest nodes, which is the spreading
+failure the term exists to prevent:
+
+| node | cpu limit | placements | share |
+|------|-----------|------------|-------|
+| `6046afdf` | 66 | 330 | 31% |
+| `f6b7e913` | 66 | 303 | 29% |
+| `bed5996d` | 30 | 130 | 12% |
+| `963d4df9` | 30 | 125 | 12% |
+| `f4ba9b6c` | 24 | 102 | 10% |
+| `7ce66641` | 18 | 62 | 6% |
+
+Two caveats on reading the concentration figure. It is *not* a clean
+measure of the demand term's spreading. With the guard refusing every
+candidate, 62% of placements were made by the P9 waiver's second
+`place_walk(False)`, which iterates the *same* ranked candidate list as
+the first (`external_api/instance.py:881-921`) but with the clause
+waived -- so it simply takes the highest-ranked candidate, and the
+demand term contributed nothing to where those instances went. The 60%
+on the top two nodes therefore reflects the scheduler's affinity-then-
+load-bucket ranking (`scheduler.py:653-691`) preferring the largest
+nodes, which is partly correct behaviour. What the fix should change is
+the *mechanism* before it changes the distribution: placements should
+be made by the first walk with `enforce_demand` true. Second, the node column here is capacity limit
+(vCPUs admitted at the 3.0 overcommit ratio), not physical size, so the
+66/30/24/18 spread is roughly a 22/10/8/6 thread spread.
+
+### Post-deploy observations
+
+Deployed to sfcbr on 2026-08-23 between 06:19Z (last event showing the
+old arithmetic) and 16:56Z (first showing the new). Measurements below
+cover 16:00Z 2026-08-23 to 18:00Z 2026-08-24, about 26 hours and 438
+placements, against the 48-hour 1,052-placement baseline above.
+
+**The deploy is confirmed from the events, not from deploy records.**
+Refusals now charge 0.6 per requested vCPU (`requested` reads 0.6 for a
+1-vCPU request, 1.2 for 2, 2.4 for 4), and across all 88 refusals there
+is no case of `exceeded` being true while `used <= limit` -- the
+comparison is `used > limit`, the `charged=False` form. Under the old
+constant those same requests would have been charged 2.5, 5.0 and 10.0.
+
+**Observation 1 -- the demand clause discriminates.** It does, though
+the honest headline is a rate change rather than a composition change.
+All 88 refusals are still demand-only; no refusal in either window was
+caused by `cpus`, `memory_mb` or `disk_gb`, because sfcbr never
+approaches those bounds. What changed is how often the clause fires at
+all:
+
+| | pre-fix | post-fix |
+|---|---|---|
+| refusals | 3,904 | 88 |
+| placements | 1,052 | 438 |
+| **refusals per placement** | **3.71** | **0.20** |
+
+An 18-fold reduction. Every one of the 88 carries `enforce_demand:
+true`, so they are first-walk refusals, and only 18 of them escalated
+to a waiver -- the rest were refused on one candidate and admitted on
+another, which is exactly the discrimination the clause was supposed to
+provide and never did. Every node still refuses sometimes and admits
+most of the time, including the 18-vCPU node that the old clause could
+never satisfy.
+
+**Observation 2 -- the P9 waiver is now rare.** This is the clearest
+result:
+
+| | pre-fix | post-fix |
+|---|---|---|
+| waiver rate | 648/1,052 = **62%** | 18/438 = **4.1%** |
+| hourly range | 25% -- 86% | 0% in 17 of 20 hours |
+
+Fourteen of the eighteen waivers fell in a single hour (2026-08-24
+06:00Z, 49 placements, 29%), with the remainder in two hours at 6% (3
+of 49) and 3% (1 of 31). The baseline's threefold hourly variance was the reason for
+insisting on a long sample, and it is what makes this readable: the
+post-fix distribution is not a quiet-hour artefact, because the busiest
+post-fix hours (50 placements at 19:00Z, 49 at 09:00Z) ran at 0% and
+6%, against a pre-fix busy hour of 72 placements at 82%. The waiver has
+gone back to being an exception under genuine burst pressure, which is
+what E3 kept it for.
+
+**Observation 3 -- burst distribution.** Placement moved off the
+top-ranked node and onto the smallest, which is the spreading the term
+exists to produce:
+
+| node | cpu limit | pre-fix | post-fix |
+|------|-----------|---------|----------|
+| `f6b7e913` | 66 | 28.8% | 30.6% |
+| `6046afdf` | 66 | 31.4% | **23.1%** |
+| `bed5996d` | 30 | 12.4% | 13.9% |
+| `963d4df9` | 30 | 11.9% | 14.6% |
+| `f4ba9b6c` | 24 | 9.7% | 8.7% |
+| `7ce66641` | 18 | 5.9% | **9.1%** |
+
+The top-ranked node shed 8.3 points and the smallest node gained 3.2,
+taking it from well under its capacity share to slightly over. Two
+honest qualifications. First, total absolute deviation from a
+capacity-proportional split actually rose, 7.5 to 13.5 points -- but
+capacity-proportional is not the target and never was. The clause
+spreads by measured load plus expected demand, so a node running hot is
+skipped whatever its size, and a deviation metric anchored on capacity
+will read that as a regression. Second, 438 placements across six nodes
+is a small sample and some of this spread is noise. The mechanism
+change is the durable finding; the distribution is corroborating, not
+load-bearing.
+
+**Observation 4 -- reconciler drift.** 299 reconcile passes over the
+window, every one seeing all six nodes, with `nodes_added`,
+`nodes_removed` and `claims_expired` all zero throughout and durations
+of 27ms/91ms/3787ms (min/median/max). No pass logged a correction.
+
+This is weaker evidence than the Definition of done implies, and the
+gap was in the instrumentation rather than the result.
+`reconcile_scheduler_capacity` recomputes the counters wholesale and
+used to log membership and timing but no before/after delta, so a
+silent correction of a `used_*` counter left no trace in the log.
+Proving zero drift needed the Prometheus gauges, which were not
+reachable from the analysis host. What can be said of the window is
+that the reconciler ran healthily every five minutes throughout, saw a
+stable cluster, and expired nothing -- which is consistent with zero
+drift but does not demonstrate it.
+
+The gap turned out to be smaller than it looked and is closed by this
+close-out rather than deferred. The per-node `delta_used_cpus` /
+`delta_used_memory_mb` / `delta_used_disk_gb` values were already in
+the `ReconcileSchedulerCapacity` reply; only the log line dropped them.
+The pass now warns per drifting node and carries `drifted_nodes` plus
+per-dimension `drift_*` magnitudes on the summary line
+(`daemons/cluster/scheduled_tasks.py`). Magnitudes are summed absolute
+rather than signed, so drift in opposite directions on two nodes adds
+instead of cancelling into an apparently healthy total.
+
+**This means the phase 3 zero-drift criterion was accepted on
+healthy-pass evidence, not on measured deltas.** A reader should not
+take phase 3's Complete as "checked". The next soak can check it
+properly, which is the point of fixing the instrumentation now rather
+than filing an issue against a plan already closed.
+
+**Observation 5 -- phase 4 claim drawdown: done deliberately, not by
+waiting.** The 48h window produced no claim activity at all: zero
+requests to `/auth/namespaces/<namespace>/claims`, zero `placement
+admitted over namespace capacity claim` audit events, and
+`claims_expired` zero in all 299 reconcile passes. That is not a soak
+result, it is an absence of one, and no amount of further waiting would
+have changed it -- nothing on sfcbr creates claims on its own. The
+pathway was therefore exercised on purpose, with
+`tools/exercise-namespace-claims.py` against sfcbr on 2026-08-24: 33
+checks, all passing, covering request validation, create, duplicate
+refusal, read and cross-namespace non-disclosure, field-masked update,
+re-dating, shrink-to-zero-and-back, drawdown against a real instance
+(`used_cpus=1 used_memory_mb=1024 used_disk_gb=8` after placement),
+the `below_usage` shrink refusal, expiry, and delete.
+
+One correction to that record, found in review. The run did **not**
+demonstrate the 507 capacity refusal, although an earlier draft of this
+section said it did. The impossible-claim check ran after the real
+claim already existed, and `create_namespace_claim` probes for an
+existing claim before it reaches the guarded `UPDATE` against
+`cluster_capacity`, so the request could only ever return the 409 for
+`exists`. The check had been widened to accept either status, which
+made it a no-500 smoke test rather than the capacity assertion its name
+promised. The check now runs before the claim is created, where
+capacity is the only thing that can refuse it, and asserts 507
+specifically. The 507 path itself was never untested -- `test_claims.py`
+and `test_mariadb_capacity_claims_live.py` cover it -- so what was wrong
+was this record, not the code.
+
+The expiry result is the one worth recording, because it is the only
+one that could not be reasoned out from the code. `coverage_state` is a
+stored column swept by the reconciler rather than computed on read, so
+a claim stays `active` past its own `expires_at` until a pass runs. The
+observed sweep latency was 210s, 280s and 321s across three runs
+against a five-minute reconcile interval -- the interval behaving as
+designed rather than a stall, and the spread is simply where in the
+cycle the claim happened to expire. Through that window the claim reads
+`state: created` while refusing a grow with 409 `not_active` -- D2's
+two-facts distinction visible from the outside, which is what the phase
+4 soak was for.
+
+Four bugs surfaced, all in the exercise script, none in the claims
+code. Three were assumptions about asynchronous object lifecycle: a
+non-existent default image, an instance created before its network left
+`initial`, and a namespace deleted before its network had finished
+going away. The fourth is worth recording as a testing lesson rather
+than a defect: the harness returned each check's detail string as its
+result, and callers used that as a "did this pass?" guard, so two
+checks whose implementation had no detail to report were silently
+skipped instead of run. They were never reported as skipped and never
+failed -- the run was green because the assertions did not execute.
+A passing check now returns `True` when it has no detail. The claims
+assertions themselves passed on their first run.
 
 ## Future work
 
