@@ -1361,7 +1361,9 @@ class ReapFederationRecordsTestCase(base.ShakenFistTestCase):
 
 def _capacity_node(node_uuid, limit_cpus=16, limit_memory_mb=32768,
                    limit_disk_gb=500, used_cpus=4, used_memory_mb=8192,
-                   used_disk_gb=100, expected_demand=2.5):
+                   used_disk_gb=100, expected_demand=2.5,
+                   delta_used_cpus=0, delta_used_memory_mb=0,
+                   delta_used_disk_gb=0):
     return {
         'node_uuid': node_uuid,
         'limit_cpus': limit_cpus,
@@ -1371,9 +1373,9 @@ def _capacity_node(node_uuid, limit_cpus=16, limit_memory_mb=32768,
         'used_memory_mb': used_memory_mb,
         'used_disk_gb': used_disk_gb,
         'expected_demand': expected_demand,
-        'delta_used_cpus': 0,
-        'delta_used_memory_mb': 0,
-        'delta_used_disk_gb': 0
+        'delta_used_cpus': delta_used_cpus,
+        'delta_used_memory_mb': delta_used_memory_mb,
+        'delta_used_disk_gb': delta_used_disk_gb
     }
 
 
@@ -1419,6 +1421,58 @@ class ReconcileSchedulerCapacityTaskTestCase(base.ShakenFistTestCase):
         st.SCHEDULER_CAPACITY_CLUSTER_TOTAL.clear()
         st.SCHEDULER_CAPACITY_CLUSTER_CLAIMED.clear()
         st.SCHEDULER_CAPACITY_CLUSTER_UNCLAIMED_USED.clear()
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity')
+    def test_zero_drift_is_reported_as_zero(self, mock_reconcile):
+        # The ordinary case, and the one that has to be distinguishable
+        # from "we did not look". A quiet pass must say drifted_nodes=0
+        # rather than say nothing, otherwise zero drift and absent
+        # instrumentation are the same log line -- which is exactly the
+        # ambiguity that left the phase 3 exit criterion uncheckable.
+        mock_reconcile.return_value = _capacity_reply(
+            [_capacity_node(NODE_UUID_1), _capacity_node(NODE_UUID_2)])
+
+        with mock.patch.object(st, 'LOG') as mock_log:
+            st.reconcile_scheduler_capacity()
+
+        fields = mock_log.with_fields.call_args[0][0]
+        self.assertEqual(0, fields['drifted_nodes'])
+        self.assertEqual(0, fields['drift_cpus'])
+        self.assertEqual(0, fields['drift_memory_mb'])
+        self.assertEqual(0, fields['drift_disk_gb'])
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.'
+        'mariadb.reconcile_scheduler_capacity')
+    def test_drift_is_counted_and_summed_by_magnitude(self, mock_reconcile):
+        # Drift in opposite directions on two nodes. The magnitudes must
+        # add rather than cancel: a cluster where one node over-counted
+        # by 3 cpus and another under-counted by 2 has drifted by 5, not
+        # by 1, and a signed sum would report the latter and read as
+        # nearly healthy.
+        mock_reconcile.return_value = _capacity_reply(
+            [_capacity_node(NODE_UUID_1, delta_used_cpus=3,
+                            delta_used_memory_mb=1024),
+             _capacity_node(NODE_UUID_2, delta_used_cpus=-2,
+                            delta_used_disk_gb=-40)])
+
+        with mock.patch.object(st, 'LOG') as mock_log:
+            st.reconcile_scheduler_capacity()
+
+        fields = mock_log.with_fields.call_args[0][0]
+        self.assertEqual(2, fields['drifted_nodes'])
+        self.assertEqual(5, fields['drift_cpus'])
+        self.assertEqual(1024, fields['drift_memory_mb'])
+        self.assertEqual(40, fields['drift_disk_gb'])
+
+        # Each drifting node is also named individually, so an operator
+        # can tell which counter went wrong rather than only that one
+        # did.
+        warned = [c for c in mock_log.with_fields.call_args_list
+                  if 'node' in c[0][0]]
+        self.assertEqual(2, len(warned))
 
     @mock.patch(
         'shakenfist.daemons.cluster.scheduled_tasks.'
