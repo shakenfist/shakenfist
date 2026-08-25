@@ -13185,10 +13185,15 @@ operations to run on that instance. These operations consist of a series of comm
 which are executed in return, with results for each being gathered as they execute.</p>
 <p>An operation also carries timing fields: <code>deadline</code> and <code>progress_timeout</code> are the
 caller's intent, and <code>last_progress</code> and <code>attempts</code> are the server's bookkeeping.
-All four read as <code>null</code> (or <code>0</code> for <code>attempts</code>) in the examples below, because no
-client can set them and nothing enforces them yet. Their meaning, including why
-<code>null</code> means "the server default applies" rather than "no deadline", is described
-in <a href="/operator_guide/database/">the database operator guide</a>.</p>
+<code>deadline</code> is an absolute unix timestamp, computed when the API server received the
+creating request; <code>progress_timeout</code> is a count of seconds, and reads <code>0</code> on an
+operation like the one below whose commands cannot report progress. Both are set
+from the optional parameters described in
+<a href="/developer_guide/api_reference/instances/#bounding-how-long-an-agent-operation-may-take">bounding how long an agent operation may take</a>.
+<code>last_progress</code> and <code>attempts</code> stay <code>null</code> and <code>0</code> until a following release begins
+enforcing these values. A <code>null</code> in either caller-intent field means the operation
+was created by an API server which predates them, so the server default applies
+rather than "no deadline" -- see <a href="/operator_guide/database/">the database operator guide</a>.</p>
 <p>In general the API for agent operations is instance-centric -- you lookup the
 agent operations an instance has seen, and then can request further information
 about the agent operation directly. There is currently no way to search for an
@@ -13222,12 +13227,12 @@ agent operations for a given instance, refer to the <a href="/developer_guide/ap
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">            </span><span class="nt">"commandline"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cat /tmp/README.md"</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">        </span><span class="p">}</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="p">],</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">"deadline"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">"deadline"</span><span class="p">:</span><span class="w"> </span><span class="mf">1787428090.5</span><span class="p">,</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">"instance_uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a771fb13-aaad-4cb6-a86b-7ee51e7bacc6"</span><span class="p">,</span>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">"last_progress"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">"metadata"</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
 <a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nt">"namespace"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vdi"</span><span class="p">,</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">"progress_timeout"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">"progress_timeout"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
 <a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="nt">"results"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">        </span><span class="nt">"0"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">            </span><span class="nt">"command-line"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cat /tmp/README.md"</span><span class="p">,</span>
@@ -13239,7 +13244,7 @@ agent operations for a given instance, refer to the <a href="/developer_guide/ap
 <a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">    </span><span class="p">},</span>
 <a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"complete"</span><span class="p">,</span>
 <a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">    </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9"</span><span class="p">,</span>
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
 <a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="p">}</span>
 </code></pre></div>
 </details>
