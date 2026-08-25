@@ -942,10 +942,10 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
 class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
     """The deadline and progress bookkeeping an operation carries.
 
-    Nothing reads these values yet -- phase 4 of the agent operation
-    deadlines plan enforces them -- so these tests are about storage
-    and retrieval, and about what each of the three possible values
-    means. None means no client intent was recorded, so the server
+    Enforcement is tested where it happens (AgentOperationQueueTestCase
+    here, test_agent_operation_expiry.py for the helpers), so these
+    tests are about storage and retrieval, and about what each of the
+    three possible values means. None means no client intent was recorded, so the server
     default applies; an explicit 0.0 means the caller asked for none.
     Collapsing those two is the failure this schema exists to avoid.
     """

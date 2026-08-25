@@ -189,8 +189,16 @@ def get_object_class(object_type):
 
 # A list of object states subject to "hard deletion". This is keyed by
 # state value across every object type, so a state only one object type
-# can reach is inert for the rest. Note that 'error' is deliberately
-# absent and has always been: errored objects are not swept.
+# can reach is inert for the rest.
+#
+# Note that 'error' is absent, and always has been. That is a known
+# defect rather than an intent: errored objects of every type are never
+# swept and leak their object_states rows indefinitely, the same class
+# of leak as issue 3532. It predates the expired state and is tracked
+# separately -- see the future work section of
+# docs/plans/PLAN-agent-operation-deadlines-phase-04-enforcement.md.
+# The consequence today is that an expired agent operation is reaped
+# and an errored one is not, which is backwards.
 FINAL_OBJECT_STATES = [
     'deleted',
     'complete',

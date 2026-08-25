@@ -2499,6 +2499,21 @@ class Instance(dbowo):
                     # preflight task has yet to promote it). We like
                     # maintaining order, so claim we have no work to do
                     # right now.
+                    #
+                    # Deliberately not deadline checked, even though the
+                    # deadline may well have passed: expiring a head
+                    # whose preflight task is running would race that
+                    # task, and preflight enforces the deadline itself
+                    # (NodeAgentopOp._preflight). The gap that leaves is
+                    # a preflight task which never runs at all -- the
+                    # node it was scheduled onto died, or the cluster
+                    # operation was lost -- which wedges this queue
+                    # indefinitely. That is pre-existing, out of scope
+                    # here, and belongs to the node-local reaper in
+                    # phase 5 of
+                    # docs/plans/PLAN-agent-operation-deadlines.md,
+                    # which can apply a grace period without racing a
+                    # live task.
                     break
 
                 # EXECUTING, COMPLETE, ERROR, EXPIRED or DELETED: this

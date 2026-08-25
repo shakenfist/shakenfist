@@ -315,7 +315,10 @@ class AgentCommandHandler:
     """Dispatch and capabilities for one agent command verb."""
 
     name: str = ''
-    reports_progress = False    # read in phase 4
+    # Read by SideChannelExecutorJob.expire_if_out_of_budget(), which
+    # only applies the progress timeout while a command that can
+    # actually report progress is in flight.
+    reports_progress = False
     retryable = True            # read in phase 5
     register_as_outstanding = False
 

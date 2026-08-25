@@ -46,6 +46,13 @@ class AgentOperation(BaseOperation):
     # "new_value not in self.state_targets.get(...)", so a bare string
     # value would do substring membership -- admitting 'deleted'
     # correctly by accident, and 'delete' incorrectly.
+    #
+    # The initial -> expired edge is permitted for completeness rather
+    # than because a site walks it: an operation is only in initial for
+    # the moments between new() and the API enqueuing it. Declaring it
+    # costs nothing and means a future enforcement point (phase 5's
+    # reaper is the obvious candidate) which does reach one does not
+    # raise InvalidStateException.
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (BaseOperation.STATE_PREFLIGHT,
@@ -150,8 +157,12 @@ class AgentOperation(BaseOperation):
         progress which are fatal to it. For both of them None means
         no client intent was recorded, so the server default applies,
         while an explicit 0.0 means the caller asked for none. The
-        API server computes the deadline at request receipt; nothing
-        reads either value yet.
+        API server computes the deadline at request receipt. Both are
+        resolved by effective_deadline() and
+        effective_progress_timeout(), and enforced at dequeue
+        (Instance.agent_operation_next), during preflight
+        (NodeAgentopOp._preflight) and in the sidechannel executor
+        (SideChannelExecutorJob.expire_if_out_of_budget).
         """
         AgentOperation._db_create(operation_uuid, {
             'uuid': operation_uuid,
