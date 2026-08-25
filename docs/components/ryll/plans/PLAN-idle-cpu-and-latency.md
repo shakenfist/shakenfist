@@ -192,13 +192,14 @@ guest). Out of scope for this plan.
 
 ## Execution
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. Profile idle CPU | [PLAN-idle-cpu-and-latency-phase-01-profile.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/) | Complete |
-| 2. Repaint cadence fix | [PLAN-idle-cpu-and-latency-phase-02-repaint.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/) | In progress |
-| 3. Demote protocol logging | [PLAN-idle-cpu-and-latency-phase-03-logging.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/) | Complete |
-| 4. Real latency from PING/PONG | [PLAN-idle-cpu-and-latency-phase-04-latency.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/) | Complete |
-| 5. Capture runtime metrics in bug reports | [PLAN-idle-cpu-and-latency-phase-05-metrics.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/) | Complete |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Profile idle CPU | [PLAN-idle-cpu-and-latency-phase-01-profile.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/) | Complete | — |
+| 2. Repaint cadence fix | [PLAN-idle-cpu-and-latency-phase-02-repaint.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/) | In progress | — |
+| 3. Demote protocol logging | [PLAN-idle-cpu-and-latency-phase-03-logging.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/) | Complete | — |
+| 4. Real latency from PING/PONG | [PLAN-idle-cpu-and-latency-phase-04-latency.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/) | Complete | — |
+| 5. Capture runtime metrics in bug reports | [PLAN-idle-cpu-and-latency-phase-05-metrics.md](/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/) | Complete | — |
+| 6. Push audit | PLAN-idle-cpu-and-latency-phase-06-push-audit.md | Not started | — |
 
 Phase 1 informs phase 2: if profiling shows logging is the
 dominant cost, swap their order.  *Profiling result: the
@@ -221,6 +222,28 @@ captured its own per-thread CPU into bug reports, the user
 report would have included the llvmpipe breakdown directly
 and the profiling phase would have been unnecessary.  This
 phase makes future incidents self-debugging.
+
+Phase 6 is the pre-push audit, and it runs last.  It works
+`PUSH-AUDIT.md` over the accumulated diff of phases 1-5
+against `develop`, not the last phase's diff alone, so it
+sees what the repaint, logging, latency and metrics changes
+did to each other.  Findings land as their own PR against
+`develop`, recorded here under an *Items deferred from the
+push audit* heading — the shape `PLAN-web-frontend.md` uses
+for its *Items deferred from the post-Phase-N pre-push audit*
+sections, minus the phase number, because this phase audits
+the whole plan rather than a range of it.  This plan is not
+complete until every one is fixed or declined in writing.  If
+the audit finds nothing, that gets recorded here in one
+sentence.
+
+Phases 1-5 have already merged, so `develop...HEAD` is empty
+on the audit branch and the accumulated diff has to be
+assembled from those phases' merge commits.  None of the five
+recorded one, so phase 6 starts by reconstructing them from
+`git log` and writing them into the `Merged` column of the
+table above.  *Two ways this runbook is invoked* in
+`PUSH-AUDIT.md` has the rest.
 
 ## Agent guidance
 

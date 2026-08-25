@@ -330,16 +330,28 @@ recorded here. If the audit finds nothing, say so in one sentence.
 One commit per logical change; the development-repo work is one
 PR on this branch, the ryll work a separate PR.
 
-| Step | Repo | Description | Status |
-|------|------|-------------|--------|
-| 1 | development | `status` subcommand + tests | Done |
-| 2 | development | `check_review_coverage` + registration + tests | Done |
-| 3 | development | `audit_common.py` metadata + `audits/review-coverage.md` | Done |
-| 4 | development | `PROJECT-CONSISTENCY-AUDITS.md` + `PLAN-consistency.md` entries | Done |
-| 5 | development | `docs/code-review-tracking.md` steady-state rewrite | Done |
-| 6 | ryll | prune workflow + `tools/ci-prune-reviews.sh` + docs | Done |
-| 7 | both | end-to-end verification (phase 5) | Blocked on merge |
-| 8 | both | push audit over each PR (phase 6) | Not started |
+| Step | Repo | Description | Status | Merged |
+|------|------|-------------|--------|--------|
+| 1 | development | `status` subcommand + tests | Done | `b677b61` (#11) |
+| 2 | development | `check_review_coverage` + registration + tests | Done | `b677b61` (#11) |
+| 3 | development | `audit_common.py` metadata + `audits/review-coverage.md` | Done | `b677b61` (#11) |
+| 4 | development | `PROJECT-CONSISTENCY-AUDITS.md` + `PLAN-consistency.md` entries | Done | `b677b61` (#11) |
+| 5 | development | `docs/code-review-tracking.md` steady-state rewrite | Done | `b677b61` (#11) |
+| 6 | ryll | prune workflow + `tools/ci-prune-reviews.sh` + docs | Done | ryll `1e94d00f` (#236) |
+| 7 | both | end-to-end verification (phase 5) | Blocked on merge | |
+| 8 | both | push audit over each PR (phase 6) | Not started | |
+
+The `Merged` column is what `plan-push-audit-phase` asks each phase
+to record as it lands, so that phase 6 has a range to audit once
+`git diff main` for this plan is empty. Steps 1--5 were one pull
+request, which is why they share a commit; step 6 is in a different
+repository against a different default branch, so it names its own.
+These were reconstructed after the fact rather than recorded live,
+and reconstructing step 6 turned up the reason v2 stopped trusting
+derivation: the two follow-ups to the prune workflow
+(`a0227e05`, `196db2f6`) reached `develop` inside ryll#262, an
+unrelated merge-queue pull request, so no range anchored on this
+plan's own commits contains them.
 
 `pre-commit run --all-files` must pass before each commit is
 proposed; the Python follows the house style (single quotes,

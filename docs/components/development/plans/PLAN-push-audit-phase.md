@@ -234,27 +234,74 @@ file lands with the change (per `CLAUDE.md`).
 Phases are the sections below rather than separate files, following
 this repository's convention.
 
-| Phase | Status |
-|-------|--------|
-| 1. Foundations | Complete |
-| 2. Fleet sweep | Complete |
-| 3. Review point | Not started |
-| 4. Push audit | Not started |
+| Phase | Status | Merged |
+|-------|--------|--------|
+| 1. Foundations | Complete | `5b1fb74` (#49) |
+| 2. Fleet sweep | Complete | `ff92357` (#50) |
+| 3. Review point | Not started | |
+| 4. Push audit | Not started | |
+
+The `Merged` column is the convention this plan introduces, applied
+to the plan that introduces it. It goes last so that a row which
+omits it still reaches `Status`, and it is not the `Status` cell,
+which `plan-status-vocabulary` reserves for a single term. Phase 4
+audits the accumulated diff of those commits against `main`.
 
 ### 1. Foundations -- this repository
 
-* **`templates/shared-blocks/plan-push-audit-phase.md`** (new, v1).
-  The canonical wording of the final phase: what it is, that it runs
-  `PUSH-AUDIT.md` against the accumulated diff of the whole plan
-  rather than one phase's, that findings land as their own PR, and
-  that a plan whose repository has no `PUSH-AUDIT.md` says so
-  explicitly rather than omitting the phase silently, and how to
-  derive the range when the plan's phases have already merged and a
-  diff against the default branch would be empty. That last bullet
-  arrived from review during phase 2 and edits v1 in place rather
-  than bumping to v2: no `PLAN-TEMPLATE.md` embeds the block yet, so
-  there is no copy to mark stale and nothing a version bump would
-  tell anyone.
+* **`templates/shared-blocks/plan-push-audit-phase.md`** (new; v1,
+  now v2). The canonical wording of the final phase: what it is,
+  that it runs `PUSH-AUDIT.md` against the accumulated diff of the
+  whole plan rather than one phase's, that findings land as their
+  own PR, that a plan whose repository has no `PUSH-AUDIT.md` says
+  so explicitly rather than omitting the phase silently, and where
+  each phase's landing commit is recorded so that the audit has a
+  range to run over once the phases have merged.
+
+  **Correction, v1 to v2.** v1 said to derive that range: from the
+  merge base of the plan's first phase commit to the default branch,
+  restricted to the paths the plan touched. Measured against ryll's
+  real history that is 338 files and 118k insertions for the five
+  phases of `PLAN-idle-cpu-and-latency`, because unrelated work
+  lands on the default branch between a plan's phases and any anchor
+  of the form "since the plan file appeared" sweeps all of it in.
+  ryll's embedded copy dropped the bullet rather than following it,
+  which would have read as drift on the next daily run. v2 replaces
+  derivation with recording: the commit that put each phase on the
+  default branch goes into the plan as the phase lands, in a
+  `Merged` column or a `Merged:` line depending on the plan's shape,
+  and never in `Status`, which `plan-status-vocabulary` reserves for
+  a single term. Reconstructing this repository's own plans (below)
+  then found two shapes v2's first draft did not cover -- phases
+  that landed as direct commits with no merge commit at all, and
+  phases that accreted across many pull requests -- so v2 says to
+  record every commit a phase landed under and to say when no range
+  is recoverable.
+
+  The v1 wording arrived from review during phase 2 and edited v1 in
+  place; the reasoning then was that no `PLAN-TEMPLATE.md` embedded
+  the block yet, so there was no copy to mark stale. That is why
+  this correction is written here rather than being visible only as
+  a version number: the in-place edit left no record of what changed
+  or why.
+
+  **Blast radius of the bump.** None, measured: no repository's
+  default branch embeds this block at any version -- checked against
+  `PLAN-TEMPLATE.md` on shakenfist, ryll, kerbside and instar via
+  the GitHub contents API, and `docs/audits/plan-template.md` shows
+  those four `compliant` only because its last regeneration
+  (2026-08-24T07:04Z) predates phase 1's merge, which added the
+  block to `PLAN_TEMPLATE_BLOCKS`. Phase 1's bump is what marks them
+  non-compliant; v2 marks nothing newly stale on top of that. The
+  one copy of v2 anywhere is shakenfist/ryll#319, which is still
+  open. The ordering that keeps that true is manual and nothing
+  records it on the ryll side, so it is stated here: this pull
+  request lands first, and ryll#319 re-copies the block from this
+  repository's `main` rather than from a branch, because the wording
+  was revised twice in review. If ryll#319 lands first, or carries a
+  copy taken mid-review, the next daily run files a stale-block issue
+  against ryll -- self-correcting, but it arrives as an audit failure
+  rather than as a known consequence.
 * **`scripts/audit-check.py`** -- extend `check_push_audit` with the
   reference checks: `AGENTS.md` must mention `PUSH-AUDIT.md`, and
   where the repository has a `PLAN-TEMPLATE.md` it must carry the new
@@ -361,7 +408,21 @@ now describes, arrived at by accident rather than by design. It is
 still the right measurement, and it makes phase 3's decision 2 more
 pressing rather than less: nothing stopped a plan being marked
 complete without its audit.
-Phase 3 reads what that audit actually found and decides three
+
+v2's carve-out is scoped so that this measurement survives it. The
+carve-out exists so that plans which were already `Complete` when
+the sweep reached their repository -- the great majority of the
+fleet's plans, and none of them touched by the sweep -- are not
+reopened to acquire a phase; it binds on whether a plan *carries*
+the phase, not on the date it reached `Complete`. Queue performance
+carries the phase -- shakenfist#3873 put it there -- so it runs its
+audit even though `index.md` marked it complete while that sweep
+was in review. Phrasing the carve-out as "before this convention landed"
+would have exempted it, and would also have been uncheckable from
+an embedded copy, which cannot tell which version of the block its
+repository received or when.
+
+Phase 3 reads what that audit actually found and decides four
 things:
 
 1. Whether the phase stays mandatory for every plan, becomes
@@ -375,15 +436,30 @@ things:
    `check_plan_template` looks at the template, and
    `check_plan_index` checks columns, dates and status vocabulary.
    The thirty-six plans this sweep edited are held in place by the
-   sweep alone. Building the check before decision 1 is settled
-   would be the same ceremony this plan is guarding against, which
-   is why it is a decision here and not a phase 1 deliverable.
-3. Whether the sweep's repository scope was right. Decision 4 says
-   the sweep covers every incomplete master plan; phase 2's
-   definition of done names five repositories and divergulent's four
-   are outside both. Either the scope widens and divergulent is
-   swept, or the plan says why an `index.md`-tracking repository
-   with a `PUSH-AUDIT.md` is excluded.
+   sweep alone. Building the check before phase 3's decision 1 is
+   settled would be the same ceremony this plan is guarding against,
+   which is why it is a decision here and not a phase 1 deliverable.
+3. Whether the sweep's repository scope was right. The plan's own
+   decision 4, under `## Decisions` above, says the sweep covers
+   every incomplete master plan; phase 2's definition of done names
+   five repositories and divergulent's four are outside both. Either
+   the scope widens and divergulent is swept, or the plan says why an
+   `index.md`-tracking repository with a `PUSH-AUDIT.md` is excluded.
+4. What to do about the thirty-six plans the phase 2 sweep already
+   edited. They carry v1's "derive the range from the merge base"
+   sentence, which v2 retracts, and none of them records a landing
+   commit for the phases that have already merged. This repository's
+   own five are fixed in the same change that bumps the block -- they
+   are the canon's own plans and could not be left contradicting it
+   -- but the fleet-wide backfill is deliberately not done here. It
+   touches five repositories and needs the same sub-agent sweep phase
+   2 ran, and if phase 3's decision 1 makes the phase conditional
+   then some of those plans stop needing a range at all. Doing it
+   before that decision would be re-sweeping thirty-six plans to
+   install a convention that might be withdrawn a fortnight later.
+   Until it happens, a reader of one of those plans gets retracted
+   guidance, which is the cost of the deferral and is recorded here
+   rather than discovered.
 
 ### 4. Push audit
 
@@ -419,6 +495,17 @@ say so in one sentence, and feed that into phase 3's decision.
   first pre-push audit written for a repository whose product is
   automation rather than a service. Mitigated by running it once, on
   this plan's own phase 1, before phase 2 depends on it.
+* **The `Merged` column collides with a plan-table parser.** The
+  column changes the shape of every plan phase table that adopts it,
+  and shakenfist's `tools/check-plan-status.py` parses those tables
+  in `pre-commit`. Checked: `status_tables()` recognises a header by
+  the separator row beneath it and takes the status column by name
+  (`names.index('status')`), not by position, so an extra column is
+  invisible to it. The one way to break it is a row with too few
+  cells to reach the status index, which the parser reports as a
+  `short` row rather than dropping -- so `Merged` goes last, where a
+  row that omits it still reaches `Status`. That is why the block
+  says "added last" rather than leaving the position open.
 
 ## Definition of done
 
@@ -427,6 +514,12 @@ say so in one sentence, and feed that into phase 3's decision.
 * `plan-push-audit-phase` is in `templates/shared-blocks/`, listed in
   its README, and required by `check_plan_template`.
 * `PLAN-plan-template-blocks.md` names nine blocks, not eight.
+* `plan-push-audit-phase` is at v2, and this repository's own five
+  master plans each record a landing commit for every merged phase,
+  or say why no range is recoverable. The thirty-six plans across
+  shakenfist, ryll, kerbside and instar still carry v1's retracted
+  wording; backfilling them is phase 3's decision 4, so this plan is
+  not done on that count until the decision is made.
 * `development` has a `PUSH-AUDIT.md` that its own `push-audit` check
   passes, and it is no longer `N/A` in the compliance table.
 * Every incomplete master plan in shakenfist, ryll, kerbside, instar

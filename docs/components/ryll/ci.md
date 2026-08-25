@@ -39,7 +39,7 @@ enqueue` status check:
 | `cargo audit` | self-hosted `s` | RustSec advisory check |
 | `cargo deny` | self-hosted `s` | Licence, ban, and advisory policy (`deny.toml`) |
 | `gitleaks` | self-hosted `s` | Secret scanning over full history |
-| `shellcheck` | self-hosted `s` | `tools/run-shellcheck.sh` |
+| `shellcheck` | self-hosted `s` | `tools/run-shellcheck.sh`, then `tools/audit/test-audit-range.sh` |
 | `bidi and zero-width` | self-hosted `s` | `tools/check-bidi.sh` |
 | `skillsaw` | self-hosted `s` | `pre-commit run skillsaw` over the agent context |
 

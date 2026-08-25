@@ -286,17 +286,18 @@ Phase files are **not yet written**. The breakdown below is a
 provisional sketch; expect it to change once the open
 questions resolve.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. Toolchain + boot an empty window | PLAN-android-apk-phase-01-toolchain.md | Not written |
-| 2. Portability shims (`#[cfg]` gating) | PLAN-android-apk-phase-02-shims.md | Not written |
-| 3. Android entrypoint (eframe vs bare winit) | PLAN-android-apk-phase-03-entrypoint.md | Not written |
-| 4. Display + activity lifecycle | PLAN-android-apk-phase-04-display.md | Not written |
-| 5. Input (BT keyboard/mouse → SPICE inputs) | PLAN-android-apk-phase-05-input.md | Not written |
-| 6. Audio (AAudio via cpal) | PLAN-android-apk-phase-06-audio.md | Not written |
-| 7. TV-specific manifest + launcher | PLAN-android-apk-phase-07-tv.md | Not written |
-| 8. CI build + release artifact | PLAN-android-apk-phase-08-ci.md | Not written |
-| 9. Docs | PLAN-android-apk-phase-09-docs.md | Not written |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Toolchain + boot an empty window | PLAN-android-apk-phase-01-toolchain.md | Not written | — |
+| 2. Portability shims (`#[cfg]` gating) | PLAN-android-apk-phase-02-shims.md | Not written | — |
+| 3. Android entrypoint (eframe vs bare winit) | PLAN-android-apk-phase-03-entrypoint.md | Not written | — |
+| 4. Display + activity lifecycle | PLAN-android-apk-phase-04-display.md | Not written | — |
+| 5. Input (BT keyboard/mouse → SPICE inputs) | PLAN-android-apk-phase-05-input.md | Not written | — |
+| 6. Audio (AAudio via cpal) | PLAN-android-apk-phase-06-audio.md | Not written | — |
+| 7. TV-specific manifest + launcher | PLAN-android-apk-phase-07-tv.md | Not written | — |
+| 8. CI build + release artifact | PLAN-android-apk-phase-08-ci.md | Not written | — |
+| 9. Docs | PLAN-android-apk-phase-09-docs.md | Not written | — |
+| 10. Push audit | PLAN-android-apk-phase-10-push-audit.md | Not written | — |
 
 ### Phase 1: Toolchain + boot
 
@@ -381,6 +382,29 @@ Release. Document the sideload workflow in
 - `ARCHITECTURE.md` — no changes expected; the core
   architecture is platform-agnostic.
 - `AGENTS.md` — add Android build commands.
+
+### Phase 10: Push audit
+
+Work `PUSH-AUDIT.md` over the accumulated diff of phases 1-9
+against `develop` — the whole port as one change, not the
+last phase's diff alone, because the `#[cfg]` gating from
+phase 2 is threaded through everything the later phases add.
+Findings land as their own PR against `develop`, recorded
+here under an *Items deferred from the push audit* heading —
+the shape `PLAN-web-frontend.md` uses for its *Items deferred
+from the post-Phase-N pre-push audit* sections, minus the
+phase number, because this phase audits the whole plan rather
+than a range of it. This plan is not complete until each one
+is fixed or declined in writing. If
+the audit finds nothing, record that here in one sentence.
+
+Phases 1-9 have merged by the time this phase runs, so
+`develop...HEAD` is empty on the audit branch and the
+accumulated diff has to be assembled from the phases' merge
+commits. Record each phase's merge commit in the `Merged`
+column of the *Phase order* table above as that phase lands;
+*Two ways this runbook is invoked* in `PUSH-AUDIT.md` has the
+rest.
 
 ## Administration and logistics
 
