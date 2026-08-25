@@ -1,7 +1,7 @@
 # Copyright 2019 Michael Still and contributors
 """Database tier assertions shared by the smoke and cluster suites.
 
-The two tests here need only a single sf-database instance, so they are
+The tests here need only a single sf-database instance, so they are
 portable across every CI topology. They live in this module rather than
 in one suite directory because stestr discovers tests per directory and
 the two suites are disjoint: a test defined in ``cluster_ci_tests/``
@@ -39,15 +39,22 @@ INSTANCE_GET_COUNT = 50
 ATTRIBUTE_FETCH_CEILING_PER_GET = 4
 AMBIENT_SAMPLE_SECONDS = 10
 
-# A blob GET builds an external view which needs the blob's outbound
-# references exactly once: depends_on, transcodes and references_from
-# are all derived from the same unfiltered read. The filtered property
-# reads used to make that three GetReferencesFrom RPCs per GET (issue
-# 3876), so the ceiling of two discriminates the old behaviour while
-# leaving one whole extra call of headroom over the expected single
-# fetch.
-BLOB_GET_COUNT = 50
-REFERENCES_FROM_CEILING_PER_GET = 2
+# Rendering a blob's "instances" field walks every healthy instance
+# (one FindInstances, then a block_devices read and a dependency chain
+# per disk). Handlers which render many blobs used to do that walk once
+# per blob, so an artifact listing cost one walk per artifact (issue
+# 3876). The walk is now hoisted to one per request, whatever the
+# response contains.
+#
+# FindInstances is the right counter for this: it is issued exactly
+# once per walk, so the measurement does not vary with how many
+# instances the cluster happens to be running -- unlike the reference
+# reads the walk performs, which do. The seeded artifacts make the old
+# behaviour cost at least ARTIFACT_SEED_COUNT walks per listing, so a
+# ceiling of two discriminates it with a whole call of headroom.
+ARTIFACT_SEED_COUNT = 3
+ARTIFACT_LIST_COUNT = 20
+INSTANCE_WALK_CEILING_PER_GET = 2
 
 # A metrics scrape is a plain HTTP GET against a daemon's port, so a
 # single failure is not evidence about the property under test.
@@ -292,80 +299,88 @@ class DatabaseTierTestsMixin:
             'attributes row more than once per call. measurement=%s'
             % (per_get, ATTRIBUTE_FETCH_CEILING_PER_GET, measurement))
 
-    def test_blob_get_reads_references_from_once(self):
-        # A blob GET builds an external view whose depends_on and
-        # transcodes fields are derived from the same object_references
-        # rows the view already reads unfiltered for references_from.
-        # Issue 3876: fetching them via the filtered depends_on and
-        # transcoded properties as well made a single blob GET cost
-        # three GetReferencesFrom RPCs, which was most of the
-        # GetReferencesFrom/GetReferencesTo imbalance on the api daemon.
+    def test_artifact_listing_walks_instances_once(self):
+        # Every blob rendered with an "instances" field needs to know
+        # which instances use it, which means walking every healthy
+        # instance and following each disk's dependency chain. The
+        # artifact handlers used to run that walk once per blob they
+        # rendered, so a listing cost one walk per artifact and a
+        # version listing one per version (issue 3876). It is now run
+        # once per request.
+        #
+        # This asserts on FindInstances rather than on the reference
+        # reads the walk performs, because FindInstances is issued
+        # exactly once per walk: the measurement is therefore
+        # independent of how many instances the cluster is running,
+        # which the reference reads are not.
         database_nodes = self._database_nodes()
 
-        # No addCleanup() to delete this instance, for the same reason as
-        # test_instance_get_fetches_the_attributes_row_once above:
-        # tearDown() already deletes and awaits every instance in the
-        # namespace, and runs before cleanups.
-        inst = self.test_client.create_instance(
-            'dbtier-blob-references', 1, 1024, None,
-            [
-                {
-                    'size': 8,
-                    'base': base.CLUSTER_CI_IMAGE,
-                    'type': 'disk'
-                }
-            ], None, None)
-        self._await_instance_create(inst['uuid'])
+        # Seed enough artifacts that the old per-blob behaviour is
+        # unambiguously above the ceiling. Uploading a few bytes is
+        # much cheaper than fetching images, and an upload artifact
+        # renders through exactly the same path.
+        for i in range(ARTIFACT_SEED_COUNT):
+            upload = self.test_client.create_upload()
+            self.test_client.send_upload(
+                upload['uuid'], ('dbtier-%d' % i).encode('ascii'))
+            self.test_client.upload_artifact(
+                'dbtier-artifact-%d' % i, upload['uuid'])
 
-        # The create reply predates disk allocation, so refresh to learn
-        # which blob backs the instance's disk.
-        inst = self.test_client.get_instance(inst['uuid'])
-        blob_uuid = inst['disks'][0]['blob_uuid']
-        self.assertIsNotNone(blob_uuid)
+        # A listing which does not actually contain the seeded
+        # artifacts would pass the ceiling vacuously.
+        artifacts = self.test_client.get_artifacts()
+        self.assertGreaterEqual(
+            len(artifacts), ARTIFACT_SEED_COUNT,
+            'Expected the listing to contain at least the %d seeded '
+            'artifacts, but it returned %d. The ceiling below cannot '
+            'discriminate the per-blob behaviour without them.'
+            % (ARTIFACT_SEED_COUNT, len(artifacts)))
 
-        def _fetches():
+        def _walks():
             return self._sum_requests(
-                database_nodes, 'GetReferencesFrom', 'api')
+                database_nodes, 'FindInstances', 'api')
 
-        # Other API traffic on the cluster reads references too, so
+        # Other API traffic on the cluster lists instances too, so
         # measure that rate and subtract it from the measurement below.
-        ambient_before = _fetches()
+        ambient_before = _walks()
         time.sleep(AMBIENT_SAMPLE_SECONDS)
-        ambient_rate = (_fetches() - ambient_before) / AMBIENT_SAMPLE_SECONDS
+        ambient_rate = (_walks() - ambient_before) / AMBIENT_SAMPLE_SECONDS
 
-        before = _fetches()
+        before = _walks()
         start = time.time()
-        for _ in range(BLOB_GET_COUNT):
-            self.test_client.get_blob(blob_uuid)
+        for _ in range(ARTIFACT_LIST_COUNT):
+            self.test_client.get_artifacts()
         elapsed = time.time() - start
-        raw_delta = _fetches() - before
+        raw_delta = _walks() - before
         delta = raw_delta - (ambient_rate * elapsed)
 
         measurement = {
             'ambient_rate_per_second': ambient_rate,
+            'artifacts_in_listing': len(artifacts),
             'elapsed_seconds': elapsed,
-            'gets': BLOB_GET_COUNT,
-            'reference_fetches': delta,
-            'reference_fetches_raw': raw_delta,
+            'gets': ARTIFACT_LIST_COUNT,
+            'instance_walks': delta,
+            'instance_walks_raw': raw_delta,
         }
         self.addDetail(
             'measurement',
             content.text_content(json.dumps(
                 measurement, indent=2, sort_keys=True)))
 
-        # As above, the floor is asserted on the raw delta so a busy
-        # cluster's ambient estimate cannot push it below zero, while the
-        # ceiling keeps the ambient correction because background reads
-        # inflate it.
+        # As in the test above, the floor is asserted on the raw delta
+        # so a busy cluster's ambient estimate cannot push it below
+        # zero, while the ceiling keeps the ambient correction because
+        # background reads inflate it.
         self.assertGreater(
             raw_delta, 0,
-            'Expected blob GETs to read the blob\'s references at all; '
+            'Expected an artifact listing to walk instances at all; '
             'measurement=%s' % measurement)
 
-        per_get = delta / BLOB_GET_COUNT
+        per_get = delta / ARTIFACT_LIST_COUNT
         self.assertLess(
-            per_get, REFERENCES_FROM_CEILING_PER_GET,
-            'Each blob GET cost %.2f GetReferencesFrom RPCs, which is above '
-            'the ceiling of %d. The external view is reading the blob\'s '
-            'outbound references more than once per call. measurement=%s'
-            % (per_get, REFERENCES_FROM_CEILING_PER_GET, measurement))
+            per_get, INSTANCE_WALK_CEILING_PER_GET,
+            'Each artifact listing walked instances %.2f times, which is '
+            'above the ceiling of %d. The handler is walking instances '
+            'per blob rendered rather than once per request. '
+            'measurement=%s'
+            % (per_get, INSTANCE_WALK_CEILING_PER_GET, measurement))
