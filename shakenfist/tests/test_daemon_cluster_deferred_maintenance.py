@@ -24,6 +24,7 @@ class ClusterDeferredMaintenanceTestCase(base.ShakenFistTestCase):
         m.pet_watchdog = mock.MagicMock()
         m.check_daemon_state = mock.MagicMock()
         m._await_election = mock.MagicMock()
+        m._anchor_scheduled_jobs = mock.MagicMock()
         m._run_due_scheduled_jobs = mock.MagicMock()
         m._cluster_wide_cleanup = mock.MagicMock()
         return m
