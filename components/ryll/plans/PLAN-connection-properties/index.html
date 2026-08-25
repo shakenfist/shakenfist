@@ -10870,6 +10870,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-5-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5 — Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13476,6 +13487,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-5-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5 — Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13830,7 +13852,7 @@ bug-report content.</p>
 </li>
 </ol>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>Four phases. Each phase plan is filled in when its phase
+<p>Five phases. Each phase plan is filled in when its phase
 starts.</p>
 <table>
 <thead>
@@ -13838,6 +13860,7 @@ starts.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -13845,21 +13868,31 @@ starts.</p>
 <td>1. Connection-info plumbing</td>
 <td>PLAN-connection-properties-phase-01-plumbing.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Dialog UI</td>
 <td>PLAN-connection-properties-phase-02-dialog.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Capability name decoding</td>
 <td>PLAN-connection-properties-phase-03-cap-names.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Docs</td>
 <td>PLAN-connection-properties-phase-04-docs.md</td>
 <td>Not started</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5. Push audit</td>
+<td>PLAN-connection-properties-phase-05-push-audit.md</td>
+<td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
@@ -13922,6 +13955,26 @@ dialog. Update <code>AGENTS.md</code> if it lists places where new
 connection state should be tracked. Add a screenshot to
 <code>docs/</code> if other dialogs have screenshots (check
 convention before adding).</p>
+<h3 id="phase-5-push-audit">Phase 5 — Push audit<a class="headerlink" href="#phase-5-push-audit" title="Permanent link">&para;</a></h3>
+<p>Work <code>PUSH-AUDIT.md</code> over the accumulated diff of phases 1-4
+against <code>develop</code>, not the last phase's diff alone, so the
+plumbing, dialog, decoding and docs changes are audited as
+the one change they add up to. Findings land as their own PR
+against <code>develop</code>, recorded here under an <em>Items deferred
+from the push audit</em> heading — the shape
+<code>PLAN-web-frontend.md</code> uses for its <em>Items deferred from the
+post-Phase-N pre-push audit</em> sections, minus the phase
+number, because this phase audits the whole plan rather than
+a range of it. This plan is not complete until each is fixed
+or declined in writing. If the audit finds nothing, record
+that here in one sentence.</p>
+<p>Phases 1-4 have merged by the time this phase runs, so
+<code>develop...HEAD</code> is empty on the audit branch and the
+accumulated diff has to be assembled from the phases' merge
+commits. Record each phase's merge commit in the <code>Merged</code>
+column of the <em>Phase order</em> table above as that phase lands;
+<em>Two ways this runbook is invoked</em> in <code>PUSH-AUDIT.md</code> has the
+rest.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never
@@ -14076,7 +14129,8 @@ capabilities, and display surfaces", initial status <em>Not
 started</em>, and links to the four phase plan files (which
 do not yet exist). An entry was also added to
 <code>docs/plans/order.yml</code>.</p>
-<p>Mark <em>Complete</em> in <code>index.md</code> when phase 4 lands.</p>
+<p>Mark <em>Complete</em> in <code>index.md</code> when phase 5 lands and
+every push-audit finding is fixed or declined above.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief
 the operator as to your understanding of the plan and how

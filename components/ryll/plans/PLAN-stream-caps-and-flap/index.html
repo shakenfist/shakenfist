@@ -13956,6 +13956,7 @@ session 002b showed that MJPEG decode in the pure-Rust
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -13963,86 +13964,109 @@ session 002b showed that MJPEG decode in the pure-Rust
 <td>1. STREAM_REPORT</td>
 <td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">completed/PLAN-stream-caps-and-flap-phase-01-stream-report.md</a></td>
 <td>Complete</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. LZ4 compression</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">PLAN-stream-caps-and-flap-phase-02-lz4.md</a></td>
 <td>Code landed; smoke test (2C) folded into phase 3 step 3H</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Fast JPEG decode</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">PLAN-stream-caps-and-flap-phase-03-jpeg-decoders.md</a></td>
 <td>Code landed (3A-3G). Session 006 follow-up revealed still-image JPEG path missed the wiring (was on pure-Rust at ~263 ms/frame); fix landed. 3H replaced with the 007 still-image JPEG smoke matrix (one shared guest, three client OSes) — pending operator runs.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Channel diagnostics audit + playback observability</td>
 <td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md</a></td>
 <td>Complete (4G verified in session 002g: <code>data_packets_received == data_packets_decoded</code>, no decode failures, underruns visible — instrumentation distinguishes the four failure modes as designed)</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Auto-snapshot bug-report mode</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md</a></td>
 <td>Code landed (5A-5B); 5C operator smoke test pending</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Multi-codec + H.264</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">PLAN-stream-caps-and-flap-phase-06-h264.md</a></td>
 <td>Code landed (6A-6E); 6F operator smoke test pending (needs an H.264-capable spice-server build to actually exercise the new path)</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Preference messages</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">PLAN-stream-caps-and-flap-phase-07-pref-messages.md</a></td>
 <td>Code landed (7A-7C); session 006 measurement drove AUTO_LZ → AUTO_GLZ revert (server stopped using GLZ entirely under AUTO_LZ; +25% bytes_in). 7D smoke folded into the next 005-style run.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>8. Live streaming indicator + flap notification</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">PLAN-stream-caps-and-flap-phase-08-streaming-indicator.md</a></td>
 <td>Code landed.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>9. Vdagent responsiveness probe</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md</a></td>
 <td>Code landed (9A-9D). 9E operator smoke (deliberately freeze the guest agent to verify the Warn notification fires) is pending.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>10. Documentation</td>
 <td>(no separate plan — docs catch-all dispatched directly)</td>
 <td>Complete. ARCHITECTURE.md capability table + README CLI flag docs + troubleshooting JPEG-decoder subsection landed across three commits (faa8ebd9 / c4849822 / dfc59950). Phase-9D's vdagent docs already covered the agent-probe surface.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>11. Remove spurious-PONG keepalive</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md</a></td>
 <td>11A landed (main channel); 11B doc cleanup landed (channel-diagnostics-audit + plan addendum); inputs-channel <code>send_idle_keepalive</code> kept (decision recorded in phase 11 plan — different mechanism + no visible side effects + cross-channel-idleness hypothesis); 11C long-idle soak pending.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>12. Bounded image cache</td>
 <td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md</a></td>
 <td><strong>Complete.</strong> 12A-12C landed; 12D smoke FAILED (revealed GlzDictionary was a second unbounded cache the snapshot was summing in); 12E (bound GLZ), 12F (split snapshot fields), 12G (docs) all landed; 12H verified in session 005b — <code>glz_dictionary_bytes</code> held at 247 MiB / 256 cap across 67 snapshots over 670 s with eviction firing, <code>image_cache_bytes</code> stayed at 0, no RSS drift.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>13. Investigate intermittent server-side streaming</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/">PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md</a></td>
 <td><strong>Parked.</strong> Session 006 confirmed the trace-ring/VRAM diminishing-returns curve (165→85→77 OOMs/min at 64/128/256 MiB) but uncovered a bigger blocker: the 1024×768 YouTube video almost never crosses <code>is_stream_start</code> (1–2 video stream creates per 10 min vs ~100 cursor / scrollbar creates). All four 006 bundles show <code>streams_created_total = 0</code> client-side. Findings folded into the phase 13 plan's "Session 006 findings" section. Resume after non-video phases close.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>14. Stop status-bar pointer events leaking into the guest</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak.md</a></td>
 <td>Code landed.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>15. Track down <code>build_tcp_frame: payload too large</code> warns</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn.md</a></td>
 <td>15B (one-shot backtrace) landed; no fires across 006 bundles. Awaiting fresh reproduction.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>16. Evaluate guest driver options for video streaming</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/">PLAN-stream-caps-and-flap-phase-16-qxl-viability.md</a></td>
 <td><strong>Parked.</strong> Concept stub. Resume alongside phase 13 after non-video phases close.</td>
+<td>—</td>
 </tr>
 <tr>
 <td>17. Patched libspice-server for hypothesis validation</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/">PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation.md</a></td>
 <td><strong>Parked.</strong> Value uncertain after 006: bumping <code>NUM_TRACE_ITEMS</code> 8→128 helps cursor / scrollbar flap, but does not address why the YouTube video itself isn't a stream. Hold off on the .deb build until the predicate question is answered.</td>
+<td>—</td>
+</tr>
+<tr>
+<td>18. Push audit</td>
+<td>PLAN-stream-caps-and-flap-phase-18-push-audit.md</td>
+<td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
@@ -14064,7 +14088,8 @@ before re-assessing. The remaining open items are:</p>
   rather than open.</li>
 <li><strong>Phase 9</strong> — vdagent responsiveness probe. Independent
   of video work. Worth picking up.</li>
-<li><strong>Phase 10</strong> — documentation catch-all. Last.</li>
+<li><strong>Phase 10</strong> — documentation catch-all. Last of the
+  work phases; phase 18 audits what they add up to.</li>
 <li><strong>Phase 11B / 11C</strong> — inputs-channel keepalive decision</li>
 <li>long-idle soak.</li>
 <li><strong>Phase 14 / 15</strong> — landed / instrumented; nothing for
@@ -14077,7 +14102,9 @@ before re-assessing. The remaining open items are:</p>
 caps + the phase-13 / 16 / 17 parking into the docs. After
 that, re-open phase 13 with the "why isn't the video a
 stream" question and decide whether to chase the
-predicate read or the client-side instrumentation first.</p>
+predicate read or the client-side instrumentation first.
+Phase 18, the push audit, closes the plan out once the
+phases that are going to land have landed.</p>
 <p>Per-phase intent:</p>
 <ul>
 <li>
@@ -14653,6 +14680,34 @@ predicate read or the client-side instrumentation first.</p>
   pivots or is cancelled. Recommended planning effort:
   <strong>medium</strong> (the package build is reasonable but
   unfamiliar; the test recipe is small).</p>
+</li>
+<li>
+<p><strong>Phase 18 — Push audit.</strong> Work <code>PUSH-AUDIT.md</code> over the
+  accumulated diff of every phase in this plan that has
+  landed by the time the audit runs, not the last phase's
+  diff alone — seventeen phases of capability, decoder,
+  diagnostics and cache work have had plenty of opportunity
+  to leave duplicated helpers and stale docs behind each
+  other. Parked phases 13 / 16 / 17 and the awaiting-
+  reproduction phase 15 do not gate it; if any of them
+  later lands, it gets its own audit. Findings land as
+  their own PR against <code>develop</code>, recorded here under an
+  <em>Items deferred from the push audit</em> heading — the shape
+  <code>PLAN-web-frontend.md</code> uses for its <em>Items deferred from
+  the post-Phase-N pre-push audit</em> sections, minus the phase
+  number, because this phase audits the whole plan rather
+  than a range of it. This plan is not complete until each
+  is fixed or declined in writing. If
+  the audit finds nothing, record that here in one
+  sentence. The audited phases have already merged, so
+  <code>develop...HEAD</code> is empty on the audit branch and the
+  accumulated diff has to be assembled from their merge
+  commits; record each phase's as it lands in the <code>Merged</code>
+  column of the table above, and reconstruct the ones that
+  landed before this convention. <em>Two ways this runbook is
+  invoked</em> in <code>PUSH-AUDIT.md</code> has the rest.
+  Recommended planning effort: <strong>low</strong> (the runbook does the
+  work; the phase plan is a wrapper).</p>
 </li>
 </ul>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>

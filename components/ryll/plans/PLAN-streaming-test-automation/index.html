@@ -11162,6 +11162,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push audit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13316,6 +13327,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push audit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13505,6 +13527,26 @@ characterisation of which scenarios are deterministic
 enough to bet a CI test on. Trying to write CI assertions
 against a streaming heuristic we don't fully understand
 yet would just produce flaky tests.</p>
+<h2 id="push-audit">Push audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h2>
+<p>Whenever this plan does grow phases, the last of them runs
+<code>PUSH-AUDIT.md</code> over the accumulated diff of all of them
+against <code>develop</code>, not the last phase's diff alone. Findings
+land as their own PR against <code>develop</code>, recorded here under
+an <em>Items deferred from the push audit</em> heading — the shape
+<code>PLAN-web-frontend.md</code> uses for its <em>Items deferred from the
+post-Phase-N pre-push audit</em> sections, minus the phase number,
+because this phase audits the whole plan rather than a range
+of it. The plan is not complete until each one is fixed or
+declined in writing. If the audit finds nothing, record that
+here in one sentence.</p>
+<p>Those phases will have merged by then, so <code>develop...HEAD</code>
+is empty on the audit branch and the accumulated diff has to
+be assembled from their merge commits. Record each phase's
+merge commit alongside its phase as that phase lands — in a
+<code>Merged</code> column, once these phases are a table — and keep it
+out of the <code>Status</code> column, which holds one vocabulary term
+and nothing else. <em>Two ways this runbook is invoked</em> in
+<code>PUSH-AUDIT.md</code> has the rest.</p>
 <h2 id="cross-references">Cross-references<a class="headerlink" href="#cross-references" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>docs/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md</code>

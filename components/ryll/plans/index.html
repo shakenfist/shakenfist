@@ -13352,7 +13352,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency/">Idle CPU and latency</a></td>
 <td>Investigate 6-core idle CPU usage; replace broken keystroke latency with PING/PONG-based measurement; demote noisy protocol logging; capture runtime metrics in bug reports</td>
 <td>In progress</td>
-<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/">1. Profile</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/">2. Repaint</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/">3. Logging</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/">4. Latency</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/">5. Metrics</a></td>
+<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/">1. Profile</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/">2. Repaint</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/">3. Logging</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/">4. Latency</a>, <a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/">5. Metrics</a>, 6. Push audit</td>
 </tr>
 <tr>
 <td>2026-04-21</td>
@@ -13366,7 +13366,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-android-apk/">Android APK port</a></td>
 <td>Concept plan for a sideloadable Android APK of ryll, targeting the Google TV Streamer as a thin-client SPICE endpoint</td>
 <td>Proposed</td>
-<td>(phases not yet written)</td>
+<td>(phases 1-9 not yet written), 10. Push audit</td>
 </tr>
 <tr>
 <td>2026-04-23</td>
@@ -13408,7 +13408,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-connection-properties/">Connection properties</a></td>
 <td>Connection properties dialog showing server endpoint, protocol version, channels, negotiated capabilities, and display surfaces</td>
 <td>Not started</td>
-<td>1. Plumbing, 2. Dialog, 3. Cap names, 4. Docs (phase plans pending)</td>
+<td>1. Plumbing, 2. Dialog, 3. Cap names, 4. Docs, 5. Push audit (phase plans pending)</td>
 </tr>
 <tr>
 <td>2026-04-30</td>
@@ -13443,7 +13443,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-ci-platform-matrix/">CI platform matrix</a></td>
 <td>Lift CI smoke coverage to macOS and Windows so platform-specific runtime bugs (e.g. the rustls macOS <code>CryptoProvider</code> panic) are caught in CI rather than during dogfooding.</td>
 <td>Not started</td>
-<td>1. TLS handshake smoke, 2. <code>web-smoke</code> parity, 3. Smoke-test portability audit, 4. Release QA checklist (phase plans pending)</td>
+<td>1. TLS handshake smoke, 2. <code>web-smoke</code> parity, 3. Smoke-test portability audit, 4. Release QA checklist, 5. Push audit (phase plans pending)</td>
 </tr>
 <tr>
 <td>2026-05-17</td>
@@ -13457,14 +13457,14 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap/">Stream caps and flap diagnostics</a></td>
 <td>Advertise the four SPICE display capabilities ryll is missing (<code>STREAM_REPORT</code>, <code>LZ4_COMPRESSION</code>, <code>MULTI_CODEC</code>+<code>CODEC_H264</code>, <code>PREF_COMPRESSION</code>+<code>PREF_VIDEO_CODEC_TYPE</code>), replace the pure-Rust MJPEG decoder with per-platform best-of-breed (ImageIO / WIC / VA-API / libjpeg-turbo), audit and complete per-channel diagnostic surface (especially playback), surface the spice-server's stream-flapping behaviour in the UI, add a vdagent responsiveness probe, and remove the now-redundant spurious-PONG keepalive. Spun out of test sessions 002 and 002b; phase 4 added after sessions 002d/002e exposed a playback observability gap.</td>
 <td>In progress</td>
-<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">1. STREAM_REPORT</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">2. LZ4</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">3. Fast JPEG decode</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">4. Channel diagnostics audit</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">5. Auto-snapshot mode</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">6. Multi-codec + H.264</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">7. Preference messages</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">8. Streaming indicator + flap notification</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">9. Vdagent probe</a>, 10. Docs (no separate plan; dispatched as a docs-audit catch-all), <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">11. Remove PONG keepalive</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">12. Bounded image cache</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/">13. Investigate intermittent server-side streaming</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">14. Status-bar pointer leak</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">15. build_tcp_frame warn</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/">16. Guest-driver viability</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/">17. Patched libspice validation</a></td>
+<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">1. STREAM_REPORT</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">2. LZ4</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">3. Fast JPEG decode</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">4. Channel diagnostics audit</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">5. Auto-snapshot mode</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">6. Multi-codec + H.264</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">7. Preference messages</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">8. Streaming indicator + flap notification</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">9. Vdagent probe</a>, 10. Docs (no separate plan; dispatched as a docs-audit catch-all), <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">11. Remove PONG keepalive</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">12. Bounded image cache</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/">13. Investigate intermittent server-side streaming</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">14. Status-bar pointer leak</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">15. build_tcp_frame warn</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/">16. Guest-driver viability</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/">17. Patched libspice validation</a>, 18. Push audit</td>
 </tr>
 <tr>
 <td>2026-05-21</td>
 <td><a href="/components/ryll/plans/PLAN-streaming-test-automation/">Streaming test automation</a></td>
 <td>Replace the manual session-driven cadence with CI coverage of known-good streaming scenarios. Covers three complementary approaches: pcap replay (smallest first cut), input record-and-replay against a dedicated CI box (closer to real-world), and AT-SPI-based semantic replay (highest effort, dovetails with future MCP agent surfaces). Blocked on phase 13 of the stream-caps work finishing so we know which scenarios are deterministic enough to assert against.</td>
 <td>Proposed</td>
-<td>(phases not yet written)</td>
+<td>(phases not yet written; the last of them is a push audit)</td>
 </tr>
 <tr>
 <td>2026-07-19</td>

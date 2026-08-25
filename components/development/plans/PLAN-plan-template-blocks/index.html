@@ -13607,6 +13607,40 @@ would cover none of the eight repositories the migration touches.</p>
   against <code>main</code>, not over the last commit alone. It runs once the
   migration is complete.</li>
 </ul>
+<p>The blocks half of that diff did not land in one place, so the range
+is recorded here rather than derived when the phase runs.
+<code>plan-push-audit-phase</code> asks for a <code>Merged:</code> line per phase where a
+plan's phases are prose sections rather than a table; this plan's
+implementation sections were built in four landings, so the line
+names the set:</p>
+<p>Merged: <code>2468dda</code> and <code>5918f5b</code> direct to <code>main</code>; <code>5b1fb74</code> (#49)
+and <code>ff92357</code> (#50). Between them those cover all nine blocks,
+<code>check_plan_template</code>, and <code>docs/audits/plan-template.md</code> --
+<code>2468dda</code> carried seven blocks plus the check and the spec page,
+<code>5918f5b</code> added <code>plan-status-vocabulary</code>, and #49 and #50 added and
+then revised <code>plan-push-audit-phase</code>. The migration commits in the
+other four repositories are named in their own pull requests and are
+audited there.</p>
+<p><strong>Two corrections to that line, both worth reading before doing this
+for another plan.</strong> It first read as seven commits "all direct to
+<code>main</code>", derived from <code>git log -- templates/shared-blocks/</code>. That
+was wrong twice over. Two of the seven were not direct: <code>51d872f</code>
+arrived inside #21 and <code>e2585e3</code> inside #49, so anchoring on either
+would have audited one commit of a pull request rather than the pull
+request, and <code>e2585e3</code> was double-counted against <code>5b1fb74</code> besides.
+A path-filtered log does not distinguish the two cases;
+<code>git rev-list --first-parent</code> does, and is now what the block tells
+you to use.</p>
+<p>The larger error was scope. Four of the seven -- <code>9a74046</code>
+(<code>readme-discipline</code>), <code>fbcd759</code> (<code>comment-proportion</code>), <code>3abb973</code>
+(<code>plan-phase-references</code>) and <code>51d872f</code> (<code>llm-doc-discipline</code>) --
+are not this plan's work at all. They touch
+<code>templates/shared-blocks/</code> but none of them is one of the nine
+blocks <code>PLAN_TEMPLATE_BLOCKS</code> names, so an audit anchored on them
+would have swept in four unrelated consistency audits. Recording a
+range by the directory a plan happens to touch is the same mistake
+as deriving it from a date: both answer "what else was going on"
+rather than "what did this plan do".</p>
 <p>Findings from either land as their own pull request; the plan is not
 complete until each is resolved or declined in writing, with the
 reason recorded here. If an audit finds nothing, say so in one

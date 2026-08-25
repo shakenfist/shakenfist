@@ -11144,6 +11144,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-05-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 05 — Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13476,6 +13487,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-05-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 05 — Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13707,11 +13729,12 @@ macOS / Windows (no KVM, no QEMU SPICE stack); browser-based
 automation of <code>--web</code> mode (separate plan); cross-compilation
 matrices (we already build natively).</p>
 <h2 id="approach">Approach<a class="headerlink" href="#approach" title="Permanent link">&para;</a></h2>
-<p>The plan breaks into four phases. Phases 1 and 2 are no-regret
+<p>The plan breaks into five phases. Phases 1 and 2 are no-regret
 expansions that fit comfortably in current CI budgets. Phase 3
 is a portability cleanup that unblocks Phases 1 and 2 on
 Windows. Phase 4 documents a manual-QA boundary; the work
-itself is a doc, not automation.</p>
+itself is a doc, not automation. Phase 5 is the pre-push audit
+of everything the first four phases changed.</p>
 <h3 id="phase-01-cross-platform-guiheadless-tls-smoke-test">Phase 01 — Cross-platform GUI/headless TLS smoke test<a class="headerlink" href="#phase-01-cross-platform-guiheadless-tls-smoke-test" title="Permanent link">&para;</a></h3>
 <p>Add a smoke test that:</p>
 <ul>
@@ -13821,6 +13844,32 @@ the release PR.</p>
 <p>Bug-class coverage per minute: not applicable. The point is
 to be honest that some bugs require this and to make the
 boundary explicit.</p>
+<h3 id="phase-05-push-audit">Phase 05 — Push audit<a class="headerlink" href="#phase-05-push-audit" title="Permanent link">&para;</a></h3>
+<p>Work <code>PUSH-AUDIT.md</code> over the accumulated diff of Phases 01-04
+against <code>develop</code>, rather than the last phase's diff alone —
+the workflow edits, the portability cleanup and the new smoke
+tests only make sense read together. Findings land as their
+own PR against <code>develop</code>, recorded here under an <em>Items
+deferred from the push audit</em> heading — the shape
+<code>PLAN-web-frontend.md</code> uses for its <em>Items deferred from the
+post-Phase-N pre-push audit</em> sections, minus the phase number,
+because this phase audits the whole plan rather than a range
+of it. This plan is not complete until each is fixed or
+declined in writing. If the audit finds nothing, record that
+here in one sentence.</p>
+<p>Phases 01-04 have merged by the time this phase runs, so
+<code>develop...HEAD</code> is empty on the audit branch and the
+accumulated diff has to be assembled from the phases' merge
+commits. Record each phase's merge commit in the <code>Merged</code>
+column of the <em>Phase order</em> table as that phase lands; <em>Two
+ways this runbook is invoked</em> in <code>PUSH-AUDIT.md</code> has the rest.</p>
+<p>This catches:
+- Cross-phase duplication and doc drift that per-phase review
+  cannot see, because it only exists once several phases have
+  landed.</p>
+<p>Cost: sub-agent time at the end of the plan. No CI minutes.</p>
+<p>Bug-class coverage per minute: not applicable. This is a
+review gate, not a test.</p>
 <h2 id="phase-order">Phase order<a class="headerlink" href="#phase-order" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -13828,6 +13877,7 @@ boundary explicit.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -13835,21 +13885,31 @@ boundary explicit.</p>
 <td>1. Cross-platform TLS handshake smoke</td>
 <td>PLAN-ci-platform-matrix-phase-01-tls-smoke.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. <code>web-smoke</code> on macOS (and Windows after Phase 03)</td>
 <td>PLAN-ci-platform-matrix-phase-02-web-smoke-parity.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Smoke-test portability audit</td>
 <td>PLAN-ci-platform-matrix-phase-03-smoke-portability.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Release QA checklist doc</td>
 <td>PLAN-ci-platform-matrix-phase-04-release-qa.md</td>
 <td>Not started</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5. Push audit</td>
+<td>PLAN-ci-platform-matrix-phase-05-push-audit.md</td>
+<td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>

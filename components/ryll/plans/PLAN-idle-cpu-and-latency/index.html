@@ -13787,6 +13787,7 @@ guest). Out of scope for this plan.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -13794,26 +13795,37 @@ guest). Out of scope for this plan.</p>
 <td>1. Profile idle CPU</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/">PLAN-idle-cpu-and-latency-phase-01-profile.md</a></td>
 <td>Complete</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Repaint cadence fix</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/">PLAN-idle-cpu-and-latency-phase-02-repaint.md</a></td>
 <td>In progress</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Demote protocol logging</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/">PLAN-idle-cpu-and-latency-phase-03-logging.md</a></td>
 <td>Complete</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Real latency from PING/PONG</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/">PLAN-idle-cpu-and-latency-phase-04-latency.md</a></td>
 <td>Complete</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Capture runtime metrics in bug reports</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/">PLAN-idle-cpu-and-latency-phase-05-metrics.md</a></td>
 <td>Complete</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6. Push audit</td>
+<td>PLAN-idle-cpu-and-latency-phase-06-push-audit.md</td>
+<td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
@@ -13836,6 +13848,26 @@ captured its own per-thread CPU into bug reports, the user
 report would have included the llvmpipe breakdown directly
 and the profiling phase would have been unnecessary.  This
 phase makes future incidents self-debugging.</p>
+<p>Phase 6 is the pre-push audit, and it runs last.  It works
+<code>PUSH-AUDIT.md</code> over the accumulated diff of phases 1-5
+against <code>develop</code>, not the last phase's diff alone, so it
+sees what the repaint, logging, latency and metrics changes
+did to each other.  Findings land as their own PR against
+<code>develop</code>, recorded here under an <em>Items deferred from the
+push audit</em> heading — the shape <code>PLAN-web-frontend.md</code> uses
+for its <em>Items deferred from the post-Phase-N pre-push audit</em>
+sections, minus the phase number, because this phase audits
+the whole plan rather than a range of it.  This plan is not
+complete until every one is fixed or declined in writing.  If
+the audit finds nothing, that gets recorded here in one
+sentence.</p>
+<p>Phases 1-5 have already merged, so <code>develop...HEAD</code> is empty
+on the audit branch and the accumulated diff has to be
+assembled from those phases' merge commits.  None of the five
+recorded one, so phase 6 starts by reconstructing them from
+<code>git log</code> and writing them into the <code>Merged</code> column of the
+table above.  <em>Two ways this runbook is invoked</em> in
+<code>PUSH-AUDIT.md</code> has the rest.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never

@@ -14140,10 +14140,39 @@ this plan against <code>main</code>, not over the last phase's diff alone --
 the interactions between phases are most of what a whole-plan
 audit is for.</p>
 <p>Phases 0--2 are already on <code>main</code>, so <code>git diff main</code> for this plan
-is empty and would read as a clean audit. Derive the range instead:
-from the merge base of phase 0's first commit to <code>main</code>, restricted
-to the paths this plan touched, and name the commit range here when
-the phase runs.</p>
+is empty and would read as a clean audit. The audit runs over the
+commits that put them there, reconstructed from this plan file's
+history rather than recorded as they landed -- which is what the
+<code>plan-push-audit-phase</code> block now asks for, and did not when these
+phases merged:</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Merged</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. Trial weAudit</td>
+<td>nothing in this repository; the trial ran in ryll</td>
+</tr>
+<tr>
+<td>1. Conventions for signed review state</td>
+<td><code>d180c39</code></td>
+</tr>
+<tr>
+<td>2. Stamp and prune hooks</td>
+<td><code>0957d15</code>, <code>9f8d47f</code>, <code>4eae793</code>, <code>ee6d4ea</code></td>
+</tr>
+</tbody>
+</table>
+<p>There are no merge commits to name: all of these landed directly on
+<code>main</code> on 2026-07-09, confirmed against
+<code>repos/shakenfist/development/commits/&lt;sha&gt;/pulls</code>, which returns no
+pull request for any of them. That is the second shape v2 covers --
+"the phase's last commit where it landed directly" -- and it is why
+the block asks for the landing commit rather than the merge commit.</p>
 <p>Phase 4's rollout lands in other repositories, so each rollout pull
 request carries its own audit against that repository's default
 branch -- which is <code>develop</code>, not <code>main</code>, in shakenfist and ryll.</p>

@@ -13753,6 +13753,7 @@ PR on this branch, the ryll work a separate PR.</p>
 <th>Repo</th>
 <th>Description</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -13761,51 +13762,70 @@ PR on this branch, the ryll work a separate PR.</p>
 <td>development</td>
 <td><code>status</code> subcommand + tests</td>
 <td>Done</td>
+<td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>2</td>
 <td>development</td>
 <td><code>check_review_coverage</code> + registration + tests</td>
 <td>Done</td>
+<td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>3</td>
 <td>development</td>
 <td><code>audit_common.py</code> metadata + <code>audits/review-coverage.md</code></td>
 <td>Done</td>
+<td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>4</td>
 <td>development</td>
 <td><code>PROJECT-CONSISTENCY-AUDITS.md</code> + <code>PLAN-consistency.md</code> entries</td>
 <td>Done</td>
+<td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>5</td>
 <td>development</td>
 <td><code>docs/code-review-tracking.md</code> steady-state rewrite</td>
 <td>Done</td>
+<td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>6</td>
 <td>ryll</td>
 <td>prune workflow + <code>tools/ci-prune-reviews.sh</code> + docs</td>
 <td>Done</td>
+<td>ryll <code>1e94d00f</code> (#236)</td>
 </tr>
 <tr>
 <td>7</td>
 <td>both</td>
 <td>end-to-end verification (phase 5)</td>
 <td>Blocked on merge</td>
+<td></td>
 </tr>
 <tr>
 <td>8</td>
 <td>both</td>
 <td>push audit over each PR (phase 6)</td>
 <td>Not started</td>
+<td></td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column is what <code>plan-push-audit-phase</code> asks each phase
+to record as it lands, so that phase 6 has a range to audit once
+<code>git diff main</code> for this plan is empty. Steps 1--5 were one pull
+request, which is why they share a commit; step 6 is in a different
+repository against a different default branch, so it names its own.
+These were reconstructed after the fact rather than recorded live,
+and reconstructing step 6 turned up the reason v2 stopped trusting
+derivation: the two follow-ups to the prune workflow
+(<code>a0227e05</code>, <code>196db2f6</code>) reached <code>develop</code> inside <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/262" title="GitHub Issue: shakenfist/ryll #262">ryll#262</a>, an
+unrelated merge-queue pull request, so no range anchored on this
+plan's own commits contains them.</p>
 <p><code>pre-commit run --all-files</code> must pass before each commit is
 proposed; the Python follows the house style (single quotes,
 120-column wrap).</p>

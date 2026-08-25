@@ -13341,7 +13341,18 @@ version of each of these shared blocks:</p>
 <li><strong><code>plan-push-audit-phase</code></strong> -- that every master plan ends with a
   phase running the repository's <code>PUSH-AUDIT.md</code> over the whole
   plan's work. This is the block that gives the pre-push audit a
-  trigger; see the <code>push-audit</code> audit for the runbook it starts.</li>
+  trigger; see the <code>push-audit</code> audit for the runbook it starts.
+  Since v2 it also carries a plan-authoring requirement: because a
+  diff against the default branch is empty once a plan's phases have
+  merged, and unrelated work landing between phases makes the range
+  underivable afterwards, each phase records what put it on the
+  default branch as it lands -- the merge commit of its pull
+  request, or every commit of the phase where it landed directly.
+  That goes in a <code>Merged</code> column where the Execution phases are a
+  table, added last so a row which omits it still reaches <code>Status</code>,
+  or a <code>Merged:</code> line where they are prose sections. It never goes
+  in the <code>Status</code> cell, which <code>plan-status-vocabulary</code> reserves for
+  a single term.</li>
 </ul>
 <p>Every embedded block must be verbatim and at the current version.</p>
 <p>Repositories with no <code>PLAN-TEMPLATE.md</code> at all are reported as N/A.

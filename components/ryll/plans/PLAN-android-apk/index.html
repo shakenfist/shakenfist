@@ -10779,6 +10779,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-10-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 10: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13614,6 +13625,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-10-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 10: Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14024,6 +14046,7 @@ questions resolve.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14031,46 +14054,61 @@ questions resolve.</p>
 <td>1. Toolchain + boot an empty window</td>
 <td>PLAN-android-apk-phase-01-toolchain.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Portability shims (<code>#[cfg]</code> gating)</td>
 <td>PLAN-android-apk-phase-02-shims.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Android entrypoint (eframe vs bare winit)</td>
 <td>PLAN-android-apk-phase-03-entrypoint.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Display + activity lifecycle</td>
 <td>PLAN-android-apk-phase-04-display.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Input (BT keyboard/mouse → SPICE inputs)</td>
 <td>PLAN-android-apk-phase-05-input.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Audio (AAudio via cpal)</td>
 <td>PLAN-android-apk-phase-06-audio.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. TV-specific manifest + launcher</td>
 <td>PLAN-android-apk-phase-07-tv.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>8. CI build + release artifact</td>
 <td>PLAN-android-apk-phase-08-ci.md</td>
 <td>Not written</td>
+<td>—</td>
 </tr>
 <tr>
 <td>9. Docs</td>
 <td>PLAN-android-apk-phase-09-docs.md</td>
 <td>Not written</td>
+<td>—</td>
+</tr>
+<tr>
+<td>10. Push audit</td>
+<td>PLAN-android-apk-phase-10-push-audit.md</td>
+<td>Not written</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
@@ -14142,6 +14180,26 @@ Release. Document the sideload workflow in
   architecture is platform-agnostic.</li>
 <li><code>AGENTS.md</code> — add Android build commands.</li>
 </ul>
+<h3 id="phase-10-push-audit">Phase 10: Push audit<a class="headerlink" href="#phase-10-push-audit" title="Permanent link">&para;</a></h3>
+<p>Work <code>PUSH-AUDIT.md</code> over the accumulated diff of phases 1-9
+against <code>develop</code> — the whole port as one change, not the
+last phase's diff alone, because the <code>#[cfg]</code> gating from
+phase 2 is threaded through everything the later phases add.
+Findings land as their own PR against <code>develop</code>, recorded
+here under an <em>Items deferred from the push audit</em> heading —
+the shape <code>PLAN-web-frontend.md</code> uses for its <em>Items deferred
+from the post-Phase-N pre-push audit</em> sections, minus the
+phase number, because this phase audits the whole plan rather
+than a range of it. This plan is not complete until each one
+is fixed or declined in writing. If
+the audit finds nothing, record that here in one sentence.</p>
+<p>Phases 1-9 have merged by the time this phase runs, so
+<code>develop...HEAD</code> is empty on the audit branch and the
+accumulated diff has to be assembled from the phases' merge
+commits. Record each phase's merge commit in the <code>Merged</code>
+column of the <em>Phase order</em> table above as that phase lands;
+<em>Two ways this runbook is invoked</em> in <code>PUSH-AUDIT.md</code> has the
+rest.</p>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
 <p>We will know the MVP has landed when:</p>
