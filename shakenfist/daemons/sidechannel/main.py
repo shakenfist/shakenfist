@@ -341,14 +341,12 @@ class PutBlobCommand(AgentCommandHandler):
 
     def dispatch(self, command_id, cmd):
         if 'blob_uuid' not in cmd:
-            self.job.agentop.state = AgentOperation.STATE_ERROR
-            self.job.agentop.error = 'missing blob uuid'
+            self.job.agentop.fail('missing blob uuid')
             return []
 
         b = blob.Blob.from_db(cmd['blob_uuid'])
         if not b:
-            self.job.agentop.state = AgentOperation.STATE_ERROR
-            self.job.agentop.error = 'missing blob'
+            self.job.agentop.fail('missing blob')
             return []
 
         # This should already have been done by preflight, but hey
@@ -718,6 +716,18 @@ class SideChannelExecutorJob(SideChannelJob):
             ]
         )
 
+    def _abort_commands_if_terminal(self):
+        """Drop the rest of an operation's commands if it has failed.
+
+        The commands list is a fail-fast transaction: a put-blob whose
+        transfer errored must never run its chmod. Expiry counts the
+        same way as an error here -- an operation whose caller has run
+        out of budget has no business continuing to the next command.
+        """
+        if self.agentop.state.value in (AgentOperation.STATE_ERROR,
+                                        AgentOperation.STATE_EXPIRED):
+            self.commands = []
+
     def _execute_inner(self, vsock):
         self._send_commands_single_envelope(
             vsock.sock,
@@ -841,8 +851,7 @@ class SideChannelExecutorJob(SideChannelJob):
                             self._handle_file_chunk(vsock.sock, reply)
 
                         except GetException as e:
-                            self.agentop.state = AgentOperation.STATE_ERROR
-                            self.agentop.error = str(e)
+                            self.agentop.fail(str(e))
 
                     elif reply.HasField('command_error'):
                         self._handle_command_error(reply)
@@ -883,8 +892,7 @@ class SideChannelExecutorJob(SideChannelJob):
                             add_event_multi(
                                 EVENT_TYPE_STATUS, self.affected_objects,
                                 'unknown command', extra=cmd)
-                            self.agentop.state = AgentOperation.STATE_ERROR
-                            self.agentop.error = 'unknown command'
+                            self.agentop.fail('unknown command')
                         else:
                             requests = handler.dispatch(command_id, cmd)
                             register_as_outstanding = handler.register_as_outstanding
@@ -907,8 +915,7 @@ class SideChannelExecutorJob(SideChannelJob):
                             self.ready = False
 
                     finally:
-                        if self.agentop.state.value == AgentOperation.STATE_ERROR:
-                            self.commands = []
+                        self._abort_commands_if_terminal()
 
             except socket.timeout:
                 ...

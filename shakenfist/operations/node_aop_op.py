@@ -2,7 +2,6 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.blob import Blob
 from shakenfist.schema.operations import node_aop_op as schema
-from shakenfist.instance import Instance
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
@@ -86,7 +85,7 @@ class NodeAgentopOp(BaseClusterOperation):
         except Exception as e:
             util_exceptions.ignore_exception('node_aop_op', e)
             self.state = NodeAgentopOp.STATE_ERROR
-            aop.state = Instance.STATE_ERROR
+            aop.fail(f'{task.name} task raised an exception')
 
     def _preflight(self, aop):
         if aop.state.value != AgentOperation.STATE_PREFLIGHT:

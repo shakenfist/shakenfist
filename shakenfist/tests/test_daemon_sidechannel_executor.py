@@ -13,11 +13,28 @@ class _FakeState:
 
 
 class _FakeAgentOp:
+    TERMINAL_STATES = AgentOperation.TERMINAL_STATES
+
     def __init__(self, state_value):
         self.uuid = 'fake-agentop'
         self.state = _FakeState(state_value)
         self.error = None
         self.commands = []
+        self.expired_reason = None
+
+    def fail(self, message):
+        """Stands in for AgentOperation.fail(), guard included."""
+        if self.state.value in self.TERMINAL_STATES:
+            return
+        self.state = _FakeState(AgentOperation.STATE_ERROR)
+        self.error = message
+
+    def expire(self, reason):
+        """Stands in for AgentOperation.expire(), guard included."""
+        if self.state.value in self.TERMINAL_STATES:
+            return
+        self.state = _FakeState(AgentOperation.STATE_EXPIRED)
+        self.expired_reason = reason
 
 
 class _FakeInstance:
@@ -143,3 +160,48 @@ class AgentCommandHandlerTestCase(base.ShakenFistTestCase):
             for cls in sidechannel.AGENT_COMMAND_HANDLERS
         }
         self.assertEqual(expected, actual)
+
+
+class ExecutorTerminalStateGuardTestCase(base.ShakenFistTestCase):
+    """The failure paths must tolerate an operation which has already
+    reached a terminal state. Deadline enforcement can expire an
+    operation underneath a caller, and expired has no edge to error, so
+    an unguarded write raises InvalidStateException."""
+
+    def _make_executor(self, state_value, commands):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = _FakeAgentOp(state_value)
+        job.commands = list(commands)
+        job.log = mock.MagicMock()
+        return job
+
+    def test_fail_from_expired_leaves_the_state_alone(self):
+        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
+        agentop.expire('deadline passed')
+        agentop.fail('and then the transfer broke')
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertIsNone(agentop.error)
+
+    def test_commands_abort_when_errored(self):
+        job = self._make_executor(
+            AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
+        job.agentop.fail('transfer broke')
+        job._abort_commands_if_terminal()
+        self.assertEqual([], job.commands)
+
+    def test_commands_abort_when_expired(self):
+        # The point of the change: an operation whose caller ran out of
+        # budget must drop its remaining commands the same way an
+        # errored one does.
+        job = self._make_executor(
+            AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
+        job.agentop.expire('deadline passed')
+        job._abort_commands_if_terminal()
+        self.assertEqual([], job.commands)
+
+    def test_commands_survive_a_healthy_operation(self):
+        job = self._make_executor(
+            AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
+        job._abort_commands_if_terminal()
+        self.assertEqual([{'command': 'chmod'}], job.commands)
