@@ -576,6 +576,7 @@ class Artifact(dbowo):
             'max_versions': self.max_versions,
             'namespace': self.namespace,
             'shared': self.shared,
+            'error_message': self.error,
             'last_cluster_operation': self.last_cluster_operation
         })
         return out
