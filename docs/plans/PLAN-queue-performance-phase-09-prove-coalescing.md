@@ -341,4 +341,99 @@ Confirm before starting, and stop at the gate:
 
 ## Results
 
-To be completed as the phase executes.
+Steps 9a to 9e are done. Step 9f is not, and cannot be until this
+branch is deployed to `sfcbr` and a day of traffic has passed
+through it; the phase stays `In progress` until then, as the risk
+section said it would.
+
+### What was built
+
+* **9b.** The fold's event now goes through
+  `eventlog.add_event_multi` against both the survivor operation and
+  its coalescing target (`shakenfist/operations/baseoperation.py`).
+  The target's object type is resolved through the schema model's
+  `target_fields` map by
+  `BaseClusterOperation._coalescible_target_reference`, so #3884's
+  multi-column key extends that map rather than adding a special
+  case. The `extra` payload and the message are unchanged.
+
+* **9c.** `BaseClusterOperation.execute` records `coalesce_outcome`
+  (`ran`, `batch_size_one`, `not_cluster_wide`,
+  `no_coalescible_tasks`), `coalesce_seconds` and `coalesce_folded`.
+
+  This step departed from its brief in one way. The brief said to
+  copy the fields into the `extra` dict in both dispatchers; both
+  dispatchers instead call a new
+  `BaseClusterOperation.execution_duration_extra`, which builds the
+  whole payload. The brief's own constraint was that the two
+  dispatchers must spell the fields identically because the report
+  reads one stream from both -- and two hand-maintained copies is
+  exactly how that stops being true. Building it once removes the
+  possibility rather than documenting it. The `wait_seconds`,
+  `defer_count` and `queue_name` fields moved into the same helper,
+  so the two dispatchers now differ only in which queue name they
+  pass.
+
+* **9d.** `tools/queue-wait-report.py` gained a `Coalescing` section
+  reporting, by operation type and by queue class, the
+  `coalesce_seconds` distribution over folds which ran, the total
+  siblings folded, and a count per outcome. Samples with no
+  instrumentation are excluded from that section and counted in a
+  footnote rather than being read as zeroes.
+
+* **9e.** `cluster_ci_tests/test_coalescing.py` starts six instances
+  on one network through a non-blocking client and asserts that at
+  least one of `enqueue-side dedup: reused pending op` or
+  `coalesced sibling ops` reaches the network's event stream. The
+  non-blocking client matters: the namespaced test client pauses for
+  up to sixty seconds per async operation, which would serialise the
+  burst into six sequential creates with nothing left to coalesce.
+
+* Operator documentation for both events and the new instrumentation
+  fields is updated in
+  `docs/operator_guide/networking/overview.md`.
+
+### The mutation run
+
+The definition of done requires the functional test to have been
+*observed* to fail with `COALESCIBLE_TASKS` emptied. That mutation
+cannot be run here: it needs the five node cluster CI environment,
+not a workstation.
+
+What was done instead is a unit-level mutation which proves the
+mechanism the functional assertion depends on:
+`test_emptying_the_coalescible_set_silences_both_signals` patches
+`NetOp.coalescible_tasks` to an empty frozenset and asserts the fold
+never runs, no `coalesced sibling ops` event is emitted, and the
+outcome is `no_coalescible_tasks`. With nothing coalescible neither
+event can reach the network, so the functional assertion cannot
+pass. That is weaker than running the mutation against a cluster --
+it says nothing about whether the burst overlaps -- and the
+difference is recorded here rather than papered over. The cluster
+mutation should be run when this branch first reaches cluster CI.
+
+### Test coverage added
+
+* `shakenfist/tests/operations/test_baseoperation.py`: 37 tests
+  pass, up from 31. New coverage for the fold event landing on the
+  target, the schema-derived target type, every `coalesce_outcome`
+  value, and the mutation above. One existing test was rewritten:
+  `test_cross_op_coalescing_records_sibling_uuids` asserted against
+  `add_event` and now asserts against `add_event_multi`.
+* `shakenfist/tests/test_queue_wait_report.py`: 32 tests pass, up
+  from 22. New coverage for parsing the three fields, rejecting a
+  boolean fold count, older events carrying none of them, and the
+  report distinguishing a fold which ran and found nothing from one
+  which never ran. `test_every_outcome_the_code_records_is_reported`
+  reads the outcome strings back out of `baseoperation.py` so the
+  report's hand-written columns cannot fall behind the guards.
+
+### Still outstanding
+
+* **9f**, in full: the `sfcbr` measurement, the verdict on the
+  ~200 ms figure in `baseoperation.py:327`, the Prometheus
+  cross-check, filing the real-MariaDB concurrency issue from
+  decision 5, and closing #3879.
+* The cluster mutation run described above.
+* Neither the master plan's phase 9 row nor its `index.md` row
+  moves to `Complete` until both are done.
