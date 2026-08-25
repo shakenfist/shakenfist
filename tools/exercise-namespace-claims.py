@@ -22,7 +22,7 @@ a cluster that is already full.
 Usage:
     tools/exercise-namespace-claims.py                 # full run
     tools/exercise-namespace-claims.py --no-instances  # API paths only
-    tools/exercise-namespace-claims.py --no-expiry     # skip the ~7 min wait
+    tools/exercise-namespace-claims.py --no-expiry     # skip the expiry wait
     tools/exercise-namespace-claims.py --keep          # leave state behind
 
 Credentials come from $SHAKENFIST_API_URL / $SHAKENFIST_NAMESPACE /
@@ -232,7 +232,11 @@ def delete_namespace(client, namespace):
     deadline = time.time() + CLEANUP_TIMEOUT
     while True:
         status, _ = client.request('DELETE', '/auth/namespaces/%s' % namespace)
-        if status == 200 or time.time() >= deadline:
+        # 404 means somebody already removed it -- a previous partial
+        # cleanup, or the cascade beating us to it. That is the outcome
+        # we wanted, so stop rather than retrying a namespace that
+        # cannot come back and reporting a failure at the deadline.
+        if status in (200, 404) or time.time() >= deadline:
             return status
         time.sleep(CLEANUP_POLL_INTERVAL)
 
@@ -275,6 +279,10 @@ def main():
     args = parser.parse_args()
 
     url, namespace, key = load_credentials(args)
+    if args.insecure:
+        print('WARNING: --insecure disables TLS certificate verification, so '
+              'the admin\n         credential is exposed to anyone able to '
+              'intercept this run.', file=sys.stderr)
     client = Client(url, namespace, key, insecure=args.insecure)
 
     # A namespace name that is unique per run, so a previous crashed run
@@ -294,6 +302,14 @@ def main():
     r = Runner()
     created_ns = False
     instances = []
+    # Defined before the try, not inside it. The finally block reads
+    # state['network'] whenever created_ns is true, and created_ns goes
+    # true at the end of Preflight -- well before the Create section
+    # where this used to be assigned. A Ctrl-C during the eight
+    # validation requests in between would otherwise reach cleanup with
+    # state unbound, raise NameError, and leak the namespace the
+    # docstring promises to remove.
+    state = {}
 
     try:
         r.begin('Preflight')
@@ -362,7 +378,19 @@ def main():
         # ------------------------------------------------------------------
         r.begin('Create')
 
-        state = {}
+        # Run this *before* the real claim exists. create_namespace_claim
+        # probes for an existing claim and raises 'exists' before it ever
+        # reaches the guarded UPDATE against cluster_capacity, so asking
+        # for an impossible claim while the namespace already holds one
+        # only ever demonstrates the duplicate refusal. With no claim in
+        # place, capacity is the only thing that can refuse it, and the
+        # 507 is a real observation rather than a widened assertion.
+        def _impossible():
+            status, body = client.request(
+                'POST', claims_url, dict(base, limit_cpus=IMPOSSIBLE_CPUS))
+            expect(status, body, 507, 'impossible claim')
+            return 'HTTP %d' % status
+        r.check('507 on a claim larger than the cluster', _impossible)
 
         def _create():
             status, body = client.request('POST', claims_url, base)
@@ -395,19 +423,6 @@ def main():
             expect(status, body, 409, 'duplicate claim')
             return 'exists'
         r.check('409 on a second claim for the same namespace', _duplicate)
-
-        def _impossible():
-            status, body = client.request(
-                'POST', '/auth/namespaces/%s/claims' % soak_ns,
-                dict(base, limit_cpus=IMPOSSIBLE_CPUS))
-            # The namespace already holds a claim, so 'exists' is
-            # checked before capacity. Assert we get one of the two
-            # refusals rather than a success or a 500.
-            if status not in (409, 507):
-                raise Failure('expected 409 or 507, got %s -- %s'
-                              % (status, body))
-            return 'HTTP %d' % status
-        r.check('an impossible claim is refused, not granted', _impossible)
 
         # ------------------------------------------------------------------
         r.begin('Read')
@@ -699,11 +714,16 @@ def main():
                           % (net, CLEANUP_TIMEOUT))
             status = delete_namespace(client, soak_ns)
             print('  namespace %s: HTTP %s' % (soak_ns, status))
-            if status != 200:
+            if status not in (200, 404):
                 print('  NOTE: the namespace was not removed. Inspect and '
                       'clean up by hand:')
+                # --namespace picks who you authenticate *as*, and
+                # deleting a namespace needs cluster admin, so this has
+                # to name the admin namespace rather than the target.
+                # Pasting the target twice authenticates as the
+                # throwaway namespace and earns a 401.
                 print('    sf-client --namespace %s namespace delete %s'
-                      % (soak_ns, soak_ns))
+                      % (namespace, soak_ns))
 
     return r.report()
 
