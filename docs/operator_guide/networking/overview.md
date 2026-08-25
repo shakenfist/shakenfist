@@ -544,10 +544,35 @@ itself):
   wait fields are populated only when the dispatcher set the
   hints.
 
+  The same event also carries the coalescing instrumentation, when
+  the operation reached the cross-op fold's guards at all:
+    * `coalesce_outcome` — `ran` if the fold's SQL was issued, or
+      which guard skipped it: `batch_size_one` (the dispatcher
+      dequeued only this op), `not_cluster_wide` (a per-node queue,
+      where folding would be unsafe) or `no_coalescible_tasks`.
+    * `coalesce_seconds` — wall clock cost of the
+      `claim_coalescible_siblings` call, present only when the fold
+      ran.
+    * `coalesce_folded` — how many siblings that call folded away,
+      which is legitimately zero.
+
+  `coalesce_outcome` is the field which distinguishes "the fold ran
+  and found nothing" from "the fold never ran". Those two look
+  identical from outside, which is how #3878 stayed invisible for
+  three months. `tools/queue-wait-report.py` reports the
+  distribution and the outcome counts.
+
 * **`coalesced sibling ops`** (`EVENT_TYPE_STATUS`). Emitted on a
-  surviving op when one or more *other* pending ops on the same
-  target with the same single coalescible task were folded into
-  this one's execution. Carries three fields in `extra`:
+  surviving op, *and on the op's coalescing target*, when one or
+  more *other* pending ops on the same target with the same single
+  coalescible task were folded into this one's execution. It lands
+  on the target as well because an operation is hard deleted thirty
+  seconds after it reaches a final state and takes its events with
+  it (issue #3864), so an event recorded only against the survivor
+  is unreadable within a minute of the fold; the network outlives
+  it. For a `net_op` the target is the network, so this event is
+  queryable through `GET /networks/<uuid>/events`. Carries three
+  fields in `extra`:
     * `sibling_count` — how many siblings were folded.
     * `sibling_uuids` — their op uuids. Looking up any of those
       will show their state as `complete` with the message
@@ -575,7 +600,12 @@ itself):
   `cluster_operations` to `object_states` on columns that could
   never match (issue #3878). If you are reading historical event
   data from that window, its absence says nothing about the
-  workload.
+  workload. There is now a functional test which asserts that one
+  of the two coalescing events reaches a network after a burst of
+  instance starts on it
+  (`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_coalescing.py`),
+  so a repeat of that defect fails CI rather than waiting for an
+  audit.
 
 * **`enqueue-side dedup: reused pending op`** (`EVENT_TYPE_AUDIT`).
   Emitted on the *existing* operation, and on the network, when a

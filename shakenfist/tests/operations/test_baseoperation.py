@@ -181,6 +181,14 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_add_event = self.add_event_patcher.start()
         self.addCleanup(self.add_event_patcher.stop)
 
+        # The cross-op fold emits through eventlog.add_event_multi
+        # rather than the object's own add_event, so that the event
+        # lands on the coalescing target as well as the survivor.
+        self.add_event_multi_patcher = mock.patch(
+            'shakenfist.operations.baseoperation.eventlog.add_event_multi')
+        self.mock_add_event_multi = self.add_event_multi_patcher.start()
+        self.addCleanup(self.add_event_multi_patcher.stop)
+
         self.claim_patcher = mock.patch(
             'shakenfist.operations.baseoperation.mariadb.'
             'claim_coalescible_siblings')
@@ -244,6 +252,11 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             ['network_apply_update_dnsmasq'], kwargs['task_names'])
         self.assertEqual(OP_UUID, kwargs['exclude_op_uuid'])
 
+    def _coalesced_events(self):
+        return [
+            c for c in self.mock_add_event_multi.call_args_list
+            if c.args[2] == 'coalesced sibling ops']
+
     def test_cross_op_coalescing_records_sibling_uuids(self):
         sibling = '33333333-3333-4333-8333-333333333333'
         self.mock_claim.return_value = [sibling]
@@ -251,13 +264,47 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.execute()
 
-        coalesced_events = [
-            c for c in self.mock_add_event.call_args_list
-            if c.args[1] == 'coalesced sibling ops']
+        coalesced_events = self._coalesced_events()
         self.assertEqual(1, len(coalesced_events))
         extra = coalesced_events[0].kwargs['extra']
         self.assertEqual(1, extra['sibling_count'])
         self.assertEqual([sibling], extra['sibling_uuids'])
+
+    def test_fold_event_lands_on_the_target_as_well(self):
+        # The survivor operation is hard deleted thirty seconds after
+        # it completes and takes its event_objects rows with it
+        # (#3864), so an event recorded only against the operation is
+        # unreadable almost immediately -- which is how #3878 hid. The
+        # network outlives the operation, so the event has to land
+        # there too for anything to be able to assert on it.
+        self.mock_claim.return_value = [
+            '33333333-3333-4333-8333-333333333333']
+
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        coalesced_events = self._coalesced_events()
+        self.assertEqual(1, len(coalesced_events))
+        references = coalesced_events[0].args[1]
+        self.assertIn((str(ObjectType.NET_OP), OP_UUID), references)
+        self.assertIn(('network', NETWORK_UUID), references)
+
+    def test_fold_target_object_type_comes_from_the_schema(self):
+        # Resolved through the schema model's target_fields map rather
+        # than hard-coded, so the multi-column key in #3884 extends the
+        # map instead of adding a special case here.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        self.assertEqual(
+            ('network', NETWORK_UUID),
+            op._coalescible_target_reference())
+
+    def test_no_fold_event_when_nothing_was_folded(self):
+        self.mock_claim.return_value = []
+
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        self.assertEqual([], self._coalesced_events())
 
     def test_no_coalescing_call_when_task_not_coalescible(self):
         # network_remove_dnsmasq isn't in COALESCIBLE_TASKS, so the
@@ -324,3 +371,144 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.execute()
 
         self.mock_claim.assert_not_called()
+
+    def test_outcome_records_that_the_fold_ran(self):
+        # "The fold ran and found nothing" has to be distinguishable
+        # from "the fold never ran". While the join was broken (#3878)
+        # those two looked identical from outside, which is why the
+        # defect survived three months and a green test suite.
+        self.mock_claim.return_value = []
+
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        self.assertEqual('ran', op.coalesce_outcome)
+        self.assertEqual(0, op.coalesce_folded)
+        self.assertIsNotNone(op.coalesce_seconds)
+
+    def test_outcome_records_how_many_siblings_were_folded(self):
+        self.mock_claim.return_value = [
+            '33333333-3333-4333-8333-333333333333',
+            '44444444-4444-4444-8444-444444444444',
+        ]
+
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        self.assertEqual('ran', op.coalesce_outcome)
+        self.assertEqual(2, op.coalesce_folded)
+
+    def test_outcome_records_the_batch_size_guard(self):
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.dispatcher_batch_size = 1
+        op.execute()
+
+        self.assertEqual('batch_size_one', op.coalesce_outcome)
+        self.assertIsNone(op.coalesce_seconds)
+
+    def test_outcome_records_the_per_node_queue_guard(self):
+        op = self._make_net_op(
+            ['network_apply_update_dnsmasq'],
+            queue_name=(
+                '11111111-1111-4111-8111-111111111111'
+                '-network-user_facing'))
+        op.execute()
+
+        self.assertEqual('not_cluster_wide', op.coalesce_outcome)
+        self.assertIsNone(op.coalesce_seconds)
+
+    def test_outcome_records_a_job_with_nothing_coalescible(self):
+        op = self._make_net_op(['network_remove_dnsmasq'])
+        op.execute()
+
+        self.assertEqual('no_coalescible_tasks', op.coalesce_outcome)
+        self.assertIsNone(op.coalesce_seconds)
+
+    def test_emptying_the_coalescible_set_silences_both_signals(self):
+        # The mutation the functional test in
+        # cluster_ci_tests/test_coalescing.py is calibrated against: with
+        # nothing declared coalescible, the fold never runs and the
+        # 'coalesced sibling ops' event never fires, so a cluster run
+        # asserting on that event must fail. Proving it here means the
+        # calibration does not depend on someone remembering to try it by
+        # hand against a real cluster.
+        self.mock_claim.return_value = [
+            '33333333-3333-4333-8333-333333333333']
+
+        with mock.patch.object(NetOp, 'coalescible_tasks', frozenset()):
+            op = self._make_net_op(['network_apply_update_dnsmasq'])
+            op.execute()
+
+        self.mock_claim.assert_not_called()
+        self.assertEqual([], self._coalesced_events())
+        self.assertEqual('no_coalescible_tasks', op.coalesce_outcome)
+
+
+class ExecutionDurationExtraTestCase(base.ShakenFistTestCase):
+    """The end-of-op event payload both dispatchers emit.
+
+    It is built on the operation rather than in each dispatcher so the
+    two cannot drift apart on field names: tools/queue-wait-report.py
+    reads a single stream carrying events from both, and a field only
+    one of them spells correctly silently halves whatever it measures.
+    """
+
+    def _make_op(self, created_at=None):
+        static_values = _make_net_op_static_values(
+            ['network_apply_update_dnsmasq'])
+        op = NetOp(static_values)
+        op._BaseClusterOperation__created_at = created_at
+        return op
+
+    def test_queue_fields_omitted_without_created_at(self):
+        # An op constructed outside the dispatch path has no insert
+        # time, so there is no queue wait to report.
+        extra = self._make_op().execution_duration_extra(0.0, 'a-queue')
+
+        self.assertIn('seconds', extra)
+        self.assertNotIn('wait_seconds', extra)
+        self.assertNotIn('queue_name', extra)
+
+    def test_queue_fields_present_with_created_at(self):
+        op = self._make_op(created_at=100.0)
+        op.current_defer_count = 3
+
+        extra = op.execution_duration_extra(160.0, 'a-queue')
+
+        self.assertEqual(60.0, extra['wait_seconds'])
+        self.assertEqual(3, extra['defer_count'])
+        self.assertEqual('a-queue', extra['queue_name'])
+
+    def test_coalescing_fields_omitted_when_unset(self):
+        # Events from a build predating the instrumentation carry none
+        # of these, and the report tool has to be able to tell that
+        # apart from a zero.
+        extra = self._make_op().execution_duration_extra(0.0, None)
+
+        self.assertNotIn('coalesce_outcome', extra)
+        self.assertNotIn('coalesce_seconds', extra)
+        self.assertNotIn('coalesce_folded', extra)
+
+    def test_coalescing_fields_reported_when_the_fold_ran(self):
+        op = self._make_op()
+        op.coalesce_outcome = 'ran'
+        op.coalesce_seconds = 0.25
+        op.coalesce_folded = 0
+
+        extra = op.execution_duration_extra(0.0, None)
+
+        self.assertEqual('ran', extra['coalesce_outcome'])
+        self.assertEqual(0.25, extra['coalesce_seconds'])
+        # Zero is a real measurement -- "ran and folded nothing" -- and
+        # must survive into the payload rather than being dropped as
+        # falsey.
+        self.assertEqual(0, extra['coalesce_folded'])
+
+    def test_skip_reason_reported_without_a_duration(self):
+        op = self._make_op()
+        op.coalesce_outcome = 'batch_size_one'
+
+        extra = op.execution_duration_extra(0.0, None)
+
+        self.assertEqual('batch_size_one', extra['coalesce_outcome'])
+        self.assertNotIn('coalesce_seconds', extra)

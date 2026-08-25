@@ -159,13 +159,12 @@ class Job(util_concurrency.Job):
         # We're good to go!
         start_time = time.time()
         op.execute()
-        # One end-of-op event carries both the queue-wait time and the
-        # execution duration. See the matching block in
-        # ``shakenfist/daemons/network/workitem.py`` for the rationale
-        # (combining halves the eventlog gRPC cost on the critical path).
-        extra = {'seconds': time.time() - start_time}
-        if op.created_at is not None:
-            extra['wait_seconds'] = start_time - op.created_at
-            extra['defer_count'] = op.current_defer_count
-            extra['queue_name'] = self.queue_name
-        op.add_event(EVENT_TYPE_USAGE, 'execution duration', extra=extra)
+        # One end-of-op event carries the queue-wait time, the execution
+        # duration and the coalescing instrumentation. The payload is
+        # built on the operation so that this dispatcher and the one in
+        # ``shakenfist/daemons/network/workitem.py`` cannot drift apart
+        # on field names -- tools/queue-wait-report.py reads one stream
+        # carrying events from both.
+        op.add_event(
+            EVENT_TYPE_USAGE, 'execution duration',
+            extra=op.execution_duration_extra(start_time, self.queue_name))
