@@ -13553,6 +13553,11 @@ pass through the response dict opaquely need no change.</p>
 <h2 id="retention">Retention<a class="headerlink" href="#retention" title="Permanent link">&para;</a></h2>
 <p>Event rows are pruned daily by <code>scheduled_tasks.prune_events</code>,
 running under <code>ClusterLock</code> election on the cluster maintainer.
+The daily cadence is anchored to a cluster-wide last-run stamp
+(the <code>SCHEDULED_TASK_LAST_RUN_PRUNE_EVENTS</code> key in
+<code>cluster_config</code>), so it survives both daemon restarts and the
+maintenance lock changing hands -- a cluster whose daemons never
+run for a full day still prunes daily.
 The prune runs in three stages:</p>
 <ol>
 <li><strong>Per-event-type sweep.</strong> Removes <code>event_objects</code> rows older
