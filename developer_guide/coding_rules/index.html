@@ -13219,6 +13219,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-per-item-convenience-wrapper-does-not-belong-in-a-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A per-item convenience wrapper does not belong in a loop
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13658,6 +13669,41 @@ that proves it matches something. Asserting the statement's <em>shape</em>
 against a mocked engine cannot do that, and neither can a test that
 rewrites the query to suit sqlite -- register the missing SQL functions
 instead, so the statement under test is the statement that ships.</p>
+<h2 id="a-per-item-convenience-wrapper-does-not-belong-in-a-loop">A per-item convenience wrapper does not belong in a loop<a class="headerlink" href="#a-per-item-convenience-wrapper-does-not-belong-in-a-loop" title="Permanent link">&para;</a></h2>
+<p><code>instance_usage_for_blob_uuid()</code> answers "which instances use this
+blob?". It does so by calling <code>instance_blob_usage()</code>, which walks
+every healthy instance in the cluster: one <code>FindInstances</code>, then a
+<code>block_devices</code> attribute read per instance and a <code>get_references_from</code>
+per link of every disk's dependency chain. The wrapper is a single line
+over a cluster-wide scan, and nothing about the call site says so.</p>
+<p>Called once per request that is fine. Called once per item rendered it
+multiplies the whole scan by the length of the response, and the cost
+is invisible in the handler:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Wrong: one cluster-wide instance walk per version.</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">ev</span><span class="p">[</span><span class="s1">'blobs'</span><span class="p">]:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">ev</span><span class="p">[</span><span class="s1">'blobs'</span><span class="p">][</span><span class="n">idx</span><span class="p">][</span><span class="s1">'instances'</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance_usage_for_blob_uuid</span><span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="n">ev</span><span class="p">[</span><span class="s1">'blobs'</span><span class="p">][</span><span class="n">idx</span><span class="p">][</span><span class="s1">'uuid'</span><span class="p">])</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># Right: one walk, indexed per version.</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">blob_usage</span> <span class="o">=</span> <span class="n">instance_blob_usage</span><span class="p">()</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">ev</span><span class="p">[</span><span class="s1">'blobs'</span><span class="p">]:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">ev</span><span class="p">[</span><span class="s1">'blobs'</span><span class="p">][</span><span class="n">idx</span><span class="p">][</span><span class="s1">'instances'</span><span class="p">]</span> <span class="o">=</span> <span class="n">blob_usage</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="nb">str</span><span class="p">(</span><span class="n">ev</span><span class="p">[</span><span class="s1">'blobs'</span><span class="p">][</span><span class="n">idx</span><span class="p">][</span><span class="s1">'uuid'</span><span class="p">]),</span> <span class="p">[])</span>
+</code></pre></div>
+<p>Issue #3502 found this in the cluster cleanup loop and fixed it there,
+and left a docstring on <code>instance_blob_usage()</code> saying which form to
+use. Four API handlers kept the per-blob form anyway -- an artifact GET
+walked once per version, the artifact and snapshot listings once per
+artifact and once per version of every snapshot -- and it took issue</p>
+<h1 id="3876-filed-against-an-unrelated-symptom-to-find-them-the-lesson-is">3876, filed against an unrelated symptom, to find them. The lesson is<a class="headerlink" href="#3876-filed-against-an-unrelated-symptom-to-find-them-the-lesson-is" title="Permanent link">&para;</a></h1>
+<p>not "read the docstring": it is that a function whose cost is
+proportional to the size of the cluster must be <em>seen</em> to be, so a
+per-item wrapper over one needs the bulk form to be the obvious thing
+to reach for and the loop body to be plainly an index lookup.</p>
+<p>The same shape of trap exists wherever a property hides a query.
+<code>Blob.depends_on</code> and <code>Blob.transcoded</code> each ran their own filtered
+<code>get_references_from</code> while the caller had already read the same rows
+unfiltered; that was the other half of #3876.</p>
 
 
 
