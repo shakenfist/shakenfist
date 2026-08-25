@@ -230,8 +230,10 @@ class _BudgetAgentOp(_FakeAgentOp):
         super().__init__(AgentOperation.STATE_EXECUTING)
         self._deadline_passed = deadline_passed
         self._progress_timeout = progress_timeout
+        self.deadline_checks = 0
 
     def deadline_passed(self):
+        self.deadline_checks += 1
         return self._deadline_passed
 
     def effective_progress_timeout(self):
@@ -253,6 +255,11 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
     backstop. It enforces two caller-set budgets and reports exhausting
     either as expired, distinguished by the message."""
 
+    # A realistic timestamp, because the rate limit compares against
+    # _last_budget_check and a "now" near zero is inside the interval
+    # of the never-checked sentinel.
+    NOW = 1700000000.0
+
     def _make_executor(self, agentop, handler=None, ready=False,
                        last_progress=0.0):
         job = sidechannel.SideChannelExecutorJob.__new__(
@@ -261,8 +268,33 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
         job.in_flight_handler = handler
         job.ready = ready
         job._last_progress = last_progress
+        job._last_budget_check = 0.0
         job.log = mock.MagicMock()
         return job
+
+    def test_the_check_is_rate_limited(self):
+        # The caller is the socket loop, which iterates once per packet
+        # during a transfer. A NULL-deadline operation resolves its
+        # default against self.state.update_time, which is an uncached
+        # database read, so an unthrottled check is thousands of reads
+        # a second.
+        agentop = _BudgetAgentOp(deadline_passed=False)
+        job = self._make_executor(agentop, handler=_SilentHandler())
+
+        with mock.patch('time.time', return_value=self.NOW):
+            self.assertFalse(job.expire_if_out_of_budget())
+        self.assertEqual(1, agentop.deadline_checks)
+
+        # Everything inside the interval is free.
+        for offset in (0.1, 0.5, 0.9):
+            with mock.patch('time.time', return_value=self.NOW + offset):
+                self.assertFalse(job.expire_if_out_of_budget())
+        self.assertEqual(1, agentop.deadline_checks)
+
+        # Past it, one more check.
+        with mock.patch('time.time', return_value=self.NOW + 1.5):
+            self.assertFalse(job.expire_if_out_of_budget())
+        self.assertEqual(2, agentop.deadline_checks)
 
     def test_passed_deadline_expires_and_stops(self):
         agentop = _BudgetAgentOp(deadline_passed=True)

@@ -54,6 +54,15 @@ MAX_OUTSTANDING = 5
 # stream must not turn into one attributes write per chunk.
 PROGRESS_PERSIST_INTERVAL = 10
 
+# How often the executor's socket loop actually evaluates the timing
+# budgets. The loop is not rate limited -- recv() returns as soon as a
+# packet arrives, so an active transfer iterates thousands of times a
+# second -- and an operation with a NULL deadline resolves its default
+# against self.state.update_time, which is an uncached GetState round
+# trip. Checking once a second is ample resolution for a 30 second
+# window and bounds the cost regardless of which branch is taken.
+BUDGET_CHECK_INTERVAL = 1
+
 
 class ConnectionFailed(Exception):
     ...
@@ -475,6 +484,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self.in_flight_handler = None
         self._last_progress = time.time()
         self._last_progress_persisted = 0.0
+        self._last_budget_check = 0.0
 
         self.ready = False
         self.welcomed = False
@@ -746,6 +756,14 @@ class SideChannelExecutorJob(SideChannelJob):
         with a message saying which -- because both are numbers the
         caller chose rather than faults of the operation.
         """
+        # Rate limited, because the caller is the socket loop and the
+        # deadline_passed() call below can be a database read; see
+        # BUDGET_CHECK_INTERVAL.
+        now = time.time()
+        if now - self._last_budget_check < BUDGET_CHECK_INTERVAL:
+            return False
+        self._last_budget_check = now
+
         # The wall-clock deadline. Queue time and preflight time have
         # already been spent from it, so this can fire almost
         # immediately after dispatch.

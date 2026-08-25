@@ -889,6 +889,33 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
                 str(op1.uuid), str(self.inst.agent_operation_next().uuid))
         self.assertEqual(AgentOperation.STATE_QUEUED, op1.state.value)
 
+    def test_next_expires_a_null_deadline_head_on_the_default(self):
+        # A row written by an API server which predates deadlines. This
+        # is the shape a rolling upgrade produces, and the only tests
+        # of the fallback anchor otherwise go through the helper rather
+        # than through the enforcement site.
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(
+            state=AgentOperation.STATE_QUEUED, deadline=time.time() + 3600)
+        self.assertIsNone(op1.deadline)
+
+        anchor = op1.state.update_time
+        with mock.patch('time.time', return_value=anchor + 601):
+            self.assertEqual(
+                str(op2.uuid), str(self.inst.agent_operation_next().uuid))
+
+        self.assertEqual(AgentOperation.STATE_EXPIRED, op1.state.value)
+        self.assertEqual([str(op2.uuid)], self._queue())
+
+    def test_next_keeps_a_null_deadline_head_inside_the_default(self):
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        anchor = op1.state.update_time
+        with mock.patch('time.time', return_value=anchor + 599):
+            self.assertEqual(
+                str(op1.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual(AgentOperation.STATE_QUEUED, op1.state.value)
+
     def test_next_leaves_a_preflight_head_alone(self):
         # A preflight head is mid-creation and is enforced by
         # NodeAgentopOp._preflight(), not here. Expiring it in the
