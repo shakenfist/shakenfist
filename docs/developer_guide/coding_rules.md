@@ -477,3 +477,45 @@ that proves it matches something. Asserting the statement's *shape*
 against a mocked engine cannot do that, and neither can a test that
 rewrites the query to suit sqlite -- register the missing SQL functions
 instead, so the statement under test is the statement that ships.
+
+## A per-item convenience wrapper does not belong in a loop
+
+`instance_usage_for_blob_uuid()` answers "which instances use this
+blob?". It does so by calling `instance_blob_usage()`, which walks
+every healthy instance in the cluster: one `FindInstances`, then a
+`block_devices` attribute read per instance and a `get_references_from`
+per link of every disk's dependency chain. The wrapper is a single line
+over a cluster-wide scan, and nothing about the call site says so.
+
+Called once per request that is fine. Called once per item rendered it
+multiplies the whole scan by the length of the response, and the cost
+is invisible in the handler:
+
+```python
+# Wrong: one cluster-wide instance walk per version.
+for idx in ev['blobs']:
+    ev['blobs'][idx]['instances'] = instance_usage_for_blob_uuid(
+        ev['blobs'][idx]['uuid'])
+
+# Right: one walk, indexed per version.
+blob_usage = instance_blob_usage()
+for idx in ev['blobs']:
+    ev['blobs'][idx]['instances'] = blob_usage.get(
+        str(ev['blobs'][idx]['uuid']), [])
+```
+
+Issue #3502 found this in the cluster cleanup loop and fixed it there,
+and left a docstring on `instance_blob_usage()` saying which form to
+use. Four API handlers kept the per-blob form anyway -- an artifact GET
+walked once per version, the artifact and snapshot listings once per
+artifact and once per version of every snapshot -- and it took issue
+#3876, filed against an unrelated symptom, to find them. The lesson is
+not "read the docstring": it is that a function whose cost is
+proportional to the size of the cluster must be *seen* to be, so a
+per-item wrapper over one needs the bulk form to be the obvious thing
+to reach for and the loop body to be plainly an index lookup.
+
+The same shape of trap exists wherever a property hides a query.
+`Blob.depends_on` and `Blob.transcoded` each ran their own filtered
+`get_references_from` while the caller had already read the same rows
+unfiltered; that was the other half of #3876.

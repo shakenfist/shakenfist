@@ -37,7 +37,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
-from shakenfist.instance import instance_usage_for_blob_uuid
+from shakenfist.instance import instance_blob_usage
 from shakenfist.namespace import get_api_token
 from shakenfist.namespace import namespace_is_trusted
 from shakenfist.upload import Upload
@@ -337,9 +337,14 @@ class ArtifactEndpoint(api_base.Resource):
     @api_base.log_token_use
     def get(self, artifact_ref=None, artifact_from_db=None):
         ev = artifact_from_db.external_view()
+
+        # One instance walk for the whole response, not one per version
+        # (issue 3876). instance_usage_for_blob_uuid() would repeat the
+        # walk, and every disk's dependency chain reads, per blob.
+        blob_usage = instance_blob_usage()
         for idx in ev['blobs']:
-            ev['blobs'][idx]['instances'] = instance_usage_for_blob_uuid(
-                ev['blobs'][idx]['uuid'])
+            ev['blobs'][idx]['instances'] = blob_usage.get(
+                str(ev['blobs'][idx]['uuid']), [])
         return ev
 
     @swag_from(api_base.swagger_helper(
@@ -406,6 +411,10 @@ class ArtifactsEndpoint(api_base.Resource):
           artifacts_get_example)]))
     @api_base.log_token_use
     def get(self, node=None):
+        # One instance walk for the whole listing, not one per
+        # artifact (issue 3876).
+        blob_usage = instance_blob_usage()
+
         retval = []
         for a in Artifacts(filters=[
                 partial(namespace_or_shared_filter, request_namespace())],
@@ -415,12 +424,8 @@ class ArtifactsEndpoint(api_base.Resource):
 
             if 'blob_uuid' in idx:
                 b = Blob.from_db(idx['blob_uuid'])
-                if b:
-                    if not node:
-                        ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
-
-                    if node and node in b.locations:
-                        ev['instances'] = instance_usage_for_blob_uuid(b.uuid)
+                if b and (not node or node in b.locations):
+                    ev['instances'] = blob_usage.get(str(b.uuid), [])
 
             retval.append(ev)
 
@@ -768,12 +773,24 @@ class ArtifactVersionsEndpoint(api_base.Resource):
     @arg_is_visible_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, artifact_from_db=None):
+        # One instance walk for the whole listing, not one per version
+        # (issue 3876).
+        blob_usage = instance_blob_usage()
+
         retval = []
         for idx in artifact_from_db.get_all_indexes():
             b = Blob.from_db(idx['blob_uuid'])
-            if b:
-                bout = b.external_view()
-                bout['instances'] = instance_usage_for_blob_uuid(b.uuid)
+            # A version whose blob has vanished is skipped rather than
+            # reported with the previous version's body: bout used to be
+            # assigned inside this conditional and indexed outside it,
+            # so a missing blob either duplicated the last version under
+            # a new index or, on the first iteration, raised NameError
+            # and answered 500.
+            if not b:
+                continue
+
+            bout = b.external_view()
+            bout['instances'] = blob_usage.get(str(b.uuid), [])
             bout['index'] = idx['index']
             retval.append(bout)
         return retval
