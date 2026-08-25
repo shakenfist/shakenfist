@@ -473,7 +473,13 @@ Queue priorities (per-node and global):
    joining the two must transform one side (see the orphan
    reconciliation queries in `mariadb.py` for the index-friendly
    pattern); ad-hoc queries that compare them directly silently never
-   match.
+   match. `object_states.object_type` sits on the same join and has the
+   same shape of trap: it is `sa.Enum(ObjectType)`, stored by enum
+   *name*, so bind an `ObjectType` rather than comparing it to a
+   `operation_type` column holding the enum *value*. A column-to-column
+   comparison never reaches the type's bind processor -- see
+   `docs/developer_guide/coding_rules.md` for why binding a plain string
+   works and comparing two columns does not.
 
 ## MariaDB Storage
 

@@ -22410,6 +22410,100 @@ def _direct_work_queue_delete_row(row_id: int) -> bool:
         return False
 
 
+# The two coalescing queries below -- the enqueue-side lookup and the
+# worker-side fold -- share their argument validation and their join to
+# object_states. They used to carry two independent copies of both, and
+# both copies were wrong in exactly the same two ways for three months
+# (issue #3878): the uuid form and the enum form. Duplicated join logic
+# does not get cross-checked, it drifts as a pair, so there is now one
+# copy of each and one test covers both callers.
+_COALESCIBLE_TARGET_COLUMNS = frozenset({
+    'network_uuid', 'instance_uuid', 'node_uuid'})
+
+
+def _coalescible_preflight(
+        caller: str,
+        operation_type: str,
+        target_column: str,
+        *uuids: Optional[str]) -> Optional[tuple[Any, list[Any]]]:
+    """Validate and coerce the arguments both coalescing queries share.
+
+    Returns ``(state_object_type, [coerced_uuids...])``, or ``None`` when
+    the query should be skipped. Every skip is logged: the whole reason
+    #3878 survived three months is that coalescing turning itself off
+    produced no signal at all, so a silent early return here is exactly
+    the failure mode this code is trying to stop repeating.
+
+    ``target_column`` names a column rather than a bind value, so it
+    cannot be parameterised. It is restricted to a small whitelist
+    before being resolved with ``getattr(table.c, ...)``, which is a
+    lookup on the table metadata rather than string interpolation and
+    refuses an unknown column with ``AttributeError``.
+    """
+    if target_column not in _COALESCIBLE_TARGET_COLUMNS:
+        LOG.warning(
+            f'{caller} skipped, {target_column!r} is not a coalescible '
+            f'target column')
+        return None
+
+    # object_states.object_type is an Enum(ObjectType) column, which
+    # SQLAlchemy stores by enum *name* ('NET_OP'), while
+    # cluster_operations.operation_type is a plain string column holding
+    # the enum *value* ('net_op'). A bound value is coerced by the Enum
+    # bind processor, but a column-to-column comparison has nothing to
+    # coerce it, so joining the two columns directly matches nothing.
+    # Bind the enum instead, as every other object_states query in this
+    # module does. This was half of issue #3878; the other half was the
+    # uuid form, handled by _coalescible_states_join below.
+    try:
+        state_object_type = ObjectType(  # type: ignore[call-arg]
+            operation_type)
+    except ValueError:
+        LOG.warning(
+            f'{caller} skipped, {operation_type!r} is not a known '
+            f'ObjectType')
+        return None
+
+    # cluster_operations' uuid columns are SQLAlchemy Uuid columns, whose
+    # bind processor calls value.hex -- the filter values therefore have
+    # to be uuid.UUID objects, but callers pass them as plain strings
+    # (e.g. create_and_enqueue passes str(network_uuid)). Coerce here,
+    # matching the insert path's _maybe_uuid usage. A malformed uuid
+    # means there is nothing meaningful to coalesce against, so skip
+    # rather than letting a StatementError kill the worker thread.
+    try:
+        coerced = [_maybe_uuid(u) for u in uuids]
+    except (ValueError, AttributeError, TypeError) as e:
+        LOG.warning(
+            f'{caller} skipped, malformed uuid in '
+            f'{[str(u) for u in uuids]}: {e}')
+        return None
+
+    return state_object_type, coerced
+
+
+def _coalescible_states_join(
+        cluster_ops_table: sa.Table,
+        states_table: sa.Table,
+        state_object_type: Any) -> Any:
+    """The ON clause joining cluster_operations to object_states.
+
+    The uuid comparison goes through ``_dashed_uuid_expr`` because the
+    two tables store uuids in different forms:
+    ``cluster_operations.uuid`` is a ``sa.Uuid`` column, which is
+    undashed CHAR(32) on MariaDB, while ``object_states.object_uuid`` is
+    the dashed 36 character form. Comparing them without that
+    transformation matches nothing at all -- which is exactly what
+    happened between 2026-05-26 and issue #3878, disabling coalescing
+    entirely and silently.
+    """
+    return sa.and_(
+        states_table.c.object_uuid
+        == _dashed_uuid_expr(cluster_ops_table.c.uuid),
+        states_table.c.object_type == state_object_type,
+    )
+
+
 def _direct_find_existing_coalescible_op(
         operation_type: str,
         target_column: str,
@@ -22432,31 +22526,27 @@ def _direct_find_existing_coalescible_op(
     block on the same op, the worker runs it once.
 
     There is a benign race: two concurrent callers can both look up
-    and not find anything, and both create new rows. The
-    dispatcher's ``claim_coalescible_siblings`` (step 4) catches the
-    duplicate on the way out -- at most one extra row gets inserted
-    per race window, never an unbounded fan-out.
-    """
-    if target_column not in {
-            'network_uuid', 'instance_uuid', 'node_uuid'}:
-        return None
+    and not find anything, and both create new rows. The dispatcher's
+    ``claim_coalescible_siblings`` (step 4) usually catches the
+    duplicate on the way out, but not always -- the fold is skipped
+    when the dispatcher dequeued a batch of one, and when the
+    survivor is not on a cluster-wide queue. When it is skipped the
+    consequence is one extra execution of a task which is idempotent
+    by the definition of being coalescible, so nothing breaks; at
+    most one extra row gets inserted per race window either way,
+    never an unbounded fan-out.
 
-    # cluster_operations' *_uuid columns are SQLAlchemy Uuid columns,
-    # whose bind processor calls value.hex -- the filter value therefore
-    # has to be a uuid.UUID object, but callers pass it as a plain string
-    # (e.g. create_and_enqueue passes str(network_uuid)). Coerce here
-    # (matching the insert path's _maybe_uuid usage and the sibling
-    # _direct_claim_coalescible_siblings) before it reaches the WHERE
-    # clause. A malformed uuid means there is nothing meaningful to
-    # coalesce against, so skip the lookup rather than letting a
-    # StatementError kill the worker thread.
-    try:
-        target_uuid_val = _maybe_uuid(target_uuid)
-    except (ValueError, AttributeError, TypeError) as e:
-        LOG.warning(
-            f'find_existing_coalescible_op skipped, malformed uuid '
-            f'({target_column}={target_uuid!r}): {e}')
+    Argument validation and the ``object_states`` join are shared with
+    ``_direct_claim_coalescible_siblings`` -- see
+    ``_coalescible_preflight`` and ``_coalescible_states_join``, and
+    issue #3878 for what those two exist to prevent.
+    """
+    preflight = _coalescible_preflight(
+        'find_existing_coalescible_op', operation_type, target_column,
+        target_uuid)
+    if preflight is None:
         return None
+    state_object_type, (target_uuid_val,) = preflight
 
     engine = _get_engine()
     cluster_ops_table = _get_cluster_operations_table()
@@ -22470,12 +22560,9 @@ def _direct_find_existing_coalescible_op(
                 .select_from(
                     cluster_ops_table.join(
                         states_table,
-                        sa.and_(
-                            states_table.c.object_uuid == sa.cast(
-                                cluster_ops_table.c.uuid, sa.String(36)),
-                            states_table.c.object_type
-                            == cluster_ops_table.c.operation_type,
-                        )))
+                        _coalescible_states_join(
+                            cluster_ops_table, states_table,
+                            state_object_type)))
                 .where(cluster_ops_table.c.operation_type == operation_type)
                 .where(target_col == target_uuid_val)
                 .where(states_table.c.state_value == 'queued')
@@ -22534,32 +22621,29 @@ def _direct_claim_coalescible_siblings(
     * Task name must be in the caller-supplied ``task_names``, which
       callers pre-filter to ``op_class.coalescible_tasks``.
 
-    ``target_column`` is restricted to a small whitelist
-    (``network_uuid``, ``instance_uuid``, ``node_uuid``) so it can
-    be interpolated into the ORDER BY safely; SQLAlchemy's
-    ``getattr(table.c, ...)`` does the column lookup and refuses
-    unknown columns with ``AttributeError``.
+    The statement is deliberately blind to which *queue* a sibling is
+    on -- ``cluster_operations`` has no queue column to filter by. That
+    is only sound because every coalescible task is confined to the
+    single cluster-wide network-node queue, drained by one elected
+    worker; the guard which enforces that lives at enqueue time in
+    ``schema/operations/net_op.py`` (``InvalidCoalescibleEnqueue``).
+    Without it a survivor on the network node folds away per-node
+    siblings doing genuinely different work on other hosts.
+
+    Argument validation and the ``object_states`` join are shared with
+    ``_direct_find_existing_coalescible_op`` -- see
+    ``_coalescible_preflight`` and ``_coalescible_states_join``. Every
+    other value in the statement is bound by SQLAlchemy.
     """
-    if not task_names or target_column not in {
-            'network_uuid', 'instance_uuid', 'node_uuid'}:
+    if not task_names:
         return []
 
-    # cluster_operations.uuid and its *_uuid columns are SQLAlchemy Uuid
-    # columns, whose bind processor calls value.hex -- the filter values
-    # therefore have to be uuid.UUID objects, but callers pass them as
-    # plain strings. Coerce here (matching the insert path's _maybe_uuid
-    # usage) before they reach the WHERE clause. A malformed uuid means
-    # there is nothing meaningful to coalesce against, so skip the fold
-    # rather than letting a StatementError kill the worker thread.
-    try:
-        target_uuid_val = _maybe_uuid(target_uuid)
-        exclude_op_uuid_val = _maybe_uuid(exclude_op_uuid)
-    except (ValueError, AttributeError, TypeError) as e:
-        LOG.warning(
-            f'claim_coalescible_siblings skipped, malformed uuid '
-            f'({target_column}={target_uuid!r}, '
-            f'exclude_op_uuid={exclude_op_uuid!r}): {e}')
+    preflight = _coalescible_preflight(
+        'claim_coalescible_siblings', operation_type, target_column,
+        target_uuid, exclude_op_uuid)
+    if preflight is None:
         return []
+    state_object_type, (target_uuid_val, exclude_op_uuid_val) = preflight
 
     engine = _get_engine()
     cluster_ops_table = _get_cluster_operations_table()
@@ -22573,12 +22657,9 @@ def _direct_claim_coalescible_siblings(
                 .select_from(
                     cluster_ops_table.join(
                         states_table,
-                        sa.and_(
-                            states_table.c.object_uuid == sa.cast(
-                                cluster_ops_table.c.uuid, sa.String(36)),
-                            states_table.c.object_type
-                            == cluster_ops_table.c.operation_type,
-                        )))
+                        _coalescible_states_join(
+                            cluster_ops_table, states_table,
+                            state_object_type)))
                 .where(cluster_ops_table.c.operation_type == operation_type)
                 .where(target_col == target_uuid_val)
                 .where(cluster_ops_table.c.uuid != exclude_op_uuid_val)
@@ -22601,7 +22682,14 @@ def _direct_claim_coalescible_siblings(
             folded_uuids = [str(r.uuid) for r in rows]
             update_stmt = (
                 sa.update(states_table)
-                .where(states_table.c.object_type == operation_type)
+                # The bound enum rather than the raw string, for
+                # consistency with the SELECT above. Passing the string
+                # would also work here -- a bound value goes through the
+                # Enum bind processor, which coerces 'net_op' to the
+                # stored 'NET_OP'. It is only the column-to-column
+                # comparison in the SELECT's join that had no processor
+                # to do that, which is half of why #3878 matched nothing.
+                .where(states_table.c.object_type == state_object_type)
                 .where(states_table.c.object_uuid.in_(folded_uuids))
                 .values(
                     state_value='complete',

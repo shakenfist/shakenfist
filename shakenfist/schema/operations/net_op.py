@@ -10,6 +10,9 @@ from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist import eventlog
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import _convert_deps
@@ -49,9 +52,6 @@ class model_tasks(Enum):
 #   from current DB state. Six instance starts on the same network
 #   each enqueue one of these; the final config covers every lease
 #   regardless of how many runs landed.
-# * ``network_ensure_mesh`` diffs the FDB against the current set of
-#   participating hypervisors. Same property: the result only
-#   depends on the current snapshot.
 # * ``network_apply_create_network_node`` is idempotent network-node
 #   setup -- running it twice in a row leaves the same state as
 #   running it once.
@@ -60,9 +60,27 @@ class model_tasks(Enum):
 # parameters (specific floating IPs, specific mac/ip lease pairs)
 # or are order-sensitive against an opposite task (remove vs
 # update / delete vs create).
+#
+# ``network_ensure_mesh`` deliberately is NOT in this set, even
+# though it looks like the best candidate in the file: it is
+# idempotent and it only depends on the current snapshot of
+# participating hypervisors. The problem is that it is the one NetOp
+# task that does *node-local* work -- ``_apply_ensure_mesh`` diffs
+# **this** host's FDB -- and the coalescing key is
+# ``COALESCIBLE_TARGET_COLUMN``, i.e. the network alone. There is no
+# column on ``cluster_operations`` recording which node an op was
+# targeted at (``target`` is queue routing, and NetOp's model has no
+# ``node_uuid``), so "same network" is the finest grain the fold can
+# express, and it cannot tell hypervisor A's mesh op apart from
+# hypervisor B's. Declaring it coalescible therefore let the network
+# node's survivor mark every other hypervisor's pending mesh op
+# ``complete`` without doing their work, leaving their FDBs stale --
+# the ``test_single_virtual_networks_work`` failure described in
+# ``BaseClusterOperation.execute``. That was inert while the fold's
+# join was broken (#3878) and would have gone live with the fix; see
+# #3884 for the multi-column key that would let it back in.
 COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
     model_tasks.network_apply_update_dnsmasq,
-    model_tasks.network_ensure_mesh,
     model_tasks.network_apply_create_network_node,
 })
 
@@ -114,28 +132,40 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
     # (worker-side dedup, step 4) for the safety net that catches the
     # race where two callers both miss the lookup.
     #
-    # The dedup query keys on (op_type, network_uuid, task) but NOT on
-    # the queue ``target``. That's only safe when the op is destined
-    # for the cluster-wide network-node queue (``target='networknode'``)
-    # -- there's exactly one consumer of that queue, so two enqueues
-    # for the same network are genuinely the same work and folding
-    # them is correct. Per-node-targeted enqueues (``target=<node_uuid>``,
-    # which is how ``Network.ensure_mesh`` reaches each participating
-    # hypervisor) MUST NOT be deduped across nodes: a mesh op for the
-    # same network on hypervisor A does completely different work
-    # (updates A's local FDB) than one on hypervisor B (updates B's).
-    # Folding them by network would route both callers at the
-    # first-arriving op, which then never runs on the other host and
-    # leaves the second host's FDB stale -- exactly the bug that broke
+    # Neither the enqueue-side dedup below nor the worker-side fold in
+    # ``BaseClusterOperation.execute`` keys on the queue: the dedup
+    # query and ``claim_coalescible_siblings`` both match on
+    # (op_type, network_uuid, task, state), and ``cluster_operations``
+    # has no queue column to filter on. That is only sound while every
+    # coalescible task lives on the single cluster-wide network-node
+    # queue, where one elected worker drains everything and two
+    # enqueues for the same network really are the same work.
+    #
+    # A coalescible task on a per-node queue (``target=<node_uuid>``)
+    # would break that: hypervisor A's op and hypervisor B's op look
+    # identical to both dedup paths, but do different work on
+    # different hosts, so folding them leaves one host's state
+    # unapplied. That is the bug which broke
     # ``test_single_virtual_networks_work`` on the network-facade
-    # branch. The intra-node case (multiple instance starts on the
-    # same hypervisor enqueueing ensure_mesh on the same per-node
-    # queue) still coalesces via the worker-side fold inside
-    # ``BaseClusterOperation.execute``; we only lose the cheaper
-    # enqueue-side optimisation in that case.
+    # branch, and it is why ``network_ensure_mesh`` is not in
+    # COALESCIBLE_TASKS (see the note there).
+    #
+    # Rather than leave that as a convention nobody checks, enforce it
+    # here. It costs a set intersection per enqueue and turns a silent
+    # class of cross-node state corruption into an immediate, loud
+    # failure at the call site that introduced it.
+    if target != 'networknode':
+        misrouted = [t.name for t in tasks if t in COALESCIBLE_TASKS]
+        if misrouted:
+            raise exceptions.InvalidCoalescibleEnqueue(
+                f'net_op tasks {misrouted} are declared coalescible, which '
+                f'is only sound on the cluster-wide networknode queue, but '
+                f'this enqueue targets {target!r}. Either drop the task from '
+                f'COALESCIBLE_TASKS or give the fold a key which '
+                f'distinguishes the target node (see issue #3884).')
+
     if (len(tasks) == 1
             and tasks[0] in COALESCIBLE_TASKS
-            and target == 'networknode'
             and depends_on is None
             and runs_after is None):
         existing_uuid = mariadb.find_existing_coalescible_op(
@@ -149,6 +179,24 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
                 'network_uuid': network_uuid,
                 'task': tasks[0].name,
             }).info('Enqueue-side dedup: reusing existing pending op')
+
+            # Returning early here means enqueue_cluster_operation() --
+            # and with it the audit event it emits on the operation and
+            # every object the metadata references -- never runs. Emit
+            # the equivalent event ourselves so the reuse is visible in
+            # the network's event stream rather than only in a daemon
+            # log, mirroring the 'coalesced sibling ops' event the
+            # worker-side fold emits on its survivor.
+            eventlog.add_event_multi(
+                EVENT_TYPE_AUDIT,
+                [(object_type.name.lower(), existing_uuid),
+                 ('network', str(network_uuid))],
+                'enqueue-side dedup: reused pending op',
+                extra={
+                    'requested_task': tasks[0].name,
+                    'existing_op_uuid': existing_uuid,
+                    'op_type': object_type.name.lower(),
+                })
             return object_type, existing_uuid
 
     operation_uuid = str(uuid4())

@@ -572,6 +572,23 @@ class ClusterOperationEnqueueFailed(Exception):
     ...
 
 
+class InvalidCoalescibleEnqueue(Exception):
+    """Raised when a task declared coalescible is enqueued somewhere the
+    coalescing key cannot distinguish it from a sibling doing different
+    work.
+
+    Neither dedup path keys on the queue -- ``cluster_operations`` has no
+    queue column -- so a coalescible task is only safe on the single
+    cluster-wide network-node queue, where one elected worker drains
+    everything. The same task on a per-node queue is folded across nodes
+    and one host's work is silently never applied. This is a programming
+    error in the declaration or the call site, not a runtime condition,
+    and it is raised rather than logged because the damage it prevents
+    (a stale FDB on one hypervisor) is invisible until something else
+    fails much later."""
+    ...
+
+
 class NetworkOperationFailed(Exception):
     """Raised by ``op.raise_for_error()`` when a cluster operation
     reached ``STATE_ERROR``. Carries the persisted ``ErrorReport`` as

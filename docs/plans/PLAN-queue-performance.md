@@ -10,6 +10,43 @@ measurement, the exclusions it rests on and the decision are in
 [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md)
 and summarised under "What step 7 measured" below.
 
+Step 8 ran a `PUSH-AUDIT.md` audit over everything the plan changed,
+and found that **coalescing had never worked**. Steps 4 and 5 -- the
+enqueue-side dedup and the worker-side fold -- joined
+`cluster_operations` to `object_states` on two columns which could
+never match: an undashed uuid against a dashed one, and an enum value
+against an enum name. Both primitives therefore always returned
+"nothing found", and the `coalesced sibling ops` event had fired zero
+times in seven days on `sfcbr`. Fixed here as #3878, with eight tests
+which execute the real statements against a real database; #3879
+tracks the missing functional coverage that let the defect sit
+unnoticed since 2026-05-26. The full audit, including the three
+headings which found nothing, is in
+[PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md).
+
+Review of that fix found a second defect it would have activated:
+`network_ensure_mesh` was declared coalescible, but it does node-local
+work and the fold's key is the network alone, so the network node's
+survivor would have marked every *other* hypervisor's pending mesh op
+complete without doing their work. It is no longer coalescible, and an
+enqueue-time guard now enforces the invariant that made the
+queue-blind fold SQL safe in the first place. #3884 tracks the
+multi-column key that would let per-node tasks coalesce properly.
+
+Two things this plan changed are deliberately still unproven:
+
+* **Step 7's numbers characterise a cluster with coalescing inert.**
+  They were gathered on `sfcbr` while steps 4 and 5 were doing
+  nothing at all. That does not invalidate the conclusion -- if
+  anything "batched dequeue alone was enough" is the stronger reading
+  of it -- but the system measured is not the system now running.
+* **The fold's cost was never measured.**
+  `claim_coalescible_siblings` is recorded in `baseoperation.py` as
+  costing ~200 ms under load, and it now also takes `FOR UPDATE`
+  locks on `object_states` rows and issues an UPDATE against a hot
+  table. Re-measuring both is folded into #3879, alongside the
+  functional coverage.
+
 ## Execution
 
 | Phase | Plan | Status |
@@ -21,6 +58,7 @@ and summarised under "What step 7 measured" below.
 | 5. Enqueue-side dedup | (in PR #3194) | Complete |
 | 6. Caller-site audit | (in PR #3194) | Complete |
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
+| 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
 
 ## Problem
 
@@ -42,7 +80,8 @@ the queue+state-machine overhead, and the work backed up.
 
 ## Approach
 
-Six discrete changes plus one measurement step:
+Six discrete changes, one measurement step, and a closing
+audit:
 
 1. **Visibility**: carry `wait_seconds`, `defer_count` and
    `queue_name` on the per-op event the dispatcher emits. The
@@ -104,7 +143,22 @@ Six discrete changes plus one measurement step:
    for the method, and `tools/queue-wait-report.py` for the tool
    which produced the numbers.
 
+8. **Push audit**: run `PUSH-AUDIT.md` over the accumulated diff
+   of every step in this plan, rather than over the last step's
+   diff alone. Because the work is already merged, the audit's
+   baseline is the plan's own commit range and not
+   `develop...HEAD`; the phase plan pins the exact range. Each
+   finding is resolved, or declined in writing, before this plan
+   is marked complete. If the audit finds nothing, that is
+   recorded in one sentence.
+
 ## What step 7 measured
+
+Read these numbers knowing what step 8 later found: **both windows
+were captured with coalescing inert**, because the fold and the
+enqueue-side dedup never matched a row until #3878 was fixed. Whatever
+improvement is visible below was delivered by the batched dequeue
+alone, and the fold's own cost does not appear in it at all.
 
 Two windows, both through `tools/queue-wait-report.py`:
 
