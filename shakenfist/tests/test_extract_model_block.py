@@ -207,6 +207,31 @@ class ExtractModelBlockTestCase(base.ShakenFistTestCase):
             'The PR_DESCRIPTION_END marker needs a line to itself.\n'
             'Still here.\n', got)
 
+    def test_marker_beginning_a_line_of_prose_does_not_terminate(self):
+        # Stricter than an anchored match: only a line which is nothing but
+        # the marker terminates. A fix to this workflow would plausibly
+        # start a sentence of its description with the token.
+        rc, got = self._extract('PR_DESCRIPTION', (
+            'PR_DESCRIPTION_START\n'
+            'PR_DESCRIPTION_END is what terminates the block.\n'
+            'This line must survive.\n'
+            'PR_DESCRIPTION_END\n'))
+        self.assertEqual(0, rc)
+        self.assertEqual(
+            'PR_DESCRIPTION_END is what terminates the block.\n'
+            'This line must survive.\n', got)
+
+    def test_start_marker_beginning_a_line_of_prose_does_not_restart(self):
+        rc, got = self._extract('PR_DESCRIPTION', (
+            'PR_DESCRIPTION_START\n'
+            'The prompt asks for a PR_DESCRIPTION_START block.\n'
+            'That sentence is prose, not a marker.\n'
+            'PR_DESCRIPTION_END\n'))
+        self.assertEqual(0, rc)
+        self.assertEqual(
+            'The prompt asks for a PR_DESCRIPTION_START block.\n'
+            'That sentence is prose, not a marker.\n', got)
+
     def test_indented_markers_are_matched(self):
         # Models indent things. Trailing whitespace on a marker line is the
         # same hazard and is handled by the same trim.
