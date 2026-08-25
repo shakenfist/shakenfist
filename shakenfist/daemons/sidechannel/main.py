@@ -16,6 +16,7 @@ import symbolicmode
 
 from shakenfist import blob
 from shakenfist import constants
+from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
@@ -46,14 +47,13 @@ MAX_CHUNK_SIZE = 102400
 MAX_OUTSTANDING = 5
 
 
-# Backstop deadline for a single agent operation once its executor has been
-# welcomed by the agent. Normal operations complete in seconds; this only
-# fires when a welcomed agent then never finishes delivering (for example a
-# get-file that stalls mid-transfer while pings keep the socket alive), which
-# would otherwise leave the operation orphaned in the executing state until the
-# caller times out. Deliberately generous -- it is a wedge backstop, not an
-# SLA. See issue #3516.
-AGENT_OPERATION_EXECUTION_TIMEOUT = 900
+# How often the executor persists an operation's last_progress
+# attribute. The in-memory value moves on every observed reply, which
+# is what the progress timeout below is measured against; the
+# persisted one exists only so a future node-local reaper can tell a
+# stalled transfer from a slow but healthy one, and a fast chunk
+# stream must not turn into one attributes write per chunk.
+PROGRESS_PERSIST_INTERVAL = 10
 
 
 class ConnectionFailed(Exception):
@@ -467,6 +467,16 @@ class SideChannelExecutorJob(SideChannelJob):
         self.command_handlers = {
             cls.name: cls(self) for cls in AGENT_COMMAND_HANDLERS}
 
+        # Progress tracking. in_flight_handler is the handler for the
+        # command currently awaiting replies, which is what says
+        # whether the progress timeout applies at all. _last_progress
+        # is seeded when a command is dispatched, so the window
+        # measures time since that command was sent rather than since
+        # the connection opened.
+        self.in_flight_handler = None
+        self._last_progress = time.time()
+        self._last_progress_persisted = 0.0
+
         self.ready = False
         self.welcomed = False
         self.log = LOG.with_fields({
@@ -517,6 +527,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self.log.with_fields({
             'outstanding_messages': self.outstanding_message_count
         }).debug('...execute reply')
+        self.observe_progress()
         result = {
             'command': 'execute-response',
             'command-line': self.command_cache[reply.command_id],
@@ -618,6 +629,10 @@ class SideChannelExecutorJob(SideChannelJob):
             }).error('Unknown file transfer')
             raise GetException('Unknown file transfer')
 
+        # Below the guard deliberately: a reply for a transfer which is
+        # not in flight is not progress on anything.
+        self.observe_progress()
+
         sr = reply.stat_result
         self._stat_result = {
             'mode': sr.mode,
@@ -639,6 +654,10 @@ class SideChannelExecutorJob(SideChannelJob):
                 'outstanding_messages': self.outstanding_message_count
             }).error('Unknown file transfer')
             raise GetException('Unknown file transfer')
+
+        # Below the guard deliberately: a chunk for a transfer which is
+        # not in flight is not progress on anything.
+        self.observe_progress()
 
         chunk = reply.file_chunk
         if chunk.encoding != agent_pb2.FileChunk.BASE64:
@@ -716,6 +735,92 @@ class SideChannelExecutorJob(SideChannelJob):
             ]
         )
 
+    def expire_if_out_of_budget(self):
+        """Expire this operation if a caller-set timing budget is spent.
+
+        Returns True if the executor should stop. Expiring before the
+        caller returns is what makes this safe: execute()'s finally
+        block only rewrites an operation which is still executing, so
+        a terminal state set here is preserved.
+
+        This replaces a fixed 900 second backstop. Two budgets are
+        checked, and exhausting either is the same outcome -- expired,
+        with a message saying which -- because both are numbers the
+        caller chose rather than faults of the operation.
+        """
+        # The wall-clock deadline. Queue time and preflight time have
+        # already been spent from it, so this can fire almost
+        # immediately after dispatch.
+        if self.agentop.deadline_passed():
+            self.log.error(
+                'Operation deadline passed while executing, aborting '
+                'executor')
+            self.agentop.expire(
+                'the operation deadline passed while executing')
+            return True
+
+        # The progress timeout, which applies only while a command
+        # which can actually report progress is in flight. This is what
+        # detects the issue #3516 wedge, in tens of seconds rather than
+        # the 900 the fixed backstop took.
+        #
+        # Note that self.last_data is not a progress signal and must
+        # never be used as one: it is refreshed by any socket traffic,
+        # and the executor pings every two seconds, so it never ages.
+        # Progress is observed explicitly in the reply handlers via
+        # observe_progress().
+        if (self.in_flight_handler is None
+                or not self.in_flight_handler.reports_progress
+                or self.ready):
+            return False
+
+        window = self.agentop.effective_progress_timeout()
+        if window is None:
+            return False
+
+        if time.time() - self._last_progress <= window:
+            return False
+
+        self.log.with_fields({
+            'command': self.in_flight_handler.name,
+            'progress_timeout': window
+        }).error('No progress from agent, aborting executor')
+        self.agentop.expire(
+            f'no progress from the agent for {window} seconds')
+        return True
+
+    def observe_progress(self):
+        """Record that the agent made forward progress just now.
+
+        Called from the reply handlers rather than from the socket
+        read loop, because any traffic at all -- a ping reply, most
+        often -- refreshes self.last_data, and a liveness signal is
+        not a progress signal.
+
+        The in-memory timestamp moves on every call, and is what the
+        progress timeout in _execute_inner() is measured against. The
+        persisted attribute is throttled to one write every
+        PROGRESS_PERSIST_INTERVAL seconds: it exists for a future
+        node-local reaper reasoning about an executor which died,
+        and a 100KiB-chunk transfer would otherwise write it hundreds
+        of times a second.
+        """
+        now = time.time()
+        self._last_progress = now
+
+        if now - self._last_progress_persisted < PROGRESS_PERSIST_INTERVAL:
+            return
+        self._last_progress_persisted = now
+
+        # The field mask is not optional. add_result() reads, merges
+        # and writes the results column on this same row, and an
+        # unmasked write here would push a stale snapshot of it over
+        # a concurrent update.
+        attrs = self.agentop._attributes()
+        attrs.last_progress = now
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['last_progress'])
+
     def _abort_commands_if_terminal(self):
         """Drop the rest of an operation's commands if it has failed.
 
@@ -757,19 +862,7 @@ class SideChannelExecutorJob(SideChannelJob):
                     'executor for later retry')
                 return
 
-            # Backstop against a welcomed agent that then never finishes the
-            # operation (e.g. a get-file that stalls mid-transfer). Without
-            # this the loop spins forever with the operation stuck EXECUTING,
-            # because pings keep the socket alive so no other deadline fires.
-            # execute()'s finally marks the operation errored on return. See
-            # issue #3516.
-            if (self.welcomed
-                    and time.time() - connected_at
-                    > AGENT_OPERATION_EXECUTION_TIMEOUT):
-                self.log.error(
-                    'Operation did not complete within '
-                    f'{AGENT_OPERATION_EXECUTION_TIMEOUT} seconds, aborting '
-                    'executor')
+            if self.expire_if_out_of_budget():
                 return
 
             if time.time() - self.last_data > 2:
@@ -813,6 +906,7 @@ class SideChannelExecutorJob(SideChannelJob):
                         self.log.with_fields({
                             'outstanding_messages': self.outstanding_message_count
                         }).debug('...file chunk reply')
+                        self.observe_progress()
                         self.outstanding_message_count -= 1
                         self.log.with_fields({
                             'outstanding_messages': self.outstanding_message_count
@@ -894,6 +988,12 @@ class SideChannelExecutorJob(SideChannelJob):
                                 'unknown command', extra=cmd)
                             self.agentop.fail('unknown command')
                         else:
+                            # The progress window measures from when
+                            # this command was sent, and only applies
+                            # while this handler's command is the one
+                            # in flight.
+                            self.in_flight_handler = handler
+                            self._last_progress = time.time()
                             requests = handler.dispatch(command_id, cmd)
                             register_as_outstanding = handler.register_as_outstanding
 

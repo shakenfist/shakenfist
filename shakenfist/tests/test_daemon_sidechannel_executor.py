@@ -205,3 +205,183 @@ class ExecutorTerminalStateGuardTestCase(base.ShakenFistTestCase):
             AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
         job._abort_commands_if_terminal()
         self.assertEqual([{'command': 'chmod'}], job.commands)
+
+
+class _BudgetAgentOp(_FakeAgentOp):
+    """A fake operation whose two timing budgets are directly settable."""
+
+    def __init__(self, deadline_passed=False, progress_timeout=30.0):
+        super().__init__(AgentOperation.STATE_EXECUTING)
+        self._deadline_passed = deadline_passed
+        self._progress_timeout = progress_timeout
+
+    def deadline_passed(self):
+        return self._deadline_passed
+
+    def effective_progress_timeout(self):
+        return self._progress_timeout
+
+
+class _ProgressHandler:
+    name = 'put-blob'
+    reports_progress = True
+
+
+class _SilentHandler:
+    name = 'execute'
+    reports_progress = False
+
+
+class ExecutorBudgetTestCase(base.ShakenFistTestCase):
+    """expire_if_out_of_budget() is what replaced the fixed 900 second
+    backstop. It enforces two caller-set budgets and reports exhausting
+    either as expired, distinguished by the message."""
+
+    def _make_executor(self, agentop, handler=None, ready=False,
+                       last_progress=0.0):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.in_flight_handler = handler
+        job.ready = ready
+        job._last_progress = last_progress
+        job.log = mock.MagicMock()
+        return job
+
+    def test_passed_deadline_expires_and_stops(self):
+        agentop = _BudgetAgentOp(deadline_passed=True)
+        job = self._make_executor(agentop)
+        self.assertTrue(job.expire_if_out_of_budget())
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(
+            'the operation deadline passed while executing',
+            agentop.expired_reason)
+
+    def test_stalled_progress_expires_and_stops(self):
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        job = self._make_executor(
+            agentop, handler=_ProgressHandler(), last_progress=0.0)
+        with mock.patch('time.time', return_value=31.0):
+            self.assertTrue(job.expire_if_out_of_budget())
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(
+            'no progress from the agent for 30.0 seconds',
+            agentop.expired_reason)
+
+    def test_progress_inside_the_window_continues(self):
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        job = self._make_executor(
+            agentop, handler=_ProgressHandler(), last_progress=0.0)
+        with mock.patch('time.time', return_value=29.0):
+            self.assertFalse(job.expire_if_out_of_budget())
+        self.assertEqual(AgentOperation.STATE_EXECUTING, agentop.state.value)
+
+    def test_a_command_which_cannot_report_progress_is_never_stalled(self):
+        # An execute of a long running command must survive far longer
+        # than the progress timeout, because it reports nothing until
+        # it is done.
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        job = self._make_executor(
+            agentop, handler=_SilentHandler(), last_progress=0.0)
+        with mock.patch('time.time', return_value=100000.0):
+            self.assertFalse(job.expire_if_out_of_budget())
+        self.assertEqual(AgentOperation.STATE_EXECUTING, agentop.state.value)
+
+    def test_nothing_in_flight_is_never_stalled(self):
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        job = self._make_executor(agentop, handler=None, last_progress=0.0)
+        with mock.patch('time.time', return_value=100000.0):
+            self.assertFalse(job.expire_if_out_of_budget())
+
+    def test_a_ready_executor_is_never_stalled(self):
+        # Ready means the command completed and we are between
+        # commands; there is nothing to be waiting on.
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        job = self._make_executor(
+            agentop, handler=_ProgressHandler(), ready=True,
+            last_progress=0.0)
+        with mock.patch('time.time', return_value=100000.0):
+            self.assertFalse(job.expire_if_out_of_budget())
+
+    def test_a_disabled_progress_timeout_is_never_stalled(self):
+        # The caller passed progress_timeout_seconds=0.
+        agentop = _BudgetAgentOp(progress_timeout=None)
+        job = self._make_executor(
+            agentop, handler=_ProgressHandler(), last_progress=0.0)
+        with mock.patch('time.time', return_value=100000.0):
+            self.assertFalse(job.expire_if_out_of_budget())
+
+    def test_the_deadline_is_checked_before_progress(self):
+        # A passed deadline must win, so the recorded reason names the
+        # budget which actually ran out first.
+        agentop = _BudgetAgentOp(deadline_passed=True, progress_timeout=30.0)
+        job = self._make_executor(
+            agentop, handler=_ProgressHandler(), last_progress=0.0)
+        with mock.patch('time.time', return_value=100000.0):
+            self.assertTrue(job.expire_if_out_of_budget())
+        self.assertEqual(
+            'the operation deadline passed while executing',
+            agentop.expired_reason)
+
+
+class ExecutorProgressPersistenceTestCase(base.ShakenFistTestCase):
+    """observe_progress() moves an in-memory timestamp on every call and
+    persists it at most once per PROGRESS_PERSIST_INTERVAL."""
+
+    def _make_executor(self):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = mock.MagicMock()
+        job._last_progress = 0.0
+        job._last_progress_persisted = 0.0
+        job.log = mock.MagicMock()
+        return job
+
+    # A real timestamp, because the throttle compares against
+    # _last_progress_persisted and a "now" near zero is inside the
+    # interval of the never-persisted sentinel.
+    NOW = 1700000000.0
+
+    def test_in_memory_timestamp_moves_on_every_call(self):
+        job = self._make_executor()
+        with mock.patch.object(sidechannel.mariadb,
+                               'update_agent_operation_attributes'):
+            for offset in (0.0, 1.0, 2.0):
+                with mock.patch('time.time', return_value=self.NOW + offset):
+                    job.observe_progress()
+                self.assertEqual(self.NOW + offset, job._last_progress)
+
+    def test_persistence_is_throttled(self):
+        job = self._make_executor()
+        with mock.patch.object(
+                sidechannel.mariadb,
+                'update_agent_operation_attributes') as mock_update:
+            # The first call persists (this row has never been
+            # written), then everything inside the interval is
+            # in-memory only. A 100KiB-chunk transfer calls this
+            # hundreds of times a second, which is the whole point.
+            for offset in (0.0, 1.0, 4.0, 9.0):
+                with mock.patch('time.time', return_value=self.NOW + offset):
+                    job.observe_progress()
+            self.assertEqual(1, mock_update.call_count)
+
+            # Past the interval, one more write.
+            with mock.patch('time.time', return_value=self.NOW + 11.0):
+                job.observe_progress()
+            self.assertEqual(2, mock_update.call_count)
+
+    def test_the_write_carries_a_field_mask(self):
+        # An unmasked write would push a stale snapshot of the results
+        # column over a concurrent add_result().
+        job = self._make_executor()
+        with mock.patch.object(
+                sidechannel.mariadb,
+                'update_agent_operation_attributes') as mock_update:
+            with mock.patch('time.time', return_value=self.NOW):
+                job.observe_progress()
+
+        self.assertEqual(1, mock_update.call_count)
+        self.assertEqual(
+            ['last_progress'], mock_update.call_args.kwargs['fields'])
+        self.assertEqual(
+            self.NOW, mock_update.call_args.args[0].last_progress)
