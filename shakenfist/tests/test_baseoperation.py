@@ -1,5 +1,10 @@
 # Copyright 2019 Michael Still and contributors
 
+import re
+
+from shakenfist.operations.baseoperation import get_all_network_queues
+from shakenfist.operations.baseoperation import get_all_node_queues
+from shakenfist.operations.baseoperation import get_node_background_node_queues
 from shakenfist.operations.baseoperation import get_node_network_queues
 from shakenfist.tests import base
 
@@ -45,3 +50,33 @@ class GetNodeNetworkQueuesTest(base.ShakenFistTestCase):
                 queue.startswith(f'{EXAMPLE_UUID}-'),
                 f'{queue!r} does not start with node uuid',
             )
+
+
+class QueueNameFormatTest(base.ShakenFistTestCase):
+    """Every dequeue-side queue name must be enqueueable.
+
+    enqueue_cluster_operation() composes queue names as
+    '<target>-<family>-<priority>' (shakenfist/schema/operations/util.py),
+    so a name the dequeue helpers list without a family segment can never
+    match a work_queue row. Issue 3867 found exactly that: a family-less
+    '<node_uuid>-background' surviving from the etcd-era work item system.
+    The regex here mirrors tools/queue-wait-report.py's parser.
+    """
+
+    QUEUE_NAME_RE = re.compile(r'^.+-(clusteroperation|network)-[^-]+$')
+
+    def test_all_node_queue_names_have_a_family_segment(self):
+        for queue in (get_all_node_queues(EXAMPLE_UUID) +
+                      get_all_network_queues() +
+                      get_node_network_queues(EXAMPLE_UUID)):
+            self.assertTrue(
+                self.QUEUE_NAME_RE.match(queue),
+                f'{queue!r} does not parse as <target>-<family>-<priority>, '
+                'so nothing can enqueue to it',
+            )
+
+    def test_node_background_queues(self):
+        self.assertEqual(
+            [f'{EXAMPLE_UUID}-clusteroperation-background',
+             f'{EXAMPLE_UUID}-clusteroperation-background_high_io'],
+            get_node_background_node_queues(EXAMPLE_UUID))
