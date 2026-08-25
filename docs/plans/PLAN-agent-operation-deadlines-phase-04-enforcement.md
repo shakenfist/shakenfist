@@ -464,22 +464,32 @@ test 0 -eq "$(grep -rnE '\.(deadline|progress_timeout)\b' \
   | grep -vE 'deadline_passed|effective_deadline|effective_progress_timeout' \
   | wc -l)" && echo 'helpers are the only readers'
 
-# 5. Every error write in the enforcement path goes through fail(),
-#    leaving exactly one direct assignment: the already-guarded one
-#    in SideChannelExecutorJob.execute()'s finally block, identified
-#    by the STATE_EXECUTING test above it rather than by a line
-#    number, which step 4e shifts. Six of these exist today.
-test 1 -eq "$(grep -rc 'state = AgentOperation.STATE_ERROR\|state = Instance.STATE_ERROR' \
+# 5. Every error write in the enforcement path goes through fail().
+#    Six direct assignments existed when the phase started. The
+#    original criterion allowed one survivor -- the already-guarded
+#    write in SideChannelExecutorJob.execute()'s finally block -- and
+#    review item 8 pointed out that leaving it there is what makes its
+#    message the one reason in the daemon which still persists
+#    nowhere, so it goes through fail() too and the count is now zero.
+test 0 -eq "$(grep -rc 'state = AgentOperation.STATE_ERROR\|state = Instance.STATE_ERROR' \
     shakenfist/daemons/sidechannel/main.py \
     shakenfist/operations/node_aop_op.py | cut -d: -f2 \
   | paste -sd+ | bc)" \
-  && grep -B 4 'self.agentop.state = AgentOperation.STATE_ERROR' \
-       shakenfist/daemons/sidechannel/main.py | grep -q 'STATE_EXECUTING' \
   && echo 'error writes guarded'
 
-# 6. The config descriptions no longer promise enforcement is coming.
-test 0 -eq "$(grep -c 'until phase 4' shakenfist/config.py)" \
-  && echo 'config descriptions current'
+# 6. No published page still says enforcement is coming. Originally
+#    this covered shakenfist/config.py only, which is why review item
+#    2 found two operator-facing pages still saying the opposite of
+#    what the server does. Plan files anywhere under docs/ are a
+#    historical record (docs/components/ carries other projects'
+#    plans, which use the same phrasing about their own phases) and
+#    are excluded; the four guides below are what an operator or an
+#    API consumer actually reads.
+test 0 -eq "$(grep -rniE 'until phase 4|not yet enforced|nothing (acts on|enforces)' \
+    shakenfist/config.py \
+    docs/developer_guide docs/operator_guide docs/user_guide \
+    docs/release_notes --include='*.md' | wc -l)" \
+  && echo 'no stale enforcement claims'
 
 # 7. Full check.
 pre-commit run --all-files
@@ -500,6 +510,77 @@ By inspection, each falsifiable:
 - `observe_progress()` is called from exactly four reply sites, and
   from nowhere that a ping reply reaches.
 
+## Response to the automated review
+
+The automated reviewer raised fourteen items on PR #3898: four marked
+FIX, nine CONSIDER, one INFO. All fourteen were addressed. The three
+worth calling out:
+
+1. **The progress window was seeded before `handler.dispatch()`, not
+   after the send** (item 1, the only real defect found). A `put-blob`
+   whose blob is not already local calls `Blob.ensure_local()` inside
+   `dispatch()`, which can fetch multiple gigabytes from another node.
+   With the clock started before that call, the very next loop
+   iteration expired the operation before the agent had been sent
+   anything at all — recording "no progress from the agent" for a
+   delay which was entirely hypervisor side. The window now starts
+   immediately after `_send_commands_single_envelope()` returns, in
+   the same breath as `self.ready = False`, which is what arms the
+   check. The dispatch block was extracted to
+   `_dispatch_next_command()` so this is testable at all: previously
+   it was reachable only through a live vsock connection.
+   `ExecutorDispatchWindowTestCase` asserts both halves — a 300 second
+   dispatch does not expire a 30 second window, and a genuinely silent
+   agent still does.
+
+2. **The budget check ran unthrottled in the socket loop** (item 3).
+   `deadline_passed()` on a NULL-deadline operation resolves its
+   default against `self.state.update_time`, and `state` is an
+   uncached `GetState`. The loop iterates once per packet, so an
+   active transfer meeting a legacy row was thousands of uncacheable
+   database reads a second — the shape of issue 3532. The check is now
+   rate limited to `BUDGET_CHECK_INTERVAL` (1 second), which is ample
+   for a 30 second window and bounds the cost whichever branch is
+   taken.
+
+3. **`fail()` no longer writes `self.error`** (item 7). Recording the
+   message in both places was defended in the original plan as making
+   the call sites correct the day attribute persistence exists. Review
+   pointed out the cost: every failure emits a "subclass should
+   override" WARNING plus a mutate event duplicating the state
+   message, and the helper made that noise regular rather than
+   occasional. Since the call sites go through `fail()` rather than
+   assigning, they become correct by construction anyway when issue
+   #3899 is fixed, so the write is dropped and the docstring cites the
+   issue.
+
+The remainder: the expiry audit event now names the instance as well
+as the operation (item 4, restoring the plan's own decision 2, which
+the implementation had quietly narrowed); `observe_progress()`
+delegates its write to a new `AgentOperation.record_progress()` and
+tolerates a `DatabaseUnavailable` rather than letting a bookkeeping
+write fail an in-flight transfer (item 9); `hard_delete()` clears
+object references the way `delete()` does (item 13); the two published
+pages which still said deadlines were unenforced were corrected and
+the definition-of-done grep widened to catch that class of drift
+(item 2); a release note landed now rather than waiting for phase 7,
+because the effective default tightens from 900 to 600 seconds
+(item 6); the vacuous test which asserted a fake implemented itself
+correctly was deleted (item 10); and the stale "read in phase 4"
+comments, the `constants.py` comment asserting the missing `error`
+state was deliberate, and the undocumented preflight-wedge gap were
+all corrected in place (items 11, 14, 5).
+
+Item 5 — a `PREFLIGHT` head whose deadline has passed still wedges its
+instance's queue if the preflight task never runs — is real and
+deliberately not fixed here. Expiring such a head races a preflight
+task which may still be working, and the safe form needs a grace
+period, which belongs with phase 5's node-local reaper. The gap is now
+documented at the site rather than left implied.
+
+Item 12 (the declared but undriven `initial --> expired` edge) needed
+no change; a note was added saying it is permitted for completeness.
+
 ## Future work
 
 - **`AgentOperation` attribute writes go nowhere.** Found while
@@ -515,7 +596,11 @@ By inspection, each falsifiable:
   recording the reason on the state, which does persist. Fixing it
   properly means deciding whether agent operations get a generic
   attributes path or whether `error` becomes a typed column, which is
-  a schema question and its own change. Worth an issue.
+  a schema question and its own change. Filed as issue #3899, which
+  also records that `Network` and `Artifact` lose their error messages
+  the same way. `fail()` no longer writes `self.error` at all (review
+  item 7); its call sites become correct by construction when #3899
+  lands.
 - **Errored agent operations still leak `object_states` rows.**
   `FINAL_OBJECT_STATES` (`shakenfist/constants.py:191`) contains
   `deleted`, `complete` and `abort` but not `error`, so the hard-delete
