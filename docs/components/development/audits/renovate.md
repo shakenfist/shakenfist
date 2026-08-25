@@ -144,7 +144,7 @@ See: `templates/renovate/README.md`
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-24T07:04:16.593679+00:00
+Last regenerated: 2026-08-25T06:54:21.186929+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -155,7 +155,7 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 | clingwrap | non-compliant | shakenfist/clingwrap#117 |
 | cloudgood | non-compliant | shakenfist/cloudgood#2 |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#37 |
+| divergulent | compliant | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | compliant | - |
@@ -173,7 +173,6 @@ Details for non-compliant projects:
 - **client-python-k3s** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **clingwrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
-- **divergulent** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **library-utilities** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **occystrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **shakenfist** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently

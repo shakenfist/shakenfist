@@ -267,6 +267,7 @@ All resolved by the operator on 2026-08-14:
 | 3. Contract handshake | [PLAN-proxy-dev-releases-phase-03-contract-handshake.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/) | Complete (merged in PR #314, 2026-08-16) |
 | 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Docs (4a) complete in PR #314. 4b (patch175 simplification) withdrawn 2026-08-18 — decision 1 is reversed in the phase plan and the Kolla patch keeps its PyPI fallback. 4c (Gerrit recheck) outstanding, operator-driven |
 | 5. Automated dev release pruning | [PLAN-proxy-dev-releases-phase-05-pypi-prune.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/) | Complete (merged in PR #328, 2026-08-18) — storage monitor, lockfile-only merges no longer publish, pruning runbook |
+| 6. Push audit | PLAN-proxy-dev-releases-phase-06-push-audit.md | Not started |
 
 Phase sketches (to be expanded into per-phase plans):
 
@@ -407,6 +408,49 @@ under the operator's CI-cost policy. Phase 5 lands as its
 own, separate PR — the single-PR batching applied to the
 phases that had to merge together to turn the scenario
 jobs green, and phase 5 depends on none of that.)
+
+**Phase 6 — push audit.** Work through `PUSH-AUDIT.md`
+against the accumulated diff of every phase in this plan —
+phases 1 to 5 together, not phase 5 alone, because what
+the phases did to each other is only visible once they are
+all in the same diff.
+
+Every judgment brief in `PUSH-AUDIT.md` says to read
+`git diff develop...HEAD`. That is wrong here and is the
+executor's first correction: phases 1 to 5 are already
+merged into `develop` (PR #314 as `14b54f3`, PR #328 as
+`2e1fd43`), so on a phase 6 branch that range holds this
+phase's own paperwork and none of the work being audited.
+Unrelated work merged between the two, so the range has to
+be scoped to the paths the phases touched:
+
+```
+paths=$( { git diff --name-only 14b54f3^1..14b54f3
+           git diff --name-only 2e1fd43^1..2e1fd43
+         } | sort -u )
+git diff 14b54f3^1..2e1fd43 -- $paths
+```
+
+That is 40 files and roughly 4,000 added lines as of
+2026-08-24. Derive the path set rather than transcribing
+it, so a rebase or a later amendment cannot silently
+narrow the audit. Substitute this range wherever
+`PUSH-AUDIT.md` says `git diff develop...HEAD`, in all
+five judgment briefs. Wave 1's lint and test gates run
+against the worktree and are unaffected, but its style
+checks are diff-based against a hard-coded `DIFF_BASE`
+(`tools/audit/wave1.sh:37`) and will see nothing; run
+those greps over the range above by hand, or edit
+`DIFF_BASE` locally without committing it.
+
+Scope note: 4b is withdrawn and 4c is still outstanding
+and operator-driven, so the audit covers phases 1 to 3,
+4a and 5.
+
+Findings land as their own pull request; this plan is not
+complete until each one is fixed or declined in writing
+here, with the reason. If the audit finds nothing, record
+that in a sentence — it is a result worth having.
 
 ## Agent guidance
 

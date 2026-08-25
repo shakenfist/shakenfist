@@ -72,7 +72,7 @@ For links to other files in the same repository, use
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-24T07:04:16.593679+00:00
+Last regenerated: 2026-08-25T06:54:21.186929+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -83,7 +83,7 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 | clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#7 |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#68 |
+| divergulent | compliant | - |
 | instar | non-compliant | shakenfist/instar#502 |
 | kerbside | compliant | - |
 | kerbside-patches | compliant | - |
@@ -97,7 +97,6 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 Details for non-compliant projects:
 
 - **cloudgood** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/index.md -> more-fundamentals.md, docs/virtualization-history.md -> more-fundamentals.md
-- **divergulent** (Status): 8 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-faster-full-run.md -> ../../PLAN-TEMPLATE.md, docs/plans/PLAN-full-machine-run.md -> ../../PLAN-TEMPLATE.md, docs/plans/PLAN-generated-marking.md -> PLAN-maintenance-health.md, docs/plans/PLAN-initial.md -> ../../PLAN-TEMPLATE.md, docs/plans/PLAN-patch-classification.md -> ../../PLAN-TEMPLATE.md, docs/plans/PLAN-published-cache.md -> ../../PLAN-TEMPLATE.md, docs/plans/PLAN-release-1.0.md -> ../../PLAN-TEMPLATE.md, docs/plans/index.md -> ../../PLAN-TEMPLATE.md
-- **instar** (Status): 44 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/amend.md -> ../src/crates/amend/src/qcow2.rs, docs/amend.md -> ../tests/test_amend.py, docs/bench.md -> ../src/crates/bench/, docs/bench.md -> ../src/crates/qcow2-write-exec/, docs/bench.md -> ../src/crates/qcow2-write/, docs/bench.md -> ../src/operations/bench/, docs/bench.md -> ../tests/test_bench.py, docs/bitmap.md -> ../src/crates/bitmap/, docs/bitmap.md -> ../src/operations/bitmap/, docs/bitmap.md -> ../tests/test_bitmap.py (+34 more)
+- **instar** (Status): 46 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/amend.md -> ../src/crates/amend/src/qcow2.rs, docs/amend.md -> ../tests/test_amend.py, docs/bench.md -> ../src/crates/bench/, docs/bench.md -> ../src/crates/qcow2-write-exec/, docs/bench.md -> ../src/crates/qcow2-write/, docs/bench.md -> ../src/operations/bench/, docs/bench.md -> ../tests/test_bench.py, docs/bitmap.md -> ../src/crates/bitmap/, docs/bitmap.md -> ../src/operations/bitmap/, docs/bitmap.md -> ../tests/test_bitmap.py (+36 more)
 - **shakenfist** (Status): 13 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/operator_guide/database.md -> ../../shakenfist/schema/object_filter.py, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/instance.py#L177-L183, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/instance.py#L344, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/network/network.py#L182, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/network/network.py#L964, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/artifact.py#L609, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/external_api/artifact.py#L387, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/external_api/instance.py#L893, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/external_api/network.py#L292, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/instance.py#L2137 (+3 more)
 <!-- consistency-audit:end -->

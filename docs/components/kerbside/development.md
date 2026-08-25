@@ -442,7 +442,11 @@ hook disagree about what passes:
 
 - **shellcheck** is pinned as a hook revision and as a `shellcheck-py`
   dependency of the `shellcheck` tox environment, which is what CI
-  runs.
+  runs. Upstream tags a fourth component — `v0.11.0.1` is shellcheck
+  0.11.0, packaging revision 1 — which is not semver, so `renovate.json`
+  also gives that dependency a regex versioning scheme. Without it the
+  `github-tags` lookup cannot resolve the current value at all, so the
+  hook half of the group is never proposed and the tox pin moves alone.
 - **skillsaw** is pinned as a hook revision and as the `skillsaw==`
   version the `sanity_checks` job installs into its test venv. CI
   installs the linter rather than using `stbenjam/skillsaw@v0`: that
@@ -456,6 +460,13 @@ no tox manager, and the `skillsaw==` pin sits in a `run:` block rather
 than a `uses:` — so a `customManagers` regex picks each one up, and the
 `shellcheck` and `skillsaw` groups land both halves of a bump in one
 pull request.
+
+Grouping only proposes the two halves together, though; it does not
+enforce that they agree. So `tools/shellcheck-wrap.sh` checks the hook
+revision against the `shellcheck-py` pin before it lints anything, and
+`tox -e shellcheck` fails in the smoke tier if they have drifted apart —
+which is what happened when the tag lookup above silently stopped
+resolving. The skillsaw pair has no equivalent assertion yet.
 
 ## Development configuration
 

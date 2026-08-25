@@ -97,7 +97,7 @@ out its real status rather than guessing from the file's existence.
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-24T07:04:16.593679+00:00
+Last regenerated: 2026-08-25T06:54:21.186929+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -108,7 +108,7 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#69 |
+| divergulent | compliant | - |
 | instar | non-compliant | shakenfist/instar#506 |
 | kerbside | compliant | - |
 | kerbside-patches | N/A | - |
@@ -123,7 +123,6 @@ Details for non-compliant projects:
 
 - **client-python** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
 - **client-python-k3s** (Status): docs/plans/index.md is missing, so none of the 2 plan(s) in docs/plans/ are registered
-- **divergulent** (Status): 1 table(s) not led by Date then Plan columns: line 10 starts "Plan | Phases"
 - **instar** (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): instar amend subcommand ("1.1 (qcow2 v2⇔v3 version transition, ...")
 - **library-utilities** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
 - **occystrap** (Status): index has no plan table (it must list plans in a table led by Date and Plan columns, not as prose or a bullet list); 4 master plan(s) not listed in the index: PLAN-make-the-speed.md, PLAN-post-write-verification.md, PLAN-registry-proxy.md, PLAN-structured-logging.md

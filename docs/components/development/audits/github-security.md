@@ -60,7 +60,7 @@ Security settings: UI-only configuration, no template needed.
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-24T07:04:16.593679+00:00
+Last regenerated: 2026-08-25T06:54:21.186929+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -71,7 +71,7 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 | clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#5 |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#41 |
+| divergulent | compliant | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | compliant | - |
@@ -86,7 +86,6 @@ Details for non-compliant projects:
 
 - **agent-python** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
 - **cloudgood** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
-- **divergulent** (Status): Missing .github/workflows/codeql-analysis.yml
 - **library-utilities** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
 - **shakenfist** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
 <!-- consistency-audit:end -->
