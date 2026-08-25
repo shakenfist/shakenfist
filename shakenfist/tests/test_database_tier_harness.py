@@ -14,9 +14,12 @@ agreeing about what normal is, so this asserts they produce the same answer
 for every entry in the shipped budget, at four cluster shapes.
 """
 
+import ast
 import importlib.util
+import json
 import os
 import textwrap
+import tomllib
 from unittest import mock
 
 from shakenfist.schema import database_load_budget
@@ -35,6 +38,75 @@ def _load_harness():
 
 
 harness = _load_harness()
+
+
+def _repository_root():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.dirname(here))
+
+
+def _daemon_modules():
+    """Every daemon name which has a module behind it, and its path.
+
+    Read from the console scripts in pyproject.toml, because that is what
+    actually decides which module a daemon name runs -- and it is where
+    the mapping stops being the identity, sf-net being
+    shakenfist.daemons.network. A name in Node.VALID_DAEMONS with no entry
+    here has no daemon module at all: sf-api is gunicorn over
+    external_api, and eventlog and checksums are names nothing implements.
+    """
+    root = _repository_root()
+    with open(os.path.join(root, 'pyproject.toml'), 'rb') as f:
+        scripts = tomllib.load(f)['project']['scripts']
+
+    modules = {}
+    for script, target in scripts.items():
+        module = target.split(':')[0]
+        if not script.startswith('sf-'):
+            continue
+        if not module.startswith('shakenfist.daemons.'):
+            continue
+        modules[script[len('sf-'):]] = os.path.join(
+            root, *module.split('.')) + '.py'
+    return modules
+
+
+def _daemons_which_poll():
+    """The daemons whose loop reaches Daemon.check_daemon_state().
+
+    Parsed rather than imported, because importing a daemon's main module
+    to ask a question about its shape runs its module level code. A daemon
+    polls if it defines a class deriving from the Daemon base class and its
+    module reaches the poll -- either through Daemon.idle() or by calling
+    check_daemon_state() directly, which the cluster and queues daemons do
+    from loops that sleep elsewhere.
+    """
+    bases = ('Daemon', 'WorkerPoolDaemon')
+    polls = set()
+
+    for name, path in _daemon_modules().items():
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding='utf-8') as f:
+            source = f.read()
+
+        tree = ast.parse(source)
+        subclasses = False
+        for statement in ast.walk(tree):
+            if not isinstance(statement, ast.ClassDef):
+                continue
+            for parent in statement.bases:
+                if isinstance(parent, ast.Attribute) and parent.attr in bases:
+                    subclasses = True
+                elif isinstance(parent, ast.Name) and parent.id in bases:
+                    subclasses = True
+
+        if not subclasses:
+            continue
+        if 'check_daemon_state' in source or '.idle(' in source:
+            polls.add(name)
+
+    return polls
 
 
 METRICS = textwrap.dedent("""\
@@ -116,13 +188,40 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
                          harness.DAEMON_STATE_POLL_INTERVAL)
 
     def test_non_polling_daemons_do_not_reach_the_tier(self):
-        # sf-database has direct MariaDB access, so its own reads never
-        # pass through the interceptor which increments the counter.
-        # Predicting a poll rate for it would make the control fail on a
-        # perfectly healthy cluster.
-        self.assertIn('database', harness.NON_POLLING_DAEMONS)
-        self.assertIn('sentinel-first', harness.NON_POLLING_DAEMONS)
-        self.assertIn('sentinel-last', harness.NON_POLLING_DAEMONS)
+        # The positive control predicts a GetNodeDaemonState rate for every
+        # daemon a node reports running and not on this list, so a daemon
+        # in the wrong half fails the control on a perfectly healthy
+        # cluster -- which is what a hand written list of three entries
+        # did, because api, nodelock and privexec do not run the base
+        # class' loop and so never poll at all.
+        #
+        # So derive it rather than list it, from the two reasons a daemon
+        # has for not appearing in the counter. A new daemon then lands in
+        # the right half or fails here, rather than at the end of a cluster
+        # build.
+        from shakenfist import mariadb
+        from shakenfist import node
+
+        polls = _daemons_which_poll()
+        direct = set(mariadb.DIRECT_MARIADB_CALLERS)
+        expected = (set(node.Node.VALID_DAEMONS) - polls) | (polls & direct)
+
+        self.assertEqual(
+            expected, set(harness.NON_POLLING_DAEMONS),
+            'NON_POLLING_DAEMONS no longer matches the daemons which '
+            'actually poll their own daemon state row over the tier. '
+            'Daemons running Daemon.idle(): %s. Daemons with direct '
+            'MariaDB access: %s.'
+            % (json.dumps(sorted(polls)), json.dumps(sorted(direct))))
+
+    def test_the_poller_derivation_sees_a_real_poller(self):
+        # The check above passes vacuously if the derivation finds nothing,
+        # so pin two daemons known to sit on opposite sides of it. sf-net
+        # is also the case which proves the daemon name and its module
+        # directory are not assumed to be the same string.
+        polls = _daemons_which_poll()
+        self.assertIn('net', polls)
+        self.assertNotIn('nodelock', polls)
 
     def test_a_steady_pair_is_fixed_rate(self):
         steady = harness.fixed_rate([{('GetNode', 'net'): 3.0},

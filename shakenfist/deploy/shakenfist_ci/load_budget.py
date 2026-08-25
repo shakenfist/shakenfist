@@ -43,10 +43,12 @@ LOAD_WINDOW_COUNT = 2
 FIXED_RATE_MIN_RATIO = 0.6
 FIXED_RATE_MAX_RATIO = 1.7
 
-# Every daemon polls its own node_daemon_states row from Daemon.idle(),
-# rate-limited to DAEMON_STATE_POLL_INTERVAL. This is that constant, and it
-# is duplicated rather than imported because this suite is standalone and
-# does not import the server package.
+# A daemon which runs the Daemon base class' loop polls its own
+# node_daemon_states row from Daemon.idle(), rate-limited to
+# DAEMON_STATE_POLL_INTERVAL. This is that constant, and it is duplicated
+# rather than imported because this suite is standalone and does not import
+# the server package. Not every daemon runs that loop -- see
+# NON_POLLING_DAEMONS.
 DAEMON_STATE_POLL_INTERVAL = 2.0
 
 # The elected cluster daemon is the one exception. It sleeps on
@@ -58,11 +60,29 @@ DAEMON_STATE_POLL_INTERVAL = 2.0
 # against the real constants.
 ELECTED_CLUSTER_LOOP_SECONDS = 5.0
 
-# Daemons which do not reach the tier over gRPC never appear in this
-# counter, however healthy they are. sf-database has direct MariaDB access
-# and would otherwise be calling itself; the sentinels are one-shot and do
-# not idle.
-NON_POLLING_DAEMONS = ['database', 'sentinel-first', 'sentinel-last']
+# Daemons whose daemon state row is never read over the tier, however
+# healthy they are. Predicting a poll rate for one of these makes the
+# positive control fail on a perfectly healthy cluster, which is what
+# happened when this list held only the first three entries. There are two
+# distinct reasons to be here, and
+# test_non_polling_daemons_do_not_reach_the_tier derives the whole list
+# from both so that a new daemon cannot quietly land in the wrong half:
+#
+#   It does not reach the tier. sf-database has direct MariaDB access (it
+#   is in mariadb.DIRECT_MARIADB_CALLERS) and would otherwise be calling
+#   itself, so its reads never pass through the interceptor which
+#   increments this counter.
+#
+#   It never runs Daemon.idle(), so there is no poll to count. The
+#   sentinels are one-shot. sf-api is gunicorn over external_api and is
+#   not a daemon module at all. sf-nodelock is a bespoke Unix socket
+#   accept() loop and sf-privexec a gRPC serve loop; neither subclasses
+#   Daemon. eventlog and checksums are names in Node.VALID_DAEMONS with no
+#   module behind them, and so can never report themselves running.
+NON_POLLING_DAEMONS = [
+    'api', 'checksums', 'database', 'eventlog', 'nodelock', 'privexec',
+    'sentinel-first', 'sentinel-last'
+]
 
 DAEMON_STATE_RUNNING = 'daemon-running'
 

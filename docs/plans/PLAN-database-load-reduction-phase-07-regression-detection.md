@@ -301,6 +301,42 @@ better expression of what the ratchet actually knew — the question is not
 tolerance is wide enough that a loop with a one minute period straddling
 two sixty second windows still counts, which is asserted directly.
 
+**Not every daemon runs the base class' loop, so not every daemon
+polls.** The positive control predicts a `GetNodeDaemonState` rate for
+each daemon a node reports running, from the premise that every daemon
+reads its own row from `Daemon.idle()`. That premise is false for three
+of them, and the first functional CI run said so: `api`, `nodelock` and
+`privexec` each measured 0.00/s against a predicted 0.50/s while the
+other seven matched their prediction to two decimal places. None is
+unhealthy. sf-api is gunicorn over `external_api` and is not a daemon
+module at all; sf-nodelock is a bespoke Unix socket `accept()` loop and
+sf-privexec a gRPC serve loop, and neither subclasses `Daemon`. The
+hand-written exemption list held only `database` and the two sentinels.
+
+The fix is not three more names — a list of names is how this went wrong
+once already. `NON_POLLING_DAEMONS` is now asserted to equal
+`Node.VALID_DAEMONS` minus the daemons which actually reach
+`check_daemon_state()`, plus those back which hold
+`mariadb.DIRECT_MARIADB_CALLERS` and so never cross the tier at all. The
+poller set is derived by parsing each daemon's module for a class
+deriving from `Daemon` — parsed rather than imported, since importing a
+daemon's `main` to ask about its shape runs its module level code — and
+the daemon-name-to-module map is read from the console scripts in
+`pyproject.toml`, which is where that mapping stops being the identity
+(`sf-net` is `shakenfist.daemons.network`). A second test pins that the
+derivation actually finds `net` and does not find `nodelock`, because the
+first assertion passes vacuously if the derivation finds nothing.
+
+Four mutations were checked to bite: dropping `api` from the list,
+exempting a daemon that really does poll, blinding the derivation so it
+finds no pollers, and assuming the name and the module directory are the
+same string. Two things corroborate the fix beyond CI going green. The
+shipped budget, derived independently from a day of sfcbr data, contains
+`GetNodeDaemonState` entries for exactly the seven pollers and none for
+these three — so production agrees they never poll. And the failure was
+the control doing its job: it fired before the budget assertions could
+pass vacuously, which is what it is for.
+
 Three smaller notes. The elected cluster daemon's contribution to the
 positive control could not be verified against production, because #3874
 merged about an hour before the measurement window closed and sfcbr had
@@ -368,8 +404,9 @@ Each item names the check that settles it. All of these were run at
 planning time and every one reported "not done", which is what makes
 them worth keeping — a criterion that already passes before the work
 starts is not a criterion. They were all run again after
-implementation; every one passes except functional CI, which needs
-the branch pushed.
+implementation; every one passes. Functional CI needed the branch
+pushed, and its first run failed on the positive control's premise
+about which daemons poll — see "What implementation found".
 
 * **The budget exists, validates, and ships.** `shakenfist/data/
   database_load_budget.yaml` parses; every entry carries a base or a
