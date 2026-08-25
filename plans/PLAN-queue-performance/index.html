@@ -13226,6 +13226,41 @@ measured the result and decided against explicit fairness; the
 measurement, the exclusions it rests on and the decision are in
 <a href="../PLAN-queue-performance-phase-07-measure-and-decide/">PLAN-queue-performance-phase-07-measure-and-decide.md</a>
 and summarised under "What step 7 measured" below.</p>
+<p>Step 8 ran a <code>PUSH-AUDIT.md</code> audit over everything the plan changed,
+and found that <strong>coalescing had never worked</strong>. Steps 4 and 5 -- the
+enqueue-side dedup and the worker-side fold -- joined
+<code>cluster_operations</code> to <code>object_states</code> on two columns which could
+never match: an undashed uuid against a dashed one, and an enum value
+against an enum name. Both primitives therefore always returned
+"nothing found", and the <code>coalesced sibling ops</code> event had fired zero
+times in seven days on <code>sfcbr</code>. Fixed here as #3878, with eight tests
+which execute the real statements against a real database; #3879
+tracks the missing functional coverage that let the defect sit
+unnoticed since 2026-05-26. The full audit, including the three
+headings which found nothing, is in
+<a href="../PLAN-queue-performance-phase-08-push-audit/">PLAN-queue-performance-phase-08-push-audit.md</a>.</p>
+<p>Review of that fix found a second defect it would have activated:
+<code>network_ensure_mesh</code> was declared coalescible, but it does node-local
+work and the fold's key is the network alone, so the network node's
+survivor would have marked every <em>other</em> hypervisor's pending mesh op
+complete without doing their work. It is no longer coalescible, and an
+enqueue-time guard now enforces the invariant that made the
+queue-blind fold SQL safe in the first place. #3884 tracks the
+multi-column key that would let per-node tasks coalesce properly.</p>
+<p>Two things this plan changed are deliberately still unproven:</p>
+<ul>
+<li><strong>Step 7's numbers characterise a cluster with coalescing inert.</strong>
+  They were gathered on <code>sfcbr</code> while steps 4 and 5 were doing
+  nothing at all. That does not invalidate the conclusion -- if
+  anything "batched dequeue alone was enough" is the stronger reading
+  of it -- but the system measured is not the system now running.</li>
+<li><strong>The fold's cost was never measured.</strong>
+  <code>claim_coalescible_siblings</code> is recorded in <code>baseoperation.py</code> as
+  costing ~200 ms under load, and it now also takes <code>FOR UPDATE</code>
+  locks on <code>object_states</code> rows and issues an UPDATE against a hot
+  table. Re-measuring both is folded into #3879, alongside the
+  functional coverage.</li>
+</ul>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -13271,6 +13306,11 @@ and summarised under "What step 7 measured" below.</p>
 <td><a href="../PLAN-queue-performance-phase-07-measure-and-decide/">PLAN-queue-performance-phase-07-measure-and-decide.md</a></td>
 <td>Complete</td>
 </tr>
+<tr>
+<td>8. Push audit</td>
+<td><a href="../PLAN-queue-performance-phase-08-push-audit/">PLAN-queue-performance-phase-08-push-audit.md</a></td>
+<td>Complete</td>
+</tr>
 </tbody>
 </table>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
@@ -13289,7 +13329,8 @@ is that the network-facade refactor moved work that used to run
 inline on the network node into the queue. Every change now pays
 the queue+state-machine overhead, and the work backed up.</p>
 <h2 id="approach">Approach<a class="headerlink" href="#approach" title="Permanent link">&para;</a></h2>
-<p>Six discrete changes plus one measurement step:</p>
+<p>Six discrete changes, one measurement step, and a closing
+audit:</p>
 <ol>
 <li>
 <p><strong>Visibility</strong>: carry <code>wait_seconds</code>, <code>defer_count</code> and
@@ -13358,8 +13399,23 @@ the queue+state-machine overhead, and the work backed up.</p>
    for the method, and <code>tools/queue-wait-report.py</code> for the tool
    which produced the numbers.</p>
 </li>
+<li>
+<p><strong>Push audit</strong>: run <code>PUSH-AUDIT.md</code> over the accumulated diff
+   of every step in this plan, rather than over the last step's
+   diff alone. Because the work is already merged, the audit's
+   baseline is the plan's own commit range and not
+   <code>develop...HEAD</code>; the phase plan pins the exact range. Each
+   finding is resolved, or declined in writing, before this plan
+   is marked complete. If the audit finds nothing, that is
+   recorded in one sentence.</p>
+</li>
 </ol>
 <h2 id="what-step-7-measured">What step 7 measured<a class="headerlink" href="#what-step-7-measured" title="Permanent link">&para;</a></h2>
+<p>Read these numbers knowing what step 8 later found: <strong>both windows
+were captured with coalescing inert</strong>, because the fold and the
+enqueue-side dedup never matched a row until #3878 was fixed. Whatever
+improvement is visible below was delivered by the batched dequeue
+alone, and the fold's own cost does not appear in it at all.</p>
 <p>Two windows, both through <code>tools/queue-wait-report.py</code>:</p>
 <ul>
 <li><strong><code>sfcbr</code></strong>, 25h58m, 17,936 operations

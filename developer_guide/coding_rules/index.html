@@ -13208,6 +13208,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-column-to-column-comparison-has-no-bind-processor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A column-to-column comparison has no bind processor
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13612,6 +13623,41 @@ one only as long as the comparison stays fixed --
 <code>smoke_ci_tests/test_ci_harness.py</code> is what holds it there. When a
 helper's failure mode is to succeed quietly, the guard has to assert the
 effect on the cluster rather than that the helper returned.</p>
+<h2 id="a-column-to-column-comparison-has-no-bind-processor">A column-to-column comparison has no bind processor<a class="headerlink" href="#a-column-to-column-comparison-has-no-bind-processor" title="Permanent link">&para;</a></h2>
+<p>SQLAlchemy coerces a <em>bound</em> value through the column type on its way into
+the statement. It cannot do that for a comparison between two columns,
+because there is no Python value to coerce. Any join whose two sides store
+the same logical value in different physical forms therefore matches
+nothing, silently, and a query that returns no rows is
+indistinguishable from a feature with no work to do.</p>
+<p>Both of <code>object_states</code>' join columns have that problem:</p>
+<ul>
+<li><code>object_states.object_uuid</code> is <code>sa.String(36)</code> holding the dashed uuid
+  form, while the static tables use <code>sa.Uuid</code>, which is undashed CHAR(32)
+  on MariaDB. Join through <code>_dashed_uuid_expr()</code>, never a bare <code>sa.cast</code>.</li>
+<li><code>object_states.object_type</code> is <code>sa.Enum(ObjectType)</code>, which SQLAlchemy
+  stores by enum <em>name</em> (<code>'NET_OP'</code>), while the operation and object
+  tables carry the enum <em>value</em> (<code>'net_op'</code>). Bind an <code>ObjectType</code>
+  member; do not compare the two columns.</li>
+</ul>
+<p>The second is the subtler one, because binding a plain <code>'net_op'</code> string
+<em>does</em> work -- <code>ObjectType</code> subclasses <code>str</code>, so the member and its value
+hash identically in the Enum type's <code>_valid_lookup</code> -- which makes every
+other <code>object_states</code> query in <code>mariadb.py</code> correct by accident and makes
+the broken join look like all of them.</p>
+<p>The two coalescing primitives in <code>mariadb.py</code> had both defects in one
+<code>ON</code> clause, each individually fatal, and shipped that way for three
+months of green CI (issue #3878). Every test mocked either the primitive
+or the engine, so nothing ever ran the statement against a table. The
+operator-facing symptom was documented before the cause was: the
+<code>coalesced sibling ops</code> event simply never fired. Both queries now share
+<code>_coalescible_states_join()</code>, and <code>shakenfist/tests/test_mariadb_coalescing.py</code>
+runs them against a real database.</p>
+<p>The general rule: a query which can fail by matching nothing needs a test
+that proves it matches something. Asserting the statement's <em>shape</em>
+against a mocked engine cannot do that, and neither can a test that
+rewrites the query to suit sqlite -- register the missing SQL functions
+instead, so the statement under test is the statement that ships.</p>
 
 
 

@@ -13900,6 +13900,34 @@ itself):</p>
   dequeue will be folded on the next dispatcher cycle, not this
   one, so a moderate gap between sibling-arriving and
   <code>coalesced sibling ops</code> firing is expected.</p>
+<p>This paragraph described the diagnostic before anything used it.
+  Between 2026-05-26 and 2026-08-24 the event never fired at all,
+  on any cluster, because both primitives joined
+  <code>cluster_operations</code> to <code>object_states</code> on columns that could
+  never match (issue #3878). If you are reading historical event
+  data from that window, its absence says nothing about the
+  workload.</p>
+<ul>
+<li><strong><code>enqueue-side dedup: reused pending op</code></strong> (<code>EVENT_TYPE_AUDIT</code>).
+  Emitted on the <em>existing</em> operation, and on the network, when a
+  new enqueue was answered with an already-pending op instead of a
+  new row. Carries <code>requested_task</code> and <code>existing_op_uuid</code> in
+  <code>extra</code>. This is the enqueue-side counterpart of
+  <code>coalesced sibling ops</code>; without it a deduped enqueue would leave
+  no trace on the network's event stream at all, since the op it
+  reuses was created by some earlier caller.</li>
+</ul>
+<p>Only the cluster-wide <code>networknode</code> queue is ever deduped, in
+  either direction. Neither primitive can filter on which queue a
+  sibling is on -- <code>cluster_operations</code> has no queue column -- so a
+  coalescible task on a per-node queue would be folded across
+  nodes, and one hypervisor's work silently never applied. That is
+  enforced at enqueue time rather than left to convention: a
+  coalescible task enqueued to a per-node target raises
+  <code>InvalidCoalescibleEnqueue</code>. It is also why <code>network_ensure_mesh</code>
+  is <em>not</em> coalescible despite looking like the best candidate --
+  it updates the local host's FDB, so two mesh ops on one network
+  are the same work only if they are on the same node. See #3884.</p>
 <h3 id="reading-these-events-back">Reading these events back<a class="headerlink" href="#reading-these-events-back" title="Permanent link">&para;</a></h3>
 <p>Neither event survives its operation for long, so plan to read them
 from the log stream rather than from the database.</p>
