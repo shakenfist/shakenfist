@@ -375,12 +375,21 @@ is here.
   constant flagged for phase 3.
 - **Phase 1** merged as PR #3578 on 2026-07-31.
 - **Phase 2** merged as PR #3614 on 2026-08-08. Its reconciler has
-  been soaking cleanly on sfcbr since, on 5-minute passes with no
-  drift.
+  been soaking cleanly on sfcbr since, on 5-minute passes which have
+  reported no corrections. Read that as "nothing observed", not
+  "nothing happened": until the phase 4a close-out the pass logged
+  membership and timing only, so a corrected `used_*` counter left no
+  trace. See the phase 3 note below.
 - **Phase 3** merged as PR #3754 on 2026-08-16. Its D13 demand clause
   shipped the #3813 defect, fixed by phase 4a. Its step 9 sfcbr soak
   was discharged by phase 4a's step 5, one soak covering phases 3, 4
   and 4a (its decision E6); see that plan's *Soak observations*.
+  One qualification on its exit criteria: **the "reconciler reports
+  zero drift" criterion was accepted on healthy-pass evidence rather
+  than on measured deltas**, because the reconcile pass did not log
+  drift magnitudes at the time. Complete here does not mean that
+  criterion was checked. The phase 4a close-out added the missing
+  instrumentation, so the next soak can check it properly.
 - **Phase 4** has landed in full, management and operator review
   included. Its claim soak was discharged by phase 4a's step 5, by
   deliberate exercise rather than by waiting: nothing on sfcbr creates

@@ -712,9 +712,9 @@ result:
 | waiver rate | 648/1,052 = **62%** | 18/438 = **4.1%** |
 | hourly range | 25% -- 86% | 0% in 17 of 20 hours |
 
-Fifteen of the eighteen waivers fell in a single hour (2026-08-24
-06:00Z, 49 placements, 29%), with the remainder in two hours at 6% and
-3%. The baseline's threefold hourly variance was the reason for
+Fourteen of the eighteen waivers fell in a single hour (2026-08-24
+06:00Z, 49 placements, 29%), with the remainder in two hours at 6% (3
+of 49) and 3% (1 of 31). The baseline's threefold hourly variance was the reason for
 insisting on a long sample, and it is what makes this readable: the
 post-fix distribution is not a quiet-hour artefact, because the busiest
 post-fix hours (50 placements at 19:00Z, 49 at 09:00Z) ran at 0% and
@@ -753,17 +753,31 @@ window, every one seeing all six nodes, with `nodes_added`,
 of 27ms/91ms/3787ms (min/median/max). No pass logged a correction.
 
 This is weaker evidence than the Definition of done implies, and the
-gap is in the instrumentation rather than the result.
-`reconcile_scheduler_capacity` recomputes the counters wholesale
-(`daemons/cluster/scheduled_tasks.py:1057-1063`) and logs membership
-and timing but no before/after delta, so a silent correction of a
-`used_*` counter would leave no trace in the log. Proving zero drift
-needs the Prometheus gauges, which were not reachable from the analysis
-host. What can be said is that the reconciler ran healthily every five
-minutes throughout, saw a stable cluster, and expired nothing. **A
-follow-up issue should be filed to have the reconcile pass log the
-magnitude of any correction it makes**, because the phase 3 exit
-criterion cannot actually be checked from logs as things stand.
+gap was in the instrumentation rather than the result.
+`reconcile_scheduler_capacity` recomputes the counters wholesale and
+used to log membership and timing but no before/after delta, so a
+silent correction of a `used_*` counter left no trace in the log.
+Proving zero drift needed the Prometheus gauges, which were not
+reachable from the analysis host. What can be said of the window is
+that the reconciler ran healthily every five minutes throughout, saw a
+stable cluster, and expired nothing -- which is consistent with zero
+drift but does not demonstrate it.
+
+The gap turned out to be smaller than it looked and is closed by this
+close-out rather than deferred. The per-node `delta_used_cpus` /
+`delta_used_memory_mb` / `delta_used_disk_gb` values were already in
+the `ReconcileSchedulerCapacity` reply; only the log line dropped them.
+The pass now warns per drifting node and carries `drifted_nodes` plus
+per-dimension `drift_*` magnitudes on the summary line
+(`daemons/cluster/scheduled_tasks.py`). Magnitudes are summed absolute
+rather than signed, so drift in opposite directions on two nodes adds
+instead of cancelling into an apparently healthy total.
+
+**This means the phase 3 zero-drift criterion was accepted on
+healthy-pass evidence, not on measured deltas.** A reader should not
+take phase 3's Complete as "checked". The next soak can check it
+properly, which is the point of fixing the instrumentation now rather
+than filing an issue against a plan already closed.
 
 **Observation 5 -- phase 4 claim drawdown: done deliberately, not by
 waiting.** The 48h window produced no claim activity at all: zero
@@ -775,11 +789,24 @@ have changed it -- nothing on sfcbr creates claims on its own. The
 pathway was therefore exercised on purpose, with
 `tools/exercise-namespace-claims.py` against sfcbr on 2026-08-24: 33
 checks, all passing, covering request validation, create, duplicate
-refusal, the capacity refusal for an impossible claim, read and
-cross-namespace non-disclosure, field-masked update, re-dating,
-shrink-to-zero-and-back, drawdown against a real instance
+refusal, read and cross-namespace non-disclosure, field-masked update,
+re-dating, shrink-to-zero-and-back, drawdown against a real instance
 (`used_cpus=1 used_memory_mb=1024 used_disk_gb=8` after placement),
 the `below_usage` shrink refusal, expiry, and delete.
+
+One correction to that record, found in review. The run did **not**
+demonstrate the 507 capacity refusal, although an earlier draft of this
+section said it did. The impossible-claim check ran after the real
+claim already existed, and `create_namespace_claim` probes for an
+existing claim before it reaches the guarded `UPDATE` against
+`cluster_capacity`, so the request could only ever return the 409 for
+`exists`. The check had been widened to accept either status, which
+made it a no-500 smoke test rather than the capacity assertion its name
+promised. The check now runs before the claim is created, where
+capacity is the only thing that can refuse it, and asserts 507
+specifically. The 507 path itself was never untested -- `test_claims.py`
+and `test_mariadb_capacity_claims_live.py` cover it -- so what was wrong
+was this record, not the code.
 
 The expiry result is the one worth recording, because it is the only
 one that could not be reasoned out from the code. `coverage_state` is a
