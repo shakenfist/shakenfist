@@ -39,6 +39,16 @@ INSTANCE_GET_COUNT = 50
 ATTRIBUTE_FETCH_CEILING_PER_GET = 4
 AMBIENT_SAMPLE_SECONDS = 10
 
+# A blob GET builds an external view which needs the blob's outbound
+# references exactly once: depends_on, transcodes and references_from
+# are all derived from the same unfiltered read. The filtered property
+# reads used to make that three GetReferencesFrom RPCs per GET (issue
+# 3876), so the ceiling of two discriminates the old behaviour while
+# leaving one whole extra call of headroom over the expected single
+# fetch.
+BLOB_GET_COUNT = 50
+REFERENCES_FROM_CEILING_PER_GET = 2
+
 # A metrics scrape is a plain HTTP GET against a daemon's port, so a
 # single failure is not evidence about the property under test.
 SCRAPE_ATTEMPTS = 3
@@ -281,3 +291,81 @@ class DatabaseTierTestsMixin:
             'above the ceiling of %d. The external view is fetching the '
             'attributes row more than once per call. measurement=%s'
             % (per_get, ATTRIBUTE_FETCH_CEILING_PER_GET, measurement))
+
+    def test_blob_get_reads_references_from_once(self):
+        # A blob GET builds an external view whose depends_on and
+        # transcodes fields are derived from the same object_references
+        # rows the view already reads unfiltered for references_from.
+        # Issue 3876: fetching them via the filtered depends_on and
+        # transcoded properties as well made a single blob GET cost
+        # three GetReferencesFrom RPCs, which was most of the
+        # GetReferencesFrom/GetReferencesTo imbalance on the api daemon.
+        database_nodes = self._database_nodes()
+
+        # No addCleanup() to delete this instance, for the same reason as
+        # test_instance_get_fetches_the_attributes_row_once above:
+        # tearDown() already deletes and awaits every instance in the
+        # namespace, and runs before cleanups.
+        inst = self.test_client.create_instance(
+            'dbtier-blob-references', 1, 1024, None,
+            [
+                {
+                    'size': 8,
+                    'base': base.CLUSTER_CI_IMAGE,
+                    'type': 'disk'
+                }
+            ], None, None)
+        self._await_instance_create(inst['uuid'])
+
+        # The create reply predates disk allocation, so refresh to learn
+        # which blob backs the instance's disk.
+        inst = self.test_client.get_instance(inst['uuid'])
+        blob_uuid = inst['disks'][0]['blob_uuid']
+        self.assertIsNotNone(blob_uuid)
+
+        def _fetches():
+            return self._sum_requests(
+                database_nodes, 'GetReferencesFrom', 'api')
+
+        # Other API traffic on the cluster reads references too, so
+        # measure that rate and subtract it from the measurement below.
+        ambient_before = _fetches()
+        time.sleep(AMBIENT_SAMPLE_SECONDS)
+        ambient_rate = (_fetches() - ambient_before) / AMBIENT_SAMPLE_SECONDS
+
+        before = _fetches()
+        start = time.time()
+        for _ in range(BLOB_GET_COUNT):
+            self.test_client.get_blob(blob_uuid)
+        elapsed = time.time() - start
+        raw_delta = _fetches() - before
+        delta = raw_delta - (ambient_rate * elapsed)
+
+        measurement = {
+            'ambient_rate_per_second': ambient_rate,
+            'elapsed_seconds': elapsed,
+            'gets': BLOB_GET_COUNT,
+            'reference_fetches': delta,
+            'reference_fetches_raw': raw_delta,
+        }
+        self.addDetail(
+            'measurement',
+            content.text_content(json.dumps(
+                measurement, indent=2, sort_keys=True)))
+
+        # As above, the floor is asserted on the raw delta so a busy
+        # cluster's ambient estimate cannot push it below zero, while the
+        # ceiling keeps the ambient correction because background reads
+        # inflate it.
+        self.assertGreater(
+            raw_delta, 0,
+            'Expected blob GETs to read the blob\'s references at all; '
+            'measurement=%s' % measurement)
+
+        per_get = delta / BLOB_GET_COUNT
+        self.assertLess(
+            per_get, REFERENCES_FROM_CEILING_PER_GET,
+            'Each blob GET cost %.2f GetReferencesFrom RPCs, which is above '
+            'the ceiling of %d. The external view is reading the blob\'s '
+            'outbound references more than once per call. measurement=%s'
+            % (per_get, REFERENCES_FROM_CEILING_PER_GET, measurement))
