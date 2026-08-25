@@ -2444,6 +2444,14 @@ class Instance(dbowo):
         sidechannel daemon there skips instances with a live executor, so
         the operation being visible at the head during execution cannot
         double dispatch.
+
+        This is also the first of the deadline enforcement points. A
+        queued head whose wall-clock deadline has passed is expired and
+        retired here, and the next entry considered in the same pass,
+        so work the caller has already abandoned never occupies the
+        executor. Heads in the initial or preflight states are left
+        alone: they are mid-creation, and their enforcement point is
+        NodeAgentopOp._preflight().
         """
         # First check cheaply if there are any agent operations queued. This is
         # likely to be the case 99% of the time.
@@ -2468,6 +2476,19 @@ class Instance(dbowo):
 
                 state = agentop.state.value
                 if state == AgentOperation.STATE_QUEUED:
+                    if agentop.deadline_passed():
+                        # The caller's wall-clock budget ran out while
+                        # this sat in the queue. Retire it here rather
+                        # than letting it occupy the instance's single
+                        # executor slot doing work nobody is waiting
+                        # for any more, and consider the next entry in
+                        # the same pass.
+                        agentop.expire(
+                            'the operation deadline passed while queued')
+                        queue.pop(0)
+                        changed = True
+                        continue
+
                     # Dispatchable. Leave it on the queue -- it is retired
                     # by a later call once it has left the QUEUED state.
                     result = agentop
@@ -2480,11 +2501,11 @@ class Instance(dbowo):
                     # right now.
                     break
 
-                # EXECUTING, COMPLETE, ERROR or DELETED: this operation is
-                # finished with the queue. Retire the entry and consider
-                # the next one. This also unwedges a queue whose head
-                # errored or was deleted, which previously blocked the
-                # instance's queue forever.
+                # EXECUTING, COMPLETE, ERROR, EXPIRED or DELETED: this
+                # operation is finished with the queue. Retire the entry
+                # and consider the next one. This also unwedges a queue
+                # whose head errored, expired or was deleted, which
+                # previously blocked the instance's queue forever.
                 queue.pop(0)
                 changed = True
 

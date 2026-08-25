@@ -764,10 +764,11 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         self.mock_mariadb.create_instance('cirros', self.instance_uuid)
         self.inst = instance.Instance.from_db(self.instance_uuid)
 
-    def _make_agentop(self, state=None):
+    def _make_agentop(self, state=None, deadline=None):
         op = AgentOperation.new(
             str(uuid.uuid4()), 'unittest', self.instance_uuid,
-            [{'command': 'execute', 'commandline': 'true'}])
+            [{'command': 'execute', 'commandline': 'true'}],
+            deadline=deadline)
         if state:
             op.state = state
         self.inst.agent_operation_enqueue(op.uuid)
@@ -835,6 +836,77 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
 
         # A queue entry with no backing operation is retired, not returned.
+        self.assertEqual(
+            str(op2.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op2.uuid)], self._queue())
+
+    def test_next_expires_a_queued_head_past_its_deadline(self):
+        # A caller who has already given up must not be allowed to
+        # occupy the instance's single executor slot. The expired head
+        # is retired and the next entry considered in the same pass.
+        op1 = self._make_agentop(
+            state=AgentOperation.STATE_QUEUED, deadline=1.0)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        self.assertEqual(
+            str(op2.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op2.uuid)], self._queue())
+        self.assertEqual(AgentOperation.STATE_EXPIRED, op1.state.value)
+        self.assertEqual(
+            'the operation deadline passed while queued', op1.state.message)
+
+    def test_next_expires_consecutive_expired_heads(self):
+        op1 = self._make_agentop(
+            state=AgentOperation.STATE_QUEUED, deadline=1.0)
+        op2 = self._make_agentop(
+            state=AgentOperation.STATE_QUEUED, deadline=2.0)
+        op3 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        self.assertEqual(
+            str(op3.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op3.uuid)], self._queue())
+        self.assertEqual(AgentOperation.STATE_EXPIRED, op1.state.value)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, op2.state.value)
+
+    def test_next_returns_a_head_within_its_deadline(self):
+        op1 = self._make_agentop(
+            state=AgentOperation.STATE_QUEUED,
+            deadline=time.time() + 3600)
+
+        self.assertEqual(
+            str(op1.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual([str(op1.uuid)], self._queue())
+        self.assertEqual(AgentOperation.STATE_QUEUED, op1.state.value)
+
+    def test_next_never_expires_an_explicit_zero_deadline(self):
+        # 0.0 is the caller's "no wall-clock deadline at all"
+        # sentinel, not an ancient timestamp.
+        op1 = self._make_agentop(
+            state=AgentOperation.STATE_QUEUED, deadline=0.0)
+
+        with mock.patch('time.time', return_value=time.time() + 1000000):
+            self.assertEqual(
+                str(op1.uuid), str(self.inst.agent_operation_next().uuid))
+        self.assertEqual(AgentOperation.STATE_QUEUED, op1.state.value)
+
+    def test_next_leaves_a_preflight_head_alone(self):
+        # A preflight head is mid-creation and is enforced by
+        # NodeAgentopOp._preflight(), not here. Expiring it in the
+        # queue would race a preflight task which is still working.
+        op1 = self._make_agentop(
+            state=AgentOperation.STATE_PREFLIGHT, deadline=1.0)
+        self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+        self.assertIsNone(self.inst.agent_operation_next())
+        self.assertEqual(AgentOperation.STATE_PREFLIGHT, op1.state.value)
+
+    def test_next_retires_an_already_expired_head(self):
+        # Expired elsewhere -- by preflight or the executor -- the head
+        # is popped by the ordinary terminal state rule.
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op1.expire('expired somewhere else')
+
         self.assertEqual(
             str(op2.uuid), str(self.inst.agent_operation_next().uuid))
         self.assertEqual([str(op2.uuid)], self._queue())
