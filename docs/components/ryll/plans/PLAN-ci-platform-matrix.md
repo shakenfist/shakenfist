@@ -160,11 +160,12 @@ matrices (we already build natively).
 
 ## Approach
 
-The plan breaks into four phases. Phases 1 and 2 are no-regret
+The plan breaks into five phases. Phases 1 and 2 are no-regret
 expansions that fit comfortably in current CI budgets. Phase 3
 is a portability cleanup that unblocks Phases 1 and 2 on
 Windows. Phase 4 documents a manual-QA boundary; the work
-itself is a doc, not automation.
+itself is a doc, not automation. Phase 5 is the pre-push audit
+of everything the first four phases changed.
 
 ### Phase 01 — Cross-platform GUI/headless TLS smoke test
 
@@ -298,14 +299,47 @@ Bug-class coverage per minute: not applicable. The point is
 to be honest that some bugs require this and to make the
 boundary explicit.
 
+### Phase 05 — Push audit
+
+Work `PUSH-AUDIT.md` over the accumulated diff of Phases 01-04
+against `develop`, rather than the last phase's diff alone —
+the workflow edits, the portability cleanup and the new smoke
+tests only make sense read together. Findings land as their
+own PR against `develop`, recorded here under an *Items
+deferred from the push audit* heading — the shape
+`PLAN-web-frontend.md` uses for its *Items deferred from the
+post-Phase-N pre-push audit* sections, minus the phase number,
+because this phase audits the whole plan rather than a range
+of it. This plan is not complete until each is fixed or
+declined in writing. If the audit finds nothing, record that
+here in one sentence.
+
+Phases 01-04 have merged by the time this phase runs, so
+`develop...HEAD` is empty on the audit branch and the
+accumulated diff has to be assembled from the phases' merge
+commits. Record each phase's merge commit in the `Merged`
+column of the *Phase order* table as that phase lands; *Two
+ways this runbook is invoked* in `PUSH-AUDIT.md` has the rest.
+
+This catches:
+- Cross-phase duplication and doc drift that per-phase review
+  cannot see, because it only exists once several phases have
+  landed.
+
+Cost: sub-agent time at the end of the plan. No CI minutes.
+
+Bug-class coverage per minute: not applicable. This is a
+review gate, not a test.
+
 ## Phase order
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. Cross-platform TLS handshake smoke | PLAN-ci-platform-matrix-phase-01-tls-smoke.md | Not started |
-| 2. `web-smoke` on macOS (and Windows after Phase 03) | PLAN-ci-platform-matrix-phase-02-web-smoke-parity.md | Not started |
-| 3. Smoke-test portability audit | PLAN-ci-platform-matrix-phase-03-smoke-portability.md | Not started |
-| 4. Release QA checklist doc | PLAN-ci-platform-matrix-phase-04-release-qa.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Cross-platform TLS handshake smoke | PLAN-ci-platform-matrix-phase-01-tls-smoke.md | Not started | — |
+| 2. `web-smoke` on macOS (and Windows after Phase 03) | PLAN-ci-platform-matrix-phase-02-web-smoke-parity.md | Not started | — |
+| 3. Smoke-test portability audit | PLAN-ci-platform-matrix-phase-03-smoke-portability.md | Not started | — |
+| 4. Release QA checklist doc | PLAN-ci-platform-matrix-phase-04-release-qa.md | Not started | — |
+| 5. Push audit | PLAN-ci-platform-matrix-phase-05-push-audit.md | Not started | — |
 
 Hard dependencies: Phase 02b (Windows web-smoke) is
 gated on Phase 03 if we choose the Rust-rewrite route.

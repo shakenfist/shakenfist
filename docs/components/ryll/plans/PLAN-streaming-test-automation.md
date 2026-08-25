@@ -170,6 +170,29 @@ enough to bet a CI test on. Trying to write CI assertions
 against a streaming heuristic we don't fully understand
 yet would just produce flaky tests.
 
+## Push audit
+
+Whenever this plan does grow phases, the last of them runs
+`PUSH-AUDIT.md` over the accumulated diff of all of them
+against `develop`, not the last phase's diff alone. Findings
+land as their own PR against `develop`, recorded here under
+an *Items deferred from the push audit* heading — the shape
+`PLAN-web-frontend.md` uses for its *Items deferred from the
+post-Phase-N pre-push audit* sections, minus the phase number,
+because this phase audits the whole plan rather than a range
+of it. The plan is not complete until each one is fixed or
+declined in writing. If the audit finds nothing, record that
+here in one sentence.
+
+Those phases will have merged by then, so `develop...HEAD`
+is empty on the audit branch and the accumulated diff has to
+be assembled from their merge commits. Record each phase's
+merge commit alongside its phase as that phase lands — in a
+`Merged` column, once these phases are a table — and keep it
+out of the `Status` column, which holds one vocabulary term
+and nothing else. *Two ways this runbook is invoked* in
+`PUSH-AUDIT.md` has the rest.
+
 ## Cross-references
 
 - `docs/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency.md`

@@ -459,10 +459,24 @@ the interactions between phases are most of what a whole-plan
 audit is for.
 
 Phases 0--2 are already on `main`, so `git diff main` for this plan
-is empty and would read as a clean audit. Derive the range instead:
-from the merge base of phase 0's first commit to `main`, restricted
-to the paths this plan touched, and name the commit range here when
-the phase runs.
+is empty and would read as a clean audit. The audit runs over the
+commits that put them there, reconstructed from this plan file's
+history rather than recorded as they landed -- which is what the
+`plan-push-audit-phase` block now asks for, and did not when these
+phases merged:
+
+| Phase | Merged |
+|-------|--------|
+| 0. Trial weAudit | nothing in this repository; the trial ran in ryll |
+| 1. Conventions for signed review state | `d180c39` |
+| 2. Stamp and prune hooks | `0957d15`, `9f8d47f`, `4eae793`, `ee6d4ea` |
+
+There are no merge commits to name: all of these landed directly on
+`main` on 2026-07-09, confirmed against
+`repos/shakenfist/development/commits/<sha>/pulls`, which returns no
+pull request for any of them. That is the second shape v2 covers --
+"the phase's last commit where it landed directly" -- and it is why
+the block asks for the landing commit rather than the merge commit.
 
 Phase 4's rollout lands in other repositories, so each rollout pull
 request carries its own audit against that repository's default

@@ -466,10 +466,45 @@ the interactions between phases are most of what a whole-plan
 audit is for.
 
 Phases 1--4 are already on `main`, so `git diff main` for this plan
-is empty and would read as a clean audit. Derive the range instead:
-from the merge base of phase 1's first commit to `main`, restricted
-to the paths this plan touched, and name the commit range here when
-the phase runs.
+is empty and would read as a clean audit. The
+`plan-push-audit-phase` block asks for the commit each phase landed
+under; this plan predates that, so what can be reconstructed is
+recorded here and what cannot is named as such:
+
+| Phase | Merged |
+|-------|--------|
+| 1. Modular audit specs | `a56f5f6`, `7c5b540`, `200e007` (2026-03-08, direct to `main`) |
+| 2. CI-based audit runner | `4a970a6`, `fed8aa4`, then not recoverable |
+| 3. Automatic review and the fix/retest split | not recoverable |
+| 4. Cleanup | `b8bf764` (#41), `ada14ef` (#44), `e3d1333` (#47) |
+
+The phase 4 merges are the plan's work but not only the plan's
+work: #47 landed `54df816`, which published the audit specs under
+`docs/`, alongside unrelated review-tracking fixes. Recording a
+merge commit buys a range that certainly contains the phase, at the
+cost of a range that may contain more -- which is the right trade
+against the alternative of a range that contains neither reliably,
+but the audit says which files it read rather than reporting the
+whole merge as this plan's diff.
+
+Phases 2 and 3 are the honest gap. Phase 2 shipped one runner in
+March 2026 and then accreted from 13 criteria to 34 over five
+months, in commits interleaved with everything else this repository
+did; phase 3 was built largely in `shakenfist/actions`, so it spans
+two repositories. No commit range recovers either
+without also recovering unrelated work, which is the failure v2
+names. So the audit for those two phases reads the current state of
+the paths the plan owns rather than a diff -- `scripts/audit-check.py`,
+`scripts/audit_common.py`, `scripts/audit-manage-issues.py`,
+`scripts/audit-update-docs.py`, `docs/audits/`,
+`.github/workflows/consistency-audit.yml` and
+`docs/consistency-audits.md` -- and says so in its result. An audit
+that states what it could not scope is a result; one that quietly
+diffs nothing is not.
+
+This plan is the worked example for why v2 requires recording as
+phases land rather than deriving afterwards: five months on, the
+range genuinely is gone.
 
 Findings land as their own pull request; the plan is not complete
 until each is resolved or declined in writing, with the reason

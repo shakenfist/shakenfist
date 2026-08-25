@@ -40,6 +40,17 @@ version of each of these shared blocks:
   phase running the repository's `PUSH-AUDIT.md` over the whole
   plan's work. This is the block that gives the pre-push audit a
   trigger; see the `push-audit` audit for the runbook it starts.
+  Since v2 it also carries a plan-authoring requirement: because a
+  diff against the default branch is empty once a plan's phases have
+  merged, and unrelated work landing between phases makes the range
+  underivable afterwards, each phase records what put it on the
+  default branch as it lands -- the merge commit of its pull
+  request, or every commit of the phase where it landed directly.
+  That goes in a `Merged` column where the Execution phases are a
+  table, added last so a row which omits it still reaches `Status`,
+  or a `Merged:` line where they are prose sections. It never goes
+  in the `Status` cell, which `plan-status-vocabulary` reserves for
+  a single term.
 
 Every embedded block must be verbatim and at the current version.
 

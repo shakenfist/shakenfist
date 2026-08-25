@@ -203,6 +203,44 @@ There are two obligations here and they are not the same one:
   against `main`, not over the last commit alone. It runs once the
   migration is complete.
 
+The blocks half of that diff did not land in one place, so the range
+is recorded here rather than derived when the phase runs.
+`plan-push-audit-phase` asks for a `Merged:` line per phase where a
+plan's phases are prose sections rather than a table; this plan's
+implementation sections were built in four landings, so the line
+names the set:
+
+Merged: `2468dda` and `5918f5b` direct to `main`; `5b1fb74` (#49)
+and `ff92357` (#50). Between them those cover all nine blocks,
+`check_plan_template`, and `docs/audits/plan-template.md` --
+`2468dda` carried seven blocks plus the check and the spec page,
+`5918f5b` added `plan-status-vocabulary`, and #49 and #50 added and
+then revised `plan-push-audit-phase`. The migration commits in the
+other four repositories are named in their own pull requests and are
+audited there.
+
+**Two corrections to that line, both worth reading before doing this
+for another plan.** It first read as seven commits "all direct to
+`main`", derived from `git log -- templates/shared-blocks/`. That
+was wrong twice over. Two of the seven were not direct: `51d872f`
+arrived inside #21 and `e2585e3` inside #49, so anchoring on either
+would have audited one commit of a pull request rather than the pull
+request, and `e2585e3` was double-counted against `5b1fb74` besides.
+A path-filtered log does not distinguish the two cases;
+`git rev-list --first-parent` does, and is now what the block tells
+you to use.
+
+The larger error was scope. Four of the seven -- `9a74046`
+(`readme-discipline`), `fbcd759` (`comment-proportion`), `3abb973`
+(`plan-phase-references`) and `51d872f` (`llm-doc-discipline`) --
+are not this plan's work at all. They touch
+`templates/shared-blocks/` but none of them is one of the nine
+blocks `PLAN_TEMPLATE_BLOCKS` names, so an audit anchored on them
+would have swept in four unrelated consistency audits. Recording a
+range by the directory a plan happens to touch is the same mistake
+as deriving it from a date: both answer "what else was going on"
+rather than "what did this plan do".
+
 Findings from either land as their own pull request; the plan is not
 complete until each is resolved or declined in writing, with the
 reason recorded here. If an audit finds nothing, say so in one
