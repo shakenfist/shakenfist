@@ -69,6 +69,29 @@ DEFERRED = (
     '"node_inst_netdesc_op": "71730e60-3a09-48d9-ac18-4463513e8bf2", '
     '"program": "sf-queues"}')
 
+COALESCED = (
+    '{"message": "execution duration", "event_type": "usage", '
+    '"extra": {"seconds": 0.1, "wait_seconds": 0.5, "defer_count": 0, '
+    '"queue_name": "networknode-clusteroperation-user_facing", '
+    '"coalesce_outcome": "ran", "coalesce_seconds": 0.2, '
+    '"coalesce_folded": 3}, '
+    '"net_op": "2ed3668d-351c-4f86-b1aa-f86547ce1927", "program": "sf-net"}')
+
+COALESCE_RAN_EMPTY = (
+    '{"message": "execution duration", "event_type": "usage", '
+    '"extra": {"seconds": 0.1, "wait_seconds": 0.5, "defer_count": 0, '
+    '"queue_name": "networknode-clusteroperation-user_facing", '
+    '"coalesce_outcome": "ran", "coalesce_seconds": 0.1, '
+    '"coalesce_folded": 0}, '
+    '"net_op": "3ed3668d-351c-4f86-b1aa-f86547ce1928", "program": "sf-net"}')
+
+COALESCE_SKIPPED = (
+    '{"message": "execution duration", "event_type": "usage", '
+    '"extra": {"seconds": 0.1, "wait_seconds": 0.5, "defer_count": 0, '
+    '"queue_name": "networknode-clusteroperation-user_facing", '
+    '"coalesce_outcome": "batch_size_one"}, '
+    '"net_op": "4ed3668d-351c-4f86-b1aa-f86547ce1929", "program": "sf-net"}')
+
 # A journal line: the JSON is preceded by a syslog style prefix.
 JOURNAL_PREFIXED = (
     'Aug 23 17:49:41 sf-3 sf-queues[1903915]: ' + PER_NODE)
@@ -347,3 +370,89 @@ class QueueWaitReportTestCase(base.ShakenFistTestCase):
         self.assertIn('(no samples)', out)
         self.assertIn(
             '(1 row with fewer than 5 samples omitted, 1 in total)', out)
+
+
+class CoalescingParseTestCase(base.ShakenFistTestCase):
+    def test_reads_the_coalescing_fields(self):
+        sample = report.parse_line(COALESCED)
+        self.assertEqual('ran', sample.coalesce_outcome)
+        self.assertEqual(0.2, sample.coalesce_seconds)
+        self.assertEqual(3, sample.coalesce_folded)
+
+    def test_a_skipped_fold_has_an_outcome_but_no_duration(self):
+        sample = report.parse_line(COALESCE_SKIPPED)
+        self.assertEqual('batch_size_one', sample.coalesce_outcome)
+        self.assertIsNone(sample.coalesce_seconds)
+        self.assertIsNone(sample.coalesce_folded)
+
+    def test_an_older_event_carries_none_of_them(self):
+        # Not zero. An event from a build predating the instrumentation
+        # says nothing about coalescing, and reading it as "the fold ran
+        # and folded nothing" would invent data.
+        sample = report.parse_line(NETWORKNODE)
+        self.assertIsNone(sample.coalesce_outcome)
+        self.assertIsNone(sample.coalesce_seconds)
+        self.assertIsNone(sample.coalesce_folded)
+
+    def test_a_boolean_is_not_a_fold_count(self):
+        line = COALESCED.replace('"coalesce_folded": 3',
+                                 '"coalesce_folded": true')
+        self.assertIsNone(report.parse_line(line).coalesce_folded)
+
+    def test_every_outcome_the_code_records_is_reported(self):
+        # The report's outcome columns are written out by hand, so they
+        # can fall behind the guards in BaseClusterOperation.execute.
+        # Read the values back out of the source of truth.
+        from shakenfist.operations import baseoperation
+        source = open(baseoperation.__file__).read()
+        for outcome in report.COALESCE_OUTCOMES:
+            self.assertIn(f"self.coalesce_outcome = '{outcome}'", source)
+
+
+class CoalescingReportTestCase(base.ShakenFistTestCase):
+    def _run(self, lines, argv=None):
+        stream = io.StringIO('\n'.join(lines))
+        captured = io.StringIO()
+        stdout = sys.stdout
+        sys.stdout = captured
+        try:
+            report.main(argv=argv or [], stream=stream)
+        finally:
+            sys.stdout = stdout
+        return captured.getvalue()
+
+    def test_reports_the_distribution_and_the_outcomes(self):
+        out = self._run([COALESCED, COALESCE_RAN_EMPTY, COALESCE_SKIPPED])
+        self.assertIn('Coalescing, by operation type', out)
+        self.assertIn('Coalescing, by queue class and priority lane', out)
+        # Three siblings folded across the two folds which ran.
+        self.assertIn('folded', out)
+        self.assertIn('batch_size_one', out)
+
+    def test_a_fold_which_ran_and_found_nothing_is_not_a_fold_which_never_ran(
+            self):
+        # The whole point of the outcome column. #3878 was invisible
+        # because these two cases produced identical evidence.
+        ran = self._run([COALESCE_RAN_EMPTY])
+        skipped = self._run([COALESCE_SKIPPED])
+        self.assertNotEqual(ran, skipped)
+
+    def test_a_stream_without_the_fields_says_so(self):
+        out = self._run([NETWORKNODE, PER_NODE])
+        self.assertIn('no samples carrying coalescing instrumentation', out)
+
+    def test_older_events_do_not_change_the_other_tables(self):
+        # A stream with none of the new fields must report exactly what
+        # it reported before the instrumentation existed, apart from the
+        # coalescing section itself.
+        out = self._run([NETWORKNODE, PER_NODE, PER_NODE_NETWORK, DEFERRED])
+        before_coalescing = out.split('Coalescing')[0]
+        self.assertIn('Samples: 4', before_coalescing)
+        self.assertIn('By queue class and priority lane', before_coalescing)
+        self.assertIn('By operation type', before_coalescing)
+        self.assertIn('By priority lane', before_coalescing)
+
+    def test_uninstrumented_samples_are_counted_not_hidden(self):
+        out = self._run([COALESCED, NETWORKNODE])
+        self.assertIn('1 of 2 samples carry no coalescing instrumentation',
+                      out)
