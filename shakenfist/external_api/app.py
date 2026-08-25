@@ -267,6 +267,78 @@ def log_response_info(response):
     return response
 
 
+# The machine searchable API capability list, as a mapping of family
+# to the capability tokens that family advertises.
+#
+# This is data rather than markup because it is a contract. A client
+# feature-detects a server-side capability by looking for its token
+# here and nowhere else, so a capability that ships without its token
+# is invisible to every client -- which is exactly what happened to
+# namespace-claims, added in scheduler-reservations phase 4 and only
+# advertised at the phase's close-out because nothing enumerated this
+# list or pinned it in a test. Keeping the tokens in a dict means the
+# list can be diffed, iterated and asserted on; test_root.py pins it.
+#
+# Tokens are append-only in practice: removing one silently changes
+# behaviour in released clients, which match on substring presence.
+API_CAPABILITIES = {
+    'admin': ['cluster-cacert', 'cluster-resources', 'vdi-token-pubkey'],
+    'agent-operations': [
+        'agentoperations-crud', 'instance-agentoperations',
+        'instance-agentoperations-all', 'agentoperations-put-with-mode'],
+    'artifacts': [
+        'artifact-metadata', 'artifact-upload-types',
+        'artifact-clusteroperations'],
+    'auth': [
+        'trusted-issuers',
+        'generated-key-secrets',
+        # scope-enforcement lets a client tell whether a 403 means
+        # "your token is not scoped for this" on this cluster, or
+        # something else entirely.
+        'scope-enforcement',
+        # mapping-rules and federated-exchange are advertised
+        # separately: a client can be told which rules exist without
+        # the cluster necessarily accepting exchanges yet.
+        'mapping-rules',
+        'federated-exchange',
+        # namespace-claims advertises the claim CRUD surface. A client
+        # cannot feature-detect it any other way, so a client that
+        # checks this capability can degrade to unclaimed behaviour
+        # against a cluster that predates it. Client verbs for claims
+        # are phase 9 of PLAN-scheduler-reservations (client-python
+        # issue 364); the server-side advertisement is an obligation
+        # regardless of whether a client has caught up yet.
+        'namespace-claims'],
+    'blobs': [
+        'blob-metadata', 'blob-search-by-hash', 'blob-data-limit',
+        'blob-hash-sha1', 'blob-hash-sha256', 'blob-hash-xxh128',
+        'blob-events', 'blob-checksums', 'blob-single-checksum'],
+    'cluster-operations': [
+        'get-cluster-operations', 'cluster-operation-chain',
+        'cluster-operations-by-target'],
+    'events': ['events-by-type'],
+    'instances': [
+        'pure-affinity', 'spice-vdi-console', 'vdi-console-helper',
+        'vdi-console-proxy', 'instance-put-blob', 'instance-execute',
+        'instance-get', 'instance-screenshot', 'get-instance-namespace',
+        'hot-plug-interface', 'include-queued-agent-operations',
+        'instance-clusteroperations'],
+    'networks': [
+        'list-addresses', 'route-addresses', 'get-network-namespace',
+        'provide-dns', 'extra-dns-entries', 'network-clusteroperations',
+        'network-delete-async'],
+    'networkinterfaces': ['interface-metadata'],
+    'nodes': ['node-get', 'node-metadata', 'node-process-metrics'],
+}
+
+
+def render_capabilities():
+    """Render API_CAPABILITIES as the list items the root page serves."""
+    return ''.join(
+        '<li>%s: %s</li>' % (family, ', '.join(tokens))
+        for family, tokens in API_CAPABILITIES.items())
+
+
 class Root(api_base.Resource):
     @api_base.public
     def get(self):
@@ -275,42 +347,7 @@ class Root(api_base.Resource):
              '<body><h1>Shaken Fist REST API service</h1>'
              '<p>You might be interested in the <a href="/apidocs">apidocs</a>.</p>'
              '<p>Machine searchable API capabilities:</p><ul>'
-
-             '<li>admin: cluster-cacert, cluster-resources, '
-             'vdi-token-pubkey</li>'
-             '<li>agent-operations: agentoperations-crud, instance-agentoperations, '
-             'instance-agentoperations-all, agentoperations-put-with-mode</li>'
-             '<li>artifacts: artifact-metadata, artifact-upload-types, '
-             'artifact-clusteroperations</li>'
-             # scope-enforcement lets a client tell whether a 403 means
-             # "your token is not scoped for this" on this cluster, or
-             # something else entirely.
-             # mapping-rules and federated-exchange are advertised
-             # separately: a client can be told which rules exist
-             # without the cluster necessarily accepting exchanges yet.
-             # namespace-claims advertises the claim CRUD surface. A
-             # client cannot feature-detect it any other way, and the
-             # conductor gates on check_capability() so that an
-             # un-upgraded client degrades to unclaimed behaviour.
-             '<li>auth: trusted-issuers, generated-key-secrets, '
-             'scope-enforcement, mapping-rules, federated-exchange, '
-             'namespace-claims</li>'
-             '<li>blobs: blob-metadata, blob-search-by-hash, blob-data-limit, '
-             'blob-hash-sha1, blob-hash-sha256, blob-hash-xxh128, blob-events, '
-             'blob-checksums, blob-single-checksum</li>'
-             '<li>cluster-operations: get-cluster-operations, '
-             'cluster-operation-chain, cluster-operations-by-target</li>'
-             '<li>events: events-by-type</li>'
-             '<li>instances: pure-affinity, spice-vdi-console, vdi-console-helper, '
-             'vdi-console-proxy, '
-             'instance-put-blob, instance-execute, instance-get, instance-screenshot, '
-             'get-instance-namespace, hot-plug-interface, '
-             'include-queued-agent-operations, instance-clusteroperations</li>'
-             '<li>networks: list-addresses, route-addresses, get-network-namespace, '
-             'provide-dns, extra-dns-entries, network-clusteroperations, '
-             'network-delete-async</li>'
-             '<li>networkinterfaces: interface-metadata</li>'
-             '<li>nodes: node-get, node-metadata, node-process-metrics</li>'
+             + render_capabilities() +
              '</ul></p></body></html>'),
             mimetype='text/html')
         resp.status_code = 200
