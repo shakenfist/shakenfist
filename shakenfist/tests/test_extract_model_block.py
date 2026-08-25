@@ -11,7 +11,8 @@ history and in a description a human is meant to read before the diff.
 The parsing looks trivial and is not. Each test below pins a shape that the
 obvious sed implementation got wrong: a range match prints every occurrence
 rather than the first, an unterminated block runs to the end of the captured
-output and swallows the block after it, and a model which copies the fenced
+output and swallows the block after it, a repeated start marker ends up
+embedded in the published prose, and a model which copies the fenced
 illustration from the prompt gets its whole description rendered as one
 preformatted lump. The one thing that must NOT be normalised is fenced code
 inside a description, which is why fences are only stripped when they wrap
@@ -70,9 +71,9 @@ class ExtractModelBlockTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, rc)
         self.assertEqual('Fix the thing.\n\nBody line.\n', got)
 
-    def test_only_the_first_block_is_taken(self):
-        # A model which emits a block, decides it is wrong and emits another
-        # used to have the interior marker lines published verbatim.
+    def test_a_second_complete_block_is_ignored(self):
+        # A range match prints every occurrence, so this used to publish the
+        # interior marker lines verbatim.
         rc, got = self._extract('PR_DESCRIPTION', (
             'PR_DESCRIPTION_START\n'
             'First attempt.\n'
@@ -84,6 +85,41 @@ class ExtractModelBlockTestCase(base.ShakenFistTestCase):
         self.assertEqual('First attempt.\n', got)
         self.assertNotIn('PR_DESCRIPTION_END', got)
         self.assertNotIn('Second attempt.', got)
+
+    def test_a_repeated_start_marker_restarts_the_block(self):
+        # The model narrating what it is about to emit, or abandoning a first
+        # attempt without closing it. Taking the first start marker instead
+        # would leave the second one embedded in the published prose.
+        rc, got = self._extract('PR_DESCRIPTION', (
+            'PR_DESCRIPTION_START\n'
+            'Abandoned attempt.\n'
+            'PR_DESCRIPTION_START\n'
+            'The real description.\n'
+            'PR_DESCRIPTION_END\n'))
+        self.assertEqual(0, rc)
+        self.assertEqual('The real description.\n', got)
+        self.assertNotIn('PR_DESCRIPTION_START', got)
+        self.assertNotIn('Abandoned attempt.', got)
+
+    def test_end_before_any_start_is_not_a_close(self):
+        rc, got = self._extract('PR_DESCRIPTION', (
+            'PR_DESCRIPTION_END\n'
+            'PR_DESCRIPTION_START\n'
+            'The real description.\n'
+            'PR_DESCRIPTION_END\n'))
+        self.assertEqual(0, rc)
+        self.assertEqual('The real description.\n', got)
+
+    def test_whitespace_only_block_is_rejected(self):
+        # As useless to a reader as an empty one, and the caller falls back
+        # for both.
+        rc, got = self._extract('PR_DESCRIPTION', (
+            'PR_DESCRIPTION_START\n'
+            '   \n'
+            '\t\n'
+            'PR_DESCRIPTION_END\n'))
+        self.assertEqual(1, rc)
+        self.assertEqual('', got)
 
     def test_unterminated_block_is_rejected(self):
         # Without this the range runs to end of file and the commit message

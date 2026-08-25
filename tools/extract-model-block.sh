@@ -15,13 +15,17 @@
 # The rules below each exist because the naive version of this got one
 # of them wrong:
 #
-# - Only the FIRST block is taken. A range match prints every
-#   occurrence, so a model which emits a block, decides it is wrong and
-#   emits another leaves the interior marker lines embedded in the
-#   result.
-# - Both markers must be present. A truncated block would otherwise run
-#   to the end of the captured output and swallow whatever followed it
-#   -- which, now that there are two blocks, is the other one.
+# - The block is the text between the LAST start marker and the FIRST
+#   end marker which follows it, buffered and emitted only once that
+#   end marker is seen. Every awkward shape then fails safe rather than
+#   into the published output: a second complete block is ignored, a
+#   repeated start marker restarts rather than embedding a marker line
+#   in the prose, an end marker before any start is not a close, and a
+#   start which is never closed yields nothing rather than the
+#   remainder of the transcript -- which, now that there are two
+#   blocks, would be the other one. A sed address range does none of
+#   this: it re-matches, so repeated markers concatenate and the
+#   markers themselves survive into the result.
 # - A marker matches only a line whose entire content is the marker
 #   token, ignoring surrounding whitespace. Prose which mentions a
 #   marker mid-sentence is therefore not a terminator; this file is
@@ -52,8 +56,8 @@ if [ ! -f "${input}" ]; then
     exit 1
 fi
 
-# Extract the first complete block. awk's exit in a main rule falls
-# through to END, which is where the "no closing marker" status is set.
+# awk's exit in a main rule falls through to END, which is where the
+# buffer is emitted and the "no closing marker" status is set.
 if ! awk -v start="${block}_START" -v end="${block}_END" '
     function trim(s) {
         sub(/^[[:space:]]+/, "", s)
@@ -62,14 +66,14 @@ if ! awk -v start="${block}_START" -v end="${block}_END" '
     }
     {
         line = trim($0)
-        if (!started) {
-            if (line == start) { started = 1 }
-            next
-        }
-        if (line == end) { closed = 1; exit }
-        print
+        if (line == start) { inblock = 1; body = ""; next }
+        if (inblock && line == end) { closed = 1; exit }
+        if (inblock) { body = body $0 "\n" }
     }
-    END { if (!closed) { exit 1 } }
+    END {
+        if (!closed) { exit 1 }
+        printf "%s", body
+    }
 ' "${input}" > "${output}"
 then
     : > "${output}"
@@ -95,6 +99,9 @@ then
     trim_blank_lines "${output}"
 fi
 
-if [ ! -s "${output}" ]; then
+# Whitespace-only is as useless to a reader as empty, and the caller
+# falls back for both.
+if ! grep -q '[^[:space:]]' "${output}"; then
+    : > "${output}"
     exit 1
 fi

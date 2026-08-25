@@ -596,10 +596,19 @@ jobs:
           - Any judgement call a reviewer might reasonably make
             differently.
 
-          Do NOT include a diffstat, a "Fixes #NNNN" line, a link to
-          this workflow run, or a note about CI not starting -- the
-          workflow appends all of those. Do not pad it either: a small
-          mechanical fix deserves a short description.
+          Do NOT include a diffstat, a link to this workflow run, or
+          a note about CI not starting -- the workflow appends all of
+          those. Do not pad it either: a small mechanical fix deserves
+          a short description.
+
+          The description is published verbatim into a pull request
+          body, where GitHub interprets what it finds. So do NOT write
+          an issue-closing keyword for any issue -- "fixes", "closes"
+          and "resolves" followed by #NNNN all close that issue when
+          this merges, and the workflow already appends the one for
+          the issue you are fixing. Refer to other issues as "issue
+          NNNN". Do NOT write "@name": it notifies a real person.
+          Refer to people by name alone.
           TASK_EOF
           } > ${{ runner.temp }}/claude-prompt.txt
 
