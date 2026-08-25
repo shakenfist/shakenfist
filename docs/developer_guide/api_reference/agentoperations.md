@@ -6,10 +6,15 @@ which are executed in return, with results for each being gathered as they execu
 
 An operation also carries timing fields: `deadline` and `progress_timeout` are the
 caller's intent, and `last_progress` and `attempts` are the server's bookkeeping.
-All four read as `null` (or `0` for `attempts`) in the examples below, because no
-client can set them and nothing enforces them yet. Their meaning, including why
-`null` means "the server default applies" rather than "no deadline", is described
-in [the database operator guide](/operator_guide/database/).
+`deadline` is an absolute unix timestamp, computed when the API server received the
+creating request; `progress_timeout` is a count of seconds, and reads `0` on an
+operation like the one below whose commands cannot report progress. Both are set
+from the optional parameters described in
+[bounding how long an agent operation may take](/developer_guide/api_reference/instances/#bounding-how-long-an-agent-operation-may-take).
+`last_progress` and `attempts` stay `null` and `0` until a following release begins
+enforcing these values. A `null` in either caller-intent field means the operation
+was created by an API server which predates them, so the server default applies
+rather than "no deadline" -- see [the database operator guide](/operator_guide/database/).
 
 In general the API for agent operations is instance-centric -- you lookup the
 agent operations an instance has seen, and then can request further information
@@ -48,12 +53,12 @@ agent operations for a given instance, refer to the [instances API documentation
                 "commandline": "cat /tmp/README.md"
             }
         ],
-        "deadline": null,
+        "deadline": 1787428090.5,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
         "last_progress": null,
         "metadata": {},
         "namespace": "vdi",
-        "progress_timeout": null,
+        "progress_timeout": 0.0,
         "results": {
             "0": {
                 "command-line": "cat /tmp/README.md",
@@ -65,7 +70,7 @@ agent operations for a given instance, refer to the [instances API documentation
         },
         "state": "complete",
         "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-        "version": 1
+        "version": 3
     }
     ```
 

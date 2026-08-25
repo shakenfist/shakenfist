@@ -652,6 +652,55 @@ following operations via the agent:
     * [POST ​/instances​/{instance_ref}​/agent​/execute](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_execute): execute a command within an instance and return results.
     * [POST /instances/{instance_ref}/agent/put](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__agent_put): copy a blob into an instance at the specified location with the specified permissions.
 
+### Bounding how long an agent operation may take
+
+All three creating calls accept an optional `deadline_seconds`, and
+`agent/get` and `agent/put` additionally accept an optional
+`progress_timeout_seconds`. Both are counts of seconds, and both refuse
+a negative value with a 400.
+
+`deadline_seconds` is how long the operation may continue to be
+dispatched or execute, counted from the moment the API server received
+your request rather than from when the agent picked the work up. Time
+spent queued behind another operation on the same instance, and any
+preflight work such as fetching a blob onto the hypervisor, both count
+against it.
+
+`progress_timeout_seconds` is how long the operation may go without
+making forward progress. It applies to commands which can report
+progress -- the transfers behind `agent/get` and `agent/put` -- and is
+the more useful of the two for a large file, because a transfer can be
+perfectly healthy and still take a long time.
+
+Each parameter has three meanings, and the difference between the first
+two matters:
+
+| You send | What happens |
+|----------|--------------|
+| nothing | The server default applies: `AGENT_OPERATION_DEFAULT_DEADLINE` (600 seconds) or `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` (30 seconds), unless your operator has changed them. |
+| `0` | None at all. The operation is not bounded by that mechanism. |
+| a positive number | That many seconds. |
+
+Sending `0` is not the same as omitting the parameter. Streaming a very
+large file out of an instance is the case the distinction exists for:
+send `deadline_seconds: 0` with a `progress_timeout_seconds`, and the
+transfer is allowed to take as long as it takes while a genuine stall
+is still detected.
+
+`agent/execute` does not accept `progress_timeout_seconds`, and sending
+it is a 400. Nothing an executed command does is observable as
+progress, so a timeout there could never fire; only `deadline_seconds`
+is meaningful.
+
+!!! note "Not yet enforced"
+
+    As of this release the values are recorded on the operation and
+    returned in its representation, but nothing acts on them: agent
+    operations are still bounded by a fixed 900 second execution
+    timeout. Enforcement -- including the new `expired` state -- lands
+    in a following release. Setting them now is safe and forward
+    compatible.
+
 ??? example "Python API client: execute a command on an instance"
 
     ```python
@@ -675,12 +724,12 @@ following operations via the agent:
                 "commandline": "cat /etc/os-release"
             }
         ],
-        "deadline": null,
+        "deadline": 1787428090.5,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
         "last_progress": null,
         "metadata": {},
         "namespace": "vdi",
-        "progress_timeout": null,
+        "progress_timeout": 0.0,
         "results": {
             "0": {
                 "command-line": "cat /etc/os-release",
@@ -692,7 +741,7 @@ following operations via the agent:
         },
         "state": "complete",
         "uuid": "93fb538c-84f5-4ff8-83ba-2be5f5f92954",
-        "version": 1
+        "version": 3
     }
     ```
 
@@ -805,12 +854,12 @@ Additionally, you can list the agent operations for a given instance.
                     "path": "/tmp/README.md"
                 }
             ],
-            "deadline": null,
+            "deadline": 1787428090.5,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
             "metadata": {},
             "namespace": "vdi",
-            "progress_timeout": null,
+            "progress_timeout": 30.0,
             "results": {
                 "0": {
                     "path": "/tmp/README.md"
@@ -821,7 +870,7 @@ Additionally, you can list the agent operations for a given instance.
             },
             "state": "complete",
             "uuid": "343049d7-da2a-46f2-bb5c-edb783ec1fb9",
-            "version": 1
+            "version": 3
         },
         {
             "attempts": 0,
@@ -832,12 +881,12 @@ Additionally, you can list the agent operations for a given instance.
                     "commandline": "cat /tmp/README.md"
                 }
             ],
-            "deadline": null,
+            "deadline": 1787428090.5,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
             "metadata": {},
             "namespace": "vdi",
-            "progress_timeout": null,
+            "progress_timeout": 0.0,
             "results": {
                 "0": {
                     "command-line": "cat /tmp/README.md",
@@ -849,7 +898,7 @@ Additionally, you can list the agent operations for a given instance.
             },
             "state": "complete",
             "uuid": "5a00d6f3-19b6-42bc-b1df-ddc4e5a299e9",
-            "version": 1
+            "version": 3
         }
     ]
     ```

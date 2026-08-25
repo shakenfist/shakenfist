@@ -964,6 +964,20 @@ each column and they mean three different things:
   receipt, so queue time and preflight time count against it.
   `progress_timeout` is a number of seconds.
 
+A current API server always writes one of the last two, never NULL: the
+caller's `deadline_seconds` and `progress_timeout_seconds` if they sent
+them, and otherwise `AGENT_OPERATION_DEFAULT_DEADLINE` (600) and
+`AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` (30) applied at request
+receipt. The default is applied there rather than left to be resolved
+later because a deadline runs from when the request arrived, and only
+the API node knows when that was. So a NULL is now diagnostic: it says
+the row came from a node which had not yet been upgraded.
+
+An operation whose commands cannot report progress -- anything created
+through `/instances/<ref>/agent/execute` -- records a `progress_timeout`
+of 0 rather than the default, because a timeout there could never fire
+and recording one would describe the operation as something it is not.
+
 `last_progress` is the unix timestamp of the most recent observed
 forward progress, NULL when none has been observed, and `attempts`
 counts dispatches for the retry bound. Nothing enforces any of these
