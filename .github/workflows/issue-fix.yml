@@ -51,6 +51,20 @@
 #   test suite and ended its turn waiting for it, which in -p mode
 #   simply ends the session: the code changes survived, both blocks
 #   did not.
+# - Both blocks are pulled out of the captured output by
+#   tools/extract-model-block.sh rather than by sed inline here. That
+#   parsing has more edge cases than it looks (a model which emits a
+#   block twice, a block with no closing marker, a block the model
+#   wrapped in a fence anyway) and each is covered by
+#   shakenfist/tests/test_extract_model_block.py. Extend the tests, not
+#   this step, when a new shape of output turns up.
+# - The model is asked to run tox -ecover and the workflow then runs it
+#   again in "Verify fix". The duplication is deliberate: the model's
+#   run is what lets it fix what it broke while it still has a turn,
+#   and the workflow's run is the gate on publication, which cannot
+#   trust the model's report of its own testing. Paying for the suite
+#   twice is cheaper than publishing a broken fix or burning a whole
+#   run on one.
 # - The description is model output, so it is passed to gh with
 #   --body-file. Never interpolate it into a shell string.
 # - The issue-fix-<N> branches are owned by this workflow and are
@@ -496,8 +510,9 @@ jobs:
           work you were intending to come back to is lost. So:
 
           - Do NOT background a long-running command and end your turn
-            meaning to check on it later. Run the test suite in the
-            foreground and wait for it, however long it takes.
+            meaning to check on it later. The test suite in step 4 below
+            takes a while: run it in the foreground and wait for it,
+            however long it takes.
           - Do NOT end a turn describing what you are about to do. Do
             it instead.
           - The last thing you emit must be the two output blocks
@@ -534,7 +549,9 @@ jobs:
           After completing your work and staging changes, you MUST
           output both of the blocks below, in this order, as the last
           thing you emit. Markers go on their own lines, and neither
-          block is wrapped in a code fence.
+          block is wrapped in a code fence. Inside a block, never write
+          a line whose only content is one of the marker tokens: that
+          ends the block early and the rest is discarded.
 
           ```
           COMMIT_SUMMARY_START
@@ -688,42 +705,31 @@ jobs:
         id: extract_summary
         if: steps.assess.outputs.has_changes == 'true'
         run: |
+          # Both blocks are pulled out by tools/extract-model-block.sh,
+          # which is unit tested in test_extract_model_block.py. The
+          # parsing is subtle enough -- repeated blocks, truncated
+          # blocks, fences the model was told not to emit -- that having
+          # it inline here means having it untested here. Run it from a
+          # copy outside the workspace for the same reason as the model
+          # wrapper above: Claude has just edited this checkout and may
+          # have touched tools/.
+          cp tools/extract-model-block.sh ${{ runner.temp }}/
+
           summary_found=false
           description_found=false
 
-          if grep -q "COMMIT_SUMMARY_START" \
-              ${{ runner.temp }}/claude-output.txt
+          if ${{ runner.temp }}/extract-model-block.sh COMMIT_SUMMARY \
+              ${{ runner.temp }}/claude-output.txt \
+              ${{ runner.temp }}/commit-summary.txt
           then
-            sed -n '/COMMIT_SUMMARY_START/,/COMMIT_SUMMARY_END/p' \
-              ${{ runner.temp }}/claude-output.txt | \
-              grep -v "COMMIT_SUMMARY_START" | \
-              grep -v "COMMIT_SUMMARY_END" | \
-              sed 's/^```$//' | \
-              sed '/^$/N;/^\n$/d' \
-              > ${{ runner.temp }}/commit-summary.txt
-
-            if [ -s ${{ runner.temp }}/commit-summary.txt ]; then
-              summary_found=true
-            fi
+            summary_found=true
           fi
 
-          # A PR description may legitimately contain fenced code, so
-          # unlike the commit summary above only the marker lines are
-          # stripped. Both markers must be present: a truncated block
-          # would otherwise run to the end of the captured output.
-          if grep -q "^PR_DESCRIPTION_START" \
-               ${{ runner.temp }}/claude-output.txt && \
-             grep -q "^PR_DESCRIPTION_END" \
-               ${{ runner.temp }}/claude-output.txt
+          if ${{ runner.temp }}/extract-model-block.sh PR_DESCRIPTION \
+              ${{ runner.temp }}/claude-output.txt \
+              ${{ runner.temp }}/pr-description.txt
           then
-            sed -n '/^PR_DESCRIPTION_START/,/^PR_DESCRIPTION_END/p' \
-              ${{ runner.temp }}/claude-output.txt | \
-              sed '1d;$d' \
-              > ${{ runner.temp }}/pr-description.txt
-
-            if [ -s ${{ runner.temp }}/pr-description.txt ]; then
-              description_found=true
-            fi
+            description_found=true
           fi
 
           # Neither block is fatal: the publish step falls back to a
@@ -804,6 +810,15 @@ jobs:
             PR_TITLE="Fix issue #${ISSUE_NUMBER}"
           fi
 
+          # Second fallback tier: the commit message body, which is a
+          # better summary than nothing. Extracted to a file first so it
+          # can be tested for content -- a commit summary which is a bare
+          # subject line with no body would otherwise publish a "##
+          # Summary" heading with nothing under it, which reads as broken
+          # rather than as terse.
+          tail -n +2 ${{ runner.temp }}/commit-summary.txt 2>/dev/null | \
+            sed '/./,$!d' > ${{ runner.temp }}/summary-body.txt || true
+
           # The description is model output, so it is written to a file
           # and passed with --body-file. It must never be interpolated
           # into a shell string: an unquoted heredoc would execute any
@@ -811,19 +826,16 @@ jobs:
           {
             if [ "${{ steps.extract_summary.outputs.description_found }}" == "true" ]; then
               cat ${{ runner.temp }}/pr-description.txt
-            elif [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ]; then
-              # No description block, but the commit message body is a
-              # better summary than nothing.
+            elif [ -s ${{ runner.temp }}/summary-body.txt ]; then
               echo "## Summary"
               echo
-              tail -n +2 ${{ runner.temp }}/commit-summary.txt | \
-                sed '/./,$!d'
+              cat ${{ runner.temp }}/summary-body.txt
             else
               echo "## Summary"
               echo
               echo "Automated fix attempt for #${ISSUE_NUMBER}. The model"
-              echo "produced neither a description nor a commit message,"
-              echo "so read the diff rather than this."
+              echo "left no usable prose describing the change, so read"
+              echo "the diff rather than this."
             fi
 
             echo
@@ -921,6 +933,8 @@ jobs:
             ${{ runner.temp }}/verify-output.txt
             ${{ runner.temp }}/commit-summary.txt
             ${{ runner.temp }}/commit-message.txt
+            ${{ runner.temp }}/pr-description.txt
+            ${{ runner.temp }}/pr-body.md
             ${{ runner.temp }}/claude-logs/
           retention-days: 14
           if-no-files-found: ignore

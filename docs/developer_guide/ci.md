@@ -246,6 +246,33 @@ landing across partially implemented plans and having to be unpicked
 (see the step 3 note in
 `docs/plans/PLAN-scheduler-reservations-phase-01-node-metrics-columns.md`).
 
+`issue-fix.yml` asks the model for two marker delimited blocks on
+stdout: a commit message and a pull request description. The commit
+message is pushed and its first line becomes the pull request title;
+the description is published as the pull request body, so an automated
+fix arrives explaining its own root cause, what it deliberately did not
+do, and any judgement call a reviewer might make differently, rather
+than as a diffstat under boilerplate.
+
+Neither block is required. A missing description falls back to the
+commit message body, and a missing commit message to a generic note
+telling the reviewer to read the diff -- a correct fix is worth
+publishing even when the prose is lost. Both cases are logged rather
+than fatal, because the run cannot be retried to recover them.
+
+The parsing lives in `tools/extract-model-block.sh` rather than inline
+in the workflow, and is covered by
+`shakenfist/tests/test_extract_model_block.py`. It takes only the first
+complete block, requires both markers (an unterminated block would
+otherwise run to the end of the captured output and swallow the block
+after it), treats a marker as a terminator only when it is the entire
+line, and strips a code fence only when one wraps the whole block --
+never globally, because a description may legitimately quote code.
+
+The description is model output, so the workflow assembles the pull
+request body into a file and passes it with `gh pr create --body-file`.
+It must never be interpolated into a shell string.
+
 `issue-fix.yml` runs its fix attempt through
 `tools/claude-model-fallback.sh`, which takes a comma-separated
 preference list (`--models`, default `claude-fable-5,claude-opus-5`) and
