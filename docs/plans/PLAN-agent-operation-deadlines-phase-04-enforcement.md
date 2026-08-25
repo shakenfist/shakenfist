@@ -305,6 +305,48 @@ them:
 - The phase 7 row records that the state machine page was updated in
   phase 4, so phase 7 does not rewrite it.
 
+## Departures from the plan
+
+Five, all found while implementing.
+
+- **`fail()` records its message on the state as well as in
+  `self.error`.** `AgentOperation` never overrides
+  `_db_set_attribute()` (`shakenfist/baseobject.py:470` warns and
+  discards; only `Instance` overrides it), so every existing
+  `agentop.error = ...` write in the tree has reached nothing but a
+  warning log and a mutate event. Decision 2 said the reason travels
+  as a state message for `expire()` only; it turned out `fail()` needs
+  the same treatment for the reason to be readable at all. The
+  `self.error` write is kept so the call sites become correct if that
+  persistence gap is closed. Recorded as future work below.
+- **Two guards were extracted into methods rather than left inline.**
+  Steps 4b and 4e as briefed put the command-abort check and the two
+  budget checks inside `_execute_inner()`, which is only reachable
+  through a vsock connection and cannot be unit tested. They are now
+  `_abort_commands_if_terminal()` and `expire_if_out_of_budget()`,
+  called from the same places. The first draft of the step 4b tests
+  reimplemented the guard in the test and asserted on the
+  reimplementation, which proved nothing; that is what prompted the
+  extraction.
+- **The progress hooks sit below the in-flight guards, not at the top
+  of their handlers.** `_handle_stat_result()` and
+  `_handle_file_chunk()` both begin by rejecting a reply for a
+  transfer which is not in flight. Calling `observe_progress()` above
+  that guard counts such a reply as progress, which it is not, and it
+  broke the existing `ExecutorGetFileGuardTestCase`.
+- **Step 4d also moved the missing-blob path onto `fail()`.**
+  `NodeAgentopOp._preflight()` assigned `aop.error` directly from the
+  preflight state. The `error` setter refuses that, so the assignment
+  raised `InvalidStateException`, `dispatch_task()`'s handler caught
+  it, and the message naming the missing blob was discarded. It is a
+  sixth instance of the same defect step 4b exists to fix, so it was
+  fixed with it.
+- **The preflight tests live at
+  `shakenfist/tests/operations/test_node_aop_op.py`.** A file of that
+  name already exists at `shakenfist/tests/schema/operations/`,
+  testing the schema rather than the operation. The module paths
+  differ so the two coexist.
+
 ## Risks and mitigations
 
 - **A new terminal state reaches a consumer nobody audited.** The
@@ -460,6 +502,20 @@ By inspection, each falsifiable:
 
 ## Future work
 
+- **`AgentOperation` attribute writes go nowhere.** Found while
+  implementing step 4a. `_db_set_attribute()` is overridden only by
+  `Instance` (`shakenfist/instance.py:477`); the base implementation
+  (`shakenfist/baseobject.py:470`) logs a warning and discards the
+  value for every other object type that uses it. For agent
+  operations the only user is the `error` attribute, so every
+  `agentop.error = ...` in the tree has been writing to nothing. The
+  visible consequence is small, because `external_view()` does not
+  publish `error` either, but it means an operator cannot read why an
+  operation failed from the object. This phase works around it by
+  recording the reason on the state, which does persist. Fixing it
+  properly means deciding whether agent operations get a generic
+  attributes path or whether `error` becomes a typed column, which is
+  a schema question and its own change. Worth an issue.
 - **Errored agent operations still leak `object_states` rows.**
   `FINAL_OBJECT_STATES` (`shakenfist/constants.py:191`) contains
   `deleted`, `complete` and `abort` but not `error`, so the hard-delete

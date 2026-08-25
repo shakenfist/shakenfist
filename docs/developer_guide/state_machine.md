@@ -31,6 +31,14 @@ have not yet aged out.
   Operation will never be marked as complete.
 * `deleted`: the Agent Operation has been deleted.
 * `error`: an error occurred while processing the Agent Operation.
+* `expired`: a timing budget the caller set was exhausted -- either the
+  wall-clock deadline (`deadline_seconds`), or the progress timeout
+  (`progress_timeout_seconds`) while a command which reports progress was
+  in flight. This is deliberately distinct from `error`, which means the
+  Agent Operation itself failed. The reason is recorded as the state's
+  message and as an audit event on the operation. Note that the two
+  states are terminal in the same way, but only `expired` is currently
+  swept for hard deletion.
 
 The following transitions are possible:
 
@@ -43,22 +51,28 @@ stateDiagram-v2
   initial --> queued
   initial --> deleted
   initial --> error
+  initial --> expired
 
   preflight --> queued
   preflight --> deleted
   preflight --> error
+  preflight --> expired
 
   queued --> executing
   queued --> deleted
   queued --> error
+  queued --> expired
 
   executing --> complete
   executing --> deleted
   executing --> error
+  executing --> expired
 
   complete --> deleted
 
   error --> deleted
+
+  expired --> deleted
 
   deleted --> [*]
 ```
