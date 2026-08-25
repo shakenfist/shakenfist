@@ -51,6 +51,12 @@
 #   test suite and ended its turn waiting for it, which in -p mode
 #   simply ends the session: the code changes survived, both blocks
 #   did not.
+# - The description is neutralised by tools/neutralise-pr-body.sh
+#   before publication: an @mention notifies a real person when the
+#   draft is created and an issue-closing keyword closes an unrelated
+#   issue on merge. The prompt forbids both, but a side effect which
+#   fires automatically and cannot be undone should not rest on the
+#   model having complied.
 # - Both blocks are pulled out of the captured output by
 #   tools/extract-model-block.sh rather than by sed inline here. That
 #   parsing has more edge cases than it looks (a model which emits a
@@ -723,6 +729,7 @@ jobs:
           # wrapper above: Claude has just edited this checkout and may
           # have touched tools/.
           cp tools/extract-model-block.sh ${{ runner.temp }}/
+          cp tools/neutralise-pr-body.sh ${{ runner.temp }}/
 
           summary_found=false
           description_found=false
@@ -739,6 +746,15 @@ jobs:
               ${{ runner.temp }}/pr-description.txt
           then
             description_found=true
+
+            # The prompt forbids @mentions and issue-closing keywords,
+            # but the description is published verbatim and both act
+            # the instant "gh pr create" runs -- before any human has
+            # looked at the draft, and a notification cannot be taken
+            # back. Prompt compliance is a weaker guarantee than code
+            # for a side effect which is not reversible.
+            ${{ runner.temp }}/neutralise-pr-body.sh \
+              ${{ runner.temp }}/pr-description.txt
           fi
 
           # Neither block is fatal: the publish step falls back to a
@@ -944,6 +960,7 @@ jobs:
             ${{ runner.temp }}/commit-message.txt
             ${{ runner.temp }}/pr-description.txt
             ${{ runner.temp }}/pr-body.md
+            ${{ runner.temp }}/summary-body.txt
             ${{ runner.temp }}/claude-logs/
           retention-days: 14
           if-no-files-found: ignore

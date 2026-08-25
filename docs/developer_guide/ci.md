@@ -273,6 +273,18 @@ The description is model output, so the workflow assembles the pull
 request body into a file and passes it with `gh pr create --body-file`.
 It must never be interpolated into a shell string.
 
+It is also run through `tools/neutralise-pr-body.sh` before
+publication, which drops the `@` from a mention and separates an
+issue-closing keyword from its reference. Both of those are things
+GitHub acts on rather than renders: a mention notifies a real person
+the instant the draft is created, and a closing keyword closes an
+unrelated issue on merge. The prompt forbids both, and a side effect
+which fires automatically and cannot be undone should not rest on the
+model having complied. Fenced code is passed through untouched --
+GitHub does not linkify inside a fence, and a description quoting a
+decorator or an email address is a normal description.
+`shakenfist/tests/test_neutralise_pr_body.py` covers both halves.
+
 `issue-fix.yml` runs its fix attempt through
 `tools/claude-model-fallback.sh`, which takes a comma-separated
 preference list (`--models`, default `claude-fable-5,claude-opus-5`) and
