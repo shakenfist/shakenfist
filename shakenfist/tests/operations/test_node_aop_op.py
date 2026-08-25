@@ -26,7 +26,7 @@ class _FakeAgentOp:
         self.uuid = 'fake-agentop'
         self.state = AgentOperation.STATE_PREFLIGHT
         self.commands = commands
-        self.error = None
+        self.failure_reason = None
         self.expired_reason = None
         if isinstance(deadline_passed, bool):
             self._deadline_passed = [deadline_passed] * 10
@@ -57,7 +57,7 @@ class _FakeAgentOp:
         if self.state.value in self.TERMINAL_STATES:
             return
         self.state = AgentOperation.STATE_ERROR
-        self.error = message
+        self.failure_reason = message
 
 
 class PreflightDeadlineTestCase(base.ShakenFistTestCase):
@@ -153,4 +153,5 @@ class PreflightDeadlineTestCase(base.ShakenFistTestCase):
             op = self._preflight(aop)
 
         self.assertEqual(node_aop_op.NodeAgentopOp.STATE_ERROR, op.state)
-        self.assertEqual('preflight failure, blob missing: b1', aop.error)
+        self.assertEqual(
+            'preflight failure, blob missing: b1', aop.failure_reason)

@@ -7,7 +7,9 @@ from unittest import mock
 from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -154,16 +156,39 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         op.state = dbo.STATE_DELETED
         self.assertEqual(dbo.STATE_DELETED, op.state.value)
 
+    # expire() emits the audit event the reason really lives in
+    def test_expire_events_the_operation_and_its_instance(self):
+        # expired is in FINAL_OBJECT_STATES, so the operation is swept
+        # for hard deletion; an event held only against it would go
+        # with it. The instance's copy is the one which survives.
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        with mock.patch(
+                'shakenfist.operations.agentoperation.add_event_multi'
+        ) as mock_event:
+            op.expire('no progress')
+
+        mock_event.assert_called_once()
+        args = mock_event.call_args.args
+        self.assertEqual(EVENT_TYPE_AUDIT, args[0])
+        self.assertEqual(
+            [(ObjectType.AGENTOPERATION, op.uuid),
+             (ObjectType.INSTANCE, self.instance_uuid)], args[1])
+        self.assertEqual('operation expired', args[2])
+        self.assertEqual(
+            {'reason': 'no progress'}, mock_event.call_args.kwargs['extra'])
+
     # fail()
     def test_fail_records_the_message_on_the_state(self):
-        # The state message is where the reason actually survives.
-        # AgentOperation does not override _db_set_attribute(), so
-        # self.error is written to nothing -- which is why fail()
-        # records it in both places and only this one is asserted.
+        # The state message is where the reason survives, and the only
+        # place it is written. AgentOperation does not override
+        # _db_set_attribute(), so an assignment to self.error would
+        # persist nothing and cost a warning per failure; see issue
+        # #3899.
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
         op.fail('it broke')
         self.assertEqual(dbo.STATE_ERROR, op.state.value)
         self.assertEqual('it broke', op.state.message)
+        self.assertIsNone(op.error)
 
     def test_fail_from_expired_is_a_noop(self):
         # Without the terminal state guard this raises
@@ -172,6 +197,46 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         op.expire('deadline passed')
         op.fail('and then something else went wrong')
         self.assertEqual(AgentOperation.STATE_EXPIRED, op.state.value)
+
+    # record_progress()
+    def test_record_progress_writes_a_masked_field(self):
+        # An unmasked write would push a stale snapshot of the results
+        # column over a concurrent add_result() -- the cross-attribute
+        # lost update which caused the vanished-agent-operation flake.
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        with mock.patch(
+                'shakenfist.operations.agentoperation.mariadb'
+                '.update_agent_operation_attributes') as mock_update:
+            op.record_progress(1700000000.0)
+
+        mock_update.assert_called_once()
+        self.assertEqual(
+            ['last_progress'], mock_update.call_args.kwargs['fields'])
+        self.assertEqual(
+            1700000000.0, mock_update.call_args.args[0].last_progress)
+
+    # hard_delete()
+    def test_hard_delete_clears_object_references(self):
+        # Symmetric with delete(). Adding expired to
+        # FINAL_OBJECT_STATES routes a new class of operation into the
+        # cluster's hard delete sweep, so an asymmetry here becomes a
+        # leak the moment anything records a reference from an agent
+        # operation.
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        op.expire('deadline passed')
+
+        with mock.patch(
+                'shakenfist.operations.agentoperation.mariadb'
+                '.remove_all_references_from') as mock_remove:
+            op.hard_delete()
+
+        mock_remove.assert_called_once_with(
+            ObjectType.AGENTOPERATION, op.uuid)
+
+    def test_record_progress_round_trips(self):
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        op.record_progress(1700000000.0)
+        self.assertEqual(1700000000.0, op.last_progress)
 
 
 class AgentOperationStateMachineTestCase(base.ShakenFistTestCase):

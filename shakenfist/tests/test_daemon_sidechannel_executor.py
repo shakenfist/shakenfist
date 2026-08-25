@@ -2,6 +2,7 @@
 
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
@@ -13,27 +14,47 @@ class _FakeState:
 
 
 class _FakeAgentOp:
+    """Stands in for an AgentOperation in the executor's tests.
+
+    fail() and expire() reimplement the real terminal-state guard so
+    that code under test behaves realistically when it calls them. That
+    makes them fixture behaviour, not behaviour under test: the real
+    guard is asserted against a real AgentOperation in
+    test_agent_operation_expiry.py.
+    """
+
     TERMINAL_STATES = AgentOperation.TERMINAL_STATES
 
     def __init__(self, state_value):
         self.uuid = 'fake-agentop'
-        self.state = _FakeState(state_value)
-        self.error = None
+        self.state = state_value
         self.commands = []
+        self.failure_reason = None
         self.expired_reason = None
+
+    # The real state is a State object read as .value and assigned as a
+    # bare string, so the fake accepts a string and reads back as an
+    # object, exactly like the thing it stands in for.
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        self._state = _FakeState(value)
 
     def fail(self, message):
         """Stands in for AgentOperation.fail(), guard included."""
         if self.state.value in self.TERMINAL_STATES:
             return
-        self.state = _FakeState(AgentOperation.STATE_ERROR)
-        self.error = message
+        self.state = AgentOperation.STATE_ERROR
+        self.failure_reason = message
 
     def expire(self, reason):
         """Stands in for AgentOperation.expire(), guard included."""
         if self.state.value in self.TERMINAL_STATES:
             return
-        self.state = _FakeState(AgentOperation.STATE_EXPIRED)
+        self.state = AgentOperation.STATE_EXPIRED
         self.expired_reason = reason
 
 
@@ -68,8 +89,10 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
         with mock.patch.object(sidechannel.SideChannelJob, 'execute',
                                return_value=None):
             job.execute()
-        self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state)
-        self.assertIsNotNone(job.agentop.error)
+        self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state.value)
+        self.assertEqual(
+            'sidechannel executor exited before the operation completed',
+            job.agentop.failure_reason)
 
     def test_marks_error_when_exception_while_executing(self):
         job = self._make_executor(AgentOperation.STATE_EXECUTING)
@@ -78,7 +101,7 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
         with mock.patch.object(sidechannel.SideChannelJob, 'execute',
                                side_effect=RuntimeError('boom')):
             self.assertRaises(RuntimeError, job.execute)
-        self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state)
+        self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state.value)
 
     def test_leaves_completed_op_untouched(self):
         job = self._make_executor(AgentOperation.STATE_COMPLETE)
@@ -87,7 +110,7 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
             job.execute()
         # A completed op is not reassigned to error.
         self.assertEqual(AgentOperation.STATE_COMPLETE, job.agentop.state.value)
-        self.assertIsNone(job.agentop.error)
+        self.assertIsNone(job.agentop.failure_reason)
 
 
 class ExecutorGetFileGuardTestCase(base.ShakenFistTestCase):
@@ -175,13 +198,6 @@ class ExecutorTerminalStateGuardTestCase(base.ShakenFistTestCase):
         job.commands = list(commands)
         job.log = mock.MagicMock()
         return job
-
-    def test_fail_from_expired_leaves_the_state_alone(self):
-        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
-        agentop.expire('deadline passed')
-        agentop.fail('and then the transfer broke')
-        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
-        self.assertIsNone(agentop.error)
 
     def test_commands_abort_when_errored(self):
         job = self._make_executor(
@@ -326,7 +342,11 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
 
 class ExecutorProgressPersistenceTestCase(base.ShakenFistTestCase):
     """observe_progress() moves an in-memory timestamp on every call and
-    persists it at most once per PROGRESS_PERSIST_INTERVAL."""
+    persists it at most once per PROGRESS_PERSIST_INTERVAL.
+
+    The write itself lives on AgentOperation.record_progress(); the
+    field mask it carries is asserted in test_agent_operation_expiry.py.
+    """
 
     def _make_executor(self):
         job = sidechannel.SideChannelExecutorJob.__new__(
@@ -344,44 +364,158 @@ class ExecutorProgressPersistenceTestCase(base.ShakenFistTestCase):
 
     def test_in_memory_timestamp_moves_on_every_call(self):
         job = self._make_executor()
-        with mock.patch.object(sidechannel.mariadb,
-                               'update_agent_operation_attributes'):
-            for offset in (0.0, 1.0, 2.0):
-                with mock.patch('time.time', return_value=self.NOW + offset):
-                    job.observe_progress()
-                self.assertEqual(self.NOW + offset, job._last_progress)
+        for offset in (0.0, 1.0, 2.0):
+            with mock.patch('time.time', return_value=self.NOW + offset):
+                job.observe_progress()
+            self.assertEqual(self.NOW + offset, job._last_progress)
 
     def test_persistence_is_throttled(self):
         job = self._make_executor()
-        with mock.patch.object(
-                sidechannel.mariadb,
-                'update_agent_operation_attributes') as mock_update:
-            # The first call persists (this row has never been
-            # written), then everything inside the interval is
-            # in-memory only. A 100KiB-chunk transfer calls this
-            # hundreds of times a second, which is the whole point.
-            for offset in (0.0, 1.0, 4.0, 9.0):
-                with mock.patch('time.time', return_value=self.NOW + offset):
-                    job.observe_progress()
-            self.assertEqual(1, mock_update.call_count)
 
-            # Past the interval, one more write.
-            with mock.patch('time.time', return_value=self.NOW + 11.0):
+        # The first call persists (this row has never been written),
+        # then everything inside the interval is in-memory only. A
+        # 100KiB-chunk transfer calls this hundreds of times a second,
+        # which is the whole point.
+        for offset in (0.0, 1.0, 4.0, 9.0):
+            with mock.patch('time.time', return_value=self.NOW + offset):
                 job.observe_progress()
-            self.assertEqual(2, mock_update.call_count)
+        self.assertEqual(1, job.agentop.record_progress.call_count)
 
-    def test_the_write_carries_a_field_mask(self):
-        # An unmasked write would push a stale snapshot of the results
-        # column over a concurrent add_result().
+        # Past the interval, one more write.
+        with mock.patch('time.time', return_value=self.NOW + 11.0):
+            job.observe_progress()
+        self.assertEqual(2, job.agentop.record_progress.call_count)
+
+    def test_the_persisted_value_is_the_observed_time(self):
         job = self._make_executor()
-        with mock.patch.object(
-                sidechannel.mariadb,
-                'update_agent_operation_attributes') as mock_update:
-            with mock.patch('time.time', return_value=self.NOW):
-                job.observe_progress()
+        with mock.patch('time.time', return_value=self.NOW):
+            job.observe_progress()
+        job.agentop.record_progress.assert_called_once_with(self.NOW)
 
-        self.assertEqual(1, mock_update.call_count)
+    def test_a_failed_write_does_not_reach_the_caller(self):
+        # The persist is bookkeeping for a reaper which does not exist
+        # yet. Without the guard a DatabaseUnavailable here propagates
+        # out of the reply handler and out of _execute_inner(), and
+        # execute()'s finally block turns a healthy transfer into an
+        # errored operation.
+        job = self._make_executor()
+        job.agentop.record_progress.side_effect = exceptions.DatabaseUnavailable(
+            'no database for you')
+
+        with mock.patch('time.time', return_value=self.NOW):
+            job.observe_progress()
+
+        # The in-memory value, which is what enforcement actually reads,
+        # still moved.
+        self.assertEqual(self.NOW, job._last_progress)
+
+    def test_a_failed_write_is_retried_on_the_next_call(self):
+        # The throttle stamp moves only on success, so a blip costs one
+        # write rather than a whole interval of them.
+        job = self._make_executor()
+        job.agentop.record_progress.side_effect = exceptions.DatabaseUnavailable(
+            'no database for you')
+        with mock.patch('time.time', return_value=self.NOW):
+            job.observe_progress()
+
+        job.agentop.record_progress.side_effect = None
+        with mock.patch('time.time', return_value=self.NOW + 0.1):
+            job.observe_progress()
+        self.assertEqual(2, job.agentop.record_progress.call_count)
+
+
+class _SlowProgressHandler:
+    """A handler whose dispatch() takes longer than the progress window."""
+
+    name = 'put-blob'
+    reports_progress = True
+    register_as_outstanding = True
+
+    def __init__(self, clock, duration):
+        self.clock = clock
+        self.duration = duration
+
+    def dispatch(self, command_id, cmd):
+        # Stands in for PutBlobCommand.dispatch() calling
+        # Blob.ensure_local(), which fetches the blob from another node
+        # if preflight did not already.
+        self.clock.now += self.duration
+        return ['a-request']
+
+
+class _Clock:
+    def __init__(self, now):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
+    """The progress window starts when the command reaches the wire.
+
+    Seeding it before handler.dispatch() means a put-blob whose blob
+    has to be fetched from another node is expired before the agent has
+    been sent anything, with a message blaming the agent for a delay
+    which was entirely hypervisor side.
+    """
+
+    NOW = 1700000000.0
+
+    def _make_executor(self, agentop, handler, cmd):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.instance = _FakeInstance()
+        job.affected_objects = [job.instance, agentop]
+        job.commands = [cmd]
+        job.command_handlers = {handler.name: handler}
+        job.in_flight_handler = None
+        job.outstanding_message_count = 0
+        job.ready = True
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job.log = mock.MagicMock()
+        job._send_commands_single_envelope = mock.MagicMock()
+        return job
+
+    def test_a_slow_dispatch_does_not_start_the_window(self):
+        clock = _Clock(self.NOW)
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        handler = _SlowProgressHandler(clock, 300.0)
+        job = self._make_executor(
+            agentop, handler, {'command': 'put-blob', 'blob_uuid': 'b1'})
+
+        with mock.patch('time.time', clock):
+            with mock.patch.object(sidechannel, 'add_event_multi'):
+                job._dispatch_next_command(mock.MagicMock())
+
+            # Five minutes of blob copying happened inside dispatch, but
+            # the window starts from the send.
+            self.assertEqual(self.NOW + 300.0, job._last_progress)
+
+            # So the very next loop iteration must not expire it.
+            self.assertFalse(job.expire_if_out_of_budget())
+
+        self.assertEqual(AgentOperation.STATE_EXECUTING, agentop.state.value)
+
+    def test_the_window_still_expires_a_genuinely_stalled_agent(self):
+        # The other half: once the command is on the wire, silence from
+        # the agent for longer than the window is still fatal.
+        clock = _Clock(self.NOW)
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        handler = _SlowProgressHandler(clock, 300.0)
+        job = self._make_executor(
+            agentop, handler, {'command': 'put-blob', 'blob_uuid': 'b1'})
+
+        with mock.patch('time.time', clock):
+            with mock.patch.object(sidechannel, 'add_event_multi'):
+                job._dispatch_next_command(mock.MagicMock())
+
+            clock.now += 31.0
+            self.assertTrue(job.expire_if_out_of_budget())
+
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
-            ['last_progress'], mock_update.call_args.kwargs['fields'])
-        self.assertEqual(
-            self.NOW, mock_update.call_args.args[0].last_progress)
+            'no progress from the agent for 30.0 seconds',
+            agentop.expired_reason)

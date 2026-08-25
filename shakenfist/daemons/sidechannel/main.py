@@ -16,7 +16,6 @@ import symbolicmode
 
 from shakenfist import blob
 from shakenfist import constants
-from shakenfist import mariadb
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
@@ -501,8 +500,7 @@ class SideChannelExecutorJob(SideChannelJob):
                 self.log.error(
                     'Executor exited with the operation still executing; '
                     'marking it errored')
-                self.agentop.state = AgentOperation.STATE_ERROR
-                self.agentop.error = (
+                self.agentop.fail(
                     'sidechannel executor exited before the operation '
                     'completed')
 
@@ -810,16 +808,20 @@ class SideChannelExecutorJob(SideChannelJob):
 
         if now - self._last_progress_persisted < PROGRESS_PERSIST_INTERVAL:
             return
-        self._last_progress_persisted = now
 
-        # The field mask is not optional. add_result() reads, merges
-        # and writes the results column on this same row, and an
-        # unmasked write here would push a stale snapshot of it over
-        # a concurrent update.
-        attrs = self.agentop._attributes()
-        attrs.last_progress = now
-        mariadb.update_agent_operation_attributes(
-            attrs, fields=['last_progress'])
+        # The persist is bookkeeping for a reaper which does not exist
+        # yet, so it must never be able to fail an in-flight transfer.
+        # Without this a DatabaseUnavailable would propagate out of the
+        # reply handler, out of _execute_inner(), and be turned into an
+        # errored operation by execute()'s finally block. The stamp is
+        # moved only on success, so a failed write is retried on the
+        # next call rather than suppressed for a whole interval.
+        try:
+            self.agentop.record_progress(now)
+            self._last_progress_persisted = now
+        except Exception as e:
+            self.log.with_fields({'error': str(e)}).warning(
+                'Failed to persist agent operation progress')
 
     def _abort_commands_if_terminal(self):
         """Drop the rest of an operation's commands if it has failed.
@@ -832,6 +834,64 @@ class SideChannelExecutorJob(SideChannelJob):
         if self.agentop.state.value in (AgentOperation.STATE_ERROR,
                                         AgentOperation.STATE_EXPIRED):
             self.commands = []
+
+    def _dispatch_next_command(self, sock):
+        """Send the next command in the operation to the agent.
+
+        Extracted from the socket loop so the progress window's start
+        can be tested: it is only reachable through a live vsock
+        connection otherwise.
+        """
+        requests = []
+        register_as_outstanding = False
+        cmd = self.commands.pop(0)
+        command_id = sf_random.random_id()
+
+        try:
+            handler = self.command_handlers.get(cmd['command'])
+            if not handler:
+                add_event_multi(
+                    EVENT_TYPE_STATUS, self.affected_objects,
+                    'unknown command', extra=cmd)
+                self.agentop.fail('unknown command')
+            else:
+                # The progress window only applies while this handler's
+                # command is the one in flight, so record that before
+                # dispatch. The window itself is not started here:
+                # dispatch() can block for a long time (PutBlobCommand
+                # fetches the blob if preflight did not), and the window
+                # measures time waiting on the agent, not time spent
+                # moving bytes around the hypervisor. Starting it here
+                # would expire a large put-blob before the agent had
+                # been sent anything at all.
+                self.in_flight_handler = handler
+                requests = handler.dispatch(command_id, cmd)
+                register_as_outstanding = handler.register_as_outstanding
+
+            if requests:
+                extra = copy.copy(cmd)
+                extra['command_id'] = command_id
+                add_event_multi(
+                    EVENT_TYPE_STATUS, self.affected_objects,
+                    'executing agent command', extra=extra)
+                self.agentop.state = AgentOperation.STATE_EXECUTING
+
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count,
+                    'register_as_outstanding': register_as_outstanding
+                }).debug(f'Sending {len(requests)} messages')
+                self._send_commands_single_envelope(
+                    sock, requests,
+                    register_as_outstanding=register_as_outstanding)
+
+                # The command is on the wire now, so the progress window
+                # starts now. self.ready goes False in the same breath,
+                # which is what arms the check at all.
+                self._last_progress = time.time()
+                self.ready = False
+
+        finally:
+            self._abort_commands_if_terminal()
 
     def _execute_inner(self, vsock):
         self._send_commands_single_envelope(
@@ -975,47 +1035,7 @@ class SideChannelExecutorJob(SideChannelJob):
                     return
 
                 if self.ready:
-                    requests = []
-                    register_as_outstanding = False
-                    cmd = self.commands.pop(0)
-                    command_id = sf_random.random_id()
-
-                    try:
-                        handler = self.command_handlers.get(cmd['command'])
-                        if not handler:
-                            add_event_multi(
-                                EVENT_TYPE_STATUS, self.affected_objects,
-                                'unknown command', extra=cmd)
-                            self.agentop.fail('unknown command')
-                        else:
-                            # The progress window measures from when
-                            # this command was sent, and only applies
-                            # while this handler's command is the one
-                            # in flight.
-                            self.in_flight_handler = handler
-                            self._last_progress = time.time()
-                            requests = handler.dispatch(command_id, cmd)
-                            register_as_outstanding = handler.register_as_outstanding
-
-                        if requests:
-                            extra = copy.copy(cmd)
-                            extra['command_id'] = command_id
-                            add_event_multi(
-                                EVENT_TYPE_STATUS, self.affected_objects,
-                                'executing agent command', extra=extra)
-                            self.agentop.state = AgentOperation.STATE_EXECUTING
-
-                            self.log.with_fields({
-                                'outstanding_messages': self.outstanding_message_count,
-                                'register_as_outstanding': register_as_outstanding
-                            }).debug(f'Sending {len(requests)} messages')
-                            self._send_commands_single_envelope(
-                                vsock.sock, requests,
-                                register_as_outstanding=register_as_outstanding)
-                            self.ready = False
-
-                    finally:
-                        self._abort_commands_if_terminal()
+                    self._dispatch_next_command(vsock.sock)
 
             except socket.timeout:
                 ...

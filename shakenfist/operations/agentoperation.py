@@ -10,6 +10,7 @@ from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
+from shakenfist.eventlog import add_event_multi
 from shakenfist.operations.baseoperation import BaseOperation
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
 from shakenfist.schema.agentoperation_data import AgentOperationData
@@ -278,8 +279,21 @@ class AgentOperation(BaseOperation):
             return
 
         self._state_update(self.STATE_EXPIRED, message=reason)
-        self.add_event(EVENT_TYPE_AUDIT, 'operation expired',
-                       extra={'reason': reason})
+
+        # The event is recorded against the instance as well as the
+        # operation, because expired is in FINAL_OBJECT_STATES and so
+        # the operation itself is swept for hard deletion after
+        # CLEANER_DELAY. An event held only against the operation
+        # would go with it; the instance is where an operator looks
+        # for the history of what was run against a machine anyway.
+        # Object tuples are passed rather than a hydrated Instance so
+        # this costs no database read, and so that agentoperation does
+        # not import instance (which imports it).
+        add_event_multi(
+            EVENT_TYPE_AUDIT,
+            [(self.object_type, self.uuid),
+             (ObjectType.INSTANCE, self.instance_uuid)],
+            'operation expired', extra={'reason': reason})
 
     def fail(self, message):
         """Move this operation to error, recording why.
@@ -289,21 +303,21 @@ class AgentOperation(BaseOperation):
         enforcement expires an operation underneath it, because
         expired has no edge to error.
 
-        The message is recorded twice, deliberately. The state message
-        is where it actually survives. self.error is set as well
-        because every call site this helper replaced set it -- but
-        AgentOperation does not override _db_set_attribute(), so that
-        write currently reaches nothing but a warning log and a mutate
-        event. Setting the state message is what makes the reason
-        readable today; keeping the self.error write is what makes
-        these call sites correct the day agent operation attribute
-        persistence exists.
+        The reason is recorded as the state message, and only there.
+        Every call site this helper replaced also assigned self.error,
+        which is dropped deliberately: AgentOperation does not override
+        _db_set_attribute(), so that write persists nothing and costs a
+        "subclass should override" warning plus a mutate event on every
+        failure -- log noise which reads as a live defect to whoever is
+        triaging the failure. See issue #3899, which tracks the
+        underlying gap. The day agent operation attribute persistence
+        exists, these call sites become correct by construction because
+        they call fail() rather than assigning.
         """
         if self.state.value in self.TERMINAL_STATES:
             return
 
         self._state_update(dbo.STATE_ERROR, message=message)
-        self.error = message
 
     def _attributes(self):
         """Read this operation's mutable attributes, creating the row if absent.
@@ -358,10 +372,33 @@ class AgentOperation(BaseOperation):
         self.add_event(EVENT_TYPE_MUTATE, 'add result',
                        extra={'index': str(index)})
 
+    def record_progress(self, timestamp):
+        """Persist the time the agent last made forward progress.
+
+        The persistence detail lives here rather than in the caller for
+        the same reason add_result()'s does: this is the object which
+        knows how its attributes row is written.
+
+        The field mask is not optional. add_result() reads, merges and
+        writes the results column on this same row, and an unmasked
+        write here would push a stale snapshot of it over a concurrent
+        update.
+        """
+        attrs = self._attributes()
+        attrs.last_progress = timestamp
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['last_progress'])
+
     def hard_delete(self):
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
         mariadb.delete_agent_operation_attributes(_uuid)
         mariadb.delete_agent_operation(_uuid)
+
+        # Symmetric with delete(). Adding expired to FINAL_OBJECT_STATES
+        # routes a new class of operation into the cluster's hard delete
+        # sweep, and a reference row left behind here would leak
+        # forever. It is a no-op when there are none.
+        mariadb.remove_all_references_from(ObjectType.AGENTOPERATION, self.uuid)
         super().hard_delete()
 
     def delete(self):
