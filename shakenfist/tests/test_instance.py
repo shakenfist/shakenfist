@@ -1917,3 +1917,158 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([False], released)
         self.assertEqual(0, row['used_cpus'])
+
+
+class InstancePortAllocationTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        # Object reference grouping asks who is making the request, which
+        # outside of a Flask request context has no answer.
+        self.request_namespace = mock.patch(
+            'shakenfist.schema.object_reference.request_namespace',
+            return_value='system')
+        self.mock_request_namespace = self.request_namespace.start()
+        self.addCleanup(self.request_namespace.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'ports-test', self.instance_uuid,
+            video={'memory': 16384, 'model': 'cirrus', 'vdi': 'spice'},
+            set_state=instance.Instance.STATE_CREATED)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+        self.consumed = mock.patch(
+            'shakenfist.mariadb.get_consumed_ports_for_node', return_value=[])
+        self.mock_consumed = self.consumed.start()
+        self.addCleanup(self.consumed.stop)
+
+    def _fake_sockets(self):
+        """Replace probe sockets with mocks and record them in order."""
+        created = []
+
+        def _make(*args, **kwargs):
+            s = mock.MagicMock()
+            created.append(s)
+            return s
+
+        return mock.patch(
+            'shakenfist.instance.socket.socket', side_effect=_make), created
+
+    @mock.patch('shakenfist.instance.random.randint',
+                side_effect=[40000, 40000, 40001, 40000, 40001, 40002])
+    def test_sibling_draws_are_mutually_exclusive(self, mock_randint):
+        # Issue 3897: the three draws for one instance must exclude each
+        # other, not just the ports already persisted for the node. The
+        # forced randint sequence repeats each port before offering a
+        # fresh one, so an allocator without sibling exclusion would
+        # return a duplicate.
+        patcher, _ = self._fake_sockets()
+        with patcher:
+            self.inst.allocate_instance_ports()
+
+        self.assertEqual(
+            {'console_port': 40000, 'vdi_port': 40001, 'vdi_tls_port': 40002},
+            self.inst.ports)
+
+    def test_node_consumed_ports_are_excluded(self):
+        self.mock_consumed.return_value = [40000, 40001]
+        patcher, _ = self._fake_sockets()
+        with patcher, mock.patch(
+                'shakenfist.instance.random.randint',
+                side_effect=[40000, 40001, 40002, 40003, 40004]):
+            self.inst.allocate_instance_ports()
+
+        self.assertEqual(
+            {'console_port': 40002, 'vdi_port': 40003, 'vdi_tls_port': 40004},
+            self.inst.ports)
+
+    def test_bind_collision_selects_another_port(self):
+        sockets = []
+
+        def _make(*args, **kwargs):
+            s = mock.MagicMock()
+            if not sockets:
+                s.bind.side_effect = OSError('port in use')
+            sockets.append(s)
+            return s
+
+        with mock.patch('shakenfist.instance.socket.socket',
+                        side_effect=_make), \
+                mock.patch('shakenfist.instance.random.randint',
+                           side_effect=[40000, 40001, 40002, 40003]):
+            self.inst.allocate_instance_ports()
+
+        self.assertEqual(
+            {'console_port': 40001, 'vdi_port': 40002, 'vdi_tls_port': 40003},
+            self.inst.ports)
+        for s in sockets:
+            s.close.assert_called_once_with()
+
+    def test_probe_sockets_held_until_ports_persisted(self):
+        # The probe sockets must stay bound until the allocation is
+        # persisted, so concurrent allocations on the node cannot
+        # interleave into the same gap.
+        patcher, sockets = self._fake_sockets()
+        closed_before_write = []
+        real_set = self.inst._db_set_attribute
+
+        def _watch(attribute, value, **kwargs):
+            if attribute == 'ports':
+                closed_before_write.extend(
+                    s for s in sockets if s.close.called)
+            return real_set(attribute, value, **kwargs)
+
+        with patcher, mock.patch.object(
+                self.inst, '_db_set_attribute', side_effect=_watch):
+            self.inst.allocate_instance_ports()
+
+        self.assertEqual(3, len(sockets))
+        self.assertEqual([], closed_before_write)
+        for s in sockets:
+            s.close.assert_called_once_with()
+
+    def test_existing_ports_are_preserved(self):
+        self.inst.ports = {
+            'console_port': 31000, 'vdi_port': 31001, 'vdi_tls_port': 31002}
+        with mock.patch('shakenfist.instance.socket.socket') as mock_socket:
+            self.inst.allocate_instance_ports()
+
+        mock_socket.assert_not_called()
+        self.assertEqual(
+            {'console_port': 31000, 'vdi_port': 31001, 'vdi_tls_port': 31002},
+            self.inst.ports)
+
+    def test_no_tls_port_for_non_spice_vdi(self):
+        other_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'vnc-test', other_uuid,
+            video={'memory': 16384, 'model': 'cirrus', 'vdi': 'vnc'},
+            set_state=instance.Instance.STATE_CREATED)
+        other = instance.Instance.from_db(other_uuid)
+
+        patcher, sockets = self._fake_sockets()
+        with patcher:
+            other.allocate_instance_ports()
+
+        self.assertEqual(
+            {'console_port', 'vdi_port'}, set(other.ports.keys()))
+        self.assertEqual(2, len(sockets))
