@@ -42,6 +42,17 @@
 #   workflow token (this prevents recursive workflow triggering), so
 #   the draft PR needs a human nudge -- push to it, or close and
 #   reopen it -- before the full CI suite runs.
+# - The model is asked for two blocks on stdout: a commit message and
+#   a pull request description. The workflow falls back to a generic
+#   template if either is missing, but a missing one is a real loss --
+#   an automated PR whose description is just a diffstat costs the
+#   reviewer the context the model already had. The "single shot"
+#   section of the prompt exists because a run once backgrounded the
+#   test suite and ended its turn waiting for it, which in -p mode
+#   simply ends the session: the code changes survived, both blocks
+#   did not.
+# - The description is model output, so it is passed to gh with
+#   --body-file. Never interpolate it into a shell string.
 # - The issue-fix-<N> branches are owned by this workflow and are
 #   force-updated on each attempt.
 # - Scratch files (prompts, logs, captured output) live in
@@ -477,6 +488,24 @@ jobs:
             without doing the plan's work: that is fine. Say which
             plan and why in the commit summary.
 
+          ## How this run works
+
+          You are a single, non-interactive `claude -p` invocation on
+          a CI runner. Nothing will re-invoke you and nobody will
+          answer you: when your turn ends the process exits, and any
+          work you were intending to come back to is lost. So:
+
+          - Do NOT background a long-running command and end your turn
+            meaning to check on it later. Run the test suite in the
+            foreground and wait for it, however long it takes.
+          - Do NOT end a turn describing what you are about to do. Do
+            it instead.
+          - The last thing you emit must be the two output blocks
+            described below. A run which ends without them still
+            commits the code, but under a placeholder commit message
+            and a contentless pull request description -- which wastes
+            the reviewer's time, not just the prose.
+
           ## Your task
 
           1. Diagnose the root cause of the issue. Fix the root
@@ -497,12 +526,15 @@ jobs:
              ```
           5. Run `pre-commit run --all-files` and fix any issues.
           6. Stage all changes with git add (do NOT commit).
-          7. Output a commit summary (see below).
+          7. Output a commit summary and a pull request description
+             (see below).
 
-          ## REQUIRED: Commit Summary Output
+          ## REQUIRED: Commit summary and PR description
 
           After completing your work and staging changes, you MUST
-          output a commit summary in the following exact format:
+          output both of the blocks below, in this order, as the last
+          thing you emit. Markers go on their own lines, and neither
+          block is wrapped in a code fence.
 
           ```
           COMMIT_SUMMARY_START
@@ -520,6 +552,37 @@ jobs:
 
           Do not include a "Fixes #NNNN" line in the summary -- the
           workflow adds that itself.
+
+          ```
+          PR_DESCRIPTION_START
+          <Markdown, wrapped at 72 chars.>
+          PR_DESCRIPTION_END
+          ```
+
+          This is what a reviewer reads before the diff, so write it
+          for them rather than restating the issue back at them.
+          Under whatever headings suit the change, cover:
+
+          - What was actually wrong, and why. The root cause you
+            found, not the symptom the issue reported. Where the
+            issue's own diagnosis turned out to be incomplete or
+            wrong, say so.
+          - What you changed, and why each piece is needed. Call out
+            anything a reviewer would otherwise have to
+            reverse-engineer: a refactor done to make the fix
+            possible, behaviour which deliberately did not change, a
+            test which pins the old behaviour as a floor.
+          - Anything in the issue you deliberately did NOT do, and
+            why: a second cause you judged out of scope, follow-up
+            work which deserves its own issue, a measurement which
+            should be repeated once this merges.
+          - Any judgement call a reviewer might reasonably make
+            differently.
+
+          Do NOT include a diffstat, a "Fixes #NNNN" line, a link to
+          this workflow run, or a note about CI not starting -- the
+          workflow appends all of those. Do not pad it either: a small
+          mechanical fix deserves a short description.
           TASK_EOF
           } > ${{ runner.temp }}/claude-prompt.txt
 
@@ -621,10 +684,13 @@ jobs:
 
           exit ${verify_exit_code}
 
-      - name: Extract commit summary
+      - name: Extract commit summary and PR description
         id: extract_summary
         if: steps.assess.outputs.has_changes == 'true'
         run: |
+          summary_found=false
+          description_found=false
+
           if grep -q "COMMIT_SUMMARY_START" \
               ${{ runner.temp }}/claude-output.txt
           then
@@ -637,13 +703,40 @@ jobs:
               > ${{ runner.temp }}/commit-summary.txt
 
             if [ -s ${{ runner.temp }}/commit-summary.txt ]; then
-              echo "summary_found=true" >> $GITHUB_OUTPUT
-            else
-              echo "summary_found=false" >> $GITHUB_OUTPUT
+              summary_found=true
             fi
-          else
-            echo "summary_found=false" >> $GITHUB_OUTPUT
           fi
+
+          # A PR description may legitimately contain fenced code, so
+          # unlike the commit summary above only the marker lines are
+          # stripped. Both markers must be present: a truncated block
+          # would otherwise run to the end of the captured output.
+          if grep -q "^PR_DESCRIPTION_START" \
+               ${{ runner.temp }}/claude-output.txt && \
+             grep -q "^PR_DESCRIPTION_END" \
+               ${{ runner.temp }}/claude-output.txt
+          then
+            sed -n '/^PR_DESCRIPTION_START/,/^PR_DESCRIPTION_END/p' \
+              ${{ runner.temp }}/claude-output.txt | \
+              sed '1d;$d' \
+              > ${{ runner.temp }}/pr-description.txt
+
+            if [ -s ${{ runner.temp }}/pr-description.txt ]; then
+              description_found=true
+            fi
+          fi
+
+          # Neither block is fatal: the publish step falls back to a
+          # generic body. Say so in the log, because a PR which turns up
+          # with a contentless description is otherwise a mystery.
+          if [ "${description_found}" != "true" ]; then
+            echo "No usable PR description in the model output. The run"
+            echo "probably ended its turn early -- check the tail of"
+            echo "claude-output.txt in the artifacts."
+          fi
+
+          echo "summary_found=${summary_found}" >> $GITHUB_OUTPUT
+          echo "description_found=${description_found}" >> $GITHUB_OUTPUT
 
       # The triage estimate of fix size is only an estimate. This is
       # the hard cap: an over-budget fix is never published as a PR,
@@ -711,37 +804,58 @@ jobs:
             PR_TITLE="Fix issue #${ISSUE_NUMBER}"
           fi
 
+          # The description is model output, so it is written to a file
+          # and passed with --body-file. It must never be interpolated
+          # into a shell string: an unquoted heredoc would execute any
+          # $(...) or backticks the model happened to write.
+          {
+            if [ "${{ steps.extract_summary.outputs.description_found }}" == "true" ]; then
+              cat ${{ runner.temp }}/pr-description.txt
+            elif [ "${{ steps.extract_summary.outputs.summary_found }}" == "true" ]; then
+              # No description block, but the commit message body is a
+              # better summary than nothing.
+              echo "## Summary"
+              echo
+              tail -n +2 ${{ runner.temp }}/commit-summary.txt | \
+                sed '/./,$!d'
+            else
+              echo "## Summary"
+              echo
+              echo "Automated fix attempt for #${ISSUE_NUMBER}. The model"
+              echo "produced neither a description nor a commit message,"
+              echo "so read the diff rather than this."
+            fi
+
+            echo
+            echo "Fixes #${ISSUE_NUMBER}"
+            echo
+            echo "## Changes"
+            echo
+            echo '```'
+            git diff --stat HEAD~1
+            echo '```'
+            echo
+            echo "## Automated verification"
+            echo
+            echo "The unit test suite (tox -ecover) passes on the runner."
+            echo
+            echo "Note: GitHub does not start CI on pull requests created"
+            echo "with the default workflow token, so push to this PR or"
+            echo "close and reopen it to trigger the full CI suite."
+            echo
+            echo "[Workflow run](${RUN_URL})"
+            echo
+            echo "---"
+            echo "Generated with [Claude Code](https://claude.com/claude-code)"
+          } > ${{ runner.temp }}/pr-body.md
+
           pr_url=$(gh pr create \
             --draft \
             --label automated-fix \
             --assignee mikalstill \
             --reviewer mikalstill \
             --title "${PR_TITLE}" \
-            --body "$(cat <<EOF
-          ## Summary
-
-          Automated fix attempt for #${ISSUE_NUMBER}.
-
-          Fixes #${ISSUE_NUMBER}
-
-          ## Changes
-
-          $(git diff --stat HEAD~1)
-
-          ## Verification
-
-          The unit test suite (tox -ecover) passes on the runner.
-
-          Note: GitHub does not start CI on pull requests created
-          with the default workflow token, so push to this PR or
-          close and reopen it to trigger the full CI suite.
-
-          [Workflow run](${RUN_URL})
-
-          ---
-          Generated with [Claude Code](https://claude.com/claude-code)
-          EOF
-          )" \
+            --body-file ${{ runner.temp }}/pr-body.md \
             --head "issue-fix-${ISSUE_NUMBER}")
 
           gh issue comment "${ISSUE_NUMBER}" \
