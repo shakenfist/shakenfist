@@ -13816,6 +13816,11 @@ kolla-ansible code beyond what is already in flight.</p>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/">PLAN-proxy-dev-releases-phase-05-pypi-prune.md</a></td>
 <td>Complete (merged in PR #328, 2026-08-18) — storage monitor, lockfile-only merges no longer publish, pruning runbook</td>
 </tr>
+<tr>
+<td>6. Push audit</td>
+<td>PLAN-proxy-dev-releases-phase-06-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <p>Phase sketches (to be expanded into per-phase plans):</p>
@@ -13948,6 +13953,42 @@ under the operator's CI-cost policy. Phase 5 lands as its
 own, separate PR — the single-PR batching applied to the
 phases that had to merge together to turn the scenario
 jobs green, and phase 5 depends on none of that.)</p>
+<p><strong>Phase 6 — push audit.</strong> Work through <code>PUSH-AUDIT.md</code>
+against the accumulated diff of every phase in this plan —
+phases 1 to 5 together, not phase 5 alone, because what
+the phases did to each other is only visible once they are
+all in the same diff.</p>
+<p>Every judgment brief in <code>PUSH-AUDIT.md</code> says to read
+<code>git diff develop...HEAD</code>. That is wrong here and is the
+executor's first correction: phases 1 to 5 are already
+merged into <code>develop</code> (PR #314 as <code>14b54f3</code>, PR #328 as
+<code>2e1fd43</code>), so on a phase 6 branch that range holds this
+phase's own paperwork and none of the work being audited.
+Unrelated work merged between the two, so the range has to
+be scoped to the paths the phases touched:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>paths=$( { git diff --name-only 14b54f3^1..14b54f3
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>           git diff --name-only 2e1fd43^1..2e1fd43
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>         } | sort -u )
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>git diff 14b54f3^1..2e1fd43 -- $paths
+</code></pre></div>
+<p>That is 40 files and roughly 4,000 added lines as of
+2026-08-24. Derive the path set rather than transcribing
+it, so a rebase or a later amendment cannot silently
+narrow the audit. Substitute this range wherever
+<code>PUSH-AUDIT.md</code> says <code>git diff develop...HEAD</code>, in all
+five judgment briefs. Wave 1's lint and test gates run
+against the worktree and are unaffected, but its style
+checks are diff-based against a hard-coded <code>DIFF_BASE</code>
+(<code>tools/audit/wave1.sh:37</code>) and will see nothing; run
+those greps over the range above by hand, or edit
+<code>DIFF_BASE</code> locally without committing it.</p>
+<p>Scope note: 4b is withdrawn and 4c is still outstanding
+and operator-driven, so the audit covers phases 1 to 3,
+4a and 5.</p>
+<p>Findings land as their own pull request; this plan is not
+complete until each one is fixed or declined in writing
+here, with the reason. If the audit finds nothing, record
+that in a sentence — it is a result worth having.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the

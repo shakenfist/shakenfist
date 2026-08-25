@@ -13943,7 +13943,11 @@ hook disagree about what passes:</p>
 <ul>
 <li><strong>shellcheck</strong> is pinned as a hook revision and as a <code>shellcheck-py</code>
   dependency of the <code>shellcheck</code> tox environment, which is what CI
-  runs.</li>
+  runs. Upstream tags a fourth component — <code>v0.11.0.1</code> is shellcheck
+  0.11.0, packaging revision 1 — which is not semver, so <code>renovate.json</code>
+  also gives that dependency a regex versioning scheme. Without it the
+  <code>github-tags</code> lookup cannot resolve the current value at all, so the
+  hook half of the group is never proposed and the tox pin moves alone.</li>
 <li><strong>skillsaw</strong> is pinned as a hook revision and as the <code>skillsaw==</code>
   version the <code>sanity_checks</code> job installs into its test venv. CI
   installs the linter rather than using <code>stbenjam/skillsaw@v0</code>: that
@@ -13957,6 +13961,12 @@ no tox manager, and the <code>skillsaw==</code> pin sits in a <code>run:</code> 
 than a <code>uses:</code> — so a <code>customManagers</code> regex picks each one up, and the
 <code>shellcheck</code> and <code>skillsaw</code> groups land both halves of a bump in one
 pull request.</p>
+<p>Grouping only proposes the two halves together, though; it does not
+enforce that they agree. So <code>tools/shellcheck-wrap.sh</code> checks the hook
+revision against the <code>shellcheck-py</code> pin before it lints anything, and
+<code>tox -e shellcheck</code> fails in the smoke tier if they have drifted apart —
+which is what happened when the tag lookup above silently stopped
+resolving. The skillsaw pair has no equivalent assertion yet.</p>
 <h2 id="development-configuration">Development configuration<a class="headerlink" href="#development-configuration" title="Permanent link">&para;</a></h2>
 <p>Configuration is loaded from environment variables (<code>KERBSIDE_*</code>), then
 an INI file at <code>/etc/kerbside/kerbside.ini</code>, then the field defaults in
