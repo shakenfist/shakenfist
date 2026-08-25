@@ -37,6 +37,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import GiB
+from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_reference import references_to_grouped_dict
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
@@ -278,12 +279,17 @@ class Blob(dbo):
         # verification timestamps)
         checksums = mariadb.get_valid_checksums(str(self.uuid))
 
+        # The unfiltered references_from read already contains the DEPENDS_ON
+        # and TRANSCODE rows, so derive those fields from it rather than
+        # issuing the properties' filtered reads as well (issue 3876).
+        refs_from = mariadb.get_references_from(ObjectType.BLOB, self.uuid)
+
         out.update({
             'size': self.size,
             'modified': self.modified,
             'fetched_at': self.fetched_at,
-            'depends_on': self.depends_on,
-            'transcodes': self.transcoded,
+            'depends_on': self._depends_on_from_references(refs_from),
+            'transcodes': self._transcodes_from_references(refs_from),
             'reference_count': self.ref_count,
             'sha512': checksums.get('sha512'),
             'last_used': self.last_used,
@@ -302,7 +308,6 @@ class Blob(dbo):
         # Add object references (what references this blob and what this blob
         # references)
         refs_to = mariadb.get_references_to(ObjectType.BLOB, self.uuid)
-        refs_from = mariadb.get_references_from(ObjectType.BLOB, self.uuid)
         out['references_to'] = references_to_grouped_dict(refs_to)
         out['references_from'] = references_to_grouped_dict(refs_from)
 
@@ -317,6 +322,14 @@ class Blob(dbo):
     def fetched_at(self) -> float:
         return self.__fetched_at
 
+    @staticmethod
+    def _depends_on_from_references(
+            refs: list[ObjectReference]) -> Optional[str]:
+        for ref in refs:
+            if ref.relationship == RelationshipType.DEPENDS_ON:
+                return str(ref.target_uuid)
+        return None
+
     @property
     def depends_on(self) -> Optional[str]:
         """Return the UUID of the blob this blob depends on, if any.
@@ -326,9 +339,7 @@ class Blob(dbo):
         """
         refs = mariadb.get_references_from(
             ObjectType.BLOB, self.uuid, RelationshipType.DEPENDS_ON)
-        if refs:
-            return str(refs[0].target_uuid)
-        return None
+        return self._depends_on_from_references(refs)
 
     # Values routed to attributes (stored in blob_attributes table)
     @property
@@ -422,16 +433,22 @@ class Blob(dbo):
             ObjectType.BLOB, self.uuid,
             exclude_relationships=[RelationshipType.BLOB_LOCATION])
 
+    @staticmethod
+    def _transcodes_from_references(
+            refs: list[ObjectReference]) -> dict[str, str]:
+        result: dict[str, str] = {}
+        for ref in refs:
+            if (ref.relationship == RelationshipType.TRANSCODE and
+                    ref.relationship_value is not None):
+                result[ref.relationship_value] = str(ref.target_uuid)
+        return result
+
     @property
     def transcoded(self) -> dict[str, str]:
         """Return a dict of {style: blob_uuid} for all transcodes of this blob."""
         refs = mariadb.get_references_from(
             ObjectType.BLOB, self.uuid, RelationshipType.TRANSCODE)
-        result: dict[str, str] = {}
-        for ref in refs:
-            if ref.relationship_value is not None:
-                result[ref.relationship_value] = str(ref.target_uuid)
-        return result
+        return self._transcodes_from_references(refs)
 
     def add_transcode(self, style: str, blob_uuid: str) -> bool:
         """Record a transcode relationship from this blob to a transcoded blob.

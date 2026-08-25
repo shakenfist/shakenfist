@@ -2627,22 +2627,58 @@ def all_instances():
             yield i
 
 
+def _blob_dependency_chain(
+        blob_uuid: str, memo: dict[str, list[str]]) -> list[str]:
+    """Return the blobs blob_uuid depends on, directly or transitively.
+
+    The chain is memoised across one instance walk because instances
+    overwhelmingly share their disks' base images: without the memo the
+    same chain is re-read from object_references once per instance
+    using it, which is a get_references_from and a blob hydration per
+    link per instance (issue 3876).
+    """
+    if blob_uuid in memo:
+        return memo[blob_uuid]
+
+    chain: list[str] = []
+    seen = {blob_uuid}
+    disk_blob = blob.Blob.from_db(blob_uuid, suppress_failure_audit=True)
+    while disk_blob:
+        depends_on = disk_blob.depends_on
+        if not depends_on:
+            break
+        # A dependency cycle should not be possible, but walking one
+        # here would hang the API worker rather than return a wrong
+        # answer, so stop rather than trust that.
+        if depends_on in seen:
+            break
+        seen.add(depends_on)
+        chain.append(depends_on)
+        disk_blob = blob.Blob.from_db(
+            depends_on, suppress_failure_audit=True)
+
+    memo[blob_uuid] = chain
+    return chain
+
+
 def instance_blob_usage(node=None):
     """Map blob uuid to the uuids of healthy instances using that blob.
 
     Walks every healthy instance (optionally filtered to one node) exactly
     once, recording the blobs each disk references directly and via its
     dependency chain. Callers that need usage for many blobs -- the
-    cluster wide cleanup loop -- must use this rather than calling
+    cluster wide cleanup loop, and every API handler which renders more
+    than one blob -- must use this rather than calling
     instance_usage_for_blob_uuid() per blob: the per-blob form repeats
     the instance walk, and its per-disk block_devices and dependency
-    chain reads, for every single blob (issue 3502).
+    chain reads, for every single blob (issues 3502 and 3876).
     """
     filters = []
     if node:
         filters.append(partial(placement_filter, node))
 
     usage: dict[str, list[str]] = defaultdict(list)
+    chains: dict[str, list[str]] = {}
     for inst in Instances(filters, prefilter='healthy'):
         # inst.block_devices isn't populated until the instance is created,
         # so it may not be ready yet. This means we will miss instances
@@ -2657,15 +2693,7 @@ def instance_blob_usage(node=None):
             in_use.add(d['blob_uuid'])
 
             # ...and so is everything in its dependency chain.
-            disk_blob = blob.Blob.from_db(
-                d['blob_uuid'], suppress_failure_audit=True)
-            while disk_blob:
-                depends_on = disk_blob.depends_on
-                if not depends_on:
-                    break
-                in_use.add(depends_on)
-                disk_blob = blob.Blob.from_db(
-                    depends_on, suppress_failure_audit=True)
+            in_use.update(_blob_dependency_chain(d['blob_uuid'], chains))
 
         for blob_uuid in in_use:
             usage[blob_uuid].append(inst_uuid)

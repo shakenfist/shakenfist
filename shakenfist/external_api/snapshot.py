@@ -21,7 +21,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import InvalidMaxVersions
 from shakenfist.external_api import base as api_base
-from shakenfist.instance import instance_usage_for_blob_uuid
+from shakenfist.instance import instance_blob_usage
 
 
 LOG, HANDLER = logs.setup(__name__)
@@ -95,6 +95,11 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
+        # One instance walk for the whole listing, not one per version
+        # of every snapshot artifact (issue 3876). This was the worst of
+        # the per-blob call sites: the walk was nested two loops deep.
+        blob_usage = instance_blob_usage()
+
         out = []
         for snap in Artifacts([
                 partial(artifact.instance_snapshot_filter, instance_from_db.uuid)]):
@@ -107,7 +112,7 @@ class InstanceSnapshotEndpoint(api_base.Resource):
 
                 bout = b.external_view()
                 bout['blob_uuid'] = bout['uuid']
-                bout['instances'] = instance_usage_for_blob_uuid(b.uuid)
+                bout['instances'] = blob_usage.get(str(b.uuid), [])
                 del bout['uuid']
 
                 # Merge it with the parent artifact
