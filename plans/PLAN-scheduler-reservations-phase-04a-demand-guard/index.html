@@ -13545,7 +13545,7 @@ one dimension.</p>
 <td>management session</td>
 <td>none</td>
 <td>Deploy to sfcbr and soak, discharging three outstanding obligations at once (E6): phase 3's step 9 soak, phase 4's step 10 operator review and soak with a real claim on a real namespace, and this phase's own validation. Run a CI burst and record, in this plan's Soak observations section: whether the demand clause now passes for some candidates and refuses others (read the <code>'schedule candidate refused by capacity guard'</code> audit events and check <code>enforce_demand</code> is true on refusals that were then admitted elsewhere); how often the P9 waiver event fires, which under E3 should be rare and only under genuine saturation; whether a burst spreads across hypervisors rather than piling on the top-ranked node; and that the reconciler reports zero drift across the burst. Then the phase 4 claim soak proper: create a claim for a namespace, run instances in it, confirm the drawdown and that <code>/admin/resources</code> and the tables agree. Phase 00a's own post-deploy question -- whether the network+database node still takes a disproportionate share -- can be observed from the same burst; record it in phase 00a's plan, not this one.</td>
-<td>Not started -- operator</td>
+<td>Complete -- deployed and soaked 2026-08-22 to 2026-08-24; the claim half needed a deliberate exercise, see the step notes</td>
 </tr>
 <tr>
 <td>6</td>
@@ -13553,7 +13553,7 @@ one dimension.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>Close-out, after step 5 has been recorded. Set the phase 3, phase 4 and phase 4a rows to <code>Complete</code> in the master plan Execution table, remove the phase status notes that describe the soaks as outstanding, and confirm <code>docs/plans/index.md</code>'s row arithmetic is right for the new phase count (the phases column is arithmetic over the Execution table; adding 4a changes the denominator). Close #3813 with a comment naming the fix and the soak observation. Commit subject: <code>scheduler: close out phases 3, 4 and 4a.</code></td>
-<td>Not started -- gated on step 5</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -13588,6 +13588,15 @@ one dimension.</p>
   exactly 54 of the 80 cells against the pre-fix clause and seed, which
   is the figure computed from the arithmetic before any code was
   written.</li>
+<li><strong>Step 5</strong> could only half happen by waiting. The demand-guard
+  observations came from a 48-hour sfcbr window, as planned, and are
+  recorded in <em>Soak observations</em>. The phase 4 claim half could not:
+  nothing on sfcbr creates a namespace capacity claim on its own, so
+  the window produced zero claim requests, zero over-limit audit
+  events and zero expiries -- an absence, not a result. The pathway
+  was exercised deliberately instead, with
+  <code>tools/exercise-namespace-claims.py</code>. Waiting longer would not have
+  helped, and the plan should have said so when it wrote the step.</li>
 <li><strong>Review round 1 (2026-08-22)</strong> raised ten items, of which five
   changed the code. The mock database's demand comparison still
   implemented the pre-fix arithmetic, so the caller-side P9 waiver
@@ -13726,7 +13735,406 @@ one dimension.</p>
 * #3813 is closed.
 * <code>pre-commit run --all-files</code> passes.</p>
 <h2 id="soak-observations">Soak observations<a class="headerlink" href="#soak-observations" title="Permanent link">&para;</a></h2>
-<p><em>(Filled by step 5.)</em></p>
+<h3 id="pre-fix-baseline-48h-to-2026-08-23-0619-utc">Pre-fix baseline (48h to 2026-08-23 06:19 UTC)<a class="headerlink" href="#pre-fix-baseline-48h-to-2026-08-23-0619-utc" title="Permanent link">&para;</a></h3>
+<p>Recorded before the phase 4a deploy, and not something the plan
+anticipated having. PR #3843 merged at 2026-08-22 11:26 UTC but sfcbr
+was not redeployed until 2026-08-23, so the two days of production
+traffic either side of the merge all ran the <strong>old</strong> clause. That makes
+this window a genuine control arm rather than a recollection, and the
+post-deploy numbers below are a measured delta rather than a judgement
+call.</p>
+<p>The window was confirmed to be pre-fix from the audit events
+themselves, not from deploy records. A refusal at 2026-08-23 06:19:17Z
+read:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>{'dimension': 'demand', 'limit': 16.5, 'used': 9.36,
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a> 'requested': 10.0, 'exceeded': True}
+</code></pre></div>
+<p>Both fields date the code. <code>requested: 10.0</code> for a 4-vCPU instance is
+2.5 per vCPU, the pre-retune <code>SCHEDULER_DEMAND_PER_VCPU</code>; the shipped
+default of 0.6 would read 2.4. And <code>exceeded: True</code> while
+<code>used 9.36 &lt; limit 16.5</code> can only be <code>used + requested &gt; limit</code>, the
+charged comparison this phase replaced with <code>charged=False</code>. Under the
+shipped code that node admits.</p>
+<p><strong>Every refusal was a demand refusal.</strong> Across 3,904
+<code>schedule candidate refused by capacity guard</code> events, the count whose
+<code>exceeded</code> set contained any of <code>cpus</code>, <code>memory_mb</code> or <code>disk_gb</code> was
+zero:</p>
+<table>
+<thead>
+<tr>
+<th>node</th>
+<th>cpu limit</th>
+<th>refusals</th>
+<th>demand-only</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>6046afdf</code></td>
+<td>66</td>
+<td>686</td>
+<td>686 (100%)</td>
+</tr>
+<tr>
+<td><code>f6b7e913</code></td>
+<td>66</td>
+<td>682</td>
+<td>682 (100%)</td>
+</tr>
+<tr>
+<td><code>bed5996d</code></td>
+<td>30</td>
+<td>669</td>
+<td>669 (100%)</td>
+</tr>
+<tr>
+<td><code>963d4df9</code></td>
+<td>30</td>
+<td>639</td>
+<td>639 (100%)</td>
+</tr>
+<tr>
+<td><code>f4ba9b6c</code></td>
+<td>24</td>
+<td>651</td>
+<td>651 (100%)</td>
+</tr>
+<tr>
+<td><code>7ce66641</code></td>
+<td>18</td>
+<td>577</td>
+<td>577 (100%)</td>
+</tr>
+<tr>
+<td><strong>total</strong></td>
+<td></td>
+<td><strong>3,904</strong></td>
+<td><strong>3,904 (100%)</strong></td>
+</tr>
+</tbody>
+</table>
+<p>This is #3813 stated as a measurement. The demand term was not one
+input to placement among several -- it was the <em>only</em> input that ever
+refused anything, on every node, at every size -- including the two
+largest, refusing a 4-vCPU request while holding 20 of an admissible
+66 vCPUs. The allocation dimensions the
+capacity tables exist to enforce never once bound.</p>
+<p>Consequently the P9 waiver, designed for genuine saturation, carried
+the majority of all traffic:</p>
+<table>
+<thead>
+<tr>
+<th>measure</th>
+<th>pre-fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>placements</td>
+<td>1,052</td>
+</tr>
+<tr>
+<td>P9 waivers (<code>enforce_demand</code> false)</td>
+<td>648 (<strong>62%</strong>)</td>
+</tr>
+<tr>
+<td>hourly waiver rate</td>
+<td>25% -- 86%</td>
+</tr>
+</tbody>
+</table>
+<p>The hourly spread is worth keeping, because it sets the bar for what
+counts as evidence after the fix: an unchanged clause varies by a
+factor of three from hour to hour, so a one- or two-hour post-deploy
+sample cannot distinguish the fix from ordinary variance. The
+discriminating hours are the busy ones -- 2026-08-22 22:00Z placed 72
+instances at an 82% waiver rate.</p>
+<p>Placement concentrated on the two largest nodes, which is the spreading
+failure the term exists to prevent:</p>
+<table>
+<thead>
+<tr>
+<th>node</th>
+<th>cpu limit</th>
+<th>placements</th>
+<th>share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>6046afdf</code></td>
+<td>66</td>
+<td>330</td>
+<td>31%</td>
+</tr>
+<tr>
+<td><code>f6b7e913</code></td>
+<td>66</td>
+<td>303</td>
+<td>29%</td>
+</tr>
+<tr>
+<td><code>bed5996d</code></td>
+<td>30</td>
+<td>130</td>
+<td>12%</td>
+</tr>
+<tr>
+<td><code>963d4df9</code></td>
+<td>30</td>
+<td>125</td>
+<td>12%</td>
+</tr>
+<tr>
+<td><code>f4ba9b6c</code></td>
+<td>24</td>
+<td>102</td>
+<td>10%</td>
+</tr>
+<tr>
+<td><code>7ce66641</code></td>
+<td>18</td>
+<td>62</td>
+<td>6%</td>
+</tr>
+</tbody>
+</table>
+<p>Two caveats on reading the concentration figure. It is <em>not</em> a clean
+measure of the demand term's spreading. With the guard refusing every
+candidate, 62% of placements were made by the P9 waiver's second
+<code>place_walk(False)</code>, which iterates the <em>same</em> ranked candidate list as
+the first (<code>external_api/instance.py:881-921</code>) but with the clause
+waived -- so it simply takes the highest-ranked candidate, and the
+demand term contributed nothing to where those instances went. The 60%
+on the top two nodes therefore reflects the scheduler's affinity-then-
+load-bucket ranking (<code>scheduler.py:653-691</code>) preferring the largest
+nodes, which is partly correct behaviour. What the fix should change is
+the <em>mechanism</em> before it changes the distribution: placements should
+be made by the first walk with <code>enforce_demand</code> true. Second, the node column here is capacity limit
+(vCPUs admitted at the 3.0 overcommit ratio), not physical size, so the
+66/30/24/18 spread is roughly a 22/10/8/6 thread spread.</p>
+<h3 id="post-deploy-observations">Post-deploy observations<a class="headerlink" href="#post-deploy-observations" title="Permanent link">&para;</a></h3>
+<p>Deployed to sfcbr on 2026-08-23 between 06:19Z (last event showing the
+old arithmetic) and 16:56Z (first showing the new). Measurements below
+cover 16:00Z 2026-08-23 to 18:00Z 2026-08-24, about 26 hours and 438
+placements, against the 48-hour 1,052-placement baseline above.</p>
+<p><strong>The deploy is confirmed from the events, not from deploy records.</strong>
+Refusals now charge 0.6 per requested vCPU (<code>requested</code> reads 0.6 for a
+1-vCPU request, 1.2 for 2, 2.4 for 4), and across all 88 refusals there
+is no case of <code>exceeded</code> being true while <code>used &lt;= limit</code> -- the
+comparison is <code>used &gt; limit</code>, the <code>charged=False</code> form. Under the old
+constant those same requests would have been charged 2.5, 5.0 and 10.0.</p>
+<p><strong>Observation 1 -- the demand clause discriminates.</strong> It does, though
+the honest headline is a rate change rather than a composition change.
+All 88 refusals are still demand-only; no refusal in either window was
+caused by <code>cpus</code>, <code>memory_mb</code> or <code>disk_gb</code>, because sfcbr never
+approaches those bounds. What changed is how often the clause fires at
+all:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pre-fix</th>
+<th>post-fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>refusals</td>
+<td>3,904</td>
+<td>88</td>
+</tr>
+<tr>
+<td>placements</td>
+<td>1,052</td>
+<td>438</td>
+</tr>
+<tr>
+<td><strong>refusals per placement</strong></td>
+<td><strong>3.71</strong></td>
+<td><strong>0.20</strong></td>
+</tr>
+</tbody>
+</table>
+<p>An 18-fold reduction. Every one of the 88 carries <code>enforce_demand:
+true</code>, so they are first-walk refusals, and only 18 of them escalated
+to a waiver -- the rest were refused on one candidate and admitted on
+another, which is exactly the discrimination the clause was supposed to
+provide and never did. Every node still refuses sometimes and admits
+most of the time, including the 18-vCPU node that the old clause could
+never satisfy.</p>
+<p><strong>Observation 2 -- the P9 waiver is now rare.</strong> This is the clearest
+result:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pre-fix</th>
+<th>post-fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>waiver rate</td>
+<td>648/1,052 = <strong>62%</strong></td>
+<td>18/438 = <strong>4.1%</strong></td>
+</tr>
+<tr>
+<td>hourly range</td>
+<td>25% -- 86%</td>
+<td>0% in 17 of 20 hours</td>
+</tr>
+</tbody>
+</table>
+<p>Fourteen of the eighteen waivers fell in a single hour (2026-08-24
+06:00Z, 49 placements, 29%), with the remainder in two hours at 6% (3
+of 49) and 3% (1 of 31). The baseline's threefold hourly variance was the reason for
+insisting on a long sample, and it is what makes this readable: the
+post-fix distribution is not a quiet-hour artefact, because the busiest
+post-fix hours (50 placements at 19:00Z, 49 at 09:00Z) ran at 0% and
+6%, against a pre-fix busy hour of 72 placements at 82%. The waiver has
+gone back to being an exception under genuine burst pressure, which is
+what E3 kept it for.</p>
+<p><strong>Observation 3 -- burst distribution.</strong> Placement moved off the
+top-ranked node and onto the smallest, which is the spreading the term
+exists to produce:</p>
+<table>
+<thead>
+<tr>
+<th>node</th>
+<th>cpu limit</th>
+<th>pre-fix</th>
+<th>post-fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f6b7e913</code></td>
+<td>66</td>
+<td>28.8%</td>
+<td>30.6%</td>
+</tr>
+<tr>
+<td><code>6046afdf</code></td>
+<td>66</td>
+<td>31.4%</td>
+<td><strong>23.1%</strong></td>
+</tr>
+<tr>
+<td><code>bed5996d</code></td>
+<td>30</td>
+<td>12.4%</td>
+<td>13.9%</td>
+</tr>
+<tr>
+<td><code>963d4df9</code></td>
+<td>30</td>
+<td>11.9%</td>
+<td>14.6%</td>
+</tr>
+<tr>
+<td><code>f4ba9b6c</code></td>
+<td>24</td>
+<td>9.7%</td>
+<td>8.7%</td>
+</tr>
+<tr>
+<td><code>7ce66641</code></td>
+<td>18</td>
+<td>5.9%</td>
+<td><strong>9.1%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The top-ranked node shed 8.3 points and the smallest node gained 3.2,
+taking it from well under its capacity share to slightly over. Two
+honest qualifications. First, total absolute deviation from a
+capacity-proportional split actually rose, 7.5 to 13.5 points -- but
+capacity-proportional is not the target and never was. The clause
+spreads by measured load plus expected demand, so a node running hot is
+skipped whatever its size, and a deviation metric anchored on capacity
+will read that as a regression. Second, 438 placements across six nodes
+is a small sample and some of this spread is noise. The mechanism
+change is the durable finding; the distribution is corroborating, not
+load-bearing.</p>
+<p><strong>Observation 4 -- reconciler drift.</strong> 299 reconcile passes over the
+window, every one seeing all six nodes, with <code>nodes_added</code>,
+<code>nodes_removed</code> and <code>claims_expired</code> all zero throughout and durations
+of 27ms/91ms/3787ms (min/median/max). No pass logged a correction.</p>
+<p>This is weaker evidence than the Definition of done implies, and the
+gap was in the instrumentation rather than the result.
+<code>reconcile_scheduler_capacity</code> recomputes the counters wholesale and
+used to log membership and timing but no before/after delta, so a
+silent correction of a <code>used_*</code> counter left no trace in the log.
+Proving zero drift needed the Prometheus gauges, which were not
+reachable from the analysis host. What can be said of the window is
+that the reconciler ran healthily every five minutes throughout, saw a
+stable cluster, and expired nothing -- which is consistent with zero
+drift but does not demonstrate it.</p>
+<p>The gap turned out to be smaller than it looked and is closed by this
+close-out rather than deferred. The per-node <code>delta_used_cpus</code> /
+<code>delta_used_memory_mb</code> / <code>delta_used_disk_gb</code> values were already in
+the <code>ReconcileSchedulerCapacity</code> reply; only the log line dropped them.
+The pass now warns per drifting node and carries <code>drifted_nodes</code> plus
+per-dimension <code>drift_*</code> magnitudes on the summary line
+(<code>daemons/cluster/scheduled_tasks.py</code>). Magnitudes are summed absolute
+rather than signed, so drift in opposite directions on two nodes adds
+instead of cancelling into an apparently healthy total.</p>
+<p><strong>This means the phase 3 zero-drift criterion was accepted on
+healthy-pass evidence, not on measured deltas.</strong> A reader should not
+take phase 3's Complete as "checked". The next soak can check it
+properly, which is the point of fixing the instrumentation now rather
+than filing an issue against a plan already closed.</p>
+<p><strong>Observation 5 -- phase 4 claim drawdown: done deliberately, not by
+waiting.</strong> The 48h window produced no claim activity at all: zero
+requests to <code>/auth/namespaces/&lt;namespace&gt;/claims</code>, zero <code>placement
+admitted over namespace capacity claim</code> audit events, and
+<code>claims_expired</code> zero in all 299 reconcile passes. That is not a soak
+result, it is an absence of one, and no amount of further waiting would
+have changed it -- nothing on sfcbr creates claims on its own. The
+pathway was therefore exercised on purpose, with
+<code>tools/exercise-namespace-claims.py</code> against sfcbr on 2026-08-24: 33
+checks, all passing, covering request validation, create, duplicate
+refusal, read and cross-namespace non-disclosure, field-masked update,
+re-dating, shrink-to-zero-and-back, drawdown against a real instance
+(<code>used_cpus=1 used_memory_mb=1024 used_disk_gb=8</code> after placement),
+the <code>below_usage</code> shrink refusal, expiry, and delete.</p>
+<p>One correction to that record, found in review. The run did <strong>not</strong>
+demonstrate the 507 capacity refusal, although an earlier draft of this
+section said it did. The impossible-claim check ran after the real
+claim already existed, and <code>create_namespace_claim</code> probes for an
+existing claim before it reaches the guarded <code>UPDATE</code> against
+<code>cluster_capacity</code>, so the request could only ever return the 409 for
+<code>exists</code>. The check had been widened to accept either status, which
+made it a no-500 smoke test rather than the capacity assertion its name
+promised. The check now runs before the claim is created, where
+capacity is the only thing that can refuse it, and asserts 507
+specifically. The 507 path itself was never untested -- <code>test_claims.py</code>
+and <code>test_mariadb_capacity_claims_live.py</code> cover it -- so what was wrong
+was this record, not the code.</p>
+<p>The expiry result is the one worth recording, because it is the only
+one that could not be reasoned out from the code. <code>coverage_state</code> is a
+stored column swept by the reconciler rather than computed on read, so
+a claim stays <code>active</code> past its own <code>expires_at</code> until a pass runs. The
+observed sweep latency was 210s, 280s and 321s across three runs
+against a five-minute reconcile interval -- the interval behaving as
+designed rather than a stall, and the spread is simply where in the
+cycle the claim happened to expire. Through that window the claim reads
+<code>state: created</code> while refusing a grow with 409 <code>not_active</code> -- D2's
+two-facts distinction visible from the outside, which is what the phase
+4 soak was for.</p>
+<p>Four bugs surfaced, all in the exercise script, none in the claims
+code. Three were assumptions about asynchronous object lifecycle: a
+non-existent default image, an instance created before its network left
+<code>initial</code>, and a namespace deleted before its network had finished
+going away. The fourth is worth recording as a testing lesson rather
+than a defect: the harness returned each check's detail string as its
+result, and callers used that as a "did this pass?" guard, so two
+checks whose implementation had no detail to report were silently
+skipped instead of run. They were never reported as skipped and never
+failed -- the run was green because the assertions did not execute.
+A passing check now returns <code>True</code> when it has no detail. The claims
+assertions themselves passed on their first run.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Phase 00a's post-deploy validation -- whether the

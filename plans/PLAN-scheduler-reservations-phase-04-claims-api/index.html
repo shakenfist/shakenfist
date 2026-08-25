@@ -13772,7 +13772,7 @@ it gets a comment and a named test rather than a discovery.</p>
 <td>—</td>
 <td>operator</td>
 <td>—</td>
-<td>Not started</td>
+<td>Complete -- discharged by phase 4a's step 5 (its decision E6). The claim pathway was exercised on sfcbr on 2026-08-24 with <code>tools/exercise-namespace-claims.py</code>: 33 checks, all passing, drawdown and expiry included</td>
 </tr>
 </tbody>
 </table>
@@ -13999,6 +13999,21 @@ in a change that does it for all of them, not one that makes
 claims the exception.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong>Omission found at close-out (2026-08-24):</strong> this phase
+  routed the claim endpoints but never advertised them in the
+  API capability list in <code>external_api/app.py</code>, so no client
+  could feature-detect claims. The phase 0 findings predicted
+  exactly this need -- "expect a capability string plus
+  <code>hasattr(client, 'reservation_create')</code> so an un-upgraded
+  client degrades to unclaimed behaviour"
+  (<code>PLAN-scheduler-reservations-phase-00-findings.md:538-542</code>)
+  -- and the phase plan then lost it, because D7 moved client
+  verbs out of scope and the capability string went with them
+  even though it is a server-side obligation. Fixed at
+  close-out as <code>auth: namespace-claims</code>. The lesson is that
+  moving a client-side item out of scope does not move the
+  server's advertisement of it; nothing in the Definition of
+  done would have caught this, and no test pins the list.</li>
 <li>A cluster-wide claim listing endpoint for operator
   dashboards (deliberately not built here; <code>/admin/resources</code>
   covers the totals).</li>
