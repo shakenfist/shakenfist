@@ -1,3 +1,4 @@
+import time
 from typing import Any, Optional
 from uuid import UUID
 
@@ -6,6 +7,8 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.operations.baseoperation import BaseOperation
 from shakenfist.schema.agentoperation_attributes import AgentOperationAttributesData
@@ -22,19 +25,43 @@ class AgentOperation(BaseOperation):
     initial_version = 2
     current_version = 3
 
+    # A terminal state meaning a timing budget the caller set -- the
+    # wall-clock deadline, or the progress timeout -- was exhausted.
+    # This is deliberately distinct from STATE_ERROR, which means the
+    # operation itself failed. It lives here rather than on
+    # BaseOperation because deadlines are agent operation scoped for
+    # now; see the non-goals in
+    # docs/plans/PLAN-agent-operation-deadlines.md.
+    STATE_EXPIRED = 'expired'
+
+    # Once an operation reaches one of these it has no further
+    # transitions worth making, so expire() and fail() are no-ops from
+    # them rather than raising InvalidStateException.
+    TERMINAL_STATES = (BaseOperation.STATE_COMPLETE, dbo.STATE_ERROR,
+                       STATE_EXPIRED, dbo.STATE_DELETED)
+
+    # NOTE(mikal): every value here is a tuple, including the
+    # single-element ones. baseobject._state_update() tests
+    # "new_value not in self.state_targets.get(...)", so a bare string
+    # value would do substring membership -- admitting 'deleted'
+    # correctly by accident, and 'delete' incorrectly.
     state_targets = {
         None: (dbo.STATE_INITIAL, dbo.STATE_ERROR),
         dbo.STATE_INITIAL: (BaseOperation.STATE_PREFLIGHT,
                             BaseOperation.STATE_QUEUED, dbo.STATE_DELETED,
-                            dbo.STATE_ERROR),
+                            dbo.STATE_ERROR, STATE_EXPIRED),
         BaseOperation.STATE_PREFLIGHT: (BaseOperation.STATE_QUEUED,
-                                        dbo.STATE_DELETED, dbo.STATE_ERROR),
+                                        dbo.STATE_DELETED, dbo.STATE_ERROR,
+                                        STATE_EXPIRED),
         BaseOperation.STATE_QUEUED: (BaseOperation.STATE_EXECUTING,
-                                     dbo.STATE_DELETED, dbo.STATE_ERROR),
+                                     dbo.STATE_DELETED, dbo.STATE_ERROR,
+                                     STATE_EXPIRED),
         BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
-                                        dbo.STATE_DELETED, dbo.STATE_ERROR),
-        BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED),
-        dbo.STATE_ERROR: (dbo.STATE_DELETED),
+                                        dbo.STATE_DELETED, dbo.STATE_ERROR,
+                                        STATE_EXPIRED),
+        BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED,),
+        dbo.STATE_ERROR: (dbo.STATE_DELETED,),
+        STATE_EXPIRED: (dbo.STATE_DELETED,),
         dbo.STATE_DELETED: None,
     }
 
@@ -186,6 +213,97 @@ class AgentOperation(BaseOperation):
     @property
     def progress_timeout(self):
         return self.__progress_timeout
+
+    # Timing resolution. Both stored columns are three valued and the
+    # two absences do not mean the same thing, so every enforcement
+    # site goes through these helpers rather than reading the columns.
+    # Test "is None" rather than truthiness everywhere below: 0.0 is
+    # the caller's explicit "none at all" sentinel, not an absence.
+    def effective_deadline(self):
+        """The absolute timestamp this operation must not outlive, or None.
+
+        None means there is no wall-clock deadline, which is what an
+        explicit 0.0 asks for.
+
+        A NULL column means no client intent was recorded -- the row
+        was written by an API server which predates deadlines -- so
+        the server default applies. Such a row carries no request
+        receipt time to anchor that default against, so we anchor on
+        the current state's transition time: for a queued operation
+        that is when it was queued, and for an executing one when it
+        was dispatched. Anchoring on time.time() instead would make
+        the deadline recede on every check and never fire. The cost
+        is that a legacy operation's budget restarts at each
+        transition, which is accepted: it is still far tighter than
+        the unbounded queue time plus 900 second executor backstop it
+        replaces. See decision 3 in
+        docs/plans/PLAN-agent-operation-deadlines-phase-04-enforcement.md.
+        """
+        if self.deadline == 0.0:
+            return None
+        if self.deadline is not None:
+            return self.deadline
+        return self.state.update_time + config.AGENT_OPERATION_DEFAULT_DEADLINE
+
+    def deadline_passed(self):
+        """True if this operation has outlived its wall-clock deadline."""
+        deadline = self.effective_deadline()
+        return deadline is not None and time.time() > deadline
+
+    def effective_progress_timeout(self):
+        """Seconds without progress which are fatal, or None if disabled.
+
+        Only meaningful while a command which can report progress is
+        in flight; the executor is what knows that.
+        """
+        if self.progress_timeout == 0.0:
+            return None
+        if self.progress_timeout is not None:
+            return self.progress_timeout
+        return float(config.AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT)
+
+    # Terminal outcomes.
+    def expire(self, reason):
+        """Move this operation to expired, recording why.
+
+        The reason is stored as the state's message and emitted as an
+        audit event. It deliberately does not go to self.error: that
+        setter refuses any state whose value does not end in "error"
+        (see baseobject.DatabaseBackedObject.error), and relaxing it
+        cluster wide to serve one new state on one object type would
+        break the invariant that an object with an error message is
+        an object in an error state.
+        """
+        if self.state.value in self.TERMINAL_STATES:
+            return
+
+        self._state_update(self.STATE_EXPIRED, message=reason)
+        self.add_event(EVENT_TYPE_AUDIT, 'operation expired',
+                       extra={'reason': reason})
+
+    def fail(self, message):
+        """Move this operation to error, recording why.
+
+        A no-op from a terminal state. Without that guard every
+        caller would raise InvalidStateException the moment deadline
+        enforcement expires an operation underneath it, because
+        expired has no edge to error.
+
+        The message is recorded twice, deliberately. The state message
+        is where it actually survives. self.error is set as well
+        because every call site this helper replaced set it -- but
+        AgentOperation does not override _db_set_attribute(), so that
+        write currently reaches nothing but a warning log and a mutate
+        event. Setting the state message is what makes the reason
+        readable today; keeping the self.error write is what makes
+        these call sites correct the day agent operation attribute
+        persistence exists.
+        """
+        if self.state.value in self.TERMINAL_STATES:
+            return
+
+        self._state_update(dbo.STATE_ERROR, message=message)
+        self.error = message
 
     def _attributes(self):
         """Read this operation's mutable attributes, creating the row if absent.

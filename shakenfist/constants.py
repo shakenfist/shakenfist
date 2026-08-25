@@ -187,9 +187,13 @@ def get_object_class(object_type):
     return getattr(lib, cls_name)
 
 
-# A list of object states subject to "hard deletion"
+# A list of object states subject to "hard deletion". This is keyed by
+# state value across every object type, so a state only one object type
+# can reach is inert for the rest. Note that 'error' is deliberately
+# absent and has always been: errored objects are not swept.
 FINAL_OBJECT_STATES = [
     'deleted',
     'complete',
-    'abort'
+    'abort',
+    'expired'
 ]
