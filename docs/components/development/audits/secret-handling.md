@@ -220,7 +220,7 @@ to it before pushing.
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-24T07:04:16.593679+00:00
+Last regenerated: 2026-08-25T06:54:21.186929+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -231,7 +231,7 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 | clingwrap | non-compliant | shakenfist/clingwrap#111 |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#57 |
+| divergulent | compliant | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | compliant | - |
@@ -247,7 +247,6 @@ Details for non-compliant projects:
 - **agent-python** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **client-python** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **clingwrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
-- **divergulent** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **library-utilities** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **occystrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 <!-- consistency-audit:end -->

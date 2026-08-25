@@ -128,7 +128,7 @@ requires the filename to appear.
 workflow from `scripts/audit-check.py` results; do not edit
 it by hand.*
 
-Last regenerated: 2026-08-24T07:04:16.593679+00:00
+Last regenerated: 2026-08-25T06:54:21.186929+00:00
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -138,8 +138,8 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#26 |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | N/A | - |
-| divergulent | non-compliant | shakenfist/divergulent#65 |
+| development | compliant | - |
+| divergulent | compliant | - |
 | instar | non-compliant | shakenfist/instar#491 |
 | kerbside | compliant | - |
 | kerbside-patches | N/A | - |
@@ -153,8 +153,7 @@ Last regenerated: 2026-08-24T07:04:16.593679+00:00
 Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository)
-- **divergulent** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository)
 - **instar** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository)
-- **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository)
-- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository)
+- **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 <!-- consistency-audit:end -->
