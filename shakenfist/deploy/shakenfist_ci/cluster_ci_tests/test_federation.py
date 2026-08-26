@@ -52,9 +52,10 @@ from cryptography.x509.oid import NameOID
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci.safe_headers import SafeHeaderMixin
 
 
-class _JWKSHandler(http.server.BaseHTTPRequestHandler):
+class _JWKSHandler(SafeHeaderMixin, http.server.BaseHTTPRequestHandler):
     """Serves one JWKS document and records that it was asked for."""
 
     def do_GET(self):
