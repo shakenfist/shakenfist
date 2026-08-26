@@ -316,6 +316,14 @@ class Daemon:
         self._last_daemon_state_check = 0.0
         self._daemon_state_poll_interval = DAEMON_STATE_POLL_INTERVAL
 
+        # Let the database gRPC retry loop pet the watchdog between
+        # attempts. A main-loop database call on the default budget blocks
+        # for up to GRPC_RETRIES * GRPC_TIMEOUT plus backoff -- past
+        # WatchdogSec -- while correctly waiting out a slow database, which
+        # is how the 2026-08-16 stall SIGABRT-killed every non-database
+        # daemon cluster-wide (issue 3789).
+        mariadb.set_watchdog_petter(self._pet_watchdog_from_database_wait)
+
     def _resolve_node_uuid(self):
         """Populate config.NODE_UUID if not already set.
 
@@ -489,6 +497,15 @@ class Daemon:
         if now - self._last_watchdog >= WATCHDOG_PET_INTERVAL:
             send_systemd_watchdog()
             self._last_watchdog = now
+
+    def _pet_watchdog_from_database_wait(self):
+        # Installed into mariadb.set_watchdog_petter() and called between
+        # gRPC retry attempts. Only the main thread pets: the watchdog
+        # exists to catch a wedged main loop, and a worker thread retrying
+        # against a slow database must not keep a genuinely wedged main
+        # loop alive.
+        if threading.current_thread() is threading.main_thread():
+            self.pet_watchdog()
 
     def idle(self, seconds):
         # round(), not int(): the loop sleeps in 0.2s chunks, and truncating

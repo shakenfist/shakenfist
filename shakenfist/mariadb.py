@@ -609,6 +609,25 @@ def _describe_rpc_error(error: BaseException) -> str:
     return f'{described}: {details}' if details else described
 
 
+# Installed by Daemon.__init__ so the retry loop in _grpc_call() can pet the
+# systemd watchdog between attempts. A single default-budget call blocks for
+# up to GRPC_RETRIES * GRPC_TIMEOUT plus backoff sleeps -- past the smallest
+# WatchdogSec in sf.service -- so without this, any main-loop database call
+# made during a stall converts the stall into a SIGABRT. Issue 3586 bounded
+# the two call sites then known to run upstream of a pet; issue 3789 (a ~5
+# minute MariaDB stall coredumping 32 daemons cluster-wide) showed every
+# other main-loop call has the same arithmetic, so the pet now lives in the
+# retry loop itself. None outside a daemon process (sf-ctl, gunicorn
+# workers, tests); the installed callback rate-limits itself and only pets
+# from the daemon's main thread.
+_watchdog_petter: Optional[Callable[[], None]] = None
+
+
+def set_watchdog_petter(callback: Optional[Callable[[], None]]) -> None:
+    global _watchdog_petter
+    _watchdog_petter = callback
+
+
 def _grpc_call(
     method: Any, request: Any,
     timeout: Optional[int] = None,
@@ -623,7 +642,11 @@ def _grpc_call(
     their sleeps) well inside WatchdogSec -- the default worst case of
     GRPC_RETRIES * GRPC_TIMEOUT plus sleeps exceeds it, which is how a
     stalled database tier SIGABRTed non-database daemons via their
-    check_daemon_state() poll (issue 3586).
+    check_daemon_state() poll (issue 3586). Default-budget callers on a
+    daemon main loop are kept inside WatchdogSec differently: the retry
+    loop pets the systemd watchdog between attempts via the callback
+    installed with set_watchdog_petter() (issue 3789), so the longest
+    unpetted stretch is one attempt's deadline plus one backoff sleep.
 
     Retries on UNAVAILABLE, DEADLINE_EXCEEDED and CANCELLED with a
     short delay between attempts. On DEADLINE_EXCEEDED and CANCELLED it
@@ -715,6 +738,13 @@ def _grpc_call(
     attempt = 0
     slow_failures = 0
     for attempt in range(GRPC_UNAVAILABLE_RETRIES):
+        # Pet the watchdog before each attempt: the call below can
+        # legitimately block for the full deadline, and a daemon main loop
+        # correctly waiting out a slow database must not be SIGABRT-killed
+        # for it (issue 3789). The petter rate-limits itself, so fast
+        # attempts cost nothing.
+        if _watchdog_petter is not None:
+            _watchdog_petter()
         try:
             if attempt > 0 and method_name:
                 stub = _get_database_stub()
