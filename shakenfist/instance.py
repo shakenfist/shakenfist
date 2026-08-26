@@ -2502,9 +2502,13 @@ class Instance(dbowo):
                     changed = True
                     continue
 
-                state = agentop.state.value
-                if state == AgentOperation.STATE_QUEUED:
-                    if agentop.deadline_passed():
+                # Read once and passed down. deadline_passed() would
+                # otherwise resolve a NULL deadline's anchor with a
+                # second uncached GetState, on a path polled per ready
+                # instance every five seconds.
+                state = agentop.state
+                if state.value == AgentOperation.STATE_QUEUED:
+                    if agentop.deadline_passed(state=state):
                         # The caller's wall-clock budget ran out while
                         # this sat in the queue. Retire it here rather
                         # than letting it occupy the instance's single
@@ -2522,7 +2526,8 @@ class Instance(dbowo):
                     result = agentop
                     break
 
-                if state in (dbo.STATE_INITIAL, AgentOperation.STATE_PREFLIGHT):
+                if state.value in (dbo.STATE_INITIAL,
+                                   AgentOperation.STATE_PREFLIGHT):
                     # Not yet dispatchable (the API is mid-enqueue, or a
                     # preflight task has yet to promote it). We like
                     # maintaining order, so claim we have no work to do

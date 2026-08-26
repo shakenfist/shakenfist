@@ -232,7 +232,7 @@ class AgentOperation(BaseOperation):
     # site goes through these helpers rather than reading the columns.
     # Test "is None" rather than truthiness everywhere below: 0.0 is
     # the caller's explicit "none at all" sentinel, not an absence.
-    def effective_deadline(self):
+    def effective_deadline(self, state=None):
         """The absolute timestamp this operation must not outlive, or None.
 
         None means there is no wall-clock deadline, which is what an
@@ -251,16 +251,30 @@ class AgentOperation(BaseOperation):
         the unbounded queue time plus 900 second executor backstop it
         replaces. See decision 3 in
         docs/plans/PLAN-agent-operation-deadlines-phase-04-enforcement.md.
+
+        A caller which has already read this operation's State passes
+        it as state, and the anchor is taken from that rather than
+        read again. That matters on the dispatch poll: reading it
+        here is an uncached GetState round trip, it only happens for
+        the NULL-deadline rows a rolling upgrade is full of, and the
+        one caller which polls per ready instance every five seconds
+        has the value in hand already.
         """
         if self.deadline == 0.0:
             return None
         if self.deadline is not None:
             return self.deadline
-        return self.state.update_time + config.AGENT_OPERATION_DEFAULT_DEADLINE
+        if state is None:
+            state = self.state
+        return state.update_time + config.AGENT_OPERATION_DEFAULT_DEADLINE
 
-    def deadline_passed(self):
-        """True if this operation has outlived its wall-clock deadline."""
-        deadline = self.effective_deadline()
+    def deadline_passed(self, state=None):
+        """True if this operation has outlived its wall-clock deadline.
+
+        state is an already-read State to anchor a NULL deadline
+        against; see effective_deadline().
+        """
+        deadline = self.effective_deadline(state=state)
         return deadline is not None and time.time() > deadline
 
     def effective_progress_timeout(self):

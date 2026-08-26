@@ -1,5 +1,8 @@
 # Copyright 2019 Michael Still and contributors
 
+import os
+import shutil
+import tempfile
 from unittest import mock
 
 from shakenfist import exceptions
@@ -21,6 +24,13 @@ class _FakeAgentOp:
     makes them fixture behaviour, not behaviour under test: the real
     guard is asserted against a real AgentOperation in
     test_agent_operation_expiry.py.
+
+    That split has one maintenance obligation, recorded here because
+    nothing enforces it: TERMINAL_STATES is borrowed from the real
+    class but the shape of the guard is not, so if AgentOperation's
+    guard grows a condition these fakes must grow it too. Until they
+    do, the executor tests keep passing against behaviour production
+    no longer has.
     """
 
     TERMINAL_STATES = AgentOperation.TERMINAL_STATES
@@ -102,6 +112,20 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
                                side_effect=RuntimeError('boom')):
             self.assertRaises(RuntimeError, job.execute)
         self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state.value)
+
+    def test_leaves_expired_op_untouched(self):
+        # The invariant the whole executor design rests on:
+        # expire_if_out_of_budget() writes the terminal state and
+        # returns, and this finally block must not then overwrite it
+        # with error. It holds because the guard tests == EXECUTING,
+        # which is exactly the line a later change would widen to
+        # "anything not complete".
+        job = self._make_executor(AgentOperation.STATE_EXPIRED)
+        with mock.patch.object(sidechannel.SideChannelJob, 'execute',
+                               return_value=None):
+            job.execute()
+        self.assertEqual(AgentOperation.STATE_EXPIRED, job.agentop.state.value)
+        self.assertIsNone(job.agentop.failure_reason)
 
     def test_leaves_completed_op_untouched(self):
         job = self._make_executor(AgentOperation.STATE_COMPLETE)
@@ -196,6 +220,7 @@ class ExecutorTerminalStateGuardTestCase(base.ShakenFistTestCase):
             sidechannel.SideChannelExecutorJob)
         job.agentop = _FakeAgentOp(state_value)
         job.commands = list(commands)
+        job._blob_partial_file = None
         job.log = mock.MagicMock()
         return job
 
@@ -269,6 +294,8 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
         job.ready = ready
         job._last_progress = last_progress
         job._last_budget_check = 0.0
+        job.commands = []
+        job._blob_partial_file = None
         job.log = mock.MagicMock()
         return job
 
@@ -313,7 +340,7 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
             self.assertTrue(job.expire_if_out_of_budget())
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
-            'no progress from the agent for 30.0 seconds',
+            'no progress from the agent for 30 seconds',
             agentop.expired_reason)
 
     def test_progress_inside_the_window_continues(self):
@@ -507,6 +534,7 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
         job.ready = True
         job._last_progress = 0.0
         job._last_budget_check = 0.0
+        job._blob_partial_file = None
         job.log = mock.MagicMock()
         job._send_commands_single_envelope = mock.MagicMock()
         return job
@@ -549,7 +577,7 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
-            'no progress from the agent for 30.0 seconds',
+            'no progress from the agent for 30 seconds',
             agentop.expired_reason)
 
 
@@ -629,3 +657,165 @@ class ExecutorCommandErrorTestCase(base.ShakenFistTestCase):
         self._handle(job)
         self.assertEqual(AgentOperation.STATE_EXPIRED, job.agentop.state.value)
         self.assertIsNone(job.agentop.failure_reason)
+
+
+class ExecutorPartialBlobTeardownTestCase(base.ShakenFistTestCase):
+    """Abandoning an operation must not abandon its .partial file.
+
+    GetFileCommand.dispatch() opens one and hands the job ownership.
+    The cleaner sweeps orphans eventually, so this was survivable when
+    only a 900 second backstop reached it; the progress timeout reaches
+    it in tens of seconds.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+        self.filepath = mock.patch.object(
+            sidechannel.blob.Blob, 'filepath',
+            side_effect=lambda u: os.path.join(self.tempdir, str(u)))
+        self.filepath.start()
+        self.addCleanup(self.filepath.stop)
+
+    def _make_executor(self, agentop, in_flight=True):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.commands = []
+        job.in_flight_handler = _ProgressHandler()
+        job.ready = False
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job._blob_uuid = None
+        job._stat_result = None
+        job._agent_path_for_get = None
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+
+        if in_flight:
+            job._blob_uuid = 'a-blob'
+            job._stat_result = {'size': 10}
+            job._agent_path_for_get = '/etc/hosts'
+            job._blob_partial_file = open(self.partial_path, 'wb')
+
+        return job
+
+    @property
+    def partial_path(self):
+        return os.path.join(self.tempdir, 'a-blob') + '.partial'
+
+    def test_expiry_closes_and_removes_the_partial_file(self):
+        agentop = _BudgetAgentOp(deadline_passed=True)
+        job = self._make_executor(agentop)
+        self.assertTrue(os.path.exists(self.partial_path))
+
+        self.assertTrue(job.expire_if_out_of_budget())
+
+        self.assertFalse(os.path.exists(self.partial_path))
+        self.assertIsNone(job._blob_partial_file)
+        self.assertIsNone(job._blob_uuid)
+        self.assertIsNone(job._stat_result)
+        self.assertIsNone(job._agent_path_for_get)
+
+    def test_a_progress_timeout_removes_it_too(self):
+        agentop = _BudgetAgentOp(progress_timeout=30.0)
+        job = self._make_executor(agentop)
+        with mock.patch('time.time', return_value=31.0):
+            self.assertTrue(job.expire_if_out_of_budget())
+        self.assertFalse(os.path.exists(self.partial_path))
+
+    def test_aborting_a_failed_operation_removes_it(self):
+        agentop = _BudgetAgentOp()
+        job = self._make_executor(agentop)
+        agentop.fail('transfer broke')
+        job._abort_commands_if_terminal()
+        self.assertFalse(os.path.exists(self.partial_path))
+
+    def test_no_transfer_in_flight_is_a_noop(self):
+        job = self._make_executor(_BudgetAgentOp(), in_flight=False)
+        job._abandon_get_file_transfer()
+        self.assertIsNone(job._blob_partial_file)
+
+    def test_a_failure_to_unlink_is_not_fatal(self):
+        # This runs while an operation is already being abandoned, so
+        # it must never be the thing that raises.
+        job = self._make_executor(_BudgetAgentOp())
+        with mock.patch.object(sidechannel.os, 'unlink',
+                               side_effect=OSError('nope')):
+            job._abandon_get_file_transfer()
+        self.assertIsNone(job._blob_partial_file)
+        job.log.with_fields.return_value.warning.assert_called_once()
+
+
+class _DispatchHandler:
+    """A handler whose dispatch() always produces one request."""
+
+    name = 'execute'
+    reports_progress = False
+    register_as_outstanding = False
+
+    def dispatch(self, command_id, cmd):
+        return ['a-request']
+
+
+class ExecutorDispatchTerminalGuardTestCase(base.ShakenFistTestCase):
+    """A dispatch must not walk an edge the state machine forbids.
+
+    An old dispatcher generation can call agent_operation_next() after
+    a replacement has taken over an instance, and since this phase that
+    call expires an over-deadline queued head rather than reading it
+    again. The executor's next transition to executing would then raise
+    InvalidStateException out of the thread.
+    """
+
+    def _make_executor(self, state_value):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = _FakeAgentOp(state_value)
+        job.instance = _FakeInstance()
+        job.affected_objects = [job.instance, job.agentop]
+        job.commands = [{'command': 'execute', 'commandline': 'true'}]
+        job.command_handlers = {'execute': _DispatchHandler()}
+        job.in_flight_handler = None
+        job.outstanding_message_count = 0
+        job.ready = True
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+        job._send_commands_single_envelope = mock.MagicMock()
+        return job
+
+    def test_an_expired_operation_is_not_dispatched(self):
+        job = self._make_executor(AgentOperation.STATE_EXPIRED)
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            job._dispatch_next_command(mock.MagicMock())
+
+        job._send_commands_single_envelope.assert_not_called()
+        self.assertEqual(AgentOperation.STATE_EXPIRED, job.agentop.state.value)
+        self.assertEqual([], job.commands)
+
+    def test_a_deleted_operation_lets_the_loop_exit(self):
+        # deleted and complete are terminal but are not what
+        # _abort_commands_if_terminal() tests, so the guard has to drop
+        # the commands itself. ready plus an empty command list is the
+        # socket loop's exit; leaving commands behind would re-dispatch
+        # on every pass forever.
+        job = self._make_executor('deleted')
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            job._dispatch_next_command(mock.MagicMock())
+
+        job._send_commands_single_envelope.assert_not_called()
+        self.assertEqual([], job.commands)
+        self.assertTrue(job.ready)
+
+    def test_a_healthy_operation_is_dispatched(self):
+        job = self._make_executor(AgentOperation.STATE_QUEUED)
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            job._dispatch_next_command(mock.MagicMock())
+
+        job._send_commands_single_envelope.assert_called_once()
+        self.assertEqual(
+            AgentOperation.STATE_EXECUTING, job.agentop.state.value)

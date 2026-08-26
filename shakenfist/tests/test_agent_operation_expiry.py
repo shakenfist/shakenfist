@@ -9,6 +9,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -99,6 +100,30 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
             self.assertFalse(op.deadline_passed())
         with mock.patch('time.time', return_value=anchor + 601):
             self.assertTrue(op.deadline_passed())
+
+    def test_a_supplied_state_is_used_as_the_anchor(self):
+        # The dispatcher has already read the State it is deciding on,
+        # and resolving a NULL deadline's anchor here would otherwise
+        # be a second uncached GetState on a path polled per ready
+        # instance every five seconds.
+        op = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        anchor = op.state.update_time
+        supplied = State(value=AgentOperation.STATE_QUEUED,
+                         update_time=anchor - 5000)
+
+        self.assertEqual(anchor - 5000 + 600,
+                         op.effective_deadline(state=supplied))
+        self.assertTrue(op.deadline_passed(state=supplied))
+        self.assertFalse(op.deadline_passed())
+
+    def test_a_supplied_state_is_ignored_when_a_deadline_is_stored(self):
+        # The anchor only exists to resolve a NULL column. A stored
+        # deadline is an absolute timestamp and nothing rebases it.
+        op = self._make_agentop(state=AgentOperation.STATE_QUEUED,
+                                deadline=1700000000.0)
+        supplied = State(value=AgentOperation.STATE_QUEUED, update_time=0.0)
+        self.assertEqual(1700000000.0,
+                         op.effective_deadline(state=supplied))
 
     def test_null_deadline_rebases_on_each_transition(self):
         # Documented consequence of the anchor choice: a legacy row's

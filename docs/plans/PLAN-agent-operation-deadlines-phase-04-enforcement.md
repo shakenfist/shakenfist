@@ -621,6 +621,122 @@ states "X is broken today" as the justification for a workaround, that
 claim has a shelf life measured in hours.
 
 
+## Response to the second automated review
+
+A re-review was requested once the first fourteen items were addressed.
+It raised twelve more: three action items (two FIX, one DOC), seven
+CONSIDER and two INFO. Eleven produced a change; the twelfth was a
+decision already argued in this plan. The three worth calling out:
+
+1. **An agent-reported command error surfaced as `expired`** (item 1,
+   and the one real defect in this round). `_handle_command_error()`
+   only emits an event. That is correct for the monitor job, which has
+   no operation to fail, and it was survivable for the executor while
+   the 900 second backstop existed: the connection eventually tore
+   down and `execute()`'s finally block recorded an error. Deleting
+   the backstop removed the thing that made it survivable. The
+   operation now sits in `EXECUTING` with `self.ready` False and a
+   command in flight, so the next thing to notice is a timing budget
+   — the 30 second progress timeout for a `put-blob` or `get-file`,
+   the 600 second deadline for an `execute` — and the operation lands
+   in `expired` with "no progress from the agent". The agent had in
+   fact just told us in detail what went wrong. That inverts the
+   distinction this phase exists to draw, and the message actively
+   blames the wrong party. `SideChannelExecutorJob` now overrides the
+   handler: it emits the same event, calls `fail()` with the agent's
+   own error text, drops the remaining commands, and sets `ready` so
+   the socket loop takes its ordinary goodbye-and-disconnect exit
+   rather than spinning to a budget. That exit only marks an operation
+   complete when it is still executing, so it cannot overwrite the
+   error. The `GetException` path in the same loop had the same
+   spin-to-a-budget shape and got the same two lines.
+
+2. **The functional CI suite could hang forever on an expired
+   operation** (item 2). `_await_command()` was
+   `while aop['state'] != 'complete': time.sleep(1)` with no timeout
+   and no terminal state check. The master plan assigns the fail-fast
+   client work to phase 7, and that deferral was defensible while
+   nothing could time an operation out. This phase changes the odds:
+   the effective budget drops from 900 seconds measured at connection
+   to 600 measured at REST request receipt, with queue time and
+   preflight blob copies already deducted. A `put-blob` of a large
+   image on a loaded CI node can now plausibly reach `expired` where
+   it previously completed, and the loop would then spin until the
+   whole CI job's wall clock ran out, producing a timeout with nothing
+   pointing at the operation. The fail-fast part was pulled forward
+   for this one loop only: an absolute 900 second bound, a check for
+   `error`/`expired`/`deleted`, and a failure that dumps the operation
+   and the instance's last fifty events. The instance events matter
+   because the expiry *reason* is on the state row, which
+   `external_view()` does not publish — but `expire()` audits it
+   against the instance as well, which is where the "deadline passed
+   while queued" versus "no progress from the agent" distinction is
+   readable. The rest of phase 7 stays where it is.
+
+3. **`_abort_commands_if_terminal()` checks two of the four terminal
+   states** (item 7). This phase introduced `TERMINAL_STATES` as the
+   canonical set and then wrote a helper whose name says "terminal"
+   which tests only `error` and `expired`. Excluding `complete` is
+   plainly right — an operation only reaches it once its last command
+   has run. Excluding `deleted` is the interesting one, and it is kept:
+   abandoning a command sequence part way through leaves the guest in
+   a state no caller asked for, a delete says the record is unwanted
+   rather than that a half-applied change should be frozen in place,
+   and there is no way to test the alternative end to end in this
+   phase. The docstring now says all of that, so the divergence reads
+   as a decision. Interrupting live work belongs with phase 5's reaper.
+
+The remainder, briefly:
+
+- **Item 3** — `test_leaves_expired_op_untouched` added. The plan's
+  risks section had promised it and step 4e did not deliver it. The
+  invariant holds today because the finally block tests
+  `== STATE_EXECUTING`, which is exactly the line a later change would
+  widen to "anything not complete".
+- **Item 4** — expiring mid `get-file` left the `.partial` blob file
+  open and on disk for the cleaner to sweep two `CLEANER_DELAY`s
+  later. Bounded, but the old backstop reached that path after 900
+  seconds and the progress timeout reaches it after 30, so the
+  frequency changes by more than an order of magnitude. Added
+  `_abandon_get_file_transfer()`, called from both expiry branches and
+  from `_abort_commands_if_terminal()`.
+- **Item 5** — `effective_deadline()` and `deadline_passed()` take an
+  optional already-read `State` to anchor a NULL deadline against, and
+  `agent_operation_next()` passes the one it has just read. For a
+  pre-phase-3 row — which is every row during a rolling upgrade — that
+  removes an uncached `GetState` from a path polled per ready instance
+  every five seconds.
+- **Item 6** — the `state = STATE_EXECUTING` write in
+  `_dispatch_next_command()` is guarded on `TERMINAL_STATES`. Normally
+  unreachable, since an instance runs one executor and the dispatcher
+  will not dequeue against a live one; reachable during dispatcher
+  generation replacement, where a descheduled predecessor can now
+  expire the very operation the new generation is dispatching. The
+  guard makes the invariant explicit at the site that depends on it.
+- **Item 8** — the `error`-not-swept asymmetry now has its own issue
+  rather than a pointer into this plan, and the `constants.py` comment
+  cites it. See the future work entry below.
+- **Item 9** — `{window:g}`, so an integral progress timeout reads as
+  "30 seconds" rather than "30.0 seconds" in the string an operator
+  pulls out of `object_states.message`.
+- **Item 10** — the test fakes still reimplement the production
+  terminal-state guard, which the reviewer agreed is the right
+  disposition. Their docstrings now name the maintenance obligation
+  that creates: `TERMINAL_STATES` is borrowed from the real class but
+  the shape of the guard is not, so a new condition on the real guard
+  has to be copied across or the executor tests keep passing against
+  behaviour production no longer has.
+- **Item 11** — no change. An operation created with both sentinels at
+  zero is unbounded by construction; that is decision 6, phase 3 has
+  already published those sentinels as meaning exactly that, and the
+  operator ceiling is recorded as future work.
+- **Item 12** — no change here, but the pre-connection wait (the
+  `while not os.path.exists(console_path)` in `SideChannelJob.execute()`)
+  is now recorded in future work as a case phase 5's reaper must
+  cover. It is the one wedge shape none of this phase's three
+  enforcement points can observe, and it is not a regression: the
+  deleted 900 second timer also started inside `_execute_inner()`.
+
 ## Future work
 
 - **`AgentOperation` attribute writes go nowhere.** Found while
@@ -645,16 +761,30 @@ claim has a shelf life measured in hours.
   than adding an attributes path. `fail()`'s call sites are now
   correct by construction, and `AgentOperation.external_view()`
   publishes `error_message` alongside `Network` and `Artifact`.
-- **Errored agent operations still leak `object_states` rows.**
+- **Errored objects of every type still leak `object_states` rows.**
   `FINAL_OBJECT_STATES` (`shakenfist/constants.py:191`) contains
   `deleted`, `complete` and `abort` but not `error`, so the hard-delete
   sweep never reaps an errored object of any type. After this phase an
   expired agent operation is reaped and an errored one is not, which is
   backwards. This is the same class of leak as issue 3532 and is
-  cluster-wide rather than agent-operation-shaped, so it wants its own
-  issue and its own reasoning about which object types can safely be
-  swept out of `error`. File it during step 4f; do not widen the list
-  here.
+  cluster-wide rather than agent-operation-shaped: the object types do
+  not agree about what `error` means, so the fix wants a per-type
+  opt-in rather than a wider global list. Tracked as issue #3922, which
+  the `constants.py` comment cites (review item 8: a pointer into a plan
+  is a weaker anchor than an issue, since the plan is archived once the
+  master plan completes). Do not widen the list here.
+- **Phase 5's reaper must cover the pre-connection wait.** Review item
+  12. `SideChannelJob.execute()` blocks in
+  `while not os.path.exists(console_path): time.sleep(1)` before
+  `_execute_inner()` is entered, so neither budget is evaluated during
+  it. An instance whose `console.log` never appears holds its executor
+  slot indefinitely, and the dequeue enforcement point cannot help
+  because the dispatcher skips instances with a live executor. This is
+  not a regression — the deleted 900 second timer also started at
+  `connected_at`, inside `_execute_inner()` — but it is the one wedge
+  shape none of this phase's three enforcement points can observe, and
+  a node-local reaper looking at executors from outside is the thing
+  that can.
 - **No operator ceiling on an explicitly unbounded operation.**
   Decision 6. If deployments turn out to need one, an
   `AGENT_OPERATION_MAX_DEADLINE` clamping the client's request is the

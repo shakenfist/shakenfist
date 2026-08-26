@@ -195,10 +195,12 @@ def get_object_class(object_type):
 # defect rather than an intent: errored objects of every type are never
 # swept and leak their object_states rows indefinitely, the same class
 # of leak as issue 3532. It predates the expired state and is tracked
-# separately -- see the future work section of
-# docs/plans/PLAN-agent-operation-deadlines-phase-04-enforcement.md.
-# The consequence today is that an expired agent operation is reaped
-# and an errored one is not, which is backwards.
+# separately as issue 3922, which also records why widening this list
+# is not the fix -- the object types do not agree about what 'error'
+# means, so an Instance an operator still has to look at and a Blob
+# which never became usable cannot share one retention rule. The
+# consequence today is that an expired agent operation is reaped and an
+# errored one is not, which is backwards.
 FINAL_OBJECT_STATES = [
     'deleted',
     'complete',

@@ -802,6 +802,7 @@ class SideChannelExecutorJob(SideChannelJob):
                 'executor')
             self.agentop.expire(
                 'the operation deadline passed while executing')
+            self._abandon_get_file_transfer()
             return True
 
         # The progress timeout, which applies only while a command
@@ -831,8 +832,44 @@ class SideChannelExecutorJob(SideChannelJob):
             'progress_timeout': window
         }).error('No progress from agent, aborting executor')
         self.agentop.expire(
-            f'no progress from the agent for {window} seconds')
+            f'no progress from the agent for {window:g} seconds')
+        self._abandon_get_file_transfer()
         return True
+
+    def _abandon_get_file_transfer(self):
+        """Tear down a half finished get-file transfer.
+
+        A no-op unless one is in flight. GetFileCommand.dispatch()
+        opens a .partial file in the blob store and hands this job
+        ownership of it; the success path in _handle_file_chunk()
+        closes it and either registers or unlinks it. Every abnormal
+        exit used to leave it open on disk until the job was collected
+        and the cleaner swept it after CLEANER_DELAY * 2, which
+        mattered little when the only route here was a 900 second
+        backstop. The progress timeout reaches it in tens of seconds
+        instead, so a wedged guest during a large get-file would
+        otherwise leave partial files occupying blob storage
+        routinely rather than rarely.
+        """
+        if not self._blob_partial_file:
+            return
+
+        partial = blob.Blob.filepath(self._blob_uuid) + '.partial'
+        try:
+            self._blob_partial_file.close()
+            os.unlink(partial)
+        except OSError as e:
+            # Never fatal: this is cleanup on a path which is already
+            # abandoning the operation, and the cleaner sweeps what we
+            # leave behind.
+            self.log.with_fields({
+                'error': str(e), 'partial': partial
+            }).warning('Failed to remove partial blob file')
+
+        self._blob_partial_file = None
+        self._blob_uuid = None
+        self._stat_result = None
+        self._agent_path_for_get = None
 
     def observe_progress(self):
         """Record that the agent made forward progress just now.
@@ -877,10 +914,27 @@ class SideChannelExecutorJob(SideChannelJob):
         transfer errored must never run its chmod. Expiry counts the
         same way as an error here -- an operation whose caller has run
         out of budget has no business continuing to the next command.
+        Any half finished get-file transfer goes with them, since
+        nothing will ever complete it.
+
+        The two states tested are deliberately not the whole of
+        AgentOperation.TERMINAL_STATES. complete is excluded because
+        an operation only reaches it once its final command has
+        finished, so there is nothing left to abort. deleted is
+        excluded because abandoning a command sequence part way
+        through leaves the guest in a state no caller asked for --
+        a delete says the record is unwanted, not that a half applied
+        change should be left in place -- and because deciding
+        otherwise is a behaviour change this phase has no way to test
+        end to end. That gap is pre-existing rather than introduced
+        here, and interrupting live work belongs with the node-local
+        reaper in phase 5 of
+        docs/plans/PLAN-agent-operation-deadlines.md.
         """
         if self.agentop.state.value in (AgentOperation.STATE_ERROR,
                                         AgentOperation.STATE_EXPIRED):
             self.commands = []
+            self._abandon_get_file_transfer()
 
     def _dispatch_next_command(self, sock):
         """Send the next command in the operation to the agent.
@@ -916,6 +970,33 @@ class SideChannelExecutorJob(SideChannelJob):
                 register_as_outstanding = handler.register_as_outstanding
 
             if requests:
+                # The assignment below is a state machine transition,
+                # and no terminal state has an edge to executing, so
+                # an unguarded write raises InvalidStateException out
+                # of the executor thread. It is normally unreachable:
+                # an instance runs one executor at a time and the
+                # dispatcher will not dequeue against a live one. The
+                # exception is a replaced dispatcher generation, whose
+                # descheduled predecessor can still call
+                # agent_operation_next() -- which since this phase
+                # expires an over-deadline queued head rather than
+                # merely reading it again. Abandon the operation
+                # instead. Dropping the commands here rather than
+                # leaving it to the finally below matters: that only
+                # fires for error and expired, and self.ready is true
+                # for us to have been called at all, so a complete or
+                # deleted operation with commands left would be
+                # re-dispatched on every pass and the loop would never
+                # reach its exit.
+                if self.agentop.state.value in AgentOperation.TERMINAL_STATES:
+                    self.log.with_fields({
+                        'state': self.agentop.state.value
+                    }).warning('Operation became terminal during dispatch, '
+                               'not sending its command')
+                    self.commands = []
+                    self._abandon_get_file_transfer()
+                    return
+
                 extra = copy.copy(cmd)
                 extra['command_id'] = command_id
                 add_event_multi(

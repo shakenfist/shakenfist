@@ -258,6 +258,18 @@ preflight at all; both were corrected during phase 4 planning.
    (retry or expire, below). This covers the case PR #3506's finally
    block cannot: the sidechannel process dying outright.
 
+   Phase 4's review added a second case the reaper must cover, and it
+   is a live executor rather than a dead one. `SideChannelJob.execute()`
+   blocks in `while not os.path.exists(console_path): time.sleep(1)`
+   before `_execute_inner()` is entered, so neither budget is
+   evaluated during it. An instance whose `console.log` never appears
+   holds its executor slot indefinitely, and enforcement point 1
+   cannot help because the dispatcher skips instances with a live
+   executor. This is not a regression -- the 900 second timer phase 4
+   deleted also started at `connected_at` -- but it is the one wedge
+   shape none of phase 4's three enforcement points can observe, and
+   only something looking at executors from outside can.
+
 Because only the sidechannel daemon on the instance's placement node
 dispatches executors, the reaper has no cross-node race: reaping and
 dispatching are serialised in one process.
