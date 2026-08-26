@@ -176,6 +176,11 @@ class Instance(dbowo):
     # ``interfaces`` was here pre-phase-7; the column on
     # ``instance_attributes`` is dropped in phase 7e and the property
     # now queries ``network_interfaces`` directly.
+    # ``error`` maps to the ``error_message`` column, which is no longer
+    # read or written by the error property -- the message now lives on
+    # the object's state row like every other object type (issue 3899).
+    # The column and this mapping remain for one release cycle as a
+    # rollback fallback.
     MARIADB_ATTRIBUTES = {
         'placement', 'power_state', 'ports', 'enforced_deletes',
         'block_devices', 'agent_state',

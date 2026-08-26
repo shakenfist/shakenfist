@@ -620,18 +620,34 @@ class DatabaseBackedObject:
 
     @property
     def error(self):
-        db_data = self._db_get_attribute('error', {'message': None})
-        return db_data.get('message')
+        # The error message is stored as the message on the object's state
+        # row, which every object type persists (issue 3899: the previous
+        # 'error' attribute write was silently discarded for every type
+        # except Instance). It is only meaningful while the object is in an
+        # error state; _state_update() clears it on the next transition.
+        s = self.state
+        if s.value and s.value.endswith('error'):
+            return s.message
+        return None
 
     @error.setter
     def error(self, msg):
-        if msg:
-            s = self.state
-            if not s.value.endswith('error'):
-                raise exceptions.InvalidStateException(
-                    'Object not in error state (state=%s, object=%s)'
-                    % (s, self.object_type))
-        self._db_set_attribute('error', {'message': msg})
+        s = self.state
+        if msg and not s.value.endswith('error'):
+            raise exceptions.InvalidStateException(
+                'Object not in error state (state=%s, object=%s)'
+                % (s, self.object_type))
+        if s.message == msg:
+            return
+
+        new_state = State(value=s.value, update_time=time.time(), message=msg)
+        if self.__in_memory_only:
+            self.__in_memory_state = new_state
+        elif not mariadb.set_state(self.object_type, str(self.uuid), new_state):
+            raise RuntimeError(
+                f'Failed to write error message for '
+                f'{self.object_type}/{self.uuid} to MariaDB')
+        self._log_attribute_mutation('error', {'message': msg})
 
     @property
     def metadata(self):

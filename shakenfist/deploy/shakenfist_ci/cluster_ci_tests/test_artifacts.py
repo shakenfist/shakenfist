@@ -54,13 +54,18 @@ class TestImages(base.BaseNamespacedTestCase):
         while time.time() - start_time < 7 * 60:
             img = self.system_client.get_artifact(img['uuid'])
             if img['state'] == 'error':
-                return
+                # The reason for the failure must be recoverable from the
+                # artifact itself, not just from its event log (issue 3899).
+                # The message is written immediately after the state, so
+                # keep polling briefly if it has not appeared yet.
+                if img.get('error_message'):
+                    return
             time.sleep(5)
 
         self.addDetail('img', content.text_content(json.dumps(
             img, indent=4, sort_keys=True)))
-        self.fail('Image was not placed into an error state after seven minutes: %s'
-                  % img['uuid'])
+        self.fail('Image was not placed into an error state with an error '
+                  'message after seven minutes: %s' % img['uuid'])
 
     def test_instance_invalid_image(self):
         # Start our test instance

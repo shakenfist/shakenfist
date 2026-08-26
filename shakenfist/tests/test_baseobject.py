@@ -6,7 +6,9 @@ from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.baseobject import State
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class MaintainVersionCacheTestCase(base.ShakenFistTestCase):
@@ -82,34 +84,109 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
                          "State({'value': 'state1', 'update_time': 3.0})")
 
     @mock.patch('shakenfist.eventlog.add_event')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_set_attribute')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
     @mock.patch('shakenfist.mariadb.get_state',
                 side_effect=[
+                    State(value=DatabaseBackedObject.STATE_INITIAL, update_time=4,
+                          message='stale message'),
+                    State(value=DatabaseBackedObject.STATE_ERROR, update_time=4,
+                          message='bad error'),
                     State(value=DatabaseBackedObject.STATE_INITIAL, update_time=4),
                     State(value=DatabaseBackedObject.STATE_ERROR, update_time=4),
                 ])
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject._db_get_attribute',
-                side_effect=[
-                    {},
-                    {'message': 'bad error'},
-                    {'message': 'real bad'},
-                ])
-    def test_property_error_msg(self, mock_get_attribute, mock_mariadb_get_state,
-                                mock_set_attribute, mock_add_event):
+    def test_property_error_msg(self, mock_mariadb_get_state,
+                                mock_mariadb_set_state, mock_add_event):
         d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+
+        # No message outside an error state, even if the state row has one
         self.assertEqual(d.error, None)
+
+        # The message is read from the state row while in an error state
         self.assertEqual(d.error, 'bad error')
 
+        # Setting a message is refused outside an error state...
         with testtools.ExpectedException(exceptions.InvalidStateException):
             d.error = 'real bad'
+        mock_mariadb_set_state.assert_not_called()
 
+        # ... and is persisted onto the state row inside one (issue 3899:
+        # the previous attribute write was silently discarded for every
+        # object type except Instance)
         d.error = 'real bad'
+        mock_mariadb_set_state.assert_called_once()
+        written = mock_mariadb_set_state.call_args.args[2]
+        self.assertEqual(DatabaseBackedObject.STATE_ERROR, written.value)
+        self.assertEqual('real bad', written.message)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value=DatabaseBackedObject.STATE_ERROR,
+                                   update_time=4, message='bad error'))
+    def test_property_error_msg_unchanged_message_not_rewritten(
+            self, mock_mariadb_get_state, mock_mariadb_set_state,
+            mock_add_event):
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+        d.error = 'bad error'
+        mock_mariadb_set_state.assert_not_called()
+
+
+class ErrorMessageRoundTripTestCase(base.ShakenFistTestCase):
+    """The error message must survive a database round trip for object
+    types without an attribute persistence override. Before issue 3899
+    every type except Instance silently discarded it."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+        add_event = mock.patch('shakenfist.eventlog.add_event')
+        add_event.start()
+        self.addCleanup(add_event.stop)
+
+    def test_agent_operation_error_message_round_trips(self):
+        aop = AgentOperation.new(
+            'aaaabbbb-0000-4000-8000-00000000000a', 'ci',
+            'aaaabbbb-0000-4000-8000-00000000000b',
+            [{'command': 'execute'}])
+        aop.state = AgentOperation.STATE_ERROR
+        aop.error = 'preflight failure, blob missing'
+
+        refetched = AgentOperation.from_db(
+            'aaaabbbb-0000-4000-8000-00000000000a')
+        self.assertEqual('preflight failure, blob missing', refetched.error)
+
+        # Grouping references requires a flask request context, which is
+        # not what this test is about
+        with mock.patch(
+                'shakenfist.operations.agentoperation.'
+                'references_to_grouped_dict', return_value={}):
+            self.assertEqual(
+                'preflight failure, blob missing',
+                refetched.external_view()['error_message'])
+
+    def test_agent_operation_error_message_cleared_by_transition(self):
+        aop = AgentOperation.new(
+            'aaaabbbb-0000-4000-8000-00000000000c', 'ci',
+            'aaaabbbb-0000-4000-8000-00000000000d',
+            [{'command': 'execute'}])
+        aop.state = AgentOperation.STATE_ERROR
+        aop.error = 'went wrong'
+        aop.state = AgentOperation.STATE_DELETED
+
+        refetched = AgentOperation.from_db(
+            'aaaabbbb-0000-4000-8000-00000000000c')
+        self.assertIsNone(refetched.error)
 
 
 class InMemoryStateTestObject(DatabaseBackedObject):
     state_targets = {
         None: (DatabaseBackedObject.STATE_CREATED, ),
-        DatabaseBackedObject.STATE_CREATED: (DatabaseBackedObject.STATE_DELETED, ),
+        DatabaseBackedObject.STATE_CREATED: (
+            DatabaseBackedObject.STATE_DELETED,
+            DatabaseBackedObject.STATE_ERROR),
+        DatabaseBackedObject.STATE_ERROR: (),
         DatabaseBackedObject.STATE_DELETED: (),
     }
 
@@ -147,6 +224,21 @@ class InMemoryOnlyStateTestCase(base.ShakenFistTestCase):
 
         with testtools.ExpectedException(exceptions.InvalidStateException):
             d.state = DatabaseBackedObject.STATE_DELETED
+
+        mock_get_state.assert_not_called()
+        mock_set_state.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch('shakenfist.mariadb.get_state')
+    def test_in_memory_error_never_touches_mariadb(
+            self, mock_get_state, mock_set_state):
+        d = InMemoryStateTestObject(
+            '12345678-1234-4321-8234-123456789012', in_memory_only=True)
+        d.state = DatabaseBackedObject.STATE_CREATED
+        d.state = DatabaseBackedObject.STATE_ERROR
+
+        d.error = 'in memory error'
+        self.assertEqual('in memory error', d.error)
 
         mock_get_state.assert_not_called()
         mock_set_state.assert_not_called()
