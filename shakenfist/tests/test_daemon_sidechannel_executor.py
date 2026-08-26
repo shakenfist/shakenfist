@@ -551,3 +551,81 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'no progress from the agent for 30.0 seconds',
             agentop.expired_reason)
+
+
+class _FakeCommandError:
+    def __init__(self, error):
+        self.error = error
+        self.last_envelope = None
+
+
+class _FakeCommandErrorReply:
+    def __init__(self, error):
+        self.command_error = _FakeCommandError(error)
+
+
+class ExecutorCommandErrorTestCase(base.ShakenFistTestCase):
+    """An agent-reported command error is an error, not an expiry.
+
+    The base handler only emits an event, which leaves the operation
+    executing with a command in flight. Before deadlines were enforced
+    the 900 second backstop eventually tidied that up as an error;
+    without the override the next thing to notice would be a timing
+    budget, and the operation would land in expired with a message
+    blaming the agent for silence it did not commit.
+    """
+
+    def _make_executor(self, state_value, commands):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = _FakeAgentOp(state_value)
+        job.instance = _FakeInstance()
+        job.instance.add_event = mock.MagicMock()
+        job.commands = list(commands)
+        job.outstanding_message_count = 1
+        job.ready = False
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+        return job
+
+    def _handle(self, job, error='no such file'):
+        with mock.patch.object(sidechannel, 'MessageToDict', return_value={}):
+            job._handle_command_error(_FakeCommandErrorReply(error))
+
+    def test_a_command_error_fails_the_operation(self):
+        job = self._make_executor(
+            AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
+        self._handle(job)
+        self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state.value)
+        self.assertEqual(
+            'agent reported a command error: no such file',
+            job.agentop.failure_reason)
+
+    def test_the_remaining_commands_are_dropped(self):
+        job = self._make_executor(
+            AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
+        self._handle(job)
+        self.assertEqual([], job.commands)
+
+    def test_the_executor_is_released_rather_than_left_to_a_budget(self):
+        # ready plus an empty command list is the socket loop's
+        # ordinary exit. Without it the loop spins until a deadline,
+        # which is the path that produced the wrong terminal state.
+        job = self._make_executor(
+            AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
+        self._handle(job)
+        self.assertTrue(job.ready)
+
+    def test_the_event_is_still_emitted(self):
+        job = self._make_executor(
+            AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
+        self._handle(job)
+        job.instance.add_event.assert_called_once()
+
+    def test_an_already_expired_operation_is_not_rewritten(self):
+        # fail()'s guard. A budget can expire the operation between the
+        # agent sending its error and us reading it.
+        job = self._make_executor(AgentOperation.STATE_EXPIRED, [])
+        self._handle(job)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, job.agentop.state.value)
+        self.assertIsNone(job.agentop.failure_reason)

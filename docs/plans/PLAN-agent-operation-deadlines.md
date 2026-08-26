@@ -626,3 +626,15 @@ Note the causal link to #3516 is plausible but unproven: both stalled
 tests await an agent, but nothing in that run confirms an orphaned
 agent operation, and #3696 is a distinct symptom (there the runner
 lost communication and uploaded nothing).
+
+**Partly pulled forward into phase 4.** `_await_command()`
+(`base.py:760`) was the worst of this family -- no window at all, just
+`while aop['state'] != 'complete'` -- and phase 4 made it materially
+more likely to fire, since an operation can now reach `expired` where
+it previously ran to completion. That one loop gained an absolute
+bound, a terminal-state check on `error`/`expired`/`deleted`, and a
+failure which dumps the operation and the instance's recent events;
+see the second review response in
+`PLAN-agent-operation-deadlines-phase-04-enforcement.md`. The
+event-renewed loops above are untouched and remain phase 7's, as does
+restricting renewal to events that represent progress.

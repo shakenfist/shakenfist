@@ -517,6 +517,32 @@ class SideChannelExecutorJob(SideChannelJob):
                     'sidechannel executor exited before the operation '
                     'completed')
 
+    def _handle_command_error(self, reply):
+        """Fail the operation when the agent reports a command error.
+
+        The base implementation only emits an event, which is right
+        for the monitor job (it has no operation to fail) and was
+        survivable for the executor while a fixed backstop eventually
+        tore the connection down. It is not survivable now. The
+        operation stays EXECUTING with a command in flight and
+        self.ready False, so the next thing to notice is a timing
+        budget, and the caller is told "no progress from the agent"
+        about an agent which has just told us in detail what went
+        wrong. This phase's whole distinction is that error means the
+        operation failed and expired means the caller's budget ran
+        out; this is a failure.
+
+        Setting ready lets the socket loop take its ordinary exit --
+        say goodbye, disconnect -- rather than spinning to a budget.
+        That exit only marks an operation complete if it is still
+        executing, so it cannot overwrite the error recorded here.
+        """
+        super()._handle_command_error(reply)
+        self.agentop.fail(
+            f'agent reported a command error: {reply.command_error.error}')
+        self._abort_commands_if_terminal()
+        self.ready = True
+
     def _send_ping(self, sock):
         request = agent_pb2.HypervisorToAgentCommand(
             command_id=sf_random.random_id(),
@@ -1027,6 +1053,8 @@ class SideChannelExecutorJob(SideChannelJob):
 
                         except GetException as e:
                             self.agentop.fail(str(e))
+                            self._abort_commands_if_terminal()
+                            self.ready = True
 
                     elif reply.HasField('command_error'):
                         self._handle_command_error(reply)
