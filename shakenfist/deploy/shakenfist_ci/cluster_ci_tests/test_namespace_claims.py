@@ -40,6 +40,27 @@ client's own methods are) and typed exceptions per status code. The
 exceptions are unwrapped by ``_claim_api()`` below, because a refusal's
 *status code* is frequently the assertion.
 
+Why success assertions retry 507
+--------------------------------
+
+This file runs concurrently with the rest of the cluster CI suite, on
+one cluster, across four stestr workers. Creating or growing a claim is
+a guarded admission against the ``cluster_capacity`` singleton, so it
+needs free cluster capacity at that instant -- capacity nothing here
+ever reserved, and which the sibling tests are free to be holding. When
+they were, this file failed asserting 200 against a 507 the server was
+right to send (issue 3907, three occurrences in one day, one of them
+6.6 seconds after the preceding test on the same worker released two
+instances whose deletion was still in flight).
+
+So every claim request whose *success* is asserted goes through
+``_claim_api_awaiting_headroom()``, which treats a full cluster as the
+transient condition it is on a busy CI cluster. Requests whose
+*refusal* is asserted must not: they use
+``_claim_api_awaiting_accounting()``, which retries only 503, so a 507
+the test wants to see is returned immediately rather than retried for
+the whole wait.
+
 What this file deliberately does not assert
 -------------------------------------------
 
@@ -74,6 +95,7 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import retries
 from shakenfist_client import apiclient
 
 
@@ -107,6 +129,14 @@ IMPOSSIBLE_CPUS = 1000000000
 # One reconcile period (five minutes) plus slack: see
 # _claim_api_awaiting_accounting().
 CAPACITY_ACCOUNTING_WAIT = 420
+
+# How long to keep retrying a claim request the cluster answered 507 to,
+# where the caller is about to assert success. The capacity the request
+# needs is usually held by the rest of the suite, and instance deletion
+# returns it asynchronously -- full-now is not full-soon (issue 3907).
+# Comfortably longer than any sibling test holds its instances, far
+# shorter than the job timeout.
+CLUSTER_HEADROOM_WAIT = 420
 
 
 class ClaimAPIMixin:
@@ -191,14 +221,39 @@ class ClaimAPIMixin:
 
         Anything else is returned immediately, refusals included. Only
         503 is retried, so a 507 capacity refusal is not silently waited
-        out into a pass.
+        out -- which makes this the wrapper for every request whose
+        *refusal* is the assertion.
         """
-        deadline = time.time() + CAPACITY_ACCOUNTING_WAIT
-        while True:
-            status, body = self._claim_api(method, url, data=data)
-            if status != 503 or time.time() > deadline:
-                return status, body
-            time.sleep(10)
+        return retries.retry_while_transient(
+            lambda: self._claim_api(method, url, data=data),
+            transient_statuses=(503,),
+            deadline=time.time() + CAPACITY_ACCOUNTING_WAIT)
+
+    def _claim_api_awaiting_headroom(self, method, url, data=None):
+        """A claim request the caller will assert succeeded, retried
+        while the cluster is full as well as while it says 503.
+
+        Creating or growing a claim is a guarded admission against the
+        cluster_capacity singleton, so it needs free cluster capacity
+        at that instant -- capacity this suite never reserved, and
+        which the sibling tests running concurrently on the same
+        cluster are free to be holding. A 507 here is the server being
+        right about a moment rather than about the cluster: instances
+        the rest of the suite is already deleting return their capacity
+        asynchronously, so the refusal is transient in exactly the way
+        the 503s are (issue 3907). A cluster which stays full for the
+        whole wait still fails the caller's assertion, with the refusal
+        body in the failure message.
+
+        Only for callers asserting success. A caller asserting a 507
+        refusal (the IMPOSSIBLE_CPUS probe) must use
+        _claim_api_awaiting_accounting instead: this wrapper would
+        retry that refusal for the whole wait before handing it back.
+        """
+        return retries.retry_while_transient(
+            lambda: self._claim_api(method, url, data=data),
+            transient_statuses=(503, 507),
+            deadline=time.time() + CLUSTER_HEADROOM_WAIT)
 
     def _create_claim(self, limit_cpus, limit_memory_mb, limit_disk_gb,
                       expires_in_seconds=CLAIM_EXPIRY_SECONDS,
@@ -209,7 +264,7 @@ class ClaimAPIMixin:
             'limit_disk_gb': limit_disk_gb,
             'expires_in_seconds': expires_in_seconds
         }
-        status, claim = self._claim_api_awaiting_accounting(
+        status, claim = self._claim_api_awaiting_headroom(
             'POST', self._claims_url(), data=body)
         self.assertEqual(
             200, status,
@@ -344,8 +399,13 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
             'API answered %s'
             % (IMPOSSIBLE_CPUS, self._describe(status, body)))
 
+        # Created with the cpu limit it will hold at its largest, so
+        # the growth exercised below is re-taking capacity its own
+        # shrink just released rather than competing with the rest of
+        # the suite for a free cpu this test never reserved (issue
+        # 3907).
         claim = self._create_claim(
-            2 * INSTANCE_CPUS, 2 * INSTANCE_MEMORY_MB, 2 * INSTANCE_DISK_GB)
+            3 * INSTANCE_CPUS, 2 * INSTANCE_MEMORY_MB, 2 * INSTANCE_DISK_GB)
 
         # The two states are two different facts (D2): existence in
         # state, coverage beside it in coverage_state. A view which
@@ -364,7 +424,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
             'The claim was created in the wrong namespace: %s'
             % json.dumps(claim, sort_keys=True, default=str))
         self.assertEqual(
-            (2 * INSTANCE_CPUS, 2 * INSTANCE_MEMORY_MB,
+            (3 * INSTANCE_CPUS, 2 * INSTANCE_MEMORY_MB,
              2 * INSTANCE_DISK_GB), self._claim_limits(claim),
             'The claim does not carry the limits it was asked for: %s'
             % json.dumps(claim, sort_keys=True, default=str))
@@ -427,10 +487,30 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
             '%s to %s'
             % (self._claim_limits(claim), self._claim_limits(unchanged)))
 
-        # Growing one dimension leaves the others where they were: the
-        # update is field masked, so an unmentioned limit is untouched
-        # rather than reset.
-        status, grown = self._claim_api_awaiting_accounting(
+        # Shrinking one dimension leaves the others where they were:
+        # the update is field masked, so an unmentioned limit is
+        # untouched rather than reset. A shrink to a limit at or above
+        # the claim's usage is always admissible, so it needs no free
+        # cluster capacity and no headroom tolerance.
+        status, shrunk = self._claim_api_awaiting_accounting(
+            'PUT', self._claim_url(claim['uuid']),
+            data={'limit_cpus': 2 * INSTANCE_CPUS})
+        self.assertEqual(
+            200, status,
+            'Shrinking the cpu limit of claim %s was refused: %s'
+            % (claim['uuid'], self._describe(status, shrunk)))
+        self.assertEqual(
+            (2 * INSTANCE_CPUS, 2 * INSTANCE_MEMORY_MB,
+             2 * INSTANCE_DISK_GB), self._claim_limits(shrunk),
+            'Shrinking only the cpu limit changed something else: %s'
+            % json.dumps(shrunk, sort_keys=True, default=str))
+
+        # And growing it back, which is field masked the same way. The
+        # growth is a guarded admission, so it does need a free cpu --
+        # the one the shrink above released a moment ago. The
+        # awaiting-headroom wrapper covers the window in which a
+        # concurrent test takes even that.
+        status, grown = self._claim_api_awaiting_headroom(
             'PUT', self._claim_url(claim['uuid']),
             data={'limit_cpus': 3 * INSTANCE_CPUS})
         self.assertEqual(
