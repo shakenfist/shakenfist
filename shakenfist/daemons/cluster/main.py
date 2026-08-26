@@ -3,6 +3,7 @@
 # obtaining the lock to do work et cetera. There is only one active cluster
 # maintenance daemon per cluster.
 from collections import defaultdict
+import datetime
 import os
 import time
 
@@ -43,6 +44,11 @@ from shakenfist.util import general as util_general
 
 
 LOG, _ = logs.setup(__name__)
+
+# Prefix for the cluster_config keys recording when each long-period
+# maintenance task last ran, cluster-wide. cluster_config already holds
+# non-configuration operational state (the Kerbside signing key).
+SCHEDULED_TASK_LAST_RUN_PREFIX = 'SCHEDULED_TASK_LAST_RUN_'
 
 
 class Monitor(daemon.Daemon):
@@ -549,6 +555,81 @@ class Monitor(daemon.Daemon):
             b.remove_location(n.fqdn)
             b.request_replication()
 
+    def _register_anchored_job(self, interval, task_name, func):
+        """Register a maintenance job whose cadence is anchored in the database.
+
+        schedule computes a job's next run from the moment it is
+        registered, which is process start, so a task whose period is
+        longer than the typical daemon lifetime never comes due at all:
+        on a cluster which redeploys daily, the daily prune_events
+        effectively never ran and the events tables grew without bound
+        (issue 3869). Each run of an anchored task therefore records a
+        cluster-wide last-run stamp in cluster_config, and
+        _anchor_scheduled_jobs() re-reads the stamps on election. A
+        persisted RecurringOperation would fix this by construction;
+        until PLAN-recurring-operations lands, the stamp is the anchor.
+        """
+        key = SCHEDULED_TASK_LAST_RUN_PREFIX + task_name.upper()
+
+        def stamped_task():
+            ret = func()
+            # A task which raises propagates before the stamp is
+            # written, matching schedule's own behaviour of leaving a
+            # raising job due. The stamp write itself is best-effort:
+            # the task has already run, so failing to record that must
+            # not re-run the whole task on the next 60 second cycle.
+            try:
+                mariadb.set_cluster_config(key, time.time())
+            except Exception as e:
+                LOG.with_fields({
+                    'task': task_name,
+                    'error': str(e)
+                }).warning('Could not record scheduled task last-run stamp')
+            return ret
+
+        self._anchored_jobs.append((interval.do(stamped_task), key))
+
+    def _anchor_scheduled_jobs(self):
+        """Re-anchor long-period jobs to their persisted last-run stamps.
+
+        Called on each election, before the elected loop's first
+        scheduled pass. A job whose stamp is missing (first election
+        since this code landed) or older than its period becomes due
+        immediately; a job another node ran recently is pushed out to
+        one period after that run, so a lock handover does not re-fire
+        it either.
+        """
+        try:
+            stamps = mariadb.get_cluster_config()
+        except Exception as e:
+            # Better a process-local timer -- the status quo ante --
+            # than no maintenance node at all.
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read scheduled task last-run stamps, keeping '
+                'process-local timers')
+            return
+
+        now = datetime.datetime.now()
+        for job, key in self._anchored_jobs:
+            stamp = stamps.get(key)
+            try:
+                if stamp is None:
+                    job.next_run = now
+                else:
+                    # schedule 1.2.2 computes a job's period inside
+                    # _schedule_next_run() without retaining it, so
+                    # rebuild it. Exact because our jobs never use the
+                    # randomised `latest` bound.
+                    period = datetime.timedelta(**{job.unit: job.interval})
+                    job.next_run = (
+                        datetime.datetime.fromtimestamp(stamp) + period)
+            except (TypeError, ValueError, OSError, OverflowError) as e:
+                LOG.with_fields({
+                    'key': key,
+                    'stamp': stamp,
+                    'error': str(e)
+                }).warning('Ignoring unusable scheduled task last-run stamp')
+
     def _run_due_scheduled_jobs(self):
         """Run every due maintenance job, petting between each one.
 
@@ -598,6 +679,13 @@ class Monitor(daemon.Daemon):
         # while elected, so an idle node still does no maintenance, but
         # the timers are continuous and a newly elected node promptly
         # runs whatever fell due while it was idle.
+        #
+        # Continuous timers are still process-local, though, and the two
+        # longest-period tasks are additionally anchored to a persisted
+        # cluster-wide last-run stamp (see _register_anchored_job) so
+        # that a process restart does not restart their period from zero
+        # either (issue 3869).
+        self._anchored_jobs = []
         schedule.every(1).minutes.do(
             scheduled_tasks.log_cluster_queue_lengths)
         schedule.every(1).minutes.do(
@@ -614,9 +702,12 @@ class Monitor(daemon.Daemon):
             scheduled_tasks.reap_expired_namespace_keys)
         schedule.every(15).minutes.do(
             scheduled_tasks.reap_federation_records)
-        schedule.every(60).minutes.do(
+        self._register_anchored_job(
+            schedule.every(60).minutes, 'reconcile_orphaned_objects',
             scheduled_tasks.reconcile_orphaned_objects)
-        schedule.every(1).days.do(scheduled_tasks.prune_events)
+        self._register_anchored_job(
+            schedule.every(1).days, 'prune_events',
+            scheduled_tasks.prune_events)
 
         while daemon.check_abort_path(self.abort_path):
             util_concurrency.set_thread_name('idle')
@@ -625,6 +716,14 @@ class Monitor(daemon.Daemon):
 
             util_concurrency.set_thread_name('active')
             LOG.debug('This cluster thread is now active')
+
+            # Anchor the long-period jobs to the cluster-wide record of
+            # when they last ran, wherever they ran. Guarded on
+            # is_elected because _await_election also returns on the
+            # abort path, where a database read would only delay
+            # shutdown.
+            if self.is_elected:
+                self._anchor_scheduled_jobs()
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):

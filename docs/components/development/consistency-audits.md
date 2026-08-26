@@ -31,8 +31,7 @@ specification: some criteria have no check at all, because judging
 them takes reading rather than matching. A
 criterion with no check has no `consistency-audit` marker block in its
 spec file, which is how to find the current set -- at the time of
-writing, `security-sanitization`, `console-logging`, `python-version`
-and `test-coverage`.
+writing, `test-coverage`.
 
 Not every criterion maps to exactly one check. `workflow-standards`
 decomposes into several -- runner tags, permissions, linting, and more
@@ -209,15 +208,18 @@ The full gate, which `ci.yml` also runs on every pull request:
 pre-commit run --all-files
 ```
 
-All four test suites run as `local` pre-commit hooks, so any change
-under `scripts/` runs them. Individually, which is quicker while
-iterating:
+Every test suite under `scripts/` runs as a `local` pre-commit hook.
+Most are triggered by any change under `scripts/`;
+`review-tracking-tests` always runs, and `issue-fix-extraction-tests`
+runs only for its own file and the template files it covers.
+Individually, which is quicker while iterating:
 
 ```
 python3 scripts/test_audit_check.py
 python3 scripts/test_audit_update_docs.py
 python3 scripts/test_review_tracking.py
 python3 scripts/test_check_audit_smoke.py
+python3 scripts/test_issue_fix_extraction.py
 ```
 
 The tests cover the machinery, not what a check *decides* about a real

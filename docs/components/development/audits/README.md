@@ -70,9 +70,11 @@ One project is in scope for part of the audit only:
 
 - private-ci -- the `sfui-vendor` check, and nothing else. It is
   internal tooling and excluded from the conventions, but it vendors
-  sfui and a vendored copy drifts silently. The scoping lives in
-  `REPO_OVERRIDES` in `scripts/audit-check.py`; every other check
-  reports N/A for it.
+  sfui and a vendored copy drifts silently: nothing in the consumer
+  fails when the copy falls behind, or when someone edits it in place
+  and the next sync discards the edit. It is not expected to grow a
+  `pyproject.toml`, a renovate config, release workflows, or a
+  `develop` branch.
 
 ### Excluded projects
 
@@ -102,30 +104,22 @@ they are internal only tooling or historical archive repositories:
 
 The `actions` repository is audited despite being tooling: the whole
 fleet depends on it for its composite actions and reusable workflows,
-so it is held to the same standards as anything else. Two criteria do
-not apply to it -- it has no Python to package, and it keeps `main` as
-its default branch because every consumer pins to `@main`.
+so it is held to the same standards as anything else. `development`,
+this repository, is audited for the same reason turned around -- it is
+where these criteria and the tooling that enforces them are written,
+so an exemption here is one the authors of the standard write for
+themselves.
 
-`development`, this repository, is audited for the same reason turned
-around: it is where these criteria and the tooling that enforces them
-are written, so an exemption here is an exemption the authors of the
-standard write for themselves. The same two criteria do not apply --
-its Python is the audit scripts, which run from a checkout and are
-never packaged, and it keeps `main` because it publishes no releases
-and so has no release branch for `develop` to be the integration
-branch against.
+Some criteria do not apply to either. Neither has Python to package
+-- which takes `pyproject-usage` and `python-version` both out of
+scope -- and both keep `main` as their default branch: `actions`
+because every consumer pins to `@main`, `development` because it
+publishes no releases and so has no release branch for `develop` to
+integrate against.
 
-Both exemptions are stated reasons in `REPO_OVERRIDES` in
-`scripts/audit-check.py`, which means they are reported as N/A with
-the reason attached rather than quietly disappearing from the table.
-
-`private-ci` stays excluded and is still audited for one thing,
-because a vendored copy is the one kind of problem an exclusion
-cannot make safe: nothing in the consumer fails when the copy falls
-behind, or when someone edits it in place and the next sync discards
-the edit. Exclusion means what it says for the rest -- `private-ci`
-is not expected to grow a `pyproject.toml`, a renovate config,
-release workflows, or a `develop` branch.
+All scoping and exemptions live in `REPO_OVERRIDES` in
+`scripts/audit-check.py`, so they are reported as N/A with the reason
+attached rather than quietly disappearing from the table.
 
 ## Audit index
 

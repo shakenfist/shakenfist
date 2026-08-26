@@ -102,6 +102,11 @@ pass through the response dict opaquely need no change.
 
 Event rows are pruned daily by `scheduled_tasks.prune_events`,
 running under `ClusterLock` election on the cluster maintainer.
+The daily cadence is anchored to a cluster-wide last-run stamp
+(the `SCHEDULED_TASK_LAST_RUN_PRUNE_EVENTS` key in
+`cluster_config`), so it survives both daemon restarts and the
+maintenance lock changing hands -- a cluster whose daemons never
+run for a full day still prunes daily.
 The prune runs in three stages:
 
 1. **Per-event-type sweep.** Removes `event_objects` rows older

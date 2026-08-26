@@ -67,7 +67,6 @@ def get_node_user_facing_node_queues(node_uuid: str) -> list[str]:
 def get_node_background_node_queues(node_uuid: str) -> list[str]:
     return [
         f'{node_uuid}-clusteroperation-background',
-        f'{node_uuid}-background',
         f'{node_uuid}-clusteroperation-background_high_io'
     ]
 

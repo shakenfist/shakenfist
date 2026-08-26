@@ -336,6 +336,7 @@ class Network(dbowo):
             'provide_dns': self.__provide_dns,
             'floating_gateway': self.floating_gateway,
             'vxlan_id': self.__vxid,
+            'error_message': self.error,
             'last_cluster_operation': self.last_cluster_operation
         })
 

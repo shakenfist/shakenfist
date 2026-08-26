@@ -427,7 +427,7 @@ it gets a comment and a named test rather than a discovery.
 | 7 | Functional CI coverage in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`: create a claim for a namespace, create an instance in it, assert the drawdown appears on the claim and not on the cluster's unclaimed sums, exceed the claim and assert the create still succeeds and the advisory event is present, shrink below usage and assert refusal, delete the claim and assert the capacity returns. Drive the endpoints through `apiclient._request_url()` with a comment explaining D7 -- the client has no claim verbs and CI installs the released client from PyPI. Note in the test what it cannot assert without them | medium | sonnet | worktree | Complete — three tests. Two Definition of done items could not be met as written (no REST surface publishes the `cluster_capacity` singleton; the namespace cascade only runs a `CLEANER_DELAY` after the soft delete) and were corrected rather than faked; both are now Future work |
 | 8 | Documentation: `docs/operator_guide/database.md` for the schema and the two new RPC families, `docs/operator_guide/scheduler.md` for what a claim is and what advisory mode does and does not do, `docs/developer_guide/subsystem_internals.md` for the claim admission transaction beside the placement one, the CLAUDE.md capacity paragraph, `ARCHITECTURE.md`/`AGENTS.md` only if the object inventory or a convention actually changed. Update the master plan Execution table and `docs/plans/index.md`. Every fact about claims must read identically wherever it appears | low | sonnet | worktree | Complete — `ARCHITECTURE.md` needed a one-clause correction (its roadmap sentence still promised the claims API as future work) and `docs/developer_guide/state_machine.md` a new section, since the claim object's comment already pointed at one. `AGENTS.md` and `README.md` untouched: no convention and no pitch changed. Also fixed the pre-existing stale scope family list in `docs/developer_guide/authentication.md` |
 | 9 | Management-session code review against the checklist below | medium | management session | none | Complete — every item checked by running it rather than reading it; see the review notes below |
-| 10 | Operator review and PR; deploy to sfcbr and soak with a real claim on a real namespace | — | operator | — | Not started |
+| 10 | Operator review and PR; deploy to sfcbr and soak with a real claim on a real namespace | — | operator | — | Complete -- discharged by phase 4a's step 5 (its decision E6). The claim pathway was exercised on sfcbr on 2026-08-24 with `tools/exercise-namespace-claims.py`: 33 checks, all passing, drawdown and expiry included |
 
 ## Risks and mitigations
 
@@ -661,6 +661,21 @@ claims the exception.
 
 ## Future work
 
+* **Omission found at close-out (2026-08-24):** this phase
+  routed the claim endpoints but never advertised them in the
+  API capability list in `external_api/app.py`, so no client
+  could feature-detect claims. The phase 0 findings predicted
+  exactly this need -- "expect a capability string plus
+  `hasattr(client, 'reservation_create')` so an un-upgraded
+  client degrades to unclaimed behaviour"
+  (`PLAN-scheduler-reservations-phase-00-findings.md:538-542`)
+  -- and the phase plan then lost it, because D7 moved client
+  verbs out of scope and the capability string went with them
+  even though it is a server-side obligation. Fixed at
+  close-out as `auth: namespace-claims`. The lesson is that
+  moving a client-side item out of scope does not move the
+  server's advertisement of it; nothing in the Definition of
+  done would have caught this, and no test pins the list.
 * A cluster-wide claim listing endpoint for operator
   dashboards (deliberately not built here; `/admin/resources`
   covers the totals).

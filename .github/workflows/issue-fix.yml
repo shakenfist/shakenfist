@@ -42,6 +42,37 @@
 #   workflow token (this prevents recursive workflow triggering), so
 #   the draft PR needs a human nudge -- push to it, or close and
 #   reopen it -- before the full CI suite runs.
+# - The model is asked for two blocks on stdout: a commit message and
+#   a pull request description. The workflow falls back to a generic
+#   template if either is missing, but a missing one is a real loss --
+#   an automated PR whose description is just a diffstat costs the
+#   reviewer the context the model already had. The "single shot"
+#   section of the prompt exists because a run once backgrounded the
+#   test suite and ended its turn waiting for it, which in -p mode
+#   simply ends the session: the code changes survived, both blocks
+#   did not.
+# - The description is neutralised by tools/neutralise-pr-body.sh
+#   before publication: an @mention notifies a real person when the
+#   draft is created and an issue-closing keyword closes an unrelated
+#   issue on merge. The prompt forbids both, but a side effect which
+#   fires automatically and cannot be undone should not rest on the
+#   model having complied.
+# - Both blocks are pulled out of the captured output by
+#   tools/extract-model-block.sh rather than by sed inline here. That
+#   parsing has more edge cases than it looks (a model which emits a
+#   block twice, a block with no closing marker, a block the model
+#   wrapped in a fence anyway) and each is covered by
+#   shakenfist/tests/test_extract_model_block.py. Extend the tests, not
+#   this step, when a new shape of output turns up.
+# - The model is asked to run tox -ecover and the workflow then runs it
+#   again in "Verify fix". The duplication is deliberate: the model's
+#   run is what lets it fix what it broke while it still has a turn,
+#   and the workflow's run is the gate on publication, which cannot
+#   trust the model's report of its own testing. Paying for the suite
+#   twice is cheaper than publishing a broken fix or burning a whole
+#   run on one.
+# - The description is model output, so it is passed to gh with
+#   --body-file. Never interpolate it into a shell string.
 # - The issue-fix-<N> branches are owned by this workflow and are
 #   force-updated on each attempt.
 # - Scratch files (prompts, logs, captured output) live in
@@ -477,6 +508,25 @@ jobs:
             without doing the plan's work: that is fine. Say which
             plan and why in the commit summary.
 
+          ## How this run works
+
+          You are a single, non-interactive `claude -p` invocation on
+          a CI runner. Nothing will re-invoke you and nobody will
+          answer you: when your turn ends the process exits, and any
+          work you were intending to come back to is lost. So:
+
+          - Do NOT background a long-running command and end your turn
+            meaning to check on it later. The test suite in step 4 below
+            takes a while: run it in the foreground and wait for it,
+            however long it takes.
+          - Do NOT end a turn describing what you are about to do. Do
+            it instead.
+          - The last thing you emit must be the two output blocks
+            described below. A run which ends without them still
+            commits the code, but under a placeholder commit message
+            and a contentless pull request description -- which wastes
+            the reviewer's time, not just the prose.
+
           ## Your task
 
           1. Diagnose the root cause of the issue. Fix the root
@@ -497,12 +547,17 @@ jobs:
              ```
           5. Run `pre-commit run --all-files` and fix any issues.
           6. Stage all changes with git add (do NOT commit).
-          7. Output a commit summary (see below).
+          7. Output a commit summary and a pull request description
+             (see below).
 
-          ## REQUIRED: Commit Summary Output
+          ## REQUIRED: Commit summary and PR description
 
           After completing your work and staging changes, you MUST
-          output a commit summary in the following exact format:
+          output both of the blocks below, in this order, as the last
+          thing you emit. Markers go on their own lines, and neither
+          block is wrapped in a code fence. Inside a block, never write
+          a line whose only content is one of the marker tokens: that
+          ends the block early and the rest is discarded.
 
           ```
           COMMIT_SUMMARY_START
@@ -520,6 +575,46 @@ jobs:
 
           Do not include a "Fixes #NNNN" line in the summary -- the
           workflow adds that itself.
+
+          ```
+          PR_DESCRIPTION_START
+          <Markdown, wrapped at 72 chars.>
+          PR_DESCRIPTION_END
+          ```
+
+          This is what a reviewer reads before the diff, so write it
+          for them rather than restating the issue back at them.
+          Under whatever headings suit the change, cover:
+
+          - What was actually wrong, and why. The root cause you
+            found, not the symptom the issue reported. Where the
+            issue's own diagnosis turned out to be incomplete or
+            wrong, say so.
+          - What you changed, and why each piece is needed. Call out
+            anything a reviewer would otherwise have to
+            reverse-engineer: a refactor done to make the fix
+            possible, behaviour which deliberately did not change, a
+            test which pins the old behaviour as a floor.
+          - Anything in the issue you deliberately did NOT do, and
+            why: a second cause you judged out of scope, follow-up
+            work which deserves its own issue, a measurement which
+            should be repeated once this merges.
+          - Any judgement call a reviewer might reasonably make
+            differently.
+
+          Do NOT include a diffstat, a link to this workflow run, or
+          a note about CI not starting -- the workflow appends all of
+          those. Do not pad it either: a small mechanical fix deserves
+          a short description.
+
+          The description is published verbatim into a pull request
+          body, where GitHub interprets what it finds. So do NOT write
+          an issue-closing keyword for any issue -- "fixes", "closes"
+          and "resolves" followed by #NNNN all close that issue when
+          this merges, and the workflow already appends the one for
+          the issue you are fixing. Refer to other issues as "issue
+          NNNN". Do NOT write "@name": it notifies a real person.
+          Refer to people by name alone.
           TASK_EOF
           } > ${{ runner.temp }}/claude-prompt.txt
 
@@ -621,29 +716,70 @@ jobs:
 
           exit ${verify_exit_code}
 
-      - name: Extract commit summary
+      - name: Extract commit summary and PR description
         id: extract_summary
         if: steps.assess.outputs.has_changes == 'true'
         run: |
-          if grep -q "COMMIT_SUMMARY_START" \
-              ${{ runner.temp }}/claude-output.txt
-          then
-            sed -n '/COMMIT_SUMMARY_START/,/COMMIT_SUMMARY_END/p' \
-              ${{ runner.temp }}/claude-output.txt | \
-              grep -v "COMMIT_SUMMARY_START" | \
-              grep -v "COMMIT_SUMMARY_END" | \
-              sed 's/^```$//' | \
-              sed '/^$/N;/^\n$/d' \
-              > ${{ runner.temp }}/commit-summary.txt
+          # Both blocks are pulled out by tools/extract-model-block.sh,
+          # which is unit tested in test_extract_model_block.py. The
+          # parsing is subtle enough -- repeated blocks, truncated
+          # blocks, fences the model was told not to emit -- that having
+          # it inline here means having it untested here.
+          #
+          # These come from HEAD rather than from the workspace, which
+          # is NOT the reason the model wrapper above is copied. That
+          # one is copied before Claude runs, because bash reads a
+          # script lazily and an edit mid-run would corrupt it. Here
+          # Claude has already exited and the danger is the opposite:
+          # the fix under test may have edited these very files -- the
+          # extractor's own header calls that out as a plausible
+          # subject for an automated fix -- and the workflow must not
+          # parse the model's output with the untested version the
+          # model just wrote. Nothing is committed until the "Commit
+          # changes" step below, so HEAD is still the pre-fix tree.
+          for script in extract-model-block.sh neutralise-pr-body.sh; do
+            git show "HEAD:tools/${script}" \
+              > "${{ runner.temp }}/${script}"
+            chmod +x "${{ runner.temp }}/${script}"
+          done
 
-            if [ -s ${{ runner.temp }}/commit-summary.txt ]; then
-              echo "summary_found=true" >> $GITHUB_OUTPUT
-            else
-              echo "summary_found=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "summary_found=false" >> $GITHUB_OUTPUT
+          summary_found=false
+          description_found=false
+
+          if ${{ runner.temp }}/extract-model-block.sh COMMIT_SUMMARY \
+              ${{ runner.temp }}/claude-output.txt \
+              ${{ runner.temp }}/commit-summary.txt
+          then
+            summary_found=true
           fi
+
+          if ${{ runner.temp }}/extract-model-block.sh PR_DESCRIPTION \
+              ${{ runner.temp }}/claude-output.txt \
+              ${{ runner.temp }}/pr-description.txt
+          then
+            description_found=true
+
+            # The prompt forbids @mentions and issue-closing keywords,
+            # but the description is published verbatim and both act
+            # the instant "gh pr create" runs -- before any human has
+            # looked at the draft, and a notification cannot be taken
+            # back. Prompt compliance is a weaker guarantee than code
+            # for a side effect which is not reversible.
+            ${{ runner.temp }}/neutralise-pr-body.sh \
+              ${{ runner.temp }}/pr-description.txt
+          fi
+
+          # Neither block is fatal: the publish step falls back to a
+          # generic body. Say so in the log, because a PR which turns up
+          # with a contentless description is otherwise a mystery.
+          if [ "${description_found}" != "true" ]; then
+            echo "No usable PR description in the model output. The run"
+            echo "probably ended its turn early -- check the tail of"
+            echo "claude-output.txt in the artifacts."
+          fi
+
+          echo "summary_found=${summary_found}" >> $GITHUB_OUTPUT
+          echo "description_found=${description_found}" >> $GITHUB_OUTPUT
 
       # The triage estimate of fix size is only an estimate. This is
       # the hard cap: an over-budget fix is never published as a PR,
@@ -711,37 +847,71 @@ jobs:
             PR_TITLE="Fix issue #${ISSUE_NUMBER}"
           fi
 
+          # Second fallback tier: the commit message body, which is a
+          # better summary than nothing. Extracted to a file first so it
+          # can be tested for content -- a commit summary which is a bare
+          # subject line with no body would otherwise publish a "##
+          # Summary" heading with nothing under it, which reads as broken
+          # rather than as terse.
+          tail -n +2 ${{ runner.temp }}/commit-summary.txt 2>/dev/null | \
+            sed '/./,$!d' > ${{ runner.temp }}/summary-body.txt || true
+
+          # The description is model output, so it is written to a file
+          # and passed with --body-file. It must never be interpolated
+          # into a shell string: an unquoted heredoc would execute any
+          # $(...) or backticks the model happened to write.
+          #
+          # The issue reference goes FIRST, above the model prose. An
+          # unbalanced code fence in the description renders everything
+          # after it as preformatted text, and GitHub does not autolink
+          # #NNNN inside a code block -- so a trailing reference would
+          # silently stop closing the issue, with nothing about the
+          # published PR looking wrong.
+          {
+            echo "Fixes #${ISSUE_NUMBER}"
+            echo
+            if [ "${{ steps.extract_summary.outputs.description_found }}" == "true" ]; then
+              cat ${{ runner.temp }}/pr-description.txt
+            elif [ -s ${{ runner.temp }}/summary-body.txt ]; then
+              echo "## Summary"
+              echo
+              cat ${{ runner.temp }}/summary-body.txt
+            else
+              echo "## Summary"
+              echo
+              echo "Automated fix attempt for #${ISSUE_NUMBER}. The model"
+              echo "left no usable prose describing the change, so read"
+              echo "the diff rather than this."
+            fi
+
+            echo
+            echo "## Changes"
+            echo
+            echo '```'
+            git diff --stat HEAD~1
+            echo '```'
+            echo
+            echo "## Automated verification"
+            echo
+            echo "The unit test suite (tox -ecover) passes on the runner."
+            echo
+            echo "Note: GitHub does not start CI on pull requests created"
+            echo "with the default workflow token, so push to this PR or"
+            echo "close and reopen it to trigger the full CI suite."
+            echo
+            echo "[Workflow run](${RUN_URL})"
+            echo
+            echo "---"
+            echo "Generated with [Claude Code](https://claude.com/claude-code)"
+          } > ${{ runner.temp }}/pr-body.md
+
           pr_url=$(gh pr create \
             --draft \
             --label automated-fix \
             --assignee mikalstill \
             --reviewer mikalstill \
             --title "${PR_TITLE}" \
-            --body "$(cat <<EOF
-          ## Summary
-
-          Automated fix attempt for #${ISSUE_NUMBER}.
-
-          Fixes #${ISSUE_NUMBER}
-
-          ## Changes
-
-          $(git diff --stat HEAD~1)
-
-          ## Verification
-
-          The unit test suite (tox -ecover) passes on the runner.
-
-          Note: GitHub does not start CI on pull requests created
-          with the default workflow token, so push to this PR or
-          close and reopen it to trigger the full CI suite.
-
-          [Workflow run](${RUN_URL})
-
-          ---
-          Generated with [Claude Code](https://claude.com/claude-code)
-          EOF
-          )" \
+            --body-file ${{ runner.temp }}/pr-body.md \
             --head "issue-fix-${ISSUE_NUMBER}")
 
           gh issue comment "${ISSUE_NUMBER}" \
@@ -807,6 +977,9 @@ jobs:
             ${{ runner.temp }}/verify-output.txt
             ${{ runner.temp }}/commit-summary.txt
             ${{ runner.temp }}/commit-message.txt
+            ${{ runner.temp }}/pr-description.txt
+            ${{ runner.temp }}/pr-body.md
+            ${{ runner.temp }}/summary-body.txt
             ${{ runner.temp }}/claude-logs/
           retention-days: 14
           if-no-files-found: ignore

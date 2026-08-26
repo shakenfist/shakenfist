@@ -19,8 +19,10 @@ import testtools
 from shakenfist.config import BaseSettings
 from shakenfist.exceptions import HashFailed
 from shakenfist.schema.blob_data import BlobData
+from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.tests import base
 from shakenfist import blob
 from shakenfist import exceptions
@@ -487,3 +489,94 @@ class VerifyChecksumHashFailedTestCase(base.ShakenFistTestCase):
         self.assertEqual('blob checksum verification error', event_args[0][1])
         self.assertEqual('Input/output error',
                          event_args[1]['extra']['error_text'])
+
+
+class BlobExternalViewReferencesTestCase(base.ShakenFistTestCase):
+    """Tests for the reference reads Blob.external_view() performs."""
+
+    BLOB_UUID = '12345678-1234-4321-8234-123456789012'
+    DEPENDS_ON_UUID = '22345678-1234-4321-8234-123456789012'
+    TRANSCODE_UUID = '32345678-1234-4321-8234-123456789012'
+
+    def _references_from(self):
+        return [
+            ObjectReference(
+                source_object_type=ObjectType.BLOB,
+                source_uuid=self.BLOB_UUID,
+                relationship=RelationshipType.DEPENDS_ON,
+                target_object_type=ObjectType.BLOB,
+                target_uuid=self.DEPENDS_ON_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0),
+            ObjectReference(
+                source_object_type=ObjectType.BLOB,
+                source_uuid=self.BLOB_UUID,
+                relationship=RelationshipType.TRANSCODE,
+                relationship_value='qcow2',
+                target_object_type=ObjectType.BLOB,
+                target_uuid=self.TRANSCODE_UUID,
+                created=1234567890.0,
+                last_active=1234567890.0),
+        ]
+
+    @mock.patch('shakenfist.schema.object_reference.request_namespace',
+                return_value='testns')
+    @mock.patch('shakenfist.blob.request_namespace', return_value='testns')
+    @mock.patch('shakenfist.mariadb.get_references_to', return_value=[])
+    @mock.patch('shakenfist.mariadb.get_references_from')
+    @mock.patch('shakenfist.mariadb.count_references_to', return_value=1)
+    @mock.patch('shakenfist.mariadb.get_blob_attributes', return_value=None)
+    @mock.patch('shakenfist.mariadb.get_valid_checksums',
+                return_value={'sha512': 'cafebeef'})
+    @mock.patch('shakenfist.mariadb.get_object_metadata', return_value=None)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value='created', update_time=1234567890.0))
+    @mock.patch('shakenfist.baseobject.get_minimum_object_version',
+                return_value=blob.Blob.current_version)
+    def test_external_view_reads_references_from_once(
+            self, mock_get_min, mock_get_state, mock_get_metadata,
+            mock_get_checksums, mock_get_blob_attrs, mock_count_refs,
+            mock_refs_from, mock_refs_to, mock_req_ns, mock_req_ns_schema):
+        # depends_on and transcodes are derived fields over the same
+        # object_references rows external_view() already reads unfiltered
+        # for references_from. Issue 3876: fetching them via the filtered
+        # depends_on and transcoded properties cost two extra
+        # get_references_from RPCs per blob view.
+        mock_refs_from.return_value = self._references_from()
+
+        data = BlobData(
+            uuid=self.BLOB_UUID,
+            modified=1234567890.0,
+            fetched_at=1234567891.0,
+            version=blob.Blob.current_version)
+        b = blob.Blob(data)
+        out = b.external_view()
+
+        mock_refs_from.assert_called_once_with(ObjectType.BLOB, b.uuid)
+        self.assertEqual(self.DEPENDS_ON_UUID, out['depends_on'])
+        self.assertEqual({'qcow2': self.TRANSCODE_UUID}, out['transcodes'])
+        self.assertEqual(
+            {
+                'depends_on': [
+                    self._references_from()[0].external_view()],
+                'transcode': [
+                    self._references_from()[1].external_view()],
+            },
+            out['references_from'])
+
+    def test_depends_on_from_references_ignores_other_relationships(self):
+        refs = self._references_from()
+        self.assertEqual(
+            self.DEPENDS_ON_UUID,
+            blob.Blob._depends_on_from_references(refs))
+        self.assertIsNone(blob.Blob._depends_on_from_references(refs[1:]))
+        self.assertIsNone(blob.Blob._depends_on_from_references([]))
+
+    def test_transcodes_from_references_ignores_other_relationships(self):
+        refs = self._references_from()
+        self.assertEqual(
+            {'qcow2': self.TRANSCODE_UUID},
+            blob.Blob._transcodes_from_references(refs))
+        self.assertEqual(
+            {}, blob.Blob._transcodes_from_references(refs[:1]))
+        self.assertEqual({}, blob.Blob._transcodes_from_references([]))

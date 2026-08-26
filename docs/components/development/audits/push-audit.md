@@ -4,131 +4,94 @@
 
 Repositories that carry a pre-push audit runbook must:
 
-* name it **`PUSH-AUDIT.md`** -- the historical name
-  `PUSH-TEMPLATE.md` is flagged as legacy (the file is a runbook the
-  operator follows before pushing, not a template that gets copied,
-  and the `-TEMPLATE` suffix is reserved for true templates like
-  `PLAN-TEMPLATE.md`);
-* embed the current **`readme-discipline` shared block** in its
-  documentation-review section;
-* embed the current **`llm-doc-discipline` shared block** in its
-  documentation-review section (see the `llm-doc-structure` audit
-  for the policy it enforces);
-* embed the current **`comment-proportion` shared block** in its
+* name it **`PUSH-AUDIT.md`** -- the historical `PUSH-TEMPLATE.md` is
+  flagged as legacy, because the file is a runbook the operator follows
+  before pushing rather than a template that gets copied, and
+  `-TEMPLATE` is reserved for true templates like `PLAN-TEMPLATE.md`;
+* embed the current **`readme-discipline`**, **`llm-doc-discipline`**
+  and **`plan-phase-references`** shared blocks in its
+  documentation-review section (see the `readme-structure`,
+  `llm-doc-structure` and `plan-phase-references` audits for the
+  policies they enforce);
+* embed the current **`comment-proportion`** shared block in its
   code-quality review section;
-* embed the current **`plan-phase-references` shared block** in its
-  documentation-review section (see the `plan-phase-references`
-  audit for the policy it enforces);
-* keep every embedded shared block verbatim and at the current
-  version; and
-* be **referenced from `AGENTS.md`**, so a session has some way of
-  discovering it.
+* embed the current **`path-traversal-review`**,
+  **`python-version-discipline`** and **`functional-test-coverage`**
+  shared blocks, which carry the three criteria delegated to the
+  reviewer because no grep can judge them (see the
+  [security-sanitization](/components/development/audits/security-sanitization/),
+  [python-version](/components/development/audits/python-version/) and
+  [test-coverage](/components/development/audits/test-coverage/) audits for the policies they
+  enforce);
+* keep every embedded block verbatim and at the current version; and
+* be **referenced from `AGENTS.md`**, so a session can discover it.
 
-Repositories with no pre-push audit file at all are reported as N/A:
-whether every project should have one is a separate decision, not
-smuggled in here.
+Repositories with no pre-push audit file are N/A: whether every project
+should have one is a separate decision, not smuggled in here.
 
 ### Why the reference is checked
 
-Checking only the file's contents is how the runbook went
-untriggered. In August 2026 the audit was current and correct in
-eight repositories while three `AGENTS.md` files mentioned it at
-all, and exactly one of those said *when* to run it -- the other
-two were passive index entries. No `CLAUDE.md`, no
-`PLAN-TEMPLATE.md`, no git hook and no CI job pointed at it either,
-so the audit ran when the operator remembered it and not otherwise.
-
-Mention is what this check measures, so three is the number it
-moves; one is the number that had a trigger. The check closes the
-discoverability half of that gap, not the trigger half.
+Checking only the file's contents is how the runbook went untriggered.
+In August 2026 the audit was current and correct in eight repositories
+while three `AGENTS.md` files mentioned it at all, and exactly one of
+those said *when* to run it. No `CLAUDE.md`, `PLAN-TEMPLATE.md`, git
+hook or CI job pointed at it either, so it ran when the operator
+remembered it and not otherwise.
 
 `AGENTS.md` is the surface checked because it is loaded into every
-session, which makes it the one place a reference is certain to be
-read. The check is deliberately shallow -- it looks for the
+session. The check is deliberately shallow -- it looks for the
 filename, not for particular wording -- because the reference that
-matters is the one a repository writes for itself. A repository
-still on the legacy `PUSH-TEMPLATE.md` name is checked against that
-name, so it is told to rename the file once rather than told twice
-about a file it does not have.
+matters is the one a repository writes for itself. A repository still
+on the legacy name is checked against that name, so it is told to
+rename the file once rather than told twice about a file it does not
+have.
 
-The reference is necessary but not sufficient: discoverable is not
-the same as run. What makes it run is the `plan-push-audit-phase`
-shared block, which puts a push-audit phase at the end of every
-master plan; that block lives in `PLAN-TEMPLATE.md` and is enforced
-by the `plan-template` audit rather than by this one.
-
-### Shared blocks
-
-A shared block is canonical wording embedded verbatim across
-repositories, delimited by versioned markers:
-
-```markdown
-<!-- shared-block: <name> v<N> -->
-...canonical wording...
-<!-- shared-block-end -->
-```
-
-Canonical copies live in `templates/shared-blocks/<name>.md` in this
-repository (markers included); see
-`templates/shared-blocks/README.md` for the mechanism. The check
-fails when an embedded block is missing where required, carries a
-stale version, has drifted from the canonical wording, is unknown
-(no canonical file), or is missing its end marker.
-
-To update shared wording: edit the canonical file, bump its version,
-and commit. The next daily audit run marks every repository carrying
-the old version non-compliant and files issues automatically.
-
-This audit exists because the pre-push audit files drifted
-independently in each repository -- several still instructed the
-documentation reviewer that "`README.md` reflects any new features",
-which is the exact feedback loop that bloats READMEs (see the
-`readme-structure` audit for the policy those instructions now
-enforce instead).
+The reference is necessary but not sufficient: discoverable is not run.
+What makes it run is the `plan-push-audit-phase` shared block, which
+puts a push-audit phase at the end of every master plan. That block
+lives in `PLAN-TEMPLATE.md` and is enforced by the `plan-template`
+audit, not this one.
 
 ### Why comment proportion is a judgment check
 
-Comment volume has no honest mechanical threshold: the same
-twenty-line docstring is right on a lock-ordering contract and
-wrong on a three-line accessor. What can be mechanised is finding
-the *candidates* -- runs of added comment lines, and comment blocks
-larger than the body they precede -- which a repository may add to
-its wave-1 sweep as a report-only grep. The proportionality call
-itself belongs to the code-quality judgment agent, which is why
-`comment-proportion` is shared wording for a sub-agent brief rather
-than a check in `audit-check.py`. The audit verifies the wording is
-present and current; it does not try to score comments.
+Comment volume has no honest mechanical threshold: the same twenty-line
+docstring is right on a lock-ordering contract and wrong on a
+three-line accessor. What can be mechanised is finding the
+*candidates* -- runs of added comment lines, and comment blocks larger
+than the body they precede -- which a repository may add to its wave-1
+sweep as a report-only grep. The proportionality call belongs to the
+code-quality judgment agent, which is why `comment-proportion` is
+shared wording for a sub-agent brief rather than a check in
+`audit-check.py`.
+
+### Shared blocks
+
+Shared blocks are canonical wording embedded verbatim across
+repositories between `<!-- shared-block: <name> v<N> -->` and
+`<!-- shared-block-end -->` markers; the canonical copies live in
+`templates/shared-blocks/`, whose `README.md` describes the
+mechanism. The check fails when a required block is missing, stale,
+drifted from the canonical wording, unknown, or missing its end marker.
+
+This audit exists because the pre-push audit files drifted
+independently in each repository -- several still told the
+documentation reviewer that "`README.md` reflects any new features",
+which is the exact feedback loop that bloats READMEs.
 
 ## Template
 
 Template: `templates/shared-blocks/`
 See: `templates/shared-blocks/README.md`
 
-To fix a non-compliant repository: rename `PUSH-TEMPLATE.md` to
-`PUSH-AUDIT.md` (updating references in `AGENTS.md`,
-`MERGE-TEMPLATE.md`, `tools/audit/`, and plan documents), paste
-the current contents of
-`templates/shared-blocks/readme-discipline.md` verbatim into the
-documentation-review section, replacing any older README guidance it
-contradicts, paste
-`templates/shared-blocks/comment-proportion.md` verbatim into the
-brief for the code-quality review agent, and paste
-`templates/shared-blocks/plan-phase-references.md` verbatim into the
-documentation-review section.
-
-To fix a missing reference: add a line to `AGENTS.md` naming
-`PUSH-AUDIT.md` and saying when it is run. Where the repository
-indexes its runbooks, that index is the natural home; the check only
-requires the filename to appear.
+To fix a non-compliant repository, copy each named block verbatim from
+`templates/shared-blocks/` into `PUSH-AUDIT.md` and reference the file
+from `AGENTS.md`; `templates/shared-blocks/README.md` describes the
+markers and the version bump procedure.
 
 ## Projects
 
 <!-- consistency-audit:begin -->
-*This table is regenerated daily by the consistency audit
-workflow from `scripts/audit-check.py` results; do not edit
-it by hand.*
-
-Last regenerated: 2026-08-25T06:54:21.186929+00:00
+*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -139,21 +102,25 @@ Last regenerated: 2026-08-25T06:54:21.186929+00:00
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#82 |
 | instar | non-compliant | shakenfist/instar#491 |
-| kerbside | compliant | - |
+| kerbside | non-compliant | shakenfist/kerbside#370 |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | non-compliant | shakenfist/occystrap#110 |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#323 |
 | sfui | non-compliant | shakenfist/sfui#15 |
-| shakenfist | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#3911 |
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository)
-- **instar** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository)
-- **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
-- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **client-python-k3s** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **divergulent** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **instar** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **kerbside** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **ryll** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **shakenfist** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 <!-- consistency-audit:end -->

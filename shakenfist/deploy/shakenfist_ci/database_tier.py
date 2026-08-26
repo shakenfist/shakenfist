@@ -1,7 +1,7 @@
 # Copyright 2019 Michael Still and contributors
 """Database tier assertions shared by the smoke and cluster suites.
 
-The two tests here need only a single sf-database instance, so they are
+The tests here need only a single sf-database instance, so they are
 portable across every CI topology. They live in this module rather than
 in one suite directory because stestr discovers tests per directory and
 the two suites are disjoint: a test defined in ``cluster_ci_tests/``
@@ -38,6 +38,23 @@ CALL_COUNT = 100
 INSTANCE_GET_COUNT = 50
 ATTRIBUTE_FETCH_CEILING_PER_GET = 4
 AMBIENT_SAMPLE_SECONDS = 10
+
+# Rendering a blob's "instances" field walks every healthy instance
+# (one FindInstances, then a block_devices read and a dependency chain
+# per disk). Handlers which render many blobs used to do that walk once
+# per blob, so an artifact listing cost one walk per artifact (issue
+# 3876). The walk is now hoisted to one per request, whatever the
+# response contains.
+#
+# FindInstances is the right counter for this: it is issued exactly
+# once per walk, so the measurement does not vary with how many
+# instances the cluster happens to be running -- unlike the reference
+# reads the walk performs, which do. The seeded artifacts make the old
+# behaviour cost at least ARTIFACT_SEED_COUNT walks per listing, so a
+# ceiling of two discriminates it with a whole call of headroom.
+ARTIFACT_SEED_COUNT = 3
+ARTIFACT_LIST_COUNT = 20
+INSTANCE_WALK_CEILING_PER_GET = 2
 
 # A metrics scrape is a plain HTTP GET against a daemon's port, so a
 # single failure is not evidence about the property under test.
@@ -281,3 +298,89 @@ class DatabaseTierTestsMixin:
             'above the ceiling of %d. The external view is fetching the '
             'attributes row more than once per call. measurement=%s'
             % (per_get, ATTRIBUTE_FETCH_CEILING_PER_GET, measurement))
+
+    def test_artifact_listing_walks_instances_once(self):
+        # Every blob rendered with an "instances" field needs to know
+        # which instances use it, which means walking every healthy
+        # instance and following each disk's dependency chain. The
+        # artifact handlers used to run that walk once per blob they
+        # rendered, so a listing cost one walk per artifact and a
+        # version listing one per version (issue 3876). It is now run
+        # once per request.
+        #
+        # This asserts on FindInstances rather than on the reference
+        # reads the walk performs, because FindInstances is issued
+        # exactly once per walk: the measurement is therefore
+        # independent of how many instances the cluster is running,
+        # which the reference reads are not.
+        database_nodes = self._database_nodes()
+
+        # Seed enough artifacts that the old per-blob behaviour is
+        # unambiguously above the ceiling. Uploading a few bytes is
+        # much cheaper than fetching images, and an upload artifact
+        # renders through exactly the same path.
+        for i in range(ARTIFACT_SEED_COUNT):
+            upload = self.test_client.create_upload()
+            self.test_client.send_upload(
+                upload['uuid'], ('dbtier-%d' % i).encode('ascii'))
+            self.test_client.upload_artifact(
+                'dbtier-artifact-%d' % i, upload['uuid'])
+
+        # A listing which does not actually contain the seeded
+        # artifacts would pass the ceiling vacuously.
+        artifacts = self.test_client.get_artifacts()
+        self.assertGreaterEqual(
+            len(artifacts), ARTIFACT_SEED_COUNT,
+            'Expected the listing to contain at least the %d seeded '
+            'artifacts, but it returned %d. The ceiling below cannot '
+            'discriminate the per-blob behaviour without them.'
+            % (ARTIFACT_SEED_COUNT, len(artifacts)))
+
+        def _walks():
+            return self._sum_requests(
+                database_nodes, 'FindInstances', 'api')
+
+        # Other API traffic on the cluster lists instances too, so
+        # measure that rate and subtract it from the measurement below.
+        ambient_before = _walks()
+        time.sleep(AMBIENT_SAMPLE_SECONDS)
+        ambient_rate = (_walks() - ambient_before) / AMBIENT_SAMPLE_SECONDS
+
+        before = _walks()
+        start = time.time()
+        for _ in range(ARTIFACT_LIST_COUNT):
+            self.test_client.get_artifacts()
+        elapsed = time.time() - start
+        raw_delta = _walks() - before
+        delta = raw_delta - (ambient_rate * elapsed)
+
+        measurement = {
+            'ambient_rate_per_second': ambient_rate,
+            'artifacts_in_listing': len(artifacts),
+            'elapsed_seconds': elapsed,
+            'gets': ARTIFACT_LIST_COUNT,
+            'instance_walks': delta,
+            'instance_walks_raw': raw_delta,
+        }
+        self.addDetail(
+            'measurement',
+            content.text_content(json.dumps(
+                measurement, indent=2, sort_keys=True)))
+
+        # As in the test above, the floor is asserted on the raw delta
+        # so a busy cluster's ambient estimate cannot push it below
+        # zero, while the ceiling keeps the ambient correction because
+        # background reads inflate it.
+        self.assertGreater(
+            raw_delta, 0,
+            'Expected an artifact listing to walk instances at all; '
+            'measurement=%s' % measurement)
+
+        per_get = delta / ARTIFACT_LIST_COUNT
+        self.assertLess(
+            per_get, INSTANCE_WALK_CEILING_PER_GET,
+            'Each artifact listing walked instances %.2f times, which is '
+            'above the ceiling of %d. The handler is walking instances '
+            'per blob rendered rather than once per request. '
+            'measurement=%s'
+            % (per_get, INSTANCE_WALK_CEILING_PER_GET, measurement))

@@ -2,64 +2,140 @@
 
 ## What we check
 
+Two code-level patterns. One is mechanical and measured here; the
+other is a judgment call and is delegated to the pre-push review.
+
 ### HTTP response header sanitization
 
-Projects using `http.server.BaseHTTPRequestHandler` directly must
-override `send_header()` to strip `\r` and `\n` characters from
-header values. This prevents HTTP response splitting (CWE-113), which
-CodeQL flags as `py/http-response-splitting`.
+Measured. Every class inheriting an `http.server` request handler --
+`BaseHTTPRequestHandler`, or its `SimpleHTTPRequestHandler` and
+`CGIHTTPRequestHandler` subclasses, all of which carry the same
+`send_header()` -- must also inherit occystrap's `SafeHeaderMixin`,
+which strips `\r` and `\n` from header values before delegating to
+the base class. A header
+value carrying a line break splits the response (CWE-113), which
+CodeQL reports as `py/http-response-splitting`.
 
-The canonical implementation is `SafeHeaderMixin` in
-`occystrap/util.py`, which calls
-`str(value).replace('\r', '').replace('\n', '')` before delegating to
-the base class. Every `BaseHTTPRequestHandler` subclass must inherit
-from it, listed **first** in the class bases so the MRO reaches the
-override.
+The mixin must be listed **first** in the bases:
 
-Projects using Flask (kerbside, shakenfist, agent-python) are
-already protected by Werkzeug's `Headers` class, which raises
-`ValueError` on a header value containing a line break. Prefer Flask
-when adding a new HTTP server; reach for `http.server` only where a
-dependency-free embedded server is the point, and then use the
-mixin.
+```python
+class Handler(
+        SafeHeaderMixin,
+        http.server.BaseHTTPRequestHandler):
+```
+
+Position is what is checked, not mere presence. Listed after the
+handler base, the MRO reaches its `send_header()` and the override
+never runs -- which is indistinguishable at runtime from not having
+the mixin at all.
+
+Flask projects (kerbside, shakenfist, agent-python) are already
+protected by Werkzeug's `Headers`, which raises `ValueError` on a
+header value containing a line break, and have no `http.server`
+handler subclass to find. Prefer Flask for a new HTTP
+server; reach for `http.server` only where a dependency-free embedded
+server is the point, and then use the mixin.
+
+A subclass that genuinely does not need it -- a test fixture serving
+literal headers, say -- carries an `audit-ok: header-sanitization`
+comment on or immediately above the `class` statement, ideally with a
+reason. The marker is read per class rather than per file, because a
+module may hold both a real server and a fixture, and it is read from
+a view in which string bodies are blanked and comments survive. A
+marker is a comment, and searching the whole file let an ordinary
+string constant holding the marker text exempt the class beneath it
+from a security check.
+
+A `class` statement whose base list cannot be read is reported rather
+than skipped: a skipped class is indistinguishable from a repository
+with no handler in it, and on a security check that reads as a clean
+bill nobody earned.
+
+The same principle decides how a base is recognised. Bases are
+compared as whole names after any dotted prefix is dropped, so
+`http.server.BaseHTTPRequestHandler` is in scope while
+`MyBaseHTTPRequestHandlerWrapper` is not, and names bound by
+`import ... as` are resolved -- `from http.server import
+BaseHTTPRequestHandler as BHR` followed by `class Handler(BHR)` is a
+handler subclass, and reading it as a bare substring reported the
+repository as having no raw HTTP server in it at all. An import
+statement is read whole rather than a line at a time, because an
+import list long enough to be wrapped -- in parentheses or over a
+backslash -- is exactly where an alias hides.
+
+Comments and string literals are blanked before any of this, so a
+`class` statement inside a docstring code sample is not a class, and
+a `#` or a `)` inside a base list no longer ends the parse early. A
+PEP 695 type parameter list between the name and the bases is walked
+rather than matched, so `class Handler[T](Base)` is in scope and a
+bound holding brackets of its own does not truncate the walk.
+
+What is still not followed is a base bound by plain assignment
+(`Base = BaseHTTPRequestHandler`), which needs the kind of name
+tracking a full parse gives and this does not attempt. If you write
+one, put an `audit-ok` marker on the class with a reason, or spell
+the base out.
 
 ### File path sanitization
 
-Projects that construct file paths from user-controlled data --
-image names, tags, digests, layer paths -- must validate that the
-resulting path stays within the intended base directory. This
-prevents path traversal attacks (CWE-22), which CodeQL flags as
-`py/path-injection`.
+**Delegated to the pre-push review, and not measured here.** Whether a
+path built from outside data is proved to stay inside its base
+directory is a judgment call about each call site: the same
+`os.path.join()` is correct on process-chosen components and a
+traversal (CWE-22, `py/path-injection`) on an image name, an archive
+member or a request parameter. A grep for the join finds every
+correct use alongside every wrong one.
 
 The canonical implementation is `safe_path_join()` in
 `occystrap/util.py`, which resolves the joined path with
 `os.path.realpath()`, verifies it starts with the base directory, and
-raises `PathEscapeError` if it would escape. Use it instead of a bare
-`os.path.join()` whenever any component comes from outside the
-process. Where a web framework offers its own safe-path helper (such
-as Flask's `send_from_directory`), use that.
+raises `PathEscapeError` otherwise. Where a web framework offers its
+own helper -- Flask's `send_from_directory` -- use that.
+
+The reviewer is given this standard by the `path-traversal-review`
+shared block in each repository's `PUSH-AUDIT.md`. **Coverage for it
+is reported by the [push-audit](/components/development/audits/push-audit/) audit**, which checks
+that the block is present and current; there is no per-repository
+table here, because a table of who carries the block would be a second
+copy of the one that audit already publishes.
 
 ## Template
 
-No template -- these are code-level patterns. Reference
-implementations are in `occystrap/util.py`.
+No template -- these are code-level patterns. The reference
+implementations are `SafeHeaderMixin` and `safe_path_join()` in
+`occystrap/util.py`, and the reviewer wording is
+`templates/shared-blocks/path-traversal-review.md`.
 
 ## Projects
 
-| Project | HTTP headers | File paths | Issue |
-|---------|-------------|------------|-------|
-| agent-python | N/A (Flask) | N/A | - |
-| client-python | N/A | N/A | - |
-| clingwrap | N/A | N/A | - |
-| cloudgood | N/A | N/A | - |
-| imago | N/A (Rust) | N/A (Rust) | - |
-| kerbside | N/A (Flask) | N/A (Flask) | - |
-| kerbside-patches | N/A | N/A | - |
-| library-utilities | N/A | N/A | - |
-| occystrap | compliant | compliant | - |
-| ryll | N/A (Rust) | N/A (Rust) | - |
-| shakenfist | N/A (Flask) | N/A (Flask) | - |
+The table below covers the header sanitization check only.
 
-N/A: Project does not use raw `BaseHTTPRequestHandler` or
-construct file paths from user input, or uses a framework that
-provides built-in protection.
+<!-- consistency-audit:begin -->
+*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | non-compliant | shakenfist/divergulent#81 |
+| instar | N/A | - |
+| kerbside | N/A | - |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | compliant | - |
+| private-ci | N/A | - |
+| ryll | non-compliant | shakenfist/ryll#322 |
+| sfui | N/A | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#3910 |
+
+Details for non-compliant projects:
+
+- **divergulent** (Status): 2 of 2 HTTP request handler class(es) do not sanitize header values: divergulent/tests/test_fetch.py:164 (ErrorHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through; divergulent/tests/test_fetch.py:37 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
+- **ryll** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tools/browser-offer-probe.py:68 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
+- **shakenfist** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_federation.py:57 (_JWKSHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
+<!-- consistency-audit:end -->

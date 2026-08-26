@@ -417,6 +417,37 @@ be completed answers **500** rather than a 200 saying capacity came
 back, and leaves the claim in place for the next attempt. In both cases
 the capacity is still held and the request can simply be repeated.
 
+### Verifying claims on a cluster
+
+`sf-client` has no claim verbs, so there is no quick interactive way to
+confirm that the claim pathway works on a particular cluster.
+`tools/exercise-namespace-claims.py` in the Shaken Fist source tree
+does it instead: it walks the whole surface end to end -- request
+validation, create, the duplicate and capacity refusals, reads and
+cross-namespace non-disclosure, field-masked updates, drawdown against
+a real instance, the below-usage shrink refusal, expiry and delete --
+and reports a pass or fail count.
+
+```bash
+tools/exercise-namespace-claims.py                 # full run
+tools/exercise-namespace-claims.py --no-instances  # API paths only
+tools/exercise-namespace-claims.py --no-expiry     # skip the expiry wait
+```
+
+Three things to know before pointing it at a cluster:
+
+- **It consumes real capacity.** The full run creates a network and an
+  instance to draw a claim down against. Do not run it on a cluster
+  that is already close to full, and prefer `--no-instances` if you
+  only want to check the API.
+- **It waits for the reconciler.** `coverage_state` is swept on the
+  five-minute reconcile pass rather than computed when you read it, so
+  the expiry checks sit for several minutes by design. `--no-expiry`
+  skips them.
+- **It cleans up after itself**, including after a failure or a
+  Ctrl-C. It works only in a throwaway namespace it creates, and never
+  touches anything it did not make. It needs cluster admin credentials.
+
 ## Configuration reference
 
 Except for `CPU_OVERCOMMIT_RATIO`, `RAM_OVERCOMMIT_RATIO`,

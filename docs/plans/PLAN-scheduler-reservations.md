@@ -353,13 +353,14 @@ table entirely (decision D8).
 | 1. Promote node capacity fields to typed columns | [PLAN-scheduler-reservations-phase-01-node-metrics-columns.md](PLAN-scheduler-reservations-phase-01-node-metrics-columns.md) | Complete |
 | 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete |
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
-| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | In progress |
-| 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | In progress |
+| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
+| 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
-| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
+| 9. Client support for claims | PLAN-scheduler-reservations-phase-09-client.md | Not started |
+| 10. Push audit | PLAN-scheduler-reservations-phase-10-push-audit.md | Not started |
 
 ### Phase status notes
 
@@ -374,15 +375,26 @@ is here.
   constant flagged for phase 3.
 - **Phase 1** merged as PR #3578 on 2026-07-31.
 - **Phase 2** merged as PR #3614 on 2026-08-08. Its reconciler has
-  been soaking cleanly on sfcbr since, on 5-minute passes with no
-  drift.
+  been soaking cleanly on sfcbr since, on 5-minute passes which have
+  reported no corrections. Read that as "nothing observed", not
+  "nothing happened": until the phase 4a close-out the pass logged
+  membership and timing only, so a corrected `used_*` counter left no
+  trace. See the phase 3 note below.
 - **Phase 3** merged as PR #3754 on 2026-08-16. Its D13 demand clause
-  shipped the #3813 defect, fixed by phase 4a; its step 9 sfcbr soak
-  has still not been run and rides with phase 4a's step 5, which is
-  one soak covering phases 3, 4 and 4a (its decision E6).
-- **Phase 4**'s steps 1-9 have landed, management review included;
-  the operator review and the sfcbr soak are still outstanding, and
-  ride with phase 4a's step 5. `NamespaceClaim`
+  shipped the #3813 defect, fixed by phase 4a. Its step 9 sfcbr soak
+  was discharged by phase 4a's step 5, one soak covering phases 3, 4
+  and 4a (its decision E6); see that plan's *Soak observations*.
+  One qualification on its exit criteria: **the "reconciler reports
+  zero drift" criterion was accepted on healthy-pass evidence rather
+  than on measured deltas**, because the reconcile pass did not log
+  drift magnitudes at the time. Complete here does not mean that
+  criterion was checked. The phase 4a close-out added the missing
+  instrumentation, so the next soak can check it properly.
+- **Phase 4** has landed in full, management and operator review
+  included. Its claim soak was discharged by phase 4a's step 5, by
+  deliberate exercise rather than by waiting: nothing on sfcbr creates
+  claims on its own, so `tools/exercise-namespace-claims.py` walks the
+  pathway end to end, drawdown and expiry included. `NamespaceClaim`
   is a first-class object with admin-only REST CRUD at
   `/auth/namespaces/<namespace>/claims`, and creation migrates the
   namespace's existing drawdown out of the cluster's unclaimed sums and
@@ -392,9 +404,10 @@ is here.
   phase plan).
 - **Phase 4a** was inserted on 2026-08-22, between phases 4 and 5,
   because #3813 was a live defect in phase 3's shipped admission code
-  and phase 5 makes that code the sole gate on placement. Its code
-  steps have landed; what remains is the sfcbr soak. Its survey
-  found that the D13 seed constant was transcribed from the wrong row
+  and phase 5 makes that code the sole gate on placement. It completed
+  on 2026-08-24. The soak measured the fix: demand-only refusals fell
+  from 100% of all refusals to a residue, and the P9 waiver rate from
+  62% to 4.1%. Its survey found that the D13 seed constant was transcribed from the wrong row
   of its own measurements, which reclassifies the fix from a deferred
   tuning question to a correction; see the phase plan's *What the
   survey found*.
@@ -549,12 +562,94 @@ capacity (including the two service classes and the
 reconciler), developer-guide write-up of the guarded-UPDATE
 idiom (D10), user-facing affinity migration notes.
 
-**Phase 9 — push audit.** Runs `PUSH-AUDIT.md` over the
-accumulated diff of every phase in this plan against
-`develop`, not the last phase's diff alone. Findings land as
-their own pull request, and the plan is not complete until
-each is resolved or declined in writing here. If the audit
-finds nothing, that is recorded in one sentence.
+**Phase 9 — client support for claims.** Add `apiclient`
+verbs for the claims API in `shakenfist/client-python`,
+tracked as client-python#364, and then move this repository's
+functional coverage onto them.
+
+Phase 4's decision D7 put client verbs out of scope for a
+real reason: CI installs the released client from PyPI, so a
+test written against new `apiclient` methods cannot pass
+until a client release exists, and no server pull request can
+produce one. That reasoning was sound and is now spent --
+the API has shipped, so the release can happen.
+
+Two obligations fall out of it, and the phase is not done
+until both are met. The first is the verbs themselves, in the
+other repository; issue #364 already carries the full surface
+including the field-mask semantics of `PUT`, the status codes
+worth typed exceptions, and the `state` /
+`coverage_state` distinction a client view must not collapse.
+The second is here:
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`
+currently reaches past the public surface via
+`apiclient.Client._request_url()`, with a docstring saying
+not to "fix" it onto verbs until a release exists. Once one
+does, the test moves onto the verbs, because the verbs are
+then what an operator actually uses and so what is worth
+defending.
+
+The server-side prerequisite is met: the API advertises
+`auth: namespace-claims` in its capability list as of the
+phase 4a close-out, so a client can feature-detect claims and
+an un-upgraded one degrades rather than failing. Phase 4
+shipped without that string; it was found by a question at
+close-out rather than by any review, and the miss is recorded
+in phase 4's Future work.
+
+This phase depends on a client release, which is outside this
+repository's control. If that release has not happened when
+the rest of the plan is otherwise finished, the honest move
+is to leave this phase open and say so rather than to close
+the plan around it.
+
+**Phase 10 — push audit.** Run
+the repository's pre-push audit over everything this plan
+built, as a single body of work rather than one branch at a
+time.
+
+The audit template is written for a branch about to be
+pushed, and this plan does not fit that shape: its phases
+were pushed and merged one at a time over months, each
+audited only against its own diff. Two classes of problem
+survive that. The first is drift between phases -- a
+convention followed in phase 2 and quietly abandoned by
+phase 5, or documentation that was true when its phase
+landed and was falsified by a later one. The second is
+anything whose absence is only visible from the whole: the
+capability string that phase 4 never advertised was found by
+a passing question at close-out, not by any phase's own
+review, and nothing in a per-phase audit would have caught
+it. That defect is the reason this phase exists.
+
+So the diff under audit is the plan's cumulative diff, not
+`develop...HEAD`. Every wave-1 and wave-2 command in
+`PUSH-AUDIT.md` that names `develop...HEAD` is rewritten to
+`ea3c9bf63..develop` -- the commit immediately before phase
+0 merged (`87a58a81e^1`, 2026-07-30) -- restricted to the
+paths this plan touches, so the range does not drag in
+unrelated work merged over the same months. The phase plan
+pins the path list.
+
+Two adaptations follow from the range being months of merged
+history rather than a pending branch:
+
+* The management checklist's "commit history is clean" and
+  "branch is up to date" items do not apply and are struck
+  rather than ticked. Nothing here is rebaseable.
+* Findings cannot block a push that already happened. They
+  are triaged instead: anything security-critical or high is
+  fixed in this phase, anything else is filed as an issue or
+  recorded as Future work, and the phase records the triage
+  rather than silently absorbing it.
+
+Findings land as their own pull request, and the plan is not
+complete until each is resolved or declined in writing here.
+If the audit finds nothing, that is recorded in one sentence.
+
+Run this last, after phase 9, so the documentation the audit
+checks is the documentation the plan intended to ship and the
+client surface it reviews is the final one.
 
 ## Dependencies on other plans
 

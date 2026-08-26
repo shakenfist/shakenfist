@@ -192,7 +192,8 @@ class AgentOperation(BaseOperation):
             'progress_timeout': self.progress_timeout,
             'results': attrs.results,
             'last_progress': attrs.last_progress,
-            'attempts': attrs.attempts
+            'attempts': attrs.attempts,
+            'error_message': self.error
         })
 
         # Add object references (what references this agent operation and what

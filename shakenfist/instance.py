@@ -176,6 +176,11 @@ class Instance(dbowo):
     # ``interfaces`` was here pre-phase-7; the column on
     # ``instance_attributes`` is dropped in phase 7e and the property
     # now queries ``network_interfaces`` directly.
+    # ``error`` maps to the ``error_message`` column, which is no longer
+    # read or written by the error property -- the message now lives on
+    # the object's state row like every other object type (issue 3899).
+    # The column and this mapping remain for one release cycle as a
+    # rollback fallback.
     MARIADB_ATTRIBUTES = {
         'placement', 'power_state', 'ports', 'enforced_deletes',
         'block_devices', 'agent_state',
@@ -1479,9 +1484,17 @@ class Instance(dbowo):
         mariadb.delete_instance(_uuid)
         super().hard_delete()
 
-    def _allocate_console_port(self):
-        consumed = mariadb.get_consumed_ports_for_node(
-            config.NODE_UUID)
+    def _allocate_console_port(self, consumed):
+        """Allocate a single free port on this node.
+
+        The caller passes 'consumed', a set of ports which must not be
+        chosen; the chosen port is added to it, so repeated calls with
+        the same set never return the same port twice. The bound probe
+        socket is returned alongside the port and must be held open by
+        the caller until the allocation is persisted, so that
+        concurrent allocations on this node cannot select the same
+        port.
+        """
         while True:
             port = random.randint(30000, 50000)
             if port in consumed:
@@ -1489,29 +1502,44 @@ class Instance(dbowo):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 # Bind to verify the port is available locally.
-                # This prevents races between concurrent allocations
-                # on the same node.
                 s.bind(('0.0.0.0', port))
-                return port
             except OSError:
                 LOG.with_fields({'instance': self.uuid}).info(
                     f'Collided with in use port {port}, selecting another')
-                consumed.append(port)
-            finally:
+                consumed.add(port)
                 s.close()
+                continue
+            consumed.add(port)
+            return port, s
 
     def allocate_instance_ports(self):
         with self.get_lock_attr('ports', 'Instance port allocation'):
-            p = self.ports
-            if not p:
-                p = {
-                    'console_port': self._allocate_console_port(),
-                    'vdi_port': self._allocate_console_port()
-                }
-                if self.video['vdi'].startswith('spice'):
-                    p['vdi_tls_port'] = self._allocate_console_port()
+            if self.ports:
+                return
 
+            # Each draw must exclude its siblings as well as the ports
+            # of instances already placed on this node -- the sibling
+            # draws are invisible to get_consumed_ports_for_node()
+            # until self.ports is written below (issue 3897, where
+            # vdi_port and vdi_tls_port collided and libvirt refused
+            # to reserve the port twice).
+            consumed = set(mariadb.get_consumed_ports_for_node(
+                config.NODE_UUID))
+
+            names = ['console_port', 'vdi_port']
+            if self.video['vdi'].startswith('spice'):
+                names.append('vdi_tls_port')
+
+            p = {}
+            sockets = []
+            try:
+                for name in names:
+                    p[name], s = self._allocate_console_port(consumed)
+                    sockets.append(s)
                 self.ports = p
+            finally:
+                for s in sockets:
+                    s.close()
 
     def deallocate_instance_ports(self):
         self._db_set_attribute('ports', None)
@@ -2663,22 +2691,58 @@ def all_instances():
             yield i
 
 
+def _blob_dependency_chain(
+        blob_uuid: str, memo: dict[str, list[str]]) -> list[str]:
+    """Return the blobs blob_uuid depends on, directly or transitively.
+
+    The chain is memoised across one instance walk because instances
+    overwhelmingly share their disks' base images: without the memo the
+    same chain is re-read from object_references once per instance
+    using it, which is a get_references_from and a blob hydration per
+    link per instance (issue 3876).
+    """
+    if blob_uuid in memo:
+        return memo[blob_uuid]
+
+    chain: list[str] = []
+    seen = {blob_uuid}
+    disk_blob = blob.Blob.from_db(blob_uuid, suppress_failure_audit=True)
+    while disk_blob:
+        depends_on = disk_blob.depends_on
+        if not depends_on:
+            break
+        # A dependency cycle should not be possible, but walking one
+        # here would hang the API worker rather than return a wrong
+        # answer, so stop rather than trust that.
+        if depends_on in seen:
+            break
+        seen.add(depends_on)
+        chain.append(depends_on)
+        disk_blob = blob.Blob.from_db(
+            depends_on, suppress_failure_audit=True)
+
+    memo[blob_uuid] = chain
+    return chain
+
+
 def instance_blob_usage(node=None):
     """Map blob uuid to the uuids of healthy instances using that blob.
 
     Walks every healthy instance (optionally filtered to one node) exactly
     once, recording the blobs each disk references directly and via its
     dependency chain. Callers that need usage for many blobs -- the
-    cluster wide cleanup loop -- must use this rather than calling
+    cluster wide cleanup loop, and every API handler which renders more
+    than one blob -- must use this rather than calling
     instance_usage_for_blob_uuid() per blob: the per-blob form repeats
     the instance walk, and its per-disk block_devices and dependency
-    chain reads, for every single blob (issue 3502).
+    chain reads, for every single blob (issues 3502 and 3876).
     """
     filters = []
     if node:
         filters.append(partial(placement_filter, node))
 
     usage: dict[str, list[str]] = defaultdict(list)
+    chains: dict[str, list[str]] = {}
     for inst in Instances(filters, prefilter='healthy'):
         # inst.block_devices isn't populated until the instance is created,
         # so it may not be ready yet. This means we will miss instances
@@ -2693,15 +2757,7 @@ def instance_blob_usage(node=None):
             in_use.add(d['blob_uuid'])
 
             # ...and so is everything in its dependency chain.
-            disk_blob = blob.Blob.from_db(
-                d['blob_uuid'], suppress_failure_audit=True)
-            while disk_blob:
-                depends_on = disk_blob.depends_on
-                if not depends_on:
-                    break
-                in_use.add(depends_on)
-                disk_blob = blob.Blob.from_db(
-                    depends_on, suppress_failure_audit=True)
+            in_use.update(_blob_dependency_chain(d['blob_uuid'], chains))
 
         for blob_uuid in in_use:
             usage[blob_uuid].append(inst_uuid)
