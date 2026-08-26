@@ -104,9 +104,18 @@ class TestCoalescing(base.BaseNamespacedTestCase):
         # ~100ms batches, and the operations themselves are still being
         # dispatched while this polls. Poll to a deadline rather than
         # reading once -- the same reason test_events.py does.
+        #
+        # Both coalescing signals are emitted while
+        # network_apply_update_dnsmasq is enqueued and dispatched, which
+        # happens as each interface is attached -- early in instance
+        # create, not at instance ready. Two minutes is therefore
+        # generous rather than tight, and the number matters: this is
+        # the wait the failure path pays, and cluster CI only runs in
+        # the merge queue, so every second of it is merge queue wall
+        # clock. Raise BURST before raising this.
         events = []
         coalesced = []
-        deadline = time.time() + 300
+        deadline = time.time() + 120
         while time.time() < deadline:
             events, coalesced = self._coalescing_events()
             if coalesced:
@@ -139,3 +148,16 @@ class TestCoalescing(base.BaseNamespacedTestCase):
             'Check the coalesce_outcome field on the operations\' '
             '"execution duration" events to tell those apart.'
             % (BURST, DEDUP_EVENT, FOLD_EVENT))
+
+        # The burst was fired through a client which does not wait, and
+        # the assertion above returns as soon as the first coalescing
+        # event lands -- which is well before the six instances finish
+        # creating. Settle them before returning, because tearDown
+        # deletes every instance in the namespace immediately and fails
+        # the test outright if any survives its five minute window, and
+        # deleting an instance mid-create is a plausible way to get
+        # there. Deliberately after the assertion: a failure to start is
+        # not this test's subject, and should not be able to mask the
+        # coalescing result.
+        for instance in instances:
+            self._await_instance_create(instance['uuid'])

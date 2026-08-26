@@ -310,9 +310,13 @@ class BaseClusterOperation(BaseOperation):
         # measurement which cannot tell "the fold ran and found
         # nothing" from "the fold never ran" is how #3878 stayed
         # invisible for three months: zero looked exactly like
-        # disabled. ``coalesce_seconds`` is the wall clock cost of the
+        # disabled. ``coalesce_seconds`` is the cost of the
         # claim_coalescible_siblings call, which baseoperation has
         # asserted to be ~200 ms under load without ever measuring it.
+        # It is measured with a monotonic clock: it is a pure interval,
+        # never differenced against a stored timestamp the way
+        # ``wait_seconds`` is, so an NTP step during the call must not
+        # be able to turn it into a negative number in the report.
         self.coalesce_outcome: Optional[str] = None
         self.coalesce_seconds: Optional[float] = None
         self.coalesce_folded: Optional[int] = None
@@ -396,7 +400,8 @@ class BaseClusterOperation(BaseOperation):
         #    transitioned to ``complete``; when their work_queue row
         #    eventually surfaces the dispatcher's terminal-state branch
         #    drops it cleanly. Logged as a single "coalesced sibling
-        #    ops" status event on the survivor.
+        #    ops" status event on the survivor and on its coalescing
+        #    target.
         coalescible = type(self).coalescible_tasks
         target_column = type(self).coalescible_target_column
 
@@ -447,25 +452,43 @@ class BaseClusterOperation(BaseOperation):
             self.queue_name is not None
             and self.queue_name.startswith('networknode-'))
 
-        # Record which of the guards above decided the outcome, in the
-        # order the condition below evaluates them. See decision 4 of
+        # Each branch records the guard which decided the outcome, so
+        # the guards exist exactly once and the instrumentation cannot
+        # report an outcome the code did not take -- which is the class
+        # of invisible wrongness this phase exists to remove. See
+        # decision 4 of
         # PLAN-queue-performance-phase-09-prove-coalescing.md.
+        #
+        # 'type_not_coalescible' and 'no_coalescible_tasks' are
+        # deliberately different outcomes. The first is "this operation
+        # type declares no coalescing at all", which is every cluster
+        # operation that is not a NetOp and so the overwhelming
+        # majority of them; the second is "this job could have
+        # coalesced and happened not to contain anything coalescible".
+        # Merging them buries the interesting case under the boring one
+        # in the by-queue-class table, and decision 4's whole aim is
+        # that "coalescing is doing nothing" stays answerable.
         if not coalescible or not target_column:
-            self.coalesce_outcome = 'no_coalescible_tasks'
+            self.coalesce_outcome = 'type_not_coalescible'
         elif skip_due_to_empty_queue:
             self.coalesce_outcome = 'batch_size_one'
         elif not queue_is_cluster_wide:
             self.coalesce_outcome = 'not_cluster_wide'
-
-        if (coalescible and target_column and not skip_due_to_empty_queue
-                and queue_is_cluster_wide):
+        else:
             survivor_coalescible_tasks = [
                 t for t in unique_tasks if t in coalescible]
             target_uuid_attr = getattr(self, target_column, None)
             if not survivor_coalescible_tasks or target_uuid_attr is None:
                 self.coalesce_outcome = 'no_coalescible_tasks'
             else:
-                coalesce_start = time.time()
+                # Recorded before the call, not after it. If
+                # claim_coalescible_siblings raises, a caller which
+                # catches and continues would otherwise emit an event
+                # with no outcome at all, which the report reads as
+                # "from a build predating the instrumentation" rather
+                # than as a fold which was attempted.
+                self.coalesce_outcome = 'ran'
+                coalesce_start = time.monotonic()
                 folded = mariadb.claim_coalescible_siblings(
                     operation_type=self.object_type,
                     target_column=target_column,
@@ -473,8 +496,7 @@ class BaseClusterOperation(BaseOperation):
                     task_names=[
                         t.name for t in survivor_coalescible_tasks],
                     exclude_op_uuid=str(self.uuid))
-                self.coalesce_seconds = time.time() - coalesce_start
-                self.coalesce_outcome = 'ran'
+                self.coalesce_seconds = time.monotonic() - coalesce_start
                 self.coalesce_folded = len(folded)
                 if folded:
                     # Emitted against the coalescing target as well as

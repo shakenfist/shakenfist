@@ -549,10 +549,17 @@ itself):
     * `coalesce_outcome` — `ran` if the fold's SQL was issued, or
       which guard skipped it: `batch_size_one` (the dispatcher
       dequeued only this op), `not_cluster_wide` (a per-node queue,
-      where folding would be unsafe) or `no_coalescible_tasks`.
-    * `coalesce_seconds` — wall clock cost of the
-      `claim_coalescible_siblings` call, present only when the fold
-      ran.
+      where folding would be unsafe), `type_not_coalescible` (this
+      operation type declares no coalescing at all, which is every
+      cluster operation that is not a `net_op` and so most of them)
+      or `no_coalescible_tasks` (a type which could have coalesced,
+      carrying nothing coalescible this time). The last two are
+      separate outcomes on purpose: merged, the boring case buries
+      the interesting one.
+    * `coalesce_seconds` — cost of the `claim_coalescible_siblings`
+      call, present only when the fold ran. Measured with a monotonic
+      clock, so it is an interval rather than a difference of two wall
+      clock readings.
     * `coalesce_folded` — how many siblings that call folded away,
       which is legitimately zero.
 

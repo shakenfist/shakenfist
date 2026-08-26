@@ -31,8 +31,8 @@ which can never match, which is what #3878 was, and explicitly not
 enough for the fold's `FOR UPDATE` half: the sqlite dialect emits
 nothing at all for `FOR UPDATE`, so every one of those tests runs
 uncontended. #3879 tracks the missing functional coverage that let
-the defect sit unnoticed since 2026-05-26, and phase 9 addresses it. The full audit, including the three
-headings which found nothing, is in
+the defect sit unnoticed since 2026-05-26, and phase 9 addresses it.
+The full audit, including the three headings which found nothing, is in
 [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md).
 
 Review of that fix found a second defect it would have activated:

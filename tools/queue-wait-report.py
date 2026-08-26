@@ -308,6 +308,21 @@ def format_seconds(value):
     return f'{value:.2f}'
 
 
+def format_milliseconds(value):
+    """Render a duration in milliseconds, to one decimal place.
+
+    The wait tables' two decimal places of seconds are right for waits
+    measured in seconds, and useless for the coalescing fold: a fold
+    which costs five milliseconds and a fold which costs fifty both
+    print as '0.00'. The point of measuring the fold at all is to
+    confirm or correct the ~200 ms claim in baseoperation.py, and a
+    table which can only say "under ten milliseconds" confirms nothing.
+    """
+    if value is None:
+        return '-'
+    return f'{value * 1000:.1f}'
+
+
 class Group:
     """The samples in one row of one table."""
 
@@ -456,15 +471,21 @@ def apply_min_samples(groups, min_samples):
                   f'samples omitted, {samples} in total)')
 
 
-# Every value BaseClusterOperation.execute records for coalesce_outcome,
-# in the order the guards are evaluated. 'ran' means the fold's SQL was
-# issued; the other three each name the guard which skipped it. See
-# shakenfist/operations/baseoperation.py.
+# Every value BaseClusterOperation.execute records for coalesce_outcome.
+# 'ran' means the fold's SQL was issued; the other four each name the
+# guard which skipped it. 'type_not_coalescible' is an operation type
+# which declares no coalescing at all -- most cluster operations, and
+# the boring case -- while 'no_coalescible_tasks' is a type which could
+# have coalesced and this time had nothing to. See
+# shakenfist/operations/baseoperation.py, whose guard chain is the
+# source of truth these strings are checked against by
+# test_every_outcome_the_code_records_is_reported.
 COALESCE_OUTCOMES = [
     'ran',
     'batch_size_one',
     'not_cluster_wide',
     'no_coalescible_tasks',
+    'type_not_coalescible',
 ]
 
 
@@ -492,16 +513,17 @@ class CoalesceGroup:
         return ([
             self.label,
             str(len(self.samples)),
-            format_seconds(percentile(durations, 0.5)),
-            format_seconds(percentile(durations, 0.9)),
-            format_seconds(percentile(durations, 0.99)),
-            format_seconds(max(durations) if durations else None),
+            format_milliseconds(percentile(durations, 0.5)),
+            format_milliseconds(percentile(durations, 0.9)),
+            format_milliseconds(percentile(durations, 0.99)),
+            format_milliseconds(max(durations) if durations else None),
             str(folded),
         ] + [str(counts.get(outcome, 0)) for outcome in COALESCE_OUTCOMES])
 
 
 COALESCE_HEADINGS = (
-    ['', 'n', 'p50', 'p90', 'p99', 'max', 'folded'] + COALESCE_OUTCOMES)
+    ['', 'n', 'p50 ms', 'p90 ms', 'p99 ms', 'max ms', 'folded']
+    + COALESCE_OUTCOMES)
 
 
 def print_coalescing_table(title, groups, footnote=None):
@@ -517,7 +539,11 @@ def print_coalescing_table(title, groups, footnote=None):
 
     rows = [g.row() for g in groups]
     if not rows:
-        print('  (no samples carrying coalescing instrumentation)')
+        # Not "no instrumentation" -- print_coalescing_report returns
+        # early in that case and never reaches here, so the only way to
+        # empty this table is --min-samples, which the footnote below
+        # then quantifies.
+        print('  (every row fell below --min-samples)')
         if footnote:
             print('  ' + footnote)
         return
@@ -577,15 +603,8 @@ def print_coalescing_report(samples, min_samples):
              lambda s: s.operation_type),
             ('Coalescing, by queue class and priority lane',
              lambda s: f'{s.queue_class} / {s.lane}')):
-        groups = coalescing_groups(samples, key)
-        kept = [g for g in groups if len(g.samples) >= min_samples]
-        dropped = [g for g in groups if len(g.samples) < min_samples]
-        footnote = None
-        if dropped:
-            total = sum(len(g.samples) for g in dropped)
-            rows = 'row' if len(dropped) == 1 else 'rows'
-            footnote = (f'({len(dropped)} {rows} with fewer than '
-                        f'{min_samples} samples omitted, {total} in total)')
+        kept, footnote = apply_min_samples(
+            coalescing_groups(samples, key), min_samples)
         print_coalescing_table(title, kept, footnote)
 
     uninstrumented = len(samples) - len(instrumented)

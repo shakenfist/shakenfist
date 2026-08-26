@@ -298,6 +298,32 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             ('network', NETWORK_UUID),
             op._coalescible_target_reference())
 
+    def test_target_reference_is_none_without_a_target_column(self):
+        # An operation type which declares no coalescing target at all.
+        # The fold cannot run for it, but the helper is public enough
+        # that it must degrade rather than raise.
+        op = _StubOp(_make_static_values())
+        self.assertIsNone(op._coalescible_target_reference())
+
+    def test_target_reference_is_none_when_the_target_is_unset(self):
+        # network_uuid is a read only property, so this stands in for an
+        # operation loaded with no target recorded against it.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        with mock.patch.object(
+                NetOp, 'network_uuid',
+                new_callable=mock.PropertyMock, return_value=None):
+            self.assertIsNone(op._coalescible_target_reference())
+
+    def test_target_reference_is_none_when_the_schema_omits_the_column(self):
+        # A column the schema's target_fields map does not name. The
+        # event then lands on the operation alone: it loses its
+        # durability past the operation's thirty second hard delete
+        # (#3864), but nothing raises and the fold still happens.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        with mock.patch.object(
+                net_op_schema.model, 'target_fields', {}):
+            self.assertIsNone(op._coalescible_target_reference())
+
     def test_no_fold_event_when_nothing_was_folded(self):
         self.mock_claim.return_value = []
 
@@ -424,6 +450,36 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertEqual('no_coalescible_tasks', op.coalesce_outcome)
         self.assertIsNone(op.coalesce_seconds)
 
+    def test_a_type_which_cannot_coalesce_is_a_different_outcome(self):
+        # 'this operation type declares no coalescing at all' is the
+        # overwhelming majority of cluster operations, and reporting it
+        # as 'no_coalescible_tasks' would bury the interesting case --
+        # a type which could have coalesced and did not -- underneath
+        # it in the by-queue-class table.
+        op = _StubOp(_make_static_values())
+        op.dispatch_task = mock.MagicMock()
+        op.queue_name = 'networknode-clusteroperation-user_facing'
+        op.dispatcher_batch_size = 4
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+        self.assertEqual('type_not_coalescible', op.coalesce_outcome)
+        self.assertIsNone(op.coalesce_seconds)
+
+    def test_outcome_survives_a_fold_which_raised(self):
+        # Recorded before the call rather than after it. A caller which
+        # catches and continues would otherwise emit an event with no
+        # outcome, which the report classifies as an uninstrumented
+        # build rather than as a fold which was attempted and failed.
+        self.mock_claim.side_effect = Exception('database unavailable')
+
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        self.assertRaises(Exception, op.execute)
+
+        self.assertEqual('ran', op.coalesce_outcome)
+        self.assertIsNone(op.coalesce_seconds)
+        self.assertIsNone(op.coalesce_folded)
+
     def test_emptying_the_coalescible_set_silences_both_signals(self):
         # The mutation the functional test in
         # cluster_ci_tests/test_coalescing.py is calibrated against: with
@@ -441,7 +497,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
 
         self.mock_claim.assert_not_called()
         self.assertEqual([], self._coalesced_events())
-        self.assertEqual('no_coalescible_tasks', op.coalesce_outcome)
+        self.assertEqual('type_not_coalescible', op.coalesce_outcome)
 
 
 class ExecutionDurationExtraTestCase(base.ShakenFistTestCase):

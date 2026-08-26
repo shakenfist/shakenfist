@@ -19,8 +19,10 @@ produces a table with three hundred rows of one sample each.
 import importlib.util
 import io
 import os
+import re
 import sys
 
+from shakenfist.operations import baseoperation
 from shakenfist.tests import base
 
 
@@ -402,11 +404,18 @@ class CoalescingParseTestCase(base.ShakenFistTestCase):
     def test_every_outcome_the_code_records_is_reported(self):
         # The report's outcome columns are written out by hand, so they
         # can fall behind the guards in BaseClusterOperation.execute.
-        # Read the values back out of the source of truth.
-        from shakenfist.operations import baseoperation
-        source = open(baseoperation.__file__).read()
-        for outcome in report.COALESCE_OUTCOMES:
-            self.assertIn(f"self.coalesce_outcome = '{outcome}'", source)
+        # Read the values back out of the source of truth and compare as
+        # sets, so this fails in both directions. The direction that
+        # matters is a new outcome in execute() which the report does not
+        # list: counts.get() never asks for it, so it vanishes from the
+        # table and the row's n stops equalling the sum of its outcome
+        # columns -- an outcome which is silently absent looking like an
+        # outcome which never happened is the shape of #3878 itself.
+        with open(baseoperation.__file__) as f:
+            source = f.read()
+        recorded = set(re.findall(
+            r"self\.coalesce_outcome = '([a-z_]+)'", source))
+        self.assertEqual(set(report.COALESCE_OUTCOMES), recorded)
 
 
 class CoalescingReportTestCase(base.ShakenFistTestCase):
@@ -421,13 +430,38 @@ class CoalescingReportTestCase(base.ShakenFistTestCase):
             sys.stdout = stdout
         return captured.getvalue()
 
+    def _coalescing_row(self, out, label):
+        """The by-operation-type row for label, as a list of cells.
+
+        Asserting on the headings alone proves nothing: they are printed
+        whenever any row exists at all, so the assertion passes without
+        a single count being correct.
+        """
+        section = out.split('Coalescing, by operation type')[1]
+        section = section.split('Coalescing, by queue class')[0]
+        for line in section.splitlines():
+            cells = line.split()
+            if cells and cells[0] == label:
+                return cells
+        self.fail('No %s row in:\n%s' % (label, section))
+
     def test_reports_the_distribution_and_the_outcomes(self):
         out = self._run([COALESCED, COALESCE_RAN_EMPTY, COALESCE_SKIPPED])
         self.assertIn('Coalescing, by operation type', out)
         self.assertIn('Coalescing, by queue class and priority lane', out)
-        # Three siblings folded across the two folds which ran.
-        self.assertIn('folded', out)
-        self.assertIn('batch_size_one', out)
+
+        headings = report.COALESCE_HEADINGS
+        cells = self._coalescing_row(out, 'net_op')
+        row = dict(zip(headings[1:], cells[1:]))
+        # Three samples, two of which ran the fold, folding three
+        # siblings between them, and one of which was skipped.
+        self.assertEqual('3', row['n'])
+        self.assertEqual('3', row['folded'])
+        self.assertEqual('2', row['ran'])
+        self.assertEqual('1', row['batch_size_one'])
+        self.assertEqual('0', row['not_cluster_wide'])
+        # 0.2s, rendered in milliseconds rather than as '0.20'.
+        self.assertEqual('200.0', row['max ms'])
 
     def test_a_fold_which_ran_and_found_nothing_is_not_a_fold_which_never_ran(
             self):

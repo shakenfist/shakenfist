@@ -359,7 +359,8 @@ section said it would.
 
 * **9c.** `BaseClusterOperation.execute` records `coalesce_outcome`
   (`ran`, `batch_size_one`, `not_cluster_wide`,
-  `no_coalescible_tasks`), `coalesce_seconds` and `coalesce_folded`.
+  `type_not_coalescible`, `no_coalescible_tasks`),
+  `coalesce_seconds` and `coalesce_folded`.
 
   This step departed from its brief in one way. The brief said to
   copy the fields into the `extra` dict in both dispatchers; both
@@ -405,7 +406,7 @@ mechanism the functional assertion depends on:
 `test_emptying_the_coalescible_set_silences_both_signals` patches
 `NetOp.coalescible_tasks` to an empty frozenset and asserts the fold
 never runs, no `coalesced sibling ops` event is emitted, and the
-outcome is `no_coalescible_tasks`. With nothing coalescible neither
+outcome is `type_not_coalescible`. With nothing coalescible neither
 event can reach the network, so the functional assertion cannot
 pass. That is weaker than running the mutation against a cluster --
 it says nothing about whether the burst overlaps -- and the
@@ -415,9 +416,12 @@ mutation should be run when this branch first reaches cluster CI.
 ### Test coverage added
 
 * `shakenfist/tests/operations/test_baseoperation.py`: 37 tests
-  pass, up from 31. New coverage for the fold event landing on the
-  target, the schema-derived target type, every `coalesce_outcome`
-  value, and the mutation above. One existing test was rewritten:
+  pass, up from 18 (counted as `def test_` in the file, at
+  `f608533ba` and at HEAD). New coverage for the fold event landing
+  on the target, the schema-derived target type and its three
+  degrade-to-`None` paths, every `coalesce_outcome` value including
+  the type-level one, an outcome surviving a fold which raised, and
+  the mutation above. One existing test was rewritten:
   `test_cross_op_coalescing_records_sibling_uuids` asserted against
   `add_event` and now asserts against `add_event_multi`.
 * `shakenfist/tests/test_queue_wait_report.py`: 32 tests pass, up
@@ -427,6 +431,90 @@ mutation should be run when this branch first reaches cluster CI.
   which never ran. `test_every_outcome_the_code_records_is_reported`
   reads the outcome strings back out of `baseoperation.py` so the
   report's hand-written columns cannot fall behind the guards.
+
+### Review changes
+
+The automated review of PR #3905 raised sixteen items. All three
+marked `fix` and ten of the eleven marked `consider` were taken; the
+remaining two were informational and needed no action.
+
+* **The drift guard failed in the harmless direction only.**
+  `test_every_outcome_the_code_records_is_reported` asserted that
+  each string in `COALESCE_OUTCOMES` appears in `baseoperation.py`,
+  which catches a report column with no code path behind it and
+  misses the direction its own comment names -- a new outcome in
+  `execute()` the report does not list, which
+  `counts.get(outcome, 0)` never asks for and which therefore
+  disappears from the table while the row's `n` quietly stops
+  equalling the sum of its outcome columns. That is #3878's shape
+  reproduced in the reporting layer. Now a set comparison, which
+  fails both ways.
+* **The guard chain existed twice.** The outcome-recording chain
+  restated, negated, the predicate of the `if` which followed it,
+  with a comment instructing future editors to keep the two in step
+  by hand. Folded into one `if/elif/else`, so the predicate exists
+  once and the recorded outcome cannot disagree with the branch
+  taken.
+* **`no_coalescible_tasks` conflated two facts.** It meant both
+  "this operation type declares no coalescing at all" -- every
+  non-`NetOp` cluster operation, which on a real cluster is the
+  overwhelming majority -- and "this job could have coalesced and
+  carried nothing coalescible". The first would have dominated the
+  by-queue-class column and buried the second. Split, with
+  `type_not_coalescible` added to `COALESCE_OUTCOMES` and documented
+  in the operator guide.
+* **An exception from the fold looked like an uninstrumented build.**
+  `coalesce_outcome` was set after `claim_coalescible_siblings`
+  returned, so a raise left it `None` and the report classified the
+  sample as predating the instrumentation. Now set before the call.
+* **The fold was timed with `time.time()`.** It is a pure interval,
+  never differenced against a stored timestamp, and it is the
+  number step 9f exists to check the ~200 ms claim against, so an
+  NTP step must not be able to make it negative. Now
+  `time.monotonic()`.
+* **The report could not resolve the number it exists to measure.**
+  `format_seconds` renders two decimal places, so any fold under
+  ~5 ms printed as `0.00` for p50, p99 and max alike -- which
+  would have let the report neither confirm nor correct the
+  ~200 ms figure. The coalescing durations are now rendered in
+  milliseconds, in columns labelled as such.
+* **The empty coalescing table blamed the wrong cause.** It said "no
+  samples carrying coalescing instrumentation" on the one path where
+  that cannot be true, directly contradicting the `--min-samples`
+  footnote printed underneath it.
+* **`print_coalescing_report` reimplemented `apply_min_samples`.**
+  Line for line, including the footnote wording. Replaced with the
+  call; `CoalesceGroup` already satisfies the helper's only
+  requirement.
+* **The functional test deleted instances it never awaited.** The
+  burst is fired through a non-blocking client and the assertion
+  returns as soon as the first coalescing event lands, so `tearDown`
+  began deleting six instances mid-create -- and `tearDown` fails
+  the test outright if any survives five minutes. It now settles
+  them with `_await_instance_create` after the assertion, which
+  costs nothing on the pass path and cannot mask the coalescing
+  result on the fail path.
+* **The functional test's poll deadline was unjustified.** Both
+  signals are emitted early in instance create, not at instance
+  ready, so 300 s bought nothing and spent five minutes of merge
+  queue wall clock on exactly the path the test exists to produce.
+  Reduced to 120 s, with the reasoning written down next to it.
+* **A late import with no justification, and a leaked file handle**
+  in `test_queue_wait_report.py`. CLAUDE.md states the late-import
+  rule as a hard convention. Both fixed.
+* **Two documentation errors.** The comment summarising the fold
+  still said the event lands on the survivor alone, which is the one
+  thing this phase changed; and the Results section claimed the
+  baseoperation tests went "37, up from 31" when the base commit has
+  18. Both corrected, and the counts now say how they were counted.
+
+Three coverage gaps the review named were also closed:
+`_coalescible_target_reference` now has a test for each of its three
+degrade-to-`None` paths, there is a test that a fold which raises
+still records an outcome, and
+`test_reports_the_distribution_and_the_outcomes` now asserts on the
+rendered row's cell values rather than on column headings which are
+printed whenever any row exists at all.
 
 ### Still outstanding
 
