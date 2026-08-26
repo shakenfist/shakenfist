@@ -13227,85 +13227,69 @@
 
 <h1 id="audit-expensive-lane-path-filtering">Audit: Expensive lane path filtering<a class="headerlink" href="#audit-expensive-lane-path-filtering" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<p>Ephemeral VM runners (the <code>vm</code> label) are the expensive pool: the
-lanes that run on them build entire clouds or boot guests, and a
-single run costs tens of minutes to hours of capacity. A pull
-request or merge queue entry that touches only content no lane
-exercises should not pay for them. The content in question is the
-<code>docs/</code> directory (where one exists) and the review-tracking state
-(<code>REVIEWS.md</code> and the <code>.vscode</code> weaudit files, where review
-tracking is deployed).</p>
-<p>Every workflow that runs <code>vm</code>-runner jobs on <code>pull_request</code> or
-<code>merge_group</code> must therefore be path-filtered, and the filter must
-exclude the repository's non-code content: a <code>docs/**</code> pattern
-where the repository has a <code>docs/</code> directory, and a <code>REVIEWS.md</code>
-pattern where it carries <code>.vscode/review-scope.toml</code>.</p>
-<p>Two filtering mechanisms count:</p>
+<p>Ephemeral VM runners (the <code>vm</code> label) are the expensive pool: the lanes
+that run on them build entire clouds or boot guests, and a single run
+costs tens of minutes to hours of capacity. A pull request or merge
+queue entry touching only content no lane exercises should not pay for
+them — the <code>docs/</code> directory, and the review-tracking state
+(<code>REVIEWS.md</code> and the <code>.vscode</code> weaudit files).</p>
+<p>Every workflow running <code>vm</code>-runner jobs on <code>pull_request</code> or
+<code>merge_group</code> must be path-filtered, and the filter must exclude a
+<code>docs/**</code> pattern where the repository has a <code>docs/</code> directory, and a
+<code>REVIEWS.md</code> pattern where it carries <code>.vscode/review-scope.toml</code>.</p>
+<p>Two mechanisms count:</p>
 <ul>
 <li>A workflow backing no required status check may use trigger-level
-  <code>paths:</code> / <code>paths-ignore:</code>. An inclusion-style <code>paths:</code> list
-  (naming what the lane exercises, as the rust workflows do)
-  excludes everything else by construction and passes without
-  pattern checks.</li>
+  <code>paths:</code> / <code>paths-ignore:</code>. An inclusion-style <code>paths:</code> list (naming
+  what the lane exercises, as the rust workflows do) excludes
+  everything else by construction and passes without pattern checks.</li>
 <li>A workflow backing a required status check must use a filter job
-  instead — <code>dorny/paths-filter</code> feeding job-level <code>if:</code>
-  conditions, as kerbside's <code>check_paths</code> jobs do. Trigger-level
-  filtering cannot coexist with required checks: a required check
-  in a <code>paths-ignore</code>'d workflow never reports on a filtered PR,
-  and a required check that never reports blocks the merge
-  forever, while a skipped one satisfies it.</li>
+  instead — <code>dorny/paths-filter</code> feeding job-level <code>if:</code> conditions, as
+  kerbside's <code>check_paths</code> jobs do. Trigger-level filtering cannot
+  coexist with required checks: a required check in a <code>paths-ignore</code>'d
+  workflow never reports on a filtered PR, and a required check that
+  never reports blocks the merge forever, while a skipped one satisfies
+  it.</li>
 </ul>
-<p>The worked example is kerbside: <code>functional-tests.yml</code>,
-<code>direct-qemu-functional.yml</code>, and <code>sf-e2e-functional.yml</code> each
-carry a <code>check_paths</code> filter job, <code>functional-tests.yml</code> also runs
-its filter on <code>merge_group</code> so a docs-only or review-marks-only
-queue entry skips the cloud matrices, and
+<p>kerbside is the worked example: <code>functional-tests.yml</code>,
+<code>direct-qemu-functional.yml</code> and <code>sf-e2e-functional.yml</code> each carry a
+<code>check_paths</code> filter job, <code>functional-tests.yml</code> also runs its filter
+on <code>merge_group</code>, and
 <a href="https://github.com/shakenfist/kerbside/blob/develop/docs/testing.md">kerbside's docs/testing.md</a>
-documents the design. When adopting the pattern, note
-dorny/paths-filter's <code>predicate-quantifier: 'every'</code> trap: the
-default ANY-match semantics make a <code>'**'</code> pattern defeat every
-exclusion.</p>
+documents the design. When adopting it, note dorny/paths-filter's
+<code>predicate-quantifier: 'every'</code> trap: the default ANY-match semantics
+make a <code>'**'</code> pattern defeat every exclusion.</p>
 <p>Dedicated content-scanner workflows (gitleaks, trufflehog,
 detect-secrets) are exempt. Their whole point is to read the
 human-written text a filter would skip: a secret lands in docs or
-review marks as easily as in code. This is the same reasoning that
-keeps content scanners out of <code>paths-ignore</code> in the review-tracking
-adoption procedure (see
-<a href="/components/development/audits/workflow-standards/">workflow-standards.md</a>).</p>
-<p><em>Dedicated</em> is measured per job: every job in the workflow must
-invoke a scanner, outside of comments. The argument for the
-exemption is about the scanner job, not about the file it happens to
-live in, so it only carries a whole workflow when the whole workflow
-is the scanner. Asking merely whether a scanner appeared anywhere in
-the file gave <code>shakenfist/actions</code> a pass for a <code>ci.yml</code> that ran
-lint, unit tests and the LLM reviewer on ephemeral VMs for every
-documentation typo, on the strength of the gitleaks job sitting
-beside them.</p>
+review marks as easily as in code.</p>
+<p><em>Dedicated</em> is measured per job: every job in the workflow must invoke
+a scanner, outside of comments. The argument for the exemption is about
+the scanner job, not the file it lives in. Asking merely whether a
+scanner appeared anywhere in the file gave <code>shakenfist/actions</code> a pass
+for a <code>ci.yml</code> that ran lint, unit tests and the LLM reviewer on
+ephemeral VMs for every documentation typo, on the strength of the
+gitleaks job sitting beside them.</p>
 <p>A mixed workflow is therefore held to the exclusion requirements
-whether or not it already carries a filter, and its scanner jobs
-should simply not consume the filter's output. Ryll's <code>ci.yml</code> is
-the worked example of the shape, and currently of the mistake too:
-its gitleaks job carries the same <code>check_paths</code> condition as the
-expensive lanes, so ryll's secret scan skips documentation-only
-pull requests.</p>
-<p>Other deliberate exceptions — a lane that must run even for
-docs-only changes — are marked with an <code>audit-ok: no-path-filter</code>
-comment anywhere in the workflow file, ideally with a reason.</p>
-<p>Repositories with neither a <code>docs/</code> directory nor review tracking
-have nothing for a filter to exclude and are reported as not
-applicable, as are repositories whose PR-triggered workflows never
-use <code>vm</code> runners.</p>
+whether or not it already carries a filter, and its scanner jobs should
+not consume the filter's output. Ryll's <code>ci.yml</code> is the worked example
+of the shape, and currently of the mistake too: its gitleaks job
+carries the same <code>check_paths</code> condition as the expensive lanes, so
+ryll's secret scan skips documentation-only pull requests.</p>
+<p>Other deliberate exceptions — a lane that must run even for docs-only
+changes — take an <code>audit-ok: no-path-filter</code> comment anywhere in the
+workflow file, ideally with a reason.</p>
+<p>Repositories with neither a <code>docs/</code> directory nor review tracking have
+nothing for a filter to exclude and are not applicable, as are
+repositories whose PR-triggered workflows never use <code>vm</code> runners.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No template — the correct shape depends on whether the workflow
-backs a required status check. Copy the <code>check_paths</code> pattern from
-kerbside's smoke workflows for gating lanes, or add trigger-level
-<code>paths-ignore</code> for advisory ones.</p>
+<p>No template — the correct shape depends on whether the workflow backs a
+required status check. Copy the <code>check_paths</code> pattern from kerbside's
+smoke workflows for gating lanes, or add trigger-level <code>paths-ignore</code>
+for advisory ones.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

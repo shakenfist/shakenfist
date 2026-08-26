@@ -13504,100 +13504,73 @@
 <h1 id="audit-workflow-standards">Audit: Workflow standards<a class="headerlink" href="#audit-workflow-standards" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
 <h3 id="workflow-permissions">Workflow permissions<a class="headerlink" href="#workflow-permissions" title="Permanent link">&para;</a></h3>
-<p>All GitHub Actions workflows must have a top-level <code>permissions</code>
-block to restrict the default <code>GITHUB_TOKEN</code> scope. This is flagged
-by GitHub Advanced Security if missing.</p>
-<ul>
-<li>Read-only workflows: <code>permissions: contents: read</code>.</li>
-<li>Mixed-need workflows: <code>permissions: {}</code> at top level with per-job
-  overrides.</li>
-</ul>
+<p>Every workflow needs a top-level <code>permissions:</code> block restricting the
+default <code>GITHUB_TOKEN</code> scope; GitHub Advanced Security flags its
+absence. Read-only workflows use <code>permissions: contents: read</code>;
+mixed-need workflows use <code>permissions: {}</code> at the top with per-job
+overrides.</p>
 <h3 id="workflow-and-job-naming">Workflow and job naming<a class="headerlink" href="#workflow-and-job-naming" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Display names should be English sentences with correct
-  capitalisation. No kebab case.</li>
-<li>The <strong>id</strong> of the job can be machine-friendly.</li>
-</ul>
+<p>Display names are English sentences with correct capitalisation, not
+kebab case. Job <strong>ids</strong> may be machine-friendly.</p>
 <h3 id="runner-preferences">Runner preferences<a class="headerlink" href="#runner-preferences" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Use <code>self-hosted</code> runners except under exceptional circumstances.
-  GitHub-provided runner minutes are limited per month, so jobs must
-  not leak onto GitHub-hosted runners without a documented reason.</li>
-<li>Legitimate exceptions (e.g. Windows and macOS builds where we own
-  no suitable hardware, as in ryll) must be marked with an
-  <code>audit-ok: github-hosted-runner</code> comment on -- or immediately
-  above -- the line referencing the GitHub-hosted label, ideally
-  with a reason:</li>
+<li>Use <code>self-hosted</code> runners. GitHub-provided minutes are limited per
+  month, so jobs must not leak onto GitHub-hosted runners without a
+  documented reason.</li>
+<li>Legitimate exceptions -- Windows and macOS builds where we own no
+  suitable hardware, as in ryll -- take an <code>audit-ok:
+  github-hosted-runner</code> comment on, or immediately above, the line
+  naming the label, ideally with a reason:</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="w">    </span><span class="c1"># audit-ok: github-hosted-runner -- no self-hosted macOS hardware</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">macos-latest</span>
 </code></pre></div>
 <ul>
-<li>The automated check flags any workflow line referencing a
-  GitHub-hosted runner label (<code>ubuntu-latest</code>, <code>windows-2022</code>,
-  <code>macos-15</code>, etc.) without an exception marker, including matrix
-  values that feed <code>runs-on: ${{ matrix.os }}</code>.</li>
-<li>The label must sit where a runner can actually be named: after
-  <code>runs-on:</code>, as an element of a <code>[...]</code> list, or as a <code>-</code> matrix
-  item. The same text elsewhere is not a runner reference, and used
-  to be reported as one -- a Shaken Fist image label
-  (<code>sf://label/ci-images/ubuntu-2404</code>), a job name
-  (<code>ubuntu-2404-slim-primary</code>) and an artifact name passed inside an
-  ssh command all matched. Those findings could not be actioned: the
-  only remedy the message offers is an <code>audit-ok</code> marker, which would
-  have been a false statement about a line that never described a
-  runner.</li>
+<li>The check flags any GitHub-hosted runner label (<code>ubuntu-latest</code>,
+  <code>windows-2022</code>, <code>macos-15</code>, ...) without a marker, including matrix
+  values feeding <code>runs-on: ${{ matrix.os }}</code>. It only counts labels
+  where a runner can actually be named -- after <code>runs-on:</code>, inside a
+  <code>[...]</code> list, or as a <code>-</code> matrix item -- so the same text in an
+  image label, a job name or an ssh command is not a finding.</li>
 <li>Claude Code automation jobs: <code>claude</code> runners only.</li>
 </ul>
 <h3 id="static-runners-for-small-non-mutating-jobs">Static runners for small, non-mutating jobs<a class="headerlink" href="#static-runners-for-small-non-mutating-jobs" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Small jobs that do not change the state of the runner -- linting,
-  metadata checks, audits, anything that does not install OS packages
-  or otherwise mutate the machine -- should run on a <code>static</code> runner
-  (<code>runs-on: [self-hosted, static]</code>). Static runners are a
-  pre-provisioned, long-lived pool, so they are much cheaper to start
-  than a fresh VM runner. Reserve <code>vm</code> runners for jobs that genuinely
-  need a throwaway machine (for example because they install packages
-  or need root that would dirty the host).</li>
-<li>A static runner advertises exactly the <code>self-hosted</code> and <code>static</code>
-  labels. A job that requests a <code>static</code> runner must therefore ask for
-  those two labels <strong>only</strong> -- <code>runs-on: [self-hosted, static]</code>.
-  Adding an impossible extra label such as a size (<code>s</code>, <code>l</code>), <code>vm</code>, or
-  an operating system (<code>debian-12</code>) asks for a runner that does not
-  exist, so the job is never scheduled and waits forever. The
-  automated check flags any <code>runs-on:</code> that combines <code>static</code> with
-  additional labels.</li>
+<li>Jobs that do not change the state of the runner -- linting, metadata
+  checks, audits, anything that installs no OS packages -- should use
+  <code>runs-on: [self-hosted, static]</code>. Static runners are a
+  pre-provisioned, long-lived pool and are much cheaper to start than a
+  fresh VM. Reserve <code>vm</code> runners for jobs that genuinely need a
+  throwaway machine.</li>
+<li>A static runner advertises exactly <code>self-hosted</code> and <code>static</code>, so a
+  <code>static</code> job must request those two labels <strong>only</strong>. Adding a size
+  (<code>s</code>, <code>l</code>), <code>vm</code>, or an OS (<code>debian-12</code>) asks for a runner that does
+  not exist, and the job waits forever. The check flags any <code>runs-on:</code>
+  combining <code>static</code> with additional labels.</li>
 </ul>
 <h3 id="job-timeouts">Job timeouts<a class="headerlink" href="#job-timeouts" title="Permanent link">&para;</a></h3>
-<p>Every job must set <code>timeout-minutes</code>. GitHub's default is 360
-minutes (six hours), which is never the right answer on a
-self-hosted pool: a wedged job holds a runner that nothing else can
-use until it expires. This matters most for jobs on the
-<code>claude-code</code> pool, where the runners are few and an unattended
-Claude Code run has no natural upper bound of its own --
-<code>--max-turns</code> caps turns, not wall clock.</p>
-<p>Rules of thumb, matching the values used in the templates:</p>
+<p>Every job must set <code>timeout-minutes</code>. GitHub's default is 360 minutes,
+which is never right on a self-hosted pool: a wedged job holds a runner
+nothing else can use until it expires. This matters most on the
+<code>claude-code</code> pool, where runners are few and an unattended Claude Code
+run has no natural upper bound -- <code>--max-turns</code> caps turns, not wall
+clock.</p>
+<p>Values used in the templates:</p>
 <ul>
-<li>Trigger / dispatch jobs that only make a few <code>gh</code> API calls
-  (<code>pr-retest.yml</code>, and the <code>trigger-*</code> job in <code>pr-fix-tests.yml</code>):
-  10 minutes.</li>
-<li>Claude Code triage runs (<code>issue-fix.yml</code>'s <code>triage</code> job): 30
-  minutes.</li>
-<li>Claude Code review runs (<code>pr-re-review.yml</code>): 60 minutes. Real
-  re-reviews finish in three to six minutes, so this is ten times
-  headroom.</li>
-<li>Claude Code fix runs that build and test (<code>issue-fix.yml</code>'s <code>fix</code>
-  job, <code>test-drift-fix.yml</code>): 120 minutes.</li>
+<li>Trigger / dispatch jobs making a few <code>gh</code> API calls (<code>pr-retest.yml</code>,
+  the <code>trigger-*</code> job in <code>pr-fix-tests.yml</code>): 10 minutes.</li>
+<li>Claude Code triage (<code>issue-fix.yml</code>'s <code>triage</code>): 30 minutes.</li>
+<li>Claude Code review (<code>pr-re-review.yml</code>): 60 minutes. Real re-reviews
+  finish in three to six minutes, so this is ten times headroom.</li>
+<li>Claude Code fix runs that build and test (<code>issue-fix.yml</code>'s <code>fix</code>,
+  <code>test-drift-fix.yml</code>): 120 minutes.</li>
 </ul>
 <h3 id="functional-test-workflow-naming">Functional test workflow naming<a class="headerlink" href="#functional-test-workflow-naming" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Functional testing must be in <code>functional-test.yml</code>.</li>
-<li>Must include <code>workflow_dispatch</code> as a trigger (needed by
-  <code>pr-retest.yml</code>).</li>
-</ul>
+<p>Functional testing lives in <code>functional-test.yml</code>, and must include
+<code>workflow_dispatch</code> as a trigger -- <code>pr-retest.yml</code> needs it.</p>
 <h3 id="pipestatus-for-piped-commands">PIPESTATUS for piped commands<a class="headerlink" href="#pipestatus-for-piped-commands" title="Permanent link">&para;</a></h3>
-<p>When piping through <code>tee</code> in a <code>run:</code> step, always use the
-<code>${PIPESTATUS[0]}</code> pattern to capture the upstream exit code:</p>
+<p>When piping through <code>tee</code> in a <code>run:</code> step, capture the upstream exit
+code with <code>${PIPESTATUS[0]}</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run something</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="no">set +e</span>
@@ -13609,19 +13582,16 @@ Claude Code run has no natural upper bound of its own --
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="no">exit ${exit_code}</span>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="no">fi</span>
 </code></pre></div>
-<p>Do not rely on <code>$?</code> (it captures the last command in the pipeline,
-which is <code>tee</code>, which always succeeds) or on <code>set -eo pipefail</code>
-alone (unreliable on self-hosted runners). The exceptions are a
-pipeline whose failure is deliberately ignored
-(<code>command | tee log.txt || true</code>) and one whose upstream cannot fail
-(<code>echo ... | tee</code>).</p>
+<p><code>$?</code> captures <code>tee</code>, which always succeeds, and <code>set -eo pipefail</code>
+alone is unreliable on self-hosted runners. Exceptions: a pipeline
+whose failure is deliberately ignored (<code>command | tee log.txt || true</code>)
+and one whose upstream cannot fail (<code>echo ... | tee</code>).</p>
 <h3 id="flake8wrapsh-correctness">flake8wrap.sh correctness<a class="headerlink" href="#flake8wrapsh-correctness" title="Permanent link">&para;</a></h3>
-<p><code>tools/flake8wrap.sh</code> runs flake8 over just the files changed in the
-current commit (via <code>tox -eflake8 -- -HEAD</code>), building a
-space-separated list in <code>filtered_files</code>. That variable must <strong>not</strong>
-be quoted on the diff/flake8 invocation line: quoting makes the whole
-list a single filename argument, which breaks as soon as more than
-one Python file changed.</p>
+<p><code>tools/flake8wrap.sh</code> runs flake8 over the files changed in the current
+commit (via <code>tox -eflake8 -- -HEAD</code>), building a space-separated list
+in <code>filtered_files</code>. That variable must <strong>not</strong> be quoted on the
+diff/flake8 line: quoting makes the whole list one filename, which
+breaks as soon as more than one Python file changed.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Correct -- the word splitting is deliberate.</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># shellcheck disable=SC2086</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>diff<span class="w"> </span>-u<span class="w"> </span>--from-file<span class="w"> </span>/dev/null<span class="w"> </span><span class="si">${</span><span class="nv">filtered_files</span><span class="si">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="nv">$FLAKE_COMMAND</span><span class="w"> </span><span class="si">${</span><span class="nv">filtered_files</span><span class="si">}</span>
@@ -13629,50 +13599,39 @@ one Python file changed.</p>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Wrong -- one argument named "a.py b.py".</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>diff<span class="w"> </span>-u<span class="w"> </span>--from-file<span class="w"> </span>/dev/null<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">filtered_files</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="nv">$FLAKE_COMMAND</span><span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">filtered_files</span><span class="si">}</span><span class="s2">"</span>
 </code></pre></div>
-<p>The <code>shellcheck disable=SC2086</code> directive is required because
-shellcheck otherwise flags that splitting; keep the comment saying it
-is intentional. The script should also filter to <code>.py</code> files, skip
-<code>_pb2</code> generated files, and handle deleted files (paths in the diff
-that no longer exist on disk).</p>
+<p>The <code>shellcheck disable=SC2086</code> directive is required, and its comment
+should say the splitting is intentional. The script should also filter
+to <code>.py</code> files, skip <code>_pb2</code> generated files, and handle paths in the
+diff that no longer exist on disk.</p>
 <h3 id="ci-linting">CI linting<a class="headerlink" href="#ci-linting" title="Permanent link">&para;</a></h3>
-<ul>
-<li><code>actionlint</code>, <code>shellcheck</code>, and <code>.pre-commit-config.yaml</code> that
-  runs them. <code>kerbside</code> and <code>kerbside-patches</code> are the worked
-  examples.</li>
-<li>Helper shell scripts should have shellcheck pre-commit hooks.</li>
-</ul>
+<p><code>actionlint</code>, <code>shellcheck</code>, and a <code>.pre-commit-config.yaml</code> that runs
+them; <code>kerbside</code> and <code>kerbside-patches</code> are the worked examples. Helper
+shell scripts should have shellcheck pre-commit hooks.</p>
 <h3 id="review-marks-excluded-from-pre-commit">Review marks excluded from pre-commit<a class="headerlink" href="#review-marks-excluded-from-pre-commit" title="Permanent link">&para;</a></h3>
 <p>Repositories with human review tracking deployed (those carrying
-<code>.vscode/review-scope.toml</code> -- see
-<a href="/components/development/code-review-tracking/">docs/code-review-tracking.md</a>)
-must exempt the weAudit state files from any pre-commit hook that
-rewrites the files it is given:</p>
+<code>.vscode/review-scope.toml</code>) must exempt the weAudit state files from
+any pre-commit hook that rewrites the files it is given:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">end-of-file-fixer</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^\.vscode/.*\.weaudit</span>
 </code></pre></div>
-<p>Those files are generated, and the generator emits no trailing
-newline, so <code>end-of-file-fixer</code> rewrites them on every
-<code>pre-commit run --all-files</code>. That reports a failure nobody can fix:
-committing the newline only means the next regen drops it again, so
-the hook warns over and over until people learn to ignore it, which
-is the opposite of what a lint gate is for. Scope the exclude to the
+<p>Those files are generated without a trailing newline, so
+<code>end-of-file-fixer</code> rewrites them on every <code>pre-commit run --all-files</code>
+and reports a failure nobody can fix. Scope the exclude to the
 rewriting hooks rather than the whole file --
-<a href="/components/development/code-review-tracking/">docs/code-review-tracking.md</a> explains
-why a blanket exclude is worse than none.</p>
-<p>The check therefore applies only where a rewriting hook
-(<code>end-of-file-fixer</code>, <code>trailing-whitespace</code>, <code>mixed-line-ending</code>,
-<code>pretty-format-json</code>, <code>file-contents-sorter</code>) is configured. It
-tries each <code>exclude:</code> value as the regex pre-commit would apply and
-passes if any one matches both <code>.vscode/&lt;user&gt;.weaudit</code> and
-<code>.vscode/&lt;user&gt;.weaudit-shas.json</code>, so a top-level exclude still
-counts where a repo has one. Repositories without the tooling,
-without a <code>.pre-commit-config.yaml</code>, or running no rewriting hook
-at all are not applicable.</p>
+<a href="/components/development/code-review-tracking/">docs/code-review-tracking.md</a> explains why
+a blanket exclude is worse than none.</p>
+<p>The check applies only where a rewriting hook (<code>end-of-file-fixer</code>,
+<code>trailing-whitespace</code>, <code>mixed-line-ending</code>, <code>pretty-format-json</code>,
+<code>file-contents-sorter</code>) is configured. It tries each <code>exclude:</code> value
+as the regex pre-commit would apply and passes if any one matches both
+<code>.vscode/&lt;user&gt;.weaudit</code> and <code>.vscode/&lt;user&gt;.weaudit-shas.json</code>, so a
+top-level exclude still counts. Repositories without the tooling,
+without a <code>.pre-commit-config.yaml</code>, or running no rewriting hook are
+not applicable.</p>
 <h3 id="pypi-caching">PyPI caching<a class="headerlink" href="#pypi-caching" title="Permanent link">&para;</a></h3>
 <p>Self-hosted runners should use the devpi PyPI cache at
-<code>http://192.168.1.15:3141</code> to reduce network load.</p>
-<p>Any job that points pip at the devpi cache with <code>PIP_INDEX_URL</code> must
-also set a pypi fallback in the <strong>same</strong> <code>env</code> block:</p>
+<code>http://192.168.1.15:3141</code>. Any job pointing pip at it with
+<code>PIP_INDEX_URL</code> must set a pypi fallback in the <strong>same</strong> <code>env</code> block:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="w">    </span><span class="nt">env</span><span class="p">:</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">      </span><span class="nt">PIP_INDEX_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://192.168.1.15:3141/root/pypi/+simple/</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">      </span><span class="nt">PIP_EXTRA_INDEX_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://pypi.org/simple/</span>
@@ -13680,29 +13639,23 @@ also set a pypi fallback in the <strong>same</strong> <code>env</code> block:</p
 </code></pre></div>
 <p>devpi's <code>root/pypi</code> mirror is lazy: the first request for a package it
 has never cached returns an empty index if the upstream fetch misses,
-and pip then reports <code>Could not find a version that satisfies the
-requirement X (from versions: none)</code> and the job fails. Because
-<code>PIP_INDEX_URL</code> replaces pypi entirely, there is no fallback without
-<code>PIP_EXTRA_INDEX_URL</code>; adding it lets pip fall back to pypi for that
-cold-cache miss. The automated check flags any devpi-backed <code>env</code>
-block missing <code>PIP_EXTRA_INDEX_URL</code>.</p>
+and pip reports <code>Could not find a version that satisfies the
+requirement X (from versions: none)</code>. <code>PIP_INDEX_URL</code> replaces pypi
+entirely, so without <code>PIP_EXTRA_INDEX_URL</code> there is no fallback. The
+check flags any devpi-backed <code>env</code> block missing it.</p>
 <h3 id="retired-devpi-address">Retired devpi address<a class="headerlink" href="#retired-devpi-address" title="Permanent link">&para;</a></h3>
-<p>The devpi cache used to live at <code>192.168.1.4</code> but moved to
-<code>192.168.1.15</code> some time ago. The old address no longer resolves to a
-running server, so a job that still points pip at <code>192.168.1.4</code> -- in
-<code>PIP_INDEX_URL</code>, <code>PIP_TRUSTED_HOST</code>, or anywhere else -- fails every
-install. The automated check flags any workflow line referencing the
-retired <code>192.168.1.4</code> address; update it to <code>192.168.1.15</code>.</p>
+<p>The cache moved from <code>192.168.1.4</code> to <code>192.168.1.15</code>. The old address
+no longer resolves to a running server, so a job still pointing at it
+-- in <code>PIP_INDEX_URL</code>, <code>PIP_TRUSTED_HOST</code>, or anywhere else -- fails
+every install. The check flags any workflow line referencing
+<code>192.168.1.4</code>.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No single template -- these are standards applied across all
-workflow files. See <code>templates/ci-review-automation/</code> for examples
-of correctly structured workflows.</p>
+<p>No single template -- these are standards applied across all workflow
+files. See <code>templates/ci-review-automation/</code> for examples of correctly
+structured workflows.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

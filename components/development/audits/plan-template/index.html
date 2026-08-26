@@ -2121,17 +2121,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#why-the-model-roster-is-its-own-block" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why the model roster is its own block
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#what-stays-project-specific" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13223,17 +13212,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#why-the-model-roster-is-its-own-block" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why the model roster is its own block
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#what-stays-project-specific" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13307,129 +13285,99 @@
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
 <p><code>PLAN-TEMPLATE.md</code> is the starting point for every master plan a
 repository writes into <code>docs/plans/</code>. Most of what it says is not
-project-specific at all: how phase files are named, that sub-agents
-do the implementation work, what the effort levels mean, which
-models are available and when to reach for each. That wording was
-copied between repositories by hand and has drifted -- six copies of
-the same paragraphs, differing in line wrapping, in which effort
-levels they know about, and in whether they mention a model that has
-since shipped.</p>
-<p>Repositories that carry a <code>PLAN-TEMPLATE.md</code> must embed the current
-version of each of these shared blocks:</p>
+project-specific -- how phase files are named, that sub-agents do the
+implementation work, what the effort levels mean, which models are
+available. That wording was copied between repositories by hand and
+drifted, so it is now embedded as versioned shared blocks.</p>
+<p>Repositories carrying a <code>PLAN-TEMPLATE.md</code> must embed the current
+version of each of:</p>
 <ul>
-<li><strong><code>plan-file-conventions</code></strong> -- where plans live, how phase files
-  are named, how phases are tracked, and the one-commit-per-logical
-  -change rule;</li>
-<li><strong><code>plan-status-vocabulary</code></strong> -- the fixed set of terms a status
-  cell may hold, in the plan's own phase table and in
-  <code>docs/plans/index.md</code> (the <code>plan-index</code> audit enforces the index
-  half);</li>
+<li><strong><code>plan-file-conventions</code></strong> -- where plans live, how phase files are
+  named, how phases are tracked, and the one-commit-per-logical-change
+  rule;</li>
+<li><strong><code>plan-status-vocabulary</code></strong> -- the fixed set of terms a status cell
+  may hold, in the plan's phase table and in <code>docs/plans/index.md</code>
+  (the <code>plan-index</code> audit enforces the index half);</li>
 <li><strong><code>subagent-execution-model</code></strong> -- implementation happens in
-  sub-agents, the plan/spawn/review/retry/commit loop, and when to
-  use worktree isolation;</li>
+  sub-agents, the plan/spawn/review/retry/commit loop, and when to use
+  worktree isolation;</li>
 <li><strong><code>plan-planning-effort</code></strong> -- the master plan is planned at high
   effort, and each phase plan states its own planning effort;</li>
 <li><strong><code>subagent-step-guidance</code></strong> -- the step table, the effort ladder
   (<code>low</code> through <code>max</code>), and what makes a good sub-agent brief;</li>
-<li><strong><code>subagent-model-roster</code></strong> -- which models sub-agents may be
-  given, what each is for, their context windows, and the
+<li><strong><code>subagent-model-roster</code></strong> -- which models sub-agents may be given,
+  what each is for, their context windows, and the
   skew-to-the-more-capable-model rule;</li>
-<li><strong><code>plan-review-checklist</code></strong> -- what the management session
-  verifies after a sub-agent completes;</li>
-<li><strong><code>plan-closeout-sections</code></strong> -- the Future work, Bugs fixed and
-  Back brief sections; and</li>
+<li><strong><code>plan-review-checklist</code></strong> -- what the management session verifies
+  after a sub-agent completes;</li>
+<li><strong><code>plan-closeout-sections</code></strong> -- the Future work, Bugs fixed and Back
+  brief sections; and</li>
 <li><strong><code>plan-push-audit-phase</code></strong> -- that every master plan ends with a
-  phase running the repository's <code>PUSH-AUDIT.md</code> over the whole
-  plan's work. This is the block that gives the pre-push audit a
-  trigger; see the <code>push-audit</code> audit for the runbook it starts.
-  Since v2 it also carries a plan-authoring requirement: because a
-  diff against the default branch is empty once a plan's phases have
-  merged, and unrelated work landing between phases makes the range
-  underivable afterwards, each phase records what put it on the
-  default branch as it lands -- the merge commit of its pull
-  request, or every commit of the phase where it landed directly.
-  That goes in a <code>Merged</code> column where the Execution phases are a
-  table, added last so a row which omits it still reaches <code>Status</code>,
-  or a <code>Merged:</code> line where they are prose sections. It never goes
-  in the <code>Status</code> cell, which <code>plan-status-vocabulary</code> reserves for
-  a single term.</li>
+  phase running the repository's <code>PUSH-AUDIT.md</code> over the whole plan's
+  work. This is what gives the pre-push audit a trigger; see the
+  <code>push-audit</code> audit for the runbook it starts. Since v2 it also
+  carries a plan-authoring requirement: because a diff against the
+  default branch is empty once a plan's phases have merged, and
+  unrelated work landing between phases makes the range underivable
+  afterwards, each phase records what put it on the default branch as
+  it lands -- the merge commit of its pull request, or every commit of
+  the phase where it landed directly. That goes in a <code>Merged</code> column
+  where the Execution phases are a table, added last so a row which
+  omits it still reaches <code>Status</code>, or a <code>Merged:</code> line where they are
+  prose sections. It never goes in the <code>Status</code> cell, which
+  <code>plan-status-vocabulary</code> reserves for a single term.</li>
 </ul>
 <p>Every embedded block must be verbatim and at the current version.</p>
-<p>Repositories with no <code>PLAN-TEMPLATE.md</code> at all are reported as N/A.
-Whether every project should have one is a separate decision, not
-smuggled in here -- a template's project-specific half (what to read
-before planning, what the success criteria are) has to be written
-with real knowledge of the project, and an empty one is worse than
-none.</p>
-<h3 id="why-the-model-roster-is-its-own-block">Why the model roster is its own block<a class="headerlink" href="#why-the-model-roster-is-its-own-block" title="Permanent link">&para;</a></h3>
-<p>The roster changes on a different cadence to everything else here:
-new models ship and old ones retire, while the effort ladder and the
-review checklist sit still for months. Keeping it separate means a
-model launch bumps one small block, and the issue filed against each
-lagging repository says the model roster is stale rather than that
-step guidance is stale.</p>
-<p>This is also the mechanism for <em>managing</em> which models planning
-sessions may use. To add, remove or re-describe a model fleet-wide:
-edit <code>templates/shared-blocks/subagent-model-roster.md</code>, bump its
-version, and commit. The next daily audit run marks every repository
-still carrying the old roster non-compliant and files the issues
-automatically.</p>
+<p>Repositories with no <code>PLAN-TEMPLATE.md</code> are N/A. Whether every project
+should have one is a separate decision, not smuggled in here: a
+template's project-specific half has to be written with real knowledge
+of the project, and an empty one is worse than none.</p>
+<p>The roster is its own block because it changes on a different cadence
+-- models ship and retire while the effort ladder sits still. That is
+also how models are <em>managed</em> fleet-wide: edit
+<code>templates/shared-blocks/subagent-model-roster.md</code>, bump its version,
+commit, and the next daily run files an issue against every lagging
+repository.</p>
 <h3 id="what-stays-project-specific">What stays project-specific<a class="headerlink" href="#what-stays-project-specific" title="Permanent link">&para;</a></h3>
-<p>The rule is that a section of <code>PLAN-TEMPLATE.md</code> is either wholly
-shared or wholly project-specific -- generic rules and local
-examples are not interleaved within a section. Where a section is a
-generic rule plus a local example, the rule is the shared block and
-the example follows it in an <code>!!! note "In this project"</code>
-admonition.</p>
-<p>The admonition is deliberate rather than a heading. Master plans
-written from this template live in <code>docs/plans/</code> and are published
-through mkdocs-material, so a template section that survives into a
-plan renders as a proper callout there -- and a good deal of this
-material does survive: of shakenfist's 125 published plans, 85 carry
-a Back brief, 76 carry Success criteria and 44 carry Step-level
-guidance. Repeating a <code>### In this project</code> heading instead would
-also mint duplicate anchor IDs and duplicate table-of-contents
-entries in every one of those plans.</p>
-<p>Only the short runs that trail a shared block need the admonition.
-Whole sections that are project-specific in their entirety --
-<code>## Prompt</code>, <code>### Success criteria</code>, <code>### Documentation index
-maintenance</code> -- already announce themselves by their headings and
-are left alone. So are the <code>...</code> placeholder sections, which are
-specific to each individual plan rather than to the project.</p>
+<p>A section of <code>PLAN-TEMPLATE.md</code> is either wholly shared or wholly
+project-specific; generic rules and local examples are not interleaved
+within a section. Where a section is a generic rule plus a local
+example, the rule is the shared block and the example follows it in an
+<code>!!! note "In this project"</code> admonition.</p>
+<p>The admonition is deliberate. Template sections survive into the plans
+written from them, which publish through mkdocs-material, so it renders
+as a proper callout -- whereas a repeated <code>### In this project</code> heading
+would mint duplicate anchor IDs and duplicate table-of-contents entries
+in every one of those plans.</p>
+<p>Only the short runs trailing a shared block need the admonition. Whole
+sections that are project-specific in their entirety -- <code>## Prompt</code>,
+<code>### Success criteria</code>, <code>### Documentation index maintenance</code> --
+announce themselves by their headings and are left alone, as are the
+<code>...</code> placeholder sections.</p>
 <p>Project-specific, and therefore never a shared block:</p>
 <ul>
-<li>the <code>## Prompt</code> preamble -- which codebase to explore, which files
-  to read first, which external concepts may need research;</li>
+<li>the <code>## Prompt</code> preamble -- which codebase to explore, which files to
+  read first, which external concepts may need research;</li>
 <li><code>### Success criteria</code> -- the project's own build, lint, test and
   documentation gates;</li>
 <li>the worked examples under <code>### Planning effort</code> and the
   project-specific entries under the review checklist; and</li>
-<li><code>### Documentation index maintenance</code>, where the project has a
-  documentation index to maintain.</li>
+<li><code>### Documentation index maintenance</code>, where the project has one.</li>
 </ul>
 <h3 id="shared-blocks">Shared blocks<a class="headerlink" href="#shared-blocks" title="Permanent link">&para;</a></h3>
-<p>A shared block is canonical wording embedded verbatim across
-repositories, delimited by versioned markers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&lt;!-- shared-block: &lt;name&gt; v&lt;N&gt; --&gt;
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>...canonical wording...
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>&lt;!-- shared-block-end --&gt;
-</code></pre></div>
-<p>Canonical copies live in <code>templates/shared-blocks/&lt;name&gt;.md</code> in this
-repository (markers included); see
-<code>templates/shared-blocks/README.md</code> for the mechanism. The check
-fails when an embedded block is missing where required, carries a
-stale version, has drifted from the canonical wording, is unknown
-(no canonical file), or is missing its end marker.</p>
+<p>Shared blocks are canonical wording embedded verbatim across
+repositories between <code>&lt;!-- shared-block: &lt;name&gt; v&lt;N&gt; --&gt;</code> and
+<code>&lt;!-- shared-block-end --&gt;</code> markers; the canonical copies live in
+<code>templates/shared-blocks/</code>, whose <code>README.md</code> describes the
+mechanism. The check fails when a required block is missing, stale,
+drifted from the canonical wording, unknown, or missing its end marker.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p><code>templates/shared-blocks/</code> holds the canonical copy of each block
 listed above. Copy each one verbatim, markers included, into the
 matching section of the repository's <code>PLAN-TEMPLATE.md</code>.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

@@ -13231,61 +13231,49 @@
 history of how it was built. <code>README.md</code>, <code>AGENTS.md</code>,
 <code>ARCHITECTURE.md</code> and the files under <code>docs/</code> must not refer to the
 phase numbers of implementation plans: wording like "feature YYY,
-implemented in phase ZZZ" tells a reader nothing they need -- often
+implemented in phase ZZZ" tells a reader nothing they need, often
 without even naming the plan the phase belongs to. Either the feature
-is implemented, in which case the docs should describe it plainly, or
-it is not, in which case the docs should link to the master plan in
-<code>docs/plans/</code> rather than citing a phase.</p>
+is implemented, in which case the docs describe it plainly, or it is
+not, in which case they link to the master plan in <code>docs/plans/</code>.</p>
 <p><code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> are in scope for the same reason
-<code>README.md</code> is: they describe current behaviour to a reader who was
-not present for the construction, so a
-<code>## Phase 6: Bridge Lifecycle</code> section heading is as unhelpful there
-as it would be in <code>docs/</code>. Their <em>shape</em> is a separate audit (<code>llm-doc-structure</code>).</p>
-<p>The automated check greps the top-level <code>README.md</code>, <code>AGENTS.md</code> and
+<code>README.md</code> is: they describe current behaviour to a reader who was not
+present for the construction, so a <code>## Phase 6: Bridge Lifecycle</code>
+heading is as unhelpful there as in <code>docs/</code>. Their <em>shape</em> is a
+separate audit (<code>llm-doc-structure</code>).</p>
+<p>The check greps the top-level <code>README.md</code>, <code>AGENTS.md</code> and
 <code>ARCHITECTURE.md</code>, and every <code>.md</code> file under <code>docs/</code>, for
 <code>phase &lt;number&gt;</code> (case-insensitive), skipping:</p>
 <ul>
-<li>any file under a <code>plans/</code> directory at any depth -- plan
-  documents legitimately discuss their own phases;</li>
-<li>per-repository <code>doc_content_excludes</code> prefixes from
-  <code>REPO_OVERRIDES</code> in <code>scripts/audit-check.py</code> -- shakenfist's
-  <code>docs/components/</code> is an automated import of the other
-  repositories' documentation, so auditing it would double-report
-  findings that must be fixed at their source;</li>
+<li>any file under a <code>plans/</code> directory at any depth -- plan documents
+  legitimately discuss their own phases;</li>
+<li>per-repository <code>doc_content_excludes</code> prefixes from <code>REPO_OVERRIDES</code>
+  in <code>scripts/audit-check.py</code> -- shakenfist's <code>docs/components/</code> is an
+  automated import of the other repositories' documentation, so
+  auditing it would double-report findings that must be fixed at their
+  source;</li>
 <li>fenced code blocks and inline code spans; and</li>
 <li>lines carrying an explicit <code>&lt;!-- audit-ok: phase-reference --&gt;</code>
   marker.</li>
 </ul>
-<p>The word "phase" is reserved for plan documents. A procedural
-document describing a live multi-stage process (a release runbook,
-say) should call its stages "steps" or "stages"; the suppression
-marker exists for the rare line where "phase <number>" is genuinely
-not a plan reference.</p>
-<p>Repositories with none of those files and no <code>docs/</code> directory are
-reported as N/A.</p>
-<p>The judgment half of the policy is enforced at the point where the
-references are written: each repository's pre-push audit file
-carries the canonical <code>plan-phase-references</code> shared block (see the
-<code>push-audit</code> audit), which instructs the documentation reviewer to
-keep plan history out of the docs.</p>
-<p>This audit exists because feature documentation across the fleet
-accreted phrasing like <code>since two-tier CI phase 3</code> and
-<code>phase 6 is what makes...</code> -- references to the phase numbering of
-historical plans that mean nothing to a reader who was not there
-when the plan was executed.</p>
+<p>The word "phase" is reserved for plan documents. A procedural document
+describing a live multi-stage process -- a release runbook, say --
+should call its stages "steps"; the suppression marker exists for the
+rare line where "phase <number>" is genuinely not a plan reference.</p>
+<p>Repositories with none of those files and no <code>docs/</code> directory are N/A.</p>
+<p>The judgment half of the policy is enforced where the references are
+written: each repository's pre-push audit file carries the canonical
+<code>plan-phase-references</code> shared block (see the <code>push-audit</code> audit),
+which instructs the documentation reviewer to keep plan history out of
+the docs.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No template -- reword the documentation to describe current
-behaviour, moving any forward-looking material into a link to the
-relevant master plan in <code>docs/plans/</code>. Consult the referenced plan
-(<code>docs/plans/PLAN-*.md</code>) to work out what the wording should say
-instead; the rewording must preserve the information, not delete
-it.</p>
+<p>No template -- reword the documentation to describe current behaviour,
+moving any forward-looking material into a link to the relevant master
+plan in <code>docs/plans/</code>. Consult the referenced plan to work out what the
+wording should say instead; the rewording must preserve the
+information, not delete it.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

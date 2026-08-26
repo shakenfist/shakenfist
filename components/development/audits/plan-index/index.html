@@ -13286,83 +13286,69 @@
 <p><code>docs/plans/index.md</code> is the one page that answers "what has this
 repository planned, and what still wants attention". It is read by
 people picking up work and by tooling deciding what to surface, and
-neither can read it if every repository shapes it differently. Three
-layouts had grown across the fleet -- a date-first table of plans, a
-plan-first table of plans, and a plan-first table of <em>phases</em> -- so
-a reader (or a script) had to work out which one it was looking at
-before it could find the status column.</p>
+neither can read it if every repository shapes it differently -- three
+layouts had grown across the fleet, so a reader had to work out which
+one it was looking at before finding the status column.</p>
 <p>Repositories with a <code>docs/plans/</code> directory must satisfy all of:</p>
 <ul>
 <li><strong>An index exists.</strong> <code>docs/plans/index.md</code> is present whenever
-  <code>docs/plans/</code> holds any plan at all.</li>
+  <code>docs/plans/</code> holds any plan.</li>
 <li><strong>Plans are listed in tables</strong>, not as prose or a bullet list.</li>
-<li><strong>Every table leads with <code>Date</code> then <code>Plan</code>.</strong> Later columns are
-  the repository's own business; <code>Intent</code>, <code>Status</code> and <code>Phases</code> are
-  the common ones. A <code>Status</code> column is optional -- a standalone
-  plan listing that tracks no status is registered, just not
-  tracked.</li>
+<li><strong>Every table leads with <code>Date</code> then <code>Plan</code>.</strong> Later columns are the
+  repository's own business; <code>Intent</code>, <code>Status</code> and <code>Phases</code> are the
+  common ones. A <code>Status</code> column is optional -- a standalone plan
+  listing that tracks no status is registered, just not tracked.</li>
 <li><strong>Dates are <code>YYYY-MM-DD</code></strong>, and rows run oldest first. Ordering is
-  checked within each table, not across them, so a repository may
-  keep separate master, standalone and consolidation tables that
-  each start over.</li>
-<li><strong>Every master plan is listed.</strong> A plan file in <code>docs/plans/</code> that
-  the index never links is invisible: it was drafted and then
-  forgotten. Phase plans are exempt -- they are named after their
-  master plan and tracked inside it.</li>
-<li><strong>Status cells come from the shared vocabulary</strong>, described below.</li>
+  checked within each table, not across them, so a repository may keep
+  separate master, standalone and consolidation tables.</li>
+<li><strong>Every master plan is listed.</strong> A plan file the index never links is
+  invisible: it was drafted and then forgotten. Phase plans are exempt
+  -- they are named after their master plan and tracked inside it.</li>
+<li><strong>Status cells come from the shared vocabulary</strong>, below.</li>
 </ul>
-<p>Repositories with no <code>docs/plans/</code> directory are reported as N/A.
-Whether every project should plan this way is a separate decision,
-not smuggled in here.</p>
+<p>Repositories with no <code>docs/plans/</code> directory are N/A. Whether every
+project should plan this way is a separate decision, not smuggled in
+here.</p>
 <h3 id="the-status-vocabulary">The status vocabulary<a class="headerlink" href="#the-status-vocabulary" title="Permanent link">&para;</a></h3>
 <p>A status cell holds exactly one of <code>Proposed</code>, <code>Not started</code>,
-<code>In progress</code>, <code>Blocked</code>, <code>Complete</code>, <code>Abandoned</code> or <code>Superseded</code>,
-and nothing else. Matching is case-insensitive, so <code>In Progress</code>
-passes, but the canonical spelling is the one to write.</p>
-<p>The rule is strict about the "nothing else" because that is the part
-that decayed. Status cells across the fleet had grown into whole
-paragraphs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Complete (phases 1-5 and 2b, 2026-08-15): every merge to develop
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>installs a freshly built .deb/.rpm on...
-</code></pre></div>
-<p>That is useful writing in the wrong column. A status is read to decide
-whether a plan still wants attention; when the answer is buried in a
-paragraph, neither a person scanning the table nor a script can get
-it out. Dates, phase arithmetic and summaries of what happened
-belong in the plan file, and a one-line summary belongs in the
-index's own <code>Intent</code> column.</p>
-<p>The vocabulary itself is a versioned shared block,
-<code>plan-status-vocabulary</code>, which every <code>PLAN-TEMPLATE.md</code> must carry
-(see the <code>plan-template</code> audit) so that plans are written to it
-rather than corrected afterwards. It governs the master plan's own
-Execution phase table as well as the index row. A test in
-<code>scripts/test_audit_check.py</code> asserts the block and the list the
-audit enforces name the same terms, so the wording repositories are
-handed cannot drift from the wording they are measured against.</p>
+<code>In progress</code>, <code>Blocked</code>, <code>Complete</code>, <code>Abandoned</code> or <code>Superseded</code>, and
+nothing else. Matching is case-insensitive, so <code>In Progress</code> passes,
+but the canonical spelling is the one to write.</p>
+<p>The "nothing else" is strict because that is the part that decayed:
+status cells had grown into whole paragraphs carrying dates, phase
+arithmetic and summaries of what happened. That is useful writing in
+the wrong column. A status is read to decide whether a plan still wants
+attention, and neither a person scanning the table nor a script can get
+that out of a paragraph. The detail belongs in the plan file, and a
+one-line summary in the index's own <code>Intent</code> column.</p>
+<p>The vocabulary is a versioned shared block, <code>plan-status-vocabulary</code>,
+which every <code>PLAN-TEMPLATE.md</code> must carry (see the <code>plan-template</code>
+audit) so plans are written to it rather than corrected afterwards. It
+governs the master plan's own Execution phase table as well as the
+index row. A test in <code>scripts/test_audit_check.py</code> asserts the block
+and the list the audit enforces name the same terms, so the wording
+repositories are handed cannot drift from the wording they are measured
+against.</p>
 <h3 id="overlap-with-the-session-hook-which-is-deliberate">Overlap with the session hook, which is deliberate<a class="headerlink" href="#overlap-with-the-session-hook-which-is-deliberate" title="Permanent link">&para;</a></h3>
 <p>An unregistered plan is also reported by the local SessionStart
-plan-status hook, which lists incomplete and unregistered plans as
-candidate work when a session opens in the repository. The two are
-not redundant: the hook is a per-session nudge that disappears when
-the session ends, and the audit is what turns a persistent gap into
-a tracked issue. Format, ordering and vocabulary are the audit's
-alone -- the hook only reads the index, it does not police it.</p>
+plan-status hook. The two are not redundant: the hook is a per-session
+nudge that disappears when the session ends, and the audit is what
+turns a persistent gap into a tracked issue. Format, ordering and
+vocabulary are the audit's alone -- the hook only reads the index, it
+does not police it.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No template. <code>templates/shared-blocks/plan-status-vocabulary.md</code>
-holds the canonical status vocabulary; copy it verbatim, markers
-included, into the repository's <code>PLAN-TEMPLATE.md</code>.</p>
-<p>To convert an index to the canonical layout, move the date to the
-first column, sort each table oldest first, and move everything that
-is not a vocabulary term out of the status column -- into <code>Intent</code>
-if it is a one-line summary, into the plan file if it is longer. Add
-a row for any plan the index does not list; consult the plan to work
-out its real status rather than guessing from the file's existence.</p>
+<p>No template. <code>templates/shared-blocks/plan-status-vocabulary.md</code> holds
+the canonical status vocabulary; copy it verbatim, markers included,
+into the repository's <code>PLAN-TEMPLATE.md</code>.</p>
+<p>To convert an index to the canonical layout, move the date to the first
+column, sort each table oldest first, and move everything that is not a
+vocabulary term out of the status column -- into <code>Intent</code> if it is a
+one-line summary, into the plan file if it is longer. Add a row for any
+plan the index does not list; consult the plan to work out its real
+status rather than guessing from the file's existence.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

@@ -1505,10 +1505,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automated-review" class="md-nav__link">
+  <a href="#measured" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Automated review
+        Measured
       
     </span>
   </a>
@@ -1516,10 +1516,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#developer-automation" class="md-nav__link">
+  <a href="#required-but-confirmed-by-a-reviewer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Developer automation
+        Required, but confirmed by a reviewer
       
     </span>
   </a>
@@ -1537,41 +1537,19 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#the-trigger-handling-must-be-the-shared-action" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The trigger handling must be the shared action
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#test-drift-fixing-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test drift fixing (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#automated-reviewer-prompt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Automated reviewer prompt
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
   
 </li>
       
@@ -13256,10 +13234,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automated-review" class="md-nav__link">
+  <a href="#measured" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Automated review
+        Measured
       
     </span>
   </a>
@@ -13267,10 +13245,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#developer-automation" class="md-nav__link">
+  <a href="#required-but-confirmed-by-a-reviewer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Developer automation
+        Required, but confirmed by a reviewer
       
     </span>
   </a>
@@ -13288,41 +13266,19 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#the-trigger-handling-must-be-the-shared-action" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The trigger handling must be the shared action
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#test-drift-fixing-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test drift fixing (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#automated-reviewer-prompt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Automated reviewer prompt
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
   
 </li>
       
@@ -13371,149 +13327,79 @@
 
 <h1 id="audit-ci-review-automation-and-developer-automation">Audit: CI review automation and developer automation<a class="headerlink" href="#audit-ci-review-automation-and-developer-automation" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<h3 id="automated-review">Automated review<a class="headerlink" href="#automated-review" title="Permanent link">&para;</a></h3>
+<h3 id="measured">Measured<a class="headerlink" href="#measured" title="Permanent link">&para;</a></h3>
+<p>These are the requirements the check decides a pass or a failure on,
+and the only ones that produce an issue. The rest of this section is
+part of the same standard; it is simply not decidable from the
+workflow files alone, so a reviewer confirms it instead.</p>
 <ul>
-<li>Claude Code automated review runs in the CI workflow, only after
-  all other tests pass.</li>
-<li>The reviewer job must be a call to the shared reusable workflow
-  <code>shakenfist/actions/.github/workflows/pr-auto-review.yml@main</code>,
-  with the project's own test jobs in its <code>needs:</code> list. Writing the
-  reviewer job out in full in the project's CI workflow is
-  superseded: projects still carrying a hand-written
-  <code>automated_reviewer</code> job should migrate to the reusable workflow
-  and delete their <code>check-bot-commit</code> job, which the reusable
-  workflow replaces with an API call.</li>
-<li>The reviewer must reach Claude Code through the shared action
-  <code>shakenfist/actions/review-pr-with-claude@main</code> (not per-project
-  scripts). The reusable workflow does this for its callers.</li>
-<li>The calling job needs <code>pull-requests: write</code> and <code>issues: write</code>
-  permissions, because a cross-repository reusable workflow cannot
-  grant itself more token scope than its caller has.</li>
-<li>The calling job must not pass <code>secrets: inherit</code>.
-  <code>pr-auto-review.yml</code> declares no secrets and reads none -- it and
-  <code>review-pr-with-claude</code> authenticate with <code>github.token</code>, which
-  comes from the <code>permissions:</code> block above -- so inheriting buys the
-  caller nothing while handing every secret the repository holds,
-  publishing tokens included, to a workflow in another repository. The
-  exposure is latent rather than active, but it means a bad change
-  landing in <code>shakenfist/actions</code> would already have those secrets
-  within reach. This applies to the <code>pr-auto-review.yml</code> call only:
-  callers of <code>smoke-cluster.yml</code> and <code>export-repo-config.yml</code> do read
-  secrets and inherit correctly.</li>
-<li>The automatic review must not pass <code>force</code> to the review action,
-  so that a PR the bot has already reviewed is left alone.
-  <code>pr-re-review.yml</code> is the only workflow which sets <code>force</code>, making
-  an explicit human request the sole way to override an existing
-  review.</li>
-<li>The reviewer runs Claude Code with
-  <code>--dangerously-skip-permissions</code> while holding a write-capable
-  token, and the PR diff is untrusted input, so the automatic review
-  must be restricted to same-repository pull requests. Fork PRs are
-  reviewed only on explicit human request.</li>
+<li>Both developer workflows are present: <code>pr-re-review.yml</code>, which
+  triggers another review, and <code>pr-retest.yml</code>, which re-runs the
+  functional tests.</li>
+<li>Some workflow reaches Claude Code through the shared action
+  <code>shakenfist/actions/review-pr-with-claude@main</code>, rather than a
+  per-project script. Calling the reusable workflow below satisfies
+  this, because that is how the reusable workflow reaches it.</li>
+<li><code>pr-re-review.yml</code> reaches <code>shakenfist/actions/pr-bot-trigger@main</code>
+  rather than open-coding the phrase match, permission lookup, reaction
+  and refusal reply.</li>
+<li>No caller passes <code>secrets: inherit</code>.</li>
+<li>The retired comment addresser is gone from the tree, as below.</li>
 </ul>
-<h3 id="developer-automation">Developer automation<a class="headerlink" href="#developer-automation" title="Permanent link">&para;</a></h3>
-<p>Projects should include bot-triggered workflows responding to
-<code>@shakenfist-bot</code> comments from authorised users:</p>
+<h3 id="required-but-confirmed-by-a-reviewer">Required, but confirmed by a reviewer<a class="headerlink" href="#required-but-confirmed-by-a-reviewer" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>pr-re-review.yml</code> -- triggers another automated review (with
-  <code>pull-requests: write</code> and <code>issues: write</code>).</li>
-<li><code>pr-retest.yml</code> -- re-runs functional tests.</li>
+<li>The reviewer job is a call to the reusable workflow
+  <code>shakenfist/actions/.github/workflows/pr-auto-review.yml@main</code>, with
+  the project's test jobs in its <code>needs:</code>. Hand-written
+  <code>automated_reviewer</code> jobs are superseded; migrating deletes the
+  project's <code>check-bot-commit</code> job too. A compliant hand-written job
+  still passes, because only the shared action above is measured.</li>
+<li>The calling job sets <code>pull-requests: write</code> and <code>issues: write</code>.</li>
+<li>The automatic review does not pass <code>force</code>, and runs on
+  same-repository pull requests only.</li>
+<li>Optional, for suites prone to drift: <code>pr-fix-tests.yml</code> +
+  <code>test-drift-fix.yml</code>.</li>
+<li>The reviewer prompt asks it to check that <code>docs/</code> was updated for
+  user-visible changes.</li>
 </ul>
 <h3 id="the-comment-addresser-is-retired">The comment addresser is retired<a class="headerlink" href="#the-comment-addresser-is-retired" title="Permanent link">&para;</a></h3>
-<p><code>pr-address-comments.yml</code> answered <code>@shakenfist-bot please address
-comments</code> by handing the review's items to Claude Code and pushing a
-commit per item. It was retired in August 2026 because it went unused:
-review items are worked through interactively with the reviewer
-instead, and a bot authoring commits from a review no human had read
-was the part that stopped anyone reaching for it.</p>
-<p>Its remains are audited rather than ignored, because they are not
-inert. The workflow triggers on <code>issue_comment</code>, so it holds
-<code>contents: write</code> against the pull request branch for a feature nobody
-wants; and it is the last thing in a project that calls
-<code>render-review.py</code>, so the script and its schema are dead weight the
-next project copies. The check therefore looks for the whole chain:</p>
-<ul>
-<li><code>.github/workflows/pr-address-comments.yml</code></li>
-<li><code>address-comments-with-claude.sh</code></li>
-<li><code>render-review.py</code></li>
-<li><code>review-schema.json</code></li>
-</ul>
-<p>All four are searched for by basename anywhere in the tree. <code>tools/</code>
-and <code>.github/workflows/</code> are the canonical homes, but deployments put
-them elsewhere -- the check this replaced found a <code>contrib/</code> copy, and
-a template directory carries the copy of the workflow the next project
-installs -- and a dead file is dead wherever it sits. Naming only the
-installed workflow would mean a maintainer who removes everything the
-finding names deletes the scripts, leaves the template copy behind, and
-passes the audit from then on while still handing the chain to the next
-project.</p>
-<p>Only a copy at <code>.github/workflows/pr-address-comments.yml</code> actually
-runs, so only that one holds <code>contents: write</code> on the pull request
-branch. The finding says so when it is present and calls the rest dead
-weight when it is not, rather than asserting a privileged workflow the
-maintainer would then go looking for and not find.</p>
-<p>One exemption. A directory holding an <code>action.yml</code> or <code>action.yaml</code> is
-a composite action's own source rather than a deployed copy, and is
-skipped.
-<code>shakenfist/actions</code> is in the matrix and is where
-<code>review-pr-with-claude/render-review.py</code> and its schema actually live
--- the copies every project's reviewer runs, and the ones this
-retirement sends projects to instead of their own. Without the
-exemption the finding would name them, and the instruction below is to
-remove everything it names in one commit, which would delete the
-renderer out from under the reviewer in every repository at once. The
-exemption covers the directory the manifest sits in and nothing below
-it, and <code>shakenfist/actions</code> is still reported for the leftovers it
-genuinely carries elsewhere in its tree.</p>
-<p>Everything the finding names goes in one commit. Deleting the workflow
-and keeping the scripts leaves the copy that gets propagated. The
-reviewer is otherwise unaffected: it reaches <code>render-review.py</code>
-through <code>shakenfist/actions/review-pr-with-claude@main</code>, which carries
-its own copy and its own schema.</p>
-<h3 id="the-trigger-handling-must-be-the-shared-action">The trigger handling must be the shared action<a class="headerlink" href="#the-trigger-handling-must-be-the-shared-action" title="Permanent link">&para;</a></h3>
-<p><code>pr-re-review.yml</code> must reach <code>shakenfist/actions/pr-bot-trigger@main</code>
-rather than hand-rolling the phrase match, permission lookup, reaction
-and refusal reply in inline shell. <code>pr-retest.yml</code> already does.</p>
-<p>This is a security requirement, not a tidiness one. <code>pr-bot-trigger</code>
-refuses pull requests from forks, and a hand-rolled copy does not
-inherit that. The action's <code>pr-ref</code> output is <code>.head.ref</code> -- the branch
-name in the <em>head</em> repository, carrying nothing to say which repository
-that is -- and callers hand it to <code>actions/checkout</code> and to
-<code>git push origin HEAD:refs/heads/&lt;ref&gt;</code> against <strong>their own</strong>
-repository. Fork pull requests are commonly opened from the fork's
-default branch, so <code>.head.ref</code> is literally <code>main</code>: the checkout
-succeeds against the target's <code>main</code>, the bot commits to it, and the
-push lands unreviewed commits there. No malice is required -- a
-maintainer typing the trigger phrase on a fork pull request is enough.</p>
-<p>Because the guard lives in the action, every workflow that uses it
-picked the fix up at <code>@main</code> with no change on its side. That is the
-whole argument for the requirement: a shared action is how a fix
-reaches ten repositories at once, and a local copy is how one of them
-misses it.</p>
-<p>An earlier version of the template open-coded this, which is why every
-deployment needs replacing rather than editing. The template copy had
-also drifted in ways that matter less but point the same way: it
-reacted with <code>+1</code> instead of <code>rocket</code>, worded its refusal differently,
-and never checked the trigger phrase itself, so it could not distinguish
-"phrase not matched" from "not authorized".</p>
-<p>The check reports nothing when <code>pr-re-review.yml</code> is absent -- that is
-already a finding on its own, and reporting both would be two findings
-for one missing file.</p>
-<h3 id="test-drift-fixing-optional">Test drift fixing (optional)<a class="headerlink" href="#test-drift-fixing-optional" title="Permanent link">&para;</a></h3>
-<p>Projects with large test suites prone to drift should also add:</p>
-<ul>
-<li><code>pr-fix-tests.yml</code> + <code>test-drift-fix.yml</code> -- triggers Claude Code
-  to fix CI failures.</li>
-</ul>
-<p>These use shared composite actions from the <code>actions/</code> repository:</p>
-<ul>
-<li><code>shakenfist/actions/pr-bot-trigger@main</code></li>
-<li><code>shakenfist/actions/review-pr-with-claude@main</code></li>
-</ul>
-<h3 id="automated-reviewer-prompt">Automated reviewer prompt<a class="headerlink" href="#automated-reviewer-prompt" title="Permanent link">&para;</a></h3>
-<p>The automated reviewer's prompt should ensure it checks that
-documentation in the <code>docs/</code> directory has been updated for any
-user-visible changes.</p>
+<p>Measured. None of these may be present, anywhere in the tree:
+<code>.github/workflows/pr-address-comments.yml</code>,
+<code>address-comments-with-claude.sh</code>, <code>render-review.py</code>,
+<code>review-schema.json</code>. Remove all four in one commit. A directory
+holding an <code>action.yml</code>/<code>action.yaml</code> is a composite action's own
+source and is exempt, which is what keeps the finding off
+<code>shakenfist/actions/review-pr-with-claude/</code>.</p>
+<h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
+<p><strong>No <code>secrets: inherit</code> on <code>pr-auto-review.yml</code>.</strong> It declares and
+reads no secrets -- it and <code>review-pr-with-claude</code> authenticate with
+<code>github.token</code> from the caller's <code>permissions:</code> block -- so inheriting
+buys nothing while putting every secret the repository holds, including
+publishing tokens, within reach of a workflow in another repository.
+Callers of <code>smoke-cluster.yml</code> and <code>export-repo-config.yml</code> do read
+secrets and inherit correctly.</p>
+<p><strong>Same-repository pull requests only.</strong> The reviewer runs Claude Code
+with <code>--dangerously-skip-permissions</code> while holding a write-capable
+token, and the diff is untrusted input. Fork PRs are reviewed on
+explicit human request.</p>
+<p><strong>The shared trigger action is a security requirement.</strong>
+<code>pr-bot-trigger</code> refuses fork pull requests; a hand-rolled copy does
+not inherit that. Its <code>pr-ref</code> output is <code>.head.ref</code> -- a branch name
+with nothing to say which repository it belongs to -- and callers hand
+it to <code>actions/checkout</code> and to <code>git push origin HEAD:refs/heads/&lt;ref&gt;</code>
+against <em>their own</em> repository. Fork PRs are commonly opened from the
+fork's default branch, so <code>.head.ref</code> is literally <code>main</code>: the bot
+commits to the target's <code>main</code> and pushes unreviewed. A maintainer
+typing the trigger phrase on a fork PR is enough; no malice required.
+Because the guard lives in the action, every user picked the fix up at
+<code>@main</code> -- which is the argument for the rule. Deployments predating
+the fix need replacing, not editing.</p>
+<p><strong>The retired addresser is not inert.</strong> It triggers on <code>issue_comment</code>,
+so it holds <code>contents: write</code> on the PR branch for a feature nobody
+wants, and it is the last caller of <code>render-review.py</code>, so the script
+and schema are dead weight the next project copies. Deleting the
+workflow but keeping the scripts leaves exactly the copy that
+propagates. Background: <code>templates/ci-review-automation/README.md</code>.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>Template: <code>templates/ci-review-automation/</code>
 See: <code>templates/ci-review-automation/README.md</code>
@@ -13522,10 +13408,7 @@ Docs: <code>docs/ci-review-automation.md</code>, <code>docs/automated-pr-review.
 See: <code>templates/test-drift-fix/README.md</code></p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

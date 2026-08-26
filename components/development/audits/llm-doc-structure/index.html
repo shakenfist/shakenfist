@@ -13228,71 +13228,61 @@
 <h1 id="audit-agentsmd-architecturemd-structure">Audit: AGENTS.md / ARCHITECTURE.md structure<a class="headerlink" href="#audit-agentsmd-architecturemd-structure" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
 <p><code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> are a <strong>summary and an index</strong>, not
-reference manuals. The <code>llm-tooling</code> audit checks that they exist;
-this audit checks their shape.</p>
+reference manuals. The <code>llm-tooling</code> audit checks that they exist; this
+audit checks their shape.</p>
 <ul>
 <li><code>AGENTS.md</code> is a working guide: the conventions, invariants and
-  gotchas an agent cannot infer by reading the code, plus curated
-  links into <code>docs/</code>. It is loaded into every session, so every line
-  costs context on every task, whether or not the task touches the
-  subject.</li>
+  gotchas an agent cannot infer by reading the code, plus curated links
+  into <code>docs/</code>. It is loaded into every session, so every line costs
+  context on every task, whether or not the task touches the subject.</li>
 <li><code>ARCHITECTURE.md</code> is a map: the component inventory, how data moves
   between components, and why the shape is the way it is. A deep dive
   on a single subsystem belongs in <code>docs/</code>, where humans benefit from
   it too.</li>
-<li>One canonical home per fact. If <code>docs/</code> covers something, link to
-  it rather than restating it -- and the same rule applies between
+<li>One canonical home per fact. If <code>docs/</code> covers something, link to it
+  rather than restating it -- and the same rule applies between
   <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code>.</li>
 </ul>
-<p>"Is this a good summary" is a judgment call, so the automated check
-enforces measurable proxies:</p>
+<p>"Is this a good summary" is a judgment call, so the check enforces
+measurable proxies:</p>
 <ul>
 <li><code>AGENTS.md</code> is at most <strong>300 lines</strong> and <strong>2500 words</strong>;</li>
 <li><code>ARCHITECTURE.md</code> is at most <strong>500 lines</strong> and <strong>4000 words</strong>;</li>
-<li>if <code>docs/</code> holds any documentation, each of the two files points
-  at a page in it -- a file that indexes <code>docs/</code> cannot do so
-  without naming something there. Unlike <code>README.md</code>, which is
-  rendered off the repository landing page and so needs real
-  absolute links (see the <code>readme-absolute-links</code> audit), these two
-  files are read on GitHub and by agents, where a backticked
-  <code>`docs/design-tokens.md`</code> points just as well as a link does,
-  so either form counts. <code>docs/plans/</code> does not count: a plan is a
-  design record, not the documentation these files delegate to, and
-  a <code>docs/</code> directory holding nothing but <code>plans/</code> switches this
-  proxy off entirely;</li>
-<li>no <code>##</code> heading appears in <em>both</em> files, which is the cheapest
-  reliable signal that the same subject is documented twice; and</li>
-<li>no <code>##</code> or <code>###</code> heading matches the filename of a page under
-  <code>docs/</code> (<code>## Configuration</code> against <code>docs/configuration.md</code>), which
-  is the cheapest reliable signal that a <code>docs/</code> page is being
-  restated.</li>
+<li>if <code>docs/</code> holds any documentation, each file points at a page in it
+  -- a file that indexes <code>docs/</code> cannot do so without naming something
+  there. Unlike <code>README.md</code>, which is rendered off the repository
+  landing page and so needs real absolute links (see
+  <code>readme-absolute-links</code>), these two are read on GitHub and by agents,
+  where a backticked <code>`docs/design-tokens.md`</code> points just as well
+  as a link, so either form counts. <code>docs/plans/</code> does not count: a
+  plan is a design record, not the documentation these files delegate
+  to, and a <code>docs/</code> holding nothing but <code>plans/</code> switches this proxy
+  off entirely;</li>
+<li>no <code>##</code> heading appears in <em>both</em> files, the cheapest reliable signal
+  that a subject is documented twice; and</li>
+<li>no <code>##</code> or <code>###</code> heading matches the filename of a page under <code>docs/</code>
+  (<code>## Configuration</code> against <code>docs/configuration.md</code>), the cheapest
+  reliable signal that a <code>docs/</code> page is being restated.</li>
 </ul>
 <p>Heading comparisons are case-insensitive and treat hyphens as spaces.
 Both heading checks skip lines carrying an explicit
 <code>&lt;!-- audit-ok: llm-doc-structure --&gt;</code> marker, for the case where a
 shared heading genuinely covers different ground in each file.</p>
-<p>Repositories with neither file are reported as N/A. Plan-phase
-history in these files is covered separately by the
-<code>plan-phase-references</code> audit, which scans them alongside <code>README.md</code>
-and <code>docs/</code>.</p>
-<p>Left unchecked these two files accrete the same way READMEs do,
-reaching thousands of lines while restating <code>docs/configuration.md</code>,
-restating a protocol reference in the very section that names that
-file as the canonical source, and duplicating a <code>## Code
-Organisation</code> section between the two.</p>
-<p>The judgment half of the policy is enforced at the point where the
-bloat is actually created: the documentation-review section of each
-repository's pre-push audit file carries the canonical
-<code>llm-doc-discipline</code> shared block (see the <code>push-audit</code> audit), which
-instructs the reviewer to send detail to <code>docs/</code> and to treat growth
-in either file as a finding.</p>
+<p>Repositories with neither file are N/A. Plan-phase history in these
+files is covered by the <code>plan-phase-references</code> audit, which scans them
+alongside <code>README.md</code> and <code>docs/</code>.</p>
 <p>This audit exists because these two files accreted the same way the
 READMEs did before the <code>readme-structure</code> audit. ryll's reached 1015
-and 2262 lines -- around 21,000 words, or roughly 28k tokens of
-context -- while restating <code>docs/configuration.md</code>, restating
-<code>docs/control-socket-protocol.md</code> in a section that names that file
-as the canonical source, carrying a <code>make test-qemu</code> runbook, and
-duplicating a <code>## Code Organisation</code> section between the two files.</p>
+and 2262 lines -- around 21,000 words, or roughly 28k tokens of context
+-- while restating <code>docs/configuration.md</code>, restating
+<code>docs/control-socket-protocol.md</code> in a section that names that file as
+the canonical source, carrying a <code>make test-qemu</code> runbook, and
+duplicating a <code>## Code Organisation</code> section between the two.</p>
+<p>The judgment half of the policy is enforced where the bloat is created:
+the documentation-review section of each repository's pre-push audit
+file carries the canonical <code>llm-doc-discipline</code> shared block (see the
+<code>push-audit</code> audit), which instructs the reviewer to send detail to
+<code>docs/</code> and to treat growth in either file as a finding.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- these files are project-specific. The fix is to move
 detail into <code>docs/</code> and leave a short summary plus a link behind. The
@@ -13300,10 +13290,7 @@ move must be a <em>move</em>, not a delete: verify the detail survives
 somewhere before trimming.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

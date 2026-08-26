@@ -13283,121 +13283,97 @@
 
 <h1 id="audit-http-header-and-file-path-sanitization">Audit: HTTP header and file path sanitization<a class="headerlink" href="#audit-http-header-and-file-path-sanitization" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
+<p>Two code-level patterns. One is mechanical and measured here; the
+other is a judgment call and is delegated to the pre-push review.</p>
 <h3 id="http-response-header-sanitization">HTTP response header sanitization<a class="headerlink" href="#http-response-header-sanitization" title="Permanent link">&para;</a></h3>
-<p>Projects using <code>http.server.BaseHTTPRequestHandler</code> directly must
-override <code>send_header()</code> to strip <code>\r</code> and <code>\n</code> characters from
-header values. This prevents HTTP response splitting (CWE-113), which
-CodeQL flags as <code>py/http-response-splitting</code>.</p>
-<p>The canonical implementation is <code>SafeHeaderMixin</code> in
-<code>occystrap/util.py</code>, which calls
-<code>str(value).replace('\r', '').replace('\n', '')</code> before delegating to
-the base class. Every <code>BaseHTTPRequestHandler</code> subclass must inherit
-from it, listed <strong>first</strong> in the class bases so the MRO reaches the
-override.</p>
-<p>Projects using Flask (kerbside, shakenfist, agent-python) are
-already protected by Werkzeug's <code>Headers</code> class, which raises
-<code>ValueError</code> on a header value containing a line break. Prefer Flask
-when adding a new HTTP server; reach for <code>http.server</code> only where a
-dependency-free embedded server is the point, and then use the
-mixin.</p>
+<p>Measured. Every class inheriting an <code>http.server</code> request handler --
+<code>BaseHTTPRequestHandler</code>, or its <code>SimpleHTTPRequestHandler</code> and
+<code>CGIHTTPRequestHandler</code> subclasses, all of which carry the same
+<code>send_header()</code> -- must also inherit occystrap's <code>SafeHeaderMixin</code>,
+which strips <code>\r</code> and <code>\n</code> from header values before delegating to
+the base class. A header
+value carrying a line break splits the response (CWE-113), which
+CodeQL reports as <code>py/http-response-splitting</code>.</p>
+<p>The mixin must be listed <strong>first</strong> in the bases:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Handler</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>        <span class="n">SafeHeaderMixin</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        <span class="n">http</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">BaseHTTPRequestHandler</span><span class="p">):</span>
+</code></pre></div>
+<p>Position is what is checked, not mere presence. Listed after the
+handler base, the MRO reaches its <code>send_header()</code> and the override
+never runs -- which is indistinguishable at runtime from not having
+the mixin at all.</p>
+<p>Flask projects (kerbside, shakenfist, agent-python) are already
+protected by Werkzeug's <code>Headers</code>, which raises <code>ValueError</code> on a
+header value containing a line break, and have no <code>http.server</code>
+handler subclass to find. Prefer Flask for a new HTTP
+server; reach for <code>http.server</code> only where a dependency-free embedded
+server is the point, and then use the mixin.</p>
+<p>A subclass that genuinely does not need it -- a test fixture serving
+literal headers, say -- carries an <code>audit-ok: header-sanitization</code>
+comment on or immediately above the <code>class</code> statement, ideally with a
+reason. The marker is read per class rather than per file, because a
+module may hold both a real server and a fixture, and it is read from
+a view in which string bodies are blanked and comments survive. A
+marker is a comment, and searching the whole file let an ordinary
+string constant holding the marker text exempt the class beneath it
+from a security check.</p>
+<p>A <code>class</code> statement whose base list cannot be read is reported rather
+than skipped: a skipped class is indistinguishable from a repository
+with no handler in it, and on a security check that reads as a clean
+bill nobody earned.</p>
+<p>The same principle decides how a base is recognised. Bases are
+compared as whole names after any dotted prefix is dropped, so
+<code>http.server.BaseHTTPRequestHandler</code> is in scope while
+<code>MyBaseHTTPRequestHandlerWrapper</code> is not, and names bound by
+<code>import ... as</code> are resolved -- <code>from http.server import
+BaseHTTPRequestHandler as BHR</code> followed by <code>class Handler(BHR)</code> is a
+handler subclass, and reading it as a bare substring reported the
+repository as having no raw HTTP server in it at all. An import
+statement is read whole rather than a line at a time, because an
+import list long enough to be wrapped -- in parentheses or over a
+backslash -- is exactly where an alias hides.</p>
+<p>Comments and string literals are blanked before any of this, so a
+<code>class</code> statement inside a docstring code sample is not a class, and
+a <code>#</code> or a <code>)</code> inside a base list no longer ends the parse early. A
+PEP 695 type parameter list between the name and the bases is walked
+rather than matched, so <code>class Handler[T](Base)</code> is in scope and a
+bound holding brackets of its own does not truncate the walk.</p>
+<p>What is still not followed is a base bound by plain assignment
+(<code>Base = BaseHTTPRequestHandler</code>), which needs the kind of name
+tracking a full parse gives and this does not attempt. If you write
+one, put an <code>audit-ok</code> marker on the class with a reason, or spell
+the base out.</p>
 <h3 id="file-path-sanitization">File path sanitization<a class="headerlink" href="#file-path-sanitization" title="Permanent link">&para;</a></h3>
-<p>Projects that construct file paths from user-controlled data --
-image names, tags, digests, layer paths -- must validate that the
-resulting path stays within the intended base directory. This
-prevents path traversal attacks (CWE-22), which CodeQL flags as
-<code>py/path-injection</code>.</p>
+<p><strong>Delegated to the pre-push review, and not measured here.</strong> Whether a
+path built from outside data is proved to stay inside its base
+directory is a judgment call about each call site: the same
+<code>os.path.join()</code> is correct on process-chosen components and a
+traversal (CWE-22, <code>py/path-injection</code>) on an image name, an archive
+member or a request parameter. A grep for the join finds every
+correct use alongside every wrong one.</p>
 <p>The canonical implementation is <code>safe_path_join()</code> in
 <code>occystrap/util.py</code>, which resolves the joined path with
 <code>os.path.realpath()</code>, verifies it starts with the base directory, and
-raises <code>PathEscapeError</code> if it would escape. Use it instead of a bare
-<code>os.path.join()</code> whenever any component comes from outside the
-process. Where a web framework offers its own safe-path helper (such
-as Flask's <code>send_from_directory</code>), use that.</p>
+raises <code>PathEscapeError</code> otherwise. Where a web framework offers its
+own helper -- Flask's <code>send_from_directory</code> -- use that.</p>
+<p>The reviewer is given this standard by the <code>path-traversal-review</code>
+shared block in each repository's <code>PUSH-AUDIT.md</code>. <strong>Coverage for it
+is reported by the <a href="/components/development/audits/push-audit/">push-audit</a> audit</strong>, which checks
+that the block is present and current; there is no per-repository
+table here, because a table of who carries the block would be a second
+copy of the one that audit already publishes.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No template -- these are code-level patterns. Reference
-implementations are in <code>occystrap/util.py</code>.</p>
+<p>No template -- these are code-level patterns. The reference
+implementations are <code>SafeHeaderMixin</code> and <code>safe_path_join()</code> in
+<code>occystrap/util.py</code>, and the reviewer wording is
+<code>templates/shared-blocks/path-traversal-review.md</code>.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>HTTP headers</th>
-<th>File paths</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>agent-python</td>
-<td>N/A (Flask)</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>imago</td>
-<td>N/A (Rust)</td>
-<td>N/A (Rust)</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>N/A (Flask)</td>
-<td>N/A (Flask)</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>N/A (Rust)</td>
-<td>N/A (Rust)</td>
-<td>-</td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>N/A (Flask)</td>
-<td>N/A (Flask)</td>
-<td>-</td>
-</tr>
-</tbody>
-</table>
-<p>N/A: Project does not use raw <code>BaseHTTPRequestHandler</code> or
-construct file paths from user input, or uses a framework that
-provides built-in protection.</p>
+<p>The table below covers the header sanitization check only.</p>
+<!-- consistency-audit:begin -->
+<p><em>(Awaiting the first automated regeneration by the consistency
+audit workflow.)</em></p>
+<!-- consistency-audit:end -->
 
 
 

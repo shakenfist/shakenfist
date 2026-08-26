@@ -13228,56 +13228,48 @@
 <h1 id="audit-sfui-vendored-copy">Audit: sfui vendored copy<a class="headerlink" href="#audit-sfui-vendored-copy" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
 <p>sfui, the Shaken Fist web UI design system, lives canonically at
-<a href="https://github.com/shakenfist/sfui">https://github.com/shakenfist/sfui</a> and is vendored into each
-consumer's static assets by that repository's <code>tools/vendor.sh</code>,
-which stamps the vendored directory with a <code>.sfui-commit</code>
-provenance file. This is the shared-blocks pattern applied to a
-directory: one canonical copy, verbatim copies downstream, and this
-audit to catch drift.</p>
-<p>For every <code>.sfui-commit</code> found in a repository, the check verifies:</p>
+<a href="https://github.com/shakenfist/sfui">https://github.com/shakenfist/sfui</a> and is vendored into each consumer's
+static assets by that repository's <code>tools/vendor.sh</code>, which stamps the
+vendored directory with a <code>.sfui-commit</code> provenance file. This is the
+shared-blocks pattern applied to a directory: one canonical copy,
+verbatim copies downstream, and this audit to catch drift.</p>
+<p>For every <code>.sfui-commit</code> found, the check verifies:</p>
 <ul>
-<li>The vendored copy is <strong>verbatim</strong> at the recorded canonical
-  commit, by running the canonical repository's own
-  <code>tools/vendor.sh --check</code> at that commit (so the distributable
-  file list always matches the commit the copy claims to be). A
-  difference means someone edited the vendored copy in place; the
-  fix is to move the change to the canonical repository and
-  re-vendor, because the next sync would silently discard it.</li>
-<li>The recorded commit <strong>is canonical HEAD</strong>. Like a stale shared
-  block, a copy behind canonical means improvements have not
-  propagated; the fix is to re-run <code>tools/vendor.sh</code> from an up to
-  date sfui checkout.</li>
+<li>The vendored copy is <strong>verbatim</strong> at the recorded canonical commit,
+  by running the canonical repository's own <code>tools/vendor.sh --check</code>
+  at that commit, so the distributable file list always matches the
+  commit the copy claims to be. A difference means someone edited the
+  vendored copy in place; move the change to the canonical repository
+  and re-vendor, because the next sync would silently discard it.</li>
+<li>The recorded commit <strong>is canonical HEAD</strong>. Like a stale shared block,
+  a copy behind canonical means improvements have not propagated;
+  re-run <code>tools/vendor.sh</code> from an up to date sfui checkout.</li>
 </ul>
 <p>Repositories with no <code>.sfui-commit</code> are not applicable.</p>
-<p>private-ci, the first sfui consumer, is internal tooling and is
-excluded from the conventions audits, but this check is the exception
-that runs against it anyway. It is in the workflow matrix scoped by
-<code>only_checks</code> in <code>REPO_OVERRIDES</code> to this check alone, so it collects
-no issues about packaging, release workflows or branch naming. The
-reason for the exception is that vendored drift produces no symptom:
-private-ci kept working perfectly for five days with a copy two
-canonical merges behind, and only a hand-run of
-<code>tools/vendor.sh --check</code> -- which nobody is scheduled to do -- would
-have said so.</p>
+<p>private-ci, the first sfui consumer, is internal tooling excluded from
+the conventions audits, but this check runs against it anyway. It is in
+the workflow matrix scoped by <code>only_checks</code> in <code>REPO_OVERRIDES</code> to this
+check alone, so it collects no issues about packaging, release
+workflows or branch naming. The reason for the exception is that
+vendored drift produces no symptom: private-ci kept working perfectly
+for five days with a copy two canonical merges behind, and only a
+hand-run of <code>tools/vendor.sh --check</code> -- which nobody is scheduled to
+do -- would have said so.</p>
 <p>kerbside is the second consumer and is audited normally. Its admin UI
-is part way through converting to sfui: a second base template and the
-login page are on the design system, and the rest converts a group of
-pages at a time, so <code>.sfui-commit</code> is already there and already checked
-while most of the UI is still Bootstrap. This audit does not care how
-much of a consumer's UI has converted, only that whatever it vendors is
-verbatim and current -- which is the useful property during a long
-conversion, because the copy is re-vendored on almost every step of it
-and each of those is a chance to land one merge behind.</p>
+is part way through converting to sfui, so <code>.sfui-commit</code> is already
+there and already checked while most of the UI is still Bootstrap. This
+audit does not care how much of a consumer's UI has converted, only
+that whatever it vendors is verbatim and current -- which is the useful
+property during a long conversion, because the copy is re-vendored on
+almost every step and each of those is a chance to land one merge
+behind.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- vendoring is performed by <code>tools/vendor.sh</code> in the
-canonical sfui repository, and the vendored files themselves are
-the template.</p>
+canonical sfui repository, and the vendored files themselves are the
+template.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

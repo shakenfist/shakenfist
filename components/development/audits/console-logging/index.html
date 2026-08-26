@@ -1529,6 +1529,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What we check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verbose-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verbose handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13180,6 +13197,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What we check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verbose-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verbose handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13227,91 +13261,92 @@
 
 <h1 id="audit-console-script-logging-setup">Audit: Console script logging setup<a class="headerlink" href="#audit-console-script-logging-setup" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<p>Projects using <code>shakenfist_utilities.logs.setup_console()</code> in their
-CLI entry point must also configure the root logger so that INFO
-messages from all module loggers are visible.</p>
-<p>Required pattern:</p>
+<p>Every file named as an entry point in <code>pyproject.toml</code> -- by
+<code>[project.scripts]</code>, <code>[project.gui-scripts]</code> or
+<code>[project.entry-points."console_scripts"]</code> -- that calls
+<code>shakenfist_utilities.logs.setup_console()</code> must also:</p>
+<ul>
+<li>call <code>logging.basicConfig()</code>; and</li>
+<li>stop its own logger propagating into the root handler.</li>
+</ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">LOG</span> <span class="o">=</span> <span class="n">logs</span><span class="o">.</span><span class="n">setup_console</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span><span class="o">.</span><span class="n">propagate</span> <span class="o">=</span> <span class="kc">False</span>
 </code></pre></div>
-<p>When <code>--verbose</code> is used, update the root handler level:</p>
+<p>The <code>propagate</code> assignment is matched against the entry point's <em>own</em>
+logger -- the name bound to <code>setup_console()</code>'s return, or
+<code>getLogger()</code> called with the same argument it was given. A line
+silencing an unrelated third-party logger does not satisfy it, because
+the entry point still emits every one of its own lines twice. Where a
+file makes several <code>setup_console()</code> calls, the one given <code>__name__</code>
+is the file configuring itself, and is the one that decides this.</p>
+<p>All three matches are made against the file's <em>code</em>: comments and
+string literals are blanked first. A commented-out
+<code>logging.basicConfig()</code> is the state of anything somebody was
+debugging and is exactly the misconfiguration this exists to catch, so
+counting it as a call would pass the file for the defect it has. The
+<code>audit-ok</code> marker is read from a complementary view in which string
+bodies are blanked and comments survive, because a marker <em>is</em> a
+comment: reading it from the whole file let a docstring that merely
+mentioned the marker exempt the module that mentioned it.</p>
+<p><code>setup_console()</code> raises the root logger's level to INFO but attaches
+its handler to the <em>named</em> logger only. Records from every other
+module therefore propagate up to a root logger with no handler on it
+and are dropped -- so without <code>basicConfig()</code> the entry point sees its
+own INFO messages and nothing else. Once root does have a handler, the
+entry point's own records reach both it and the handler
+<code>setup_console()</code> installed, which is what <code>propagate = False</code>
+prevents.</p>
+<p>Only declared entry points are examined. occystrap calls
+<code>logs.setup_console(__name__)</code> at the top of all 24 of its modules,
+and only <code>occystrap/main.py</code> is an entry point; a call anywhere else
+is a module getting a logger, not a console script setting up logging.
+A repository that declares no console scripts, or whose entry points
+do not use the helper, is not applicable -- this is a rule about how
+the helper is used, not a requirement to use it.</p>
+<p>An entry point is resolved to a file by trying <code>pkg/mod.py</code>,
+<code>pkg/__init__.py</code> and both of those under <code>src/</code>. A repository whose
+layout is none of those -- <code>lib/</code>, say -- is reported as having
+declared entry points that did not resolve, naming them, rather than
+as having declared none: the two are different facts, and the second
+is a clean bill for a file nobody looked at. A declaration that is
+malformed rather than merely unresolvable -- <code>scripts</code> given as a
+string, a target that is not one -- is named the same way, and does
+not stop the rest of the repository being audited.</p>
+<p>An unresolved declaration is named in every outcome, not only when
+nothing resolved at all. A repository with a mixed layout collected a
+pass on the entry points that were found while the one that was not
+went unmentioned, which is the same clean bill for a file nobody
+opened. A pass is a statement about every entry point the repository
+declares, so one that resolved to nothing withholds it: the ones that
+did resolve are reported as compliant, but the criterion has not been
+assessed.</p>
+<p>A file that genuinely should not configure logging -- because
+something else in the process already has -- carries an
+<code>audit-ok: console-logging</code> comment, ideally with a reason. The marker
+is read per file rather than per line: the finding is about the file's
+logging setup as a whole, so there is no single line for it to sit on.</p>
+<h3 id="verbose-handling">Verbose handling<a class="headerlink" href="#verbose-handling" title="Permanent link">&para;</a></h3>
+<p>Part of the standard, and reviewed rather than measured. When a
+<code>--verbose</code> or <code>--debug</code> flag is handled, the root handler level has
+to move too, or raising <code>LOG</code>'s level alone changes nothing:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">logging</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">logging</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="n">handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">LOG</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 </code></pre></div>
+<p>This is not checked because there is no reliable signal for "this
+entry point has a verbosity flag" that does not also match parsers
+that pass the value straight through. occystrap's <code>main.py</code> is the
+worked example of the shape.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- this is a code-level pattern.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>Status</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>agent-python</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>imago</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<p>N/A: Does not use <code>shakenfist_utilities.logs.setup_console()</code>.</p>
+<!-- consistency-audit:begin -->
+<p><em>(Awaiting the first automated regeneration by the consistency
+audit workflow.)</em></p>
+<!-- consistency-audit:end -->
 
 
 

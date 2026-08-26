@@ -13237,84 +13237,74 @@ That pointer is the only trail from the code to the reasoning behind
 it, and it is the trail a reader follows when they want to change the
 code.</p>
 <p>Nothing renders these pointers. A markdown link in <code>docs/</code> breaks
-visibly on the documentation site, and <code>docs-external-links</code> audits
-it; a path inside a <code>//</code> comment or a YAML key is inert text that no
-renderer ever resolves. So when a plan is renamed, or archived into
-<code>docs/plans/completed/</code>, the pointer rots silently and stays rotten.
-The first person to notice is someone who went looking for the
-reasoning and did not find it -- at which point the comment is worse
-than no comment, because it asserts a record exists.</p>
-<p>The automated check runs <code>git ls-files</code>, skips markdown files (they
-are <code>docs-external-links</code>' scope) and files over 2 MB, and looks for
-<code>PLAN-&lt;name&gt;.md</code> in what remains. Each match is resolved:</p>
+visibly and <code>docs-external-links</code> audits it; a path inside a <code>//</code>
+comment or a YAML key is inert text no renderer resolves. So a renamed
+or archived plan rots the pointer silently, and the first person to
+notice is someone who went looking for the reasoning and did not find
+it -- at which point the comment is worse than none, because it asserts
+a record exists.</p>
+<p>The check runs <code>git ls-files</code>, skips markdown files (they are
+<code>docs-external-links</code>' scope) and files over 2 MB, and resolves each
+<code>PLAN-&lt;name&gt;.md</code> it finds in what remains:</p>
 <ul>
-<li><strong>Path-qualified references</strong> (<code>docs/plans/PLAN-foo.md</code>) are
-  resolved as written, from the repository root and then from
-  <code>docs/</code>. The second position exists for mkdocs navigation, which
-  addresses pages relative to the documentation root.</li>
-<li><strong>Bare filenames</strong> (<code>PLAN-foo.md</code>) are matched against every
-  markdown file under <code>docs/plans/</code> at any depth, so a plan archived
-  into <code>docs/plans/completed/</code> still resolves. A bare filename names
-  no directory, so there is no path for it to be wrong about.</li>
+<li><strong>Path-qualified references</strong> (<code>docs/plans/PLAN-foo.md</code>) resolve as
+  written, from the repository root and then from <code>docs/</code>. The second
+  position exists for mkdocs navigation, which addresses pages relative
+  to the documentation root.</li>
+<li><strong>Bare filenames</strong> (<code>PLAN-foo.md</code>) match any markdown file under
+  <code>docs/plans/</code> at any depth, so a plan archived into
+  <code>docs/plans/completed/</code> still resolves. A bare filename names no
+  directory, so there is no path for it to be wrong about.</li>
 </ul>
 <p>Three shapes are not flagged:</p>
 <ul>
-<li><strong>Absolute URLs.</strong> Text matching a <code>scheme://</code> URL is removed
-  before scanning. A plan in another repository cannot resolve
-  locally and should be written as
+<li><strong>Absolute URLs.</strong> Text matching a <code>scheme://</code> URL is removed before
+  scanning. A plan in another repository cannot resolve locally and
+  should be written as
   <code>https://github.com/&lt;org&gt;/&lt;repo&gt;/blob/&lt;default-branch&gt;/docs/plans/PLAN-foo.md</code>
   -- the same rule <code>docs-external-links</code> and <code>readme-absolute-links</code>
-  apply for the same underlying reason: a reference that is read
-  somewhere other than where it lives has to be absolute.</li>
-<li><strong><code>PLAN-TEMPLATE.md</code>.</strong> Not a plan but the template plans are
-  written from, living at the repository root rather than in
-  <code>docs/plans/</code>, and held there by the <code>plan-template</code> audit. Naming
-  it in a script or a config is not a pointer into <code>docs/plans/</code>
-  that can rot.</li>
-<li><strong>Lines carrying <code>audit-ok: plan-reference</code>.</strong> For the rare line
-  where a <code>PLAN-*.md</code> string is not a pointer at all -- a filename
-  pattern in a linter config, a single test fixture naming a plan
-  that deliberately does not exist.</li>
+  apply, for the same reason: a reference read somewhere other than
+  where it lives has to be absolute.</li>
+<li><strong><code>PLAN-TEMPLATE.md</code>.</strong> Not a plan but the template plans are written
+  from, living at the repository root and held there by the
+  <code>plan-template</code> audit.</li>
+<li><strong>Lines carrying <code>audit-ok: plan-reference</code></strong>, for the rare line
+  where a <code>PLAN-*.md</code> string is not a pointer -- a filename pattern in
+  a linter config, a fixture naming a plan that deliberately does not
+  exist.</li>
 </ul>
-<p>Test suites are otherwise scanned like any other source. A test file
-carries prose pointers too, and they rot the same way -- instar's
-<code>tests/test_adversarial.py</code> cites a plan that no longer exists, in
-its module docstring -- so skipping a file for having "test" in its
-name would hide exactly the finding this audit is for. A suite whose
-plan paths genuinely are all fixtures instead carries
-<code>audit-ok: plan-reference-file</code> once, near the top, with a sentence
-saying why. That marker exempts the whole file, prose included, so
-it is the blunter of the two: prefer the per-line form, and reach
-for the file form only when the file is made of fixtures rather than
-merely containing one.</p>
-<p>A repository with no plan references outside markdown is reported as
-N/A.</p>
+<p>Test suites are scanned like any other source: a test file carries
+prose pointers too and they rot the same way -- instar's
+<code>tests/test_adversarial.py</code> cites a plan that no longer exists, in its
+module docstring -- so skipping files for having "test" in the name
+would hide exactly the finding this audit is for. A suite whose plan
+paths genuinely are all fixtures carries <code>audit-ok:
+plan-reference-file</code> once near the top with a sentence saying why. That
+exempts the whole file, prose included, so prefer the per-line form.</p>
+<p>A repository with no plan references outside markdown is N/A.</p>
 <p>This audit composes with <code>plan-phase-references</code>, which governs what
-documentation prose may cite, and with <code>plan-index</code>, which governs
-whether a plan is registered. This one governs only whether a pointer
-written in code still lands on a file.</p>
+documentation prose may cite, and <code>plan-index</code>, which governs whether a
+plan is registered. This one governs only whether a pointer written in
+code still lands on a file.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template. Fix each reference at its source:</p>
 <ul>
-<li>the plan moved to <code>docs/plans/completed/</code> -- update the path, or
-  drop to the bare filename, which resolves either way;</li>
+<li>the plan moved to <code>docs/plans/completed/</code> -- update the path, or drop
+  to the bare filename, which resolves either way;</li>
 <li>the plan was renamed -- update the name;</li>
-<li>the plan lives in another repository -- rewrite the reference as an
-  absolute <code>https://github.com/...</code> URL;</li>
+<li>the plan lives in another repository -- rewrite it as an absolute
+  <code>https://github.com/...</code> URL;</li>
 <li>the plan never existed, or the reference is not a pointer -- delete
   it, or mark the line <code>audit-ok: plan-reference</code>;</li>
-<li>the whole file is fixtures rather than pointers -- mark it once
-  with <code>audit-ok: plan-reference-file</code>, and say why.</li>
+<li>the whole file is fixtures rather than pointers -- mark it once with
+  <code>audit-ok: plan-reference-file</code>, and say why.</li>
 </ul>
 <p>Rewording is not a fix on its own: the point of the pointer is that a
 reader can reach the reasoning, so a reference that cannot be made to
 resolve should be replaced by the reasoning itself, not deleted.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

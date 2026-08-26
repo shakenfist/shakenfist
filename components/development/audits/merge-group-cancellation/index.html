@@ -13271,119 +13271,103 @@
 
 <h1 id="audit-merge-group-run-cancellation">Audit: Merge group run cancellation<a class="headerlink" href="#audit-merge-group-run-cancellation" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<p>Expensive jobs that can run on a <code>merge_group</code> event must sit in a
-concurrency group that a superseding merge group joins -- so the
-older run is cancelled rather than left to run a full cloud build
-nobody is waiting on -- and that nothing running <em>beside</em> them
-joins, so the cancellation takes only what is superseded.</p>
-<p>Concretely, for every workflow with a <code>merge_group:</code> trigger and every
-reusable <code>workflow_call:</code> workflow, each job that holds a scarce
-self-hosted runner and is reachable on <code>merge_group</code> must have an
-effective <code>concurrency:</code> block -- job-level, or workflow-level if the
-job declares none -- that:</p>
+<p>Expensive jobs reachable on a <code>merge_group</code> event must sit in a
+concurrency group that a superseding merge group joins, so the older
+run is cancelled rather than left building a cloud nobody is waiting
+on -- and that nothing running <em>beside</em> them joins, so the
+cancellation takes only what is superseded.</p>
+<p>For every workflow with a <code>merge_group:</code> trigger, and every reusable
+<code>workflow_call:</code> workflow, each job holding a scarce self-hosted
+runner needs an effective <code>concurrency:</code> block -- job-level, or
+workflow-level if the job declares none -- that:</p>
 <ul>
 <li>sets <code>cancel-in-progress: true</code>;</li>
-<li>keys the group on something stable across queue rebuilds. Either the
-  group expression does not mention a per-rebuild context at all, or
-  it branches on <code>github.event_name == 'merge_group'</code> and uses a
-  stable key on that branch. The per-rebuild contexts are
-  <code>github.ref</code> (and <code>ref_name</code> / <code>ref_type</code>), <code>github.sha</code>,
-  <code>github.run_id</code>, <code>github.run_number</code>, <code>github.run_attempt</code> and the
-  <code>github.event.merge_group</code> head contexts. <code>github.sha</code> is on that
-  list because on <code>merge_group</code> it is the per-attempt merge commit,
-  not the pull request head -- it is the key somebody reaches for on
-  noticing that <code>github.ref</code> is wrong, and it is just as unique per
-  rebuild;</li>
-<li>varies between the lanes of its own matrix. A matrix job's group
+<li>keys on something stable across queue rebuilds. Either the group
+  expression mentions no per-rebuild context, or it branches on
+  <code>github.event_name == 'merge_group'</code> and uses a stable key there.
+  The per-rebuild contexts are <code>github.ref</code> (and <code>ref_name</code> /
+  <code>ref_type</code>), <code>github.sha</code>, <code>github.run_id</code>, <code>github.run_number</code>,
+  <code>github.run_attempt</code> and the <code>github.event.merge_group</code> head
+  contexts. <code>github.sha</code> is on the list because on <code>merge_group</code> it is
+  the per-attempt merge commit, not the pull request head -- it is
+  what somebody reaches for on noticing <code>github.ref</code> is wrong, and it
+  is just as unique per rebuild;</li>
+<li>varies between the lanes of its own matrix: a matrix job's group
   must carry a <code>matrix.</code> context.</li>
 </ul>
-<p>And on the two sides of a <code>uses:</code>:</p>
+<p>Across a <code>uses:</code>:</p>
 <ul>
-<li>a reusable workflow that declares <code>workflow_call</code> inputs must key
-  its group on at least one of them. A group made only of caller
-  contexts renders identically for every invocation on a ref, so the
-  second invocation cancels the first;</li>
-<li>a job that invokes a reusable workflow more than once per ref --
-  because it is a matrix job, or because a sibling job invokes the
-  same callee -- must pass a <code>concurrency_key</code> input, distinct per
-  invocation and varying per matrix lane. That is the fleet
-  convention shakenfist/actions' <code>smoke-cluster.yml</code> declares the
-  input for; a callee cannot see its caller's job name, so the caller
-  has to say which invocation it is. A callee invoked once per ref
-  needs nothing: there is nothing for it to be distinct from.</li>
+<li>a reusable workflow declaring <code>workflow_call</code> inputs must key its
+  group on at least one of them. A group made only of caller contexts
+  renders identically for every invocation on a ref, so the second
+  cancels the first;</li>
+<li>a caller invoking a reusable workflow more than once per ref --
+  a matrix job, or a sibling job invoking the same callee -- must pass
+  a <code>concurrency_key</code> input, distinct per invocation and varying per
+  matrix lane. A callee cannot see its caller's job name, so the
+  caller has to say which invocation it is. Invoked once per ref, it
+  needs nothing.</li>
 </ul>
-<p>Two further conditions are checked once per repository rather than
-per job. The default branch's merge queue must build one entry at a
-time wherever the <code>base_ref</code> key is used (see <a href="#why-cancelling-is-safe-here">Why cancelling is safe
-here</a>), and a <code>uses:</code> job may only
-delegate to a callee this audit can see: in-repo, or another
-<code>shakenfist/</code> repository, both of which are audited in their own
-right. Anything else is a concurrency group nobody has checked and
-the caller cannot fix.</p>
-<p>"Scarce" means any self-hosted pool except <code>static</code>. The sibling
-<code>expensive-lane-path-filter</code> audit uses the narrower <code>vm</code> label, which
-is right for the question it asks, but instar's ephemeral runners are
-tagged <code>[self-hosted, debian-12, xl]</code> with no <code>vm</code> label and an
-abandoned merge group holds one of those just as firmly. The <code>static</code>
-pool is exempt because it is always-on and shared, and the jobs on it
-(path filters, gate jobs) are seconds long. GitHub-hosted runners are
-exempt: there is no fleet runner to starve. A <code>runs-on:</code> expression is
-resolved against the matrix it reads, so <code>runs-on: ${{ matrix.runner }}</code>
-over self-hosted label lists is in scope; ryll's genuinely
-GitHub-hosted Windows and macOS matrix is not.</p>
-<p>Reusable workflows are in scope unconditionally, because a callee
-published for the fleet cannot know what event it will see. Inferring
-reachability from in-repo callers was tried and is wrong: it exempted
-shakenfist/actions' <code>smoke-cluster.yml</code> -- which every shakenfist merge
-group runs four nested clusters through -- on the strength of a
-scheduled canary also calling it.</p>
+<p>Two conditions are checked once per repository: the default branch's
+merge queue must be serial wherever the <code>base_ref</code> key is used (see
+<a href="#why-cancelling-is-safe-here">Why cancelling is safe here</a>), and a
+<code>uses:</code> job may only delegate to a callee this audit can see --
+in-repo, or another <code>shakenfist/</code> repository. Anything else is a
+concurrency group nobody has checked and the caller cannot fix.</p>
+<p><strong>Scarce</strong> means any self-hosted pool except <code>static</code>. <code>static</code> is
+exempt because it is always-on, shared, and its jobs are seconds long;
+GitHub-hosted runners are exempt because there is no fleet runner to
+starve. A <code>runs-on:</code> expression is resolved against the matrix it
+reads, so <code>runs-on: ${{ matrix.runner }}</code> over self-hosted label lists
+is in scope. (The sibling <code>expensive-lane-path-filter</code> audit uses the
+narrower <code>vm</code> label, which is right for its question; instar's
+ephemeral runners are <code>[self-hosted, debian-12, xl]</code> with no <code>vm</code>
+label and an abandoned merge group holds one just as firmly.)</p>
+<p>Reusable workflows are in scope unconditionally: a callee published
+for the fleet cannot know what event it will see. Inferring
+reachability from in-repo callers was tried and is wrong -- it exempted
+<code>shakenfist/actions</code>' <code>smoke-cluster.yml</code>, which every shakenfist merge
+group runs four nested clusters through, because a scheduled canary
+also calls it.</p>
 <p>Out of scope: jobs whose <code>if:</code> excludes <code>merge_group</code>. Deliberate
-exceptions are marked with an <code>audit-ok: merge-group-cancellation</code>
-comment, read per job: a marker inside a job exempts that job, and
-only a marker above the <code>jobs:</code> key exempts a whole file. A workflow
-here runs to eight hundred lines and fifteen jobs, and one job's
-stated exception should not quietly stop the other fourteen being
-measured. The fleet has one exception: <code>test-drift-fix.yml</code> is
-reusable, but its only caller is <code>pr-fix-tests.yml</code> on
-<code>issue_comment</code>, so it can never see a merge group.</p>
+exceptions take an <code>audit-ok: merge-group-cancellation</code> comment, read
+per job -- a marker inside a job exempts that job, and only a marker
+above the <code>jobs:</code> key exempts the file, because one job's stated
+exception should not quietly stop the other fourteen being measured.
+The fleet has one: <code>test-drift-fix.yml</code> is reusable, but its only
+caller is <code>pr-fix-tests.yml</code> on <code>issue_comment</code>.</p>
 <h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
 <p><code>github.ref</code> is the natural concurrency key and is correct on every
 event except this one. On <code>merge_group</code> it is the per-attempt queue
 branch, <code>gh-readonly-queue/&lt;base&gt;/pr-&lt;N&gt;-&lt;SHA&gt;</code>, and GitHub mints a
-fresh SHA every time it rebuilds the group -- which it does on every
-push to the base branch. Keying on it therefore puts every rebuild in
-a concurrency group of its own, <code>cancel-in-progress</code> never matches,
-and superseded runs are never cancelled. They run to completion
-against a queue branch GitHub has already abandoned.</p>
-<p>The cost is not theoretical. In <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/284" title="GitHub Issue: shakenfist/kerbside #284">kerbside#284</a>, three merge
-groups for the same pull request built three complete oVirt clouds
-concurrently on the shared sfcbr under-cloud; only the newest could
-possibly merge. The lane that failed did so by timing out waiting for
-a 12 vCPU / 16GB instance the under-cloud could not place. The same
-issue later recorded the cross-repository form: kerbside's merge group
-starved on capacity consumed by two superseded
-shakenfist/shakenfist merge groups. A fix in one repository does not
-hold when its neighbours share the under-cloud, which is what makes
-this a fleet audit rather than a per-project judgement call.</p>
+fresh SHA on every rebuild -- which it does on every push to the base
+branch. Keying on it puts each rebuild in a group of its own,
+<code>cancel-in-progress</code> never matches, and superseded runs run to
+completion against a queue branch GitHub has already abandoned.</p>
+<p>In <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/284" title="GitHub Issue: shakenfist/kerbside #284">kerbside#284</a> three merge groups for one pull request
+built three complete oVirt clouds concurrently on the shared sfcbr
+under-cloud; only the newest could merge, and the lane that failed
+timed out waiting for an instance the under-cloud could not place. The
+same issue records the cross-repository form: kerbside's merge group
+starving on capacity two superseded shakenfist/shakenfist merge groups
+held. A fix in one repository does not hold when its neighbours share
+the under-cloud, which is what makes this a fleet audit.</p>
 <h2 id="why-cancelling-is-safe-here">Why cancelling is safe here<a class="headerlink" href="#why-cancelling-is-safe-here" title="Permanent link">&para;</a></h2>
-<p>Cancelling a <code>merge_group</code> run that the queue is still waiting on
-reports a failed required check and ejects the pull request. That is
-avoided by the fleet's serial queue: the <code>merge-queue-config</code> audit
-requires <code>max_entries_to_build: 1</code> on every repository with a merge
-queue, so the queue only ever builds one entry at a time and any
-<em>other</em> in-flight <code>merge_group</code> run is by definition superseded.</p>
-<p>This audit therefore depends on <a href="/components/development/audits/merge-queue-config/">merge-queue-config.md</a>,
-and checks the dependency rather than stating it: where a repository
-uses the <code>base_ref</code> key below, the check asks GitHub whether that
-repository's queue is serial and fails if it is not. If
-<code>max_entries_to_build</code> were ever raised above 1, several merge groups
-would be live at once, a base-branch key would alias them, and the
-pattern below would start cancelling entries that are still wanted --
-the key would have to narrow to something unique per live entry.</p>
-<p>The same reasoning is what puts lane distinctness in this audit. An
-ejected pull request is what the fleet is protected from at the queue
-level, and it is exactly what a self-cancelling matrix produces at
-the job level.</p>
+<p>Cancelling a <code>merge_group</code> run the queue is still waiting on reports a
+failed required check and ejects the pull request. The fleet's serial
+queue is what avoids that: <a href="/components/development/audits/merge-queue-config/">merge-queue-config.md</a>
+requires <code>max_entries_to_build: 1</code>, so only one entry builds at a time
+and any <em>other</em> in-flight <code>merge_group</code> run is by definition
+superseded.</p>
+<p>This audit checks that dependency rather than stating it: where a
+repository uses the <code>base_ref</code> key, it asks GitHub whether the queue is
+serial and fails if it is not. Raise <code>max_entries_to_build</code> above 1 and
+a base-branch key would alias several live entries, cancelling ones
+still wanted -- the key would have to narrow to something unique per
+entry.</p>
+<p>The same reasoning puts lane distinctness here. An ejected pull request
+is what the serial queue protects against, and it is exactly what a
+self-cancelling matrix produces at the job level.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- the change is a concurrency key edit per workflow. The
 fleet pattern, from kerbside's <code>functional-tests.yml</code>:</p>
@@ -13396,14 +13380,12 @@ fleet pattern, from kerbside's <code>functional-tests.yml</code>:</p>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>The <code>merge_group-</code> prefix matters: without it a queue run keyed on
-<code>refs/heads/develop</code> would share a group with a <code>workflow_dispatch</code>
-run on <code>develop</code>, whose <code>github.ref</code> is the same string, and the two
-would cancel each other.</p>
-<p>In a reusable workflow, <code>github.workflow</code> resolves to the <em>caller's</em>
-name, so keep whatever literal prefix the callee already uses to
-separate components and substitute only the <code>github.ref</code> tail -- and
-add the caller-supplied key, so two invocations on one ref are two
-groups:</p>
+<code>refs/heads/develop</code> would share a group with a <code>workflow_dispatch</code> run
+on <code>develop</code>, whose <code>github.ref</code> is the same string, and the two would
+cancel each other.</p>
+<p>In a reusable workflow <code>github.workflow</code> resolves to the <em>caller's</em>
+name, so keep the literal prefix the callee already uses, substitute
+only the <code>github.ref</code> tail, and add the caller-supplied key:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="w">    </span><span class="nt">concurrency</span><span class="p">:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">        </span><span class="no">smoke-cluster-${{ inputs.component }}-${{ inputs.tier }}-${{</span>
@@ -13413,17 +13395,13 @@ groups:</p>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">        </span><span class="no">|| github.ref }}</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
-<p>A matrix job substitutes its own lane into the group, and a matrix
-job calling a reusable workflow does the same thing through the
-input:</p>
+<p>A matrix job substitutes its own lane into the group, and a matrix job
+calling a reusable workflow does the same through the input:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="w">      </span><span class="nt">concurrency_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ matrix.merge.job_name }}</span>
 </code></pre></div>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

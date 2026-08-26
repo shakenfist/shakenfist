@@ -2160,10 +2160,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#shared-blocks" class="md-nav__link">
+  <a href="#why-comment-proportion-is-a-judgment-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared blocks
+        Why comment proportion is a judgment check
       
     </span>
   </a>
@@ -2171,10 +2171,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#why-comment-proportion-is-a-judgment-check" class="md-nav__link">
+  <a href="#shared-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why comment proportion is a judgment check
+        Shared blocks
       
     </span>
   </a>
@@ -13234,10 +13234,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#shared-blocks" class="md-nav__link">
+  <a href="#why-comment-proportion-is-a-judgment-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared blocks
+        Why comment proportion is a judgment check
       
     </span>
   </a>
@@ -13245,10 +13245,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#why-comment-proportion-is-a-judgment-check" class="md-nav__link">
+  <a href="#shared-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why comment proportion is a judgment check
+        Shared blocks
       
     </span>
   </a>
@@ -13307,110 +13307,80 @@
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
 <p>Repositories that carry a pre-push audit runbook must:</p>
 <ul>
-<li>name it <strong><code>PUSH-AUDIT.md</code></strong> -- the historical name
-  <code>PUSH-TEMPLATE.md</code> is flagged as legacy (the file is a runbook the
-  operator follows before pushing, not a template that gets copied,
-  and the <code>-TEMPLATE</code> suffix is reserved for true templates like
-  <code>PLAN-TEMPLATE.md</code>);</li>
-<li>embed the current <strong><code>readme-discipline</code> shared block</strong> in its
-  documentation-review section;</li>
-<li>embed the current <strong><code>llm-doc-discipline</code> shared block</strong> in its
-  documentation-review section (see the <code>llm-doc-structure</code> audit
-  for the policy it enforces);</li>
-<li>embed the current <strong><code>comment-proportion</code> shared block</strong> in its
+<li>name it <strong><code>PUSH-AUDIT.md</code></strong> -- the historical <code>PUSH-TEMPLATE.md</code> is
+  flagged as legacy, because the file is a runbook the operator follows
+  before pushing rather than a template that gets copied, and
+  <code>-TEMPLATE</code> is reserved for true templates like <code>PLAN-TEMPLATE.md</code>;</li>
+<li>embed the current <strong><code>readme-discipline</code></strong>, <strong><code>llm-doc-discipline</code></strong>
+  and <strong><code>plan-phase-references</code></strong> shared blocks in its
+  documentation-review section (see the <code>readme-structure</code>,
+  <code>llm-doc-structure</code> and <code>plan-phase-references</code> audits for the
+  policies they enforce);</li>
+<li>embed the current <strong><code>comment-proportion</code></strong> shared block in its
   code-quality review section;</li>
-<li>embed the current <strong><code>plan-phase-references</code> shared block</strong> in its
-  documentation-review section (see the <code>plan-phase-references</code>
-  audit for the policy it enforces);</li>
-<li>keep every embedded shared block verbatim and at the current
-  version; and</li>
-<li>be <strong>referenced from <code>AGENTS.md</code></strong>, so a session has some way of
-  discovering it.</li>
+<li>embed the current <strong><code>path-traversal-review</code></strong>,
+  <strong><code>python-version-discipline</code></strong> and <strong><code>functional-test-coverage</code></strong>
+  shared blocks, which carry the three criteria delegated to the
+  reviewer because no grep can judge them (see the
+  <a href="/components/development/audits/security-sanitization/">security-sanitization</a>,
+  <a href="/components/development/audits/python-version/">python-version</a> and
+  <a href="/components/development/audits/test-coverage/">test-coverage</a> audits for the policies they
+  enforce);</li>
+<li>keep every embedded block verbatim and at the current version; and</li>
+<li>be <strong>referenced from <code>AGENTS.md</code></strong>, so a session can discover it.</li>
 </ul>
-<p>Repositories with no pre-push audit file at all are reported as N/A:
-whether every project should have one is a separate decision, not
-smuggled in here.</p>
+<p>Repositories with no pre-push audit file are N/A: whether every project
+should have one is a separate decision, not smuggled in here.</p>
 <h3 id="why-the-reference-is-checked">Why the reference is checked<a class="headerlink" href="#why-the-reference-is-checked" title="Permanent link">&para;</a></h3>
-<p>Checking only the file's contents is how the runbook went
-untriggered. In August 2026 the audit was current and correct in
-eight repositories while three <code>AGENTS.md</code> files mentioned it at
-all, and exactly one of those said <em>when</em> to run it -- the other
-two were passive index entries. No <code>CLAUDE.md</code>, no
-<code>PLAN-TEMPLATE.md</code>, no git hook and no CI job pointed at it either,
-so the audit ran when the operator remembered it and not otherwise.</p>
-<p>Mention is what this check measures, so three is the number it
-moves; one is the number that had a trigger. The check closes the
-discoverability half of that gap, not the trigger half.</p>
+<p>Checking only the file's contents is how the runbook went untriggered.
+In August 2026 the audit was current and correct in eight repositories
+while three <code>AGENTS.md</code> files mentioned it at all, and exactly one of
+those said <em>when</em> to run it. No <code>CLAUDE.md</code>, <code>PLAN-TEMPLATE.md</code>, git
+hook or CI job pointed at it either, so it ran when the operator
+remembered it and not otherwise.</p>
 <p><code>AGENTS.md</code> is the surface checked because it is loaded into every
-session, which makes it the one place a reference is certain to be
-read. The check is deliberately shallow -- it looks for the
+session. The check is deliberately shallow -- it looks for the
 filename, not for particular wording -- because the reference that
-matters is the one a repository writes for itself. A repository
-still on the legacy <code>PUSH-TEMPLATE.md</code> name is checked against that
-name, so it is told to rename the file once rather than told twice
-about a file it does not have.</p>
-<p>The reference is necessary but not sufficient: discoverable is not
-the same as run. What makes it run is the <code>plan-push-audit-phase</code>
-shared block, which puts a push-audit phase at the end of every
-master plan; that block lives in <code>PLAN-TEMPLATE.md</code> and is enforced
-by the <code>plan-template</code> audit rather than by this one.</p>
-<h3 id="shared-blocks">Shared blocks<a class="headerlink" href="#shared-blocks" title="Permanent link">&para;</a></h3>
-<p>A shared block is canonical wording embedded verbatim across
-repositories, delimited by versioned markers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&lt;!-- shared-block: &lt;name&gt; v&lt;N&gt; --&gt;
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>...canonical wording...
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>&lt;!-- shared-block-end --&gt;
-</code></pre></div>
-<p>Canonical copies live in <code>templates/shared-blocks/&lt;name&gt;.md</code> in this
-repository (markers included); see
-<code>templates/shared-blocks/README.md</code> for the mechanism. The check
-fails when an embedded block is missing where required, carries a
-stale version, has drifted from the canonical wording, is unknown
-(no canonical file), or is missing its end marker.</p>
-<p>To update shared wording: edit the canonical file, bump its version,
-and commit. The next daily audit run marks every repository carrying
-the old version non-compliant and files issues automatically.</p>
-<p>This audit exists because the pre-push audit files drifted
-independently in each repository -- several still instructed the
-documentation reviewer that "<code>README.md</code> reflects any new features",
-which is the exact feedback loop that bloats READMEs (see the
-<code>readme-structure</code> audit for the policy those instructions now
-enforce instead).</p>
+matters is the one a repository writes for itself. A repository still
+on the legacy name is checked against that name, so it is told to
+rename the file once rather than told twice about a file it does not
+have.</p>
+<p>The reference is necessary but not sufficient: discoverable is not run.
+What makes it run is the <code>plan-push-audit-phase</code> shared block, which
+puts a push-audit phase at the end of every master plan. That block
+lives in <code>PLAN-TEMPLATE.md</code> and is enforced by the <code>plan-template</code>
+audit, not this one.</p>
 <h3 id="why-comment-proportion-is-a-judgment-check">Why comment proportion is a judgment check<a class="headerlink" href="#why-comment-proportion-is-a-judgment-check" title="Permanent link">&para;</a></h3>
-<p>Comment volume has no honest mechanical threshold: the same
-twenty-line docstring is right on a lock-ordering contract and
-wrong on a three-line accessor. What can be mechanised is finding
-the <em>candidates</em> -- runs of added comment lines, and comment blocks
-larger than the body they precede -- which a repository may add to
-its wave-1 sweep as a report-only grep. The proportionality call
-itself belongs to the code-quality judgment agent, which is why
-<code>comment-proportion</code> is shared wording for a sub-agent brief rather
-than a check in <code>audit-check.py</code>. The audit verifies the wording is
-present and current; it does not try to score comments.</p>
+<p>Comment volume has no honest mechanical threshold: the same twenty-line
+docstring is right on a lock-ordering contract and wrong on a
+three-line accessor. What can be mechanised is finding the
+<em>candidates</em> -- runs of added comment lines, and comment blocks larger
+than the body they precede -- which a repository may add to its wave-1
+sweep as a report-only grep. The proportionality call belongs to the
+code-quality judgment agent, which is why <code>comment-proportion</code> is
+shared wording for a sub-agent brief rather than a check in
+<code>audit-check.py</code>.</p>
+<h3 id="shared-blocks">Shared blocks<a class="headerlink" href="#shared-blocks" title="Permanent link">&para;</a></h3>
+<p>Shared blocks are canonical wording embedded verbatim across
+repositories between <code>&lt;!-- shared-block: &lt;name&gt; v&lt;N&gt; --&gt;</code> and
+<code>&lt;!-- shared-block-end --&gt;</code> markers; the canonical copies live in
+<code>templates/shared-blocks/</code>, whose <code>README.md</code> describes the
+mechanism. The check fails when a required block is missing, stale,
+drifted from the canonical wording, unknown, or missing its end marker.</p>
+<p>This audit exists because the pre-push audit files drifted
+independently in each repository -- several still told the
+documentation reviewer that "<code>README.md</code> reflects any new features",
+which is the exact feedback loop that bloats READMEs.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>Template: <code>templates/shared-blocks/</code>
 See: <code>templates/shared-blocks/README.md</code></p>
-<p>To fix a non-compliant repository: rename <code>PUSH-TEMPLATE.md</code> to
-<code>PUSH-AUDIT.md</code> (updating references in <code>AGENTS.md</code>,
-<code>MERGE-TEMPLATE.md</code>, <code>tools/audit/</code>, and plan documents), paste
-the current contents of
-<code>templates/shared-blocks/readme-discipline.md</code> verbatim into the
-documentation-review section, replacing any older README guidance it
-contradicts, paste
-<code>templates/shared-blocks/comment-proportion.md</code> verbatim into the
-brief for the code-quality review agent, and paste
-<code>templates/shared-blocks/plan-phase-references.md</code> verbatim into the
-documentation-review section.</p>
-<p>To fix a missing reference: add a line to <code>AGENTS.md</code> naming
-<code>PUSH-AUDIT.md</code> and saying when it is run. Where the repository
-indexes its runbooks, that index is the natural home; the check only
-requires the filename to appear.</p>
+<p>To fix a non-compliant repository, copy each named block verbatim from
+<code>templates/shared-blocks/</code> into <code>PUSH-AUDIT.md</code> and reference the file
+from <code>AGENTS.md</code>; <code>templates/shared-blocks/README.md</code> describes the
+markers and the version bump procedure.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

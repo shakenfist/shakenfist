@@ -13231,15 +13231,16 @@
 resolve to a file that exists <strong>inside</strong> <code>docs/</code>. Anything pointing
 outside it must be an absolute URL.</p>
 <p><code>docs/</code> is not only rendered on the GitHub file tree. It is
-synchronised into <code>shakenfist/shakenfist</code> under <code>docs/components/&lt;repo&gt;/</code>
-and published on shakenfist.com, where the tree above <code>docs/</code> does not
-exist. A link like <code>[release.yml](../.github/workflows/release.yml)</code>
-resolves to <code>docs/components/.github/workflows/release.yml</code> there and
-404s, while the identical link renders correctly on GitHub -- so
-nothing catches it in the source repository.</p>
+synchronised into <code>shakenfist/shakenfist</code> under
+<code>docs/components/&lt;repo&gt;/</code> and published on shakenfist.com, where the
+tree above <code>docs/</code> does not exist. A link like
+<code>[release.yml](../.github/workflows/release.yml)</code> resolves to
+<code>docs/components/.github/workflows/release.yml</code> there and 404s, while
+the identical link renders correctly on GitHub -- so nothing catches it
+in the source repository.</p>
 <p>Two shapes are flagged:</p>
 <ul>
-<li><strong>Escaping relative links.</strong> The target resolves above <code>docs/</code>:
+<li><strong>Escaping relative links</strong>, whose target resolves above <code>docs/</code>:
   <code>../README.md</code>, <code>../../ryll/src/app.rs</code>.</li>
 <li><strong>Relative links that resolve nowhere.</strong> The target stays under
   <code>docs/</code> but names no file that exists. In practice this is almost
@@ -13247,45 +13248,36 @@ nothing catches it in the source repository.</p>
   (<code>ryll/src/app.rs</code> rather than <code>../../ryll/src/app.rs</code>) -- the same
   defect wearing a different spelling, and dead on GitHub too.</li>
 </ul>
-<p>Links whose target stays inside <code>docs/</code> and resolves are fine, and
+<p>Links whose target stays inside <code>docs/</code> and resolves are fine and
 should stay relative: they move with the tree and work in both
 renderings. Pure in-page anchors (<code>#section</code>), scheme-qualified URLs
-and protocol-relative <code>//host</code> URLs are absolute already and are not
-flagged.</p>
-<p>Site-root-absolute targets (<code>/operator_guide/locks/</code>) are also left
-alone. They are the mkdocs convention for addressing another page of
-the same site, and they resolve on the published site -- which is the
-rendering this audit exists to protect. They do not resolve on the
-GitHub file tree, but that is a separate trade-off the mkdocs-hosted
-repositories have already made, not a regression this audit should
-manufacture issues about.</p>
-<p><code>docs/plans/</code> is <strong>in scope</strong>. Plans are synchronised to the
-documentation site along with everything else, so a broken link there
-is broken for a reader whether or not anyone still maintains the file.
-A plan that references a path which has since moved should still carry
-an absolute URL; the link form is the thing being audited, not whether
-a historical path still resolves.</p>
-<p>A repository's <code>doc_content_excludes</code> prefixes are skipped. For
-<code>shakenfist</code> that is <code>docs/components/</code> itself: those are imported
-copies of other repositories' documentation, audited at their source,
-and flagging the import would double-report every finding.</p>
+and protocol-relative <code>//host</code> URLs are absolute already.</p>
+<p>Site-root-absolute targets (<code>/operator_guide/locks/</code>) are left alone.
+They are the mkdocs convention for addressing another page of the same
+site and they resolve on the published site, which is the rendering
+this audit exists to protect. That they do not resolve on the GitHub
+file tree is a trade-off the mkdocs-hosted repositories have already
+made, not a regression this audit should manufacture issues about.</p>
+<p><code>docs/plans/</code> is <strong>in scope</strong>. Plans are synchronised to the site along
+with everything else, so a broken link there is broken for a reader
+whether or not anyone still maintains the file. The link form is what
+is audited, not whether a historical path still resolves.</p>
+<p>A repository's <code>doc_content_excludes</code> prefixes are skipped -- for
+<code>shakenfist</code> that is <code>docs/components/</code> itself, imported copies audited
+at their source.</p>
 <p>Links inside fenced code blocks and inline code spans are ignored: a
-documented command that happens to contain <code>[x](y)</code> is sample text,
-not a rendered link.</p>
+documented command containing <code>[x](y)</code> is sample text, not a rendered
+link.</p>
 <p>This audit composes with <code>readme-absolute-links</code>, which covers the
-top-level <code>README.md</code> for the same underlying reason -- a file that is
-rendered somewhere other than where it lives cannot use relative
-links.</p>
+top-level <code>README.md</code> for the same underlying reason -- a file rendered
+somewhere other than where it lives cannot use relative links.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- rewrite each offending link target to an absolute URL.
 For links to other files in the same repository, use
 <code>https://github.com/&lt;org&gt;/&lt;repo&gt;/blob/&lt;default-branch&gt;/&lt;path&gt;</code>.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

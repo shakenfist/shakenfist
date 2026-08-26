@@ -13364,9 +13364,11 @@ another check), and a spec file on its own does not measure anything.</p>
 <ul>
 <li>private-ci -- the <code>sfui-vendor</code> check, and nothing else. It is
   internal tooling and excluded from the conventions, but it vendors
-  sfui and a vendored copy drifts silently. The scoping lives in
-  <code>REPO_OVERRIDES</code> in <code>scripts/audit-check.py</code>; every other check
-  reports N/A for it.</li>
+  sfui and a vendored copy drifts silently: nothing in the consumer
+  fails when the copy falls behind, or when someone edits it in place
+  and the next sync discards the edit. It is not expected to grow a
+  <code>pyproject.toml</code>, a renovate config, release workflows, or a
+  <code>develop</code> branch.</li>
 </ul>
 <h3 id="excluded-projects">Excluded projects<a class="headerlink" href="#excluded-projects" title="Permanent link">&para;</a></h3>
 <p>The following projects are <strong>excluded</strong> from these criteria, because
@@ -13395,27 +13397,20 @@ they are internal only tooling or historical archive repositories:</p>
 </ul>
 <p>The <code>actions</code> repository is audited despite being tooling: the whole
 fleet depends on it for its composite actions and reusable workflows,
-so it is held to the same standards as anything else. Two criteria do
-not apply to it -- it has no Python to package, and it keeps <code>main</code> as
-its default branch because every consumer pins to <code>@main</code>.</p>
-<p><code>development</code>, this repository, is audited for the same reason turned
-around: it is where these criteria and the tooling that enforces them
-are written, so an exemption here is an exemption the authors of the
-standard write for themselves. The same two criteria do not apply --
-its Python is the audit scripts, which run from a checkout and are
-never packaged, and it keeps <code>main</code> because it publishes no releases
-and so has no release branch for <code>develop</code> to be the integration
-branch against.</p>
-<p>Both exemptions are stated reasons in <code>REPO_OVERRIDES</code> in
-<code>scripts/audit-check.py</code>, which means they are reported as N/A with
-the reason attached rather than quietly disappearing from the table.</p>
-<p><code>private-ci</code> stays excluded and is still audited for one thing,
-because a vendored copy is the one kind of problem an exclusion
-cannot make safe: nothing in the consumer fails when the copy falls
-behind, or when someone edits it in place and the next sync discards
-the edit. Exclusion means what it says for the rest -- <code>private-ci</code>
-is not expected to grow a <code>pyproject.toml</code>, a renovate config,
-release workflows, or a <code>develop</code> branch.</p>
+so it is held to the same standards as anything else. <code>development</code>,
+this repository, is audited for the same reason turned around -- it is
+where these criteria and the tooling that enforces them are written,
+so an exemption here is one the authors of the standard write for
+themselves.</p>
+<p>Some criteria do not apply to either. Neither has Python to package
+-- which takes <code>pyproject-usage</code> and <code>python-version</code> both out of
+scope -- and both keep <code>main</code> as their default branch: <code>actions</code>
+because every consumer pins to <code>@main</code>, <code>development</code> because it
+publishes no releases and so has no release branch for <code>develop</code> to
+integrate against.</p>
+<p>All scoping and exemptions live in <code>REPO_OVERRIDES</code> in
+<code>scripts/audit-check.py</code>, so they are reported as N/A with the reason
+attached rather than quietly disappearing from the table.</p>
 <h2 id="audit-index">Audit index<a class="headerlink" href="#audit-index" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

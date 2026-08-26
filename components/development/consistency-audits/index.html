@@ -13355,8 +13355,7 @@ specification: some criteria have no check at all, because judging
 them takes reading rather than matching. A
 criterion with no check has no <code>consistency-audit</code> marker block in its
 spec file, which is how to find the current set -- at the time of
-writing, <code>security-sanitization</code>, <code>console-logging</code>, <code>python-version</code>
-and <code>test-coverage</code>.</p>
+writing, <code>test-coverage</code>.</p>
 <p>Not every criterion maps to exactly one check. <code>workflow-standards</code>
 decomposes into several -- runner tags, permissions, linting, and more
 -- which all render into the one spec file as separate columns.</p>
@@ -13497,13 +13496,16 @@ test.</p>
 <p>The full gate, which <code>ci.yml</code> also runs on every pull request:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pre-commit run --all-files
 </code></pre></div>
-<p>All four test suites run as <code>local</code> pre-commit hooks, so any change
-under <code>scripts/</code> runs them. Individually, which is quicker while
-iterating:</p>
+<p>Every test suite under <code>scripts/</code> runs as a <code>local</code> pre-commit hook.
+Most are triggered by any change under <code>scripts/</code>;
+<code>review-tracking-tests</code> always runs, and <code>issue-fix-extraction-tests</code>
+runs only for its own file and the template files it covers.
+Individually, which is quicker while iterating:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3 scripts/test_audit_check.py
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python3 scripts/test_audit_update_docs.py
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>python3 scripts/test_review_tracking.py
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>python3 scripts/test_check_audit_smoke.py
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>python3 scripts/test_issue_fix_extraction.py
 </code></pre></div>
 <p>The tests cover the machinery, not what a check <em>decides</em> about a real
 repository. Test that half against local clones:</p>

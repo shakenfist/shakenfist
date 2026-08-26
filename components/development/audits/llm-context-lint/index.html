@@ -13306,16 +13306,15 @@
 <h1 id="audit-llm-context-linting">Audit: LLM context linting<a class="headerlink" href="#audit-llm-context-linting" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
 <p>Agent context -- <code>AGENTS.md</code>, <code>CLAUDE.md</code>, skills, plugins, hooks and
-MCP configuration -- is code that an agent executes against, but
-nothing has been checking it. This audit runs
+MCP configuration -- is code an agent executes against. This audit runs
 <a href="https://skillsaw.org/">skillsaw</a> over each repository and reports
 error-severity findings, plus one structural check skillsaw cannot
 make.</p>
 <h3 id="skillsaw-at-error-severity">skillsaw at error severity<a class="headerlink" href="#skillsaw-at-error-severity" title="Permanent link">&para;</a></h3>
 <p>Only the error tier is reported. skillsaw's warning and info tiers
 carry style opinions -- unlinked path references alone run to dozens
-per repository -- and an audit that reported them would spend more of
-our time than it saves. The error tier is the structural and security
+per repository -- and an audit reporting them would spend more of our
+time than it saves. The error tier is the structural and security
 subset:</p>
 <ul>
 <li><code>agentskill-valid</code>, <code>claude-plugin-json-valid</code> and friends --
@@ -13328,26 +13327,22 @@ subset:</p>
 <li><code>hooks-dangerous</code>, <code>claude-settings-dangerous</code> -- settings and hooks
   that execute arbitrary commands.</li>
 </ul>
-<p>Measured across shakenfist, instar, kerbside, occystrap, development
-and kerbside-patches when this audit was written, the error tier was
-empty in every repository. The baseline is green, so a failure here is
-a regression rather than a backlog.</p>
+<p>The error tier was empty in every repository when this audit was
+written, so a failure here is a regression rather than a backlog.</p>
 <h3 id="markdown-that-will-never-load-as-a-skill">Markdown that will never load as a skill<a class="headerlink" href="#markdown-that-will-never-load-as-a-skill" title="Permanent link">&para;</a></h3>
 <p>A skill is <code>&lt;skills dir&gt;/&lt;name&gt;/SKILL.md</code>. A bare markdown file
-directly in <code>.claude/skills/</code>, or a subdirectory with no <code>SKILL.md</code>,
-is inert: the agent does not load it, and skillsaw does not lint it
-either, because it is never discovered as a skill at all. A repository
-in that state lints clean while its skills do nothing.</p>
-<p>This is not hypothetical. When the audit was written, twelve local
-checkouts were affected, including instar (12 files, whose <code>AGENTS.md</code>
-asserts "Custom skills in <code>.claude/skills/</code> cover the repetitive
-work"), kerbside, occystrap, shakenfist and kerbside-patches. Every
-one of those repositories was passing the <code>llm-tooling</code> audit at the
-time.</p>
-<p>Sampled across those repositories the check produced no false
+directly in <code>.claude/skills/</code>, or a subdirectory with no <code>SKILL.md</code>, is
+inert: the agent does not load it, and skillsaw does not lint it
+either, because it is never discovered as a skill. A repository in that
+state lints clean while its skills do nothing.</p>
+<p>This is not hypothetical: when the audit was written twelve local
+checkouts were affected -- including instar, whose <code>AGENTS.md</code> asserts
+"Custom skills in <code>.claude/skills/</code> cover the repetitive work" -- and
+every one of them was passing the <code>llm-tooling</code> audit at the time.
+Sampled across those repositories the check produced no false
 positives: every file flagged either opens with "Use this skill when
-..." or describes itself as a slash command. <code>README.md</code> and
-<code>index.md</code> are allowed to sit beside skill directories.</p>
+..." or describes itself as a slash command. <code>README.md</code> and <code>index.md</code>
+are allowed to sit beside skill directories.</p>
 <h3 id="not-applicable">Not applicable<a class="headerlink" href="#not-applicable" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Repositories with no agent context files at all.</li>
@@ -13360,17 +13355,14 @@ positives: every file flagged either opens with "Use this skill when
 </ul>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- the fix is repository-specific. Skills move to
-<code>&lt;name&gt;/SKILL.md</code> with <code>name</code> and <code>description</code> frontmatter, or, if
-the file is really a slash command, to <code>.claude/commands/</code>, where flat
+<code>&lt;name&gt;/SKILL.md</code> with <code>name</code> and <code>description</code> frontmatter, or, if the
+file is really a slash command, to <code>.claude/commands/</code>, where flat
 markdown is the correct shape.</p>
 <p>See <a href="/components/development/audits/llm-context-lint-ci/">llm-context-lint-ci.md</a> for running the
 same linter per commit rather than once a day.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

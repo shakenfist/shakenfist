@@ -2397,19 +2397,19 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What we check">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#unit-test-coverage" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-standard" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Unit test coverage
+        The standard
       
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="The standard">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#functional-test-coverage" class="md-nav__link">
@@ -2422,8 +2422,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#unit-test-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit test coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-is-not-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this is not measured
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2432,17 +2454,6 @@
     <span class="md-ellipsis">
       
         Template
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#projects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Projects
       
     </span>
   </a>
@@ -13208,19 +13219,19 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What we check">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#unit-test-coverage" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-standard" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Unit test coverage
+        The standard
       
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="The standard">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#functional-test-coverage" class="md-nav__link">
@@ -13233,8 +13244,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#unit-test-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit test coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-is-not-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this is not measured
+      
+    </span>
+  </a>
   
 </li>
       
@@ -13243,17 +13276,6 @@
     <span class="md-ellipsis">
       
         Template
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#projects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Projects
       
     </span>
   </a>
@@ -13283,101 +13305,50 @@
 
 <h1 id="audit-test-coverage">Audit: Test coverage<a class="headerlink" href="#audit-test-coverage" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<h3 id="unit-test-coverage">Unit test coverage<a class="headerlink" href="#unit-test-coverage" title="Permanent link">&para;</a></h3>
-<p>We should have solid unit test coverage. No specific coverage
-percentage target, but whenever we see something that should be
-covered by tests and isn't, we should note it for fixing.</p>
+<p><strong>Nothing, here.</strong> This criterion is delegated in full to the pre-push
+review, and <strong>coverage for it is reported by the
+<a href="/components/development/audits/push-audit/">push-audit</a> audit</strong>, which checks that every
+repository carries the current <code>functional-test-coverage</code> shared block
+in its <code>PUSH-AUDIT.md</code>. There is no per-repository table on this page,
+because a table of who carries the block would be a second copy of the
+one that audit already publishes -- and a table of who has <em>good
+tests</em> is not something any script can fill in.</p>
+<p>This page remains the statement of the standard.</p>
+<h2 id="the-standard">The standard<a class="headerlink" href="#the-standard" title="Permanent link">&para;</a></h2>
 <h3 id="functional-test-coverage">Functional test coverage<a class="headerlink" href="#functional-test-coverage" title="Permanent link">&para;</a></h3>
-<p>We are obsessed with functional testing. The gold standard is
-"do we run the code to do the real thing and does it work as
-intended". The goal is to have a test for everything exposed on
-the command line or via an API.</p>
-<p>For the smaller projects we should be there now and any gap is a
-bug to be closed. <code>shakenfist</code> is still on a journey towards full
+<p>We are obsessed with functional testing. The gold standard is "do we
+run the code to do the real thing and does it work as intended", and
+the goal is a test for everything exposed on the command line or via
+an API.</p>
+<p>For the smaller projects we should be there now, and any gap is a bug
+to be closed. <code>shakenfist</code> is still on a journey towards full
 functional coverage.</p>
+<p>The test that matters for a given change is the one that would have
+failed before it and passes after. Mocking the system under test
+proves nothing: mock the boundary -- the network, the clock, the
+hypervisor -- and let the code being tested actually run.</p>
+<h3 id="unit-test-coverage">Unit test coverage<a class="headerlink" href="#unit-test-coverage" title="Permanent link">&para;</a></h3>
+<p>We should have solid unit test coverage. There is no specific
+coverage percentage target, but whenever we see something that should
+be covered by tests and isn't, we should note it for fixing. Error
+paths and argument validation are where this bites, being the code
+most often written once and never run again.</p>
+<h2 id="why-this-is-not-measured">Why this is not measured<a class="headerlink" href="#why-this-is-not-measured" title="Permanent link">&para;</a></h2>
+<p>A coverage percentage is not the property we want, and the property we
+do want -- "is there a test for everything exposed on the command
+line" -- needs someone to read the command line and the test suite and
+compare them. A script can count tests; it cannot notice the
+subcommand nobody wrote one for.</p>
+<p>So the standard is enforced where the gap is created, by the reviewer
+that runs before a push. That is the same treatment the
+<code>comment-proportion</code> block gets, and for the same reason: the audit
+verifies the wording is present and current, and does not try to score
+the thing itself.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No template -- test coverage is project-specific and assessed
-holistically.</p>
-<h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>Unit tests</th>
-<th>Functional tests</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>agent-python</td>
-<td>needs checking</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>needs checking</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>needs checking</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>imago</td>
-<td>needs checking</td>
-<td>compliant</td>
-<td></td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>needs checking</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>needs checking</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>needs checking</td>
-<td>compliant</td>
-<td></td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>needs checking</td>
-<td>needs checking</td>
-<td></td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>needs checking</td>
-<td>partial</td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<p>N/A for cloudgood: documentation project.</p>
+<p>No template. The reviewer wording is
+<code>templates/shared-blocks/functional-test-coverage.md</code>; the
+<a href="/components/development/audits/push-audit/">push-audit</a> audit is what checks it is deployed and
+current.</p>
 
 
 

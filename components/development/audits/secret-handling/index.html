@@ -13371,20 +13371,18 @@
 
 <h1 id="audit-credential-handling-and-leak-detection">Audit: Credential handling and leak detection<a class="headerlink" href="#audit-credential-handling-and-leak-detection" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<p>Two related things: that credentials do not get written into
-places with weaker access control than the credential itself, and
-that a scanner is watching for the times they do anyway.</p>
-<p>The automated part of this audit checks only the scanner. The
-code-level patterns below are review criteria -- a grep for them
-is either trivially evaded or drowns in false positives, so a
-passing check means "a scanner is running", not "this project has
-no credentials in its logs".</p>
+<p>Two related things: that credentials do not get written into places
+with weaker access control than the credential itself, and that a
+scanner is watching for the times they do anyway.</p>
+<p>The automated part checks only the scanner. The code-level patterns
+below are review criteria -- a grep for them is either trivially evaded
+or drowns in false positives -- so a passing check means "a scanner is
+running", not "this project has no credentials in its logs".</p>
 <h3 id="a-secret-scanner-runs-in-ci">A secret scanner runs in CI<a class="headerlink" href="#a-secret-scanner-runs-in-ci" title="Permanent link">&para;</a></h3>
-<p>Every project with CI must run a repository secret scanner on
-pull requests and on pushes to the default branch. <code>gitleaks</code> is
-the reference implementation; <code>trufflehog</code> and <code>detect-secrets</code>
-are accepted equivalents.</p>
-<p>The reference invocation:</p>
+<p>Every project with CI must run a repository secret scanner on pull
+requests and on pushes to the default branch. <code>gitleaks</code> is the
+reference implementation; <code>trufflehog</code> and <code>detect-secrets</code> are
+accepted equivalents.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="w">  </span><span class="nt">gitleaks</span><span class="p">:</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gitleaks</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">vm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-13</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">s</span><span class="p p-Indicator">]</span>
@@ -13403,162 +13401,130 @@ are accepted equivalents.</p>
 </code></pre></div>
 <p>Four things in there are not obvious and cost time to rediscover:</p>
 <ul>
-<li><code>gitleaks-action@v2</code> refuses to run on organization repositories
-  without a paid licence, so the upstream binary is invoked
-  directly instead.</li>
-<li><code>gitleaks</code> is only packaged from Debian 13 (trixie) onward --
-  bookworm has no package -- so the job needs a <code>debian-13</code>
-  runner. Where the runner pool has no passwordless sudo, download
-  the release tarball with a pinned version and sha256 instead;
-  pinning is worth doing anyway, because the configuration file
+<li><code>gitleaks-action@v2</code> refuses organization repositories without a paid
+  licence, so the upstream binary is invoked directly.</li>
+<li><code>gitleaks</code> is packaged from Debian 13 (trixie) onward -- bookworm has
+  no package -- so the job needs a <code>debian-13</code> runner. Where the pool
+  has no passwordless sudo, download the release tarball with a pinned
+  version and sha256; pinning is worth doing anyway, because the config
   schema changes between releases.</li>
-<li><code>fetch-depth: 0</code> matters: a secret committed and then reverted is
-  still in the history, and still needs rotating. A shallow clone
-  makes the job report a clean history it never looked at, which is
-  worse than not running it.</li>
-<li><code>--log-opts="HEAD"</code> matters just as much, and is easy to leave
-  off. Without it gitleaks scans <em>every ref</em>, which is not what
-  anyone means by "scan this project's history".</li>
+<li><code>fetch-depth: 0</code>: a secret committed and then reverted is still in
+  the history and still needs rotating. A shallow clone reports a clean
+  history it never looked at, which is worse than not running.</li>
+<li><code>--log-opts="HEAD"</code>: without it gitleaks scans <em>every ref</em>. On Shaken
+  Fist that turned a three second job into five minutes and 13 findings
+  into 163, because <code>gh-pages</code> carries a documentation search index
+  quoting every code sample -- and gitleaks 8.16 <em>misattributes</em> those
+  findings to unrelated merge commits that do not contain the file, so
+  they cannot be triaged by commit either. Any project publishing a
+  site from a branch has some version of this. Scoping to <code>HEAD</code> is not
+  a narrower claim: on a pull request <code>HEAD</code> reaches the branch under
+  test <em>and</em> all of the default branch.</li>
 </ul>
-<p>The all-refs default is a real problem, not a tidiness point. On
-Shaken Fist it turned a three second job into five minutes and 13
-findings into 163, because <code>gh-pages</code> carries the built
-documentation site whose search index quotes every code sample in
-the docs -- so every finding in a documented example reappears
-there once per deploy commit. Worse, gitleaks 8.16 <em>misattributes</em>
-those findings, reporting them against unrelated merge commits on
-the default branch which do not contain the file at all, so they
-cannot be triaged by commit either. Any project that publishes a
-site from a branch, or keeps long-lived branches, has some version
-of this.</p>
-<p>Scoping to <code>HEAD</code> is not a narrower claim. On a pull request <code>HEAD</code>
-reaches the branch under test <em>and</em> all of the default branch, so
-it is the same history, scanned correctly.</p>
-<p>Do not gate the job on a docs-only path filter. Every other job
-can skip when only documentation changed; this one cannot, because
-a credential pasted into a code sample is a credential. Shaken
-Fist's own history contains exactly one leaked cluster-minted key
-secret, and it was published in the user guide.</p>
+<p>Do not gate the job on a docs-only path filter. Every other job can
+skip when only documentation changed; this one cannot, because a
+credential pasted into a code sample is a credential. Shaken Fist's one
+leaked cluster-minted key secret was published in the user guide.</p>
 <h3 id="the-scan-needs-a-positive-control">The scan needs a positive control<a class="headerlink" href="#the-scan-needs-a-positive-control" title="Permanent link">&para;</a></h3>
 <p>A scan that finds nothing is indistinguishable from a scan that
-cannot find anything -- a broken regex, a shallow clone, an
-allowlist that has grown to swallow everything. Plant a credential
-in a scratch directory, scan it, and fail the build if the scanner
-does not report it. <code>shakenfist/tools/gitleaks-scan.sh</code> is the
-reference: it plants a key secret and an SSH private key and
-refuses to run the real scan until both come back.</p>
+<em>cannot</em> find anything -- a broken regex, a shallow clone, an allowlist
+that has grown to swallow everything. Plant a credential in a scratch
+directory, scan it, and fail the build if the scanner does not report
+it. <code>shakenfist/tools/gitleaks-scan.sh</code> plants a key secret and an SSH
+private key and refuses to run the real scan until both come back.</p>
 <h3 id="accepting-a-finding">Accepting a finding<a class="headerlink" href="#accepting-a-finding" title="Permanent link">&para;</a></h3>
-<p>Some findings are real and cannot be removed. History cannot be
-rewritten to unpublish anything from a public repository -- the
-objects survive in every fork and in GitHub's own reflog -- so an
-accepted finding is a claim that the credential has been dealt with
-<em>where it was trusted</em>, not that it has been tidied out of sight.
-Never suppress a finding for a credential that still authorises
-something.</p>
-<p>There are two mechanisms and they are not interchangeable:</p>
+<p>History cannot be rewritten to unpublish anything from a public
+repository -- the objects survive in every fork and in GitHub's reflog
+-- so an accepted finding claims the credential has been dealt with
+<em>where it was trusted</em>, not tidied out of sight. Never suppress a
+finding for a credential that still authorises something.</p>
+<p>Two mechanisms, not interchangeable:</p>
 <ul>
-<li><strong>Content that recurs</strong> -- documentation placeholders, test
-  fixtures, an upstream default -- belongs in the <code>[allowlist]</code>
-  <code>regexes</code> list in <code>.gitleaks.toml</code>, keyed on the text. Editing
-  the paragraph around a placeholder produces a new finding in a
-  new commit, so anything keyed on a commit would need replacing
-  every time. Avoid <code>paths</code> for this: blinding a whole file also
-  blinds a real credential added to it later.</li>
-<li><strong>A specific historical event</strong> belongs in <code>.gitleaksignore</code> as a
-  <code>commit:path:rule-id:line</code> fingerprint, which forgives one
-  occurrence and nothing else -- the same secret in a new commit
-  fails the scan again. Require a comment on each entry saying what
-  the credential was and what was done about it; an undocumented
-  entry is indistinguishable from a mistake.</li>
+<li><strong>Content that recurs</strong> -- documentation placeholders, test fixtures,
+  an upstream default -- goes in the <code>[allowlist]</code> <code>regexes</code> list in
+  <code>.gitleaks.toml</code>, keyed on the text. Editing the paragraph around a
+  placeholder produces a new finding in a new commit, so anything keyed
+  on a commit would need replacing every time. Avoid <code>paths</code>: blinding
+  a file also blinds a real credential added to it later.</li>
+<li><strong>A specific historical event</strong> goes in <code>.gitleaksignore</code> as a
+  <code>commit:path:rule-id:line</code> fingerprint, which forgives one occurrence
+  and nothing else. Require a comment on each entry saying what the
+  credential was and what was done about it; an undocumented entry is
+  indistinguishable from a mistake.</li>
 </ul>
 <p>Two gitleaks 8.16 details worth knowing before writing a config:
-per-rule allowlists are a single <code>[rules.allowlist]</code> table rather
-than the repeatable <code>[[rules.allowlists]]</code> array the current
-upstream documentation describes, and global allowlist regexes are
-matched against the whole match rather than the secret alone, so
-anchoring one with <code>^...$</code> silently stops it matching.</p>
-<p>This is distinct from the GitHub-hosted secret scanning covered by
-<a href="/components/development/audits/github-security/">github-security.md</a>. That one detects known
-third-party credential formats and needs GitHub Advanced Security
-for custom patterns; this one runs locally, costs nothing, and can
-be taught a project's own credential format.</p>
+per-rule allowlists are a single <code>[rules.allowlist]</code> table rather than
+the repeatable <code>[[rules.allowlists]]</code> array the upstream documentation
+describes, and global allowlist regexes match the whole match rather
+than the secret alone, so anchoring one with <code>^...$</code> silently stops it
+matching.</p>
+<p>This is distinct from the GitHub-hosted secret scanning in
+<a href="/components/development/audits/github-security/">github-security.md</a>, which detects known
+third-party formats and needs Advanced Security for custom patterns.
+This one runs locally, costs nothing, and can be taught a project's own
+credential format.</p>
 <h3 id="credentials-do-not-go-into-logs-or-events">Credentials do not go into logs or events<a class="headerlink" href="#credentials-do-not-go-into-logs-or-events" title="Permanent link">&para;</a></h3>
-<p>Anything a project writes to a log line, an audit event, an
-exception message, or a metrics label is readable by a wider
-audience than the credential is, and usually leaves the machine
-entirely -- Shaken Fist events, for instance, go to syslog <em>and</em>
-to Loki, so a credential in an event is a credential in log
-aggregation.</p>
-<p>Concretely, none of these belong in a log or event payload:</p>
+<p>Anything written to a log line, an audit event, an exception message or
+a metrics label is readable by a wider audience than the credential is,
+and usually leaves the machine -- Shaken Fist events go to syslog <em>and</em>
+Loki, so a credential in an event is a credential in log aggregation.</p>
+<p>None of these belong in a log or event payload:</p>
 <ul>
-<li>Bearer tokens and session cookies, including ones the process
-  just minted and ones it received on the request it is serving.</li>
-<li>Passwords and API key secrets, in any form the recipient could
-  replay. A stored hash counts: it is offline-attackable.</li>
-<li>Revocation handles such as a token nonce. Publishing one tells
-  a reader which captured tokens are still live.</li>
-<li>Raw HTTP request and response bodies on routes that carry
-  credentials. This is the one most often missed, because the
-  logging is usually generic request tracing added for debugging
-  long before the credential-bearing route existed.</li>
+<li>Bearer tokens and session cookies, including ones just minted and
+  ones received on the request being served.</li>
+<li>Passwords and API key secrets in any replayable form. A stored hash
+  counts: it is offline-attackable.</li>
+<li>Revocation handles such as a token nonce. Publishing one tells a
+  reader which captured tokens are still live.</li>
+<li>Raw HTTP request and response bodies on credential-bearing routes.
+  This is the one most often missed, because the logging is generic
+  request tracing added long before the route existed.</li>
 </ul>
-<p>Log the <em>identifier</em> instead -- the key name, the token's <code>jti</code>,
-the account -- which is what makes an audit trail useful without
-making it a credential store.</p>
-<p>Redact by route rather than by field name where a framework logs
-bodies generically. Field-name redaction has to know which route
-it is on anyway (a field called <code>key</code> is a metadata key name on
-most endpoints and a secret on a few) and starts leaking silently
-the day somebody adds a route it has not heard of.</p>
+<p>Log the <em>identifier</em> instead -- the key name, the token's <code>jti</code>, the
+account. Where a framework logs bodies generically, redact by route
+rather than by field name: field-name redaction has to know which route
+it is on anyway (a field called <code>key</code> is a metadata key name on most
+endpoints and a secret on a few) and starts leaking silently the day
+somebody adds a route it has not heard of.</p>
 <h3 id="secret-carrying-types-refuse-to-stringify">Secret-carrying types refuse to stringify<a class="headerlink" href="#secret-carrying-types-refuse-to-stringify" title="Permanent link">&para;</a></h3>
-<p>Where a language offers a wrapper type that renders as asterisks
-instead of its contents, secret fields should use it. This turns
-"remember not to log this" into a property of the type:</p>
+<p>Where a language offers a wrapper type that renders as asterisks, use
+it. This turns "remember not to log this" into a property of the type:</p>
 <ul>
 <li>Python: <code>pydantic.SecretStr</code>. <code>str()</code> and <code>repr()</code> yield
-  <code>'**********'</code>; the real value comes back only from an explicit
-  <code>.get_secret_value()</code>.</li>
+  <code>'**********'</code>; the value comes back only from <code>.get_secret_value()</code>.</li>
 <li>Rust: the <code>secrecy</code> crate's <code>Secret&lt;T&gt;</code>, or a manual <code>Debug</code>
-  implementation that prints a placeholder. Deriving <code>Debug</code> on a
-  struct with a secret field is the Rust version of this bug.</li>
+  implementation printing a placeholder. Deriving <code>Debug</code> on a struct
+  with a secret field is the Rust version of this bug.</li>
 </ul>
-<p>The unwrap calls then cluster at the few places that genuinely
-need the plaintext -- a hash comparison, a signature, an outbound
-header -- and each one is a place a reviewer can stop and ask
-whether the value belongs there.</p>
+<p>The unwrap calls then cluster at the few places that genuinely need
+plaintext -- a hash comparison, a signature, an outbound header -- and
+each is a place a reviewer can stop and ask whether it belongs there.</p>
 <h3 id="credentials-the-project-mints-are-recognisable">Credentials the project mints are recognisable<a class="headerlink" href="#credentials-the-project-mints-are-recognisable" title="Permanent link">&para;</a></h3>
-<p>Where a project generates a credential rather than accepting one
-chosen by a user, the generated form should carry a short
-identifying prefix and a checksum, following the pattern GitHub
-(<code>ghp_</code>), GitLab (<code>glpat-</code>), Stripe (<code>sk_live_</code>) and Slack
-(<code>xoxb-</code>) use. The prefix makes the credential greppable in logs
-and repositories; the checksum lets a scanner reject lookalikes
-without an API call, which is what makes scanning at volume
-tolerable rather than alert spam.</p>
-<p>This costs nothing cryptographically. A bearer token is a random
-identifier, not ciphertext, so a fixed prefix is a label sitting
-beside a random value rather than a revealed piece of one -- the
-entropy of the random part is unchanged.</p>
-<p>It applies only to credentials the project generates. A secret
-the user chose cannot carry the project's prefix, and requiring
-one would be a breaking API change for no benefit.</p>
+<p>Where a project generates a credential rather than accepting one a user
+chose, the generated form should carry a short identifying prefix and a
+checksum, as GitHub (<code>ghp_</code>), GitLab (<code>glpat-</code>), Stripe (<code>sk_live_</code>)
+and Slack (<code>xoxb-</code>) do. The prefix makes it greppable in logs and
+repositories; the checksum lets a scanner reject lookalikes without an
+API call, which is what makes scanning at volume tolerable rather than
+alert spam.</p>
+<p>This costs nothing cryptographically: a bearer token is a random
+identifier, not ciphertext, so a fixed prefix is a label beside a random
+value rather than a revealed piece of one. It applies only to
+credentials the project generates -- a secret the user chose cannot
+carry the prefix, and requiring one would be a breaking API change for
+no benefit.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No template -- the scanner job is a workflow snippet (see the
-reference invocation above, and ryll's
-<code>.github/workflows/ci.yml</code> for it in context), and the rest are
+<p>No template -- the scanner job is a workflow snippet (see above, and
+ryll's <code>.github/workflows/ci.yml</code> for it in context), and the rest are
 code-level patterns.</p>
-<p>For a scan that has grown beyond a single <code>run:</code> line -- a positive
-control, an allowlist, a shallow-clone guard -- put it in a script
-in the repository rather than in the workflow, as
-<code>shakenfist/tools/gitleaks-scan.sh</code> does. It then runs the same way
-locally as in CI, which is the only way anyone will check a change
-to it before pushing.</p>
+<p>For a scan grown beyond a single <code>run:</code> line -- a positive control, an
+allowlist, a shallow-clone guard -- put it in a script in the
+repository, as <code>shakenfist/tools/gitleaks-scan.sh</code> does. It then runs
+the same way locally as in CI, which is the only way anyone will check
+a change to it before pushing.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>

@@ -13249,56 +13249,49 @@
 
 <h1 id="audit-merge-queue-reasonability">Audit: Merge queue reasonability<a class="headerlink" href="#audit-merge-queue-reasonability" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<p>Repositories that enable a GitHub merge queue on their default
-branch must configure it so entries are processed serially and
-merged individually:</p>
+<p>Repositories that enable a GitHub merge queue on their default branch
+must configure it so entries are processed serially and merged
+individually:</p>
 <ul>
 <li><code>max_entries_to_build: 1</code> — no speculative stacking.</li>
 <li><code>min_entries_to_merge: 1</code> — merge each green entry immediately.</li>
 </ul>
-<p>Repositories without a merge queue are not in scope for this audit;
-whether to adopt two-stage CI at all is a per-project decision.</p>
+<p>Repositories without a merge queue are out of scope; whether to adopt
+two-stage CI at all is a per-project decision.</p>
 <p>The check reads the effective rules for the default branch via
 <code>GET /repos/shakenfist/&lt;repo&gt;/rules/branches/&lt;branch&gt;</code> and validates
 the parameters of any <code>merge_queue</code> rule found.</p>
 <h2 id="why-these-values">Why these values<a class="headerlink" href="#why-these-values" title="Permanent link">&para;</a></h2>
-<p>Two merge queue mechanics are easy to get wrong, and both were
-learned the hard way on shakenfist/shakenfist (August 2026):</p>
+<p>Both were learned the hard way on shakenfist/shakenfist in August 2026.</p>
 <p><strong>Speculative stacking multiplies failures.</strong> With
-<code>max_entries_to_build</code> above 1, entry N+1 builds on a temporary
-branch containing entry N's changes. When any entry ahead fails,
-the entries behind it are ejected and rebuilt on new SHAs. On a CI
-cluster whose dominant failure mode is load, this is doubly wrong:
-the stacked builds waste runs (we observed single PRs rebuilt five
-times in one day) and the extra concurrent merge groups add the
-very load that causes the failures. A serialized queue
-(<code>max_entries_to_build: 1</code>) never starts CI for an entry until the
-entry ahead has merged or ejected, so a failure can never
-invalidate work behind it.</p>
-<p><strong>Batched merging is pure latency.</strong> The queue always builds one
-merge group and runs CI once per entry, no matter how merges are
-batched — <code>min_entries_to_merge</code> only controls how many green
-entries land in a single default-branch update. Raising it makes
-the queue idle for up to <code>min_entries_to_merge_wait_minutes</code>
-hoping more PRs arrive, which on a mostly-single-developer project
-delays every merge and saves nothing. With
-<code>min_entries_to_merge: 1</code> that wait timer never engages (it is the
-timeout for reaching the minimum group size, which a single entry
-already satisfies).</p>
+<code>max_entries_to_build</code> above 1, entry N+1 builds on a temporary branch
+containing entry N's changes, so when any entry ahead fails the entries
+behind it are ejected and rebuilt on new SHAs. On a CI cluster whose
+dominant failure mode is load this is doubly wrong: the stacked builds
+waste runs (we observed single PRs rebuilt five times in one day) and
+the extra concurrent merge groups add the very load that causes the
+failures. A serialized queue never starts CI for an entry until the one
+ahead has merged or ejected.</p>
+<p><strong>Batched merging is pure latency.</strong> The queue always builds one merge
+group and runs CI once per entry no matter how merges are batched —
+<code>min_entries_to_merge</code> only controls how many green entries land in a
+single default-branch update. Raising it makes the queue idle for up to
+<code>min_entries_to_merge_wait_minutes</code> hoping more PRs arrive, which on a
+mostly-single-developer project delays every merge and saves nothing.
+At 1 that wait timer never engages.</p>
 <p>Other parameters (<code>grouping_strategy</code>, <code>merge_method</code>,
 <code>max_entries_to_merge</code>, <code>check_response_timeout_minutes</code>) are
-conventions rather than correctness issues and are not enforced;
-the fleet reference is shakenfist/shakenfist's "Develop branch"
-ruleset: ALLGREEN, MERGE, 5, and 360 respectively.</p>
+conventions rather than correctness issues and are not enforced; the
+fleet reference is shakenfist/shakenfist's "Develop branch" ruleset:
+ALLGREEN, MERGE, 5, and 360 respectively.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template — this is a one-time ruleset configuration change.</p>
 <p>To inspect the current configuration:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rules/branches/develop<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--jq<span class="w"> </span><span class="s1">'.[] | select(.type == "merge_queue") | .parameters'</span>
 </code></pre></div>
-<p>To fix a non-compliant ruleset, fetch it, rewrite the two
-parameters, and PUT it back (preserving everything else, including
-<code>bypass_actors</code>):</p>
+<p>To fix a non-compliant ruleset, fetch it, rewrite the two parameters,
+and PUT it back, preserving everything else including <code>bypass_actors</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="s1">'.[] | select(.target == "branch") | {id, name}'</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="se">\</span>
@@ -13312,14 +13305,11 @@ parameters, and PUT it back (preserving everything else, including
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/&lt;repo&gt;/rulesets/&lt;id&gt;<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span>--input<span class="w"> </span>/tmp/ruleset.json
 </code></pre></div>
-<p>Afterwards, trigger the repository's <code>export-repo-config</code> workflow
-so the change is captured in <code>.github/exported-config/</code>.</p>
+<p>Afterwards, trigger the repository's <code>export-repo-config</code> workflow so
+the change is captured in <code>.github/exported-config/</code>.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <!-- consistency-audit:begin -->
-<p><em>This table is regenerated daily by the consistency audit
-workflow from <code>scripts/audit-check.py</code> results; do not edit
-it by hand.</em></p>
-<p>Last regenerated: 2026-08-25T06:54:21.186929+00:00</p>
+<p><em>Generated 2026-08-25T06:54:21.186929+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <table>
 <thead>
 <tr>
