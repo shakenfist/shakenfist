@@ -13371,8 +13371,109 @@ implementations are <code>SafeHeaderMixin</code> and <code>safe_path_join()</cod
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <p>The table below covers the header sanitization check only.</p>
 <!-- consistency-audit:begin -->
-<p><em>(Awaiting the first automated regeneration by the consistency
-audit workflow.)</em></p>
+<p><em>Generated 2026-08-26T06:56:26.297909+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Status</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actions</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>clingwrap</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>cloudgood</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>development</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/81" title="GitHub Issue: shakenfist/divergulent #81">divergulent#81</a></td>
+</tr>
+<tr>
+<td>instar</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>private-ci</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/322" title="GitHub Issue: shakenfist/ryll #322">ryll#322</a></td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3910" title="GitHub Issue: shakenfist/shakenfist #3910">shakenfist#3910</a></td>
+</tr>
+</tbody>
+</table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>divergulent</strong> (Status): 2 of 2 HTTP request handler class(es) do not sanitize header values: divergulent/tests/test_fetch.py:164 (ErrorHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through; divergulent/tests/test_fetch.py:37 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through</li>
+<li><strong>ryll</strong> (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tools/browser-offer-probe.py:68 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through</li>
+<li><strong>shakenfist</strong> (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_federation.py:57 (_JWKSHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through</li>
+</ul>
 <!-- consistency-audit:end -->
 
 
