@@ -5,7 +5,7 @@
 The daily consistency audit is a backstop, not a feedback loop. A
 malformed skill, a smuggled unicode character or a secret pasted into
 `CLAUDE.md` should be caught by the commit that introduces it, not up
-to twenty-four hours later by a report nobody is watching at the time.
+to twenty-four hours later by a report nobody is watching.
 
 Every repository with agent context must therefore run
 [skillsaw](https://skillsaw.org/) itself, in both places the other
@@ -18,21 +18,17 @@ linters run:
 
 Both are required. Pre-commit alone is advisory; CI alone is slow.
 
-A CI job which runs `pre-commit run` satisfies the second half
-without naming skillsaw itself, because it runs every hook the
-pre-commit config declares. Requiring the linter to be named in a
-workflow as well would report a repository as non-compliant for a
-wiring that does run it -- and would fail this repository's own
-`consistency-audit.yml`, which installs skillsaw from PyPI and so
-never names the upstream repository either. The pre-commit half is
-still checked independently, so a workflow running pre-commit
+A CI job running `pre-commit run` satisfies the second half without
+naming skillsaw, because it runs every hook the config declares.
+Requiring the linter to be named in a workflow as well would report a
+repository non-compliant for a wiring that does run it. The pre-commit
+half is still checked independently, so a workflow running pre-commit
 against a config with no skillsaw hook does not pass.
 
 As with the secret scanner check, *how* skillsaw is invoked is
-deliberately not pinned. Naming the upstream repository in a
-pre-commit config and in a workflow is the step change; requiring a
-particular rev or argument list would make the audit brittle against
-reasonable variation.
+deliberately not pinned: naming it in a pre-commit config and in a
+workflow is the step change, and requiring a particular rev or argument
+list would make the audit brittle against reasonable variation.
 
 ## Template
 
@@ -57,19 +53,13 @@ CI, in the lane that already runs the other linters:
 ```
 
 Pin `rev` and the action to a commit SHA if the repository pins its
-other third-party actions that way.
-
-Repositories that enable renovate's pre-commit manager will have the
-`rev` kept current automatically.
+other third-party actions that way. Repositories that enable renovate's
+pre-commit manager will have the `rev` kept current automatically.
 
 ## Projects
 
 <!-- consistency-audit:begin -->
-*This table is regenerated daily by the consistency audit
-workflow from `scripts/audit-check.py` results; do not edit
-it by hand.*
-
-Last regenerated: 2026-08-25T06:54:21.186929+00:00
+*Generated 2026-08-25T06:54:21.186929+00:00 from `scripts/audit-check.py`; do not edit.*
 
 | Project | Status | Issue |
 |---------|--------|--------|
