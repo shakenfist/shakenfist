@@ -249,12 +249,16 @@ expectation that phase 6 withdrew.
     generator, the private nightly report and any deployer's own tooling
     are not all Python; inside the package rather than `examples/` because
     `sf-ctl database-load` must read it on a node, where only the wheel
-    exists. The wheel does carry it — `setuptools_scm` finds every
-    git-tracked file and `include-package-data` defaults on — but nothing
-    in `pyproject.toml` says so, so the test asserts the file is readable
-    through `importlib.resources` rather than through a path relative to
-    `__file__`, which is the difference between noticing a packaging
-    regression and shipping one.
+    exists. *(Revised during review: the plan reasoned that the wheel
+    carries it anyway — `setuptools_scm` finds every git-tracked file and
+    `include-package-data` defaults on — and that a test reading it
+    through `importlib.resources` would therefore catch a packaging
+    regression. It would not. A source checkout resolves
+    `shakenfist.data` as a namespace package whatever `pyproject.toml`
+    says, so that test passes either way. The file is now declared in
+    `[tool.setuptools.package-data]`, and the test asserts the
+    declaration covers it. The resources test stays, as an assertion
+    about the runtime path every consumer takes.)*
 
 ## Step plan
 
@@ -268,8 +272,9 @@ expectation that phase 6 withdrew.
 
 ## What implementation found
 
-Two things the plan did not anticipate, both caught by checking output
-against real data rather than by reasoning about it.
+Three things the plan did not anticipate, all caught by checking output
+against real data rather than by reasoning about it. A fourth section
+below records what the automated reviewer found once the code existed.
 
 **The budget's inclusion cut has to sit below the unbudgeted threshold.**
 7a derived at 0.30/s, which seemed a reasonable place to stop: 73 pairs
@@ -353,6 +358,120 @@ tier: 201.2/s measured against 177.6/s modelled at six nodes and 32
 standing instances, nothing over budget, at a cluster shape well outside
 the range the coefficients were fitted over.
 
+### What review found
+
+The automated reviewer's findings are worth recording, because five of
+them are variations on one theme the plan stated as its central claim and
+did not actually deliver: *every consumer reads one budget file so they
+cannot disagree about what normal load is.* Reading the same file turns
+out not to be enough. The three consumers also have to evaluate it the
+same way, and they did not.
+
+**They disagreed about what a standing instance is.** The per-instance
+coefficients were fitted by regressing against `sum(instances_active)`,
+which counts running libvirt domains. The generated Prometheus rules use
+that series. `sf-ctl database-load` counted every instance in the
+`created` state, powered off ones included, and the CI check counted every
+instance the API returned — three quantities, one model. Because the
+ceiling is `modelled x 2.0 + 0.5`, over-counting instances inflates a
+cluster's own ceiling by roughly the coefficient per spurious instance,
+and the larger coefficients are around 0.5/s each. A cluster with a lot of
+powered-off instances was therefore quietly raising the bar for the
+regression this phase exists to detect. `_cluster_shape()` now reads
+`instances_active` from the node metrics rows (ignoring rows staler than
+five minutes, because Prometheus drops such a series and a departed node
+must not keep charging the per-node term), the CI check counts instances
+whose `power_state` is `on`, and `_doc.method` in the budget now says
+which quantity the coefficients were fitted against so a re-derivation
+uses the matching regressor.
+
+**They disagreed about whether unbudgeted traffic is a problem.**
+`ShakenFistUnbudgetedDatabasePolling` fires on it and
+`test_no_unbudgeted_fixed_rate_database_polling` fails the build on it,
+but `sf-ctl database-load` computed `over_budget` as `measured > ceiling
+and (entry is not None and entry.enforced)`, which is unconditionally
+false when there is no entry — which is what unbudgeted means. So a brand
+new polling loop at 5/s printed as a flagged row and then the footer said
+"Nothing is over budget; the rows above are flagged rather than
+excessive." The one-word fix is `entry is None or entry.enforced`; the
+test that pins it also pins the other half, that a quiet unbudgeted pair
+is still not over budget.
+
+**Both measurement paths divided by the window they slept rather than the
+time they measured.** A counter delta covers the sleep plus the scrapes.
+For `sf-ctl` that is a few percent. For the CI harness it is worse:
+`_all_pairs` retries a failed scrape up to three times with a five second
+timeout and a two second backoff, per node, per sample, so two slow tier
+nodes can add tens of seconds to a 60s divisor and inflate every rate by
+most of a factor. Both windows inflate together so the fixed-rate filter
+does not drop it, and the result is a budgeted pair pushed past its
+ceiling and a build failed for a regression that is not there — decision
+3's flaky check, arriving by a route the plan did not consider. Both paths
+now divide by a monotonic measurement (per gateway in `sf-ctl`, by the
+difference of per-sweep means in CI) and report it, so a slow run is
+visible instead of silently scaling the numbers.
+
+**The generator could not regenerate the file it generated.** `emit()`
+wrote five of the ten `_doc` keys, no provisional block and no notes, so
+running the command in the tool's own docstring produced a budget that
+failed `test_doc_block_records_its_provenance` and
+`test_provisional_entries_name_an_issue_and_are_not_enforced`. It also
+re-emitted `tolerance_multiplier`, `tolerance_floor_qps` and
+`unbudgeted_fixed_rate_qps` as literals, so tuning one in the file and
+re-deriving silently put it back — the same failure mode
+`CODE_DERIVED_TERMS` was introduced to prevent for entry terms. The static
+caveats are now module constants, and the defaults, notes and provisional
+markings are carried forward from `--previous` (defaulting to the shipped
+file), with a stderr line naming the pairs that are genuinely new and
+still need a note written. Six round-trip tests assert the output is a
+budget this repository accepts; mutating the carry-forward back out fails
+two of them.
+
+**The packaging test did not test packaging.** `shakenfist/schema/
+database_load_budget.py` and this plan's definition of done both claimed
+that reading the budget through `importlib.resources` is "what proves the
+wheel carries it". It is not: a source checkout resolves `shakenfist.data`
+as a namespace package whatever `pyproject.toml` says, so narrowing
+`package-data` would have left the test green and broken `sf-ctl
+database-load` on a node. Nothing declared the file at all — it reached
+the wheel through the undeclared union of the setuptools_scm file finder
+with `include-package-data`. `data/*.yaml` is now declared, a test asserts
+the declaration matches the resource path, and the claim has been removed
+from the docstring, the schema module and the definition of done. A wheel
+was built by hand to confirm the file ships.
+
+Five smaller ones, all taken. The CI harness had no negative-delta guard,
+so an sf-database restart mid-measurement produced a negative rate and
+failed the positive control with a message about #3708 coverage — it now
+says a gateway restarted, because that is what happened. Three Grafana
+panels kept `bps` on the y-axis from the etcd panel they replaced, so
+201 QPS rendered as "201 b/s". `test_every_budgeted_pair_is_in_every_
+coefficient_series` compared operations rather than pairs, so dropping
+`GetInstanceAttributes`/net would have gone unnoticed while its six other
+callers kept the operation present. `FIXED_RATE_MIN_RATIO` and
+`FIXED_RATE_MAX_RATIO` were only ever used as the quotient
+`MAX / MIN = 2.83`, so anybody tuning one would have moved the threshold
+somewhere they did not predict; they are one `FIXED_RATE_MAX_SPREAD` now.
+And both metrics parsers read the last whitespace field as the counter
+value, which the exposition format permits to be a trailing millisecond
+timestamp — both copies made the same mistake, so the parity test agreed
+with itself; the fixture now contains a timestamped sample.
+
+One finding was recorded rather than fixed: the measured-versus-modelled
+*total* includes every activity-coupled pair, whose coefficients were
+fitted against our own cluster's API traffic, so on a deployment whose
+users behave differently the two total lines diverge permanently for a
+reason that is not a regression. Rather than only caveat it, the rules now
+also record `sf_database:request_rate:enforced_total` and
+`sf_database:modelled_rate:enforced_total` over the enforced pairs alone,
+and the Grafana panel plots those alongside — that pair is comparable
+across deployments and is the one that should track.
+
+Finally, rebasing onto develop brought in the fix for #3876, which the
+budget describes as an open defect. The entry stays provisional, because a
+level nobody has re-measured is not a floor worth defending either, but
+its note now says the fix landed and the coefficient predates it.
+
 ## Risks and mitigations
 
 * **The budget encodes the regression.** If 7a is derived before phase 6
@@ -406,13 +525,16 @@ them worth keeping — a criterion that already passes before the work
 starts is not a criterion. They were all run again after
 implementation; every one passes. Functional CI needed the branch
 pushed, and its first run failed on the positive control's premise
-about which daemons poll — see "What implementation found".
+about which daemons poll; its second passed. The automated review that
+followed found eleven things, nine of them fixed and two recorded — see
+"What implementation found".
 
 * **The budget exists, validates, and ships.** `shakenfist/data/
   database_load_budget.yaml` parses; every entry carries a base or a
   coefficient; every `provisional` entry names an open issue; and the file
-  is reachable through `importlib.resources`. The last of those is the one
-  that matters:
+  is reachable through `importlib.resources`, and `pyproject.toml`
+  declares it as package data. The last two are the ones that matter, and
+  they are two different questions — see decision 11:
 
   ```bash
   python3 -m build --wheel --outdir /tmp/wheel . && \
@@ -422,7 +544,8 @@ about which daemons poll — see "What implementation found".
   must print a line. *(Done: it does. At planning time the file did not
   exist, and the wheel carried 555 entries including
   `shakenfist/kerbside/*.md`, which was the evidence that a git-tracked
-  data file ships without a `package-data` entry.)*
+  data file ships without a `package-data` entry — true, but not a reason
+  to leave it undeclared, which is what review pointed out.)*
 * **The budget's levels are post-phase-6.** Its `_doc` block names the
   measurement window, the cluster shape it was taken on, and the fact that
   figures before 2026-08-11 undercount by two nodes and the cluster

@@ -117,6 +117,7 @@ METRICS = textwrap.dedent("""\
     database_requests_total{operation="Dequeue",caller_daemon="queues"} 12.0
     database_get_node_total 48.0
     database_requests_total{caller_daemon="net"} 3.0
+    database_requests_total{caller_daemon="cleaner",operation="Sweep"} 5.0 1700000000000
     """)
 
 
@@ -147,7 +148,20 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         with mock.patch.object(harness.requests, 'get',
                                return_value=FakeResponse(METRICS)):
             pairs = harness.scrape_request_pairs('10.0.0.1')
-        self.assertEqual(3, len(pairs))
+        self.assertEqual(4, len(pairs))
+
+    def test_a_trailing_timestamp_is_not_the_value(self):
+        # The exposition format allows a sample to carry a trailing
+        # millisecond timestamp. Reading the last whitespace field, which
+        # both copies of this parser used to do, returns 1.7e12 as the
+        # counter -- and since both copies did it, the parity test below
+        # agreed with itself and nothing failed. prometheus_client does
+        # not emit timestamps today, so this is the case which would have
+        # gone unnoticed until something else served these metrics.
+        with mock.patch.object(harness.requests, 'get',
+                               return_value=FakeResponse(METRICS)):
+            pairs = harness.scrape_request_pairs('10.0.0.1')
+        self.assertEqual(5.0, pairs[('Sweep', 'cleaner')])
 
     def test_expected_qps_matches_the_server_side_model(self):
         # The assertion this file exists for.
@@ -268,6 +282,25 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         steady = harness.fixed_rate([{('Sweep', 'cluster'): 1.0 / per_window},
                                      {('Sweep', 'cluster'): 2.0 / per_window}])
         self.assertIn(('Sweep', 'cluster'), steady)
+
+    def test_the_spread_admits_the_straddle_and_nothing_much_wider(self):
+        # FIXED_RATE_MAX_SPREAD is one constant because the two it
+        # replaced were only ever used as a quotient: the code read
+        # "high / low > MAX / MIN", so 0.6 and 1.7 meant 2.83, and
+        # anybody tuning one of them to reduce flakes would have moved
+        # the threshold somewhere they did not predict. Pin what the
+        # single number means at both ends.
+        self.assertLess(2.0, harness.FIXED_RATE_MAX_SPREAD,
+                        'the one-sample-versus-two straddle above is a '
+                        'factor of two and has to survive')
+
+        just_inside = harness.FIXED_RATE_MAX_SPREAD - 0.1
+        self.assertIn(('Poll', 'net'), harness.fixed_rate(
+            [{('Poll', 'net'): 1.0}, {('Poll', 'net'): just_inside}]))
+
+        just_outside = harness.FIXED_RATE_MAX_SPREAD + 0.1
+        self.assertNotIn(('Poll', 'net'), harness.fixed_rate(
+            [{('Poll', 'net'): 1.0}, {('Poll', 'net'): just_outside}]))
 
     def test_parser_matches_the_server_side_parser(self):
         # shakenfist/util/metrics_scrape.py is the same parser for

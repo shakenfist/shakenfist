@@ -19,6 +19,7 @@ the budget's own defaults.
 
 import importlib.util
 import io
+import re
 import os
 
 import yaml
@@ -66,12 +67,16 @@ def _rules():
     return parsed['groups'][0]['rules']
 
 
+# The generated form of one term, from which both labels are read. Reading
+# only the operation would let a pair vanish from a coefficient series
+# while another caller of the same operation kept the name present, which
+# is exactly the failure the test below is for.
+PAIR_RE = re.compile(
+    r'"operation", "([^"]+)", "", ""\), "caller_daemon", "([^"]+)"')
+
+
 def _pairs_in(expr):
-    pairs = set()
-    for term in expr.split('label_replace(')[1:]:
-        if '"operation", "' in term:
-            pairs.add(term.split('"operation", "')[1].split('"')[0])
-    return pairs
+    return set(PAIR_RE.findall(expr))
 
 
 class DatabaseLoadRulesTestCase(base.ShakenFistTestCase):
@@ -97,13 +102,28 @@ class DatabaseLoadRulesTestCase(base.ShakenFistTestCase):
         # in two of the three coefficient rules and not the third vanishes
         # from the modelled rate entirely -- and a pair with no model is a
         # pair no alert can fire for.
+        #
+        # Asserted per pair rather than per operation, because most
+        # operations have several callers: GetInstanceAttributes appears
+        # with seven, so dropping its /net term would leave the operation
+        # present via /api and an operation-level assertion would not
+        # notice.
         budget = database_load_budget.load_budget()
-        expected = {e.operation for e in budget.entries}
+        expected = {e.key for e in budget.entries}
         by_name = {r['record']: r['expr'] for r in _rules() if 'record' in r}
         for name in ('sf_database:budget:per_node_base',
                      'sf_database:budget:cluster_base',
                      'sf_database:budget:per_instance'):
             self.assertEqual(expected, _pairs_in(by_name[name]), name)
+
+    def test_the_pair_reader_reads_both_labels(self):
+        # _pairs_in() drives the assertion above, and a regex which
+        # matched nothing, or matched only the operation, would make it
+        # pass on a series which had lost a caller.
+        pairs = _pairs_in(
+            'label_replace(label_replace(vector(0.026), "operation", '
+            '"AcquireLock", "", ""), "caller_daemon", "cleaner", "", "")')
+        self.assertEqual({('AcquireLock', 'cleaner')}, pairs)
 
     def test_provisional_pairs_are_not_alerted_on(self):
         # GetReferencesFrom/api records a known defect (#3876). Alerting on

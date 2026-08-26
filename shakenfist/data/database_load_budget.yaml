@@ -103,18 +103,21 @@ entries:
     provisional:
       issue: 3876
       reason: >-
-        unpaired reference reads in the blob and artifact external
-        views
+        measured before the unpaired reference reads in the blob and
+        artifact external views were removed, so this level records
+        the defect rather than the cost of the work
     measured:
       mean_qps: 10.266
       r2: 0.729
     note: >-
-      Blob and artifact external views. This pair is a known defect,
-      not a floor: Blob.external_view() issues three
-      get_references_from() calls where one filtered read would serve,
-      and Artifact.external_view() issues one per blob version. It
-      runs at about 11x its paired GetReferencesTo/api, which no
-      paired view can produce.
+      Blob and artifact external views. These terms were measured
+      before #3876 was fixed, when Blob.external_view() issued three
+      get_references_from() calls where one filtered read would serve
+      and the artifact handlers walked every instance once per blob
+      rendered. That is fixed, so this entry now over-predicts and
+      will keep doing so until the budget is re-derived; it stays
+      provisional because a level nobody has re-measured is not a
+      floor worth defending either way.
   - operation: GetInstanceAttributes
     caller_daemon: net
     per_node_base_qps: 0.039

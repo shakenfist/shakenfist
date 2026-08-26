@@ -37,11 +37,19 @@ METRICS_TIMEOUT = 5
 LOAD_WINDOW_SECONDS = 60
 LOAD_WINDOW_COUNT = 2
 
-# How alike two windows must be before a pair counts as fixed-rate. A poll
-# is far steadier than this; the slack is for windows which straddle the
-# period of a slow loop.
-FIXED_RATE_MIN_RATIO = 0.6
-FIXED_RATE_MAX_RATIO = 1.7
+# How alike two windows must be before a pair counts as fixed-rate,
+# expressed as the largest ratio allowed between the highest and lowest
+# observation. A poll is far steadier than this; the slack is for a slow
+# loop whose period straddles a window boundary, which can legitimately
+# land one sample in one window and two in the next. That is a factor of
+# two on its own, so anything much under 2 would make this check blind to
+# exactly the slow polls which are hardest to spot by reading code -- see
+# test_a_slow_loop_straddling_a_window_survives.
+#
+# One constant, because two were only ever used as a quotient: the code
+# read "high / low > MAX / MIN", so the pair 0.6 and 1.7 was really 2.83
+# and halving either one moved the threshold somewhere nobody predicted.
+FIXED_RATE_MAX_SPREAD = 2.83
 
 # A daemon which runs the Daemon base class' loop polls its own
 # node_daemon_states row from Daemon.idle(), rate-limited to
@@ -149,6 +157,12 @@ def scrape_request_pairs(mesh_ip):
     answers "what is this node serving at all", which is what a check for
     traffic nobody budgeted for needs -- it cannot ask about a pair whose
     name it does not know yet.
+
+    Reads the second whitespace field as the value, not the last, for the
+    reason given in shakenfist/util/metrics_scrape.py: a sample may carry
+    a trailing timestamp. The two copies are asserted to agree by
+    test_parser_matches_the_server_side_parser, which is only worth
+    anything if the fixture it runs on contains the case.
     """
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
     resp = requests.get(url, timeout=METRICS_TIMEOUT)
@@ -174,7 +188,7 @@ def scrape_request_pairs(mesh_ip):
             continue
         try:
             pairs[(operation, caller)] = (
-                pairs.get((operation, caller), 0.0) + float(parts[-1]))
+                pairs.get((operation, caller), 0.0) + float(parts[1]))
         except ValueError:
             continue
     return pairs
@@ -207,7 +221,7 @@ def fixed_rate(rates_per_window):
         low, high = min(observed), max(observed)
         if low <= 0.0:
             continue
-        if high / low > FIXED_RATE_MAX_RATIO / FIXED_RATE_MIN_RATIO:
+        if high / low > FIXED_RATE_MAX_SPREAD:
             continue
         steady[key] = low
     return steady

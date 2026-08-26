@@ -19,6 +19,13 @@ def parse_request_pairs(text: str) -> dict[tuple[str, str], float]:
     Samples missing either label are skipped rather than being an error:
     the endpoint also serves the older unlabelled per-operation counters,
     and those cannot be attributed to a caller.
+
+    The value is read as the second whitespace field rather than the last
+    one, because the exposition format allows a sample to carry a trailing
+    millisecond timestamp -- "metric{...} 3.0 1700000000000" -- and
+    reading the last field there returns the timestamp as the counter.
+    prometheus_client does not emit timestamps today, so nothing would
+    notice until something else served these metrics.
     """
     pairs: dict[tuple[str, str], float] = {}
     for line in text.splitlines():
@@ -41,7 +48,7 @@ def parse_request_pairs(text: str) -> dict[tuple[str, str], float]:
             continue
         try:
             key = (operation, caller)
-            pairs[key] = pairs.get(key, 0.0) + float(parts[-1])
+            pairs[key] = pairs.get(key, 0.0) + float(parts[1])
         except ValueError:
             continue
     return pairs

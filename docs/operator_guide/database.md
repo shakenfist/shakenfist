@@ -358,9 +358,10 @@ something to attach to a bug report.
 
 Two flags in that output mean "expected, do not report":
 
-* `provisional:#NNNN` -- the level is a known defect with an open issue
-  rather than a floor worth defending. When the issue is fixed the entry
-  is re-measured and the flag goes.
+* `provisional:#NNNN` -- the level is a known defect rather than a floor
+  worth defending. Read the issue: it may already be fixed, in which case
+  the entry over-predicts until the budget is next re-derived. Either way
+  the pair is reported and never enforced.
 * `activity` -- the level is set by what you and your tooling do rather
   than by one of our loops, so only you can say whether it is reasonable.
 
@@ -384,6 +385,16 @@ which looks exactly like a healthy cluster.
 [`examples/grafana-dashboard.json`](https://github.com/shakenfist/shakenfist/blob/develop/examples/grafana-dashboard.json)
 has matching panels for load by caller, measured against modelled, and
 the count of pairs over budget.
+
+On the measured-against-modelled panel, watch the enforced pair of lines
+rather than the totals. The totals include every `activity` pair, and
+those coefficients were fitted against the API traffic of the cluster the
+budget was derived from -- which is ours, and is mostly CI. If your users
+and tooling call the API differently, and they will, those two lines
+diverge steadily and permanently without anything being wrong. The
+`enforced` lines cover only the pairs produced by Shaken Fist's own loops,
+so they are comparable across deployments, and they are the ones which
+should track each other as the cluster grows.
 
 #### When a pair is over budget
 

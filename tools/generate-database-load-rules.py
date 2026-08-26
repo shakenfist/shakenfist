@@ -225,6 +225,30 @@ def main():
       - record: sf_database:modelled_rate:total
         expr: sum(sf_database:modelled_rate)
 
+      # The same two numbers over the enforced pairs alone, which is the
+      # comparison that actually means something on a cluster which is
+      # not ours. The totals above include every activity coupled pair,
+      # whose level was fitted against the API traffic of the cluster the
+      # budget was derived from -- so on a deployment whose users and
+      # tooling behave differently the two total lines diverge steadily
+      # and permanently, for a reason which is not a regression. These
+      # two exclude those pairs and the provisional ones, so they are
+      # comparable across deployments and they are what
+      # ShakenFistDatabasePairOverBudget is summing up.
+      - record: sf_database:request_rate:enforced_total
+        expr: |-
+          sum(
+            sf_database:request_rate
+              and on (operation, caller_daemon) sf_database:budget:enforced
+          )
+
+      - record: sf_database:modelled_rate:enforced_total
+        expr: |-
+          sum(
+            sf_database:modelled_rate
+              and on (operation, caller_daemon) sf_database:budget:enforced
+          )
+
       # The ceiling is deliberately generous. These rules exist to catch a
       # new polling loop or one which lost its bulk read, not to police a
       # ten percent drift.

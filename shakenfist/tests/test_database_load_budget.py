@@ -1,5 +1,8 @@
 # Copyright 2019 Michael Still and contributors
+import fnmatch
 import io
+import os
+import tomllib
 from importlib import resources
 
 import yaml
@@ -10,14 +13,16 @@ from shakenfist.tests import base
 
 
 class DatabaseLoadBudgetTestCase(base.ShakenFistTestCase):
-    """The shipped budget file must parse, and must ship.
+    """The shipped budget file must parse, and must be readable as a resource.
 
-    The packaging assertion is the one worth having. Nothing in
-    pyproject.toml names this file: it reaches the wheel because
-    setuptools_scm finds every git tracked file. That is fine until
-    somebody tidies package-data, at which point `sf-ctl database-load`
-    keeps working in a checkout and in CI and stops working on a node.
-    Reading it the way a deployed process does is what catches that.
+    Note what the resource test does not do. It was written believing it
+    was the packaging guard, and it is not: a source checkout resolves
+    shakenfist.data as a namespace package whether or not the file is
+    declared anywhere, so narrowing package-data would leave this green
+    and break `sf-ctl database-load` on a node. The file is now named by
+    [tool.setuptools.package-data] in pyproject.toml, which is what
+    actually keeps it in the wheel. This asserts the runtime path -- that
+    the loader every consumer goes through returns the committed bytes.
     """
 
     def test_budget_is_readable_as_package_data(self):
@@ -25,6 +30,31 @@ class DatabaseLoadBudgetTestCase(base.ShakenFistTestCase):
                 .joinpath(budget.BUDGET_RESOURCE).read_text(encoding='utf-8'))
         self.assertIn('entries:', text)
         self.assertEqual(text, budget.budget_text())
+
+    def test_the_budget_is_declared_as_package_data(self):
+        # This is the packaging assertion, and it is a different question
+        # from the one above: does anything actually ask setuptools to put
+        # the file in the wheel. Until this branch nothing did -- it rode
+        # along on the setuptools_scm file finder and the
+        # include-package-data default, neither of which is written down
+        # anywhere, and both of which a tidy-up of package-data would have
+        # left in place while breaking `sf-ctl database-load` on a node.
+        # Building a wheel here would be the direct test, but it needs
+        # network and a build backend; this catches the deletion, which is
+        # the way it would actually go wrong.
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(os.path.dirname(here))
+        with open(os.path.join(root, 'pyproject.toml'), 'rb') as f:
+            declared = tomllib.load(f)['tool']['setuptools'][
+                'package-data']['shakenfist']
+
+        directory = budget.BUDGET_PACKAGE.split('.', 1)[1]
+        self.assertTrue(
+            any(fnmatch.fnmatch('%s/%s' % (directory, budget.BUDGET_RESOURCE),
+                                pattern) for pattern in declared),
+            'No [tool.setuptools.package-data] pattern for shakenfist '
+            'matches %s/%s, so nothing puts it in the wheel. Patterns: %s'
+            % (directory, budget.BUDGET_RESOURCE, declared))
 
     def test_budget_parses_and_validates(self):
         b = budget.load_budget()

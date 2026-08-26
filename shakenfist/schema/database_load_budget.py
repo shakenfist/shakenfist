@@ -8,13 +8,15 @@
 # Prometheus rules, `sf-ctl database-load`, and our own nightly report --
 # reads this one file so that the several consumers cannot drift apart.
 #
-# The data file is shipped inside the package. Nothing in pyproject.toml
-# declares it: setuptools_scm supplies the file finder and
-# include-package-data defaults on, so every git tracked file under
-# shakenfist/ ends up in the wheel. That is load bearing but implicit, which
-# is why load_budget() reads through importlib.resources rather than
-# building a path from __file__, and why test_database_load_budget.py
-# asserts the resource is readable.
+# The data file is shipped inside the package, declared by
+# [tool.setuptools.package-data] in pyproject.toml. It used to reach the
+# wheel only through the implicit union of the setuptools_scm file finder
+# with include-package-data, which nothing declared and nothing checked:
+# reading it through importlib.resources does not test that, because a
+# source checkout resolves shakenfist.data as a namespace package whatever
+# packaging says. load_budget() still reads through importlib.resources,
+# because that is how a deployed process finds it, but the thing which
+# keeps it in the wheel is the declaration.
 
 import functools
 from importlib import resources
@@ -174,9 +176,10 @@ def budget_text() -> str:
     """The raw budget file, read as package data.
 
     Deliberately not a path relative to __file__: on a deployed node the
-    only copy is the one inside the wheel, and reading it the way every
-    other consumer of package data does is what makes a packaging
-    regression fail here rather than in production.
+    only copy is the one inside the wheel, and this is how a process
+    installed from one finds it. It is not a packaging assertion --
+    a source checkout resolves it either way -- so what keeps the file
+    in the wheel is the package-data declaration in pyproject.toml.
     """
     return (resources.files(BUDGET_PACKAGE)
             .joinpath(BUDGET_RESOURCE).read_text(encoding='utf-8'))

@@ -2105,7 +2105,7 @@
       "yaxes": [
         {
           "$$hashKey": "object:358",
-          "format": "bps",
+          "format": "reqps",
           "logBase": 1,
           "min": "0",
           "show": true
@@ -2130,7 +2130,7 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "What the tier is serving against what Shaken Fist expects a cluster of this size to draw. The two tracking each other means load grew because the cluster grew. Needs the recording rules from examples/prometheus-database-load-rules.yaml.",
+      "description": "What the tier is serving against what Shaken Fist expects a cluster of this size to draw. Watch the enforced pair: the totals include every activity coupled pair, whose level was fitted against the API traffic of the cluster the budget came from, so on your deployment those two lines can diverge steadily without anything being wrong. The enforced lines cover only the pairs produced by Shaken Fist's own loops, and those two tracking each other means load grew because the cluster grew. Needs the recording rules from examples/prometheus-database-load-rules.yaml.",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -2187,6 +2187,28 @@
           "interval": "",
           "legendFormat": "Modelled",
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "sf_database:request_rate:enforced_total",
+          "interval": "",
+          "legendFormat": "Measured (enforced pairs)",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "sf_database:modelled_rate:enforced_total",
+          "interval": "",
+          "legendFormat": "Modelled (enforced pairs)",
+          "refId": "D"
         }
       ],
       "thresholds": [],
@@ -2206,7 +2228,7 @@
       "yaxes": [
         {
           "$$hashKey": "object:358",
-          "format": "bps",
+          "format": "reqps",
           "logBase": 1,
           "min": "0",
           "show": true
@@ -2296,7 +2318,7 @@
       "yaxes": [
         {
           "$$hashKey": "object:358",
-          "format": "bps",
+          "format": "short",
           "logBase": 1,
           "min": "0",
           "show": true
