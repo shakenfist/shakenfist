@@ -7,16 +7,17 @@ resolve to a file that exists **inside** `docs/`. Anything pointing
 outside it must be an absolute URL.
 
 `docs/` is not only rendered on the GitHub file tree. It is
-synchronised into `shakenfist/shakenfist` under `docs/components/<repo>/`
-and published on shakenfist.com, where the tree above `docs/` does not
-exist. A link like `[release.yml](../.github/workflows/release.yml)`
-resolves to `docs/components/.github/workflows/release.yml` there and
-404s, while the identical link renders correctly on GitHub -- so
-nothing catches it in the source repository.
+synchronised into `shakenfist/shakenfist` under
+`docs/components/<repo>/` and published on shakenfist.com, where the
+tree above `docs/` does not exist. A link like
+`[release.yml](../.github/workflows/release.yml)` resolves to
+`docs/components/.github/workflows/release.yml` there and 404s, while
+the identical link renders correctly on GitHub -- so nothing catches it
+in the source repository.
 
 Two shapes are flagged:
 
-* **Escaping relative links.** The target resolves above `docs/`:
+* **Escaping relative links**, whose target resolves above `docs/`:
   `../README.md`, `../../ryll/src/app.rs`.
 * **Relative links that resolve nowhere.** The target stays under
   `docs/` but names no file that exists. In practice this is almost
@@ -24,40 +25,34 @@ Two shapes are flagged:
   (`ryll/src/app.rs` rather than `../../ryll/src/app.rs`) -- the same
   defect wearing a different spelling, and dead on GitHub too.
 
-Links whose target stays inside `docs/` and resolves are fine, and
+Links whose target stays inside `docs/` and resolves are fine and
 should stay relative: they move with the tree and work in both
 renderings. Pure in-page anchors (`#section`), scheme-qualified URLs
-and protocol-relative `//host` URLs are absolute already and are not
-flagged.
+and protocol-relative `//host` URLs are absolute already.
 
-Site-root-absolute targets (`/operator_guide/locks/`) are also left
-alone. They are the mkdocs convention for addressing another page of
-the same site, and they resolve on the published site -- which is the
-rendering this audit exists to protect. They do not resolve on the
-GitHub file tree, but that is a separate trade-off the mkdocs-hosted
-repositories have already made, not a regression this audit should
-manufacture issues about.
+Site-root-absolute targets (`/operator_guide/locks/`) are left alone.
+They are the mkdocs convention for addressing another page of the same
+site and they resolve on the published site, which is the rendering
+this audit exists to protect. That they do not resolve on the GitHub
+file tree is a trade-off the mkdocs-hosted repositories have already
+made, not a regression this audit should manufacture issues about.
 
-`docs/plans/` is **in scope**. Plans are synchronised to the
-documentation site along with everything else, so a broken link there
-is broken for a reader whether or not anyone still maintains the file.
-A plan that references a path which has since moved should still carry
-an absolute URL; the link form is the thing being audited, not whether
-a historical path still resolves.
+`docs/plans/` is **in scope**. Plans are synchronised to the site along
+with everything else, so a broken link there is broken for a reader
+whether or not anyone still maintains the file. The link form is what
+is audited, not whether a historical path still resolves.
 
-A repository's `doc_content_excludes` prefixes are skipped. For
-`shakenfist` that is `docs/components/` itself: those are imported
-copies of other repositories' documentation, audited at their source,
-and flagging the import would double-report every finding.
+A repository's `doc_content_excludes` prefixes are skipped -- for
+`shakenfist` that is `docs/components/` itself, imported copies audited
+at their source.
 
 Links inside fenced code blocks and inline code spans are ignored: a
-documented command that happens to contain `[x](y)` is sample text,
-not a rendered link.
+documented command containing `[x](y)` is sample text, not a rendered
+link.
 
 This audit composes with `readme-absolute-links`, which covers the
-top-level `README.md` for the same underlying reason -- a file that is
-rendered somewhere other than where it lives cannot use relative
-links.
+top-level `README.md` for the same underlying reason -- a file rendered
+somewhere other than where it lives cannot use relative links.
 
 ## Template
 
@@ -68,11 +63,7 @@ For links to other files in the same repository, use
 ## Projects
 
 <!-- consistency-audit:begin -->
-*This table is regenerated daily by the consistency audit
-workflow from `scripts/audit-check.py` results; do not edit
-it by hand.*
-
-Last regenerated: 2026-08-25T06:54:21.186929+00:00
+*Generated 2026-08-25T06:54:21.186929+00:00 from `scripts/audit-check.py`; do not edit.*
 
 | Project | Status | Issue |
 |---------|--------|--------|

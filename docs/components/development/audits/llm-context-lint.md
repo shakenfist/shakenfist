@@ -3,8 +3,7 @@
 ## What we check
 
 Agent context -- `AGENTS.md`, `CLAUDE.md`, skills, plugins, hooks and
-MCP configuration -- is code that an agent executes against, but
-nothing has been checking it. This audit runs
+MCP configuration -- is code an agent executes against. This audit runs
 [skillsaw](https://skillsaw.org/) over each repository and reports
 error-severity findings, plus one structural check skillsaw cannot
 make.
@@ -13,8 +12,8 @@ make.
 
 Only the error tier is reported. skillsaw's warning and info tiers
 carry style opinions -- unlinked path references alone run to dozens
-per repository -- and an audit that reported them would spend more of
-our time than it saves. The error tier is the structural and security
+per repository -- and an audit reporting them would spend more of our
+time than it saves. The error tier is the structural and security
 subset:
 
 * `agentskill-valid`, `claude-plugin-json-valid` and friends --
@@ -27,30 +26,25 @@ subset:
 * `hooks-dangerous`, `claude-settings-dangerous` -- settings and hooks
   that execute arbitrary commands.
 
-Measured across shakenfist, instar, kerbside, occystrap, development
-and kerbside-patches when this audit was written, the error tier was
-empty in every repository. The baseline is green, so a failure here is
-a regression rather than a backlog.
+The error tier was empty in every repository when this audit was
+written, so a failure here is a regression rather than a backlog.
 
 ### Markdown that will never load as a skill
 
 A skill is `<skills dir>/<name>/SKILL.md`. A bare markdown file
-directly in `.claude/skills/`, or a subdirectory with no `SKILL.md`,
-is inert: the agent does not load it, and skillsaw does not lint it
-either, because it is never discovered as a skill at all. A repository
-in that state lints clean while its skills do nothing.
+directly in `.claude/skills/`, or a subdirectory with no `SKILL.md`, is
+inert: the agent does not load it, and skillsaw does not lint it
+either, because it is never discovered as a skill. A repository in that
+state lints clean while its skills do nothing.
 
-This is not hypothetical. When the audit was written, twelve local
-checkouts were affected, including instar (12 files, whose `AGENTS.md`
-asserts "Custom skills in `.claude/skills/` cover the repetitive
-work"), kerbside, occystrap, shakenfist and kerbside-patches. Every
-one of those repositories was passing the `llm-tooling` audit at the
-time.
-
+This is not hypothetical: when the audit was written twelve local
+checkouts were affected -- including instar, whose `AGENTS.md` asserts
+"Custom skills in `.claude/skills/` cover the repetitive work" -- and
+every one of them was passing the `llm-tooling` audit at the time.
 Sampled across those repositories the check produced no false
 positives: every file flagged either opens with "Use this skill when
-..." or describes itself as a slash command. `README.md` and
-`index.md` are allowed to sit beside skill directories.
+..." or describes itself as a slash command. `README.md` and `index.md`
+are allowed to sit beside skill directories.
 
 ### Not applicable
 
@@ -65,8 +59,8 @@ positives: every file flagged either opens with "Use this skill when
 ## Template
 
 No template -- the fix is repository-specific. Skills move to
-`<name>/SKILL.md` with `name` and `description` frontmatter, or, if
-the file is really a slash command, to `.claude/commands/`, where flat
+`<name>/SKILL.md` with `name` and `description` frontmatter, or, if the
+file is really a slash command, to `.claude/commands/`, where flat
 markdown is the correct shape.
 
 See [llm-context-lint-ci.md](/components/development/audits/llm-context-lint-ci/) for running the
@@ -75,11 +69,7 @@ same linter per commit rather than once a day.
 ## Projects
 
 <!-- consistency-audit:begin -->
-*This table is regenerated daily by the consistency audit
-workflow from `scripts/audit-check.py` results; do not edit
-it by hand.*
-
-Last regenerated: 2026-08-25T06:54:21.186929+00:00
+*Generated 2026-08-25T06:54:21.186929+00:00 from `scripts/audit-check.py`; do not edit.*
 
 | Project | Status | Issue |
 |---------|--------|--------|
