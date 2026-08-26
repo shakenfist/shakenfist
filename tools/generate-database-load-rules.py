@@ -249,12 +249,35 @@ def main():
               and on (operation, caller_daemon) sf_database:budget:enforced
           )
 
+      # The model, averaged over the window the alerts measure across.
+      # The alerts compare a one day rate; the modelled rate is evaluated
+      # from the cluster's shape right now. When a cluster shrinks --
+      # instances deleted, a node drained -- the model drops at once
+      # while the measurement still carries yesterday's larger cluster,
+      # and every per-instance pair reads over budget for up to a day for
+      # a reason which is not a regression. "for: 1h" does not cover a
+      # mismatch that lasts 24h, so smooth the model to match instead.
+      - record: sf_database:modelled_rate:1d
+        expr: avg_over_time(sf_database:modelled_rate[1d])
+
       # The ceiling is deliberately generous. These rules exist to catch a
       # new polling loop or one which lost its bulk read, not to police a
       # ten percent drift.
       - record: sf_database:budget_ceiling
         expr: |-
-          sf_database:modelled_rate * {multiplier} + {floor}
+          sf_database:modelled_rate:1d * {multiplier} + {floor}
+
+      # What a pair with no budget entry is allowed before it looks like a
+      # new polling loop. A model rather than a number for the same reason
+      # everything above is: the pairs deliberately left out of the budget
+      # are mostly per-node loops running under the inclusion cut, so a
+      # flat threshold is one the largest of them crosses on a cluster
+      # rather bigger than ours -- permanently, where nothing is wrong.
+      - record: sf_database:unbudgeted_ceiling
+        expr: |-
+          clamp_min(
+            sf_database:cluster_nodes * {unbudgeted_per_node},
+            {unbudgeted})
 
       - alert: ShakenFistDatabasePairOverBudget
         expr: |-
@@ -283,7 +306,7 @@ def main():
             sf_database:request_rate:1d
               unless on (operation, caller_daemon)
                 sf_database:budget:per_node_base
-          ) > {unbudgeted}
+          ) > on() group_left() sf_database:unbudgeted_ceiling
         for: 1h
         labels:
           severity: warning
@@ -296,7 +319,9 @@ def main():
             This (operation, caller_daemon) pair is not in Shaken Fist's
             shipped load budget and has sustained
             {{{{ $value | printf "%.2f" }}}} calls per second for an hour,
-            which is what a new polling loop looks like. If you are
+            which is more than a cluster of this many nodes should see
+            from traffic nobody budgeted for, and is what a new polling
+            loop looks like. If you are
             running a modified Shaken Fist this may be yours; otherwise
             please report it.
 
@@ -315,7 +340,8 @@ def main():
             (13007 by default) on every node.
 '''.format(multiplier=defaults.tolerance_multiplier,
            floor=defaults.tolerance_floor_qps,
-           unbudgeted=defaults.unbudgeted_fixed_rate_qps))
+           unbudgeted=defaults.unbudgeted_fixed_rate_qps,
+           unbudgeted_per_node=defaults.unbudgeted_fixed_rate_per_node_qps))
 
     sys.stdout.write(''.join(out))
 

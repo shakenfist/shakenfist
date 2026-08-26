@@ -201,6 +201,70 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         self.assertEqual(float(daemon.DAEMON_STATE_POLL_INTERVAL),
                          harness.DAEMON_STATE_POLL_INTERVAL)
 
+    def test_elected_loop_interval_matches_the_daemon(self):
+        # The other half of the pair above, and the one which was a bare
+        # literal in four places until review noticed: the elected cluster
+        # daemon polls once per loop, so its loop sleep sets a rate the
+        # positive control predicts and the budget encodes.
+        from shakenfist.daemons.cluster import main as cluster_main
+
+        self.assertEqual(float(cluster_main.ELECTED_LOOP_POLL_SECONDS),
+                         harness.ELECTED_CLUSTER_LOOP_SECONDS)
+
+    def test_the_unbudgeted_ceiling_matches_the_server_side_one(self):
+        # Two implementations of the same rule, for the same reason as
+        # expected_qps() above. A CI check with a stricter idea of "new
+        # poll" than the alert an operator runs is a check which fails
+        # builds nobody else can reproduce.
+        defaults = database_load_budget.load_budget().defaults
+        raw = harness.load_budget()['defaults']
+        for nodes in (1, 3, 6, 20, 60):
+            self.assertAlmostEqual(defaults.unbudgeted_ceiling_qps(nodes),
+                                   harness.unbudgeted_ceiling_qps(raw, nodes),
+                                   msg='%d nodes' % nodes)
+
+    def test_the_unbudgeted_ceiling_grows_with_the_cluster(self):
+        # The point of the per-node term: the pairs left out of the budget
+        # are mostly per-node loops, so a flat threshold is one ordinary
+        # traffic crosses on a big enough cluster -- permanently, where
+        # nothing is wrong.
+        defaults = database_load_budget.load_budget().defaults
+        self.assertLess(defaults.unbudgeted_ceiling_qps(6),
+                        defaults.unbudgeted_ceiling_qps(60))
+        # ... but never below the floor, so a two node cluster does not
+        # get a stricter test than the one the budget was derived on.
+        self.assertEqual(defaults.unbudgeted_fixed_rate_qps,
+                         defaults.unbudgeted_ceiling_qps(1))
+
+    def test_daemon_node_counts_reads_the_external_view(self):
+        # The key parsing has to survive a daemon name containing the
+        # word it is being stripped of, and has to drop the daemons which
+        # never reach the tier -- a count for one of those makes the
+        # positive control predict a rate which will never arrive, and
+        # fails the build on a perfectly healthy cluster.
+        nodes = [
+            {'name': 'node1',
+             'daemon-net-state': 'daemon-running',
+             'daemon-cluster-state': 'daemon-running',
+             'daemon-database-state': 'daemon-running',
+             'daemon-sentinel-first-state': 'daemon-running',
+             'ip': '10.0.0.1'},
+            {'name': 'node2',
+             'daemon-net-state': 'daemon-running',
+             'daemon-cluster-state': 'daemon-stopped',
+             'state': 'created'},
+        ]
+        self.assertEqual({'net': 2, 'cluster': 1},
+                         harness.daemon_node_counts(nodes))
+
+    def test_daemon_node_counts_of_nothing_is_empty(self):
+        # Which is what the positive control asserts against before it
+        # draws any conclusion: no daemons seen means the harness cannot
+        # predict a rate, not that the cluster is quiet.
+        self.assertEqual({}, harness.daemon_node_counts([]))
+        self.assertEqual({}, harness.daemon_node_counts(
+            [{'name': 'node1', 'state': 'created'}]))
+
     def test_non_polling_daemons_do_not_reach_the_tier(self):
         # The positive control predicts a GetNodeDaemonState rate for every
         # daemon a node reports running and not on this list, so a daemon

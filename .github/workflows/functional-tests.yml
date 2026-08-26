@@ -224,6 +224,13 @@ jobs:
           pip3 install uv
           uv pip install -r pyproject.toml
 
+      # So that test_the_generated_promql_parses validates
+      # examples/prometheus-database-load-rules.yaml as PromQL rather than
+      # skipping. Cached on the runner between jobs; see the script.
+      - name: Install promtool
+        timeout-minutes: 5
+        run: tools/ci-install-promtool.sh >> "$GITHUB_PATH"
+
       - name: Run python3 unit tests and gather coverage data
         id: py3_tests
         timeout-minutes: 10

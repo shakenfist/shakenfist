@@ -17,6 +17,7 @@ harness puts it. What must not be duplicated is the data.
 import os
 
 import requests
+import yaml
 
 
 METRICS_PORT = 13006
@@ -59,13 +60,13 @@ FIXED_RATE_MAX_SPREAD = 2.83
 # NON_POLLING_DAEMONS.
 DAEMON_STATE_POLL_INTERVAL = 2.0
 
-# The elected cluster daemon is the one exception. It sleeps on
-# lock.lost_event.wait(ELECTED_CLUSTER_LOOP_SECONDS) rather than in idle(),
-# so it polls once per loop instead of once per interval. Before #3874 it
-# did not poll at all; if these two constants ever disagree with
+# The elected cluster daemon is the one exception. Its maintenance loop
+# sleeps on lock.lost_event.wait(ELECTED_LOOP_POLL_SECONDS) rather than in
+# idle(), so it polls once per loop instead of once per interval. Before
+# #3874 it did not poll at all; if these two constants ever disagree with
 # shakenfist/daemons/cluster/main.py the positive control below is wrong,
-# which is why test_database_load_budget.py asserts the shipped budget
-# against the real constants.
+# which is why test_database_tier_harness.py asserts both against the
+# daemons they are copied from.
 ELECTED_CLUSTER_LOOP_SECONDS = 5.0
 
 # Daemons whose daemon state row is never read over the tier, however
@@ -110,8 +111,6 @@ def load_budget():
     one. Never a copy: a second copy of the numbers is the failure this
     module exists to avoid.
     """
-    import yaml
-
     here = os.path.dirname(os.path.abspath(__file__))
     checkout = os.path.join(
         os.path.dirname(os.path.dirname(here)), 'data',
@@ -122,6 +121,45 @@ def load_budget():
 
     from shakenfist.schema import database_load_budget
     return yaml.safe_load(database_load_budget.budget_text())
+
+
+def daemon_node_counts(nodes):
+    """How many nodes run each daemon, from the daemon state rows.
+
+    The node external view carries a ``daemon-<name>-state`` key per
+    daemon in Node.VALID_DAEMONS. Counting the running ones is how the
+    positive control in database_tier.py knows what the poll rate ought to
+    be without assuming every daemon runs on every node -- which is true
+    on the clusters we build and is not something a check should depend
+    on.
+
+    Here rather than in database_tier.py because that module needs a
+    cluster to import and this needs nothing, so the key parsing and the
+    NON_POLLING_DAEMONS filter can be asserted on every commit rather
+    than only when a cluster gets built.
+    """
+    counts = {}
+    for node in nodes:
+        for key, value in node.items():
+            if not key.startswith('daemon-') or not key.endswith('-state'):
+                continue
+            daemon = key[len('daemon-'):-len('-state')]
+            if daemon in NON_POLLING_DAEMONS:
+                continue
+            if value == DAEMON_STATE_RUNNING:
+                counts[daemon] = counts.get(daemon, 0) + 1
+    return counts
+
+
+def unbudgeted_ceiling_qps(defaults, nodes):
+    """The rate at which a pair with no budget entry looks like a new poll.
+
+    Kept in step with BudgetDefaults.unbudgeted_ceiling_qps() in
+    shakenfist/schema/database_load_budget.py, and asserted to be so by
+    shakenfist/tests/test_database_tier_harness.py.
+    """
+    return max(defaults['unbudgeted_fixed_rate_qps'],
+               defaults['unbudgeted_fixed_rate_per_node_qps'] * nodes)
 
 
 def expected_qps(entry, nodes, standing_instances):

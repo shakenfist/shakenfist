@@ -9,18 +9,21 @@ normal load is. So the assertion which matters here is that the committed
 file is byte for byte what the generator produces from the committed
 budget, which fails if either is edited alone.
 
-The PromQL itself is checked with promtool, which needs a Prometheus
-binary this suite cannot assume. What is asserted here instead is the
-structure a reader of these rules depends on -- that every budgeted pair
-appears in every coefficient series, that provisional and activity coupled
-pairs are excluded from the alerting flag, and that the tolerances match
-the budget's own defaults.
+The PromQL itself is checked with promtool, which the sanity checks job
+installs (tools/ci-install-promtool.sh) and which
+test_the_generated_promql_parses skips without. What is asserted here
+besides that is the structure a reader of these rules depends on -- that
+every budgeted pair appears in every coefficient series, that provisional
+and activity coupled pairs are excluded from the alerting flag, and that
+the tolerances match the budget's own defaults.
 """
 
 import importlib.util
 import io
 import re
 import os
+import shutil
+import subprocess
 
 import yaml
 
@@ -158,9 +161,29 @@ class DatabaseLoadRulesTestCase(base.ShakenFistTestCase):
         self.assertIn('* %s + %s' % (defaults.tolerance_multiplier,
                                      defaults.tolerance_floor_qps),
                       by_name['sf_database:budget_ceiling'])
+        self.assertIn('* %s' % defaults.unbudgeted_fixed_rate_per_node_qps,
+                      by_name['sf_database:unbudgeted_ceiling'])
+        self.assertIn('%s)' % defaults.unbudgeted_fixed_rate_qps,
+                      by_name['sf_database:unbudgeted_ceiling'])
         alerts = {r['alert']: r['expr'] for r in _rules() if 'alert' in r}
-        self.assertIn('> %s' % defaults.unbudgeted_fixed_rate_qps,
+        self.assertIn('sf_database:unbudgeted_ceiling',
                       alerts['ShakenFistUnbudgetedDatabasePolling'])
+
+    def test_the_alerted_ceiling_is_smoothed_like_the_measurement(self):
+        # ShakenFistDatabasePairOverBudget compares a one day rate. If the
+        # ceiling it is compared against were evaluated from the cluster's
+        # shape right now, then halving a cluster's standing instances
+        # overnight would put every per-instance pair over budget the next
+        # morning and hold them there for a day, which "for: 1h" does not
+        # cover and which is not a regression.
+        by_name = {r['record']: r['expr'] for r in _rules() if 'record' in r}
+        self.assertIn('avg_over_time(sf_database:modelled_rate[1d])',
+                      by_name['sf_database:modelled_rate:1d'])
+        self.assertIn('sf_database:modelled_rate:1d',
+                      by_name['sf_database:budget_ceiling'])
+        alerts = {r['alert']: r['expr'] for r in _rules() if 'alert' in r}
+        self.assertIn('sf_database:request_rate:1d',
+                      alerts['ShakenFistDatabasePairOverBudget'])
 
     def test_there_is_an_alert_for_the_model_going_blind(self):
         # Every other alert in the file depends on instances_active. If it
@@ -172,6 +195,34 @@ class DatabaseLoadRulesTestCase(base.ShakenFistTestCase):
         self.assertIn('ShakenFistDatabaseLoadModelBlind', alerts)
         self.assertIn('absent(sf_database:cluster_nodes)',
                       alerts['ShakenFistDatabaseLoadModelBlind'])
+
+    def test_the_generated_promql_parses(self):
+        """The rules are valid PromQL, not merely valid YAML.
+
+        Everything else in this file reads the rules as data, which a
+        mismatched paren in the generator, a group_left Prometheus rejects
+        or a label_replace with its arguments in the wrong order all
+        survive. The first thing that would notice is an operator's
+        Prometheus refusing to load the group -- and a rule group which
+        did not load fires no alerts, which looks exactly like a cluster
+        with nothing wrong. That is the failure mode
+        ShakenFistDatabaseLoadModelBlind exists for and cannot itself
+        cover, because it is in the group too.
+        """
+        promtool = shutil.which('promtool')
+        if not promtool:
+            self.skipTest(
+                'promtool is not on PATH, so the PromQL in %s has been '
+                'checked for shape but not parsed. Install it with '
+                'tools/ci-install-promtool.sh.' % RULES_PATH)
+
+        result = subprocess.run(
+            [promtool, 'check', 'rules', RULES_PATH],
+            capture_output=True, text=True)
+        self.assertEqual(
+            0, result.returncode,
+            'promtool rejected %s:\n%s\n%s'
+            % (RULES_PATH, result.stdout, result.stderr))
 
     def test_the_file_says_it_is_generated(self):
         self.assertIn('GENERATED FILE', _committed())

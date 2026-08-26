@@ -190,28 +190,6 @@ class DatabaseTierTestsMixin:
                     % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
         return totals, sum(read_at) / len(read_at)
 
-    def _daemon_node_counts(self, nodes):
-        """How many nodes run each daemon, from the daemon state rows.
-
-        The node external view carries a ``daemon-<name>-state`` key per
-        daemon in Node.VALID_DAEMONS. Counting the running ones is how the
-        positive control below knows what the poll rate ought to be
-        without assuming every daemon runs on every node -- which is true
-        on the clusters we build and is not something a check should
-        depend on.
-        """
-        counts = {}
-        for node in nodes:
-            for key, value in node.items():
-                if not key.startswith('daemon-') or not key.endswith('-state'):
-                    continue
-                daemon = key[len('daemon-'):-len('-state')]
-                if daemon in lb.NON_POLLING_DAEMONS:
-                    continue
-                if value == lb.DAEMON_STATE_RUNNING:
-                    counts[daemon] = counts.get(daemon, 0) + 1
-        return counts
-
     def _sum_requests(self, database_nodes, operation, caller_daemon):
         """Sum one counter across the tier, retrying a failed scrape.
 
@@ -522,17 +500,32 @@ class DatabaseTierTestsMixin:
         # #3708 this counter could not see daemons co-located with MariaDB,
         # which on our production cluster was two nodes of six, and phase 6
         # spent a fortnight chasing the difference as though it were load.
-        daemon_nodes = self._daemon_node_counts(nodes)
+        daemon_nodes = lb.daemon_node_counts(nodes)
         self.assertNotEqual(
             {}, daemon_nodes,
             'No node reported a running daemon, so the poll rates below '
             'cannot be predicted and this test proves nothing. Nodes '
             'seen: %s' % json.dumps([n.get('name') for n in nodes]))
 
+        # The highest rate seen in any window, for both halves of the
+        # control, because each half asks a different question of it.
+        #
+        # Undercount asks "can this harness see the whole cluster", which
+        # is a persistent condition: a daemon visible in either window is
+        # a daemon the harness can see, and taking the minimum instead
+        # fails the build whenever one window happens to straddle a
+        # daemon restart.
+        #
+        # Overcount asks "has the rate limit in check_daemon_state()
+        # stopped working", which is the opposite: a daemon polling at
+        # twice the permitted rate in one window and normally in the
+        # other has still lost its rate limit, and the minimum would let
+        # that through.
         control = {}
         for daemon, node_count in sorted(daemon_nodes.items()):
-            measured = min(w.get(('GetNodeDaemonState', daemon), 0.0)
-                           for w in windows)
+            rates = [w.get(('GetNodeDaemonState', daemon), 0.0)
+                     for w in windows]
+            measured = max(rates)
             expected = node_count / lb.DAEMON_STATE_POLL_INTERVAL
             if daemon == 'cluster':
                 # One cluster daemon cluster-wide holds the maintenance
@@ -543,7 +536,9 @@ class DatabaseTierTestsMixin:
                 expected -= (1.0 / lb.DAEMON_STATE_POLL_INTERVAL
                              - 1.0 / lb.ELECTED_CLUSTER_LOOP_SECONDS)
             control[daemon] = {'nodes': node_count, 'expected_qps': expected,
-                               'measured_qps': measured}
+                               'measured_qps': measured,
+                               'measured_qps_per_window': [round(r, 3)
+                                                           for r in rates]}
 
         self.addDetail('poll_positive_control', content.text_content(
             json.dumps({'daemons': control,
@@ -556,8 +551,9 @@ class DatabaseTierTestsMixin:
                 seen['expected_qps'] * lb.POLL_UNDERCOUNT_TOLERANCE,
                 'The %s daemon runs on %d node(s), and each one polls its '
                 'own daemon state row every %.1fs, so the tier should be '
-                'serving about %.2f GetNodeDaemonState/s for it. It is '
-                'serving %.2f. Either this harness cannot see the whole '
+                'serving about %.2f GetNodeDaemonState/s for it. Its '
+                'busiest window served %.2f. Either this harness cannot '
+                'see the whole '
                 'cluster -- in which case nothing else this test asserts '
                 'means anything -- or those daemons have stopped polling. '
                 'control=%s'
@@ -595,6 +591,7 @@ class DatabaseTierTestsMixin:
             [i for i in self.system_client.get_instances()
              if i.get('power_state') == 'on'])
         steady = lb.fixed_rate(windows)
+        unbudgeted_ceiling = lb.unbudgeted_ceiling_qps(defaults, node_count)
 
         over = []
         unbudgeted = []
@@ -602,7 +599,7 @@ class DatabaseTierTestsMixin:
         for key, measured in sorted(steady.items()):
             entry = entries.get(key)
             if entry is None:
-                if measured > defaults['unbudgeted_fixed_rate_qps']:
+                if measured > unbudgeted_ceiling:
                     unbudgeted.append((key, measured))
                 continue
             modelled = lb.expected_qps(entry, node_count, standing_instances)
@@ -619,6 +616,7 @@ class DatabaseTierTestsMixin:
             'nodes': node_count,
             'standing_instances': standing_instances,
             'window_seconds': lb.LOAD_WINDOW_SECONDS,
+            'unbudgeted_ceiling_qps': round(unbudgeted_ceiling, 3),
             'measured_seconds': elapsed_seconds,
             'windows': lb.LOAD_WINDOW_COUNT,
             'pairs_seen': len(windows[0]),
@@ -644,8 +642,7 @@ class DatabaseTierTestsMixin:
             'what a new fixed-rate poll looks like. If the traffic is '
             'meant to be there, add it to the budget with a note naming '
             'the loop which produces it. summary=%s'
-            % (defaults['unbudgeted_fixed_rate_qps'],
-               json.dumps(summary, sort_keys=True)))
+            % (unbudgeted_ceiling, json.dumps(summary, sort_keys=True)))
 
         self.assertEqual(
             [], over,

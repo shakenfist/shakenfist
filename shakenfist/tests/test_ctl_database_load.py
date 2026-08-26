@@ -38,6 +38,19 @@ SECOND = {
 }
 
 
+# GetNodeDaemonState/net budgets 0.497 per node, so a six node cluster
+# models 2.98/s and tolerates 6.46/s. This puts it at 40/s, well over,
+# while leaving Mystery/net quiet.
+OVER_SECOND = {
+    'gw1': {('GetNodeDaemonState', 'net'): 500.0,
+            ('GetReferencesFrom', 'api'): 560.0,
+            ('Mystery', 'net'): 11.0},
+    'gw2': {('GetNodeDaemonState', 'net'): 600.0,
+            ('GetReferencesFrom', 'api'): 960.0,
+            ('Mystery', 'net'): 21.0},
+}
+
+
 class FakeConfig:
     MARIADB_GATEWAY_HOSTS = ['gw1', 'gw2']
     MARIADB_GATEWAY_METRICS_PORT = 13006
@@ -66,6 +79,13 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
 
         calls = {'n': 0}
 
+        # Which gateways were actually reached, in order, across both
+        # samples. A test asserting we do not scrape the same gateway
+        # twice has to count the scrapes: the results are keyed by host,
+        # so a duplicate reading is discarded either way and the report
+        # looks identical whether or not the round trip was made.
+        self.scraped_hosts = []
+
         # A fake monotonic clock, advanced by the sleep and by each
         # scrape. Rates are computed from what it says elapsed between
         # the two reads of a counter, so a test which left it real would
@@ -73,6 +93,7 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
         clock = {'t': 1000.0}
 
         def _scrape(host, port, timeout=5):
+            self.scraped_hosts.append(host)
             sample = samples[calls['n']]
             if host not in sample:
                 raise OSError('connection refused')
@@ -99,8 +120,6 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
                 ctl.database_load, (args or []) + ['--window', '10'])
 
     def test_reports_measured_and_modelled(self):
-        # --all-pairs because GetNodeDaemonState/net at 6/s is inside its
-        # budget for a six node cluster and is filtered out by default.
         result = self._run([FIRST, SECOND], ['--json', '--all-pairs'])
         self.assertEqual(0, result.exit_code, result.output)
         report = json.loads(result.output)
@@ -221,6 +240,125 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
         entry = pairs[('Mystery', 'net')]
         self.assertIn('unbudgeted', entry['flags'])
         self.assertFalse(entry['over_budget'])
+
+    def test_the_unbudgeted_ceiling_scales_with_the_cluster(self):
+        # Mystery/net runs at 12/s on six nodes and on sixty. What moves
+        # is the ceiling it is measured against, because the pairs left
+        # out of the budget are mostly per-node loops: a flat threshold
+        # is one ordinary traffic crosses on a big enough cluster, and an
+        # alert which always fires gets silenced.
+        def mystery_ceiling(nodes):
+            report = json.loads(
+                self._run([FIRST, SECOND], ['--json'], nodes=nodes).output)
+            pairs = {(p['operation'], p['caller_daemon']): p
+                     for p in report['pairs']}
+            return pairs[('Mystery', 'net')]['ceiling_qps']
+
+        self.assertEqual(0.3, mystery_ceiling(6))
+        self.assertEqual(3.0, mystery_ceiling(60))
+
+    def test_the_table_leaves_out_quiet_unbudgeted_pairs(self):
+        # Almost every pair a cluster serves is unbudgeted and quiet --
+        # around 300 of them on a cluster the size of the one the model
+        # came from -- so a table which prints them all buries the rows
+        # it exists to surface.
+        quiet = {}
+        for host, pairs in SECOND.items():
+            row = dict(pairs)
+            row[('Mystery', 'net')] = FIRST[host][('Mystery', 'net')] + 1.0
+            quiet[host] = row
+
+        result = self._run([FIRST, quiet])
+        self.assertEqual(0, result.exit_code, result.output)
+        self.assertNotIn('Mystery', result.output)
+        self.assertIn('quiet pair(s) with no budget entry were not shown',
+                      result.output)
+
+        verbose = self._run([FIRST, quiet], ['--all-pairs'])
+        self.assertIn('Mystery', verbose.output)
+
+    def test_json_carries_every_pair_whatever_the_table_shows(self):
+        # This output is what a deployer attaches to an issue. An
+        # attachment somebody then has to ask them to re-run with another
+        # flag costs a round trip for no reason.
+        quiet = {}
+        for host, pairs in SECOND.items():
+            row = dict(pairs)
+            row[('Mystery', 'net')] = FIRST[host][('Mystery', 'net')] + 1.0
+            quiet[host] = row
+
+        report = json.loads(self._run([FIRST, quiet], ['--json']).output)
+        pairs = {(p['operation'], p['caller_daemon']) for p in report['pairs']}
+        self.assertIn(('Mystery', 'net'), pairs)
+        self.assertEqual(report['pairs_seen'], len(report['pairs']))
+        self.assertLess(0, report['pairs_hidden_from_table'])
+
+    def test_a_budgeted_pair_over_budget_asks_for_an_issue(self):
+        # The table's footer, which until now only --json exercised.
+        result = self._run([FIRST, OVER_SECOND])
+        self.assertEqual(0, result.exit_code, result.output)
+        self.assertIn('budgeted pair(s) are above what the model allows',
+                      result.output)
+        self.assertIn('github.com/shakenfist/shakenfist/issues',
+                      result.output)
+        report = json.loads(
+            self._run([FIRST, OVER_SECOND], ['--json']).output)
+        self.assertEqual(1, report['budgeted_pairs_over_budget'])
+        self.assertEqual(0, report['unbudgeted_pairs_over_ceiling'])
+
+    def test_an_unbudgeted_spike_asks_for_a_longer_window_not_an_issue(self):
+        # Mystery/net is over the unbudgeted ceiling across this one
+        # short window, which is what a new polling loop looks like and
+        # equally what a burst of instance creation looks like. The other
+        # two consumers of this budget want an hour of it, or the same
+        # rate in two consecutive windows, before they say anything --
+        # so this one must not send a deployer to the issue tracker off
+        # a single sixty second sample.
+        result = self._run([FIRST, SECOND])
+        self.assertEqual(0, result.exit_code, result.output)
+        self.assertIn('Re-run with a longer --window', result.output)
+        self.assertNotIn('github.com/shakenfist/shakenfist/issues',
+                         result.output)
+        report = json.loads(self._run([FIRST, SECOND], ['--json']).output)
+        self.assertEqual(0, report['budgeted_pairs_over_budget'])
+        self.assertEqual(1, report['unbudgeted_pairs_over_ceiling'])
+        self.assertEqual(1, report['pairs_over_budget'])
+
+    def test_a_gateway_listed_twice_is_measured_once(self):
+        # MARIADB_GATEWAY_HOSTS is operator-written configuration, and a
+        # host repeated in it is one gateway. Counting it twice would
+        # double every rate it contributes and read as a regression
+        # across the whole tier.
+        once = self._run([FIRST, SECOND], ['--json'], hosts=['gw1', 'gw2'])
+        once_scrapes = list(self.scraped_hosts)
+        twice = self._run([FIRST, SECOND], ['--json'],
+                          hosts=['gw1', 'gw2', 'gw1'])
+
+        # Not just the same answer -- the same work. The extra scrape
+        # would land inside the measurement window and be thrown away,
+        # because everything downstream is keyed by host.
+        self.assertEqual(once_scrapes, self.scraped_hosts)
+        self.assertEqual(json.loads(once.output)['total_measured_qps'],
+                         json.loads(twice.output)['total_measured_qps'])
+        self.assertEqual(['gw1', 'gw2'],
+                         json.loads(twice.output)['gateways_measured'])
+
+    def test_a_pair_which_stops_being_served_contributes_no_rate(self):
+        # A counter present in the first sample and gone from the second
+        # has no later value to subtract from, so there is no rate to
+        # report for it. Recording the absolute first reading as a delta
+        # would invent load; recording zero would claim the pair was
+        # measured at zero. It is simply not in the report.
+        second = {}
+        for host, pairs in SECOND.items():
+            row = dict(pairs)
+            del row[('Mystery', 'net')]
+            second[host] = row
+
+        report = json.loads(self._run([FIRST, second], ['--json']).output)
+        pairs = {(p['operation'], p['caller_daemon']) for p in report['pairs']}
+        self.assertNotIn(('Mystery', 'net'), pairs)
+        self.assertIn(('GetNodeDaemonState', 'net'), pairs)
 
     def test_rates_are_divided_by_measured_time_not_the_window(self):
         # A counter delta covers the sleep plus the scrapes, and the

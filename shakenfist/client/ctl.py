@@ -130,9 +130,7 @@ config = sf_config.config
 # These imports _must_ occur after the extra config setup has run.
 from shakenfist import exceptions                          # noqa
 from shakenfist import mariadb                             # noqa
-from shakenfist import node                                # noqa
 from shakenfist.constants import EVENT_TYPE_AUDIT          # noqa
-from shakenfist.baseobject import DatabaseBackedObject as dbo  # noqa
 from shakenfist.namespace import Namespace                 # noqa
 from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
@@ -481,7 +479,11 @@ def _gather_database_load(window: int, timeout: int) -> dict[str, Any]:
     measurement reported as a whole one is worse than no measurement: it
     reads as load having fallen.
     """
-    hosts = list(config.MARIADB_GATEWAY_HOSTS)
+    # Deduplicated, order preserved. A host listed twice is one gateway,
+    # and scraping it twice per sample costs a second round trip inside
+    # the measured window for a reading which is then thrown away --
+    # everything below is keyed by host.
+    hosts = list(dict.fromkeys(config.MARIADB_GATEWAY_HOSTS))
     if not hosts:
         raise click.ClickException(
             'MARIADB_GATEWAY_HOSTS is empty, so there is no database tier '
@@ -601,7 +603,8 @@ def _cluster_shape() -> tuple[int, int]:
 @click.option('--timeout', default=5, type=int,
               help='Per-gateway scrape timeout, in seconds.')
 @click.option('--all-pairs', is_flag=True, default=False,
-              help='Include pairs which are within budget.')
+              help='Print the quiet pairs nobody has budgeted too. '
+                   '"--json" always includes them.')
 @click.option('--json', 'as_json', is_flag=True, default=False,
               help='Emit JSON rather than a table.')
 def database_load(window: int, timeout: int, all_pairs: bool,
@@ -625,6 +628,13 @@ def database_load(window: int, timeout: int, all_pairs: bool,
     its current level is not a floor worth defending. "activity" means
     the level is set by what you and your tooling do rather than by one
     of our loops, so only you can say whether it is reasonable.
+
+    Most pairs a cluster serves have no budget entry at all, because they
+    are activity driven and near zero at idle -- around 300 of them on a
+    cluster like the one the model was derived from. The table leaves
+    those out unless they are over the unbudgeted ceiling or
+    "--all-pairs" is given, since a table nobody reads to the end is no
+    better than no table. "--json" always carries every pair.
     """
     budget = database_load_budget.load_budget()
     defaults = budget.defaults
@@ -638,7 +648,7 @@ def database_load(window: int, timeout: int, all_pairs: bool,
         entry = budget.get(operation, caller)
         if entry is None:
             modelled = None
-            ceiling = defaults.unbudgeted_fixed_rate_qps
+            ceiling = defaults.unbudgeted_ceiling_qps(nodes)
             flags = ['unbudgeted']
         else:
             modelled = entry.expected_qps(nodes, instances)
@@ -671,8 +681,29 @@ def database_load(window: int, timeout: int, all_pairs: bool,
         })
 
     rows.sort(key=lambda r: -r['excess_qps'])
-    shown = rows if all_pairs else [r for r in rows
-                                    if r['excess_qps'] > 0 or r['flags']]
+
+    # A budgeted pair carrying a flag is worth showing whatever its rate:
+    # "provisional" and "activity" are things the reader has to know
+    # about their own numbers. "unbudgeted" is not, on its own -- almost
+    # every pair on any cluster is unbudgeted and quiet, and printing all
+    # of them buries the handful of rows this command exists to surface.
+    shown = rows if all_pairs else [
+        r for r in rows
+        if r['excess_qps'] > 0 or (r['flags']
+                                   and 'unbudgeted' not in r['flags'])]
+    hidden = len(rows) - len(shown)
+
+    # Counted apart because the two carry different weights of evidence.
+    # A budgeted pair over its ceiling is measured against a model of this
+    # cluster and is worth an issue. An unbudgeted pair over the
+    # new-poll threshold in one short window is worth a longer look
+    # first: the Prometheus alert for the same thing wants an hour of it,
+    # and the CI check wants the same rate in two consecutive windows,
+    # because a burst of ordinary work looks identical over one.
+    budgeted_over = [r for r in rows
+                     if r['over_budget'] and 'unbudgeted' not in r['flags']]
+    unbudgeted_over = [r for r in rows
+                       if r['over_budget'] and 'unbudgeted' in r['flags']]
 
     report = {
         'window_seconds': window,
@@ -684,9 +715,16 @@ def database_load(window: int, timeout: int, all_pairs: bool,
         'total_measured_qps': round(sum(rates.values()), 3),
         'total_modelled_qps': round(
             budget.expected_total_qps(nodes, instances), 3),
-        'pairs': shown,
+        # Every pair, whatever the table is about to print. This output
+        # is what a deployer attaches to an issue, and an attachment
+        # somebody has to be asked to re-run with another flag is worse
+        # than a long one.
+        'pairs': rows,
         'pairs_seen': len(rows),
-        'pairs_over_budget': sum(1 for r in rows if r['over_budget']),
+        'pairs_hidden_from_table': hidden,
+        'pairs_over_budget': len(budgeted_over) + len(unbudgeted_over),
+        'budgeted_pairs_over_budget': len(budgeted_over),
+        'unbudgeted_pairs_over_ceiling': len(unbudgeted_over),
     }
 
     if as_json:
@@ -715,6 +753,9 @@ def database_load(window: int, timeout: int, all_pairs: bool,
 
     if not shown:
         click.echo('Every pair is inside its budget.')
+        if hidden:
+            click.echo('%d quiet pair(s) with no budget entry were not '
+                       'shown. Use --all-pairs to see them.' % hidden)
         return
 
     click.echo('%-34s %-13s %9s %9s %9s  %s'
@@ -730,13 +771,26 @@ def database_load(window: int, timeout: int, all_pairs: bool,
                       ','.join(row['flags'])))
 
     click.echo('')
-    if report['pairs_over_budget']:
+    if hidden:
+        click.echo('%d quiet pair(s) with no budget entry were not shown. '
+                   'Use --all-pairs to see them.' % hidden)
+    if budgeted_over:
         click.echo(
-            '%d pair(s) are over budget. Please report this at '
+            '%d budgeted pair(s) are above what the model allows for a '
+            'cluster of this shape. Please report this at '
             'https://github.com/shakenfist/shakenfist/issues with the '
             'output of "sf-ctl database-load --json" attached.'
-            % report['pairs_over_budget'])
-    else:
+            % len(budgeted_over))
+    if unbudgeted_over:
+        click.echo(
+            '%d pair(s) with no budget entry ran above %.2f/s across this '
+            'one %ds window, which is what a new polling loop looks like '
+            '-- and also what a burst of ordinary work looks like over a '
+            'window this short. Re-run with a longer --window, and report '
+            'it if it holds.'
+            % (len(unbudgeted_over), defaults.unbudgeted_ceiling_qps(nodes),
+               window))
+    if not budgeted_over and not unbudgeted_over:
         click.echo('Nothing is over budget; the rows above are flagged '
                    'rather than excessive.')
 
