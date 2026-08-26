@@ -133,15 +133,16 @@ class DatabaseLoadBudgetTestCase(base.ShakenFistTestCase):
         # The one entry which encodes an arithmetic claim about the code
         # rather than a measurement: every daemon polls its own state row
         # at 1/DAEMON_STATE_POLL_INTERVAL, except the single elected
-        # cluster daemon, which polls from a 5s loop instead. If either
-        # constant moves, this budget entry is wrong.
+        # cluster daemon, which polls once per ELECTED_LOOP_POLL_SECONDS
+        # instead. If either constant moves, this budget entry is wrong.
+        from shakenfist.daemons.cluster import main as cluster_main
         from shakenfist.daemons import daemon
 
         entry = budget.load_budget().get('GetNodeDaemonState', 'cluster')
         per_node = 1.0 / daemon.DAEMON_STATE_POLL_INTERVAL
+        elected = 1.0 / cluster_main.ELECTED_LOOP_POLL_SECONDS
         self.assertEqual(per_node, entry.per_node_base_qps)
-        self.assertAlmostEqual(-(per_node - 1.0 / 5.0),
-                               entry.cluster_base_qps)
+        self.assertAlmostEqual(-(per_node - elected), entry.cluster_base_qps)
 
     def test_ceiling_is_above_expected(self):
         b = budget.load_budget()

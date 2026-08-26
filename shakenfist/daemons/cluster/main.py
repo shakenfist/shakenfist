@@ -50,6 +50,18 @@ LOG, _ = logs.setup(__name__)
 # non-configuration operational state (the Kerbside signing key).
 SCHEDULED_TASK_LAST_RUN_PREFIX = 'SCHEDULED_TASK_LAST_RUN_'
 
+# How long the elected maintenance loop sleeps between passes. Named
+# because it is not only a sleep: this loop polls its own daemon state row
+# once per iteration rather than once per DAEMON_STATE_POLL_INTERVAL from
+# idle(), so the value sets the elected node's GetNodeDaemonState rate and
+# is what the cluster_base_qps term of that pair in
+# shakenfist/data/database_load_budget.yaml is arithmetic about. Change it
+# and the budget entry, the functional suite's positive control, and the
+# generated Prometheus rules are all wrong together -- which is why
+# test_elected_cluster_daemon_poll_matches_the_daemon_code reads this
+# constant rather than restating the number.
+ELECTED_LOOP_POLL_SECONDS = 5
+
 
 class Monitor(daemon.Daemon):
     def __init__(self, name):
@@ -735,8 +747,9 @@ class Monitor(daemon.Daemon):
                 # internally): an externally written stop request -- sf-ctl
                 # stop cluster -- is only noticed by check_daemon_state(),
                 # and without this call the elected node ignored it until it
-                # lost election (issue 3874). The wait(5) below bounds the
-                # added stop latency at 5s, inside TimeoutStopSec=30s.
+                # lost election (issue 3874). The wait below bounds the
+                # added stop latency at ELECTED_LOOP_POLL_SECONDS, inside
+                # TimeoutStopSec=30s.
                 self.pet_watchdog()
                 self.check_daemon_state()
 
@@ -780,15 +793,16 @@ class Monitor(daemon.Daemon):
 
                         last_loop_run = now
 
-                # Sleep up to 5s. Wakes early if the background refresher
-                # reports our lease was stolen, OR when the timeout fires
-                # so the outer ``not os.path.exists(self.abort_path)``
-                # check runs again. The maintenance work above is gated
-                # at 60 s; this short poll is just so SIGTERM during a
-                # quiet period gets observed inside the systemd
-                # ``TimeoutStopSec=30s`` budget (the old wait(60) parked
-                # past it and got SIGKILLed).
-                if self.lock.lost_event.wait(5):
+                # Sleep up to ELECTED_LOOP_POLL_SECONDS. Wakes early if
+                # the background refresher reports our lease was stolen,
+                # OR when the timeout fires so the outer ``not
+                # os.path.exists(self.abort_path)`` check runs again. The
+                # maintenance work above is gated at 60 s; this short
+                # poll is just so SIGTERM during a quiet period gets
+                # observed inside the systemd ``TimeoutStopSec=30s``
+                # budget (the old wait(60) parked past it and got
+                # SIGKILLed).
+                if self.lock.lost_event.wait(ELECTED_LOOP_POLL_SECONDS):
                     LOG.warning(
                         'Cluster maintenance lock lost; re-entering election')
                     self.is_elected = False

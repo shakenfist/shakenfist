@@ -138,6 +138,26 @@ class BudgetDefaults(BaseModel):
     tolerance_multiplier: float = Field(..., gt=1.0)
     tolerance_floor_qps: float = Field(..., ge=0.0)
     unbudgeted_fixed_rate_qps: float = Field(..., gt=0.0)
+    unbudgeted_fixed_rate_per_node_qps: float = Field(..., ge=0.0)
+
+    def unbudgeted_ceiling_qps(self, nodes: int) -> float:
+        """Above this, a pair with no entry looks like a new polling loop.
+
+        Scaled by node count rather than flat, for the same reason every
+        entry above is a model rather than a number. The pairs left out of
+        the budget are mostly per-node loops running under the inclusion
+        cut, so a threshold which does not grow with the cluster is a
+        threshold the largest of them crosses on a cluster three times the
+        size of the one this was derived from -- permanently, on a cluster
+        where nothing is wrong. An alert which always fires gets silenced,
+        and a silenced alert still reads as coverage.
+
+        The floor is what a small cluster gets, because a two node cluster
+        should not have a stricter idea of "new poll" than the six node
+        one the coefficients came from.
+        """
+        return max(self.unbudgeted_fixed_rate_qps,
+                   self.unbudgeted_fixed_rate_per_node_qps * nodes)
 
 
 class DatabaseLoadBudget(BaseModel):

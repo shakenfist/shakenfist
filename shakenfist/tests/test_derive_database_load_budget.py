@@ -93,6 +93,56 @@ class DeriveBudgetTestCase(base.ShakenFistTestCase):
                 self.assertEqual(value, getattr(entry, term),
                                  '%s/%s %s' % (key[0], key[1], term))
 
+    def test_the_shipped_budget_says_what_its_generator_says(self):
+        """The committed _doc prose is the generator's, word for word.
+
+        The rules file has test_committed_rules_match_the_generator and so
+        cannot drift from what produces it. The budget had nothing, and it
+        had already drifted: the shipped _doc.method described the fit
+        without naming the regressor, which is precisely the question
+        AGENTS.md sends a new consumer to _doc.method to answer.
+
+        Only the prose is compared. derived_from, window, samples and
+        cluster_shape are facts about a particular measurement, and
+        coverage_of_total is half computed from one, so the fixed half of
+        that is checked by suffix.
+        """
+        doc = yaml.safe_load(io.StringIO(budget.budget_text()))['_doc']
+        for key, expected in (('method', tool.DOC_METHOD),
+                              ('base_term_caveat', tool.DOC_BASE_TERM_CAVEAT),
+                              ('coverage_caveat', tool.DOC_COVERAGE_CAVEAT),
+                              ('rederive', tool.DOC_REDERIVE)):
+            self.assertEqual(
+                ' '.join(expected.split()), ' '.join(doc[key].split()),
+                '_doc.%s is not what tools/derive-database-load-budget.py '
+                'writes' % key)
+        self.assertTrue(
+            ' '.join(doc['coverage_of_total'].split()).endswith(
+                ' '.join(tool.DOC_INCLUSION_CUT_LESSON.split())),
+            '_doc.coverage_of_total does not end with the generator\'s '
+            'explanation of where the inclusion cut sits')
+
+    def test_the_shipped_budget_carries_the_generators_header(self):
+        # The file says "DO NOT hand-edit levels to make a check pass" and
+        # names the tool which rewrites it. Neither survives a
+        # re-derivation unless the generator emits them, so assert the
+        # committed file is carrying the generator's copy rather than one
+        # somebody pasted.
+        self.assertTrue(budget.budget_text().startswith(tool.FILE_HEADER))
+
+    def test_code_derived_terms_match_the_daemons(self):
+        # The tool is standalone and cannot import the server, so it
+        # restates the two intervals the GetNodeDaemonState/cluster entry
+        # is arithmetic about. Restated is fine; drifted is not, and the
+        # drift would show up as a budget term rather than as an error.
+        from shakenfist.daemons.cluster import main as cluster_main
+        from shakenfist.daemons import daemon
+
+        self.assertEqual(float(daemon.DAEMON_STATE_POLL_INTERVAL),
+                         tool.DAEMON_STATE_POLL_INTERVAL)
+        self.assertEqual(float(cluster_main.ELECTED_LOOP_POLL_SECONDS),
+                         tool.ELECTED_LOOP_POLL_SECONDS)
+
     def test_a_significant_slope_becomes_a_per_instance_term(self):
         entry = tool.to_entry(('GetInstanceAttributes', 'net'),
                               stats(slope=0.35, intercept=0.2, r2=0.76,

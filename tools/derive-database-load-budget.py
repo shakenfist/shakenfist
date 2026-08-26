@@ -74,6 +74,8 @@ import time
 import urllib.parse
 import urllib.request
 
+import yaml
+
 
 # database_requests_total could not see the whole cluster before #3708
 # reached it. See the module docstring.
@@ -85,7 +87,7 @@ DEFAULT_PREVIOUS = os.path.join(
     'shakenfist', 'data', 'database_load_budget.yaml')
 
 # A pair is worth an entry if it averages at least this much. It has to sit
-# well below the budget's unbudgeted_fixed_rate_qps, because a pair which is
+# well below the budget's unbudgeted ceiling, because a pair which is
 # quiet in the measurement window and louder on a busier cluster would
 # otherwise read as brand new traffic. Deriving at 0.30 against a window
 # averaging 18 standing instances left five pairs which crossed 0.25/s once
@@ -159,7 +161,12 @@ DOC_BASE_TERM_CAVEAT = (
     'per_node_base_qps. A cluster with a different role mix -- a node '
     'that runs no hypervisor, say -- will read low against the per-node '
     'terms, and that is a modelling limit rather than a fault in the '
-    'cluster.')
+    'cluster. The other direction is the one that costs somebody an '
+    'afternoon: a cluster-wide singleton mis-assigned to '
+    'per_node_base_qps reads high on a cluster smaller than the one this '
+    'was derived from, which fails a build and fires an alert rather '
+    'than merely under-predicting. Check the assignment before believing '
+    'a small cluster is over budget.')
 
 DOC_COVERAGE_CAVEAT = (
     'Only figures taken after 2026-08-11 are usable. Until #3708, '
@@ -168,6 +175,18 @@ DOC_COVERAGE_CAVEAT = (
     'was two nodes of six and the whole cluster daemon whenever the '
     'maintenance lock sat on one of them. Coefficients from before that '
     'date undercount, and phase 6 spent a fortnight discovering it.')
+
+# Why the inclusion cut sits where it does. A fact about this tool's
+# judgement rather than about any one measurement, so it is stated here and
+# appended to the computed coverage text below.
+DOC_INCLUSION_CUT_LESSON = (
+    'The inclusion cut sits well below that threshold on purpose, because '
+    'a pair which is quiet in the measurement window and louder on a '
+    'busier cluster would otherwise read as brand new traffic. Deriving '
+    'at 0.30 left five pairs which were quiet across a window averaging '
+    '18 standing instances and crossed 0.25/s once the same cluster '
+    'reached 32, so each was a standing false alarm on the cluster the '
+    'budget came from.')
 
 DOC_REDERIVE = (
     'tools/derive-database-load-budget.py, pointed at a Prometheus that '
@@ -182,6 +201,7 @@ FALLBACK_DEFAULTS = collections.OrderedDict([
     ('tolerance_multiplier', 2.0),
     ('tolerance_floor_qps', 0.5),
     ('unbudgeted_fixed_rate_qps', 0.25),
+    ('unbudgeted_fixed_rate_per_node_qps', 0.05),
 ])
 
 # A few entries are arithmetic about the code rather than a measurement, and
@@ -195,10 +215,19 @@ FALLBACK_DEFAULTS = collections.OrderedDict([
 # not yet deployed that fix still does. Overriding here rather than editing
 # the generated file by hand means a re-derivation does not silently revert
 # to the measurement.
+#
+# Written as the arithmetic rather than as the two numbers it comes to,
+# because the numbers are a claim about two constants in the server and
+# nothing here can import them. test_code_derived_terms_match_the_daemons
+# pins both against the real ones.
+DAEMON_STATE_POLL_INTERVAL = 2.0      # shakenfist/daemons/daemon.py
+ELECTED_LOOP_POLL_SECONDS = 5.0       # shakenfist/daemons/cluster/main.py
 CODE_DERIVED_TERMS = {
     ('GetNodeDaemonState', 'cluster'): {
-        'per_node_base_qps': 0.5,
-        'cluster_base_qps': -0.3,
+        'per_node_base_qps': round(1.0 / DAEMON_STATE_POLL_INTERVAL, 3),
+        'cluster_base_qps': round(
+            1.0 / ELECTED_LOOP_POLL_SECONDS
+            - 1.0 / DAEMON_STATE_POLL_INTERVAL, 3),
     },
 }
 
@@ -348,7 +377,6 @@ def load_previous(path):
             'placeholder and no provisional marking will survive.\n' % path)
         return None
 
-    import yaml
     with open(path, encoding='utf-8') as f:
         return yaml.safe_load(f)
 
@@ -391,9 +419,12 @@ def emit(entries, by_time, args, out, coverage=None, previous=None):
     if previous and previous.get('defaults'):
         defaults = previous['defaults']
     out.write('\ndefaults:\n')
-    for key in ('tolerance_multiplier', 'tolerance_floor_qps',
-                'unbudgeted_fixed_rate_qps'):
-        out.write('  %s: %s\n' % (key, defaults[key]))
+    for key in FALLBACK_DEFAULTS:
+        # A previous file which predates a key still has to produce a
+        # complete one, or the re-derivation writes a budget the schema
+        # refuses to load.
+        out.write('  %s: %s\n' % (key, defaults.get(key,
+                                                    FALLBACK_DEFAULTS[key])))
 
     out.write('\nentries:\n')
     for entry in entries:
@@ -433,16 +464,12 @@ def coverage_text(coverage):
         'These %d pairs are the pairs averaging at least %.2f/s. They '
         'carry %.1f%% of measured load; the remaining %d pairs together '
         'average %.1f/s and none individually exceeds %.2f/s. An '
-        'unbudgeted pair sustaining more than '
-        'defaults.unbudgeted_fixed_rate_qps is treated as a new poll: it '
-        'fails the CI check and fires '
-        'ShakenFistUnbudgetedDatabasePolling. The inclusion cut sits '
-        'below that threshold on purpose, because a pair which is quiet '
-        'in the measurement window and louder on a busier cluster would '
-        'otherwise read as brand new traffic.'
+        'unbudgeted pair sustaining more than the unbudgeted ceiling in '
+        'defaults is treated as a new poll: it fails the CI check and '
+        'fires ShakenFistUnbudgetedDatabasePolling. '
         % (coverage['kept'], coverage['cut_qps'], coverage['kept_percent'],
            coverage['dropped'], coverage['dropped_qps'],
-           coverage['largest_dropped_qps']))
+           coverage['largest_dropped_qps'])) + DOC_INCLUSION_CUT_LESSON
 
 
 def main():
