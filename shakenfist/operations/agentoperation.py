@@ -316,15 +316,13 @@ class AgentOperation(BaseOperation):
         expired has no edge to error.
 
         The reason is recorded as the state message, and only there.
-        Every call site this helper replaced also assigned self.error,
-        which is dropped deliberately: AgentOperation does not override
-        _db_set_attribute(), so that write persists nothing and costs a
-        "subclass should override" warning plus a mutate event on every
-        failure -- log noise which reads as a live defect to whoever is
-        triaging the failure. See issue #3899, which tracks the
-        underlying gap. The day agent operation attribute persistence
-        exists, these call sites become correct by construction because
-        they call fail() rather than assigning.
+        Every call site this helper replaced also assigned self.error
+        as well; that second write is dropped deliberately. Since the
+        fix for issue #3899 the error setter stores the message on the
+        object's state row, which is the row _state_update() has just
+        written, so self.error already reads back what was passed here
+        and assigning it again would buy nothing but a redundant mutate
+        event on every failure.
         """
         if self.state.value in self.TERMINAL_STATES:
             return

@@ -179,16 +179,16 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
 
     # fail()
     def test_fail_records_the_message_on_the_state(self):
-        # The state message is where the reason survives, and the only
-        # place it is written. AgentOperation does not override
-        # _db_set_attribute(), so an assignment to self.error would
-        # persist nothing and cost a warning per failure; see issue
-        # #3899.
+        # fail() makes one write, and both readers see it: the state
+        # message is where the reason is stored, and since the fix for
+        # issue #3899 the error property reads that same message back.
+        # Asserting both is what pins the single write -- .error alone
+        # would also pass if the message were stored somewhere else.
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
         op.fail('it broke')
         self.assertEqual(dbo.STATE_ERROR, op.state.value)
         self.assertEqual('it broke', op.state.message)
-        self.assertIsNone(op.error)
+        self.assertEqual('it broke', op.error)
 
     def test_fail_from_expired_is_a_noop(self):
         # Without the terminal state guard this raises

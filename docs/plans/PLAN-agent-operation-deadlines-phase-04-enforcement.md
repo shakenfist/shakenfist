@@ -554,6 +554,17 @@ worth calling out:
    #3899 is fixed, so the write is dropped and the docstring cites the
    issue.
 
+   Issue #3899 was then fixed on `develop` while this branch was in
+   the merge queue (commit `c8ff408f0`), which turned that prediction
+   into the present tense sooner than expected: the `error` setter now
+   stores the message on the object's `object_states` row, so
+   `fail()`'s single `_state_update()` write *is* the error write and
+   `agentop.error` reads the message back. The code needed no change
+   -- dropping the second write was the right call either way -- but
+   the reason for it did, and the test asserting `error is None`
+   became false and failed in merge CI. Both were corrected; see the
+   merge CI triage note below.
+
 The remainder: the expiry audit event now names the instance as well
 as the operation (item 4, restoring the plan's own decision 2, which
 the implementation had quietly narrowed); `observe_progress()`
@@ -581,6 +592,35 @@ documented at the site rather than left implied.
 Item 12 (the declared but undriven `initial --> expired` edge) needed
 no change; a note was added saying it is permitted for completeness.
 
+## Merge CI triage
+
+The first merge queue attempt (run 32933393451) failed three jobs.
+
+`Sanity checks` failed for a reason belonging to this branch:
+`test_fail_records_the_message_on_the_state` asserted
+`assertIsNone(op.error)`, which was true when it was written and false
+by the time the merge group ran. Issue #3899 -- filed from this
+branch's own review -- was fixed on `develop` in between, and the fix
+routes `.error` through the state row that `fail()` writes. The
+assertion was inverted to `assertEqual('it broke', op.error)` and the
+two paragraphs which explained the old behaviour were rewritten. No
+production code changed: dropping the second write in review item 7
+was correct before the fix and is correct after it.
+
+The other two jobs failed on the known 507 family. `Debian 12 cluster`
+lost `test_affinity` (issue #3565) and `Debian 12 tier` lost
+`test_network_plumbing_lifecycle` to
+`No nodes remaining at scheduling stage sufficient_idle_cpu` (issue
+#3772). Neither touches agent operations, both are recorded against
+their tracking issues, and both are unrelated to this phase.
+
+The transferable lesson is about the autofixer rather than about
+deadlines: a branch which files an issue during its own review can be
+overtaken by the fix for that issue before it merges. Where a plan
+states "X is broken today" as the justification for a workaround, that
+claim has a shelf life measured in hours.
+
+
 ## Future work
 
 - **`AgentOperation` attribute writes go nowhere.** Found while
@@ -600,7 +640,11 @@ no change; a note was added saying it is permitted for completeness.
   also records that `Network` and `Artifact` lose their error messages
   the same way. `fail()` no longer writes `self.error` at all (review
   item 7); its call sites become correct by construction when #3899
-  lands.
+  lands. **Resolved:** #3899 landed on `develop` on 2026-08-25 as
+  commit `c8ff408f0`, which stores the message on the state row rather
+  than adding an attributes path. `fail()`'s call sites are now
+  correct by construction, and `AgentOperation.external_view()`
+  publishes `error_message` alongside `Network` and `Artifact`.
 - **Errored agent operations still leak `object_states` rows.**
   `FINAL_OBJECT_STATES` (`shakenfist/constants.py:191`) contains
   `deleted`, `complete` and `abort` but not `error`, so the hard-delete
