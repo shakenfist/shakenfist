@@ -472,6 +472,87 @@ budget describes as an open defect. The entry stays provisional, because a
 level nobody has re-measured is not a floor worth defending either, but
 its note now says the fix landed and the coefficient predates it.
 
+### What the second review found
+
+A second pass over the result found twelve more things. The theme this
+time is narrower and worth naming too: *a file which says it is generated
+has to actually be what its generator produces, or the thing it says about
+itself is the first thing to go stale.*
+
+**The budget had already drifted from its own generator.** The shipped
+`_doc.method` described the ordinary least squares fit without naming the
+regressor — which is precisely the question AGENTS.md sends a new consumer
+to `_doc.method` to answer, and precisely what the fix above was supposed
+to have made the file self-describing about. The generator's `DOC_METHOD`
+did say it; the committed file predated that and nothing compared them.
+`base_term_caveat`, `coverage_of_total` and the file header had drifted
+the same way, in both directions: the file carried a hand-written
+explanation of where the inclusion cut sits which the generator would have
+deleted on the next re-derivation. Both halves are now in the tool, the
+committed file is what the tool writes, and
+`test_the_shipped_budget_says_what_its_generator_says` fails if they part
+company again. The rules file has had that guard since it was written; the
+budget, which is the file everything else reads, had none.
+
+**The unbudgeted threshold was a flat number in a system built on the
+premise that flat numbers are useless.** Every entry in the budget is a
+model because "a number that is right for a six node cluster is wrong for
+everybody else" — and then a pair with *no* entry was measured against a
+cluster-wide constant 0.25/s, in all three consumers. The pairs
+deliberately left below the inclusion cut are mostly per-node loops, so
+the largest of them crosses 0.25/s at around twenty nodes and
+`ShakenFistUnbudgetedDatabasePolling` then fires forever on a cluster
+where nothing is wrong. The plan's own words for this failure are two
+sections up: an alert that always fires gets silenced, and a silenced
+alert still reads as coverage. `defaults` now carries
+`unbudgeted_fixed_rate_per_node_qps`, and the flat value became the floor
+small clusters get.
+
+**The alerts compared a one day rate to an instantaneous ceiling.**
+`sf_database:budget_ceiling` was derived from the model evaluated at the
+cluster's shape right now, while `ShakenFistDatabasePairOverBudget`
+compares it against `sf_database:request_rate:1d`. Halve a cluster's
+standing instances overnight and the ceiling drops at once while the
+measurement still carries yesterday's cluster, so every per-instance pair
+sits over budget for up to a day — which `for: 1h` does not cover, and
+which is not a regression. The ceiling is now built from
+`sf_database:modelled_rate:1d`, so both halves cover the same window.
+
+**The positive control used the minimum window for both of its bounds.**
+Which is the most jitter-prone choice for the undercount assertion (the
+one that detects the harness having gone blind, a persistent condition a
+single restart-straddling window would fail the build over) and the most
+lenient for the overcount assertion (the one that detects
+`check_daemon_state()` losing its rate limit, which a single bad window is
+enough to prove). Both now read the busiest window, and the per-window
+rates are recorded in the test detail either way.
+
+**The generated PromQL was never parsed.** Everything asserted about the
+rules file read it as data, which a mismatched paren, a `group_left`
+Prometheus rejects, or a `label_replace` with its arguments swapped all
+survive. The first thing to notice would be an operator's Prometheus
+refusing to load the group — and a group which did not load fires no
+alerts, which is the exact failure `ShakenFistDatabaseLoadModelBlind`
+exists for and cannot cover, being inside the group itself. The sanity
+checks job now installs promtool (`tools/ci-install-promtool.sh`, cached
+on the runner because promtool ships only inside a 100MB tarball) and
+`test_the_generated_promql_parses` runs it.
+
+The rest were smaller: `sf-ctl database-load` printed roughly three
+hundred quiet unbudgeted rows by default and then pointed the deployer at
+the issue tracker for a single sixty second sample of an unbudgeted pair —
+weaker evidence than either of the other two consumers requires before
+they say anything; the elected cluster loop's five second sleep was a bare
+literal restated in four places with nothing pinning them together, and is
+now `ELECTED_LOOP_POLL_SECONDS`; two unused imports; two late `import
+yaml` statements without the comment the convention asks for; and
+`_daemon_node_counts()` moved into `load_budget.py` so its key parsing can
+be tested without building a cluster. Two findings were observations and
+took no change: the check's two minutes of wall clock, and the base-term
+split being assigned rather than fitted — though the caveat now names the
+direction of that error which fails a build, rather than only the
+direction which under-predicts.
+
 ## Risks and mitigations
 
 * **The budget encodes the regression.** If 7a is derived before phase 6
@@ -526,8 +607,10 @@ starts is not a criterion. They were all run again after
 implementation; every one passes. Functional CI needed the branch
 pushed, and its first run failed on the positive control's premise
 about which daemons poll; its second passed. The automated review that
-followed found eleven things, nine of them fixed and two recorded — see
-"What implementation found".
+followed found eleven things, nine of them fixed and two recorded; a
+second review of the result found twelve more, ten of them fixed and two
+observations — see "What implementation found" and the two review
+subsections under it.
 
 * **The budget exists, validates, and ships.** `shakenfist/data/
   database_load_budget.yaml` parses; every entry carries a base or a
@@ -565,7 +648,23 @@ followed found eleven things, nine of them fixed and two recorded — see
 * **The rules cannot drift from the budget.** A test regenerates
   `examples/prometheus-database-load-rules.yaml` from the committed budget
   and asserts byte equality with the committed rules, and it fails if
-  either is edited alone.
+  either is edited alone. A second test parses the result as PromQL with
+  promtool, which the sanity checks job installs, so an expression
+  Prometheus would reject at rule-load time fails the build instead.
+* **The budget cannot drift from the tool that writes it.** The committed
+  file starts with the generator's header, and its `_doc` prose is what
+  the generator's `DOC_*` constants say word for word — asserted by
+  `test_the_shipped_budget_says_what_its_generator_says`. Review found the
+  file had already drifted here, in a way that made AGENTS.md point a
+  contributor at text which did not answer the question it was sent to
+  answer.
+* **The unbudgeted threshold is a model, not a number.** `defaults`
+  carries `unbudgeted_fixed_rate_per_node_qps` as well as the flat floor,
+  all three consumers compute the ceiling from the cluster's node count,
+  and the CI harness's copy is asserted equal to the server's across five
+  cluster sizes. A flat threshold fires forever on a large cluster where
+  nothing is wrong, which is the failure mode this phase's own reasoning
+  rejects everywhere else.
 * **`sf-ctl database-load` works against a cluster.** It appears in `sf-ctl
   --help`, prints measured versus modelled per-caller load sorted by
   excess, supports `--json`, flags provisional entries, and when one tier

@@ -64,9 +64,11 @@ metrics. The headlines:
   that says so. It is generated —
   `tools/derive-database-load-budget.py` re-derives it and
   `tools/generate-database-load-rules.py` re-renders
-  `examples/prometheus-database-load-rules.yaml` from it, and a test
-  fails if either is edited alone. A new consumer must evaluate the model
-  against the quantities it was fitted against — nodes and instances as
+  `examples/prometheus-database-load-rules.yaml` from it. A test fails if
+  the rules file is edited alone, if the budget's prose drifts from the
+  constants in the tool that writes it, or — where promtool is installed
+  — if the generated PromQL does not parse. A new consumer must evaluate
+  the model against what it was fitted against — nodes and instances as
   `instances_active` reports them, per `_doc.method` in the budget — or it
   will silently compute a different ceiling from the same file. See
   [docs/operator_guide/database.md](docs/operator_guide/database.md#understanding-database-load).

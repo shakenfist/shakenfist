@@ -352,9 +352,14 @@ sf-ctl database-load
 
 Scrapes every gateway in `MARIADB_GATEWAY_HOSTS` twice over a minute and
 prints what the tier is serving next to what the model predicts for your
-cluster, sorted by how far over budget each pair is. Add `--all-pairs` to
-see everything rather than only what is flagged, and `--json` for
-something to attach to a bug report.
+cluster, sorted by how far over budget each pair is.
+
+Most of the pairs a cluster serves have no budget entry at all, because
+they are activity driven and near zero when nothing is happening -- around
+three hundred of them on a cluster the size of ours. The table leaves
+those out unless one is above its ceiling; `--all-pairs` prints them. The
+`--json` output always carries every pair, so it is the one to attach to a
+bug report.
 
 Two flags in that output mean "expected, do not report":
 
@@ -369,6 +374,23 @@ If a gateway does not answer, the command says which and reports on the
 rest. It never quietly reports part of the tier as the whole of it,
 because a total missing a gateway reads as load having fallen.
 
+The footer distinguishes two things, because they carry different weights
+of evidence. A *budgeted* pair above its ceiling is measured against a
+model of your cluster and is worth reporting. A pair with *no* budget
+entry above the unbudgeted ceiling has only been seen for one short
+window, and a burst of ordinary work looks the same over sixty seconds as
+a new polling loop does; the command asks you to re-run with a longer
+`--window` first. The Prometheus alert for the same thing wants an hour
+of it before it fires, for the same reason.
+
+The unbudgeted ceiling is itself a model rather than a number: the pairs
+left out of the budget are mostly per-node loops, so the ceiling is
+`unbudgeted_fixed_rate_per_node_qps` per node with
+`unbudgeted_fixed_rate_qps` as a floor for small clusters. A flat
+threshold would be one that ordinary traffic crosses on a large enough
+cluster, permanently, with nothing wrong -- and an alert that always fires
+gets silenced, while a silenced alert still reads as coverage.
+
 #### Standing monitoring
 
 [`examples/prometheus-database-load-rules.yaml`](https://github.com/shakenfist/shakenfist/blob/develop/examples/prometheus-database-load-rules.yaml)
@@ -378,7 +400,15 @@ installation instructions in its comments. It records the model as
 `sf_database:request_rate`, and carries three alerts: a budgeted pair
 well above its model, a pair nobody budgeted for polling steadily, and
 one for the model going blind because `instances_active` is not being
-scraped. That last one matters: without `sf-resources` scraped the
+scraped.
+
+The alerts compare a one day rate against a one day average of the model
+(`sf_database:modelled_rate:1d`), rather than against the model evaluated
+right now. Both halves have to cover the same window: a cluster that
+halves its standing instance count overnight would otherwise have every
+per-instance pair sitting above an immediately-shrunken ceiling until the
+measurement caught up, for up to a day, which `for: 1h` does not cover and
+which is not a regression. That last one matters: without `sf-resources` scraped the
 modelled series are empty and neither of the other two can ever fire,
 which looks exactly like a healthy cluster.
 
