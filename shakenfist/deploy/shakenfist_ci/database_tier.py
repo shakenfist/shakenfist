@@ -156,14 +156,28 @@ class DatabaseTierTestsMixin:
         Retried the same way and for the same reason as _sum_requests():
         a refused scrape says nothing about the property under test, and
         these tests gate every PR.
+
+        Returns the totals and the mean of the moments they were read at.
+        The caller turns two of these into rates, and the interval it
+        should divide by is the one between the reads, not the sleep it
+        put between them: a sweep of this tier costs up to
+        SCRAPE_ATTEMPTS x (METRICS_TIMEOUT + SCRAPE_RETRY_SECONDS) per
+        node when nodes are slow, which against a 60s window is enough
+        to push a budgeted pair past its ceiling and fail the build for
+        a regression which is not there. Differencing the means is
+        exact when every node is read at the same rate and close enough
+        otherwise, and it is what makes a slow sweep cancel rather than
+        accumulate.
         """
         totals = {}
+        read_at = []
         for node in database_nodes:
             last = None
             for attempt in range(SCRAPE_ATTEMPTS):
                 try:
                     for key, value in lb.scrape_request_pairs(node['ip']).items():
                         totals[key] = totals.get(key, 0.0) + value
+                    read_at.append(time.monotonic())
                     break
                 except Exception as e:
                     last = e
@@ -174,7 +188,7 @@ class DatabaseTierTestsMixin:
                     'Failed to scrape database metrics from %s (%s) after '
                     '%d attempts: %s'
                     % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
-        return totals
+        return totals, sum(read_at) / len(read_at)
 
     def _daemon_node_counts(self, nodes):
         """How many nodes run each daemon, from the daemon state rows.
@@ -452,14 +466,49 @@ class DatabaseTierTestsMixin:
         nodes = self.system_client.get_nodes()
 
         windows = []
-        counters = self._all_pairs(database_nodes)
+        elapsed_seconds = []
+        restarted = []
+        counters, read_at = self._all_pairs(database_nodes)
         for _ in range(lb.LOAD_WINDOW_COUNT):
             time.sleep(lb.LOAD_WINDOW_SECONDS)
-            later = self._all_pairs(database_nodes)
-            windows.append({
-                key: (value - counters.get(key, 0.0)) / lb.LOAD_WINDOW_SECONDS
-                for key, value in later.items()})
-            counters = later
+            later, later_read_at = self._all_pairs(database_nodes)
+
+            # Divide by what was actually measured, not by what was
+            # slept. See _all_pairs().
+            elapsed = later_read_at - read_at
+            elapsed_seconds.append(round(elapsed, 1))
+
+            window = {}
+            for key, value in later.items():
+                delta = value - counters.get(key, 0.0)
+                if delta < 0:
+                    # A counter went backwards, so an sf-database
+                    # restarted inside this window and began again from
+                    # zero. sf-ctl's reader drops these for the same
+                    # reason; here they are also recorded, because
+                    # without that the assertions below see a pair which
+                    # simply stopped and report it as this harness
+                    # having lost sight of the cluster.
+                    restarted.append({'operation': key[0],
+                                      'caller_daemon': key[1],
+                                      'delta': delta})
+                    continue
+                window[key] = delta / elapsed
+            windows.append(window)
+            counters, read_at = later, later_read_at
+
+        # Said once, up front, rather than left to be inferred from
+        # whichever assertion below trips over the gap it leaves.
+        self.assertEqual(
+            [], restarted,
+            'A database_requests_total counter went backwards during the '
+            'measurement, which means an sf-database restarted inside it. '
+            'Every rate below is then measured across a window the tier '
+            'did not survive, so this run cannot say whether the cluster '
+            'is polling more than it should -- and the failure it would '
+            'otherwise report is a restart, not a regression. Look at why '
+            'sf-database restarted. counters=%s'
+            % json.dumps(restarted, sort_keys=True))
 
         # The positive control, asserted first and without reference to the
         # budget, because it is the check which says whether any of the
@@ -497,7 +546,9 @@ class DatabaseTierTestsMixin:
                                'measured_qps': measured}
 
         self.addDetail('poll_positive_control', content.text_content(
-            json.dumps(control, indent=2, sort_keys=True)))
+            json.dumps({'daemons': control,
+                        'measured_seconds': elapsed_seconds},
+                       indent=2, sort_keys=True)))
 
         for daemon, seen in sorted(control.items()):
             self.assertGreater(
@@ -531,7 +582,18 @@ class DatabaseTierTestsMixin:
         entries = {(e['operation'], e['caller_daemon']): e
                    for e in budget['entries']}
         node_count = len(nodes)
-        standing_instances = len(self.system_client.get_instances())
+
+        # Powered on instances, not every instance. The per-instance
+        # coefficients were fitted against instances_active, which counts
+        # running libvirt domains, so a powered off instance contributes
+        # nothing to the model and must not contribute here either --
+        # counting it would raise every ceiling below by its coefficient
+        # for load it does not produce. power_state is the closest thing
+        # the API offers to that series; it is what the hypervisor last
+        # reported for the domain.
+        standing_instances = len(
+            [i for i in self.system_client.get_instances()
+             if i.get('power_state') == 'on'])
         steady = lb.fixed_rate(windows)
 
         over = []
@@ -557,6 +619,7 @@ class DatabaseTierTestsMixin:
             'nodes': node_count,
             'standing_instances': standing_instances,
             'window_seconds': lb.LOAD_WINDOW_SECONDS,
+            'measured_seconds': elapsed_seconds,
             'windows': lb.LOAD_WINDOW_COUNT,
             'pairs_seen': len(windows[0]),
             'pairs_fixed_rate': len(steady),

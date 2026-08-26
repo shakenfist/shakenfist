@@ -488,14 +488,23 @@ def _gather_database_load(window: int, timeout: int) -> dict[str, Any]:
             'to measure.')
     port = config.MARIADB_GATEWAY_METRICS_PORT
 
+    # A counter delta covers the time between the two reads of that
+    # counter, which is the sleep plus however long the scrapes took --
+    # not the sleep. Timing each gateway individually and dividing by
+    # what it actually measured keeps a slow or timing-out gateway from
+    # inflating every rate it contributes to: at the default 5s timeout,
+    # a handful of gateways is already several percent of a 60s window,
+    # and the numbers here are compared against a budget.
     def _sample() -> tuple[
-            dict[str, dict[tuple[str, str], float]], dict[str, str]]:
-        reached: dict[str, dict[tuple[str, str], float]] = {}
+            dict[str, tuple[dict[tuple[str, str], float], float]],
+            dict[str, str]]:
+        reached: dict[str, tuple[dict[tuple[str, str], float], float]] = {}
         failed: dict[str, str] = {}
         for host in hosts:
             try:
-                reached[host] = metrics_scrape.scrape_request_pairs(
+                pairs = metrics_scrape.scrape_request_pairs(
                     host, port, timeout=timeout)
+                reached[host] = (pairs, time.monotonic())
             except Exception as e:
                 failed[host] = str(e)
         return reached, failed
@@ -516,9 +525,17 @@ def _gather_database_load(window: int, timeout: int) -> dict[str, Any]:
     unreachable = sorted(set(hosts) - set(usable))
 
     rates: dict[tuple[str, str], float] = {}
+    elapsed_by_host: dict[str, float] = {}
     for host in usable:
-        before = first[host]
-        after = second[host]
+        before, before_at = first[host]
+        after, after_at = second[host]
+        elapsed = after_at - before_at
+        elapsed_by_host[host] = round(elapsed, 3)
+        if elapsed <= 0:
+            # Cannot happen with a monotonic clock and a sleep between
+            # the samples, but a zero here would divide by zero rather
+            # than report a rate, so say so instead.
+            continue
         for key, value in after.items():
             delta = value - before.get(key, 0.0)
             if delta < 0:
@@ -526,23 +543,56 @@ def _gather_database_load(window: int, timeout: int) -> dict[str, Any]:
                 # began again from zero. Its share of this pair is unknown
                 # rather than negative.
                 continue
-            rates[key] = rates.get(key, 0.0) + delta / window
+            rates[key] = rates.get(key, 0.0) + delta / elapsed
 
     return {
         'rates': rates,
         'gateways_measured': usable,
         'gateways_unreachable': unreachable,
+        'gateway_elapsed_seconds': elapsed_by_host,
         'gateway_errors': {h: second_failed.get(h, first_failed.get(h, ''))
                            for h in unreachable},
     }
 
 
+# sf-resources republishes every node's metrics row each cycle and only
+# clears its own at startup, so a node which has left the cluster leaves
+# a row behind. Prometheus drops such a series once it goes stale and the
+# reader below has to do the same, or the per-node term keeps charging
+# for a node which is gone. Generous against the 60s publish interval,
+# and the same 5 minutes Prometheus looks back by default.
+NODE_METRICS_STALE_SECONDS = 300
+
+
 def _cluster_shape() -> tuple[int, int]:
-    """How many nodes, and how many instances are standing."""
-    nodes = len(list(node.Nodes([], prefilter='active')))
-    instances = len(mariadb.get_objects_by_state(
-        ObjectType.INSTANCE, [dbo.STATE_CREATED]) or [])
-    return nodes, instances
+    """How many nodes, and how many instances are standing.
+
+    Both numbers come from the metrics sf-resources publishes, because
+    that is the series the budget's coefficients were fitted against:
+    per_instance_qps is a regression against ``sum(instances_active)``,
+    which counts running libvirt domains, and the generated Prometheus
+    rules evaluate the same model with ``count(instances_active)`` and
+    ``sum(instances_active)``. Counting instances in the created state
+    instead would include powered off ones, which cost the database
+    nothing -- and since the ceiling is a multiple of the modelled
+    value, a cluster with many of them would quietly raise its own
+    ceiling by about 0.5/s per instance on the larger pairs, which is
+    room enough to hide the regression this command exists to find.
+    """
+    now = time.time()
+    fresh = [m for m in mariadb.get_all_node_metrics()
+             if now - float(m.get('timestamp') or 0)
+             < NODE_METRICS_STALE_SECONDS]
+    if not fresh:
+        raise click.ClickException(
+            'No node has published resource metrics in the last %d '
+            'seconds, so the shape of this cluster is unknown and the '
+            'model below cannot be evaluated. Is sf-resources running?'
+            % NODE_METRICS_STALE_SECONDS)
+
+    instances = sum(int((m.get('metrics') or {}).get('instances_active', 0))
+                    for m in fresh)
+    return len(fresh), instances
 
 
 @click.command(name='database-load')
@@ -607,8 +657,16 @@ def database_load(window: int, timeout: int, all_pairs: bool,
             'modelled_qps': None if modelled is None else round(modelled, 3),
             'ceiling_qps': round(ceiling, 3),
             'excess_qps': round(measured - ceiling, 3),
+            # An unbudgeted pair has no entry to ask about enforcement,
+            # but it does have a ceiling -- and exceeding it is exactly
+            # the new-poll case ShakenFistUnbudgetedDatabasePolling
+            # alerts on and test_no_unbudgeted_fixed_rate_database_polling
+            # fails the build on. Reading `entry is not None` here made
+            # this the one consumer of the three which counted it as
+            # fine, and then printed "nothing is over budget" over the
+            # top of it.
             'over_budget': measured > ceiling and (
-                entry is not None and entry.enforced),
+                entry is None or entry.enforced),
             'flags': flags,
         })
 
@@ -618,6 +676,7 @@ def database_load(window: int, timeout: int, all_pairs: bool,
 
     report = {
         'window_seconds': window,
+        'measured_seconds': measurement['gateway_elapsed_seconds'],
         'cluster': {'nodes': nodes, 'standing_instances': instances},
         'gateways_measured': measurement['gateways_measured'],
         'gateways_unreachable': measurement['gateways_unreachable'],

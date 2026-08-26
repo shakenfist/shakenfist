@@ -60,19 +60,28 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
         super().setUp()
         self.runner = CliRunner()
 
-    def _run(self, samples, args=None, hosts=None, nodes=6, instances=8):
+    def _run(self, samples, args=None, hosts=None, nodes=6, instances=8,
+             scrape_seconds=0.0):
         from shakenfist.client import ctl
 
         calls = {'n': 0}
+
+        # A fake monotonic clock, advanced by the sleep and by each
+        # scrape. Rates are computed from what it says elapsed between
+        # the two reads of a counter, so a test which left it real would
+        # divide a counter delta by a few microseconds.
+        clock = {'t': 1000.0}
 
         def _scrape(host, port, timeout=5):
             sample = samples[calls['n']]
             if host not in sample:
                 raise OSError('connection refused')
+            clock['t'] += scrape_seconds
             return dict(sample[host])
 
-        def _sleep(_):
+        def _sleep(seconds):
             calls['n'] += 1
+            clock['t'] += seconds
 
         config = FakeConfig()
         if hosts is not None:
@@ -81,6 +90,8 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
         with mock.patch.object(ctl.metrics_scrape, 'scrape_request_pairs',
                                side_effect=_scrape), \
                 mock.patch.object(ctl.time, 'sleep', side_effect=_sleep), \
+                mock.patch.object(ctl.time, 'monotonic',
+                                  side_effect=lambda: clock['t']), \
                 mock.patch.object(ctl, 'config', config), \
                 mock.patch.object(ctl, '_cluster_shape',
                                   return_value=(nodes, instances)):
@@ -177,6 +188,62 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
                  for p in report['pairs']}
         self.assertIn('unbudgeted', pairs[('Mystery', 'net')]['flags'])
 
+    def test_an_unbudgeted_pair_over_its_ceiling_is_over_budget(self):
+        # Mystery/net runs at 12/s here, against the 0.25/s ceiling an
+        # unbudgeted pair gets. That is precisely the new polling loop
+        # this whole phase exists to find, and the command used to show
+        # it as a flagged row and then print "nothing is over budget"
+        # underneath -- because the enforcement test asked whether the
+        # entry was enforced, and an unbudgeted pair has no entry. The
+        # other two consumers of this budget both act on this case:
+        # ShakenFistUnbudgetedDatabasePolling fires and
+        # test_no_unbudgeted_fixed_rate_database_polling fails the build.
+        result = self._run([FIRST, SECOND], ['--json'])
+        report = json.loads(result.output)
+        pairs = {(p['operation'], p['caller_daemon']): p
+                 for p in report['pairs']}
+        self.assertTrue(pairs[('Mystery', 'net')]['over_budget'])
+        self.assertLess(0, report['pairs_over_budget'])
+
+    def test_a_quiet_unbudgeted_pair_is_not_over_budget(self):
+        # The other half of the same rule: unbudgeted is not by itself a
+        # problem. Below the ceiling it is a row worth printing and
+        # nothing to report.
+        quiet_second = {}
+        for host, pairs in SECOND.items():
+            quiet = dict(pairs)
+            quiet[('Mystery', 'net')] = FIRST[host][('Mystery', 'net')] + 1.0
+            quiet_second[host] = quiet
+        result = self._run([FIRST, quiet_second], ['--json'])
+        report = json.loads(result.output)
+        pairs = {(p['operation'], p['caller_daemon']): p
+                 for p in report['pairs']}
+        entry = pairs[('Mystery', 'net')]
+        self.assertIn('unbudgeted', entry['flags'])
+        self.assertFalse(entry['over_budget'])
+
+    def test_rates_are_divided_by_measured_time_not_the_window(self):
+        # A counter delta covers the sleep plus the scrapes, and the
+        # scrapes are not free: at the default 5s timeout a handful of
+        # gateways is already several percent of a 60s window. Dividing
+        # by the nominal window overstates every rate, which on a
+        # budgeted pair reads as a regression that is not there.
+        #
+        # Two gateways scraped at 1s each: the first sample is read at
+        # +1s and +2s, the sleep takes the clock to +12s, the second
+        # sample is read at +13s and +14s. Each gateway's counter
+        # therefore covers 12 seconds, not the 10 that was slept, and
+        # 30 counts on each gateway is 5/s rather than 6/s.
+        result = self._run([FIRST, SECOND], ['--json', '--all-pairs'],
+                           scrape_seconds=1.0)
+        report = json.loads(result.output)
+        pairs = {(p['operation'], p['caller_daemon']): p
+                 for p in report['pairs']}
+        self.assertEqual(5.0, pairs[('GetNodeDaemonState', 'net')]
+                         ['measured_qps'])
+        self.assertEqual({'gw1': 12.0, 'gw2': 12.0},
+                         report['measured_seconds'])
+
     def test_rows_are_sorted_by_excess_not_by_rate(self):
         # The busiest pair on any cluster is usually a poll doing exactly
         # what it should, so sorting by rate would bury the finding.
@@ -190,3 +257,76 @@ class DatabaseLoadCommandTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, result.exit_code, result.output)
         self.assertIn('OPERATION', result.output)
         self.assertIn('standing instances', result.output)
+
+
+def metrics_row(node, active, age=0.0):
+    return {'node_uuid': node, 'fqdn': node, 'timestamp': 1000.0 - age,
+            'metrics': {'instances_active': active, 'instances_total': 99}}
+
+
+class ClusterShapeTestCase(base.ShakenFistTestCase):
+    """The model has to be evaluated against what it was fitted against.
+
+    per_instance_qps is a regression against sum(instances_active), which
+    counts running libvirt domains. This used to count every instance in
+    the created state instead, which is a different and larger number on
+    any cluster with powered off instances -- and since the ceiling is a
+    multiple of the modelled value, counting them raises the cluster's own
+    ceiling for load those instances do not produce. The generated
+    Prometheus rules read the right series, so the two disagreed.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.verify_config_patcher = mock.patch(
+            'shakenfist.config.verify_config', mock.MagicMock())
+        cls.verify_config_patcher.start()
+        if 'shakenfist.client.ctl' in sys.modules:
+            del sys.modules['shakenfist.client.ctl']
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.verify_config_patcher.stop()
+
+    def _shape(self, rows):
+        from shakenfist.client import ctl
+
+        with mock.patch.object(ctl.mariadb, 'get_all_node_metrics',
+                               return_value=rows), \
+                mock.patch.object(ctl.time, 'time', return_value=1000.0):
+            return ctl._cluster_shape()
+
+    def test_standing_instances_are_the_running_domains(self):
+        self.assertEqual(
+            (2, 7),
+            self._shape([metrics_row('a', 3), metrics_row('b', 4)]))
+
+    def test_a_node_running_nothing_still_counts_as_a_node(self):
+        # The per-node base term is most of the budget, so an idle node
+        # has to be counted or every modelled value reads low.
+        self.assertEqual(
+            (2, 3),
+            self._shape([metrics_row('a', 3), metrics_row('b', 0)]))
+
+    def test_a_stale_row_is_not_a_node(self):
+        # sf-resources only clears its own row, and only at startup, so a
+        # node which has left the cluster leaves one behind. Prometheus
+        # drops the series; counting it here would keep charging the
+        # per-node term for a node which is gone.
+        shape = self._shape([
+            metrics_row('a', 3),
+            metrics_row('gone', 40, age=ctl_stale() + 1)])
+        self.assertEqual((1, 3), shape)
+
+    def test_no_fresh_metrics_is_an_error_not_an_empty_cluster(self):
+        # Returning (0, 0) would make every modelled value zero and every
+        # ceiling the tolerance floor, so a healthy cluster would report
+        # every pair it has as over budget.
+        from shakenfist.client import ctl
+
+        self.assertRaises(ctl.click.ClickException, self._shape, [])
+
+
+def ctl_stale():
+    from shakenfist.client import ctl
+    return ctl.NODE_METRICS_STALE_SECONDS
