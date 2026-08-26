@@ -206,30 +206,44 @@
       <model type='{{video_model}}' vram='{{video_memory}}' heads='1' primary='yes'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
     </video>
+    <!-- NOTE(mikal): free page reporting lets the guest hand pages it has
+         freed back to the host, which releases them (MADV_DONTNEED) instead
+         of leaving them as cold anonymous pages the host can only reclaim by
+         swapping. Without it a guest's host footprint is a high-water mark:
+         memory a CI job touched once stays charged to the hypervisor for the
+         life of the instance. That is not theoretical: a long-lived static CI
+         runner, idle with 4.6GB free inside the guest, was found with 4.9GB
+         of its pages in host swap while the node was 109% committed and
+         actively placing new work.
+
+         This is separate from ballooning: the balloon target is untouched, so
+         nothing shrinks the guest against its will, and the allocation-based
+         accounting is unchanged. memory_total_instance_actual reads
+         domain.info()[2], the balloon target, and the scheduler_node_capacity
+         ledgers count requested memory. The measured pre-filter in
+         Scheduler._has_sufficient_ram() does see the difference, because
+         memory_available comes from psutil.virtual_memory().available on the
+         host: a node running reporting-capable guests will admit more work
+         than it used to. That is the point of the change, but note the guest
+         can re-fault those pages at any time.
+
+         It only returns pages the guest has already decided it does not want.
+         Guest page cache is NOT returned, only free pages.
+
+         Requires QEMU >= 5.1 and libvirt >= 6.9 on the host, and a guest
+         kernel >= 5.7 for VIRTIO_BALLOON_F_REPORTING. The feature is
+         negotiated, so older guests simply decline it.
+
+         A libvirt domain definition is persistent and we only render this
+         template when libvirt has no domain for the instance, so an existing
+         instance does not gain this by being powered off and on, or by the
+         hypervisor rebooting, or by a redeploy shipping this file. It has to
+         be recreated. See docs/operator_guide/upgrades.md. -->
     <memballoon model='virtio' freePageReporting='on'>
       <!-- The stats period makes the balloon driver report guest internal
            memory statistics (unused, available, swap activity) every 10
            seconds, which surface in instance usage events. -->
       <stats period='10'/>
-      <!-- NOTE(mikal): free page reporting lets the guest hand pages it has
-           freed back to the host, which releases them (MADV_DONTNEED)
-           instead of leaving them as cold anonymous pages the host can only
-           reclaim by swapping. Without it a guest's host footprint is a
-           high-water mark: memory a CI job touched once stays charged to the
-           hypervisor for the life of the instance. That is not theoretical:
-           a long-lived static CI runner, idle with 4.6GB free inside the
-           guest, was found with 4.9GB of its pages in host swap while the
-           node was 109% committed and actively placing new work.
-
-           This is separate from ballooning: the balloon target is untouched,
-           so nothing shrinks the guest against its will and the scheduler's
-           accounting (which reads the balloon target) is unchanged. It only
-           returns pages the guest has already decided it does not want.
-
-           Requires QEMU >= 5.1 and libvirt >= 6.9 on the host, and a guest
-           kernel >= 5.7 for VIRTIO_BALLOON_F_REPORTING. The feature is
-           negotiated, so older guests simply decline it. Guest page cache is
-           NOT returned, only free pages. -->
       <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
     </memballoon>
 

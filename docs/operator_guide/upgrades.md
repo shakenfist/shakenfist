@@ -58,6 +58,34 @@ not trigger a spurious restart. See the collection's *Idempotence and
 restart-on-change* section for details. This automates, per node, the same
 restart the manual procedure below performs by hand.
 
+### Free page reporting applies to new instances
+
+An upgrade never rewrites the libvirt domain XML of an instance that
+already exists. A libvirt domain definition is persistent, and Shaken
+Fist renders the domain template only when the hypervisor has no
+definition for that instance, so a power off and power on, a
+hypervisor reboot, or a redeploy shipping a newer template all leave
+an existing instance on the XML it was created with.
+
+This matters for [free page reporting](scheduler.md#guest-memory-returned-to-the-host),
+added in this release: an instance created before the upgrade keeps
+its old, non-reporting balloon device and continues to hold its
+high-water mark of host memory until it is deleted and recreated.
+Long-lived instances are both the ones this affects most and the ones
+that stand to gain most from it, so it is worth deliberately recycling
+them if host memory pressure is what prompted the upgrade.
+
+There is a manual route if recreating an instance is not acceptable:
+power the instance off, undefine the domain on its hypervisor with
+`virsh undefine sf:<instance uuid>` (add `--keep-nvram` for a UEFI
+instance, so its boot variables survive), and power it back on, at
+which point Shaken Fist re-renders the template. Understand what that
+gives up before reaching for it. It is the same code path a failed
+power on retry uses, and it discards any libvirt-side state carried in
+the existing definition. Recreating the instance is the supported
+route; this is a workaround, and it is on you to confirm the instance
+comes back.
+
 ## MariaDB schema migrations
 
 Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
