@@ -71,7 +71,11 @@ class ProxyPeerUnreachableTestCase(base.ShakenFistTestCase):
         records = self._unreachable_records()
         self.assertEqual(1, len(records))
         record = records[0]
-        self.assertEqual(logging.ERROR, record.levelno)
+
+        # Issue 3850: the commonest cause is a peer restarting during a
+        # rolling redeploy -- a handled, retryable condition -- so this
+        # is a WARNING (still shipped to Loki), not an ERROR.
+        self.assertEqual(logging.WARNING, record.levelno)
         fields = record.extra_fields
         self.assertEqual('sf-5', fields['peer'])
         self.assertEqual(url, fields['url'])

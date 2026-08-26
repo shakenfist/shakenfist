@@ -918,6 +918,9 @@ def proxy_request_to_node(url, api_token, data, peer):
     the node-to-node variant of issues 3373 and 3522). It surfaces as a
     503 naming the peer, with the peer and proxied URL as structured log
     fields so the failure is attributable without parsing a traceback.
+    The commonest cause is a peer's API restarting during a rolling
+    redeploy -- a handled, retryable condition -- so it is logged at
+    WARNING, not ERROR (issue 3850).
     """
     method = flask.request.environ['REQUEST_METHOD']
 
@@ -936,7 +939,7 @@ def proxy_request_to_node(url, api_token, data, peer):
             'url': url,
             'peer': peer,
             'error': str(e)
-        }).error('Peer node API unreachable while proxying request')
+        }).warning('Peer node API unreachable while proxying request')
         return sf_api.error(
             503, f'peer node {peer} did not answer the proxied request, please retry',
             suppress_traceback=True)
