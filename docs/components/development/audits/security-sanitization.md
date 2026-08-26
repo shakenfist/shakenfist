@@ -111,6 +111,31 @@ implementations are `SafeHeaderMixin` and `safe_path_join()` in
 The table below covers the header sanitization check only.
 
 <!-- consistency-audit:begin -->
-*(Awaiting the first automated regeneration by the consistency
-audit workflow.)*
+*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | non-compliant | shakenfist/divergulent#81 |
+| instar | N/A | - |
+| kerbside | N/A | - |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | compliant | - |
+| private-ci | N/A | - |
+| ryll | non-compliant | shakenfist/ryll#322 |
+| sfui | N/A | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#3910 |
+
+Details for non-compliant projects:
+
+- **divergulent** (Status): 2 of 2 HTTP request handler class(es) do not sanitize header values: divergulent/tests/test_fetch.py:164 (ErrorHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through; divergulent/tests/test_fetch.py:37 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
+- **ryll** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tools/browser-offer-probe.py:68 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
+- **shakenfist** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_federation.py:57 (_JWKSHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
 <!-- consistency-audit:end -->

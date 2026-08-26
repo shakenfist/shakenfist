@@ -109,7 +109,7 @@ matching section of the repository's `PLAN-TEMPLATE.md`.
 ## Projects
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-25T06:54:21.186929+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -127,7 +127,7 @@ matching section of the repository's `PLAN-TEMPLATE.md`.
 | library-utilities | N/A | - |
 | occystrap | non-compliant | shakenfist/occystrap#117 |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#321 |
+| ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#3892 |
 
@@ -138,6 +138,5 @@ Details for non-compliant projects:
 - **instar** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **kerbside** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **occystrap** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **ryll** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **shakenfist** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 <!-- consistency-audit:end -->
