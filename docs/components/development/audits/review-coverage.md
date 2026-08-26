@@ -37,7 +37,7 @@ when the backlog has grown regardless.
 ## Projects
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-25T06:54:21.186929+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
 
 | Project | Status | Issue |
 |---------|--------|--------|
@@ -61,8 +61,8 @@ when the backlog has grown regardless.
 
 Details for non-compliant projects:
 
-- **actions** (Status): 0 of 91 in-scope files reviewed at HEAD; 91 need review (threshold 5)
-- **development** (Status): 15 of 71 in-scope files reviewed at HEAD; 56 need review (threshold 5)
+- **actions** (Status): 0 of 89 in-scope files reviewed at HEAD; 89 need review (threshold 5)
+- **development** (Status): 14 of 77 in-scope files reviewed at HEAD; 63 need review (threshold 5)
 - **kerbside** (Status): 125 of 194 in-scope files reviewed at HEAD; 69 need review (threshold 5)
-- **ryll** (Status): 101 of 176 in-scope files reviewed at HEAD; 75 need review (threshold 5)
+- **ryll** (Status): 97 of 178 in-scope files reviewed at HEAD; 81 need review (threshold 5)
 <!-- consistency-audit:end -->
