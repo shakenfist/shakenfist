@@ -16,6 +16,29 @@ from shakenfist.util import concurrency as util_concurrency
 LOG, _ = logs.setup(__name__)
 
 
+# Dependency-wait defer backoff. Most dependency waits clear on the first
+# retry, so the previous flat 15 second re-poll dominated instance start
+# latency on the user_waiting queues (issue 3863: node_inst_netdesc_op wait
+# p50 of 15.78s against 0.77s for never-deferred ops). The schedule matches
+# sf-net's (shakenfist/daemons/network/workitem.py), but where sf-net tracks
+# back-off depth in a per-worker map, sf-queues jobs are one-shot threads --
+# so the depth is derived from the defer_count the work item already
+# persists across defers.
+INITIAL_DEFER_DELAY = 0.1
+MAX_DEFER_DELAY = 15.0
+DEFER_DELAY_MULTIPLIER = 2.0
+
+
+def dependency_defer_delay(defer_count: int) -> float:
+    """The defer delay for an operation which has already deferred
+    defer_count times: 0.1s doubling to a 15s cap."""
+    # Exponent clamp so a pathologically large defer_count cannot overflow
+    # float pow; anything past the clamp is far beyond the cap anyway.
+    exponent = min(defer_count, 64)
+    return min(INITIAL_DEFER_DELAY * (DEFER_DELAY_MULTIPLIER ** exponent),
+               MAX_DEFER_DELAY)
+
+
 class Job(util_concurrency.Job):
     def __init__(self, queue_name, jobname, workitem, batch_size=None):
         super().__init__()
@@ -123,7 +146,8 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                op.defer(waiting_on=[dep_op])
+                op.defer(waiting_on=[dep_op],
+                         delay=dependency_defer_delay(op.current_defer_count))
                 return
 
         # Ensure that we are running after any runs_after requirements.
@@ -149,7 +173,8 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
                 # Dependency not yet ready, we should defer
-                op.defer(waiting_on=[dep_op])
+                op.defer(waiting_on=[dep_op],
+                         delay=dependency_defer_delay(op.current_defer_count))
                 return
 
         # Ensure we haven't been aborted or something

@@ -389,7 +389,7 @@ class BaseClusterOperation(BaseOperation):
     def defer(
             self,
             waiting_on: Optional[list[dbo]] = None,
-            delay: int = 15
+            delay: float = 15.0
     ) -> None:
         if not self.queue_name:
             raise CannotDeferUnqueued(
