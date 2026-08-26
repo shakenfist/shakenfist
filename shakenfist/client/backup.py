@@ -9,6 +9,13 @@ from shakenfist_utilities import logs  # noreorder
 
 LOG = logs.setup_console(__name__)
 
+# setup_console() only attaches a handler to this module's logger, so the
+# root logger needs a handler as well or log lines from every other module
+# are dropped. Propagation is then disabled so this module's own lines are
+# not emitted twice.
+logging.basicConfig(level=logging.INFO)
+logging.getLogger(__name__).propagate = False
+
 
 # Utilities not started by systemd need to load /etc/sf/config to ensure
 # that they are correctly configured. Environment variables set before
@@ -41,6 +48,7 @@ config = sf_config.config
 def cli(ctx, verbose=None):
     if verbose:
         LOG.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
 
 
 @click.command()
