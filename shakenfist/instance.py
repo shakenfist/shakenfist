@@ -1479,9 +1479,17 @@ class Instance(dbowo):
         mariadb.delete_instance(_uuid)
         super().hard_delete()
 
-    def _allocate_console_port(self):
-        consumed = mariadb.get_consumed_ports_for_node(
-            config.NODE_UUID)
+    def _allocate_console_port(self, consumed):
+        """Allocate a single free port on this node.
+
+        The caller passes 'consumed', a set of ports which must not be
+        chosen; the chosen port is added to it, so repeated calls with
+        the same set never return the same port twice. The bound probe
+        socket is returned alongside the port and must be held open by
+        the caller until the allocation is persisted, so that
+        concurrent allocations on this node cannot select the same
+        port.
+        """
         while True:
             port = random.randint(30000, 50000)
             if port in consumed:
@@ -1489,29 +1497,44 @@ class Instance(dbowo):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 # Bind to verify the port is available locally.
-                # This prevents races between concurrent allocations
-                # on the same node.
                 s.bind(('0.0.0.0', port))
-                return port
             except OSError:
                 LOG.with_fields({'instance': self.uuid}).info(
                     f'Collided with in use port {port}, selecting another')
-                consumed.append(port)
-            finally:
+                consumed.add(port)
                 s.close()
+                continue
+            consumed.add(port)
+            return port, s
 
     def allocate_instance_ports(self):
         with self.get_lock_attr('ports', 'Instance port allocation'):
-            p = self.ports
-            if not p:
-                p = {
-                    'console_port': self._allocate_console_port(),
-                    'vdi_port': self._allocate_console_port()
-                }
-                if self.video['vdi'].startswith('spice'):
-                    p['vdi_tls_port'] = self._allocate_console_port()
+            if self.ports:
+                return
 
+            # Each draw must exclude its siblings as well as the ports
+            # of instances already placed on this node -- the sibling
+            # draws are invisible to get_consumed_ports_for_node()
+            # until self.ports is written below (issue 3897, where
+            # vdi_port and vdi_tls_port collided and libvirt refused
+            # to reserve the port twice).
+            consumed = set(mariadb.get_consumed_ports_for_node(
+                config.NODE_UUID))
+
+            names = ['console_port', 'vdi_port']
+            if self.video['vdi'].startswith('spice'):
+                names.append('vdi_tls_port')
+
+            p = {}
+            sockets = []
+            try:
+                for name in names:
+                    p[name], s = self._allocate_console_port(consumed)
+                    sockets.append(s)
                 self.ports = p
+            finally:
+                for s in sockets:
+                    s.close()
 
     def deallocate_instance_ports(self):
         self._db_set_attribute('ports', None)

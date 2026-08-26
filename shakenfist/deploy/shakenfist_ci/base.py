@@ -545,6 +545,18 @@ class BaseTestCase(testtools.TestCase):
                     'error state)')
 
             if i['state'] == 'created':
+                # Issue 3897: an instance allocated the same port for two of
+                # its consoles cannot start, because libvirt refuses to
+                # reserve the port twice. Assert distinctness here so any
+                # recurrence fails with a clear message rather than an
+                # opaque start failure.
+                ports = [i.get(p) for p in
+                         ('console_port', 'vdi_port', 'vdi_tls_port')
+                         if i.get(p)]
+                self.assertEqual(
+                    len(ports), len(set(ports)),
+                    f'Instance {instance_uuid} was allocated duplicate '
+                    f'console ports: {ports}')
                 return
 
             events = self.system_client.get_instance_events(
