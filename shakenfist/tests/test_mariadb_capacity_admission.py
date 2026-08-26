@@ -635,6 +635,13 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual(10.0, detail['demand']['requested'])
         self.assertTrue(detail['demand']['exceeded'])
         self.assertFalse(detail['cpus']['exceeded'])
+        # The two terms of used mean different things -- ground truth
+        # versus feedforward estimate -- so they are also reported
+        # separately (issue 3913), and only on the demand dimension.
+        self.assertEqual(4.0, detail['demand']['cpu_load_1'])
+        self.assertEqual(8.5, detail['demand']['expected_demand'])
+        self.assertNotIn('cpu_load_1', detail['cpus'])
+        self.assertNotIn('expected_demand', detail['cpus'])
 
     def test_an_allocation_denial_with_quiet_demand_is_not_waivable(self):
         # The converse of the demand-only case, and the one that decides
@@ -1356,6 +1363,24 @@ class DimensionDetailTestCase(base.ShakenFistTestCase):
                 f'charged {charged}')
             self.assertEqual(float(requested), detail['requested'])
 
+    def test_the_demand_breakdown_is_present_only_when_supplied(self):
+        # The demand dimension's used is two terms that mean different
+        # things -- measured load and the feedforward estimate -- so a
+        # caller that has them reports them separately (issue 3913). The
+        # allocation dimensions have no such split and must not grow
+        # spurious zero-valued keys.
+        detail = mariadb._capacity_dimension(
+            'demand', 12.0, 12.5, 10.0, charged=False,
+            cpu_load_1=4.0, expected_demand=8.5)
+        self.assertEqual(4.0, detail['cpu_load_1'])
+        self.assertEqual(8.5, detail['expected_demand'])
+        self.assertEqual(detail['used'],
+                         detail['cpu_load_1'] + detail['expected_demand'])
+
+        detail = mariadb._capacity_dimension('cpus', 48.0, 46.0, 4.0)
+        self.assertNotIn('cpu_load_1', detail)
+        self.assertNotIn('expected_demand', detail)
+
 
 class ServicerRoundTripTestCase(base.ShakenFistTestCase):
     """The result dicts survive the trip through the proto and back.
@@ -1378,8 +1403,12 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         'dimensions': [
             {'dimension': 'cpus', 'limit': 48.0, 'used': 46.0,
              'requested': 4.0, 'exceeded': True},
+            # The demand breakdown keys (issue 3913) ride along; the
+            # cpus dimension above must come back without them, which
+            # the dict-equality assertions check exactly.
             {'dimension': 'demand', 'limit': 12.0, 'used': 12.5,
-             'requested': 10.0, 'exceeded': True},
+             'requested': 10.0, 'exceeded': True,
+             'cpu_load_1': 4.0, 'expected_demand': 8.5},
         ],
         'node_used_cpus': 0, 'node_used_memory_mb': 0,
         'node_used_disk_gb': 0, 'node_expected_demand': 0.0,
@@ -1433,6 +1462,22 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
     def test_denied_round_trip_preserves_the_dimension_detail(self):
         unpacked, _ = self._unpack(self._admit_reply(self.DENIED))
         self.assertEqual(self.DENIED, unpacked)
+
+    def test_a_reply_without_the_breakdown_reads_as_absent_not_zero(self):
+        # Mixed-version window: an sf-database predating the optional
+        # cpu_load_1/expected_demand fields never sets them, and that
+        # must unpack as "no breakdown available" rather than as a
+        # breakdown of zeroes under a non-zero used -- which would read
+        # as an estimator defect that is not there (issue 3913).
+        reply = database_pb2.AdmitInstancePlacementReply(
+            success=True, admitted=False, failing_stage='node')
+        reply.dimensions.add(dimension='demand', limit=12.0, used=12.5,
+                             requested=10.0, exceeded=True)
+        unpacked, _ = self._unpack(reply)
+        self.assertEqual(
+            [{'dimension': 'demand', 'limit': 12.0, 'used': 12.5,
+              'requested': 10.0, 'exceeded': True}],
+            unpacked['dimensions'])
 
     def test_over_claim_round_trip_preserves_the_advisory_detail(self):
         # An admitted placement carrying advisory over-limit detail: the
