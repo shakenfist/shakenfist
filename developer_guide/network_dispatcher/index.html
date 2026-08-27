@@ -14292,6 +14292,14 @@ next defer delay for each op UUID. Constants:</p>
 <p>Each successive defer doubles the delay up to the 15 s cap. On successful
 execution or cancellation the entry is removed. When the map exceeds 1 000
 entries, the oldest entry (insertion order) is evicted (FIFO).</p>
+<p><code>sf-queues</code> applies the same schedule to its dependency waits, but its jobs
+are one-shot threads with no per-worker map, so the depth is derived
+statelessly from the <code>defer_count</code> the work item persists across defers
+(<code>dependency_defer_delay()</code> in <code>shakenfist/daemons/queues/workitem.py</code>,
+issue 3863). Because the count survives worker restarts, <code>sf-queues</code> back-off
+does not reset the way the operator note below describes for <code>sf-net</code>; the
+trade-off is that a chained wait (the same op deferring on a second
+dependency) carries its depth over rather than starting again at 100 ms.</p>
 <h3 id="single-worker-safety-invariant">Single-worker safety invariant<a class="headerlink" href="#single-worker-safety-invariant" title="Permanent link">&para;</a></h3>
 <p><strong>The back-off schedule is only correct because each queue is drained by
 exactly one worker.</strong> Per-node queues are drained by that node's net-worker
