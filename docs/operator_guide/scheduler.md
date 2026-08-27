@@ -30,7 +30,9 @@ a placement decision can be reconstructed after the fact (see
    See [CPU overcommit](#cpu-overcommit).
 4. **RAM admission** -- the node must retain its published memory
    reservation after placement, and KSM overcommit must stay
-   under `RAM_OVERCOMMIT_RATIO`.
+   under `RAM_OVERCOMMIT_RATIO`. See [Guest memory returned to the
+   host](#guest-memory-returned-to-the-host) for how much of a guest's
+   memory a node is actually charged.
 5. **Disk capacity** -- requested disk must fit while leaving the
    node's `NODE_DISK_RESERVATION_GB` free on the instances/blobs
    filesystems. The candidate node publishes its own reservation as
@@ -117,6 +119,71 @@ The published fields are `cpu_cores`, `cpu_threads`,
 `disk_reservation_gb`. On Intel hybrid CPUs the daemon also
 publishes `cpu_cores_performance` and `cpu_cores_efficiency`; these
 are informational and nothing in scheduling consumes them yet.
+
+## Guest memory returned to the host
+
+Instances are given a virtio balloon device with **free page
+reporting** enabled. When a guest frees a page, its kernel tells the
+balloon driver, and the host releases the backing memory
+(`MADV_DONTNEED`) instead of holding it. Without this a guest's host
+footprint is a high-water mark: memory a workload touched once stays
+charged to the hypervisor for the life of the instance, and the only
+way the host can reclaim it under pressure is to swap it out. On one
+production node an idle CI runner was found holding 4.9 GB of its
+pages in host swap while reporting 4.7 GB free inside the guest, on a
+node that was 109% committed and still being placed on.
+
+Things worth knowing about it:
+
+- **This is not ballooning.** The balloon target is never moved, so
+  nothing shrinks a guest against its will. Only pages the guest has
+  already decided it does not want are returned.
+- **Guest page cache is not returned**, only free pages. A guest that
+  has read a lot of data keeps that cache, and keeps the host memory
+  backing it.
+- **It is negotiated.** A guest kernel older than 5.7 does not
+  advertise `VIRTIO_BALLOON_F_REPORTING` and simply declines, behaving
+  as it always has. The host needs QEMU 5.1 or newer and libvirt 6.9
+  or newer, which every supported platform satisfies.
+- **The guest can take the memory back at any time.** A returned page
+  is re-faulted on next use. Freed memory is an opportunity, not a
+  permanent reduction in the instance's demand.
+
+### What this changes about scheduling
+
+The two RAM admission checks are affected differently, and the
+difference matters when you are debugging a memory pressure incident:
+
+- The **measured** check -- the node must retain its published memory
+  reservation after placement -- reads the `memory_available` metric,
+  which the resources daemon takes from the host's own view of free
+  memory. Returned pages show up there, so a node running
+  reporting-capable guests will admit work it previously would not.
+  That is the point of the feature, but remember the previous bullet:
+  those guests can re-fault the pages afterwards.
+- The **allocation** checks are unchanged. KSM overcommit is computed
+  from `memory_total_instance_actual`, which is the balloon
+  allocation, and the [capacity
+  counters](#admission-is-a-guarded-capacity-claim) count requested
+  memory. Neither moves because a guest behaved well, so nodes are not
+  packed harder on that basis.
+
+### Only new domains get it
+
+A libvirt domain definition is persistent, and Shaken Fist renders the
+domain template only when the hypervisor has no definition for the
+instance. An instance that already exists therefore does **not** gain
+free page reporting from a power off and power on, a hypervisor
+reboot, or a redeploy that ships the new template -- it has to be
+recreated. This is most visible on exactly the long-lived instances
+that stand to gain the most. See
+[Upgrades](upgrades.md#free-page-reporting-applies-to-new-instances).
+
+Once an instance is recreated, the `rss kb` figure in its usage events
+steps down, because the qemu process really is holding less memory.
+It is not comparable with the same instance's historical values. The
+`actual kb` figure in those events is the balloon allocation and does
+not move, so anything billing on allocation is unaffected.
 
 ## Load-aware ordering
 
