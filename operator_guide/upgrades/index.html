@@ -13099,6 +13099,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Upgrade process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#free-page-reporting-applies-to-new-instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Free page reporting applies to new instances
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13279,6 +13296,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Upgrade process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#free-page-reporting-applies-to-new-instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Free page reporting applies to new instances
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -13482,6 +13516,30 @@ installed package files, not the wheel, so a rebuilt-but-identical wheel does
 not trigger a spurious restart. See the collection's <em>Idempotence and
 restart-on-change</em> section for details. This automates, per node, the same
 restart the manual procedure below performs by hand.</p>
+<h3 id="free-page-reporting-applies-to-new-instances">Free page reporting applies to new instances<a class="headerlink" href="#free-page-reporting-applies-to-new-instances" title="Permanent link">&para;</a></h3>
+<p>An upgrade never rewrites the libvirt domain XML of an instance that
+already exists. A libvirt domain definition is persistent, and Shaken
+Fist renders the domain template only when the hypervisor has no
+definition for that instance, so a power off and power on, a
+hypervisor reboot, or a redeploy shipping a newer template all leave
+an existing instance on the XML it was created with.</p>
+<p>This matters for <a href="../scheduler/#guest-memory-returned-to-the-host">free page reporting</a>,
+added in this release: an instance created before the upgrade keeps
+its old, non-reporting balloon device and continues to hold its
+high-water mark of host memory until it is deleted and recreated.
+Long-lived instances are both the ones this affects most and the ones
+that stand to gain most from it, so it is worth deliberately recycling
+them if host memory pressure is what prompted the upgrade.</p>
+<p>There is a manual route if recreating an instance is not acceptable:
+power the instance off, undefine the domain on its hypervisor with
+<code>virsh undefine sf:&lt;instance uuid&gt;</code> (add <code>--keep-nvram</code> for a UEFI
+instance, so its boot variables survive), and power it back on, at
+which point Shaken Fist re-renders the template. Understand what that
+gives up before reaching for it. It is the same code path a failed
+power on retry uses, and it discards any libvirt-side state carried in
+the existing definition. Recreating the instance is the supported
+route; this is a workaround, and it is on you to confirm the instance
+comes back.</p>
 <h2 id="mariadb-schema-migrations">MariaDB schema migrations<a class="headerlink" href="#mariadb-schema-migrations" title="Permanent link">&para;</a></h2>
 <p>Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
 MariaDB schema is versioned; migrations must be applied by an operator (or

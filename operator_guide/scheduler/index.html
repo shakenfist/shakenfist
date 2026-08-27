@@ -13059,6 +13059,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#guest-memory-returned-to-the-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest memory returned to the host
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Guest memory returned to the host">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-this-changes-about-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this changes about scheduling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#only-new-domains-get-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Only new domains get it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#load-aware-ordering" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13323,6 +13362,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#guest-memory-returned-to-the-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest memory returned to the host
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Guest memory returned to the host">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-this-changes-about-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this changes about scheduling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#only-new-domains-get-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Only new domains get it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#load-aware-ordering" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13516,7 +13594,9 @@ a placement decision can be reconstructed after the fact (see
    See <a href="#cpu-overcommit">CPU overcommit</a>.</li>
 <li><strong>RAM admission</strong> -- the node must retain its published memory
    reservation after placement, and KSM overcommit must stay
-   under <code>RAM_OVERCOMMIT_RATIO</code>.</li>
+   under <code>RAM_OVERCOMMIT_RATIO</code>. See <a href="#guest-memory-returned-to-the-host">Guest memory returned to the
+   host</a> for how much of a guest's
+   memory a node is actually charged.</li>
 <li><strong>Disk capacity</strong> -- requested disk must fit while leaving the
    node's <code>NODE_DISK_RESERVATION_GB</code> free on the instances/blobs
    filesystems. The candidate node publishes its own reservation as
@@ -13599,6 +13679,65 @@ headroom.</p>
 <code>disk_reservation_gb</code>. On Intel hybrid CPUs the daemon also
 publishes <code>cpu_cores_performance</code> and <code>cpu_cores_efficiency</code>; these
 are informational and nothing in scheduling consumes them yet.</p>
+<h2 id="guest-memory-returned-to-the-host">Guest memory returned to the host<a class="headerlink" href="#guest-memory-returned-to-the-host" title="Permanent link">&para;</a></h2>
+<p>Instances are given a virtio balloon device with <strong>free page
+reporting</strong> enabled. When a guest frees a page, its kernel tells the
+balloon driver, and the host releases the backing memory
+(<code>MADV_DONTNEED</code>) instead of holding it. Without this a guest's host
+footprint is a high-water mark: memory a workload touched once stays
+charged to the hypervisor for the life of the instance, and the only
+way the host can reclaim it under pressure is to swap it out. On one
+production node an idle CI runner was found holding 4.9 GB of its
+pages in host swap while reporting 4.7 GB free inside the guest, on a
+node that was 109% committed and still being placed on.</p>
+<p>Things worth knowing about it:</p>
+<ul>
+<li><strong>This is not ballooning.</strong> The balloon target is never moved, so
+  nothing shrinks a guest against its will. Only pages the guest has
+  already decided it does not want are returned.</li>
+<li><strong>Guest page cache is not returned</strong>, only free pages. A guest that
+  has read a lot of data keeps that cache, and keeps the host memory
+  backing it.</li>
+<li><strong>It is negotiated.</strong> A guest kernel older than 5.7 does not
+  advertise <code>VIRTIO_BALLOON_F_REPORTING</code> and simply declines, behaving
+  as it always has. The host needs QEMU 5.1 or newer and libvirt 6.9
+  or newer, which every supported platform satisfies.</li>
+<li><strong>The guest can take the memory back at any time.</strong> A returned page
+  is re-faulted on next use. Freed memory is an opportunity, not a
+  permanent reduction in the instance's demand.</li>
+</ul>
+<h3 id="what-this-changes-about-scheduling">What this changes about scheduling<a class="headerlink" href="#what-this-changes-about-scheduling" title="Permanent link">&para;</a></h3>
+<p>The two RAM admission checks are affected differently, and the
+difference matters when you are debugging a memory pressure incident:</p>
+<ul>
+<li>The <strong>measured</strong> check -- the node must retain its published memory
+  reservation after placement -- reads the <code>memory_available</code> metric,
+  which the resources daemon takes from the host's own view of free
+  memory. Returned pages show up there, so a node running
+  reporting-capable guests will admit work it previously would not.
+  That is the point of the feature, but remember the previous bullet:
+  those guests can re-fault the pages afterwards.</li>
+<li>The <strong>allocation</strong> checks are unchanged. KSM overcommit is computed
+  from <code>memory_total_instance_actual</code>, which is the balloon
+  allocation, and the <a href="#admission-is-a-guarded-capacity-claim">capacity
+  counters</a> count requested
+  memory. Neither moves because a guest behaved well, so nodes are not
+  packed harder on that basis.</li>
+</ul>
+<h3 id="only-new-domains-get-it">Only new domains get it<a class="headerlink" href="#only-new-domains-get-it" title="Permanent link">&para;</a></h3>
+<p>A libvirt domain definition is persistent, and Shaken Fist renders the
+domain template only when the hypervisor has no definition for the
+instance. An instance that already exists therefore does <strong>not</strong> gain
+free page reporting from a power off and power on, a hypervisor
+reboot, or a redeploy that ships the new template -- it has to be
+recreated. This is most visible on exactly the long-lived instances
+that stand to gain the most. See
+<a href="../upgrades/#free-page-reporting-applies-to-new-instances">Upgrades</a>.</p>
+<p>Once an instance is recreated, the <code>rss kb</code> figure in its usage events
+steps down, because the qemu process really is holding less memory.
+It is not comparable with the same instance's historical values. The
+<code>actual kb</code> figure in those events is the balloon allocation and does
+not move, so anything billing on allocation is unaffected.</p>
 <h2 id="load-aware-ordering">Load-aware ordering<a class="headerlink" href="#load-aware-ordering" title="Permanent link">&para;</a></h2>
 <p>Candidate nodes that survive the hard filters are bucketed by
 <strong>load per schedulable thread</strong> (<code>cpu_load_1 / cpu_schedulable</code>)
