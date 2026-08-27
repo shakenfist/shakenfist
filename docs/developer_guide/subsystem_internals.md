@@ -97,7 +97,14 @@ is the test the guard actually made:
 `CapacityAdmissionDenied.demand_only` is derived from the set of
 exceeded dimensions, so a demand dimension that reports `used +
 requested > limit` would make denials look waivable that the clause
-never made.
+never made. The demand dimension additionally carries `cpu_load_1` and
+`expected_demand` keys whose sum is `used` (issue #3913): measured load
+and the feedforward estimate mean different things, and which one made
+the node exceed its target is what tells a correct refusal from an
+estimator defect. The proto fields are `optional` so a reply from an
+older `sf-database` reads as "no breakdown available" rather than a
+breakdown of zeroes; the three allocation dimensions never carry the
+keys.
 
 There used to be a second ledger here: `Scheduler._committed_vcpus()`,
 a Python walk over each candidate's `INSTANCE_LOCATION` rows added as

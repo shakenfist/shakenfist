@@ -432,6 +432,12 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(48.0, detail['demand']['limit'])
         self.assertEqual(50.0, detail['demand']['used'])
         self.assertTrue(detail['demand']['exceeded'])
+        # used is two terms meaning different things, reported
+        # separately so a correct refusal (real load) can be told from
+        # an estimator defect (undecayed expected_demand) -- issue 3913.
+        # Here the refusal is all measured load.
+        self.assertEqual(50.0, detail['demand']['cpu_load_1'])
+        self.assertEqual(0.0, detail['demand']['expected_demand'])
         # No allocation dimension is at fault, which is exactly the case
         # a bare "denied" reply could not explain -- and it is what
         # makes the denial waivable by the P9 re-walk.

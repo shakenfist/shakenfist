@@ -2710,6 +2710,16 @@ message CapacityDimensionDetail {
   double used = 3;
   double requested = 4;
   bool exceeded = 5;      // Did this dimension actually fail?
+  // Set only on the demand dimension, whose used is the sum of two terms
+  // that mean different things: cpu_load_1 is measured ground truth (a
+  // high value means the node really is busy), expected_demand is the
+  // D13 feedforward estimate (a high value on an idle node means the
+  // estimator is wrong). Reported separately so a correct refusal can be
+  // told from an estimator defect (issue 3913); used stays their sum.
+  // optional so a reply from an sf-database predating these fields reads
+  // as "no breakdown available" rather than a breakdown of zeroes.
+  optional double cpu_load_1 = 6;
+  optional double expected_demand = 7;
 }
 
 message AdmitInstancePlacementReply {

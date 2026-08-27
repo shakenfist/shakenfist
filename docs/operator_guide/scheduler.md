@@ -554,7 +554,17 @@ above its target:
 cpu_load_1 + expected_demand <= SCHEDULER_TARGET_LOAD × cpu_schedulable
 ```
 
-A denial on this clause is reported as the `demand` dimension.
+A denial on this clause is reported as the `demand` dimension. Because
+its `used` is the sum of two terms that mean different things --
+`cpu_load_1` is measured ground truth, while `expected_demand` is an
+estimate that decays -- the refusal detail also reports each term under
+its own key. When triaging a `schedule candidate refused by capacity
+guard` event, a `used` dominated by `cpu_load_1` means the node really
+was busy and the refusal was correct; one dominated by
+`expected_demand` on an otherwise idle node means the estimator is
+wrong (mis-tuned constants, or decay not keeping up) and should be
+compared against the `scheduler_capacity_node_expected_demand`
+prometheus gauge.
 
 The placement asking is deliberately not part of that comparison. The
 question the clause asks is whether the node is already over target,

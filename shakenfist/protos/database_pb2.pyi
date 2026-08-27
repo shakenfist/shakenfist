@@ -9155,6 +9155,8 @@ class CapacityDimensionDetail(_message.Message):
     USED_FIELD_NUMBER: _builtins.int
     REQUESTED_FIELD_NUMBER: _builtins.int
     EXCEEDED_FIELD_NUMBER: _builtins.int
+    CPU_LOAD_1_FIELD_NUMBER: _builtins.int
+    EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
     dimension: _builtins.str
     """cpus, memory_mb, disk_gb or demand"""
     limit: _builtins.float
@@ -9162,6 +9164,17 @@ class CapacityDimensionDetail(_message.Message):
     requested: _builtins.float
     exceeded: _builtins.bool
     """Did this dimension actually fail?"""
+    cpu_load_1: _builtins.float
+    """Set only on the demand dimension, whose used is the sum of two terms
+    that mean different things: cpu_load_1 is measured ground truth (a
+    high value means the node really is busy), expected_demand is the
+    D13 feedforward estimate (a high value on an idle node means the
+    estimator is wrong). Reported separately so a correct refusal can be
+    told from an estimator defect (issue 3913); used stays their sum.
+    optional so a reply from an sf-database predating these fields reads
+    as "no breakdown available" rather than a breakdown of zeroes.
+    """
+    expected_demand: _builtins.float
     def __init__(
         self,
         *,
@@ -9170,12 +9183,21 @@ class CapacityDimensionDetail(_message.Message):
         used: _builtins.float = ...,
         requested: _builtins.float = ...,
         exceeded: _builtins.bool = ...,
+        cpu_load_1: _builtins.float | None = ...,
+        expected_demand: _builtins.float | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["dimension", b"dimension", "exceeded", b"exceeded", "limit", b"limit", "requested", b"requested", "used", b"used"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "limit", b"limit", "requested", b"requested", "used", b"used"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    _WhichOneofReturnType__cpu_load_1: _TypeAlias = _typing.Literal["cpu_load_1"]  # noqa: Y015
+    _WhichOneofArgType__cpu_load_1: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1"]  # noqa: Y015
+    _WhichOneofReturnType__expected_demand: _TypeAlias = _typing.Literal["expected_demand"]  # noqa: Y015
+    _WhichOneofArgType__expected_demand: _TypeAlias = _typing.Literal["_expected_demand", b"_expected_demand"]  # noqa: Y015
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__cpu_load_1) -> _WhichOneofReturnType__cpu_load_1 | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__expected_demand) -> _WhichOneofReturnType__expected_demand | None: ...
 
 Global___CapacityDimensionDetail: _TypeAlias = CapacityDimensionDetail  # noqa: Y015
 

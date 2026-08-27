@@ -29,8 +29,8 @@ import math
 import random
 import time
 import threading
-from typing import (Any, Callable, cast, Dict, List, NamedTuple, Optional,
-                    TypedDict, TypeVar)
+from typing import (Any, Callable, cast, Dict, List, NamedTuple, NotRequired,
+                    Optional, TypedDict, TypeVar)
 from uuid import UUID
 from uuid import uuid4
 
@@ -25051,6 +25051,13 @@ class CapacityDimensionDetailDict(TypedDict):
     used: float
     requested: float
     exceeded: bool
+    # Present only on the demand dimension: the two terms whose sum is
+    # used. cpu_load_1 is measured ground truth, expected_demand is the
+    # D13 feedforward estimate, and which one made used exceed the limit
+    # decides whether a refusal was correct or an estimator defect
+    # (issue 3913).
+    cpu_load_1: NotRequired[float]
+    expected_demand: NotRequired[float]
 
 
 class AdmitPlacementResult(TypedDict):
@@ -25165,7 +25172,10 @@ def _retry_transaction(fn: Callable[[], _T], op_name: str) -> _T:
 
 def _capacity_dimension(
         dimension: str, limit: float, used: float, requested: float, *,
-        charged: bool = True) -> CapacityDimensionDetailDict:
+        charged: bool = True,
+        cpu_load_1: Optional[float] = None,
+        expected_demand: Optional[float] = None
+) -> CapacityDimensionDetailDict:
     """Build one denial-detail entry, recomputing the guard comparison.
 
     ``exceeded`` is the same test the SQL guard made, evaluated here
@@ -25190,8 +25200,17 @@ def _capacity_dimension(
     ``exceeded`` set, that would in turn change whether the P9 waiver
     fires. ``requested`` is still reported, because an operator reading
     the event wants to know what the placement would have added.
+
+    ``cpu_load_1`` and ``expected_demand`` are the demand dimension's
+    two terms, reported alongside their sum because they mean different
+    things: measured load is ground truth about the machine while the
+    feedforward estimate decays over SCHEDULER_DEMAND_DECAY_SECONDS, so
+    which term made ``used`` exceed the limit is what tells a correct
+    refusal from an estimator defect (issue 3913). The keys are absent
+    (not zero) on the three allocation dimensions, which have no such
+    split.
     """
-    return {
+    detail: CapacityDimensionDetailDict = {
         'dimension': dimension,
         'limit': float(limit),
         'used': float(used),
@@ -25199,6 +25218,34 @@ def _capacity_dimension(
         'exceeded': bool(
             used + requested > limit if charged else used > limit),
     }
+    if cpu_load_1 is not None:
+        detail['cpu_load_1'] = float(cpu_load_1)
+    if expected_demand is not None:
+        detail['expected_demand'] = float(expected_demand)
+    return detail
+
+
+def _dimension_from_proto(d: Any) -> CapacityDimensionDetailDict:
+    """One CapacityDimensionDetail proto message back into dict form.
+
+    The demand breakdown fields are optional in the proto so that
+    explicit presence, not the proto3 zero default, decides whether the
+    dict carries them: a reply from an sf-database predating the fields
+    must read as "no breakdown available" rather than as a breakdown of
+    zeroes under a non-zero used (issue 3913).
+    """
+    detail: CapacityDimensionDetailDict = {
+        'dimension': d.dimension,
+        'limit': float(d.limit),
+        'used': float(d.used),
+        'requested': float(d.requested),
+        'exceeded': bool(d.exceeded),
+    }
+    if d.HasField('cpu_load_1'):
+        detail['cpu_load_1'] = float(d.cpu_load_1)
+    if d.HasField('expected_demand'):
+        detail['expected_demand'] = float(d.expected_demand)
+    return detail
 
 
 def _empty_admit_result() -> AdmitPlacementResult:
@@ -25688,12 +25735,17 @@ def _admission_denial_dimensions(
                     ).where(metrics.c.node_uuid == node_key)).first()
                     if (target_load > 0 and measured is not None
                             and measured.cpu_schedulable is not None):
+                        # The two terms are reported separately as well
+                        # as summed into used -- see
+                        # _capacity_dimension().
+                        load = float(measured.cpu_load_1 or 0.0)
+                        expected = float(row.expected_demand)
                         dimensions.append(_capacity_dimension(
                             'demand',
                             target_load * measured.cpu_schedulable,
-                            ((measured.cpu_load_1 or 0.0)
-                             + row.expected_demand),
-                            demand_add, charged=False))
+                            load + expected,
+                            demand_add, charged=False,
+                            cpu_load_1=load, expected_demand=expected))
     except OperationalError as e:
         # The detail is diagnostic, not load bearing: the denial itself
         # is already decided and the caller walks to the next candidate
@@ -26262,26 +26314,14 @@ def _grpc_admit_instance_placement(
         result['clamped'] = bool(reply.clamped)
         result['failing_stage'] = reply.failing_stage
         result['dimensions'] = [
-            {
-                'dimension': d.dimension,
-                'limit': float(d.limit),
-                'used': float(d.used),
-                'requested': float(d.requested),
-                'exceeded': bool(d.exceeded),
-            } for d in reply.dimensions]
+            _dimension_from_proto(d) for d in reply.dimensions]
         result['node_used_cpus'] = int(reply.node_used_cpus)
         result['node_used_memory_mb'] = int(reply.node_used_memory_mb)
         result['node_used_disk_gb'] = int(reply.node_used_disk_gb)
         result['node_expected_demand'] = float(reply.node_expected_demand)
         result['claim_over_limit'] = bool(reply.claim_over_limit)
         result['claim_dimensions'] = [
-            {
-                'dimension': d.dimension,
-                'limit': float(d.limit),
-                'used': float(d.used),
-                'requested': float(d.requested),
-                'exceeded': bool(d.exceeded),
-            } for d in reply.claim_dimensions]
+            _dimension_from_proto(d) for d in reply.claim_dimensions]
         return result
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC AdmitInstancePlacement failed: {e}')
