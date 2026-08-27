@@ -159,20 +159,20 @@ splits them into three buckets:
 **Migrate to namespace kwarg** (predicates that are exactly
 `partial(baseobject.namespace_filter, ns)`):
 
-* [shakenfist/artifact.py:609](shakenfist/artifact.py#L609)
+* [shakenfist/artifact.py:609](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/artifact.py#L609)
   (`artifacts_in_namespace`)
-* [shakenfist/network/network.py:1016](shakenfist/network/network.py#L1016)
+* [shakenfist/network/network.py:1016](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/network.py#L1016)
   (equivalent network helper)
-* [shakenfist/instance.py:2137](shakenfist/instance.py#L2137)
+* [shakenfist/instance.py:2137](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L2137)
   (`instances_in_namespace`)
-* [shakenfist/external_api/network.py:292](shakenfist/external_api/network.py#L292)
-* [shakenfist/external_api/instance.py:893](shakenfist/external_api/instance.py#L893)
+* [shakenfist/external_api/network.py:292](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/external_api/network.py#L292)
+* [shakenfist/external_api/instance.py:893](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/external_api/instance.py#L893)
 
 **Migrate to namespace kwarg with a tweak**
 (predicates that are `partial(namespace_exact_filter, ns)` —
 exact match, no 'system' special case):
 
-* [shakenfist/external_api/artifact.py:387](shakenfist/external_api/artifact.py#L387)
+* [shakenfist/external_api/artifact.py:387](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/external_api/artifact.py#L387)
 
 For this one the caller knows namespace is never 'system'
 (it's an admin path or a pre-checked tenant lookup), so
