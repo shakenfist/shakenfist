@@ -26,7 +26,7 @@ against new ``apiclient`` methods could not pass in CI until a client
 release existed. That reasoning (phase 4's decision D7) was wrong, and
 had been wrong since 2026-06-24: cluster CI does not install the
 released client. It builds a wheel from a ``client-python`` checkout at
-``develop`` -- see the CI section of
+``develop`` -- see "Where the functional jobs get their code" in
 ``docs/developer_guide/ci.md`` -- so a verb is available here as soon
 as it merges, with no release involved. Phase 4b
 (``docs/plans/PLAN-scheduler-reservations-phase-04b-client.md``) added
@@ -77,8 +77,10 @@ What this file deliberately does not assert
   every counter from ground truth every five minutes; asserting the
   agreement means waiting out a period, which belongs in a soak rather
   than in the suite.
-* **Anything about the command line.** There are no claim verbs to run
-  (D7, above), so nothing here covers ``sf-client``.
+* **Anything about the command line.** ``sf-client namespace claim``
+  exists as of phase 4b, but its argument parsing and output formatting
+  are covered by unit tests in ``client-python``. What this file defends
+  is the API surface those commands sit on.
 """
 
 import functools
@@ -152,7 +154,7 @@ class _ClaimTarget:
 
 
 class ClaimAPIMixin:
-    """The claim endpoints, driven through the raw request path (D7)."""
+    """The claim endpoints, driven through the client verbs."""
 
     def setUp(self):
         super().setUp()
@@ -167,15 +169,27 @@ class ClaimAPIMixin:
         # rest of the suite, until the cluster daemon collected the
         # namespace CLEANER_DELAY (an hour, by default) later.
         problems = []
-        for claim_uuid in getattr(self, '_created_claims', []):
-            status, body = self._claim_api(
-                'DELETE', self._claim_target(claim_uuid))
-            if status not in (200, 404):
-                problems.append(
-                    '%s: DELETE answered %s'
-                    % (claim_uuid, self._describe(status, body)))
-
-        super().tearDown()
+        try:
+            for claim_uuid in getattr(self, '_created_claims', []):
+                status, body = self._claim_api(
+                    'DELETE', self._claim_target(claim_uuid))
+                if status not in (200, 404):
+                    problems.append(
+                        '%s: DELETE answered %s'
+                        % (claim_uuid, self._describe(status, body)))
+        except Exception as e:
+            # _claim_api() unwraps APIException and nothing else. A client
+            # which predates the verbs (AttributeError), a connection
+            # error or a client-side timeout would otherwise escape this
+            # loop and skip the namespace delete below, leaking a
+            # namespace and its instances on a shared CI cluster -- a
+            # worse outcome than the leaked claim this method exists to
+            # prevent.
+            problems.append(
+                'the claim delete loop raised %s: %s'
+                % (type(e).__name__, e))
+        finally:
+            super().tearDown()
 
         if problems:
             self.fail(
@@ -200,6 +214,14 @@ class ClaimAPIMixin:
         ...}`` -- and the raw text otherwise, so a failure message can
         always print something.
 
+        The success status is structural rather than observed: a verb
+        returns decoded JSON and not a response, so a 200 from here
+        means "the verb returned" rather than "the server said 200".
+        That is exact for every claim endpoint today -- none of them is
+        asynchronous -- but it does mean the success-path status
+        assertions can no longer fail, and would not notice an endpoint
+        which grew a 202.
+
         Keeping this adapter, rather than calling the verbs from each
         test, is deliberate. Every status assertion in this file stays
         as it was written; ``shakenfist_ci.retries`` keeps its
@@ -213,6 +235,11 @@ class ClaimAPIMixin:
 
         namespace = target.namespace
         claim_uuid = target.claim_uuid
+        if data and method in ('GET', 'DELETE'):
+            raise NotImplementedError(
+                'no claim verb sends a request body with %s, so the data '
+                'passed for %s would be silently discarded'
+                % (method, target))
         data = data or {}
 
         if method == 'GET' and claim_uuid is None:

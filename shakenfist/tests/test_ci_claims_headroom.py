@@ -24,6 +24,18 @@ transient answer to the caller's assertion rather than raising), and
 the wiring (the shared creation helper and the lifecycle test's growth
 PUT actually go through the headroom-tolerant path, because the defect
 was precisely those two call sites not doing so).
+
+The same AST harness carries one further guard, which is here because
+this is where the harness lives rather than because it is about
+headroom. Phase 4b moved the claims suite off ``_request_url()`` and
+onto the client verbs, so the suite now names five ``apiclient``
+methods that nothing in this repository can import. A typo in one of
+those names, or a verb renamed next door, otherwise surfaces only in a
+merge-queue run -- the ``(collection)`` matrix is skipped on
+``pull_request``, which is the trap ``coding_rules.md`` documents with
+the federation test that died in ``setUp`` for four commits. This
+cannot check that the names exist in the installed client, only that
+the suite still names the five it was written against.
 """
 
 import ast
@@ -40,6 +52,19 @@ CI_SUITE = os.path.join(
 RETRIES_PATH = os.path.join(CI_SUITE, 'retries.py')
 CLAIMS_TEST_PATH = os.path.join(
     CI_SUITE, 'cluster_ci_tests', 'test_namespace_claims.py')
+
+
+# The apiclient methods the claims suite dispatches to. Duplicated from
+# client-python rather than imported, because shakenfist_client is not a
+# test dependency of this repository -- so this catches drift within this
+# repository, not skew against an installed client.
+CLAIM_VERBS = (
+    'get_namespace_claims',
+    'get_namespace_claim',
+    'create_namespace_claim',
+    'update_namespace_claim',
+    'delete_namespace_claim',
+)
 
 
 def _load_retries():
@@ -134,8 +159,8 @@ class RetryWhileTransientTestCase(base.ShakenFistTestCase):
             'deadline.')
 
 
-class ClaimsSuiteWiringTestCase(base.ShakenFistTestCase):
-    """The two call sites the defect lived in use the tolerant path.
+class ClaimsSourceTestCase(base.ShakenFistTestCase):
+    """Shared AST access to the functional claims suite.
 
     Source is parsed rather than imported: the functional suite needs
     shakenfist_client, which is not a test dependency here.
@@ -161,6 +186,10 @@ class ClaimsSuiteWiringTestCase(base.ShakenFistTestCase):
             'the wrong code and cannot be trusted.'
             % (CLAIMS_TEST_PATH, name))
 
+
+class ClaimsSuiteWiringTestCase(ClaimsSourceTestCase):
+    """The two call sites the defect lived in use the tolerant path."""
+
     def test_claim_creation_tolerates_a_full_cluster(self):
         creator = self._function(self._claims_test_tree(), '_create_claim')
         self.assertNotEqual(
@@ -184,3 +213,31 @@ class ClaimsSuiteWiringTestCase(base.ShakenFistTestCase):
             '_claim_api_awaiting_headroom, so the growth asserts a free '
             'cpu the concurrent suite is free to be holding (issue '
             '3907).')
+
+
+class ClaimsSuiteDispatchTestCase(ClaimsSourceTestCase):
+    """_claim_api() names the five verbs, and nothing reaches past them."""
+
+    def _claim_api_client_attributes(self):
+        dispatch = self._function(self._claims_test_tree(), '_claim_api')
+        return {
+            node.attr for node in ast.walk(dispatch)
+            if isinstance(node, ast.Attribute) and
+            isinstance(node.value, ast.Name) and node.value.id == 'client'}
+
+    def test_dispatch_names_exactly_the_claim_verbs(self):
+        self.assertEqual(
+            set(CLAIM_VERBS), self._claim_api_client_attributes(),
+            'The claims suite dispatches to a different set of client '
+            'methods than the five phase 4b added to apiclient. A name '
+            'which is not a verb fails with AttributeError, which '
+            '_claim_api() does not catch, and only in a merge-queue run.')
+
+    def test_no_call_to_request_url_remains(self):
+        # Asserted on call nodes rather than on text: the module
+        # docstring names _request_url deliberately, explaining what the
+        # file used to do and why that reasoning was wrong.
+        self.assertEqual(
+            [], self._calls_of(self._claims_test_tree(), '_request_url'),
+            'The claims suite still calls _request_url(), so some request '
+            'in it reaches past the client verbs it is meant to defend.')
