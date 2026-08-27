@@ -65,6 +65,15 @@ PROGRESS_PERSIST_INTERVAL = 10
 # window and bounds the cost regardless of which branch is taken.
 BUDGET_CHECK_INTERVAL = 1
 
+# How often the executor reaper looks at a single instance's agent
+# operation queue. Nothing it finds is urgent -- a dead executor's
+# operation has already been abandoned, and a wedged one is out of
+# budget either way -- and the peek is an uncached instance attributes
+# read. Without this it would run for every instance on the node on
+# every dispatcher pass, which is one read per instance per second: the
+# cost the dispatch check's own rate limit exists to avoid.
+EXECUTOR_REAP_INTERVAL = 30
+
 
 class ConnectionFailed(Exception):
     ...
@@ -1306,6 +1315,7 @@ class Monitor(daemon.Daemon):
         self.monitor_attempts = {}
         self.executors = {}
         self.executor_attempts = {}
+        self.reaper_attempts = {}
 
         # Dispatcher liveness. The dispatch thread records the completion
         # time of each pass; the monitor management loop supervises it and
@@ -1401,6 +1411,19 @@ class Monitor(daemon.Daemon):
             })
 
     def reap_instance_executors(self):
+        """Sweep finished executors, and free the queues they left stuck.
+
+        An operation's queue entry survives until the operation reaches a
+        terminal state (see Instance.agent_operation_next), which is what
+        makes dispatch crash safe -- but it also means an operation left
+        in EXECUTING with nothing working on it blocks its instance's
+        queue for as long as it stays there. Nothing in the queue itself
+        can tell a live executor from a dead one. This node can: the
+        instance is placed here, its executor is a thread in this
+        process, and so the absence of that thread is direct evidence
+        rather than an inference. Converting that evidence back into a
+        queue which drains is this reaper's whole purpose.
+        """
         all_executors = list(self.executors.keys())
         for executor_id in all_executors:
             t = self.executors[executor_id]
@@ -1413,6 +1436,123 @@ class Monitor(daemon.Daemon):
                         'thread_ident': t['thread'].ident
                     })
                 del self.executors[executor_id]
+
+        # Deliberately after the sweep above, so an executor whose thread
+        # ended without resolving its operation (the process was killed
+        # between the agent's last reply and the finally block, say) is
+        # handled in the same pass rather than the next one.
+        for instance_uuid in list(self.monitors.keys()):
+            self._resolve_stuck_queue_head(instance_uuid)
+
+    def _resolve_stuck_queue_head(self, instance_uuid):
+        """Resolve an operation this instance's agent queue is stuck behind.
+
+        Three cases, and only three. Two of them are the absence of a
+        thread, which is directly observable; the third is a wall-clock
+        deadline, which is an absolute timestamp and so cannot be wrong
+        about a thread which is still making progress. A live executor
+        inside its budgets is left entirely alone, because the progress
+        timeout is that executor's own job and it holds state this
+        method does not.
+
+        That leaves two shapes this cannot see, both of which need
+        evidence a node-local reaper does not have. An instance with no
+        monitor entry is never examined at all, so an operation which
+        was executing when its monitor died waits for the monitor to be
+        restarted (which happens within 30 seconds while the instance
+        still has an agent channel, and never once it does not). And an
+        operation created with deadline_seconds=0 asked for no
+        wall-clock budget, so a live executor wedged before it connects
+        holds that instance's executor slot with nothing able to prove
+        it is stuck.
+        """
+        # The monitor management loop can remove entries while the
+        # dispatcher iterates its snapshot, so fetch defensively.
+        monitor = self.monitors.get(instance_uuid)
+        if not monitor:
+            return
+
+        # Rate limited for the reason EXECUTOR_REAP_INTERVAL records.
+        # Note that a restarted daemon starts with an empty dictionary,
+        # so the first pass after a restart -- the case which most needs
+        # this reaper -- is never delayed.
+        last_attempt = self.reaper_attempts.get(instance_uuid, 0)
+        if time.time() - last_attempt < EXECUTOR_REAP_INTERVAL:
+            return
+        self.reaper_attempts[instance_uuid] = time.time()
+
+        # The same cheap unlocked peek Instance.agent_operation_next()
+        # opens with, and for the same reason: this runs for every
+        # instance on the node at the top of every dispatcher pass, so an
+        # instance with nothing queued must not cost an operation read at
+        # all. The monitor's own instance object is reused rather than
+        # re-read, so the idle path is one attributes read and nothing
+        # else.
+        inst = monitor['object'].instance
+        queue = inst.agent_operations.get('queue', [])
+        if not queue:
+            return
+
+        agentop = AgentOperation.from_db(queue[0])
+        if not agentop:
+            # A queue entry with no backing operation. Retiring it takes
+            # the instance's attribute lock, which this method
+            # deliberately does not; agent_operation_next() does it on
+            # the dispatch path instead.
+            return
+
+        # Read once and passed to deadline_passed(), which would
+        # otherwise resolve a NULL deadline's anchor with a second
+        # uncached GetState.
+        state = agentop.state
+        if state.value != AgentOperation.STATE_EXECUTING:
+            return
+
+        log = LOG.with_fields({
+            'instance': instance_uuid,
+            'agentoperation': agentop.uuid
+        })
+        executor = self.executors.get(instance_uuid)
+        if not executor:
+            # Case one: nothing is working on this operation. Either this
+            # daemon restarted while it was executing, so the executor
+            # died with the process and no finally block ever ran, or the
+            # thread was swept out by the loop above without resolving
+            # it. The evidence either way is the absence of the thread.
+            log.warning(
+                'Agent operation is executing with no executor; resolving it')
+            resolve_abandoned_operation(
+                agentop,
+                'no sidechannel executor was running for this operation',
+                terminal=agentop.expire)
+            return
+
+        if not agentop.deadline_passed(state=state):
+            # Case three: a live executor which still has wall-clock
+            # budget. Leave it entirely alone.
+            return
+
+        # Case two: a live executor whose operation is out of wall-clock
+        # budget. The executor checks both of its budgets itself, so
+        # reaching here means it is wedged somewhere neither is evaluated
+        # -- the pre-connection wait in SideChannelJob.execute(), which
+        # blocks on the console log appearing before _execute_inner() is
+        # ever entered.
+        #
+        # Resolve before aborting, not after. The executor's finally
+        # block only rewrites an operation which is still EXECUTING, so
+        # resolving first means the thread we are about to stop cannot
+        # overwrite this verdict on its way out.
+        log.warning(
+            'Agent operation deadline passed while its executor was wedged; '
+            'resolving it and aborting the executor')
+        resolve_abandoned_operation(
+            agentop,
+            'the sidechannel executor was wedged and made no progress',
+            terminal=agentop.expire)
+        daemon.set_abort_path(
+            executor['object'].abort_path,
+            'from the side channel executor reaper')
 
     def _request_all_threads_exit(self):
         LOG.info('Requesting all threads exit')

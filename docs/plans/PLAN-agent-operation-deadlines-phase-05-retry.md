@@ -442,6 +442,34 @@ By inspection, each falsifiable:
   rather than fixed here, because shutdown ordering deserves its own
   change and its own test, and would be invisible inside a commit
   about retry.
+- **An instance with no monitor entry is never examined by the
+  reaper.** Found while implementing step 5b, and the fourth shape the
+  risk section asked for. The reaper iterates `self.monitors`, so an
+  operation which was executing when its monitor thread died is not
+  looked at until the monitor comes back. In the common case that is
+  self-healing: `reap_instance_monitors()` drops the dead entry and
+  `start_instance_monitor()` retries within 30 seconds. It does not
+  heal for an instance which has permanently lost its agent channel,
+  where the operation stays `executing` for ever and is therefore
+  never swept for hard deletion. The operation leaked the same way
+  before this phase -- the pop retired the *entry*, never the state --
+  so what is new is only that the queue no longer drains, on an
+  instance which cannot run agent operations anyway. Fixing it needs
+  the daemon to know which instances are placed on this node, which it
+  does not currently keep, so it is deliberately not fixed here.
+
+- **A `deadline_seconds=0` operation wedged before connecting cannot
+  be reaped.** Also found in step 5b. The reaper's only evidence for a
+  *live* executor is `deadline_passed()`, and an explicit `0.0`
+  deadline means there is no wall-clock budget to pass, so case two
+  never fires and nothing ever sets the abort path. Decision 8
+  forbids the alternative, since a grace period on `state.update_time`
+  is exactly the suspicion it rules out. This is the same shape as
+  phase 4's "no operator ceiling on an explicitly unbounded
+  operation", and belongs beside it in phase 7's release note: with
+  both budgets disabled, the attempt cap is the only bound, and it is
+  not reached by an executor which never connects.
+
 - **A retried operation's events do not distinguish attempts.** The
   dispatcher's "dispatching agent operation" event
   (`main.py:1389-1391`) is emitted identically for a first dispatch

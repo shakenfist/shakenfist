@@ -2457,15 +2457,23 @@ class Instance(dbowo):
         """Return the next dispatchable agent operation, leaving it queued.
 
         The queue entry is the unit of durability: an operation stays at
-        the head of the queue until it has provably left the QUEUED state
-        (the executor moved it to EXECUTING or beyond), at which point a
-        later call lazily pops it. This makes dispatch crash safe -- if
-        the sidechannel daemon or its executor thread dies between
-        selecting an operation and delivering it to the agent, the
-        operation is simply returned again by a later call, instead of
-        being orphaned in QUEUED with no queue entry (the failure mode
-        this replaces, which presented as an agent operation stuck in the
-        queued state while the instance's agent was ready).
+        the head of the queue until it reaches a terminal state, at which
+        point a later call lazily pops it. This makes dispatch crash safe
+        -- if the sidechannel daemon or its executor thread dies anywhere
+        between selecting an operation and the operation finishing, the
+        entry is still at the head for something to act on, instead of
+        the operation being orphaned mid-flight with no queue entry (the
+        failure mode this replaces, which presented as an agent operation
+        stuck in the queued state while the instance's agent was ready).
+
+        An EXECUTING head is therefore left where it is rather than
+        returned or retired: something is working on it, and the entry is
+        what remains if that something dies. Nothing in this method can
+        tell a live executor from a dead one, so an EXECUTING head with
+        no executor behind it would sit here forever; resolving that is
+        the node-local reaper's job (Monitor.reap_instance_executors in
+        the sidechannel daemon), and that reaper is what turns this
+        stricter durability rule back into a queue which drains.
 
         The caller must ensure only one executor runs per instance at a
         time -- instances are placed on exactly one hypervisor and the
@@ -2549,13 +2557,38 @@ class Instance(dbowo):
                     # live task.
                     break
 
-                # EXECUTING, COMPLETE, ERROR, EXPIRED or DELETED: this
-                # operation is finished with the queue. Retire the entry
-                # and consider the next one. This also unwedges a queue
-                # whose head errored, expired or was deleted, which
-                # previously blocked the instance's queue forever.
-                queue.pop(0)
-                changed = True
+                if state.value == AgentOperation.STATE_EXECUTING:
+                    # Being worked on. The entry stays at the head until
+                    # the operation is terminal, so that an executor
+                    # which dies mid-flight leaves something behind for
+                    # the sidechannel daemon's reaper to find. Nothing
+                    # is dispatchable meanwhile: the instance already
+                    # has an executor, so the dispatcher skips it.
+                    break
+
+                if state.value in AgentOperation.TERMINAL_STATES:
+                    # COMPLETE, ERROR, EXPIRED or DELETED: this operation
+                    # is finished with the queue. Retire the entry and
+                    # consider the next one. This also unwedges a queue
+                    # whose head errored, expired or was deleted, which
+                    # previously blocked the instance's queue forever.
+                    queue.pop(0)
+                    changed = True
+                    continue
+
+                # A state this method has not been taught about, which
+                # can only arrive by adding one to AgentOperation without
+                # classifying it here. Treat it as not dispatchable and
+                # preserve order rather than guessing: retiring an entry
+                # for an operation which might still be live is the one
+                # outcome this queue cannot recover from. Also stops the
+                # loop, which would otherwise spin forever having neither
+                # popped nor broken.
+                self.log.with_fields({
+                    'agentoperation': agentop.uuid,
+                    'state': state.value
+                }).error('Agent operation queue head is in an unknown state')
+                break
 
             if changed:
                 db_data['queue'] = queue
