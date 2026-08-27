@@ -13507,16 +13507,26 @@ describing what the handler actually accepts. New config options:</p>
 <li><code>AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT</code> = 30 (see decisions)</li>
 </ul>
 <h3 id="enforcement-points">Enforcement points<a class="headerlink" href="#enforcement-points" title="Permanent link">&para;</a></h3>
-<p>The deadline and progress timeout are enforced at three places, in
-increasing order of reach:</p>
+<p>The deadline and progress timeout are enforced at four places, in
+increasing order of reach. Phase 4 owns the first three; the reaper is
+phase 5's, because a reaper for a dead executor is only useful once
+the queue entry survives execution, which is phase 5's terminal-only
+pop. This section originally listed three points and did not mention
+preflight at all; both were corrected during phase 4 planning.</p>
 <ol>
-<li><strong>At dequeue</strong> — <code>Instance.agent_operation_next()</code> checks the
+<li><strong>At dequeue</strong> (phase 4) — <code>Instance.agent_operation_next()</code> checks the
    deadline before returning an operation. An expired queued operation
    is transitioned to <code>expired</code>, popped, and the next
    entry considered. This is the "skip a cycle" behaviour for periodic
    callers: work the caller has already abandoned never occupies the
    executor.</li>
-<li><strong>In the executor</strong> — <code>_execute_inner()</code> replaces the fixed
+<li><strong>During preflight</strong> (phase 4) — <code>NodeAgentopOp._preflight()</code>
+   checks the deadline on entry and again after each
+   <code>Blob.ensure_local()</code>, which is the longest pre-queue delay in the
+   system and precisely the wait a receipt-anchored deadline exists to
+   count. See decision 4 below, which this section previously did not
+   reflect.</li>
+<li><strong>In the executor</strong> (phase 4) — <code>_execute_inner()</code> replaces the fixed
    <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code> check with two checks: the
    operation's absolute deadline (if any), and
    <code>time.time() - last_progress &gt; progress_timeout</code> while a
@@ -13526,7 +13536,7 @@ increasing order of reach:</p>
    in the command reply handlers (<code>file_chunk</code>, <code>file_chunk_reply</code>,
    <code>stat_result</code>, <code>execute_reply</code>) via an explicit
    <code>observe_progress()</code> hook.</li>
-<li><strong>By a node-local reaper</strong> — the sidechannel daemon's main loop
+<li><strong>By a node-local reaper</strong> (phase 5) — the sidechannel daemon's main loop
    (which already iterates this node's instances and knows which
    executors are live) sweeps for operations in <code>EXECUTING</code> with no
    live executor thread. If the operation's deadline has passed, or
@@ -13535,6 +13545,17 @@ increasing order of reach:</p>
    (retry or expire, below). This covers the case PR #3506's finally
    block cannot: the sidechannel process dying outright.</li>
 </ol>
+<p>Phase 4's review added a second case the reaper must cover, and it
+   is a live executor rather than a dead one. <code>SideChannelJob.execute()</code>
+   blocks in <code>while not os.path.exists(console_path): time.sleep(1)</code>
+   before <code>_execute_inner()</code> is entered, so neither budget is
+   evaluated during it. An instance whose <code>console.log</code> never appears
+   holds its executor slot indefinitely, and enforcement point 1
+   cannot help because the dispatcher skips instances with a live
+   executor. This is not a regression -- the 900 second timer phase 4
+   deleted also started at <code>connected_at</code> -- but it is the one wedge
+   shape none of phase 4's three enforcement points can observe, and
+   only something looking at executors from outside can.</p>
 <p>Because only the sidechannel daemon on the instance's placement node
 dispatches executors, the reaper has no cross-node race: reaping and
 dispatching are serialised in one process.</p>
@@ -13722,12 +13743,18 @@ three-repository audit of every consumer of agent operation state).</p>
    fail-fast gap tracked as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>) — and enumerated the
    phase 4 obligations: <code>state_targets</code> edges (into <code>expired</code> from
    every non-terminal state, plus <code>expired -&gt; deleted</code>), adding
-   <code>expired</code> to <code>FINAL_OBJECT_STATES</code> (<code>constants.py:190</code>) so the
+   <code>expired</code> to <code>FINAL_OBJECT_STATES</code> (<code>constants.py:191</code>) so the
    hard-delete sweep reaps it rather than leaking state rows, guarding
    the five unguarded <code>state = STATE_ERROR</code> writes (sidechannel
-   <code>main.py:470,476,794,848</code>; <code>node_aop_op.py:89</code>) that would raise
+   <code>main.py:344,350,844,886</code>; <code>node_aop_op.py:89</code>) that would raise
    <code>InvalidStateException</code> from <code>expired</code>, and including <code>expired</code> in
-   the executor's command-abort check (<code>main.py:869</code>).</li>
+   the executor's command-abort check (<code>main.py:910</code>). The sixth such
+   write, <code>main.py:496</code>, is already guarded on <code>STATE_EXECUTING</code> and
+   needs no change. Every address in this decision was refreshed
+   during phase 4 planning: phase 1's per-command handler refactor
+   moved all of them, and the audit's original numbers
+   (<code>main.py:470,476,794,848</code>, <code>:869</code>, <code>constants.py:190</code>) now point
+   at unrelated lines.</li>
 <li><strong>The progress timeout default is 30 seconds</strong>
    (<code>AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT</code>). Measurement: the
    worst complete transfer observed in CI was 625 MB in 2.83 s
@@ -13847,9 +13874,9 @@ the slot at all.</p>
 </tr>
 <tr>
 <td>4</td>
-<td></td>
-<td>Not started</td>
-<td>Enforcement: dequeue expiry, executor deadline + progress timeout, <code>observe_progress()</code> hooks; remove <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code>; the <code>expired</code> state with its audit-enumerated obligations (<code>state_targets</code>, <code>FINAL_OBJECT_STATES</code>, guarded error writes, command-abort check)</td>
+<td><a href="../PLAN-agent-operation-deadlines-phase-04-enforcement/">PLAN-agent-operation-deadlines-phase-04-enforcement.md</a></td>
+<td>Complete</td>
+<td>Enforcement: dequeue expiry, preflight expiry, executor deadline + progress timeout, <code>observe_progress()</code> hooks; remove <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code>; the <code>expired</code> state with its audit-enumerated obligations (<code>state_targets</code>, <code>FINAL_OBJECT_STATES</code>, guarded error writes, command-abort check). Survey corrections applied at source: every address in decision 1 was refreshed after phase 1's refactor, the reaper is phase 5's rather than this phase's, and preflight is a fourth enforcement point the design sketch never listed. The phase plan also decides that an expiry records its reason as a state message and an audit event rather than as <code>.error</code>, which the <code>error</code> setter refuses from a non-<code>error</code> state</td>
 </tr>
 <tr>
 <td>5</td>
@@ -13867,7 +13894,7 @@ the slot at all.</p>
 <td>7</td>
 <td></td>
 <td>Not started</td>
-<td>Docs (state machine, operator + developer guides, and the <code>v07-v08</code> release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below)</td>
+<td>Docs (operator + developer guides, and the <code>v07-v08</code> release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note <code>docs/developer_guide/state_machine.md</code> is <strong>not</strong> this phase's: it is a rendering of <code>state_targets</code>, so phase 4 updated it when it added <code>expired</code> rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge</td>
 </tr>
 <tr>
 <td>8</td>
@@ -13921,6 +13948,17 @@ message, which says "no progress in 5 minutes" for a 500-second (8m
 tests await an agent, but nothing in that run confirms an orphaned
 agent operation, and #3696 is a distinct symptom (there the runner
 lost communication and uploaded nothing).</p>
+<p><strong>Partly pulled forward into phase 4.</strong> <code>_await_command()</code>
+(<code>base.py:760</code>) was the worst of this family -- no window at all, just
+<code>while aop['state'] != 'complete'</code> -- and phase 4 made it materially
+more likely to fire, since an operation can now reach <code>expired</code> where
+it previously ran to completion. That one loop gained an absolute
+bound, a terminal-state check on <code>error</code>/<code>expired</code>/<code>deleted</code>, and a
+failure which dumps the operation and the instance's recent events;
+see the second review response in
+<code>PLAN-agent-operation-deadlines-phase-04-enforcement.md</code>. The
+event-renewed loops above are untouched and remain phase 7's, as does
+restricting renewal to events that represent progress.</p>
 
 
 

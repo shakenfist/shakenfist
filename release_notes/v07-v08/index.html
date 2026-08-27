@@ -11626,6 +11626,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent operations are bounded by a deadline, not a fixed backstop
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13654,6 +13665,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent operations are bounded by a deadline, not a fixed backstop
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14390,6 +14412,49 @@ refused until they drain. Operators who prefer the historic
 behaviour can set <code>CPU_OVERCOMMIT_RATIO=16</code> and
 <code>NODE_CPU_RESERVATION_THREADS</code> / <code>NODE_RAM_RESERVATION_GB</code> to zero
 per node in inventory.</p>
+<h2 id="agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop">Agent operations are bounded by a deadline, not a fixed backstop<a class="headerlink" href="#agent-operations-are-bounded-by-a-deadline-not-a-fixed-backstop" title="Permanent link">&para;</a></h2>
+<p>Agent operations used to be bounded by a single hardcoded 900 second
+execution timeout, measured from the moment the sidechannel executor
+established a connection to the in-guest agent. That constant is gone.</p>
+<p>An operation now carries two timing budgets of its own, either of which
+a caller may set on the request:</p>
+<ul>
+<li><code>deadline_seconds</code>, counted from when the API server received the
+  request rather than from when the executor picked the work up. Time
+  spent queued behind another operation on the same instance, and any
+  preflight work such as fetching a blob onto the hypervisor, both
+  count against it. The default is <code>AGENT_OPERATION_DEFAULT_DEADLINE</code>,
+  600 seconds.</li>
+<li><code>progress_timeout_seconds</code>, how long a transfer may go without
+  forward progress. It applies only to <code>agent/get</code> and <code>agent/put</code>,
+  which are the commands that report progress at all. The default is
+  <code>AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT</code>, 30 seconds.</li>
+</ul>
+<p>Exhausting either moves the operation to <code>expired</code>, a new terminal
+state distinct from <code>error</code>: <code>error</code> means the operation failed,
+<code>expired</code> means a budget ran out, and the state's message says which.
+The budgets are enforced when an operation reaches the head of an
+instance's queue, during preflight, and while the executor is running
+it.</p>
+<p><strong>The effective default is tighter than the behaviour it replaces.</strong>
+Where a welcomed operation previously had 900 seconds of execution, it
+now has 600 seconds counted from request receipt, with queue and
+preflight time deducted before execution starts. A long-running
+<code>agent/execute</code> loses the most, because it reports nothing until it
+finishes and so was never bounded by anything but the backstop. Raise
+<code>AGENT_OPERATION_DEFAULT_DEADLINE</code> if your cluster runs long agent
+commands, or send an explicit <code>deadline_seconds</code> per request.</p>
+<p>Sending <code>0</code> for either parameter means "none at all", which is not the
+same as omitting it. Streaming a very large file out of an instance is
+the case that distinction exists for: send <code>deadline_seconds: 0</code> with a
+<code>progress_timeout_seconds</code> and the transfer may take as long as it
+takes, while a genuine stall is still detected.</p>
+<p>Relatedly, an error reported by the in-guest agent now ends the
+operation immediately, in <code>error</code>, with the agent's own message. It
+previously only emitted an event and left the executor waiting, so the
+operation ended in whatever the 900 second backstop made of it. Clients
+which distinguish the two terminal states get a more useful answer, and
+get it sooner.</p>
 
 
 
