@@ -149,9 +149,9 @@ that is honestly deleted.
 
 * `p90(committed vCPU cluster-wide) / ledger` -- warn above an upper
   bound (oversubscribed, 507 risk) and below a lower bound (oversized).
-* any `sufficient_idle_cpu` or `sufficient_idle_memory` refusal
-  observed during a job that otherwise passes is itself a warning,
-  independent of the ratio.
+* any `sufficient_idle_cpu`, `sufficient_idle_memory` or
+  `sufficient_idle_disk` refusal observed during a job that otherwise
+  passes is itself a warning, independent of the ratio.
 
 Provisional bounds are 0.70 and 0.35. Phase 2 replaces them with
 numbers derived from the measured distribution, or keeps them and says
@@ -182,7 +182,9 @@ any topology changes, which is exactly what phase 4 does.
 **Decision:** treat memory as a genuine binding dimension, not an
 artefact. No topology's per-node RAM is reduced below the measured p90
 plus a margin phase 2 sets, and phase 1's probe records memory headroom
-alongside CPU.
+alongside CPU. Phase 2 must also measure capacity refusals per stage --
+cpu, memory and disk counted separately, not as one combined number --
+since a reshape that relaxes one stage can tighten another.
 
 **Reasoning:** survey finding 1 removes the reason to disbelieve the
 one observed `sufficient_idle_memory` refusal. The measured peak usage
@@ -238,11 +240,34 @@ grows.
 | Signature | Issues | Disposition |
 |-----------|--------|-------------|
 | Instance create refused `507 sufficient_idle_cpu` under suite concurrency | #3772 (umbrella, open); #3498, #3602, #3670, #3728, #3749, #3767 (closed members) | **Behaviour to assert.** Phase 3 fills a cluster deliberately and asserts what the server does today. #3772 stays open: its own verdict is that a bare 507 is the wrong answer to a transient condition, and that is unchanged by a bigger cloud. |
+| Instance create refused `507 sufficient_idle_disk`, a rate predicate rather than a ledger | #3772 (umbrella, open) | **Behaviour to assert; sizing does not address it.** `_has_idle_disk_bandwidth()` (`shakenfist/scheduler.py:329`) checks disk-busy rate against a metric unrelated to `cpu_schedulable` or memory. A 2026-08-21 comment on #3772 records an occurrence at exactly this stage on the single-node smoke topology, under a `pull_request` event, with the node hosting only two instances and every other capacity stage passing -- a cluster nowhere near full. Widening vCPUs does nothing for it. Phase 3's saturation test must cover this stage directly rather than assume the CPU-stage test also exercises it. |
 | Claim growth refused because the concurrent suite holds the cluster | #3907 (closed) | **Test bug, already fixed**, by routing success-asserted claim requests through a transient-tolerant retry. Phase 3 keeps a test that exercises the refusal path directly, so the retry cannot mask a genuine regression in claim admission. |
-| Soft affinity loses to resource filters; instances that should share a node do not | #3565 (open) | **Defect to fix**, not here. This is the most frequent `slim-primary` failure in the sampled window and it will get greener when the cloud grows, which is not a fix. Phase 3 gives it a deterministic reproduction (fill the affinity target, then place) so it stops depending on ambient load. |
-| Targeted create silently lands on a different node | #3496 (open) | **Defect to fix**, not here. Related but distinct: `force_placement` tests cannot fall back to a less loaded node, so they fail first under scarcity. Record the interaction; phase 3 asserts the documented behaviour of a targeted create against a full node. |
+| Soft affinity loses to resource filters; instances that should share a node do not | #3565 (open) | **Defect to fix**, not here. This is the most frequent `slim-primary` failure in the sampled window. A 2026-08-26 comment on the issue traces the most recent occurrence to `sufficient_idle_memory`, not `sufficient_idle_cpu` -- the candidate shapes consolidate onto fewer, larger hypervisors, which raises instances per node, so growing the cloud may relax the CPU filter while tightening the memory one instead of making the test uniformly greener. Fixing the scheduler is still not this plan's job. Phase 3 gives it a deterministic reproduction (fill the affinity target, then place) so it stops depending on ambient load. |
+| Targeted create silently lands on a different node | #3496 (open) | **Defect to fix**, not here. Related but distinct: `force_placement` tests cannot fall back to a less loaded node, so they fail first under scarcity. Record the interaction; phase 3 asserts the documented behaviour of a targeted create against a full node. Deliberately **not** given a heads-up comment, unlike #3565 and #3772: this issue's recorded occurrence is a wrong-node placement with no refusal and no stage trace at all, and the one capacity mode it names it hands off to #3772, so a note predicting that it will reproduce less often would assert a connection its own evidence does not carry. |
 | Demand guard refuses every placement below four schedulable threads | #3813 (closed) | **Fixed, and the reason for D1.** No further coverage needed beyond keeping a fleet where `cpu_schedulable` is small, which D1 does. |
-| Runners lose communication when concurrent merge groups saturate the under-cloud | #3696 (open) | **Out of scope** per D8. Named so that a later reduction in footprint can be checked against it. |
+| Runners lose communication when concurrent merge groups saturate the under-cloud | #3696, #3718 (open) | **Out of scope** per D8; the family has two observed shapes -- a runner dying mid-test, and a nested node never booting far enough to answer SSH. Named so that a later reduction in footprint can be checked against it. In the same window as the two dead runners, three other attempts by the same PR failed with `507 sufficient_idle_cpu` (citing #3498 and #3670), which suggests the under-cloud shortage and the inner-cloud 507s are the same shortage observed at two levels -- a reading the issue itself calls "well supported by the surrounding evidence" rather than proven. |
+
+The sweep also turned up hits that are not scarcity signatures, and
+are deliberately not rows above. #3516 (sf-sidechannel orphans agent
+operations in `executing`) is a stuck-state defect with no capacity
+trigger. #3770 (the Guests suite stalling because
+`_await_agent_state`'s deadline is renewed by any event, not only the
+one it is actually waiting for) is a logic bug in the wait itself, not
+a resource refusal. #3720 (`ImageMissingFromCache` on a redirected
+start) is a cache-consistency defect independent of cluster size.
+#3652 and #3669 are deterministic CI test bugs that fail regardless of
+how much capacity is available. All five matched the search only
+because the searched words appear somewhere in their text, not because
+they describe scarcity.
+
+One further trap is worth recording here. #3602 (closed) and #3603
+(open) are the same test, `test_disappearing_source_instance`, with
+two entirely different causes: #3602 is the `507` scarcity failure
+already counted as a member of the #3772 umbrella above, while #3603
+is a genuine defect where an instance built from a cached image whose
+source URL has since gone missing enters an error state. #3603 is not
+a scarcity signature and does not belong in this table. Matching by
+test name rather than by cause would conflate the two.
 
 Two properties of this table are the point of it:
 
@@ -257,7 +282,7 @@ Two properties of this table are the point of it:
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 0a | medium | sonnet | none | Sweep the issue tracker for capacity-shaped CI failures beyond the six already in the inventory table above: search closed and open issues for `sufficient_idle_cpu`, `507`, `InsufficientResources`, and for the phrase "suite concurrency". For each hit not already in the table, decide whether it is the same signature as an existing row (add the number to that row) or a new one (add a row, with a disposition drawn from the three permitted values). Do not open or modify any issue in this step -- report candidates instead. Edit only `docs/plans/PLAN-ci-cloud-sizing-phase-00-decisions.md`. |
-| 0b | high | opus | none | For each inventory row dispositioned "defect to fix" (#3565, #3496), post a comment on the issue recording that a CI topology change is coming which will reduce how often it reproduces, linking this phase plan, and stating the deterministic reproduction phase 3 owes it. Do not change state or labels. Then confirm #3772 carries the same note, since it is the umbrella. Judgement is needed on the wording: these must read as "this will get quieter, and that is not a fix", not as a status update. **The management session reviews the exact text before anything is posted** -- this writes to a public tracker. |
+| 0b | high | opus | none | Post a comment on #3565 and on the #3772 umbrella recording that a CI topology change is coming which will reduce how often the issue reproduces, linking this phase plan, and stating the deterministic reproduction phase 3 owes it. Do not change state or labels. #3496 is deliberately excluded -- see its inventory row for why -- so a draft written for it should be discarded rather than posted. Judgement is needed on the wording: these must read as "this will get quieter, and that is not a fix", not as a status update. **The management session reviews the exact text before anything is posted** -- this writes to a public tracker. |
 | 0c | low | haiku | none | Set the phase 0 row to `Complete` in the master plan's Execution table and update the `docs/plans/index.md` arithmetic to `1 of 7`, then run `python3 tools/check-plan-status.py`. Do this only after 0a and 0b are reviewed. |
 
 The survey corrections that would otherwise have been a step here
@@ -282,7 +307,7 @@ survey found*.
   *Mitigation:* D3 fixes provisional bounds now, so phase 5 has
   something to enforce even if phase 2's analysis is thinner than
   hoped.
-* **Commenting on issues is outward-facing.** Step 0c writes to a
+* **Commenting on issues is outward-facing.** Step 0b writes to a
   public tracker. *Mitigation:* the management session reviews the exact
   comment text before it is posted, and the step is explicitly barred
   from changing state or labels.
@@ -303,10 +328,11 @@ Falsifiable, in order:
 3. The inventory table has a row for every issue returned by a tracker
    search for `sufficient_idle_cpu`, and each row's disposition is one
    of the three permitted values.
-4. #3565, #3496 and #3772 each carry a comment linking this phase
-   plan and stating that a topology change will reduce their
-   reproduction rate without fixing them, and none of the three had
-   its state or labels changed.
+4. #3565 and #3772 each carry a comment linking this phase plan and
+   stating that a topology change will change their reproduction rate
+   without fixing them, and neither had its state or labels changed.
+   #3496 carries no such comment, and the reason is recorded in its
+   inventory row rather than left as an omission.
 5. No file outside `docs/plans/` is modified by this phase.
 6. `python3 tools/check-plan-status.py` passes, and
    `pre-commit run --all-files` passes.

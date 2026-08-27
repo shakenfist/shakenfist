@@ -267,6 +267,18 @@ test greener without anyone having decided whether the scheduler
 was right. That is the lemon squeezed too far, and phase 3 is
 where we stop squeezing and start asserting.
 
+That "greener" claim needs a caveat, though. A 2026-08-26 comment
+on #3565 corrects the earlier diagnosis on the same run: the
+affinity target node survived `sufficient_idle_cpu` and was then
+dropped at `sufficient_idle_memory`, so the most recent
+fully-traced occurrence is memory-bound, not CPU-bound. The
+candidate shapes below buy their RAM saving by consolidating onto
+fewer, larger hypervisors, which raises instances per node even
+with per-node RAM unchanged -- so the same reshape can relax the
+CPU filter while tightening the memory one. Whether the test
+actually gets greener is therefore not settled by this plan; it is
+one more thing phase 2's per-stage refusal counts must show.
+
 ### Candidate shapes
 
 Illustrative only -- phase 2 supplies the peak-demand figure that
@@ -355,7 +367,7 @@ those are corrected here as well.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Not started |
+| 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete |
 | 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | PLAN-ci-cloud-sizing-phase-01-headroom-probe.md | Not started |
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | PLAN-ci-cloud-sizing-phase-02-baseline.md | Not started |
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md | Not started |
@@ -736,6 +748,15 @@ which is what `tools/check-plan-status.py` enforces.
   tier's extra ten minutes was granted for slowness the data does
   not show. It is harmless, but it encodes a belief that is
   false, and beliefs like that are why the sizing went unexamined.
+- **The merge queue's throttle counts groups, not clouds.** #3696
+  records two merge groups forming for the same PR sixty seconds
+  apart, both running their full matrix, for roughly eleven nested
+  clusters on the under-cloud at once. The throttle is set to two
+  parallel builds, but each build launches five or six clouds, so the
+  quantity actually bounded is not the one that exhausts the
+  under-cloud. Reducing per-cloud footprint helps; bounding the right
+  quantity would help more, and is a change to queue configuration
+  rather than to anything in this plan.
 - **Generalise to the other repositories' clouds.** The
   downstream repositories fork these topologies. Phase 6
   propagates the shapes; making the headroom probe part of the
@@ -766,9 +787,11 @@ sure none of them is closed by accident:
   "soft affinity loses to resource filters under suite
   concurrency". The most frequent `slim-primary` failure in the
   sampled window, always the same signature: instances that
-  should share a node do not. A bigger cloud makes
-  it greener without anyone deciding whether the scheduler was
-  right, so it needs a disposition in phase 0 before phase 4.
+  should share a node do not. Its most recent traced occurrence
+  binds at the memory stage rather than the CPU one, so a bigger
+  cloud may quieten it, may not, and either way decides nothing
+  about whether the scheduler was right. It needs a disposition in
+  phase 0 before phase 4.
 - **#3882** (open) -- reconciler drift is not provable from logs.
   Phase 2 wants to compare the live ledger derivation against the
   reconciled `cluster_capacity` figure; if they disagree, this is
