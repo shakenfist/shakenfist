@@ -743,13 +743,81 @@ class BaseTestCase(testtools.TestCase):
             self.system_client.get_blob_events,
             blob_uuids)
 
+    # How long _await_command() will wait for an agent operation. It
+    # only has to exceed the server's own budget: an operation which
+    # runs out of one lands in expired and is caught by the terminal
+    # state check below long before this fires. This is the backstop
+    # for the operation never reaching a terminal state at all.
+    AGENT_OPERATION_TIMEOUT = 900
+
+    # Everything an agent operation can end up in which is not
+    # success. expired is new as of the deadline enforcement work, and
+    # is why this loop grew a terminal state check: before it, an
+    # operation which was never going to complete simply never
+    # completed, and there was no state to notice.
+    AGENT_OPERATION_FAILED_STATES = ('error', 'expired', 'deleted')
+
     def _await_command(self, instance_ref, command):
         aop = self.system_client.instance_execute(instance_ref, command)
+        start_time = time.time()
+
         while aop['state'] != 'complete':
+            if aop['state'] in self.AGENT_OPERATION_FAILED_STATES:
+                self._raise_agent_operation_failure(
+                    instance_ref, command, aop,
+                    f"agent operation {aop['uuid']} for command "
+                    f"'{command}' finished in state {aop['state']} "
+                    'instead of completing')
+
+            if time.time() - start_time > self.AGENT_OPERATION_TIMEOUT:
+                self._raise_agent_operation_failure(
+                    instance_ref, command, aop,
+                    f"agent operation {aop['uuid']} for command "
+                    f"'{command}' was still in state {aop['state']} after "
+                    f'{self.AGENT_OPERATION_TIMEOUT} seconds')
+
             time.sleep(1)
             aop = self.system_client.get_agent_operation(aop['uuid'])
 
         return aop['results']['0']
+
+    def _raise_agent_operation_failure(self, instance_ref, command, aop,
+                                       message):
+        """Emit what is known about a failed agent operation, then fail.
+
+        The operation's own view carries its error_message, results,
+        attempts and last_progress. The reason an expired operation
+        expired is not on that view -- it is the state row's message --
+        but expire() also audits it against the instance, so the
+        instance's recent events are where the "deadline passed while
+        queued" versus "no progress from the agent" distinction is
+        readable.
+        """
+        self._emit_tracing_event({
+            'msg': 'Agent operation failed',
+            'instance_uuid': instance_ref,
+            'command': command,
+            'agent_operation': aop
+        })
+
+        try:
+            events = self.system_client.get_instance_events(
+                instance_ref, limit=50)
+            self._emit_tracing_event({
+                'msg': 'Recent instance events',
+                'instance_uuid': instance_ref,
+                'events': events
+            })
+        except Exception as e:
+            self._emit_tracing_event({
+                'msg': 'Failed to gather instance events',
+                'instance_uuid': instance_ref,
+                'error': str(e)
+            })
+
+        raise TimeoutException(
+            f'{message}. The operation was: '
+            f'{json.dumps(aop, indent=4, sort_keys=True, default=str)}')
 
     def _test_ping(self, instance_uuid, network_uuid, ip, expected):
         # NOTE(mikal): each call to client.ping() sends 10 ICMP packets

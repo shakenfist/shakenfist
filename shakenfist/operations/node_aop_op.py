@@ -2,7 +2,6 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.blob import Blob
 from shakenfist.schema.operations import node_aop_op as schema
-from shakenfist.instance import Instance
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import BaseOperationException
@@ -86,10 +85,24 @@ class NodeAgentopOp(BaseClusterOperation):
         except Exception as e:
             util_exceptions.ignore_exception('node_aop_op', e)
             self.state = NodeAgentopOp.STATE_ERROR
-            aop.state = Instance.STATE_ERROR
+            aop.fail(f'{task.name} task raised an exception')
 
     def _preflight(self, aop):
+        """Promote an agent operation from preflight to queued.
+
+        This is a deadline enforcement point. Preflight's
+        ensure_local() copy is the longest pre-queue delay in the
+        system, and a deadline runs from when the REST request was
+        received, so it is precisely the wait a deadline exists to
+        count. Expiring here does not fail this cluster operation:
+        the operation ran out of the caller's budget, which is not a
+        preflight failure.
+        """
         if aop.state.value != AgentOperation.STATE_PREFLIGHT:
+            return
+
+        if aop.deadline_passed():
+            aop.expire('the operation deadline passed before preflight')
             return
 
         for command in aop.commands:
@@ -97,10 +110,19 @@ class NodeAgentopOp(BaseClusterOperation):
                 b = Blob.from_db(command['blob_uuid'])
                 if not b:
                     self.state = NodeAgentopOp.STATE_ERROR
-                    aop.error = ('preflight failure, blob missing: '
-                                 f'{command["blob_uuid"]}')
+                    aop.fail('preflight failure, blob missing: '
+                             f'{command["blob_uuid"]}')
                     return
                 b.ensure_local()
+
+                # Checked before the state re-read below, because an
+                # operation expired here is no longer in preflight and
+                # would otherwise be swallowed by that guard with no
+                # explanation recorded anywhere.
+                if aop.deadline_passed():
+                    aop.expire(
+                        'the operation deadline passed during preflight')
+                    return
 
                 # This agent operation could have been deleted while we copied
                 # this blob?

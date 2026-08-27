@@ -245,12 +245,15 @@ class SFConfig(BaseSettings):
             'to an absolute timestamp at request receipt, so queue time and '
             'preflight time both count against it. A client may pass an '
             'explicit deadline_seconds of 0 to ask for no wall-clock '
-            'deadline at all. This replaces the hardcoded 900 second '
-            'AGENT_OPERATION_EXECUTION_TIMEOUT in '
-            'shakenfist/daemons/sidechannel/main.py, but does not yet: '
-            'nothing enforces either value until phase 4 of '
-            'PLAN-agent-operation-deadlines, which is what deletes that '
-            'constant. Until then both exist and only the constant bites.'
+            'deadline at all, in which case nothing bounds the '
+            'operation. Enforced in three places: an expired operation '
+            'is retired when the sidechannel daemon looks for work, '
+            'when a preflight task promotes it to queued, and by the '
+            'executor while it runs. An operation which runs out of '
+            'budget moves to the expired state, which is distinct from '
+            'error. This replaced a hardcoded 900 second backstop in '
+            'the sidechannel daemon, so the effective default is now '
+            'tighter than it used to be.'
         )
     )
     AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT: int = Field(
@@ -267,7 +270,12 @@ class SFConfig(BaseSettings):
             '0.44 s, so 30 seconds is roughly ten times the worst total '
             'duration -- let alone any gap within one -- while detecting the '
             '#3516 sidechannel wedge thirty times faster than the 900 '
-            'second constant it will replace. Enforcement lands in phase 4.'
+            'second constant it replaced. Enforced by the sidechannel '
+            'executor, and only while a command which can actually '
+            'report progress is in flight -- an execute of a long '
+            'running command reports nothing until it finishes and is '
+            'never subject to it. An operation which stalls moves to '
+            'the expired state, which is distinct from error.'
         )
     )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(

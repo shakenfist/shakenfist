@@ -692,14 +692,25 @@ it is a 400. Nothing an executed command does is observable as
 progress, so a timeout there could never fire; only `deadline_seconds`
 is meaningful.
 
-!!! note "Not yet enforced"
+!!! note "What happens when a budget runs out"
 
-    As of this release the values are recorded on the operation and
-    returned in its representation, but nothing acts on them: agent
-    operations are still bounded by a fixed 900 second execution
-    timeout. Enforcement -- including the new `expired` state -- lands
-    in a following release. Setting them now is safe and forward
-    compatible.
+    An operation which exhausts either budget moves to `expired`, a
+    terminal state distinct from `error`. `error` means the operation
+    itself failed; `expired` means a budget you set ran out, and the
+    state's message says which. Nothing is retried and no further
+    command in the operation runs.
+
+    Three places enforce this, so an abandoned operation is retired
+    wherever it happens to be sitting: when it reaches the head of the
+    instance's queue, during preflight (either side of any blob copy),
+    and once per second while the executor is running it. Only the
+    executor can enforce `progress_timeout_seconds`, since it is the
+    only one of the three watching replies arrive.
+
+    The reason is recorded as an audit event against both the operation
+    and its instance, and the instance's copy is the one which
+    survives: an expired operation is eventually hard deleted, like a
+    completed one.
 
 ??? example "Python API client: execute a command on an instance"
 

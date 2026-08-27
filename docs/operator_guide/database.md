@@ -980,8 +980,16 @@ and recording one would describe the operation as something it is not.
 
 `last_progress` is the unix timestamp of the most recent observed
 forward progress, NULL when none has been observed, and `attempts`
-counts dispatches for the retry bound. Nothing enforces any of these
-values yet; that arrives with the rest of
+counts dispatches for the retry bound.
+
+`deadline` and `progress_timeout` are enforced: an operation which
+outlives either moves to the terminal `expired` state, checked at
+dequeue, during preflight and in the sidechannel executor. A NULL
+`deadline` has no request receipt time to anchor its default against,
+so it is anchored on the current state's transition time instead, which
+means a legacy row's budget restarts at each transition. `attempts` and
+`last_progress` are recorded but not yet consumed; the retry bound and
+the node-local reaper which reads them arrive with the rest of
 `docs/plans/PLAN-agent-operation-deadlines.md`.
 
 Namespace keys used to be anonymous entries inside that row's `keys`

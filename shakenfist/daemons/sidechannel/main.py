@@ -46,14 +46,22 @@ MAX_CHUNK_SIZE = 102400
 MAX_OUTSTANDING = 5
 
 
-# Backstop deadline for a single agent operation once its executor has been
-# welcomed by the agent. Normal operations complete in seconds; this only
-# fires when a welcomed agent then never finishes delivering (for example a
-# get-file that stalls mid-transfer while pings keep the socket alive), which
-# would otherwise leave the operation orphaned in the executing state until the
-# caller times out. Deliberately generous -- it is a wedge backstop, not an
-# SLA. See issue #3516.
-AGENT_OPERATION_EXECUTION_TIMEOUT = 900
+# How often the executor persists an operation's last_progress
+# attribute. The in-memory value moves on every observed reply, which
+# is what the progress timeout below is measured against; the
+# persisted one exists only so a future node-local reaper can tell a
+# stalled transfer from a slow but healthy one, and a fast chunk
+# stream must not turn into one attributes write per chunk.
+PROGRESS_PERSIST_INTERVAL = 10
+
+# How often the executor's socket loop actually evaluates the timing
+# budgets. The loop is not rate limited -- recv() returns as soon as a
+# packet arrives, so an active transfer iterates thousands of times a
+# second -- and an operation with a NULL deadline resolves its default
+# against self.state.update_time, which is an uncached GetState round
+# trip. Checking once a second is ample resolution for a 30 second
+# window and bounds the cost regardless of which branch is taken.
+BUDGET_CHECK_INTERVAL = 1
 
 
 class ConnectionFailed(Exception):
@@ -307,7 +315,10 @@ class AgentCommandHandler:
     """Dispatch and capabilities for one agent command verb."""
 
     name: str = ''
-    reports_progress = False    # read in phase 4
+    # Read by SideChannelExecutorJob.expire_if_out_of_budget(), which
+    # only applies the progress timeout while a command that can
+    # actually report progress is in flight.
+    reports_progress = False
     retryable = True            # read in phase 5
     register_as_outstanding = False
 
@@ -341,14 +352,12 @@ class PutBlobCommand(AgentCommandHandler):
 
     def dispatch(self, command_id, cmd):
         if 'blob_uuid' not in cmd:
-            self.job.agentop.state = AgentOperation.STATE_ERROR
-            self.job.agentop.error = 'missing blob uuid'
+            self.job.agentop.fail('missing blob uuid')
             return []
 
         b = blob.Blob.from_db(cmd['blob_uuid'])
         if not b:
-            self.job.agentop.state = AgentOperation.STATE_ERROR
-            self.job.agentop.error = 'missing blob'
+            self.job.agentop.fail('missing blob')
             return []
 
         # This should already have been done by preflight, but hey
@@ -469,6 +478,17 @@ class SideChannelExecutorJob(SideChannelJob):
         self.command_handlers = {
             cls.name: cls(self) for cls in AGENT_COMMAND_HANDLERS}
 
+        # Progress tracking. in_flight_handler is the handler for the
+        # command currently awaiting replies, which is what says
+        # whether the progress timeout applies at all. _last_progress
+        # is seeded when a command is dispatched, so the window
+        # measures time since that command was sent rather than since
+        # the connection opened.
+        self.in_flight_handler = None
+        self._last_progress = time.time()
+        self._last_progress_persisted = 0.0
+        self._last_budget_check = 0.0
+
         self.ready = False
         self.welcomed = False
         self.log = LOG.with_fields({
@@ -493,10 +513,35 @@ class SideChannelExecutorJob(SideChannelJob):
                 self.log.error(
                     'Executor exited with the operation still executing; '
                     'marking it errored')
-                self.agentop.state = AgentOperation.STATE_ERROR
-                self.agentop.error = (
+                self.agentop.fail(
                     'sidechannel executor exited before the operation '
                     'completed')
+
+    def _handle_command_error(self, reply):
+        """Fail the operation when the agent reports a command error.
+
+        The base implementation only emits an event, which is right
+        for the monitor job (it has no operation to fail) and was
+        survivable for the executor while a fixed backstop eventually
+        tore the connection down. It is not survivable now. The
+        operation stays EXECUTING with a command in flight and
+        self.ready False, so the next thing to notice is a timing
+        budget, and the caller is told "no progress from the agent"
+        about an agent which has just told us in detail what went
+        wrong. This phase's whole distinction is that error means the
+        operation failed and expired means the caller's budget ran
+        out; this is a failure.
+
+        Setting ready lets the socket loop take its ordinary exit --
+        say goodbye, disconnect -- rather than spinning to a budget.
+        That exit only marks an operation complete if it is still
+        executing, so it cannot overwrite the error recorded here.
+        """
+        super()._handle_command_error(reply)
+        self.agentop.fail(
+            f'agent reported a command error: {reply.command_error.error}')
+        self._abort_commands_if_terminal()
+        self.ready = True
 
     def _send_ping(self, sock):
         request = agent_pb2.HypervisorToAgentCommand(
@@ -519,6 +564,7 @@ class SideChannelExecutorJob(SideChannelJob):
         self.log.with_fields({
             'outstanding_messages': self.outstanding_message_count
         }).debug('...execute reply')
+        self.observe_progress()
         result = {
             'command': 'execute-response',
             'command-line': self.command_cache[reply.command_id],
@@ -620,6 +666,10 @@ class SideChannelExecutorJob(SideChannelJob):
             }).error('Unknown file transfer')
             raise GetException('Unknown file transfer')
 
+        # Below the guard deliberately: a reply for a transfer which is
+        # not in flight is not progress on anything.
+        self.observe_progress()
+
         sr = reply.stat_result
         self._stat_result = {
             'mode': sr.mode,
@@ -641,6 +691,10 @@ class SideChannelExecutorJob(SideChannelJob):
                 'outstanding_messages': self.outstanding_message_count
             }).error('Unknown file transfer')
             raise GetException('Unknown file transfer')
+
+        # Below the guard deliberately: a chunk for a transfer which is
+        # not in flight is not progress on anything.
+        self.observe_progress()
 
         chunk = reply.file_chunk
         if chunk.encoding != agent_pb2.FileChunk.BASE64:
@@ -718,6 +772,255 @@ class SideChannelExecutorJob(SideChannelJob):
             ]
         )
 
+    def expire_if_out_of_budget(self):
+        """Expire this operation if a caller-set timing budget is spent.
+
+        Returns True if the executor should stop. Expiring before the
+        caller returns is what makes this safe: execute()'s finally
+        block only rewrites an operation which is still executing, so
+        a terminal state set here is preserved.
+
+        This replaces a fixed 900 second backstop. Two budgets are
+        checked, and exhausting either is the same outcome -- expired,
+        with a message saying which -- because both are numbers the
+        caller chose rather than faults of the operation.
+        """
+        # Rate limited, because the caller is the socket loop and the
+        # deadline_passed() call below can be a database read; see
+        # BUDGET_CHECK_INTERVAL.
+        now = time.time()
+        if now - self._last_budget_check < BUDGET_CHECK_INTERVAL:
+            return False
+        self._last_budget_check = now
+
+        # The wall-clock deadline. Queue time and preflight time have
+        # already been spent from it, so this can fire almost
+        # immediately after dispatch.
+        if self.agentop.deadline_passed():
+            self.log.error(
+                'Operation deadline passed while executing, aborting '
+                'executor')
+            self.agentop.expire(
+                'the operation deadline passed while executing')
+            self._abandon_get_file_transfer()
+            return True
+
+        # The progress timeout, which applies only while a command
+        # which can actually report progress is in flight. This is what
+        # detects the issue #3516 wedge, in tens of seconds rather than
+        # the 900 the fixed backstop took.
+        #
+        # Note that self.last_data is not a progress signal and must
+        # never be used as one: it is refreshed by any socket traffic,
+        # and the executor pings every two seconds, so it never ages.
+        # Progress is observed explicitly in the reply handlers via
+        # observe_progress().
+        if (self.in_flight_handler is None
+                or not self.in_flight_handler.reports_progress
+                or self.ready):
+            return False
+
+        window = self.agentop.effective_progress_timeout()
+        if window is None:
+            return False
+
+        if time.time() - self._last_progress <= window:
+            return False
+
+        self.log.with_fields({
+            'command': self.in_flight_handler.name,
+            'progress_timeout': window
+        }).error('No progress from agent, aborting executor')
+        self.agentop.expire(
+            f'no progress from the agent for {window:g} seconds')
+        self._abandon_get_file_transfer()
+        return True
+
+    def _abandon_get_file_transfer(self):
+        """Tear down a half finished get-file transfer.
+
+        A no-op unless one is in flight. GetFileCommand.dispatch()
+        opens a .partial file in the blob store and hands this job
+        ownership of it; the success path in _handle_file_chunk()
+        closes it and either registers or unlinks it. Every abnormal
+        exit used to leave it open on disk until the job was collected
+        and the cleaner swept it after CLEANER_DELAY * 2, which
+        mattered little when the only route here was a 900 second
+        backstop. The progress timeout reaches it in tens of seconds
+        instead, so a wedged guest during a large get-file would
+        otherwise leave partial files occupying blob storage
+        routinely rather than rarely.
+        """
+        if not self._blob_partial_file:
+            return
+
+        partial = blob.Blob.filepath(self._blob_uuid) + '.partial'
+        try:
+            self._blob_partial_file.close()
+            os.unlink(partial)
+        except OSError as e:
+            # Never fatal: this is cleanup on a path which is already
+            # abandoning the operation, and the cleaner sweeps what we
+            # leave behind.
+            self.log.with_fields({
+                'error': str(e), 'partial': partial
+            }).warning('Failed to remove partial blob file')
+
+        self._blob_partial_file = None
+        self._blob_uuid = None
+        self._stat_result = None
+        self._agent_path_for_get = None
+
+    def observe_progress(self):
+        """Record that the agent made forward progress just now.
+
+        Called from the reply handlers rather than from the socket
+        read loop, because any traffic at all -- a ping reply, most
+        often -- refreshes self.last_data, and a liveness signal is
+        not a progress signal.
+
+        The in-memory timestamp moves on every call, and is what the
+        progress timeout in _execute_inner() is measured against. The
+        persisted attribute is throttled to one write every
+        PROGRESS_PERSIST_INTERVAL seconds: it exists for a future
+        node-local reaper reasoning about an executor which died,
+        and a 100KiB-chunk transfer would otherwise write it hundreds
+        of times a second.
+        """
+        now = time.time()
+        self._last_progress = now
+
+        if now - self._last_progress_persisted < PROGRESS_PERSIST_INTERVAL:
+            return
+
+        # The persist is bookkeeping for a reaper which does not exist
+        # yet, so it must never be able to fail an in-flight transfer.
+        # Without this a DatabaseUnavailable would propagate out of the
+        # reply handler, out of _execute_inner(), and be turned into an
+        # errored operation by execute()'s finally block. The stamp is
+        # moved only on success, so a failed write is retried on the
+        # next call rather than suppressed for a whole interval.
+        try:
+            self.agentop.record_progress(now)
+            self._last_progress_persisted = now
+        except Exception as e:
+            self.log.with_fields({'error': str(e)}).warning(
+                'Failed to persist agent operation progress')
+
+    def _abort_commands_if_terminal(self):
+        """Drop the rest of an operation's commands if it has failed.
+
+        The commands list is a fail-fast transaction: a put-blob whose
+        transfer errored must never run its chmod. Expiry counts the
+        same way as an error here -- an operation whose caller has run
+        out of budget has no business continuing to the next command.
+        Any half finished get-file transfer goes with them, since
+        nothing will ever complete it.
+
+        The two states tested are deliberately not the whole of
+        AgentOperation.TERMINAL_STATES. complete is excluded because
+        an operation only reaches it once its final command has
+        finished, so there is nothing left to abort. deleted is
+        excluded because abandoning a command sequence part way
+        through leaves the guest in a state no caller asked for --
+        a delete says the record is unwanted, not that a half applied
+        change should be left in place -- and because deciding
+        otherwise is a behaviour change this phase has no way to test
+        end to end. That gap is pre-existing rather than introduced
+        here, and interrupting live work belongs with the node-local
+        reaper in phase 5 of
+        docs/plans/PLAN-agent-operation-deadlines.md.
+        """
+        if self.agentop.state.value in (AgentOperation.STATE_ERROR,
+                                        AgentOperation.STATE_EXPIRED):
+            self.commands = []
+            self._abandon_get_file_transfer()
+
+    def _dispatch_next_command(self, sock):
+        """Send the next command in the operation to the agent.
+
+        Extracted from the socket loop so the progress window's start
+        can be tested: it is only reachable through a live vsock
+        connection otherwise.
+        """
+        requests = []
+        register_as_outstanding = False
+        cmd = self.commands.pop(0)
+        command_id = sf_random.random_id()
+
+        try:
+            handler = self.command_handlers.get(cmd['command'])
+            if not handler:
+                add_event_multi(
+                    EVENT_TYPE_STATUS, self.affected_objects,
+                    'unknown command', extra=cmd)
+                self.agentop.fail('unknown command')
+            else:
+                # The progress window only applies while this handler's
+                # command is the one in flight, so record that before
+                # dispatch. The window itself is not started here:
+                # dispatch() can block for a long time (PutBlobCommand
+                # fetches the blob if preflight did not), and the window
+                # measures time waiting on the agent, not time spent
+                # moving bytes around the hypervisor. Starting it here
+                # would expire a large put-blob before the agent had
+                # been sent anything at all.
+                self.in_flight_handler = handler
+                requests = handler.dispatch(command_id, cmd)
+                register_as_outstanding = handler.register_as_outstanding
+
+            if requests:
+                # The assignment below is a state machine transition,
+                # and no terminal state has an edge to executing, so
+                # an unguarded write raises InvalidStateException out
+                # of the executor thread. It is normally unreachable:
+                # an instance runs one executor at a time and the
+                # dispatcher will not dequeue against a live one. The
+                # exception is a replaced dispatcher generation, whose
+                # descheduled predecessor can still call
+                # agent_operation_next() -- which since this phase
+                # expires an over-deadline queued head rather than
+                # merely reading it again. Abandon the operation
+                # instead. Dropping the commands here rather than
+                # leaving it to the finally below matters: that only
+                # fires for error and expired, and self.ready is true
+                # for us to have been called at all, so a complete or
+                # deleted operation with commands left would be
+                # re-dispatched on every pass and the loop would never
+                # reach its exit.
+                if self.agentop.state.value in AgentOperation.TERMINAL_STATES:
+                    self.log.with_fields({
+                        'state': self.agentop.state.value
+                    }).warning('Operation became terminal during dispatch, '
+                               'not sending its command')
+                    self.commands = []
+                    self._abandon_get_file_transfer()
+                    return
+
+                extra = copy.copy(cmd)
+                extra['command_id'] = command_id
+                add_event_multi(
+                    EVENT_TYPE_STATUS, self.affected_objects,
+                    'executing agent command', extra=extra)
+                self.agentop.state = AgentOperation.STATE_EXECUTING
+
+                self.log.with_fields({
+                    'outstanding_messages': self.outstanding_message_count,
+                    'register_as_outstanding': register_as_outstanding
+                }).debug(f'Sending {len(requests)} messages')
+                self._send_commands_single_envelope(
+                    sock, requests,
+                    register_as_outstanding=register_as_outstanding)
+
+                # The command is on the wire now, so the progress window
+                # starts now. self.ready goes False in the same breath,
+                # which is what arms the check at all.
+                self._last_progress = time.time()
+                self.ready = False
+
+        finally:
+            self._abort_commands_if_terminal()
+
     def _execute_inner(self, vsock):
         self._send_commands_single_envelope(
             vsock.sock,
@@ -747,19 +1050,7 @@ class SideChannelExecutorJob(SideChannelJob):
                     'executor for later retry')
                 return
 
-            # Backstop against a welcomed agent that then never finishes the
-            # operation (e.g. a get-file that stalls mid-transfer). Without
-            # this the loop spins forever with the operation stuck EXECUTING,
-            # because pings keep the socket alive so no other deadline fires.
-            # execute()'s finally marks the operation errored on return. See
-            # issue #3516.
-            if (self.welcomed
-                    and time.time() - connected_at
-                    > AGENT_OPERATION_EXECUTION_TIMEOUT):
-                self.log.error(
-                    'Operation did not complete within '
-                    f'{AGENT_OPERATION_EXECUTION_TIMEOUT} seconds, aborting '
-                    'executor')
+            if self.expire_if_out_of_budget():
                 return
 
             if time.time() - self.last_data > 2:
@@ -803,6 +1094,7 @@ class SideChannelExecutorJob(SideChannelJob):
                         self.log.with_fields({
                             'outstanding_messages': self.outstanding_message_count
                         }).debug('...file chunk reply')
+                        self.observe_progress()
                         self.outstanding_message_count -= 1
                         self.log.with_fields({
                             'outstanding_messages': self.outstanding_message_count
@@ -841,8 +1133,9 @@ class SideChannelExecutorJob(SideChannelJob):
                             self._handle_file_chunk(vsock.sock, reply)
 
                         except GetException as e:
-                            self.agentop.state = AgentOperation.STATE_ERROR
-                            self.agentop.error = str(e)
+                            self.agentop.fail(str(e))
+                            self._abort_commands_if_terminal()
+                            self.ready = True
 
                     elif reply.HasField('command_error'):
                         self._handle_command_error(reply)
@@ -872,43 +1165,7 @@ class SideChannelExecutorJob(SideChannelJob):
                     return
 
                 if self.ready:
-                    requests = []
-                    register_as_outstanding = False
-                    cmd = self.commands.pop(0)
-                    command_id = sf_random.random_id()
-
-                    try:
-                        handler = self.command_handlers.get(cmd['command'])
-                        if not handler:
-                            add_event_multi(
-                                EVENT_TYPE_STATUS, self.affected_objects,
-                                'unknown command', extra=cmd)
-                            self.agentop.state = AgentOperation.STATE_ERROR
-                            self.agentop.error = 'unknown command'
-                        else:
-                            requests = handler.dispatch(command_id, cmd)
-                            register_as_outstanding = handler.register_as_outstanding
-
-                        if requests:
-                            extra = copy.copy(cmd)
-                            extra['command_id'] = command_id
-                            add_event_multi(
-                                EVENT_TYPE_STATUS, self.affected_objects,
-                                'executing agent command', extra=extra)
-                            self.agentop.state = AgentOperation.STATE_EXECUTING
-
-                            self.log.with_fields({
-                                'outstanding_messages': self.outstanding_message_count,
-                                'register_as_outstanding': register_as_outstanding
-                            }).debug(f'Sending {len(requests)} messages')
-                            self._send_commands_single_envelope(
-                                vsock.sock, requests,
-                                register_as_outstanding=register_as_outstanding)
-                            self.ready = False
-
-                    finally:
-                        if self.agentop.state.value == AgentOperation.STATE_ERROR:
-                            self.commands = []
+                    self._dispatch_next_command(vsock.sock)
 
             except socket.timeout:
                 ...

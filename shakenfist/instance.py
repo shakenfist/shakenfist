@@ -2472,6 +2472,14 @@ class Instance(dbowo):
         sidechannel daemon there skips instances with a live executor, so
         the operation being visible at the head during execution cannot
         double dispatch.
+
+        This is also the first of the deadline enforcement points. A
+        queued head whose wall-clock deadline has passed is expired and
+        retired here, and the next entry considered in the same pass,
+        so work the caller has already abandoned never occupies the
+        executor. Heads in the initial or preflight states are left
+        alone: they are mid-creation, and their enforcement point is
+        NodeAgentopOp._preflight().
         """
         # First check cheaply if there are any agent operations queued. This is
         # likely to be the case 99% of the time.
@@ -2494,25 +2502,58 @@ class Instance(dbowo):
                     changed = True
                     continue
 
-                state = agentop.state.value
-                if state == AgentOperation.STATE_QUEUED:
+                # Read once and passed down. deadline_passed() would
+                # otherwise resolve a NULL deadline's anchor with a
+                # second uncached GetState, on a path polled per ready
+                # instance every five seconds.
+                state = agentop.state
+                if state.value == AgentOperation.STATE_QUEUED:
+                    if agentop.deadline_passed(state=state):
+                        # The caller's wall-clock budget ran out while
+                        # this sat in the queue. Retire it here rather
+                        # than letting it occupy the instance's single
+                        # executor slot doing work nobody is waiting
+                        # for any more, and consider the next entry in
+                        # the same pass.
+                        agentop.expire(
+                            'the operation deadline passed while queued')
+                        queue.pop(0)
+                        changed = True
+                        continue
+
                     # Dispatchable. Leave it on the queue -- it is retired
                     # by a later call once it has left the QUEUED state.
                     result = agentop
                     break
 
-                if state in (dbo.STATE_INITIAL, AgentOperation.STATE_PREFLIGHT):
+                if state.value in (dbo.STATE_INITIAL,
+                                   AgentOperation.STATE_PREFLIGHT):
                     # Not yet dispatchable (the API is mid-enqueue, or a
                     # preflight task has yet to promote it). We like
                     # maintaining order, so claim we have no work to do
                     # right now.
+                    #
+                    # Deliberately not deadline checked, even though the
+                    # deadline may well have passed: expiring a head
+                    # whose preflight task is running would race that
+                    # task, and preflight enforces the deadline itself
+                    # (NodeAgentopOp._preflight). The gap that leaves is
+                    # a preflight task which never runs at all -- the
+                    # node it was scheduled onto died, or the cluster
+                    # operation was lost -- which wedges this queue
+                    # indefinitely. That is pre-existing, out of scope
+                    # here, and belongs to the node-local reaper in
+                    # phase 5 of
+                    # docs/plans/PLAN-agent-operation-deadlines.md,
+                    # which can apply a grace period without racing a
+                    # live task.
                     break
 
-                # EXECUTING, COMPLETE, ERROR or DELETED: this operation is
-                # finished with the queue. Retire the entry and consider
-                # the next one. This also unwedges a queue whose head
-                # errored or was deleted, which previously blocked the
-                # instance's queue forever.
+                # EXECUTING, COMPLETE, ERROR, EXPIRED or DELETED: this
+                # operation is finished with the queue. Retire the entry
+                # and consider the next one. This also unwedges a queue
+                # whose head errored, expired or was deleted, which
+                # previously blocked the instance's queue forever.
                 queue.pop(0)
                 changed = True
 
