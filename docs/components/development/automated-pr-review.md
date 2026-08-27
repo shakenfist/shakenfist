@@ -301,8 +301,9 @@ render-review.py review.json
 
 ## Projects Using This System
 
-Most of them, and the list moves: see the compliance table in
-[`docs/audits/ci-review-automation.md`](/components/development/audits/ci-review-automation/).
+Most of them, and the list moves: see the `ci-review-automation`
+section of
+[the compliance page](/components/development/audits/compliance/#ci-review-automation).
 imago was the original implementation and occystrap the first
 adaptation of it, which is why both turn up in the history above.
 

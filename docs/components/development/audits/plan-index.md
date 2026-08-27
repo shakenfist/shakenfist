@@ -78,35 +78,6 @@ status rather than guessing from the file's existence.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | N/A | - |
-| agent-python | N/A | - |
-| client-python | non-compliant | shakenfist/client-python#365 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#32 |
-| clingwrap | N/A | - |
-| cloudgood | N/A | - |
-| development | compliant | - |
-| divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#506 |
-| kerbside | compliant | - |
-| kerbside-patches | N/A | - |
-| library-utilities | non-compliant | shakenfist/library-utilities#42 |
-| occystrap | non-compliant | shakenfist/occystrap#116 |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | non-compliant | shakenfist/sfui#24 |
-| shakenfist | compliant | - |
-
-Details for non-compliant projects:
-
-- **client-python** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
-- **client-python-k3s** (Status): docs/plans/index.md is missing, so none of the 2 plan(s) in docs/plans/ are registered
-- **instar** (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): instar amend subcommand ("1.1 (qcow2 v2⇔v3 version transition, ...")
-- **library-utilities** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
-- **occystrap** (Status): index has no plan table (it must list plans in a table led by Date and Plan columns, not as prose or a bullet list); 4 master plan(s) not listed in the index: PLAN-make-the-speed.md, PLAN-post-write-verification.md, PLAN-registry-proxy.md, PLAN-structured-logging.md
-- **sfui** (Status): docs/plans/index.md is missing, so none of the 3 plan(s) in docs/plans/ are registered
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#plan-index).

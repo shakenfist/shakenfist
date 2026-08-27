@@ -61,26 +61,6 @@ PEP 503 canonical form.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | N/A | - |
-| agent-python | compliant | - |
-| client-python | compliant | - |
-| client-python-k3s | compliant | - |
-| clingwrap | compliant | - |
-| cloudgood | N/A | - |
-| development | N/A | - |
-| divergulent | compliant | - |
-| instar | N/A | - |
-| kerbside | compliant | - |
-| kerbside-patches | N/A | - |
-| library-utilities | compliant | - |
-| occystrap | compliant | - |
-| private-ci | N/A | - |
-| ryll | N/A | - |
-| sfui | N/A | - |
-| shakenfist | compliant | - |
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#dependency-name-normalization).

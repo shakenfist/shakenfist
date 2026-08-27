@@ -138,6 +138,7 @@ nav:
                 - "Audit: sfui vendored copy": components/development/audits/sfui-vendor.md
                 - "Audit: Test coverage": components/development/audits/test-coverage.md
                 - "Audit: Workflow standards": components/development/audits/workflow-standards.md
+                - "Consistency audit compliance": components/development/audits/compliance.md
                 - "Consistency Audit Specifications": components/development/audits/README.md
             - Plans:
                 - "Plans index": components/development/plans/index.md
@@ -145,6 +146,7 @@ nav:
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
                 - "Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster": components/development/plans/PLAN-plan-template-blocks.md
+                - "Plan: split the generated compliance tables out of the audit specifications": components/development/plans/PLAN-audit-compliance-split.md
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md

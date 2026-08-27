@@ -438,6 +438,44 @@ Omitting the step does not fail at job start -- it fails part way through
 with `docker: command not found`, whenever the first container command is
 reached.
 
+### Self-hosted runners and the GitHub CLI
+
+The same applies to `gh`: the `[self-hosted, debian-12, ...]` runners do
+not ship it either, so any job that files an issue, opens a PR or
+otherwise calls the GitHub CLI must install it first. Do not paste an
+apt block into the workflow -- call the shared installer, which is a
+no-op when `gh` is already present:
+
+```yaml
+      - name: Install GitHub CLI on host
+        run: tools/ci/install-gh-cli.sh
+```
+
+The `[self-hosted, claude-code]` and `[self-hosted, static]` runners do
+have `gh` preinstalled, which is why the Claude Code workflows and the
+comment-triggered bot workflows call it directly. The `static` case is
+load-bearing rather than incidental: `shakenfist/actions`'
+`pr-bot-trigger` composite action -- the first step of every
+`@shakenfist-bot please ...` workflow across the fleet -- is built
+entirely on `gh api` and `gh pr comment`, so if those runners lacked
+`gh` no bot trigger anywhere would work. Instar's own
+`pr-address-comments.yml` run 24368074053 (2026-04-13) has that step
+passing on a `static` runner.
+
+So the rule is per runner label, not per workflow: add the installer
+step on `debian-12` (and any new pool that turns out to lack `gh`), and
+leave the `claude-code` and `static` jobs alone.
+
+This one bites late rather than early. The `gh` call is usually the last
+thing a job does -- open the PR, file the issue -- so the job burns its
+full runtime, succeeds at the real work, and then dies on
+`gh: command not found`. That is exactly what happened to
+`rust-nightly-bump` on 2026-08-24: it validated `nightly-2026-08-24`,
+committed it and pushed the branch, then failed the run without opening
+the PR. Worse, in `release.yml` the `gh` call sits on a `if: failure()`
+error-reporting path, where a missing `gh` would have silently swallowed
+the report of the original failure.
+
 ### Merge queue and the `develop` ruleset
 
 `develop` is gated by a repository **ruleset** named "Develop branch"
@@ -806,6 +844,11 @@ The self-hosted runners have no Docker preinstalled, so any job touching
 `docker` or a container-backed Makefile target needs an "Install Docker"
 step -- see "Self-hosted runners and Docker" in `docs/development.md`.
 
+The `debian-12` runners have no `gh` preinstalled either, so any job on
+those that calls the GitHub CLI needs a `tools/ci/install-gh-cli.sh`
+step -- see "Self-hosted runners and the GitHub CLI" in
+`docs/development.md`.
+
 ## Scripts
 
 - `tools/address-comments-with-claude.sh` - Addresses review comments (reads JSON); CI stages each fix for it via `tools/ci/stage-autofix-changes.sh --tracked-only` (see "How Automated Comment Addressing Works" above)
@@ -815,6 +858,7 @@ step -- see "Self-hosted runners and Docker" in `docs/development.md`.
 - `tools/review-schema.json` - JSON schema for review output validation
 - `scripts/differential-fuzz.py` - Differential fuzzing script (instar vs qemu-img + libyal)
 - `scripts/extract-fuzz-corpus.py` - Seeds + restores the coverage-fuzz corpus from instar-testdata
+- `tools/ci/install-gh-cli.sh` - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)
 - `tools/ci/fuzz-tier.sh` - Computes tiered nightly per-target fuzz durations
 - `tools/ci/report-fuzz-crash.sh` - Files the `security-audit` issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in `docs/testing.md`)
 - `tools/ci/pick-fuzz-artifact.sh` - Chooses which libFuzzer artifact to report as the reproducer

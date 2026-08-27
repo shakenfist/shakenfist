@@ -37,13 +37,21 @@ documents the design. When adopting it, note dorny/paths-filter's
 `predicate-quantifier: 'every'` trap: the default ANY-match semantics
 make a `'**'` pattern defeat every exclusion.
 
-Dedicated content-scanner workflows (gitleaks, trufflehog,
-detect-secrets) are exempt. Their whole point is to read the
-human-written text a filter would skip: a secret lands in docs or
-review marks as easily as in code.
+Dedicated content-scanner workflows are exempt. Their whole point is to
+read the human-written text a filter would skip: a secret lands in docs
+or review marks as easily as in code, and so does an instruction
+smuggled into text an agent will load.
+
+The tools that count are `CONTENT_SCANNERS` in `scripts/audit-check.py`
+— the credential scanners (gitleaks, trufflehog, detect-secrets) plus
+`skillsaw`, which lints the agent context. skillsaw earns the exemption
+for the same reason the credential scanners do, not because it is a
+secret scanner: `CONTENT_SCANNERS` is deliberately a superset of
+`SECRET_SCANNERS`, so a repository whose only scanner is skillsaw still
+fails [the secret scanning audit](/components/development/audits/secret-handling/).
 
 *Dedicated* is measured per job: every job in the workflow must invoke
-a scanner, outside of comments. The argument for the exemption is about
+one of those tools, outside of comments. The argument for the exemption is about
 the scanner job, not the file it lives in. Asking merely whether a
 scanner appeared anywhere in the file gave `shakenfist/actions` a pass
 for a `ci.yml` that ran lint, unit tests and the LLM reviewer on
@@ -59,7 +67,9 @@ ryll's secret scan skips documentation-only pull requests.
 
 Other deliberate exceptions — a lane that must run even for docs-only
 changes — take an `audit-ok: no-path-filter` comment anywhere in the
-workflow file, ideally with a reason.
+workflow file, ideally with a reason. client-python needed one when it
+first put its agent-context lint beside its credential scan, before
+this audit knew what skillsaw was; that marker is now redundant there.
 
 Repositories with neither a `docs/` directory nor review tracking have
 nothing for a filter to exclude and are not applicable, as are
@@ -74,34 +84,6 @@ for advisory ones.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#123 |
-| client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#29 |
-| clingwrap | non-compliant | shakenfist/clingwrap#118 |
-| cloudgood | N/A | - |
-| development | compliant | - |
-| divergulent | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
-| kerbside-patches | compliant | - |
-| library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#113 |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | non-compliant | shakenfist/sfui#14 |
-| shakenfist | compliant | - |
-
-Details for non-compliant projects:
-
-- **agent-python** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-- **client-python-k3s** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-- **clingwrap** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-- **occystrap** (Status): 2 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering), python-unit-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-- **sfui** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#expensive-lane-path-filter).

@@ -55,30 +55,6 @@ information, not delete it.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | compliant | - |
-| agent-python | compliant | - |
-| client-python | compliant | - |
-| client-python-k3s | compliant | - |
-| clingwrap | compliant | - |
-| cloudgood | compliant | - |
-| development | compliant | - |
-| divergulent | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
-| kerbside-patches | compliant | - |
-| library-utilities | compliant | - |
-| occystrap | compliant | - |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3732 |
-
-Details for non-compliant projects:
-
-- **shakenfist** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:151, docs/developer_guide/subsystem_internals.md:153, docs/developer_guide/subsystem_internals.md:172, docs/developer_guide/subsystem_internals.md:226, docs/developer_guide/subsystem_internals.md:243, docs/developer_guide/subsystem_internals.md:447 (+7 more)
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#plan-phase-references).

@@ -40,31 +40,6 @@ detail survives somewhere before trimming the README.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | compliant | - |
-| agent-python | compliant | - |
-| client-python | non-compliant | shakenfist/client-python#353 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#22 |
-| clingwrap | compliant | - |
-| cloudgood | N/A | - |
-| development | compliant | - |
-| divergulent | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
-| kerbside-patches | compliant | - |
-| library-utilities | compliant | - |
-| occystrap | compliant | - |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | compliant | - |
-| shakenfist | compliant | - |
-
-Details for non-compliant projects:
-
-- **client-python** (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation
-- **client-python-k3s** (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#readme-structure).

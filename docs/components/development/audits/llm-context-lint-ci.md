@@ -58,39 +58,6 @@ pre-commit manager will have the `rev` kept current automatically.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#125 |
-| client-python | non-compliant | shakenfist/client-python#366 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#35 |
-| clingwrap | non-compliant | shakenfist/clingwrap#120 |
-| cloudgood | non-compliant | shakenfist/cloudgood#8 |
-| development | compliant | - |
-| divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#514 |
-| kerbside | non-compliant | shakenfist/kerbside#359 |
-| kerbside-patches | compliant | - |
-| library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#119 |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | non-compliant | shakenfist/sfui#25 |
-| shakenfist | non-compliant | shakenfist/shakenfist#3832 |
-
-Details for non-compliant projects:
-
-- **agent-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **client-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **client-python-k3s** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **clingwrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **instar** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **kerbside** (Status): skillsaw does not run from a CI workflow
-- **occystrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **sfui** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **shakenfist** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#llm-context-lint-ci).
