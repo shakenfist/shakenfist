@@ -355,7 +355,7 @@ table entirely (decision D8).
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
-| 4b. Client support for claims | PLAN-scheduler-reservations-phase-04b-client.md | Not started |
+| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Not started |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
@@ -542,11 +542,25 @@ shipped without that string; it was found by a question at
 close-out rather than by any review, and the miss is recorded
 in phase 4's Future work.
 
-This phase depends on a client release, which is outside this
-repository's control. If that release has not happened when
-the rest of the plan is otherwise finished, the honest move
-is to leave this phase open and say so rather than to close
-the plan around it.
+*Correction (2026-08-27), from the phase 4b survey.* The
+premise above -- that a test written against new `apiclient`
+methods cannot pass in CI until a client release exists -- is
+false, and has been since 2026-06-24. Cluster CI does not
+install the released client: it builds a wheel from a
+`client-python` checkout at `develop` and installs that, via
+`sf_build_local_wheels` in `examples/_shared/site.yml`. A verb
+merged to the client's `develop` is in this repository's
+cluster CI on the next merge-queue run. D7's reasoning was
+already stale when phase 4 wrote it down.
+
+A release is still needed, but by phase 4c rather than by this
+phase's own functional coverage: the conductor installs a
+released client from PyPI. Cutting it is one tag and one
+approval in `shakenfist/client-python`, not something outside
+the project's control.
+
+The plan is
+[PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md).
 
 **Phase 4c — conductor claim integration.** Implement D18 in
 the private CI conductor (the `shakenfist/private-ci`

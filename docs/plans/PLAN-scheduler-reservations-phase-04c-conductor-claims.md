@@ -188,9 +188,11 @@ suite has no watchdog to trip.
 401, 403, 404, 406, 409, 500 and 507, but not 503 -- and the
 claims API answers 503 for both of its retryable refusals
 (`no_cluster_capacity` and `conflict`, per `CLAIM_REFUSAL_STATUS`
-at `shakenfist/external_api/auth.py:1254-1262`). A caller today
-must string-match to tell "retry in a moment" from a durable
-error. client-python#364 already scopes "the status codes worth
+at `shakenfist/external_api/auth.py:1254-1262`). A 503 still raises a bare
+`APIException` carrying `status_code`, so a caller can tell
+"retry in a moment" from a durable error by attribute -- but
+catching a class reads better than inspecting one, and E6
+branches on exactly that distinction. client-python#364 already scopes "the status codes worth
 typed exceptions" for phase 4b; 503 is the specific one this
 phase's refusal handling depends on, so it is named here rather
 than left to that issue's discretion.
