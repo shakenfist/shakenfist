@@ -26,6 +26,18 @@ merges the caller's fields over the record last, and one of those fields is
 is why this tool matches on ``execution duration`` and why grepping a log
 stream for ``Added event`` finds nothing.
 
+The same event also carries the cross-op coalescing instrumentation, when
+the build which emitted it has any: ``coalesce_outcome`` (``ran``, or which
+of the three guards skipped the fold), ``coalesce_seconds`` (the wall clock
+cost of the ``claim_coalescible_siblings`` call) and ``coalesce_folded`` (how
+many sibling operations that call folded away). ``BaseClusterOperation.execute``
+records them and both dispatchers copy them onto this event through
+``op.execution_duration_extra``. Events without them are from a build
+predating the instrumentation and are reported as such rather than counted as
+folds which did not happen -- the distinction matters, because a fold which
+matches nothing and a fold which never runs look identical otherwise, and that
+is exactly how coalescing stayed broken for three months (#3878).
+
 This reads that stream as newline delimited JSON on stdin. The same lines
 reach three different places and all three work here:
 
@@ -115,7 +127,9 @@ class Sample:
     """One queue-wait observation."""
 
     def __init__(self, wait, execution, defer_count, queue_class, lane,
-                 operation_type, program, timestamp):
+                 operation_type, program, timestamp,
+                 coalesce_outcome=None, coalesce_seconds=None,
+                 coalesce_folded=None):
         self.wait = wait
         self.execution = execution
         self.defer_count = defer_count
@@ -124,6 +138,14 @@ class Sample:
         self.operation_type = operation_type
         self.program = program
         self.timestamp = timestamp
+        # None on every event emitted by a build predating the
+        # coalescing instrumentation. Those samples are still perfectly
+        # good queue-wait observations, so they stay in every other
+        # table and are simply absent from the coalescing one -- which
+        # is not the same as counting them as a zero.
+        self.coalesce_outcome = coalesce_outcome
+        self.coalesce_seconds = coalesce_seconds
+        self.coalesce_folded = coalesce_folded
 
 
 def classify_queue(queue_name):
@@ -226,6 +248,20 @@ def parse_line(line):
 
     queue_class, lane = classify_queue(extra.get('queue_name'))
 
+    coalesce_outcome = extra.get('coalesce_outcome')
+    if not isinstance(coalesce_outcome, str):
+        coalesce_outcome = None
+
+    coalesce_seconds = extra.get('coalesce_seconds')
+    if (not isinstance(coalesce_seconds, (int, float))
+            or isinstance(coalesce_seconds, bool)):
+        coalesce_seconds = None
+
+    coalesce_folded = extra.get('coalesce_folded')
+    if not isinstance(coalesce_folded, int) or isinstance(
+            coalesce_folded, bool):
+        coalesce_folded = None
+
     return Sample(
         wait=float(wait),
         execution=None if execution is None else float(execution),
@@ -234,7 +270,11 @@ def parse_line(line):
         lane=lane,
         operation_type=operation_type_of(record) or 'unknown',
         program=record.get('program') or 'unknown',
-        timestamp=record.get('ts'))
+        timestamp=record.get('ts'),
+        coalesce_outcome=coalesce_outcome,
+        coalesce_seconds=(
+            None if coalesce_seconds is None else float(coalesce_seconds)),
+        coalesce_folded=coalesce_folded)
 
 
 def read_samples(stream):
@@ -266,6 +306,21 @@ def format_seconds(value):
     if value is None:
         return '-'
     return f'{value:.2f}'
+
+
+def format_milliseconds(value):
+    """Render a duration in milliseconds, to one decimal place.
+
+    The wait tables' two decimal places of seconds are right for waits
+    measured in seconds, and useless for the coalescing fold: a fold
+    which costs five milliseconds and a fold which costs fifty both
+    print as '0.00'. The point of measuring the fold at all is to
+    confirm or correct the ~200 ms claim in baseoperation.py, and a
+    table which can only say "under ten milliseconds" confirms nothing.
+    """
+    if value is None:
+        return '-'
+    return f'{value * 1000:.1f}'
 
 
 class Group:
@@ -416,6 +471,152 @@ def apply_min_samples(groups, min_samples):
                   f'samples omitted, {samples} in total)')
 
 
+# Every value BaseClusterOperation.execute records for coalesce_outcome.
+# 'ran' means the fold's SQL was issued; the other four each name the
+# guard which skipped it. 'type_not_coalescible' is an operation type
+# which declares no coalescing at all -- most cluster operations, and
+# the boring case -- while 'no_coalescible_tasks' is a type which could
+# have coalesced and this time had nothing to. See
+# shakenfist/operations/baseoperation.py, whose guard chain is the
+# source of truth these strings are checked against by
+# test_every_outcome_the_code_records_is_reported.
+COALESCE_OUTCOMES = [
+    'ran',
+    'batch_size_one',
+    'not_cluster_wide',
+    'no_coalescible_tasks',
+    'type_not_coalescible',
+]
+
+
+class CoalesceGroup:
+    """The coalescing observations in one row."""
+
+    def __init__(self, label):
+        self.label = label
+        self.samples = []
+
+    def add(self, sample):
+        self.samples.append(sample)
+
+    @property
+    def ran(self):
+        return [s for s in self.samples if s.coalesce_outcome == 'ran']
+
+    def row(self):
+        durations = [s.coalesce_seconds for s in self.ran
+                     if s.coalesce_seconds is not None]
+        folded = sum(s.coalesce_folded for s in self.ran
+                     if s.coalesce_folded is not None)
+        counts = collections.Counter(
+            s.coalesce_outcome for s in self.samples)
+        return ([
+            self.label,
+            str(len(self.samples)),
+            format_milliseconds(percentile(durations, 0.5)),
+            format_milliseconds(percentile(durations, 0.9)),
+            format_milliseconds(percentile(durations, 0.99)),
+            format_milliseconds(max(durations) if durations else None),
+            str(folded),
+        ] + [str(counts.get(outcome, 0)) for outcome in COALESCE_OUTCOMES])
+
+
+COALESCE_HEADINGS = (
+    ['', 'n', 'p50 ms', 'p90 ms', 'p99 ms', 'max ms', 'folded']
+    + COALESCE_OUTCOMES)
+
+
+def print_coalescing_table(title, groups, footnote=None):
+    """Render the coalescing table.
+
+    Deliberately not the banner-and-span renderer the wait tables use:
+    the columns here are a duration distribution and a set of outcome
+    counts, which do not divide into the same column groups.
+    """
+    print()
+    print(title)
+    print('-' * len(title))
+
+    rows = [g.row() for g in groups]
+    if not rows:
+        # Not "no instrumentation" -- print_coalescing_report returns
+        # early in that case and never reaches here, so the only way to
+        # empty this table is --min-samples, which the footnote below
+        # then quantifies.
+        print('  (every row fell below --min-samples)')
+        if footnote:
+            print('  ' + footnote)
+        return
+
+    widths = [len(h) for h in COALESCE_HEADINGS]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(cell))
+
+    header = [COALESCE_HEADINGS[0].ljust(widths[0])]
+    header.extend(h.rjust(widths[i])
+                  for i, h in enumerate(COALESCE_HEADINGS) if i > 0)
+    print('  ' + ' '.join(header))
+
+    for row in rows:
+        line = [row[0].ljust(widths[0])]
+        line.extend(cell.rjust(widths[i])
+                    for i, cell in enumerate(row) if i > 0)
+        print('  ' + ' '.join(line))
+
+    if footnote:
+        print('  ' + footnote)
+
+
+def coalescing_groups(samples, key):
+    groups = collections.OrderedDict()
+    for sample in samples:
+        if sample.coalesce_outcome is None:
+            continue
+        label = key(sample)
+        if label not in groups:
+            groups[label] = CoalesceGroup(label)
+        groups[label].add(sample)
+    return sorted(groups.values(), key=lambda g: -len(g.samples))
+
+
+def print_coalescing_report(samples, min_samples):
+    """Report what the cross-op coalescing fold cost and whether it ran.
+
+    The outcome counts matter as much as the durations. Coalescing was
+    dead for three months (#3878) with a green test suite and a report
+    which could not have shown it, because a fold that matches nothing
+    and a fold that never runs both produce no evidence at all. Here
+    they are different columns.
+    """
+    instrumented = [s for s in samples if s.coalesce_outcome is not None]
+    if not instrumented:
+        print()
+        print('Coalescing')
+        print('----------')
+        print('  (no samples carrying coalescing instrumentation -- every '
+              'event in this stream predates it)')
+        return
+
+    for title, key in (
+            ('Coalescing, by operation type',
+             lambda s: s.operation_type),
+            ('Coalescing, by queue class and priority lane',
+             lambda s: f'{s.queue_class} / {s.lane}')):
+        kept, footnote = apply_min_samples(
+            coalescing_groups(samples, key), min_samples)
+        print_coalescing_table(title, kept, footnote)
+
+    uninstrumented = len(samples) - len(instrumented)
+    if uninstrumented:
+        print()
+        print(f'  {uninstrumented} of {len(samples)} samples carry no '
+              'coalescing instrumentation and are absent from the tables '
+              'above.')
+        print('  Those events come from a build predating it; they are not '
+              'counted as folds which did not happen.')
+
+
 def print_window(samples):
     stamps = sorted(s.timestamp for s in samples if s.timestamp)
     print(f'Samples: {len(samples)}')
@@ -476,6 +677,7 @@ def main(argv=None, stream=None):
             grouped(samples, key), args.min_samples)
         print_table(title, kept, footnote)
 
+    print_coalescing_report(samples, args.min_samples)
     print_notes()
     return 0
 

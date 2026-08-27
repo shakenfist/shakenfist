@@ -7,6 +7,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.operations.error_report import ErrorReport
@@ -129,6 +130,80 @@ class BaseClusterOperation(BaseOperation):
     coalescible_tasks: 'frozenset[Enum]' = frozenset()
     coalescible_target_column: Optional[str] = None
 
+    def execution_duration_extra(
+            self,
+            start_time: float,
+            queue_name: Optional[str]
+    ) -> dict[str, Any]:
+        """Build the ``extra`` payload for the end-of-op event.
+
+        One end-of-op event carries the queue-wait time, the execution
+        duration and the coalescing instrumentation, because both
+        dispatchers can see all of it here and a second event would
+        double the eventlog cost on the critical path -- which
+        profiling identified as the largest per-op overhead the
+        queue-performance plan added.
+
+        This lives on the operation rather than in either dispatcher
+        because both of them emit it and
+        ``tools/queue-wait-report.py`` reads one stream carrying
+        events from both. Two copies of the field names is two chances
+        for them to drift apart, and a report which silently sees a
+        field from only one dispatcher understates whatever it
+        measures.
+
+        ``wait_seconds`` and its companions are only populated when
+        the op carries a ``created_at`` -- that is, when it was loaded
+        from the cluster_operations table rather than constructed
+        in-memory outside the dispatch path.
+        """
+        extra: dict[str, Any] = {'seconds': time.time() - start_time}
+        if self.created_at is not None:
+            extra['wait_seconds'] = start_time - self.created_at
+            extra['defer_count'] = self.current_defer_count
+            extra['queue_name'] = queue_name
+
+        if self.coalesce_outcome is not None:
+            extra['coalesce_outcome'] = self.coalesce_outcome
+        if self.coalesce_seconds is not None:
+            extra['coalesce_seconds'] = self.coalesce_seconds
+        if self.coalesce_folded is not None:
+            extra['coalesce_folded'] = self.coalesce_folded
+        return extra
+
+    def _coalescible_target_reference(
+            self
+    ) -> Optional[tuple[str, str]]:
+        """The (object_type, uuid) this operation coalesces against.
+
+        Returns None when the operation declares no coalescing target,
+        when the target column is unset on this instance, or when the
+        schema does not say which object type the column names.
+
+        The object type is resolved through the schema model's
+        ``target_fields`` map -- the same declaration
+        ``schema/operations/util.py:enqueue_cluster_operation`` uses to
+        write ``cluster_operation_targets`` rows -- rather than being
+        hard-coded per operation class. A future multi-column
+        coalescing key (#3884) adds columns to that map, not special
+        cases here.
+        """
+        target_column = type(self).coalescible_target_column
+        if not target_column:
+            return None
+
+        target_uuid = getattr(self, target_column, None)
+        if target_uuid is None:
+            return None
+
+        model_class = getattr(self._schema, 'model', None)
+        target_fields = getattr(model_class, 'target_fields', {})
+        target_object_type = target_fields.get(target_column)
+        if target_object_type is None:
+            return None
+
+        return (str(target_object_type), str(target_uuid))
+
     @classmethod
     def _db_get(cls, object_uuid: str) -> Optional[dict[str, Any]]:
         o = mariadb.get_cluster_operation(object_uuid)
@@ -201,6 +276,12 @@ class BaseClusterOperation(BaseOperation):
         # dispatcher just skips emitting wait_seconds in that case.
         self.__created_at: Optional[float] = static_values.get('created_at')
 
+        # The schema module this operation was built from. Kept so
+        # ``BaseClusterOperation`` can read ``model.target_fields`` and
+        # resolve which object a coalescible target column points at,
+        # rather than hard-coding one object type per operation class.
+        self._schema: ModuleType = schema
+
         # We only know this if we have been dequeued
         self._queue_name: Optional[str] = None
 
@@ -221,6 +302,24 @@ class BaseClusterOperation(BaseOperation):
         # picked up by the next dispatcher cycle with a batch >= 2, where
         # the fold will run.
         self.dispatcher_batch_size: Optional[int] = None
+
+        # Coalescing instrumentation, read by both dispatchers after
+        # execute() returns and reported on the per-op 'execution
+        # duration' event. ``coalesce_outcome`` says whether the
+        # cross-op fold ran or which guard skipped it, because a
+        # measurement which cannot tell "the fold ran and found
+        # nothing" from "the fold never ran" is how #3878 stayed
+        # invisible for three months: zero looked exactly like
+        # disabled. ``coalesce_seconds`` is the cost of the
+        # claim_coalescible_siblings call, which baseoperation has
+        # asserted to be ~200 ms under load without ever measuring it.
+        # It is measured with a monotonic clock: it is a pure interval,
+        # never differenced against a stored timestamp the way
+        # ``wait_seconds`` is, so an NTP step during the call must not
+        # be able to turn it into a negative number in the report.
+        self.coalesce_outcome: Optional[str] = None
+        self.coalesce_seconds: Optional[float] = None
+        self.coalesce_folded: Optional[int] = None
 
         # Convert tasks names back into enum entries
         self.__tasks: list[Enum] = []
@@ -301,7 +400,8 @@ class BaseClusterOperation(BaseOperation):
         #    transitioned to ``complete``; when their work_queue row
         #    eventually surfaces the dispatcher's terminal-state branch
         #    drops it cleanly. Logged as a single "coalesced sibling
-        #    ops" status event on the survivor.
+        #    ops" status event on the survivor and on its coalescing
+        #    target.
         coalescible = type(self).coalescible_tasks
         target_column = type(self).coalescible_target_column
 
@@ -352,12 +452,43 @@ class BaseClusterOperation(BaseOperation):
             self.queue_name is not None
             and self.queue_name.startswith('networknode-'))
 
-        if (coalescible and target_column and not skip_due_to_empty_queue
-                and queue_is_cluster_wide):
+        # Each branch records the guard which decided the outcome, so
+        # the guards exist exactly once and the instrumentation cannot
+        # report an outcome the code did not take -- which is the class
+        # of invisible wrongness this phase exists to remove. See
+        # decision 4 of
+        # PLAN-queue-performance-phase-09-prove-coalescing.md.
+        #
+        # 'type_not_coalescible' and 'no_coalescible_tasks' are
+        # deliberately different outcomes. The first is "this operation
+        # type declares no coalescing at all", which is every cluster
+        # operation that is not a NetOp and so the overwhelming
+        # majority of them; the second is "this job could have
+        # coalesced and happened not to contain anything coalescible".
+        # Merging them buries the interesting case under the boring one
+        # in the by-queue-class table, and decision 4's whole aim is
+        # that "coalescing is doing nothing" stays answerable.
+        if not coalescible or not target_column:
+            self.coalesce_outcome = 'type_not_coalescible'
+        elif skip_due_to_empty_queue:
+            self.coalesce_outcome = 'batch_size_one'
+        elif not queue_is_cluster_wide:
+            self.coalesce_outcome = 'not_cluster_wide'
+        else:
             survivor_coalescible_tasks = [
                 t for t in unique_tasks if t in coalescible]
             target_uuid_attr = getattr(self, target_column, None)
-            if survivor_coalescible_tasks and target_uuid_attr is not None:
+            if not survivor_coalescible_tasks or target_uuid_attr is None:
+                self.coalesce_outcome = 'no_coalescible_tasks'
+            else:
+                # Recorded before the call, not after it. If
+                # claim_coalescible_siblings raises, a caller which
+                # catches and continues would otherwise emit an event
+                # with no outcome at all, which the report reads as
+                # "from a build predating the instrumentation" rather
+                # than as a fold which was attempted.
+                self.coalesce_outcome = 'ran'
+                coalesce_start = time.monotonic()
                 folded = mariadb.claim_coalescible_siblings(
                     operation_type=self.object_type,
                     target_column=target_column,
@@ -365,17 +496,39 @@ class BaseClusterOperation(BaseOperation):
                     task_names=[
                         t.name for t in survivor_coalescible_tasks],
                     exclude_op_uuid=str(self.uuid))
+                self.coalesce_seconds = time.monotonic() - coalesce_start
+                self.coalesce_folded = len(folded)
                 if folded:
-                    self.add_event(
-                        EVENT_TYPE_STATUS,
-                        'coalesced sibling ops',
-                        extra={
-                            'sibling_count': len(folded),
-                            'sibling_uuids': folded,
-                            'tasks': [
-                                t.name
-                                for t in survivor_coalescible_tasks],
-                        })
+                    # Emitted against the coalescing target as well as
+                    # the operation. An operation is hard deleted thirty
+                    # seconds after it reaches a final state and takes
+                    # its event_objects rows with it (#3864), so an
+                    # event recorded only against the survivor is
+                    # unreadable within a minute of the fold happening
+                    # -- which is why nothing noticed this event had
+                    # never fired at all (#3878). The target outlives
+                    # the operation, so the same event on the target is
+                    # still there to be queried and asserted on. The
+                    # enqueue-side dedup emits against both for the same
+                    # reason; see ``net_op.create_and_enqueue``.
+                    references: list[Any] = [
+                        (str(self.object_type), str(self.uuid))]
+                    target_reference = self._coalescible_target_reference()
+                    if target_reference:
+                        references.append(target_reference)
+
+                    if not self.in_memory_only:
+                        eventlog.add_event_multi(
+                            EVENT_TYPE_STATUS,
+                            references,
+                            'coalesced sibling ops',
+                            extra={
+                                'sibling_count': len(folded),
+                                'sibling_uuids': folded,
+                                'tasks': [
+                                    t.name
+                                    for t in survivor_coalescible_tasks],
+                            })
 
         for t in unique_tasks:
             self.dispatch_task(t)  # type: ignore[attr-defined]

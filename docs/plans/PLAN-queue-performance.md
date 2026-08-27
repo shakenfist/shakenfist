@@ -2,7 +2,13 @@
 
 ## Status
 
-Complete.
+In progress.
+
+Reopened on 2026-08-25 with three further phases. The plan reached 8
+of 8 while explicitly recording two things it had not proven and two
+follow-ups it had not built; those are now phases 9, 10 and 11 rather
+than issues nobody is scheduled to reach. Phases 1-8 are unchanged and
+remain complete.
 
 Steps 1-6 merged to `develop` as PR #3194 on 2026-05-26. Step 7
 measured the result and decided against explicit fairness; the
@@ -17,11 +23,16 @@ enqueue-side dedup and the worker-side fold -- joined
 never match: an undashed uuid against a dashed one, and an enum value
 against an enum name. Both primitives therefore always returned
 "nothing found", and the `coalesced sibling ops` event had fired zero
-times in seven days on `sfcbr`. Fixed here as #3878, with eight tests
-which execute the real statements against a real database; #3879
-tracks the missing functional coverage that let the defect sit
-unnoticed since 2026-05-26. The full audit, including the three
-headings which found nothing, is in
+times in seven days on `sfcbr`. Fixed here as #3878, with thirteen tests
+in `shakenfist/tests/test_mariadb_coalescing.py` which execute the
+real statements against an in-memory sqlite database built from
+`mariadb.py`'s own table definitions. That is enough to catch a join
+which can never match, which is what #3878 was, and explicitly not
+enough for the fold's `FOR UPDATE` half: the sqlite dialect emits
+nothing at all for `FOR UPDATE`, so every one of those tests runs
+uncontended. #3879 tracks the missing functional coverage that let
+the defect sit unnoticed since 2026-05-26, and phase 9 addresses it.
+The full audit, including the three headings which found nothing, is in
 [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md).
 
 Review of that fix found a second defect it would have activated:
@@ -44,8 +55,8 @@ Two things this plan changed are deliberately still unproven:
   `claim_coalescible_siblings` is recorded in `baseoperation.py` as
   costing ~200 ms under load, and it now also takes `FOR UPDATE`
   locks on `object_states` rows and issues an UPDATE against a hot
-  table. Re-measuring both is folded into #3879, alongside the
-  functional coverage.
+  table. Both are re-measured in phase 9, alongside the functional
+  coverage.
 
 ## Execution
 
@@ -59,6 +70,9 @@ Two things this plan changed are deliberately still unproven:
 | 6. Caller-site audit | (in PR #3194) | Complete |
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
 | 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
+| 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | In progress |
+| 10. The 15 second dependency wait | (not yet planned) | Not started |
+| 11. Multi-column coalescing key | (not yet planned) | Not started |
 
 ## Problem
 
@@ -151,6 +165,50 @@ audit:
    finding is resolved, or declined in writing, before this plan
    is marked complete. If the audit finds nothing, that is
    recorded in one sentence.
+
+## Phases 9 to 11
+
+Added on 2026-08-25. Steps 1-8 answered the question the plan was
+written to ask -- the wait tail is gone -- but left three things
+behind, each of which is now a phase rather than an issue waiting
+for someone to notice it.
+
+9. **Prove coalescing works.** Step 7's numbers were gathered while
+   coalescing was inert, and the fold's cost has never been
+   measured. There is also still no functional coverage anywhere
+   that coalescing matches a row on a running cluster (#3879),
+   which is what let #3878 sit on `develop` for three months. This
+   phase makes the fold's evidence durable enough to assert on,
+   adds that assertion to the functional suite, instruments the
+   fold's cost onto the event `tools/queue-wait-report.py` already
+   reads, and re-measures on `sfcbr`. See
+   [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md).
+
+10. **The 15 second dependency wait.** Step 7 measured a p50 of
+    15.78 s on the `user_waiting` queue and traced all of it to
+    deferral: a dependency wait re-enqueues a flat 15 seconds into
+    the future on the queues `sf-queues` drains, where `sf-net`
+    instead backs off from 0.1 s to a 15 s cap. Restricted to
+    operations which never deferred, the same p50 is 0.77 s. This
+    is the largest user-visible latency in the whole sample and it
+    has nothing to do with queue order, which is why step 7 excluded
+    it from the fairness question and filed it as #3863 instead.
+    Not yet planned.
+
+11. **Multi-column coalescing key.** The fold keys on a single
+    target column, which for `net_op` means "the same network". A
+    per-node task therefore cannot be coalesced: two hypervisors'
+    operations look identical to both dedup paths while doing
+    different work on different hosts. That is why
+    `network_ensure_mesh` was removed from `COALESCIBLE_TASKS` in
+    phase 8, and why `network_apply_create_hypervisor` -- fanned out
+    per instance during node startup, and idempotent -- has never
+    been coalescible despite the step 6 audit identifying it.
+    Generalising the key to a list of `(column, value)` pairs lets
+    both back in. Filed as #3884. Not yet planned. Phase 9 comes
+    first deliberately: generalising a primitive that was silently
+    broken for three months, before anything proves it works on a
+    running cluster, repeats the mistake.
 
 ## What step 7 measured
 
@@ -249,7 +307,8 @@ documentation, which claimed 30 day retention, is corrected.
   node), which the current `target_column` parameter does not
   support. Generalising to a list of `(column, value)` pairs is
   straightforward; deferred so step 5's CI run gives us
-  measurable baseline numbers first.
+  measurable baseline numbers first. Now scheduled as phase 11,
+  behind phase 9, and tracked as #3884.
 
 * **Explicit fairness for low-priority queues**. The dequeue
   query honours strict priority order via `FIELD()`; lower

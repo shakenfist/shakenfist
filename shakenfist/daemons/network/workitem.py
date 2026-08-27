@@ -399,16 +399,12 @@ class Job(util_concurrency.Job):
         # The op may have transitioned to a terminal state during execute();
         # drop the entry again in case it was somehow re-populated.
         self._drop_defer_entry(str(op.uuid), defer_delays)
-        # One end-of-op event carries both the queue-wait time and the
-        # execution duration, since both are knowable here and emitting
-        # two separate events doubles the eventlog gRPC cost on the
-        # critical path. ``wait_seconds`` is only populated when the
-        # op carries a ``created_at`` (i.e. it was loaded from the
-        # cluster_operations table -- in-memory ops loaded outside the
-        # dispatch path don't have one).
-        extra = {'seconds': time.time() - start_time}
-        if op.created_at is not None:
-            extra['wait_seconds'] = start_time - op.created_at
-            extra['defer_count'] = op.current_defer_count
-            extra['queue_name'] = queue_name
-        op.add_event(EVENT_TYPE_USAGE, 'execution duration', extra=extra)
+        # One end-of-op event carries the queue-wait time, the execution
+        # duration and the coalescing instrumentation. The payload is
+        # built on the operation so that this dispatcher and the one in
+        # ``shakenfist/daemons/queues/workitem.py`` cannot drift apart
+        # on field names -- tools/queue-wait-report.py reads one stream
+        # carrying events from both.
+        op.add_event(
+            EVENT_TYPE_USAGE, 'execution duration',
+            extra=op.execution_duration_extra(start_time, queue_name))
