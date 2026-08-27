@@ -286,8 +286,7 @@ class Node(dbo):
                 add_event(
                     EVENT_TYPE_AUDIT, cls.object_type, str(identifier),
                     'attempt to lookup non-existent object',
-                    extra={'caller': util_callstack.get_caller(offset=-3)},
-                    log_as_error=True)
+                    extra={'caller': util_callstack.get_caller(offset=-3)})
             return None
 
         return cls(data)

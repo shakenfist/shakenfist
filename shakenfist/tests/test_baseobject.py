@@ -4,11 +4,17 @@ from unittest import mock
 import testtools
 from shakenfist import baseobject
 from shakenfist import exceptions
+from shakenfist.artifact import Artifact
 from shakenfist.baseobject import DatabaseBackedObject
 from shakenfist.baseobject import State
+from shakenfist.blob import Blob
+from shakenfist.managed_executables.dnsmasq import DnsMasq
+from shakenfist.namespace import Namespace
+from shakenfist.node import Node
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.upload import Upload
 
 
 class MaintainVersionCacheTestCase(base.ShakenFistTestCase):
@@ -178,6 +184,62 @@ class ErrorMessageRoundTripTestCase(base.ShakenFistTestCase):
         refetched = AgentOperation.from_db(
             'aaaabbbb-0000-4000-8000-00000000000c')
         self.assertIsNone(refetched.error)
+
+
+class MissingObjectTestObject(DatabaseBackedObject):
+    @classmethod
+    def _db_get(cls, object_uuid):
+        return None
+
+
+class FromDbMissingObjectTestCase(base.ShakenFistTestCase):
+    """A missing object is an ordinary outcome of from_db(), so the audit
+    event it emits must not be logged as an error. All unsuppressed call
+    sites share the one 'attempt to lookup non-existent object' log
+    signature, which made it untriageable at ERROR (issue 3906)."""
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    def test_missing_object_audit_is_not_an_error(self, mock_add_event):
+        self.assertIsNone(MissingObjectTestObject.from_db(
+            '12345678-1234-4321-8234-123456789012'))
+
+        mock_add_event.assert_called_once()
+        args, kwargs = mock_add_event.call_args
+        self.assertEqual('attempt to lookup non-existent object', args[3])
+        self.assertIn('caller', kwargs.get('extra', {}))
+        self.assertFalse(kwargs.get('log_as_error', False))
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    def test_missing_object_audit_can_be_suppressed(self, mock_add_event):
+        self.assertIsNone(MissingObjectTestObject.from_db(
+            '12345678-1234-4321-8234-123456789012',
+            suppress_failure_audit=True))
+
+        mock_add_event.assert_not_called()
+
+    def test_overridden_from_db_audit_is_not_an_error(self):
+        """Blob, Artifact, Namespace, Upload, Node and DnsMasq carry their
+        own copies of the from_db() missing-object audit, so they must not
+        log it as an error either (issue 3906)."""
+        for cls, add_event_target in (
+                (Blob, 'shakenfist.blob.add_event'),
+                (Artifact, 'shakenfist.artifact.add_event'),
+                (Namespace, 'shakenfist.namespace.add_event'),
+                (Upload, 'shakenfist.eventlog.add_event'),
+                (Node, 'shakenfist.node.add_event'),
+                (DnsMasq, 'shakenfist.eventlog.add_event')):
+            with mock.patch.object(cls, '_db_get', return_value=None), \
+                    mock.patch(add_event_target) as mock_add_event:
+                self.assertIsNone(cls.from_db(
+                    '12345678-1234-4321-8234-123456789012'))
+
+                mock_add_event.assert_called_once()
+                args, kwargs = mock_add_event.call_args
+                self.assertEqual(
+                    'attempt to lookup non-existent object', args[3],
+                    cls.__name__)
+                self.assertFalse(
+                    kwargs.get('log_as_error', False), cls.__name__)
 
 
 class InMemoryStateTestObject(DatabaseBackedObject):

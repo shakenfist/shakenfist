@@ -363,11 +363,18 @@ class DatabaseBackedObject:
         static_values = cls._db_get(object_uuid)
         if not static_values:
             if not suppress_failure_audit:
+                # A missing object is an ordinary outcome of a lookup -- the
+                # caller receives None and branches on it -- so this audit
+                # event must not be logged as an error. All 170-odd
+                # unsuppressed call sites share this one log signature, which
+                # made it untriageable at ERROR (issue 3906). A call site for
+                # which a miss has a real consequence logs its own error with
+                # its own signature (see _cluster_operation_execute() in
+                # daemons/queues/workitem.py).
                 eventlog.add_event(
                     EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
                     'attempt to lookup non-existent object',
-                    extra={'caller': util_callstack.get_caller(offset=-3)},
-                    log_as_error=True)
+                    extra={'caller': util_callstack.get_caller(offset=-3)})
             return None
 
         # Ignore old versions of objects for this check, because namespaces

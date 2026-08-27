@@ -742,8 +742,8 @@ class CleanerNodeSelfLookupTestCase(base.ShakenFistTestCase):
     every cleaner pass looks up a node which does not exist yet (and the
     same happens if the node is removed from the cluster while the
     daemon runs). That is anticipated and handled, so the lookup must
-    pass suppress_failure_audit -- otherwise baseobject audits it as an
-    ERROR and every restart logs "attempt to lookup non-existent object"
+    pass suppress_failure_audit -- otherwise baseobject audits it and
+    every restart logs "attempt to lookup non-existent object"
     (github issue 3704).
     """
 
