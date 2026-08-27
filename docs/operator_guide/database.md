@@ -383,6 +383,13 @@ a new polling loop does; the command asks you to re-run with a longer
 `--window` first. The Prometheus alert for the same thing wants an hour
 of it before it fires, for the same reason.
 
+An absent entry means the pair was too quiet to model on the cluster the
+budget was derived from, not that it ought to be near zero. A cluster
+whose workload mix differs from that one -- fetching blobs harder, say --
+can run such a pair well above the ceiling with nothing wrong, which is
+why both this footer and the alert ask for more evidence before you act
+on one.
+
 The unbudgeted ceiling is itself a model rather than a number: the pairs
 left out of the budget are mostly per-node loops, so the ceiling is
 `unbudgeted_fixed_rate_per_node_qps` per node with

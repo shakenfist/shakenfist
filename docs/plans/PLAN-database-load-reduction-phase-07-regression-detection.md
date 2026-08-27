@@ -306,6 +306,10 @@ better expression of what the ratchet actually knew — the question is not
 tolerance is wide enough that a loop with a one minute period straddling
 two sixty second windows still counts, which is asserted directly.
 
+Two windows turned out not to be enough, and same-rate-in-every-window
+turned out not to be the whole of metronomic: see *What the merge queue
+found* below.
+
 **Not every daemon runs the base class' loop, so not every daemon
 polls.** The positive control predicts a `GetNodeDaemonState` rate for
 each daemon a node reports running, from the premise that every daemon
@@ -552,6 +556,80 @@ took no change: the check's two minutes of wall clock, and the base-term
 split being assigned rather than fitted — though the caveat now names the
 direction of that error which fails a build, rather than only the
 direction which under-predicts.
+
+### What the merge queue found
+
+The check passed every run on the branch and failed all three cluster
+jobs the first time it reached the merge queue, because the branch's own
+functional job is the single node smoke suite and the cluster and tier
+topologies are gated on `merge_group`. The single node run was also the
+shape the budget was derived against, so the first multi-node exercise of
+this check was the one that had to gate a merge.
+
+**Steady is not metronomic, and on this cluster the difference matters.**
+Each of the three jobs reported a different set of "fixed rate"
+unbudgeted pairs, with no pair common to all three: twelve pairs of blob
+and transfer traffic in one, a different five in another, two in the
+third. Nothing there was polling. `CreateClusterOperationTarget` and
+`DeleteClusterOperationTarget` reported rates equal to fifteen decimal
+places, as did `RecordRelationship` and `UpdateBlobLastUsed`, because
+each pair is written once per blob fetched — a blob heavy test running
+flat out for the two minutes being measured, not a loop. Two minutes is
+well inside the length of a single test, so "the same rate in both
+windows" is a property an ordinary test has.
+
+This is the flaky-check failure of decision 3 arriving by a third route,
+and worth stating as a rule: *absence from the budget does not mean a
+pair should be near zero.* The budget holds what cleared the inclusion
+cut on sfcbr. `derive-database-load-budget.py` already lowered that cut
+to 0.10 for the neighbouring reason — a pair quiet in the derivation
+window and louder on a busier cluster reads as new traffic — but the cut
+cannot cover a cluster with a *different workload mix*, and CI fetches
+blobs far harder relative to its size than sfcbr ever does.
+
+**The fix is a second property, not a wider tolerance.** Neither raising
+`unbudgeted_fixed_rate_qps` nor lowering the inclusion cut again was
+open: the budget file forbids editing levels to make a check pass, and
+both would have traded away the detection this phase exists for. What
+separates a poll from a busy test is not steadiness but what each does
+when the suite gets busier around it. A poll's rate is set by
+configuration, so it holds while its share of the tier's traffic falls;
+work the suite drives rises and falls with everything else, so its share
+is the steadier of its two measurements. `independent_of_activity()` is
+that comparison, `LOAD_WINDOW_COUNT` goes to four so the spreads have
+more than two points and the measurement crosses test boundaries, and
+the steady set is narrowed by it before either budget assertion reads it.
+
+**A comparison that cannot decide must say so, not guess.** The
+comparison is meaningless if the suite ran level throughout, because
+dividing every window by the same number cannot change a ratio: on such a
+run every pair's share is exactly as steady as its rate, poll and
+workload alike. So the test records `activity_spread` and skips when it
+is under `ACTIVITY_DISCRIMINATION_SPREAD`, and skips again if no
+`GetNodeDaemonState` pair — the one traffic on the cluster certainly
+polling — survived the filter. A skip is visible in the run log; a pass
+on a measurement that proved nothing reads as coverage, which is what
+this module's header already warns about.
+
+**The margin arithmetic is squared, and the obvious reading is wrong by a
+square root.** A pair which itself rises by `p` while the traffic around
+it rises by `a` has its share move by `a/p`, because the pair is in the
+numerator. The condition is therefore `p² × ACTIVITY_INDEPENDENCE_MARGIN
+< a`, not `p × margin < a`. Written the obvious way, 1.25 and 1.5 promise
+a poll a fifth of wobble and deliver a tenth; the constants are 1.25 and
+1.8, and a unit test pins the square so the next person to tune one does
+not silently halve the headroom. A pair's share is also measured against
+the traffic *other* than itself, since a dominant pair is most of its own
+denominator and would otherwise damp the variation it is being compared
+against — the direction of error which hides a big new poll.
+
+**What is not yet known.** How often a real merge queue run clears the
+activity gate is a prediction, not a measurement — the summary records
+`activity_spread` and `activity_qps_per_window` on every run including
+the skipped ones, and that is the number to read before moving
+`ACTIVITY_DISCRIMINATION_SPREAD`. A check that skips most of the time is
+the disabled check of decision 3 wearing a different hat, so this is
+worth looking at after a few merges rather than after a regression.
 
 ## Risks and mitigations
 

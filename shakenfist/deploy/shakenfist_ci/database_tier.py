@@ -436,10 +436,18 @@ class DatabaseTierTestsMixin:
         # shares hardware, and -- because stestr runs this suite in
         # parallel -- is never idle while this runs. So rather than ask
         # "how much load is there", which no assertion here could make
-        # stick, it asks "is any of this load metronomic": measure two
-        # consecutive windows and consider only the pairs which ran at the
-        # same rate in both. A polling loop does that. The test in the next
-        # worker creating an instance does not.
+        # stick, it asks "is any of this load metronomic".
+        #
+        # Metronomic takes two measurements, because the first one alone
+        # was not enough. A pair must run at the same rate in every window,
+        # which the test in the next worker creating an instance does not
+        # -- but a blob heavy test running flat out for the whole
+        # measurement does, and that is what made the check report a
+        # different handful of imaginary polling loops in each of three
+        # merge queue jobs. So a pair must also have held its rate while
+        # the rest of the suite got busier around it, which is what a rate
+        # set by configuration does and what work driven by the suite
+        # cannot.
         database_nodes = self._database_nodes()
         nodes = self.system_client.get_nodes()
 
@@ -590,13 +598,40 @@ class DatabaseTierTestsMixin:
         standing_instances = len(
             [i for i in self.system_client.get_instances()
              if i.get('power_state') == 'on'])
+        # Steady is not yet metronomic. A blob heavy test running at a
+        # level rate for the whole measurement is steady too, which is how
+        # the first version of this check came to report twelve pairs of
+        # blob and transfer traffic as new polling loops in one merge queue
+        # job and a different five in the next, with no pair common to
+        # both. So the steady set is narrowed to the pairs whose rate did
+        # not follow the rest of the suite, which is the property a poll
+        # has and a busy test does not.
         steady = lb.fixed_rate(windows)
+        independent = lb.independent_of_activity(windows)
+        metronomic = {key: rate for key, rate in steady.items()
+                      if key in independent}
+        spread = lb.activity_spread(windows)
         unbudgeted_ceiling = lb.unbudgeted_ceiling_qps(defaults, node_count)
+
+        # The discriminator's own positive control, which is the same
+        # argument as the poll control above and about a different thing:
+        # that one asks whether the harness can see the cluster, this asks
+        # whether this run's measurement can tell a poll from a test.
+        # GetNodeDaemonState is the traffic on this cluster which is
+        # definitely a poll -- every daemon reads its own row on a fixed
+        # interval, at a rate the control above just finished asserting.
+        # If the filter cannot recognise those, it would not recognise a
+        # new poll either, and an empty unbudgeted list below would mean
+        # nothing.
+        recognised = sorted(
+            '%s/%s' % (operation, daemon)
+            for operation, daemon in set(metronomic)
+            if operation == 'GetNodeDaemonState' and daemon in daemon_nodes)
 
         over = []
         unbudgeted = []
         reported = []
-        for key, measured in sorted(steady.items()):
+        for key, measured in sorted(metronomic.items()):
             entry = entries.get(key)
             if entry is None:
                 if measured > unbudgeted_ceiling:
@@ -621,6 +656,12 @@ class DatabaseTierTestsMixin:
             'windows': lb.LOAD_WINDOW_COUNT,
             'pairs_seen': len(windows[0]),
             'pairs_fixed_rate': len(steady),
+            'pairs_metronomic': len(metronomic),
+            'activity_qps_per_window': [
+                round(level, 3) for level in lb.activity_levels(windows)],
+            'activity_spread': round(spread, 3),
+            'activity_spread_required': lb.ACTIVITY_DISCRIMINATION_SPREAD,
+            'known_polls_recognised': recognised,
             'over_budget': [
                 {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
                  'modelled': mod, 'ceiling': c} for k, m, mod, c in over],
@@ -634,14 +675,41 @@ class DatabaseTierTestsMixin:
         self.addDetail('database_load', content.text_content(
             json.dumps(summary, indent=2, sort_keys=True)))
 
+        # Both assertions below read the metronomic set, so both are
+        # vacuous unless this run could tell metronomic from busy. Where it
+        # could not, say so and stop: a skip is visible in the run log,
+        # where a pass on a measurement that proved nothing reads as
+        # coverage -- which is the failure this module's own header warns
+        # about.
+        if spread < lb.ACTIVITY_DISCRIMINATION_SPREAD:
+            self.skipTest(
+                'The tier ran at a level rate throughout the measurement '
+                '(busiest window over quietest was %.2f, and %.2f is '
+                'needed), so every pair here is exactly as steady in its '
+                'share of the traffic as it is in its rate, and this run '
+                'cannot tell a polling loop from a test which happened to '
+                'run at a constant rate. summary=%s'
+                % (spread, lb.ACTIVITY_DISCRIMINATION_SPREAD,
+                   json.dumps(summary, sort_keys=True)))
+
+        if not recognised:
+            self.skipTest(
+                'No GetNodeDaemonState pair survived the fixed-rate filter, '
+                'and those are the one kind of traffic on this cluster '
+                'which is certainly a poll. The filter therefore could not '
+                'have recognised a new poll either, so the empty result '
+                'below proves nothing. summary=%s'
+                % json.dumps(summary, sort_keys=True))
+
         self.assertEqual(
             [], unbudgeted,
             'These (operation, caller_daemon) pairs are not in '
-            'shakenfist/data/database_load_budget.yaml, and ran at the '
-            'same rate above %.2f/s in every measurement window, which is '
-            'what a new fixed-rate poll looks like. If the traffic is '
-            'meant to be there, add it to the budget with a note naming '
-            'the loop which produces it. summary=%s'
+            'shakenfist/data/database_load_budget.yaml, and ran above '
+            '%.2f/s at the same rate in every measurement window without '
+            'following the rest of the suite, which is what a new '
+            'fixed-rate poll looks like and what a busy test does not. If '
+            'the traffic is meant to be there, add it to the budget with a '
+            'note naming the loop which produces it. summary=%s'
             % (unbudgeted_ceiling, json.dumps(summary, sort_keys=True)))
 
         self.assertEqual(

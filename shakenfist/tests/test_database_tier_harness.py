@@ -366,6 +366,120 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         self.assertNotIn(('Poll', 'net'), harness.fixed_rate(
             [{('Poll', 'net'): 1.0}, {('Poll', 'net'): just_outside}]))
 
+    def test_a_poll_is_independent_of_activity(self):
+        # The rate holds while everything around it triples, so its share
+        # of the tier's traffic is the measurement which moved.
+        windows = [{('Poll', 'net'): 1.5, ('Work', 'api'): 4.0},
+                   {('Poll', 'net'): 1.5, ('Work', 'api'): 12.0}]
+        self.assertEqual({('Poll', 'net')},
+                         harness.independent_of_activity(windows))
+
+    def test_work_which_tracks_the_suite_is_not_independent(self):
+        # This is the case the check was getting wrong: a blob heavy test
+        # running at a level rate looks fixed-rate to fixed_rate(), and is
+        # only distinguishable because it rises and falls with the rest of
+        # the suite. Both pairs here are steady enough to survive
+        # fixed_rate(); only the poll survives this.
+        windows = [{('Poll', 'net'): 1.5, ('UpsertBlobHash', 'queues'): 1.0},
+                   {('Poll', 'net'): 1.5, ('UpsertBlobHash', 'queues'): 2.5},
+                   {('Poll', 'net'): 1.5, ('UpsertBlobHash', 'queues'): 1.4}]
+        self.assertIn(('UpsertBlobHash', 'queues'),
+                      harness.fixed_rate(windows))
+        self.assertNotIn(('UpsertBlobHash', 'queues'),
+                         harness.independent_of_activity(windows))
+
+    def test_nothing_is_independent_when_the_suite_ran_level(self):
+        # Dividing every window by the same number cannot change a ratio,
+        # so on a level run a pair's share is exactly as steady as its
+        # rate and neither measurement decides anything. Erring towards
+        # the empty set is what makes the tie-break safe; the caller then
+        # notices via activity_spread() and skips rather than reporting
+        # whatever fell out.
+        windows = [{('Poll', 'net'): 1.5, ('Work', 'api'): 4.0},
+                   {('Poll', 'net'): 1.5, ('Work', 'api'): 4.0}]
+        self.assertEqual(set(), harness.independent_of_activity(windows))
+        self.assertEqual(1.0, harness.activity_spread(windows))
+
+    def test_a_pair_measures_its_share_against_the_other_traffic(self):
+        # A pair big enough to dominate the tier is most of its own
+        # denominator, so dividing by the total would damp the variation
+        # in everything else down to almost nothing and the pair would
+        # read as tracking traffic it is not. Here the poll is twenty
+        # times the size of the only other pair and perfectly flat while
+        # that pair doubles: measured against the total its share moves by
+        # 5%, and measured against the rest it moves by the full factor of
+        # two.
+        #
+        # Dividing by the total gets this wrong in the direction which
+        # hides a big new polling loop, which is the one thing this check
+        # exists to find, so it is worth the subtraction.
+        windows = [{('Poll', 'api'): 20.0, ('Small', 'net'): 1.0},
+                   {('Poll', 'api'): 20.0, ('Small', 'net'): 2.0}]
+        self.assertEqual({('Poll', 'api')},
+                         harness.independent_of_activity(windows))
+
+        # And the total moved by so little that the CI test would skip
+        # this run rather than trust it -- the subtraction buys headroom
+        # for the runs which do clear that gate, it does not replace it.
+        self.assertLess(harness.activity_spread(windows),
+                        harness.ACTIVITY_DISCRIMINATION_SPREAD)
+
+    def test_a_lone_pair_is_independent_of_nothing(self):
+        # There is no activity to be independent of, and the alternative
+        # is dividing by zero.
+        windows = [{('Poll', 'net'): 1.5}, {('Poll', 'net'): 1.5}]
+        self.assertEqual(set(), harness.independent_of_activity(windows))
+        self.assertEqual(set(), harness.independent_of_activity([]))
+
+    def test_activity_spread_is_one_when_there_is_nothing_to_compare(self):
+        self.assertEqual(1.0, harness.activity_spread([]))
+        self.assertEqual(1.0, harness.activity_spread([{}, {}]))
+
+    def test_activity_levels_total_every_pair(self):
+        self.assertEqual(
+            [3.0, 7.0],
+            harness.activity_levels([{('a', 'b'): 1.0, ('c', 'd'): 2.0},
+                                     {('a', 'b'): 3.0, ('c', 'd'): 4.0}]))
+
+    def test_the_discrimination_threshold_admits_a_wobbling_poll(self):
+        # ACTIVITY_DISCRIMINATION_SPREAD is the gate the CI test skips
+        # below, and it has to leave room for a real poll whose own rate
+        # is not perfectly flat -- otherwise a healthy cluster measured on
+        # a quiet run reports its polls as workload and the check passes
+        # vacuously. Pin the arithmetic that choice rests on.
+        # A pair which itself rises by p sits in the numerator of its own
+        # share, so the share moves by a/p and not by a. The condition is
+        # therefore p squared, not p -- which is worth pinning, because
+        # the obvious reading of these two constants is out by a square
+        # root and would promise twice the headroom that exists.
+        self.assertLessEqual(
+            1.2 ** 2 * harness.ACTIVITY_INDEPENDENCE_MARGIN,
+            harness.ACTIVITY_DISCRIMINATION_SPREAD,
+            'a poll whose rate wobbles by a fifth must still be '
+            'recognisable on a run which only just cleared the gate')
+
+        # A fifth of wobble, against other traffic which moved by the
+        # gate. Pin both sides of it: the boundary itself is exact, so a
+        # run a shade busier recognises the poll and a run a shade flatter
+        # does not -- which is the behaviour the skip in database_tier.py
+        # relies on, since it is what stops a level run reporting its own
+        # polls as workload.
+        def wobbling_poll(activity_spread):
+            base = 10.0
+            return [{('Poll', 'net'): 1.0, ('Work', 'api'): base},
+                    {('Poll', 'net'): 1.2,
+                     ('Work', 'api'): base * activity_spread}]
+
+        just_inside = harness.ACTIVITY_DISCRIMINATION_SPREAD + 0.1
+        self.assertIn(
+            ('Poll', 'net'),
+            harness.independent_of_activity(wobbling_poll(just_inside)))
+
+        just_outside = harness.ACTIVITY_DISCRIMINATION_SPREAD - 0.1
+        self.assertNotIn(
+            ('Poll', 'net'),
+            harness.independent_of_activity(wobbling_poll(just_outside)))
+
     def test_parser_matches_the_server_side_parser(self):
         # shakenfist/util/metrics_scrape.py is the same parser for
         # sf-ctl database-load. The CI suite carries its own copy because

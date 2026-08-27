@@ -23,20 +23,32 @@ import yaml
 METRICS_PORT = 13006
 METRICS_TIMEOUT = 5
 
-# The load check watches two consecutive windows rather than one long one,
-# because the cluster it runs on is not idle: stestr runs the suite in
+# The load check watches several consecutive windows rather than one long
+# one, because the cluster it runs on is not idle: stestr runs the suite in
 # parallel, so other tests are creating and deleting things throughout. A
 # single window cannot tell a new polling loop from the test in the next
 # worker, and a check which cannot tell them apart is a flaky check, which
 # gets disabled, which is worse than no check at all because a disabled
 # check still reads as coverage.
 #
-# Two windows can tell them apart, because the thing being looked for has a
-# property test churn does not: a fixed-rate poll runs at the same rate in
-# both windows. That is the idea worth having here -- not "how much load is
-# there" but "is any of this load metronomic".
+# Two windows were the first attempt, and two windows are not enough. In
+# the merge queue run which first exercised this check on a multi node
+# cluster it reported a different set of "fixed rate" pairs in each of the
+# three jobs, with no pair common to all three: twelve pairs of blob and
+# transfer traffic in one, a different five in another. Nothing there was
+# polling. A blob heavy test simply ran at a level rate for the two minutes
+# being measured, and two minutes is well inside the length of one test --
+# two of those pairs reported rates equal to fifteen decimal places because
+# they are written once each per blob fetched.
+#
+# Four windows is four minutes, which crosses test boundaries in the
+# parallel suite, and gives the spread comparisons below more than two
+# points to work from. It is a compromise rather than a maximum: each
+# window costs its own sixty seconds in three merge queue jobs, and the
+# more windows a pair must appear in the likelier a slow loop is to miss
+# one and be dropped by fixed_rate()'s "absent from any window" rule.
 LOAD_WINDOW_SECONDS = 60
-LOAD_WINDOW_COUNT = 2
+LOAD_WINDOW_COUNT = 4
 
 # How alike two windows must be before a pair counts as fixed-rate,
 # expressed as the largest ratio allowed between the highest and lowest
@@ -51,6 +63,55 @@ LOAD_WINDOW_COUNT = 2
 # read "high / low > MAX / MIN", so the pair 0.6 and 1.7 was really 2.83
 # and halving either one moved the threshold somewhere nobody predicted.
 FIXED_RATE_MAX_SPREAD = 2.83
+
+# Steadiness on its own does not separate a poll from workload, because
+# workload on this cluster is frequently steady too -- see the note on
+# LOAD_WINDOW_COUNT for what that cost. What does separate them is how each
+# behaves when the rest of the suite gets busier around it. A poll runs at
+# a rate set by configuration, so its rate holds and its share of the
+# tier's traffic falls. Work the suite drives rises and falls with
+# everything else, so its share is the steadier of its two measurements.
+# independent_of_activity() is that comparison and this is what it means
+# by "clearly steadier".
+#
+# The margin is also which way the comparison errs. A pair is kept only
+# when its absolute rate beats its share by this factor, so a pair the
+# data cannot decide about is dropped rather than reported. That is the
+# right way round here: this check exists to catch a polling loop nobody
+# meant to add, and missing one until the next release costs an afternoon,
+# while failing merge queue runs on somebody else's blob test costs the
+# check its life.
+ACTIVITY_INDEPENDENCE_MARGIN = 1.25
+
+# The comparison means nothing unless the cluster's activity actually
+# moved while it was being measured. If the suite happened to run level
+# throughout, every pair's share is exactly as steady as its rate -- polls
+# and workload alike, because dividing a window by a constant cannot
+# change a ratio -- and the run has no way to tell them apart. It says so
+# and stops rather than reporting whichever way the tie broke.
+#
+# Set high enough that a poll whose own rate is not perfectly flat is
+# still recognised on a run which only just cleared the gate. The
+# arithmetic is not the obvious one, and getting it wrong is easy: a pair
+# whose rate rises by p while the traffic around it rises by a has its
+# share move by a/p rather than by a, because the pair sits in the
+# numerator. The condition in independent_of_activity() therefore works
+# out at p squared x ACTIVITY_INDEPENDENCE_MARGIN < a. At 1.8 that allows
+# p up to exactly 1.2, so a poll may wobble by a fifth between windows and
+# still read as one. That is a floor rather than the real allowance: this
+# gate is measured against the whole tier, while the comparison itself is
+# measured against the traffic other than the pair, and a flat pair damps
+# the total it is excluded from. Below 1.8, a healthy cluster measured on
+# an even run reports its own polls as workload, which is the vacuous pass
+# the positive control in database_tier.py exists to prevent.
+#
+# This is also the rate at which the check gives up: the higher it sits,
+# the more runs skip for want of a busy enough suite. Four minutes of a
+# parallel suite starting and finishing instance heavy tests should clear
+# it comfortably, but that is a prediction rather than a measurement, so
+# the summary records activity_spread on every run -- the skipped ones
+# included -- and that is the number to look at before moving this.
+ACTIVITY_DISCRIMINATION_SPREAD = 1.8
 
 # A daemon which runs the Daemon base class' loop polls its own
 # node_daemon_states row from Daemon.idle(), rate-limited to
@@ -230,6 +291,82 @@ def scrape_request_pairs(mesh_ip):
         except ValueError:
             continue
     return pairs
+
+
+def activity_levels(rates_per_window):
+    """How busy the tier was in each window, as total requests per second.
+
+    The sum over every pair, which stands in for what the rest of the
+    suite is doing, because the pairs large enough to move it are the ones
+    the tests drive. Used only as a covariate: nothing asserts a level,
+    since on shared CI hardware no level assertion would stick.
+    """
+    return [sum(window.values()) for window in rates_per_window]
+
+
+def activity_spread(rates_per_window):
+    """The ratio between the busiest window and the quietest.
+
+    One -- no variation at all -- when there is nothing to compare or the
+    tier was idle, which are both cases where the caller must not go on to
+    draw a conclusion. See ACTIVITY_DISCRIMINATION_SPREAD.
+    """
+    levels = activity_levels(rates_per_window)
+    if not levels:
+        return 1.0
+    low, high = min(levels), max(levels)
+    if low <= 0.0:
+        return 1.0
+    return high / low
+
+
+def independent_of_activity(rates_per_window):
+    """The pairs whose rate did not follow the cluster's activity level.
+
+    A poll holds its rate while the suite gets busier around it, so its
+    share of the tier's traffic moves and its rate does not. Work the suite
+    drives does the opposite. Comparing how steady each of those two
+    measurements is asks which of them a pair looks like, without needing
+    to know what any operation means -- which matters, because the pairs
+    this has to judge are by definition ones nobody has written down.
+
+    A pair's share is measured against the traffic other than its own.
+    Including it would let a large pair damp its own denominator: at a
+    quarter of the tier's traffic, doubling lifts the total it is divided
+    by too, and the share would hold still for a pair that plainly did
+    not. That is the direction which hides a big new poll, so it is worth
+    the subtraction.
+
+    Returns a set, not a dict: the rate a caller wants is the one
+    fixed_rate() already chose.
+    """
+    if len(rates_per_window) < 2:
+        return set()
+
+    levels = activity_levels(rates_per_window)
+
+    keys = set(rates_per_window[0])
+    for window in rates_per_window[1:]:
+        keys &= set(window)
+
+    independent = set()
+    for key in keys:
+        rates = [window[key] for window in rates_per_window]
+        if min(rates) <= 0.0:
+            continue
+
+        others = [level - rate for level, rate in zip(levels, rates)]
+        if min(others) <= 0.0:
+            # This pair is the only traffic there is, so there is no
+            # activity to be independent of.
+            continue
+
+        shares = [rate / other for rate, other in zip(rates, others)]
+        rate_spread = max(rates) / min(rates)
+        share_spread = max(shares) / min(shares)
+        if rate_spread * ACTIVITY_INDEPENDENCE_MARGIN < share_spread:
+            independent.add(key)
+    return independent
 
 
 def fixed_rate(rates_per_window):
