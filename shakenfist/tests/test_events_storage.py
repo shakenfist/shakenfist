@@ -1051,19 +1051,26 @@ class GrpcPruneEventsTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_success_returns_rows_pruned(self, mock_stub):
-        mock_stub.return_value.PruneEvents.return_value = mock.Mock(
+        future = mock_stub.return_value.PruneEvents.future
+        future.return_value.result.return_value = mock.Mock(
             success=True, error='', rows_pruned=42)
 
         self.assertEqual(42, mariadb._grpc_prune_events())
-        _, kwargs = mock_stub.return_value.PruneEvents.call_args
+        _, kwargs = future.call_args
         self.assertEqual(
             mariadb.PRUNE_EVENTS_RPC_TIMEOUT, kwargs['timeout'])
+        # The wait on the future is chunked so the watchdog can be
+        # petted between chunks (issue 3919).
+        _, kwargs = future.return_value.result.call_args
+        self.assertEqual(
+            mariadb.PRUNE_EVENTS_PET_INTERVAL, kwargs['timeout'])
 
     @mock.patch('shakenfist.mariadb.LOG')
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_rpc_error_raises_database_unavailable(
             self, mock_stub, mock_log):
-        mock_stub.return_value.PruneEvents.side_effect = grpc.RpcError()
+        future = mock_stub.return_value.PruneEvents.future
+        future.return_value.result.side_effect = grpc.RpcError()
 
         self.assertRaises(
             exceptions.DatabaseUnavailable, mariadb._grpc_prune_events)
@@ -1078,7 +1085,8 @@ class GrpcPruneEventsTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_server_side_failure_raises_write_exception(self, mock_stub):
-        mock_stub.return_value.PruneEvents.return_value = mock.Mock(
+        future = mock_stub.return_value.PruneEvents.future
+        future.return_value.result.return_value = mock.Mock(
             success=False, error='mid-sweep explosion', rows_pruned=0)
 
         exc = self.assertRaises(

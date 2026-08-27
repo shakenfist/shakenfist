@@ -95,6 +95,90 @@ class GrpcCallWatchdogPettingTestCase(base.ShakenFistTestCase):
         self.assertEqual('ok', mariadb._grpc_call(method, mock.MagicMock()))
 
 
+class PruneEventsWatchdogPettingTestCase(base.ShakenFistTestCase):
+    """The daily events prune must pet the watchdog while in flight.
+
+    Issue 3919: _grpc_prune_events() bypasses _grpc_call() (its deadline
+    is legitimately minutes long), so the issue 3789 pet in the retry
+    loop never reaches it. Its deadline equals sf-cluster's WatchdogSec,
+    so a prune blocking unpetted to its deadline guaranteed a SIGABRT of
+    the elected cluster maintainer. The RPC is now issued as a future
+    and the wait chunked to PRUNE_EVENTS_PET_INTERVAL, petting between
+    chunks.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # The petter is process-global; never leak one into other tests.
+        self.addCleanup(mariadb.set_watchdog_petter, None)
+
+    @staticmethod
+    def _stub_future(mock_stub):
+        return mock_stub.return_value.PruneEvents.future.return_value
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_petter_called_while_prune_in_flight(self, mock_stub):
+        petter = mock.MagicMock()
+        mariadb.set_watchdog_petter(petter)
+
+        # Two wait chunks elapse before the sweep completes.
+        self._stub_future(mock_stub).result.side_effect = [
+            grpc.FutureTimeoutError(), grpc.FutureTimeoutError(),
+            mock.Mock(success=True, error='', rows_pruned=42)]
+
+        self.assertEqual(42, mariadb._grpc_prune_events())
+        self.assertEqual(3, petter.call_count)
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_petter_called_while_prune_runs_to_its_deadline(
+            self, mock_stub, mock_log):
+        # The issue 3919 shape: the sweep burns its whole deadline and
+        # fails. Every wait chunk along the way must have petted.
+        petter = mock.MagicMock()
+        mariadb.set_watchdog_petter(petter)
+
+        self._stub_future(mock_stub).result.side_effect = [
+            grpc.FutureTimeoutError()] * 3 + [
+            FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED)]
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable, mariadb._grpc_prune_events)
+        self.assertEqual(4, petter.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_no_petter_installed_is_a_noop(self, mock_stub):
+        # sf-ctl, gunicorn workers and tests never install a petter; the
+        # wait loop must work identically without one.
+        mariadb.set_watchdog_petter(None)
+
+        self._stub_future(mock_stub).result.side_effect = [
+            grpc.FutureTimeoutError(),
+            mock.Mock(success=True, error='', rows_pruned=7)]
+
+        self.assertEqual(7, mariadb._grpc_prune_events())
+
+    def test_prune_pet_cadence_fits_smallest_watchdogsec(self):
+        # The invariant behind issue 3919: with the wait chunked, the
+        # longest the prune can go without a pet is one stale pet window
+        # on entry (the pet is rate-limited to WATCHDOG_PET_INTERVAL)
+        # plus one wait chunk. That must fit inside the smallest
+        # WatchdogSec any daemon unit arms -- the RPC deadline itself no
+        # longer bounds the unpetted stretch.
+        service_template = os.path.join(
+            os.path.dirname(__file__), '..', 'deploy', 'collection',
+            'roles', 'node', 'templates', 'sf.service')
+        with open(service_template) as f:
+            watchdog_secs = [
+                int(m) for m in re.findall(r'WatchdogSec=(\d+)s', f.read())]
+        self.assertTrue(watchdog_secs, 'no WatchdogSec found in sf.service')
+
+        worst_unpetted_stretch = (
+            daemon.WATCHDOG_PET_INTERVAL +
+            mariadb.PRUNE_EVENTS_PET_INTERVAL)
+        self.assertLess(worst_unpetted_stretch, min(watchdog_secs))
+
+
 class DaemonDatabaseWaitPetTestCase(base.ShakenFistTestCase):
     def _make_daemon(self):
         # Construct a Daemon without running __init__ (which touches
