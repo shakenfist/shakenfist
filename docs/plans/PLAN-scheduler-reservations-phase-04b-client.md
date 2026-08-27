@@ -356,8 +356,11 @@ the honest outcome and does not block phases 5 through 9.
 
 ## Definition of done
 
-- [ ] `grep -n "_request_url" shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`
-      returns nothing.
+- [ ] No *call* to `_request_url` remains in
+      `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`.
+      The name still appears once, in the docstring explaining what the
+      file used to do and why that reasoning was wrong, which is worth
+      keeping.
 - [ ] `shakenfist/tests/test_ci_claims_headroom.py` still passes,
       and `shakenfist_ci/retries.py` still imports nothing from
       `shakenfist_client`.
@@ -377,6 +380,35 @@ the honest outcome and does not block phases 5 through 9.
 - [ ] `docs/developer_guide/ci.md` says where cluster CI gets its
       client from.
 - [ ] `pre-commit run --all-files` passes in each repository.
+
+## What the implementation established
+
+Recorded here as it was found, because two of these were open questions
+the plan asked to have answered before code was written.
+
+**An over-large claim on a claim-free namespace answers 507**, as
+`InsufficientResourcesException`, with a per-dimension body: `the
+cluster does not have the capacity to promise this claim: cpus (limit
+234, used 114, requested 100000)`. Checked against sfcbr on 2026-08-27.
+The same request against a namespace which *already* holds a claim
+answers 409, because the `exists` branch is evaluated first -- which is
+what the phase 4a soak recorded, and why its "impossible claim is
+refused" line said 409 rather than 507. This answers phase 4c's step 2
+open question directly: the conductor creates its claim on a namespace
+it has just made, so the refusal it must handle is 507, and E6's first
+branch catches `InsufficientResourcesException`.
+
+**Every dispatch path of the rewritten `_claim_api()` behaves against a
+real cluster.** Collection and single `GET`, `POST`, a refused second
+`POST`, a `PUT` naming no fields (400), a `PUT` naming one dimension
+(the others unmoved), a cross-namespace read (404, not disclosed),
+`DELETE`, and `DELETE` of a claim already gone (404). D3's claim that no
+assertion in the file needed to change held.
+
+**The headroom-tolerant wiring is real, not decorative.** Routing
+`_create_claim` off `_claim_api_awaiting_headroom` fails exactly one
+test in `test_ci_claims_headroom.py`, so the assertion added by the
+issue-3907 fix does what it says.
 
 ## Future work
 

@@ -28,6 +28,40 @@ Every workflow in `.github/workflows/`:
 | `sync-external-docs.yml` | Import the sibling repositories' documentation into `docs/components/` | Hourly schedule, manual |
 | `release.yml` | Build and publish a release | Tag push, manual |
 
+## Where the functional jobs get their code
+
+The functional jobs do not install released packages. `shakenfist/actions`'s
+`setup-test-environment` checks out three repositories --
+`shakenfist/shakenfist`, `shakenfist/client-python` and
+`shakenfist/agent-python` -- with the repository that triggered the workflow
+at its triggering ref and **the others at `develop`**. Its
+`tools/deploy-collection.sh` then runs the collection's example playbook with
+`sf_build_local_wheels=true`, `repo_path` and `client_repo_path` pointing at
+those checkouts. Play 0 of `examples/_shared/site.yml` builds a server wheel
+and a client wheel, play 1 copies them to every node, and the node role
+installs the wheel paths in place of the PyPI names it would otherwise use
+(`shakenfist/deploy/collection/roles/node/tasks/bootstrap.yml`).
+
+The consequence is worth stating plainly, because it was missed for two
+months: **an unreleased client change is available to the functional jobs as
+soon as it merges to `client-python`'s `develop`.** No PyPI release is
+involved. A test in this repository may be written against a new `apiclient`
+verb the moment that verb merges next door.
+
+Two things this does not mean. An operator deploying the collection normally
+gets the PyPI packages, since `sf_build_local_wheels` defaults to false --
+so an unreleased verb reaches CI and nothing else, and anything that runs
+against a *released* client (the private CI conductor, for one) still needs a
+release. And the coupling runs both ways: a regression merged to
+`client-python`'s `develop` breaks this repository's functional jobs with no
+change here.
+
+Phase 4 of `docs/plans/PLAN-scheduler-reservations.md` reasoned from the
+opposite belief and deliberately wrote its functional coverage against
+`apiclient.Client._request_url()` to work around a constraint which had
+already been gone for seven weeks. If you find yourself about to do something
+similar, check this section first.
+
 ## Coverage the functional suite does not have
 
 ### Upgrade data verification
