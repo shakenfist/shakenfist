@@ -15,6 +15,7 @@ from shakenfist_utilities import logs                       # noreorder
 import symbolicmode
 
 from shakenfist import blob
+from shakenfist.config import config
 from shakenfist import constants
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
@@ -27,6 +28,7 @@ from shakenfist import instance
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.protos import agent_pb2
 from shakenfist.protos import common_pb2
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
@@ -453,6 +455,109 @@ class GetFileCommand(AgentCommandHandler):
 AGENT_COMMAND_HANDLERS = [ExecuteCommand, PutBlobCommand, ChmodCommand, GetFileCommand]
 
 
+def operation_is_retryable(agentop):
+    """True if every command in this operation is safe to run again.
+
+    Retryability is a property of the whole command list, not of the
+    command which happened to be in flight when the attempt was
+    abandoned. That is deliberate, and it is the reading a later
+    reader is most likely to think is a mistake: a retry restarts the
+    command list at index 0, so an [execute, get-file] operation which
+    stalls in the get-file would re-run the execute on its second
+    attempt -- exactly the side effect the agent cannot take back, and
+    exactly what phase 0 decision 6 forbids. The cheaper per-command
+    reading ("the stalled command is a get-file, get-file is
+    retryable, so retry") would ship a smaller diff and be wrong.
+
+    No API endpoint builds a mixed command list today, so the two
+    readings currently agree and no test we can write demonstrates the
+    difference. This is the version which stays correct when one does.
+
+    An unrecognised command name is not retryable: we cannot know what
+    running it a second time would do. Neither is an empty command
+    list, which all() would otherwise call retryable vacuously: a
+    second attempt at nothing cannot make progress, so it would burn
+    dispatches to the attempt cap and then report a timing budget as
+    the reason.
+    """
+    if not agentop.commands:
+        return False
+
+    handlers = {cls.name: cls for cls in AGENT_COMMAND_HANDLERS}
+    for cmd in agentop.commands:
+        handler = handlers.get(cmd.get('command'))
+        if handler is None or not handler.retryable:
+            return False
+    return True
+
+
+def resolve_abandoned_operation(agentop, reason, terminal):
+    """Retry an abandoned attempt at an operation, or end it.
+
+    This is the single place the retry decision is made. It is called
+    by the executor's two exit paths and by the node local reaper, so
+    it deliberately depends on nothing but the operation itself -- the
+    reaper has no executor job to hand it.
+
+    reason says what abandoned the attempt, and is recorded either
+    way. terminal is the outcome to apply when no retry is possible,
+    and belongs to the caller rather than to this function because the
+    two callers differ: a stall which cannot retry expires, since the
+    progress timeout is a budget the caller set, while an executor
+    exit which cannot retry errors, preserving the message phase 4
+    gave it. Callers pass agentop.expire or agentop.fail.
+
+    Retry is for a stalled attempt and never for a failed one. A
+    passed deadline therefore never retries -- retrying spends time
+    nobody is waiting for, because the caller's budget is the thing
+    which just ran out -- and an agent reported command error never
+    arrives here at all, because _handle_command_error() fails the
+    operation outright.
+
+    The attempt counter is written on dispatch rather than here, so an
+    operation reads attempts == 1 while its first attempt is running
+    and the cap is a count of dispatches. Returns True if the
+    operation was requeued.
+    """
+    if not operation_is_retryable(agentop):
+        terminal(f'{reason}, and the operation cannot be safely retried')
+        return False
+
+    if agentop.deadline_passed():
+        terminal(f'{reason}, and the operation deadline has passed')
+        return False
+
+    attempts = agentop.attempts
+    if attempts >= config.AGENT_OPERATION_MAX_ATTEMPTS:
+        terminal(f'{reason}, after {attempts} attempts')
+        return False
+
+    # The next attempt rewrites every result index it reaches, so the
+    # only rows cleared here are ones the retry is about to replace or
+    # was never going to reach. Leaving them would present the caller
+    # with a content_blob from an abandoned attempt as though it were
+    # this operation's result.
+    agentop.clear_results()
+    agentop.state = AgentOperation.STATE_QUEUED
+
+    # Recorded against the instance as well as the operation, for the
+    # reason AgentOperation.expire() spells out: the operation is
+    # swept for hard deletion once it does reach a terminal state, and
+    # the instance is where an operator looks for the history of what
+    # was run against a machine.
+    add_event_multi(
+        EVENT_TYPE_AUDIT,
+        [(AgentOperation.object_type, agentop.uuid),
+         (ObjectType.INSTANCE, agentop.instance_uuid)],
+        'agent operation requeued for retry',
+        extra={
+            'reason': reason,
+            'attempts': attempts,
+            'max_attempts': config.AGENT_OPERATION_MAX_ATTEMPTS
+        })
+    return True
+
+
 class SideChannelExecutorJob(SideChannelJob):
     def __init__(self, inst, agentop):
         super().__init__(inst)
@@ -500,22 +605,29 @@ class SideChannelExecutorJob(SideChannelJob):
         try:
             super().execute()
         finally:
-            # An operation is popped from the instance's queue as soon as it
-            # reaches EXECUTING (see Instance.agent_operation_next), so it is
-            # never re-dispatched. If the executor exits for any reason with the
-            # operation still EXECUTING -- a dropped connection or socket error
-            # swallowed by the base execute(), an unexpected exception (e.g. a
-            # database error from Blob.register in the get-file path), or the
-            # execution deadline in _execute_inner -- fail it cleanly here
-            # rather than leaving it orphaned in EXECUTING until the caller
-            # times out. See issues #3516 and #2240.
+            # An operation's queue entry survives until the operation reaches a
+            # terminal state (see Instance.agent_operation_next), so an
+            # operation left in EXECUTING here is one nothing will finish and
+            # nothing will re-dispatch: the queue entry is still at the head,
+            # but the dispatcher skips a head which is already executing. The
+            # exit is reached by a dropped connection or socket error swallowed
+            # by the base execute(), by an unexpected exception (e.g. a
+            # database error from Blob.register in the get-file path), or by
+            # the execution deadline in _execute_inner. Resolve it here rather
+            # than leaving it orphaned until the caller times out: the attempt
+            # got nowhere rather than failing, so it is retried when the
+            # command list allows it and the budgets have room, and errors
+            # otherwise with the message phase 4 gave it. See issues #3516 and
+            # #2240.
             if self.agentop.state.value == AgentOperation.STATE_EXECUTING:
                 self.log.error(
                     'Executor exited with the operation still executing; '
-                    'marking it errored')
-                self.agentop.fail(
+                    'resolving it')
+                resolve_abandoned_operation(
+                    self.agentop,
                     'sidechannel executor exited before the operation '
-                    'completed')
+                    'completed',
+                    terminal=self.agentop.fail)
 
     def _handle_command_error(self, reply):
         """Fail the operation when the agent reports a command error.
@@ -831,8 +943,17 @@ class SideChannelExecutorJob(SideChannelJob):
             'command': self.in_flight_handler.name,
             'progress_timeout': window
         }).error('No progress from agent, aborting executor')
-        self.agentop.expire(
-            f'no progress from the agent for {window:g} seconds')
+
+        # A stall is the case retry exists for: nothing failed, the
+        # attempt merely got nowhere. The terminal outcome when it
+        # cannot be retried stays expiry, because the progress timeout
+        # is a budget the caller chose. The executor stops either way
+        # -- a requeued operation is dispatched afresh, by a new
+        # executor, from the head of the instance's queue.
+        resolve_abandoned_operation(
+            self.agentop,
+            f'no progress from the agent for {window:g} seconds',
+            terminal=self.agentop.expire)
         self._abandon_get_file_transfer()
         return True
 
@@ -1251,6 +1372,18 @@ class Monitor(daemon.Daemon):
             return
 
         sc_obj = SideChannelExecutorJob(inst, agentop)
+
+        # Attempts are counted on dispatch, not on retry, so an operation
+        # reads attempts == 1 while its first attempt is running and
+        # AGENT_OPERATION_MAX_ATTEMPTS is a count of dispatches. It is
+        # recorded before the thread starts because the thread is what reads
+        # it back: an executor which exits immediately would otherwise resolve
+        # the operation against an attempt count which does not yet include
+        # its own dispatch. Failing here is safe for the reason noted above --
+        # the operation stays at the head of the queue and is dispatched
+        # again.
+        agentop.record_attempt()
+
         sc_thread = threading.Thread(
             target=sc_obj.run, daemon=True, name=instance_uuid)
         sc_thread.start()

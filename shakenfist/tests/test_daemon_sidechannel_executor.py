@@ -34,13 +34,31 @@ class _FakeAgentOp:
     """
 
     TERMINAL_STATES = AgentOperation.TERMINAL_STATES
+    object_type = AgentOperation.object_type
 
-    def __init__(self, state_value):
+    def __init__(self, state_value, commands=None, attempts=0,
+                 deadline_passed=False):
         self.uuid = 'fake-agentop'
+        self.instance_uuid = 'fake-instance'
         self.state = state_value
-        self.commands = []
+
+        # Abandoning an operation is only terminal when it cannot be
+        # retried, so the default command list here is one which never
+        # is: execute repeats a side effect the agent cannot take
+        # back. Tests of the retry path pass a retryable list.
+        if commands is None:
+            commands = [{'command': 'execute'}]
+        self.commands = list(commands)
         self.failure_reason = None
         self.expired_reason = None
+
+        # Retry inputs. attempts is written on dispatch by the real
+        # dispatcher, so a fake in the middle of its first attempt
+        # carries 1, not 0.
+        self.attempts = attempts
+        self._deadline_passed = deadline_passed
+        self.results = {'0': {'content_blob': 'an-abandoned-blob'}}
+        self.results_cleared = False
 
     # The real state is a State object read as .value and assigned as a
     # bare string, so the fake accepts a string and reads back as an
@@ -66,6 +84,16 @@ class _FakeAgentOp:
             return
         self.state = AgentOperation.STATE_EXPIRED
         self.expired_reason = reason
+
+    def deadline_passed(self):
+        return self._deadline_passed
+
+    def clear_results(self):
+        self.results = {}
+        self.results_cleared = True
+
+    def record_attempt(self):
+        self.attempts += 1
 
 
 class _FakeInstance:
@@ -101,7 +129,8 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
             job.execute()
         self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state.value)
         self.assertEqual(
-            'sidechannel executor exited before the operation completed',
+            'sidechannel executor exited before the operation completed, '
+            'and the operation cannot be safely retried',
             job.agentop.failure_reason)
 
     def test_marks_error_when_exception_while_executing(self):
@@ -251,9 +280,15 @@ class ExecutorTerminalStateGuardTestCase(base.ShakenFistTestCase):
 class _BudgetAgentOp(_FakeAgentOp):
     """A fake operation whose two timing budgets are directly settable."""
 
-    def __init__(self, deadline_passed=False, progress_timeout=30.0):
-        super().__init__(AgentOperation.STATE_EXECUTING)
-        self._deadline_passed = deadline_passed
+    def __init__(self, deadline_passed=False, progress_timeout=30.0,
+                 commands=None, attempts=0):
+        # A stall only reaches a terminal state when a retry is
+        # impossible, so these fakes default to a command list which
+        # cannot be retried. The retry path itself is exercised in
+        # ExecutorRetryTestCase.
+        super().__init__(
+            AgentOperation.STATE_EXECUTING, commands=commands,
+            attempts=attempts, deadline_passed=deadline_passed)
         self._progress_timeout = progress_timeout
         self.deadline_checks = 0
 
@@ -333,6 +368,10 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
             agentop.expired_reason)
 
     def test_stalled_progress_expires_and_stops(self):
+        # The fake operation is an execute, which is never retried, so
+        # the stall is terminal here and the message names both what
+        # happened and why no retry followed. ExecutorRetryTestCase
+        # owns the case where it is retried instead.
         agentop = _BudgetAgentOp(progress_timeout=30.0)
         job = self._make_executor(
             agentop, handler=_ProgressHandler(), last_progress=0.0)
@@ -340,7 +379,8 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
             self.assertTrue(job.expire_if_out_of_budget())
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
-            'no progress from the agent for 30 seconds',
+            'no progress from the agent for 30 seconds, and the '
+            'operation cannot be safely retried',
             agentop.expired_reason)
 
     def test_progress_inside_the_window_continues(self):
@@ -577,7 +617,8 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
-            'no progress from the agent for 30 seconds',
+            'no progress from the agent for 30 seconds, and the '
+            'operation cannot be safely retried',
             agentop.expired_reason)
 
 
@@ -819,3 +860,252 @@ class ExecutorDispatchTerminalGuardTestCase(base.ShakenFistTestCase):
         job._send_commands_single_envelope.assert_called_once()
         self.assertEqual(
             AgentOperation.STATE_EXECUTING, job.agentop.state.value)
+
+
+class OperationRetryabilityTestCase(base.ShakenFistTestCase):
+    """Retryability is a property of the whole command list.
+
+    A retry restarts the list at index 0, so a list containing any
+    command which cannot be repeated must not be retried at all --
+    even when the command which stalled could have been. No API
+    endpoint builds a mixed list today, which is exactly why this is
+    tested here rather than left to be discovered when one does.
+    """
+
+    def _op(self, *names):
+        return _FakeAgentOp(
+            AgentOperation.STATE_EXECUTING,
+            commands=[{'command': n} for n in names])
+
+    def test_a_retryable_list_is_retryable(self):
+        self.assertTrue(
+            sidechannel.operation_is_retryable(self._op('put-blob', 'chmod')))
+        self.assertTrue(
+            sidechannel.operation_is_retryable(self._op('get-file')))
+
+    def test_execute_is_not_retryable(self):
+        self.assertFalse(
+            sidechannel.operation_is_retryable(self._op('execute')))
+
+    def test_an_empty_list_is_not_retryable(self):
+        # all() over an empty list is True, which would make an
+        # operation with nothing to run retryable. A second attempt at
+        # nothing cannot make progress, so it would burn dispatches to
+        # the cap and then report a timing budget as the reason.
+        self.assertFalse(sidechannel.operation_is_retryable(self._op()))
+
+    def test_a_mixed_list_is_not_retryable_in_either_order(self):
+        # The decision this test exists for. Retrying the second list
+        # would re-run the execute, which is the side effect the agent
+        # cannot take back.
+        self.assertFalse(
+            sidechannel.operation_is_retryable(
+                self._op('execute', 'get-file')))
+        self.assertFalse(
+            sidechannel.operation_is_retryable(
+                self._op('get-file', 'execute')))
+
+    def test_an_unknown_command_is_not_retryable(self):
+        # We cannot know what running it a second time would do.
+        self.assertFalse(
+            sidechannel.operation_is_retryable(self._op('no-such-command')))
+
+
+class ExecutorRetryTestCase(base.ShakenFistTestCase):
+    """resolve_abandoned_operation() is the only place the retry decision
+    is made, for the executor and for the reaper alike.
+
+    Retry is for a stalled attempt and never for a failed one, so the
+    three refusals -- not retryable, deadline passed, attempts
+    exhausted -- each say so in the message the operator reads back
+    from object_states.
+    """
+
+    STALL = 'no progress from the agent for 30 seconds'
+    EXIT = 'sidechannel executor exited before the operation completed'
+
+    def _op(self, commands=None, attempts=1, deadline_passed=False):
+        return _FakeAgentOp(
+            AgentOperation.STATE_EXECUTING, commands=commands,
+            attempts=attempts, deadline_passed=deadline_passed)
+
+    def _resolve(self, agentop, reason, terminal):
+        with mock.patch.object(sidechannel, 'add_event_multi') as event:
+            retried = sidechannel.resolve_abandoned_operation(
+                agentop, reason, terminal=terminal)
+        return retried, event
+
+    def test_a_stall_under_the_cap_requeues_and_clears_results(self):
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=1)
+        retried, event = self._resolve(
+            agentop, self.STALL, agentop.expire)
+
+        self.assertTrue(retried)
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(agentop.expired_reason)
+
+        # The abandoned attempt registered a blob nothing else
+        # references. Leaving its result would hand the caller a
+        # content_blob from an attempt which never finished.
+        self.assertTrue(agentop.results_cleared)
+        self.assertEqual({}, agentop.results)
+
+        # One audit event, carrying why and which attempt.
+        event.assert_called_once()
+        extra = event.call_args[1]['extra']
+        self.assertEqual(self.STALL, extra['reason'])
+        self.assertEqual(1, extra['attempts'])
+
+    def test_the_cap_expires_with_a_message_naming_it(self):
+        # A stall which runs out of attempts expires rather than
+        # errors, because the progress timeout is a budget the caller
+        # set. The count is in the message so an operator can tell
+        # "stalled once and gave up" from "stalled three times".
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=3)
+        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+
+        self.assertFalse(retried)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(f'{self.STALL}, after 3 attempts',
+                         agentop.expired_reason)
+        self.assertFalse(agentop.results_cleared)
+
+    def test_a_passed_deadline_expires_even_with_attempts_left(self):
+        # Retrying would spend time nobody is waiting for: the
+        # caller's budget is the thing which just ran out.
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=1,
+                           deadline_passed=True)
+        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+
+        self.assertFalse(retried)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(
+            f'{self.STALL}, and the operation deadline has passed',
+            agentop.expired_reason)
+
+    def test_an_execute_operation_never_retries(self):
+        agentop = self._op(commands=[{'command': 'execute'}], attempts=1)
+        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+
+        self.assertFalse(retried)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(
+            f'{self.STALL}, and the operation cannot be safely retried',
+            agentop.expired_reason)
+
+    def test_a_stalled_transfer_is_requeued_by_the_budget_check(self):
+        # The same decision reached through the executor's progress
+        # stall branch, which must still stop the executor: a requeued
+        # operation is dispatched afresh by a new one.
+        agentop = _BudgetAgentOp(
+            progress_timeout=30.0, commands=[{'command': 'get-file'}],
+            attempts=1)
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.in_flight_handler = _ProgressHandler()
+        job.ready = False
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job.commands = []
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            with mock.patch('time.time', return_value=31.0):
+                self.assertTrue(job.expire_if_out_of_budget())
+
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(agentop.expired_reason)
+
+    def test_an_executor_exit_retries_to_the_cap_and_then_errors(self):
+        # The whole loop, one dispatch at a time. attempts is written
+        # on dispatch, so the first executor to exit sees 1.
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=0)
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.log = mock.MagicMock()
+
+        cap = sidechannel.config.AGENT_OPERATION_MAX_ATTEMPTS
+        states = []
+        for _ in range(cap):
+            agentop.attempts += 1
+            agentop.state = AgentOperation.STATE_EXECUTING
+            with mock.patch.object(sidechannel, 'add_event_multi'):
+                with mock.patch.object(sidechannel.SideChannelJob, 'execute',
+                                       return_value=None):
+                    job.execute()
+            states.append(agentop.state.value)
+
+        self.assertEqual(
+            [AgentOperation.STATE_QUEUED] * (cap - 1)
+            + [AgentOperation.STATE_ERROR], states)
+        self.assertEqual(
+            f'{self.EXIT}, after {cap} attempts', agentop.failure_reason)
+
+
+class _DispatchMonitor:
+    """Stands in for self inside Monitor.start_instance_executor().
+
+    The method only touches these three dictionaries, and constructing
+    a real Monitor would start a daemon. Calling the unbound method
+    with this keeps the test to the one method under test, the same
+    way PreflightDeadlineTestCase._FakeClusterOp does in
+    test_node_aop_op.py.
+    """
+
+    def __init__(self):
+        self.executor_attempts = {}
+        self.monitors = {}
+        self.executors = {}
+
+
+class DispatchRecordsAnAttemptTestCase(base.ShakenFistTestCase):
+    """Dispatch is what counts an attempt.
+
+    Nothing else writes the attempts counter, so if this call is lost
+    the counter stays at zero, every comparison against
+    AGENT_OPERATION_MAX_ATTEMPTS is false, and a stalling operation
+    retries until its deadline -- or forever, for the deadline_seconds
+    of 0 case the cap exists to be the only bound on.
+    """
+
+    def _dispatch(self, agentop):
+        mon = _DispatchMonitor()
+        mon.monitors['inst'] = {'object': mock.Mock()}
+
+        with mock.patch.object(sidechannel.instance.Instance, 'from_db',
+                               return_value=mock.Mock()), \
+                mock.patch.object(sidechannel, 'SideChannelExecutorJob'), \
+                mock.patch.object(sidechannel.threading, 'Thread'), \
+                mock.patch.object(sidechannel, 'add_event'):
+            sidechannel.Monitor.start_instance_executor(mon, 'inst', agentop)
+        return mon
+
+    def test_dispatch_records_an_attempt(self):
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+        self._dispatch(agentop)
+        self.assertEqual(1, agentop.attempts)
+
+    def test_each_dispatch_records_another(self):
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+        self._dispatch(agentop)
+        self._dispatch(agentop)
+        self._dispatch(agentop)
+        self.assertEqual(3, agentop.attempts)
+
+    def test_an_instance_with_no_monitor_records_nothing(self):
+        # The early return above the counter. Dispatch did not happen,
+        # so it must not be counted against the operation's cap.
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+        mon = _DispatchMonitor()
+
+        with mock.patch.object(sidechannel.instance.Instance, 'from_db',
+                               return_value=mock.Mock()), \
+                mock.patch.object(sidechannel, 'SideChannelExecutorJob'), \
+                mock.patch.object(sidechannel.threading, 'Thread'), \
+                mock.patch.object(sidechannel, 'add_event'):
+            sidechannel.Monitor.start_instance_executor(mon, 'inst', agentop)
+
+        self.assertEqual(0, agentop.attempts)
