@@ -278,6 +278,21 @@ class SFConfig(BaseSettings):
             'the expired state, which is distinct from error.'
         )
     )
+    AGENT_OPERATION_MAX_ATTEMPTS: int = Field(
+        3,
+        description=(
+            'The number of times an agent operation is dispatched before '
+            'it is allowed to reach a terminal state, counting the initial '
+            'dispatch plus retries -- so the default of 3 means one '
+            'dispatch and two retries. This is the only bound on an '
+            'operation created with an explicit deadline_seconds of 0, '
+            'which otherwise has no wall-clock deadline at all. Retrying '
+            'restarts the command list from index 0, which an execute '
+            'operation cannot do without repeating a side effect the '
+            'agent cannot take back, so execute operations are never '
+            'retried whatever this is set to.'
+        )
+    )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(
         16384,
         description=(

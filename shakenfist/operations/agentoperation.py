@@ -65,6 +65,7 @@ class AgentOperation(BaseOperation):
                                      dbo.STATE_DELETED, dbo.STATE_ERROR,
                                      STATE_EXPIRED),
         BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
+                                        BaseOperation.STATE_QUEUED,
                                         dbo.STATE_DELETED, dbo.STATE_ERROR,
                                         STATE_EXPIRED),
         BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED,),
@@ -378,6 +379,23 @@ class AgentOperation(BaseOperation):
     def attempts(self):
         return self._attributes().attempts
 
+    def record_attempt(self):
+        """Persist that another dispatch attempt of this operation has started.
+
+        The persistence detail lives here rather than in the caller for
+        the same reason record_progress()'s does: this is the object
+        which knows how its attributes row is written.
+
+        The field mask is not optional. add_result() reads, merges and
+        writes the results column on this same row, and an unmasked
+        write here would push a stale snapshot of it over a concurrent
+        update.
+        """
+        attrs = self._attributes()
+        attrs.attempts += 1
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['attempts'])
+
     def add_result(self, index, value):
         if 'command' in value:
             del value['command']
@@ -395,6 +413,25 @@ class AgentOperation(BaseOperation):
 
         self.add_event(EVENT_TYPE_MUTATE, 'add result',
                        extra={'index': str(index)})
+
+    def clear_results(self):
+        """Discard this operation's results.
+
+        Used when a retry abandons an attempt: the next attempt
+        rewrites every index it reaches, so the results this clears
+        are only ever ones the retry is about to replace or was never
+        going to reach.
+
+        It takes the same results lock that add_result() takes, since
+        the two write the same column.
+
+        The field mask is not optional, for the reason record_progress()
+        spells out in its docstring.
+        """
+        with self.get_lock_attr('results', op='clear results'):
+            _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+            updated = AgentOperationAttributesData(uuid=_uuid, results={})
+            mariadb.update_agent_operation_attributes(updated, fields=['results'])
 
     def record_progress(self, timestamp):
         """Persist the time the agent last made forward progress.
