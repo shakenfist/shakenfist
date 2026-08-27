@@ -5953,14 +5953,23 @@ def record_event_batch(events: list[EventRecord]) -> bool:
 
 PRUNE_EVENTS_RPC_TIMEOUT = 300.0
 
+# How long to block on the in-flight prune future between watchdog pets.
+# Bypassing _grpc_call() also bypasses the pet its retry loop performs
+# (issue 3789), and PRUNE_EVENTS_RPC_TIMEOUT equals sf-cluster's
+# WatchdogSec, so a prune left to block unpetted to its deadline
+# guarantees a SIGABRT of the elected cluster maintainer (issue 3919).
+PRUNE_EVENTS_PET_INTERVAL = 10.0
+
 
 def _grpc_prune_events() -> int:
     """Trigger the daily events prune sweep via the database microservice.
 
     The prune is a once-a-day call that may legitimately take minutes,
     so we bypass the standard ``_grpc_call`` retry helper (which uses
-    the short ``GRPC_TIMEOUT``) and invoke the stub directly with a
-    generous 5-minute timeout.
+    the short ``GRPC_TIMEOUT``) and issue the RPC as a future with a
+    generous 5-minute deadline, petting the systemd watchdog every
+    ``PRUNE_EVENTS_PET_INTERVAL`` seconds while it is in flight (see
+    the comment on that constant).
 
     A failure raises rather than returning zero: a return value from
     this function always means the sweep ran, so the caller can tell
@@ -5976,8 +5985,19 @@ def _grpc_prune_events() -> int:
     stub = _get_database_stub()
     request = database_pb2.PruneEventsRequest()
     start_time = time.time()
+    call_future = stub.PruneEvents.future(
+        request, timeout=PRUNE_EVENTS_RPC_TIMEOUT)
     try:
-        reply = stub.PruneEvents(request, timeout=PRUNE_EVENTS_RPC_TIMEOUT)
+        while True:
+            if _watchdog_petter is not None:
+                _watchdog_petter()
+            try:
+                reply = call_future.result(timeout=PRUNE_EVENTS_PET_INTERVAL)
+                break
+            except grpc.FutureTimeoutError:
+                # Still in flight. The RPC deadline bounds the total wait:
+                # once it expires, result() raises DEADLINE_EXCEEDED below.
+                continue
     except grpc.RpcError as e:
         elapsed = time.time() - start_time
         msg = (f'gRPC PruneEvents failed after {elapsed:.1f}s of its '
