@@ -326,3 +326,122 @@ Findings:
 - Incidental: sf-5 was NOT-READY (`/readyz` failing, zero
   VMs, host reachable) at measurement time — unrelated to
   this plan, flagged to the operator.
+
+## Post-deploy observation (2026-08-27)
+
+The last outstanding item of this phase: a real sfcbr CI burst,
+observed to check that placement no longer concentrates on the
+network+database node. The burst was a full day of ordinary CI
+load, and the observation ran for an hour of it.
+
+**The criterion is met.** Placement does not concentrate on
+sf-1.
+
+### What was measured, and why three ways
+
+A single snapshot is not an answer to this question, and the
+first one taken was actively misleading: at that instant sf-1
+held 14.0% of the cluster's committed vCPU against 7.7% of its
+hard-max capacity, or 1.82x its share, which reads like the
+original incident. Three things had to be separated before that
+number meant anything.
+
+*Stock from flow.* sfcbr carries two populations. Eighteen
+instances were ephemeral conductor runners in `sfcbr-*`
+namespaces, minutes old; eight were static runners placed five
+days earlier. Only the first says anything about the scheduler
+as it behaves now. (The external instance view publishes no
+`created_at`, so age came from `agent_system_boot_time`, which
+every live instance had.)
+
+*Small samples from real bias.* Counting only ephemeral
+instances at that first instant gave sf-1 1.90x its share --
+which is one extra four-vCPU runner on the smallest node in the
+cluster. Accumulating distinct placements over the hour instead
+moved it to 1.32x, and counting only placements made *during*
+the window -- excluding the opening stock entirely -- to 0.84x.
+
+*The ranking from the outcome.* The scheduler publishes its own
+working in `schedule have lowest cpu load` and `schedule final
+candidates` events, which say what it saw and what it kept.
+
+### The numbers
+
+Thirty-five placements were made during the hour, excluding the
+stock present when it started. As a multiple of each node's
+share of cluster hard-max capacity, where 1.00x is proportional:
+
+| node | roles | schedulable | hard max | placements | vCPU | share |
+|------|-------|-------------|----------|------------|------|-------|
+| sf-1 | N+D+H | 6 | 18 | 3 | 7 | 0.78x |
+| sf-2 | D+H | 8 | 24 | 5 | 11 | 0.92x |
+| sf-3 | H | 10 | 30 | 4 | 24 | 1.60x |
+| sf-4 | H | 10 | 30 | 2 | 8 | 0.53x |
+| sf-5 | H | 22 | 66 | 8 | 27 | 0.82x |
+| sf-6 | H | 22 | 66 | 13 | 40 | 1.21x |
+
+Read that table with its sample size in mind. Thirty-five
+placements across six nodes is not enough to pin any single
+node's share, and watching it accumulate makes that obvious: the
+node sitting above parity moved from sf-6 (1.61x at n=21) to
+sf-3 (1.69x at n=32) as the window grew, which is what
+small-sample noise looks like rather than a bias.
+
+What does not move is the node this phase is about. sf-1's share
+was 0.69x, 0.84x, 0.73x, 0.82x and 0.78x at n = 21, 23, 26, 32
+and 35 -- below proportional at every point, on a node which was
+89% filled by commitment when the window opened. The
+network+database node is not being concentrated on, and the bulk
+of new work lands on the two large hypervisors. That is the
+behaviour this phase was for.
+
+Two of its other success criteria are evidenced by the same
+events rather than by inspection. The infra-role reservation is
+live: sf-1 publishes `cpu_schedulable` 6 where the same-sized
+sf-3 and sf-4 publish 10. And the load-per-thread ordering reads
+the typed columns phase 1 added, not the fallback --
+`cpu_schedulable_from_fallback` is `false` on every node in
+every decision observed.
+
+### One finding this raises, for phase 6
+
+The load stage narrows to the lowest occupied bucket *before*
+headroom weighting, so it can discard nodes with far more room
+than the ones it keeps. In one observed decision the survivors
+were sf-1 (weight 3.67) and sf-4 (6.02), while sf-5 (9.55) and
+sf-6 (7.64) were eliminated for being in bucket 1 rather than
+bucket 0. Across 60 decisions on 30 live runners, 8 (13%)
+discarded a node whose headroom weight was higher than the best
+survivor's, and 34 left only a single survivor.
+
+The mechanism is that `cpu_load_1` measures activity, not
+occupancy. A node packed with idle CI runners looks emptier than
+a busy one with room to spare -- and sf-1, at 89% of its hard
+max by commitment, sat in bucket 0 with the lowest normalised
+load in the cluster.
+
+This is not concentrating placement today, because the capacity
+filters reject sf-1 for most runner sizes before ranking ever
+runs: it has six schedulable threads and, at the time of
+observation, two available vCPUs. So the risk is contained by
+the capacity filter rather than removed by the ranking, which is
+a weaker guarantee than it looks and worth knowing before the
+ranking is reworked. Recorded here rather than fixed: phase 6
+owns the ranking model, and D6's open question about whether a
+preference may bid against a hard ceiling is the same question
+in a different coat.
+
+### Method
+
+An hour of sampling every two minutes, recording each instance
+uuid the first time it was seen along with the node it landed
+on, so that what is counted is placements rather than the same
+stock counted repeatedly. Sixty-one distinct instances were
+seen; 35 of them were ephemeral runners placed after the window
+opened, and those are the table above.
+
+Read-only, against the live cluster: `tools/sfcbr-capacity.sh`
+in the `33fl` repository (not this one, which is what this
+plan's step 00a-5 brief implies), `/admin/resources` through the
+client for the per-node ledger, and the instances' own
+scheduling events for the ranking detail.

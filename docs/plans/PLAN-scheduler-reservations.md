@@ -348,7 +348,7 @@ table entirely (decision D8).
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 00a. Load-aware ordering and system reservations (static quick wins) | [PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md) | In progress |
+| 00a. Load-aware ordering and system reservations (static quick wins) | [PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md) | Complete |
 | 0. Research and decisions document | [PLAN-scheduler-reservations-phase-00-decisions.md](PLAN-scheduler-reservations-phase-00-decisions.md) | Complete |
 | 1. Promote node capacity fields to typed columns | [PLAN-scheduler-reservations-phase-01-node-metrics-columns.md](PLAN-scheduler-reservations-phase-01-node-metrics-columns.md) | Complete |
 | 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete |
@@ -601,6 +601,20 @@ wrong gate, and phase 4c replaces it. The advisory release
 exists to collect calibration data, so what phase 5 waits on is
 that data existing, not time elapsing. Phase 5 does not start
 until phase 4c's observation record is written.
+
+*Input from phase 00a's post-deploy observation (2026-08-27):*
+the load stage narrows to the lowest occupied bucket before
+headroom weighting, so it can discard nodes with far more room
+than the ones it keeps -- 8 of 60 observed decisions on sfcbr
+did exactly that, and 34 left a single survivor. The mechanism
+is that `cpu_load_1` measures activity rather than occupancy,
+so a node packed with idle CI runners ranks as the emptiest in
+the cluster. It is not concentrating placement today only
+because the capacity filters reject the over-committed node
+before ranking runs, which is a weaker guarantee than it looks.
+Phase 6 owns the ranking model and should decide this
+deliberately; the detail is in
+[PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md).
 
 **Phase 6 — affinity rework.** Binary soft affinity plus
 hard require constraints, weighted-form deprecation mapping,
