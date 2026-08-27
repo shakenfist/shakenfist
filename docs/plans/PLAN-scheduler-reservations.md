@@ -355,7 +355,7 @@ table entirely (decision D8).
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
-| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Not started |
+| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | In progress |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
@@ -712,9 +712,9 @@ Findings land as their own pull request, and the plan is not
 complete until each is resolved or declined in writing here.
 If the audit finds nothing, that is recorded in one sentence.
 
-Run this last, after every other phase, so the documentation the audit
-checks is the documentation the plan intended to ship and the
-client surface it reviews is the final one.
+Run this last, after every other phase, so the documentation
+the audit checks is the documentation the plan intended to ship
+and the client surface it reviews is the final one.
 
 ## Dependencies on other plans
 

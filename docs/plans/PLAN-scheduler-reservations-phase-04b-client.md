@@ -315,12 +315,35 @@ the server does not itself have.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent | Status |
 |------|--------|-------|-----------|---------------------|--------|
-| 1 | medium | sonnet | worktree | (client-python) The five verbs and the exception. In `shakenfist_client/apiclient.py`, add `get_namespace_claims(namespace)`, `get_namespace_claim(namespace, claim_uuid)`, `create_namespace_claim(namespace, limit_cpus, limit_memory_mb, limit_disk_gb, expires_in_seconds)`, `update_namespace_claim(namespace, claim_uuid, limit_cpus=None, limit_memory_mb=None, limit_disk_gb=None, expires_in_seconds=None)` and `delete_namespace_claim(namespace, claim_uuid)`, beside the namespace key and trust verbs at `:1245-1290` and following their shape exactly (build the path by concatenation, `self._request_url(...)`, return `r.json()`). Two things are not boilerplate. `update_namespace_claim` sends **only** the keyword arguments the caller passed -- the server treats the body as a field mask, so sending all four with values read from a previous GET turns a re-date into a resize race; build the data dict from the non-`None` arguments and let the server reject an empty one. And `expires_in_seconds` is a duration against the cluster's clock, so pass it through and do not convert a datetime. Add `ServiceUnavailableException(APIException)` and map `503` to it in `STATUS_CODES_TO_ERRORS` (`:118-127`); read `_actual_request_url()` at `:328-337` first to confirm the guarded lookup means this changes an exception's class and nothing else. Unit tests in `shakenfist_client/tests/test_client_apiclient.py`, following that file's `_request_url` mocking pattern -- cover each verb's method and path, that `update_namespace_claim` omits unpassed fields, and that a 503 now raises the new class. Read client-python#364 for the API detail. Commit subject: `Add namespace capacity claim verbs.` | Not started |
-| 2 | medium | sonnet | worktree | (client-python) CLI verbs, per D2 and D4. Add a `claim` subgroup to the `namespace` click group in `shakenfist_client/commandline/namespace.py`, following the key and trust subcommands' patterns for arguments, `shell_complete` and output formatting: `namespace claim list <namespace>`, `claim show <namespace> <uuid>`, `claim create <namespace> --cpus --memory-mb --disk-gb --expires-in`, `claim update <namespace> <uuid> [--cpus] [--memory-mb] [--disk-gb] [--expires-in]` and `claim delete <namespace> <uuid>`. `update` passes through only the options the operator supplied, for the field-mask reason in step 1 -- click's default of `None` for an unsupplied option is what makes that natural, so do not give them defaults. Output must print `coverage_state` beside `state` as two columns and never merge them (D4). Help text describes a claim as capacity the cluster accounts against, not capacity it reserves or guarantees, because exceeding a claim is recorded rather than refused in this release. Do not add a "how much room is left" display: no endpoint publishes cluster totals, and that view is phase 5's. Tests beside `shakenfist_client/tests/test_client_commandline_instance.py`, mirroring its approach. Commit subject: `Add namespace claim commands to sf-client.` | Not started |
+| 1 | medium | sonnet | worktree | (client-python) The five verbs and the exception. In `shakenfist_client/apiclient.py`, add `get_namespace_claims(namespace)`, `get_namespace_claim(namespace, claim_uuid)`, `create_namespace_claim(namespace, limit_cpus, limit_memory_mb, limit_disk_gb, expires_in_seconds)`, `update_namespace_claim(namespace, claim_uuid, limit_cpus=None, limit_memory_mb=None, limit_disk_gb=None, expires_in_seconds=None)` and `delete_namespace_claim(namespace, claim_uuid)`, beside the namespace key and trust verbs at `:1245-1290` and following their shape exactly (build the path by concatenation, `self._request_url(...)`, return `r.json()`). Two things are not boilerplate. `update_namespace_claim` sends **only** the keyword arguments the caller passed -- the server treats the body as a field mask, so sending all four with values read from a previous GET turns a re-date into a resize race; build the data dict from the non-`None` arguments and let the server reject an empty one. And `expires_in_seconds` is a duration against the cluster's clock, so pass it through and do not convert a datetime. Add `ServiceUnavailableException(APIException)` and map `503` to it in `STATUS_CODES_TO_ERRORS` (`:118-127`); read `_actual_request_url()` at `:328-337` first to confirm the guarded lookup means this changes an exception's class and nothing else. Unit tests in `shakenfist_client/tests/test_client_apiclient.py`, following that file's `_request_url` mocking pattern -- cover each verb's method and path, that `update_namespace_claim` omits unpassed fields, and that a 503 now raises the new class. Read client-python#364 for the API detail. Commit subject: `Add namespace capacity claim verbs.` | Proposed, not merged: [client-python#375](https://github.com/shakenfist/client-python/pull/375) |
+| 2 | medium | sonnet | worktree | (client-python) CLI verbs, per D2 and D4. Add a `claim` subgroup to the `namespace` click group in `shakenfist_client/commandline/namespace.py`, following the key and trust subcommands' patterns for arguments, `shell_complete` and output formatting: `namespace claim list <namespace>`, `claim show <namespace> <uuid>`, `claim create <namespace> --cpus --memory-mb --disk-gb --expires-in`, `claim update <namespace> <uuid> [--cpus] [--memory-mb] [--disk-gb] [--expires-in]` and `claim delete <namespace> <uuid>`. `update` passes through only the options the operator supplied, for the field-mask reason in step 1 -- click's default of `None` for an unsupplied option is what makes that natural, so do not give them defaults. Output must print `coverage_state` beside `state` as two columns and never merge them (D4). Help text describes a claim as capacity the cluster accounts against, not capacity it reserves or guarantees, because exceeding a claim is recorded rather than refused in this release. Do not add a "how much room is left" display: no endpoint publishes cluster totals, and that view is phase 5's. Tests beside `shakenfist_client/tests/test_client_commandline_instance.py`, mirroring its approach. Commit subject: `Add namespace claim commands to sf-client.` | Proposed, not merged: [client-python#375](https://github.com/shakenfist/client-python/pull/375), which carries steps 1 and 2 together |
 | 3 | n/a | management session | none | (client-python) Merge steps 1 and 2 to `develop`, then cut a release: tag `v0.8.4` and approve the `release` environment per `RELEASE-SETUP.md`. The release is not needed for step 4 (finding 1) but is needed by phase 4c, and cutting it here means one release rather than two. Confirm the release appears on PyPI before phase 4c's step 0 gate is evaluated. | Not started |
-| 4 | high | opus | worktree | (shakenfist) Move the functional coverage onto the verbs, per D3. In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`, change `_claim_api()` (`:180-204`) to dispatch to the client verbs instead of `_request_url()`, reading the returned `(status, body)` pair off `APIException.status_code` and `.text` for the failure path and returning `(200, result)` for the success path. Keep the method's signature and contract, so `_claim_api_awaiting_accounting()`, `_claim_api_awaiting_headroom()` and every assertion in the file are untouched -- and so `shakenfist_ci/retries.py` keeps its pair contract and its freedom from `shakenfist_client` imports, which `shakenfist/tests/test_ci_claims_headroom.py` asserts by loading it by path. `_claims_url()` and `_claim_url()` become namespace and uuid arguments rather than paths; keep or remove them as the dispatch makes natural, but do not leave a helper that builds a URL nothing uses. Then rewrite the file's "Why this file reaches past the client library" docstring section: it currently explains a constraint that no longer exists, and should instead say that the verbs are what an operator uses and so what this file defends, and note that cluster CI builds the client from a `develop` checkout rather than installing the release. This step cannot be verified on a `pull_request` run -- the `(collection)` matrix is skipped there and runs on `merge_group` (`docs/developer_guide/coding_rules.md:341-352`) -- so drive the changed helper against a real cluster before proposing the commit, per that same rule. Requires step 1 merged to client-python's `develop` first. Commit subject: `tests: drive claims through the client verbs.` | Not started |
-| 5 | medium | sonnet | worktree | (shakenfist) The documentation half. Add a short subsection to `docs/developer_guide/ci.md` saying how cluster CI obtains its code: the `(collection)` matrix deploys through `shakenfist/actions`, which checks out `shakenfist`, `client-python` and `agent-python` (the triggering repository at its ref, the others at `develop`), and `tools/deploy-collection.sh` passes `sf_build_local_wheels=true` so the collection builds and installs wheels from those checkouts rather than the PyPI packages an operator would get. Say the consequence plainly, because it is the part that was missed for two months: an unreleased client change is available to cluster CI as soon as it merges to the client's `develop`. Then close the loop on client-python#364 -- comment correcting its "Why this needs an issue rather than just happening" section and close it if steps 1 and 2 satisfy it. Commit subject: `docs: say where CI gets its client from.` | Not started |
+| 4 | high | opus | worktree | (shakenfist) Move the functional coverage onto the verbs, per D3. In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`, change `_claim_api()` (`:180-204`) to dispatch to the client verbs instead of `_request_url()`, reading the returned `(status, body)` pair off `APIException.status_code` and `.text` for the failure path and returning `(200, result)` for the success path. Keep the method's signature and contract, so `_claim_api_awaiting_accounting()`, `_claim_api_awaiting_headroom()` and every assertion in the file are untouched -- and so `shakenfist_ci/retries.py` keeps its pair contract and its freedom from `shakenfist_client` imports, which `shakenfist/tests/test_ci_claims_headroom.py` asserts by loading it by path. `_claims_url()` and `_claim_url()` become namespace and uuid arguments rather than paths; keep or remove them as the dispatch makes natural, but do not leave a helper that builds a URL nothing uses. Then rewrite the file's "Why this file reaches past the client library" docstring section: it currently explains a constraint that no longer exists, and should instead say that the verbs are what an operator uses and so what this file defends, and note that cluster CI builds the client from a `develop` checkout rather than installing the release. This step cannot be verified on a `pull_request` run -- the `(collection)` matrix is skipped there and runs on `merge_group` (`docs/developer_guide/coding_rules.md:341-352`) -- so drive the changed helper against a real cluster before proposing the commit, per that same rule. Requires step 1 merged to client-python's `develop` first. Commit subject: `tests: drive claims through the client verbs.` | Complete |
+| 5 | medium | sonnet | worktree | (shakenfist) The documentation half. Add a short subsection to `docs/developer_guide/ci.md` saying how cluster CI obtains its code: the `(collection)` matrix deploys through `shakenfist/actions`, which checks out `shakenfist`, `client-python` and `agent-python` (the triggering repository at its ref, the others at `develop`), and `tools/deploy-collection.sh` passes `sf_build_local_wheels=true` so the collection builds and installs wheels from those checkouts rather than the PyPI packages an operator would get. Say the consequence plainly, because it is the part that was missed for two months: an unreleased client change is available to cluster CI as soon as it merges to the client's `develop`. Then close the loop on client-python#364 -- comment correcting its "Why this needs an issue rather than just happening" section and close it if steps 1 and 2 satisfy it. Commit subject: `docs: say where CI gets its client from.` | Complete, except the GitHub half (correcting and closing client-python#364), which waits on the release |
 | 6 | low | sonnet | worktree | (shakenfist) Close-out. Set the phase 4b row to `Complete` in the master plan Execution table and confirm `docs/plans/index.md`'s arithmetic. Check the phase 4c plan's step 0 gate now reads true (a released client carrying the verbs) and say so in that plan rather than leaving the reader to check PyPI. Commit subject: `scheduler: close out phase 4b.` | Not started |
+
+### Cross-repository ordering
+
+D1's ordering constraint is checked here rather than left to
+memory, because the failure it produces reads as a claims bug.
+
+Steps 1 and 2 are proposed together as
+[client-python#375](https://github.com/shakenfist/client-python/pull/375)
+(branch `namespace-claim-verbs`), which adds all five verbs and
+`ServiceUnavailableException`, and whose checks are green. As of
+2026-08-28 it is **open, not merged**.
+
+Until it is on client-python's `develop`, the step 4 branch must
+not enter this repository's merge queue: the collection builds
+the client wheel from that checkout, so every test in
+`test_namespace_claims.py` would die with `AttributeError` --
+which `_claim_api()` does not catch -- and the `(collection)`
+matrix is skipped on `pull_request`, so nothing before the merge
+queue would notice. The pull request opening this work says so in
+its first paragraph.
+
+When #375 merges, record its merge commit here and set steps 1
+and 2 to `Complete`.
 
 ## Risks and mitigations
 
@@ -356,12 +379,12 @@ the honest outcome and does not block phases 5 through 9.
 
 ## Definition of done
 
-- [ ] No *call* to `_request_url` remains in
+- [x] No *call* to `_request_url` remains in
       `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`.
       The name still appears once, in the docstring explaining what the
       file used to do and why that reasoning was wrong, which is worth
       keeping.
-- [ ] `shakenfist/tests/test_ci_claims_headroom.py` still passes,
+- [x] `shakenfist/tests/test_ci_claims_headroom.py` still passes,
       and `shakenfist_ci/retries.py` still imports nothing from
       `shakenfist_client`.
 - [ ] The `(collection)` matrix passes with the rewritten test,
@@ -376,8 +399,10 @@ the honest outcome and does not block phases 5 through 9.
 - [ ] No document in either repository still says a client
       release is required before functional coverage can use the
       verbs: the master plan stub, the test docstring, and
-      client-python#364 are each corrected or closed.
-- [ ] `docs/developer_guide/ci.md` says where cluster CI gets its
+      client-python#364 are each corrected or closed. This
+      repository's three sites are corrected; #364 is closed by
+      step 5's GitHub half, which waits on the release.
+- [x] `docs/developer_guide/ci.md` says where cluster CI gets its
       client from.
 - [ ] `pre-commit run --all-files` passes in each repository.
 
@@ -404,6 +429,18 @@ real cluster.** Collection and single `GET`, `POST`, a refused second
 (the others unmoved), a cross-namespace read (404, not disclosed),
 `DELETE`, and `DELETE` of a claim already gone (404). D3's claim that no
 assertion in the file needed to change held.
+
+**The dispatch is guarded within this repository.**
+`test_ci_claims_headroom.py` already parsed the claims suite's AST,
+because `shakenfist_client` is not a test dependency here; it now also
+asserts that `_claim_api()` names exactly the five verbs and that no
+call to `_request_url()` survives. That catches a typo or a rename
+seconds after the edit rather than at the merge gate, which is the only
+place the `(collection)` matrix runs. It cannot check the names against
+an installed client -- that skew is what the ordering record above is
+for. Both assertions were mutation-tested: renaming a verb and
+reintroducing a `_request_url()` call each fail exactly the guard that
+names them.
 
 **The headroom-tolerant wiring is real, not decorative.** Routing
 `_create_claim` off `_claim_api_awaiting_headroom` fails exactly one
