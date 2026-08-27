@@ -193,9 +193,15 @@ this plan exists to fix. For now:
   strips step timestamps.
 - Ledger and refusal evidence: `ci-status shakenfist/shakenfist
   logs <job id>`, then grep for `cpu_schedulable`, `limit_cpus`
-  and `No nodes remaining at scheduling stage`. The scheduler's
-  per-candidate audit payload only reaches the log when a test
-  fails and attaches it, so a green run tells you nothing.
+  and `No nodes remaining at scheduling stage`. Note that the
+  scheduler's per-candidate audit payload is written on *every*
+  schedule, not only failing ones: `_log_and_raise_on_error()`
+  (`shakenfist/scheduler.py:348-364`) emits `schedule at stage
+  {stage}` carrying `extra['dropped']` whenever candidates
+  survived, and `schedule has no candidates at stage {stage},
+  aborting` when none did. A green run therefore does record its
+  refusals -- the phase 1 survey corrected an earlier claim here
+  that it did not.
 - Per-instance utilisation: the conductor database, copied as
   described in the private-ci access notes; join
   `workflow_cost_samples` to `workflow_costs` on `namespace` and
@@ -368,7 +374,7 @@ those are corrected here as well.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete |
-| 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | PLAN-ci-cloud-sizing-phase-01-headroom-probe.md | Not started |
+| 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Not started |
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | PLAN-ci-cloud-sizing-phase-02-baseline.md | Not started |
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md | Not started |
 | 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started |
@@ -394,19 +400,27 @@ Sample `GET /admin/resources` (admin-only, already implemented by
 throughout the functional-test step, and emit a per-run summary:
 peak and p90 committed vCPU cluster-wide and per node, both as
 absolute numbers and as a fraction of ledger; the same for memory;
-and a count of `sufficient_idle_cpu` / `sufficient_idle_memory`
-refusals. Upload the raw series as a job artifact and print the
-summary in the log.
+and a per-stage count of candidate refusals. Upload the raw series
+as a job artifact and print the summary in the log.
 
-No gating, no topology change. The endpoint already publishes both
-inputs to the admission decision (`cpu_measured` and
-`cpu_committed`, plus `cpu_hard_max`) precisely so "this node
+There are four capacity stages, not three: `sufficient_idle_cpu`,
+`sufficient_idle_memory`, `sufficient_free_disk` (disk *space*)
+and `sufficient_idle_disk` (disk *bandwidth*, a rate predicate).
+Phase 1's survey found this plan and phase 0 naming only three,
+with the bandwidth stage standing in for disk capacity.
+
+No gating, no topology change. The endpoint publishes
+`cpu_measured`, `cpu_committed` and `cpu_hard_max`, so "this node
 measures idle but is refusing work" is answerable, which is what
-makes it the right probe.
+makes it the right probe. It does *not* publish the capacity row's
+`limit_cpus`, which is what admission actually compares against
+and which D7 needs; phase 1 adds it.
 
-Lives in `shakenfist/actions` (the reusable `smoke-cluster`
-workflow and `build-smoke-cluster`), so it needs an operator push
-and a real CI run to prove.
+Most of the work lives in the main repository's `tools/`, following
+`ci_wait_schedulable.py`; the invocation lives in
+`shakenfist/actions` (the reusable `smoke-cluster` workflow and
+`build-smoke-cluster`), so it still needs an operator push and a
+real CI run to prove.
 
 ### Phase 2 -- Baseline measurement window
 
