@@ -2381,6 +2381,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/" class="md-nav__link">
         
   
@@ -2584,6 +2612,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -3505,6 +3561,17 @@
     <span class="md-ellipsis">
       
         Self-hosted runners and Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#self-hosted-runners-and-the-github-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-hosted runners and the GitHub CLI
       
     </span>
   </a>
@@ -13487,6 +13554,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#self-hosted-runners-and-the-github-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-hosted runners and the GitHub CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#merge-queue-and-the-develop-ruleset" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13913,6 +13991,37 @@ or any other container-backed Makefile target must install it first:</p>
 <p>Omitting the step does not fail at job start -- it fails part way through
 with <code>docker: command not found</code>, whenever the first container command is
 reached.</p>
+<h3 id="self-hosted-runners-and-the-github-cli">Self-hosted runners and the GitHub CLI<a class="headerlink" href="#self-hosted-runners-and-the-github-cli" title="Permanent link">&para;</a></h3>
+<p>The same applies to <code>gh</code>: the <code>[self-hosted, debian-12, ...]</code> runners do
+not ship it either, so any job that files an issue, opens a PR or
+otherwise calls the GitHub CLI must install it first. Do not paste an
+apt block into the workflow -- call the shared installer, which is a
+no-op when <code>gh</code> is already present:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install GitHub CLI on host</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tools/ci/install-gh-cli.sh</span>
+</code></pre></div>
+<p>The <code>[self-hosted, claude-code]</code> and <code>[self-hosted, static]</code> runners do
+have <code>gh</code> preinstalled, which is why the Claude Code workflows and the
+comment-triggered bot workflows call it directly. The <code>static</code> case is
+load-bearing rather than incidental: <code>shakenfist/actions</code>'
+<code>pr-bot-trigger</code> composite action -- the first step of every
+<code>@shakenfist-bot please ...</code> workflow across the fleet -- is built
+entirely on <code>gh api</code> and <code>gh pr comment</code>, so if those runners lacked
+<code>gh</code> no bot trigger anywhere would work. Instar's own
+<code>pr-address-comments.yml</code> run 24368074053 (2026-04-13) has that step
+passing on a <code>static</code> runner.</p>
+<p>So the rule is per runner label, not per workflow: add the installer
+step on <code>debian-12</code> (and any new pool that turns out to lack <code>gh</code>), and
+leave the <code>claude-code</code> and <code>static</code> jobs alone.</p>
+<p>This one bites late rather than early. The <code>gh</code> call is usually the last
+thing a job does -- open the PR, file the issue -- so the job burns its
+full runtime, succeeds at the real work, and then dies on
+<code>gh: command not found</code>. That is exactly what happened to
+<code>rust-nightly-bump</code> on 2026-08-24: it validated <code>nightly-2026-08-24</code>,
+committed it and pushed the branch, then failed the run without opening
+the PR. Worse, in <code>release.yml</code> the <code>gh</code> call sits on a <code>if: failure()</code>
+error-reporting path, where a missing <code>gh</code> would have silently swallowed
+the report of the original failure.</p>
 <h3 id="merge-queue-and-the-develop-ruleset">Merge queue and the <code>develop</code> ruleset<a class="headerlink" href="#merge-queue-and-the-develop-ruleset" title="Permanent link">&para;</a></h3>
 <p><code>develop</code> is gated by a repository <strong>ruleset</strong> named "Develop branch"
 (not classic branch protection — the whole Shaken Fist fleet uses
@@ -14001,16 +14110,16 @@ ruleset, transform the exported object rather than PUTting the <code>GET</code>
 response back unchanged — the response carries fields that are not part
 of the update schema (<code>id</code>, <code>_links</code>, and <code>"parameters": null</code> on the
 rules that take no parameters):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="s1">  name, target, enforcement, conditions,</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="s1">  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="s1">  rules: [.rules[]</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="s1">    | if .type == "required_status_checks"</span>
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="s1">      then .parameters.required_status_checks</span>
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="s1">             += [{context: "Can merge", integration_id: 15368}]</span>
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="s1">      else . end</span>
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}'</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
-<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="s1">  name, target, enforcement, conditions,</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="s1">  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="s1">  rules: [.rules[]</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="s1">    | if .type == "required_status_checks"</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="s1">      then .parameters.required_status_checks</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="s1">             += [{context: "Can merge", integration_id: 15368}]</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="s1">      else . end</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}'</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
 </code></pre></div>
 <p>Read it back and diff it against the intent afterwards; dropping
 <code>bypass_actors</code> from the payload silently removes the bypass.</p>
@@ -14028,8 +14137,8 @@ rules that take no parameters):</p>
   never reports leaves the queue waiting forever.</li>
 </ul>
 <p>To inspect or recreate it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[] | "\(.id) \(.name) \(.enforcement)"'</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[] | "\(.id) \(.name) \(.enforcement)"'</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
 </code></pre></div>
 <p><code>.github/exported-config/</code> carries the nightly export of the live
 ruleset state, which is the machine-readable companion to the table
@@ -14038,16 +14147,16 @@ committing directly.</p>
 <h3 id="differential-fuzzing">Differential fuzzing<a class="headerlink" href="#differential-fuzzing" title="Permanent link">&para;</a></h3>
 <p>On-demand differential fuzzing compares instar against qemu-img on randomly
 generated images to find behavioral divergences:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
 </code></pre></div>
 <p>The fuzzer generates random images (varying format, size, cluster size,
 compression, data patterns), runs chains of operations (info, check, convert)
@@ -14060,9 +14169,9 @@ fills the gap for VMDK/VHD/VHDX where qemu-img check is unavailable.</p>
 <h3 id="coverage-guided-fuzzing">Coverage-guided fuzzing<a class="headerlink" href="#coverage-guided-fuzzing" title="Permanent link">&para;</a></h3>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
 parser crates directly without the VMM/KVM stack:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
 </code></pre></div>
 <p>40 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
 VDI, Parallels, QCOW1, DMG, RAW, LUKS) including header parsing,
@@ -14077,7 +14186,7 @@ refcount mutators (<code>fuzz_snapshot_refcount</code>), the dd window math
 which drives the write/copy-on-write planner through the crate's
 <code>sim</code> harness asserting the <code>max_rc &lt; 3</code> COW invariant oracle, and
 <code>fuzz_qcow2_write_growth</code>). Seed the corpus from <code>instar-testdata</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>The CI workflow runs nightly at 04:00 UTC. Crashes are minimized and
 filed as GitHub Issues with the <code>security-audit</code> label immediately.
@@ -14118,8 +14227,8 @@ starts marking glibc version needs weak. <code>nightly-2026-07-22</code> emitted
 took out the Rocky 9, Rocky 10 and Fedora matrix jobs in the merge
 queue. <code>.deb</code> packaging is unaffected — cargo-deb uses
 <code>dpkg-shlibdeps</code>. To inspect what a built package actually requires:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>rpm<span class="w"> </span>-qpR<span class="w"> </span>src/target/generate-rpm/instar-*.rpm
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>readelf<span class="w"> </span>-V<span class="w"> </span>src/target/release/instar<span class="w">   </span><span class="c1"># Version needs section</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>rpm<span class="w"> </span>-qpR<span class="w"> </span>src/target/generate-rpm/instar-*.rpm
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>readelf<span class="w"> </span>-V<span class="w"> </span>src/target/release/instar<span class="w">   </span><span class="c1"># Version needs section</span>
 </code></pre></div>
 <p>Note that this class of breakage is only caught by the distro matrix,
 which runs in the merge queue rather than in the pull-request gate.</p>
@@ -14260,6 +14369,10 @@ inside the work tree.</p>
 <p>The self-hosted runners have no Docker preinstalled, so any job touching
 <code>docker</code> or a container-backed Makefile target needs an "Install Docker"
 step -- see "Self-hosted runners and Docker" in <code>docs/development.md</code>.</p>
+<p>The <code>debian-12</code> runners have no <code>gh</code> preinstalled either, so any job on
+those that calls the GitHub CLI needs a <code>tools/ci/install-gh-cli.sh</code>
+step -- see "Self-hosted runners and the GitHub CLI" in
+<code>docs/development.md</code>.</p>
 <h2 id="scripts">Scripts<a class="headerlink" href="#scripts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>tools/address-comments-with-claude.sh</code> - Addresses review comments (reads JSON); CI stages each fix for it via <code>tools/ci/stage-autofix-changes.sh --tracked-only</code> (see "How Automated Comment Addressing Works" above)</li>
@@ -14269,6 +14382,7 @@ step -- see "Self-hosted runners and Docker" in <code>docs/development.md</code>
 <li><code>tools/review-schema.json</code> - JSON schema for review output validation</li>
 <li><code>scripts/differential-fuzz.py</code> - Differential fuzzing script (instar vs qemu-img + libyal)</li>
 <li><code>scripts/extract-fuzz-corpus.py</code> - Seeds + restores the coverage-fuzz corpus from instar-testdata</li>
+<li><code>tools/ci/install-gh-cli.sh</code> - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)</li>
 <li><code>tools/ci/fuzz-tier.sh</code> - Computes tiered nightly per-target fuzz durations</li>
 <li><code>tools/ci/report-fuzz-crash.sh</code> - Files the <code>security-audit</code> issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in <code>docs/testing.md</code>)</li>
 <li><code>tools/ci/pick-fuzz-artifact.sh</code> - Chooses which libFuzzer artifact to report as the reproducer</li>

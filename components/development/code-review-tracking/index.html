@@ -1384,6 +1384,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Session discipline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reviewing-a-file-that-is-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing a file that is out of scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2507,6 +2524,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/" class="md-nav__link">
         
   
@@ -2710,6 +2755,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13266,6 +13339,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Session discipline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reviewing-a-file-that-is-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing a file that is out of scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13663,6 +13753,33 @@ covers, which imposes three rules:</p>
    in the sidecar and regenerates <code>REVIEWS.md</code>, printing exactly
    what to <code>git add</code>. The (signed) commit that lands contains the
    marks, the stamps, and the regenerated <code>REVIEWS.md</code> together.</p>
+<h3 id="reviewing-a-file-that-is-out-of-scope">Reviewing a file that is out of scope<a class="headerlink" href="#reviewing-a-file-that-is-out-of-scope" title="Permanent link">&para;</a></h3>
+<p><code>stamp</code> ends with a banner naming any marked file the scope config
+excludes, and exits non-zero. It is deliberately the loudest thing
+the tool prints, because the mistake is otherwise close to
+undetectable from the outside: an out-of-scope review <em>does</em> get a
+row in the <code>REVIEWS.md</code> table, so it looks recorded, but the
+coverage count above that table only counts in-scope files and does
+not move. <code>status</code> cannot see it either, so the <code>review-coverage</code>
+audit goes on reporting the file as outstanding, and <code>next</code> never
+offered it in the first place. The reviewer reads a file carefully
+and the number they are trying to move stays where it was.</p>
+<p>The banner repeats on every run, not just the one that first stamps
+the file. A mark noticed once and left alone is precisely the case
+that needs saying again, and the second run is when the reviewer is
+looking for confirmation that the count moved.</p>
+<p>Two ways out, and which one is right is a judgement call:</p>
+<ul>
+<li>If reviewing the file was a mistake, un-mark it in weAudit and
+  re-run <code>stamp</code>, which drops the stamp along with the mark.</li>
+<li>If the file should have been in scope, widen the include or
+  exclude patterns in <code>.vscode/review-scope.toml</code> and say why in
+  the commit message. The exclusions in that file are argued rather
+  than incidental -- each one carries a comment explaining what
+  would go wrong if the file were in the queue -- so an addition
+  that does not engage with the argument is likely to be reverted
+  by whoever wrote it.</li>
+</ul>
 <h2 id="staleness">Staleness<a class="headerlink" href="#staleness" title="Permanent link">&para;</a></h2>
 <p>A review applies to the file content that was read, not the path:
 once the file changes, that review is stale and the file should be
@@ -13692,10 +13809,11 @@ weAudit's own JSON.</p>
   reviewed file changes, the only path forward is prune then
   re-review. This is what prevents a stale review being silently
   refreshed at the file's current content. <code>stamp</code> reports such a
-  file and exits non-zero rather than passing over it, so the
-  pre-commit hook stops the commit that would carry the stale mark:
-  until this was checked it skipped the file in silence, and because
-  a review-only commit is exempt from CI, the mark then survived to
+  file and exits non-zero rather than passing over it, which is the
+  last chance anything gets to say so: <code>stamp</code> runs by hand and not
+  from a hook, so nothing downstream will stop the commit. Until
+  this was checked it skipped the file in silence, and because a
+  review-only commit is exempt from CI, the mark then survived to
   the default branch where <code>prune-reviews</code> deleted it -- discarding
   the review rather than the staleness, which is the wrong half.</li>
 <li>When every file in a directory is reviewed, weAudit adds a

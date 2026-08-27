@@ -16,7 +16,7 @@
         <link rel="prev" href="../test-coverage/">
       
       
-        <link rel="next" href="../">
+        <link rel="next" href="../compliance/">
       
       
         
@@ -2603,6 +2603,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../" class="md-nav__link">
         
   
@@ -2806,6 +2834,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13654,239 +13710,9 @@ every install. The check flags any workflow line referencing
 files. See <code>templates/ci-review-automation/</code> for examples of correctly
 structured workflows.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<!-- consistency-audit:begin -->
-<p><em>Generated 2026-08-26T06:56:26.297909+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>Permissions</th>
-<th>Linting</th>
-<th>Review marks</th>
-<th>flake8wrap</th>
-<th>Runners</th>
-<th>Static tags</th>
-<th>devpi fallback</th>
-<th>devpi IP</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>actions</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>agent-python</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>non-compliant</td>
-<td>non-compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/105" title="GitHub Issue: shakenfist/agent-python #105">agent-python#105</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/82" title="GitHub Issue: shakenfist/agent-python #82">agent-python#82</a></td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>client-python-k3s</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>development</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>divergulent</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>instar</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>non-compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/67" title="GitHub Issue: shakenfist/occystrap #67">occystrap#67</a></td>
-</tr>
-<tr>
-<td>private-ci</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>sfui</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
-<td>non-compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>non-compliant</td>
-<td>compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3057" title="GitHub Issue: shakenfist/shakenfist #3057">shakenfist#3057</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3418" title="GitHub Issue: shakenfist/shakenfist #3418">shakenfist#3418</a></td>
-</tr>
-</tbody>
-</table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>agent-python</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
-<li><strong>agent-python</strong> (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment</li>
-<li><strong>occystrap</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
-<li><strong>shakenfist</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
-<li><strong>shakenfist</strong> (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:102, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: <a href="https://pypi.org/simple/">https://pypi.org/simple/</a>" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"</li>
-</ul>
-<!-- consistency-audit:end -->
+<p>Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+<a href="/components/development/audits/compliance/#workflow-standards">the compliance page</a>.</p>
 
 
 

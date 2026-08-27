@@ -2465,6 +2465,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../" class="md-nav__link">
         
   
@@ -2668,6 +2696,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13259,12 +13315,19 @@ on <code>merge_group</code>, and
 documents the design. When adopting it, note dorny/paths-filter's
 <code>predicate-quantifier: 'every'</code> trap: the default ANY-match semantics
 make a <code>'**'</code> pattern defeat every exclusion.</p>
-<p>Dedicated content-scanner workflows (gitleaks, trufflehog,
-detect-secrets) are exempt. Their whole point is to read the
-human-written text a filter would skip: a secret lands in docs or
-review marks as easily as in code.</p>
+<p>Dedicated content-scanner workflows are exempt. Their whole point is to
+read the human-written text a filter would skip: a secret lands in docs
+or review marks as easily as in code, and so does an instruction
+smuggled into text an agent will load.</p>
+<p>The tools that count are <code>CONTENT_SCANNERS</code> in <code>scripts/audit-check.py</code>
+— the credential scanners (gitleaks, trufflehog, detect-secrets) plus
+<code>skillsaw</code>, which lints the agent context. skillsaw earns the exemption
+for the same reason the credential scanners do, not because it is a
+secret scanner: <code>CONTENT_SCANNERS</code> is deliberately a superset of
+<code>SECRET_SCANNERS</code>, so a repository whose only scanner is skillsaw still
+fails <a href="/components/development/audits/secret-handling/">the secret scanning audit</a>.</p>
 <p><em>Dedicated</em> is measured per job: every job in the workflow must invoke
-a scanner, outside of comments. The argument for the exemption is about
+one of those tools, outside of comments. The argument for the exemption is about
 the scanner job, not the file it lives in. Asking merely whether a
 scanner appeared anywhere in the file gave <code>shakenfist/actions</code> a pass
 for a <code>ci.yml</code> that ran lint, unit tests and the LLM reviewer on
@@ -13278,7 +13341,9 @@ carries the same <code>check_paths</code> condition as the expensive lanes, so
 ryll's secret scan skips documentation-only pull requests.</p>
 <p>Other deliberate exceptions — a lane that must run even for docs-only
 changes — take an <code>audit-ok: no-path-filter</code> comment anywhere in the
-workflow file, ideally with a reason.</p>
+workflow file, ideally with a reason. client-python needed one when it
+first put its agent-context lint beside its credential scan, before
+this audit knew what skillsaw was; that marker is now redundant there.</p>
 <p>Repositories with neither a <code>docs/</code> directory nor review tracking have
 nothing for a filter to exclude and are not applicable, as are
 repositories whose PR-triggered workflows never use <code>vm</code> runners.</p>
@@ -13288,113 +13353,9 @@ required status check. Copy the <code>check_paths</code> pattern from kerbside's
 smoke workflows for gating lanes, or add trigger-level <code>paths-ignore</code>
 for advisory ones.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<!-- consistency-audit:begin -->
-<p><em>Generated 2026-08-26T06:56:26.297909+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>Status</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>actions</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>agent-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/123" title="GitHub Issue: shakenfist/agent-python #123">agent-python#123</a></td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>client-python-k3s</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/29" title="GitHub Issue: shakenfist/client-python-k3s #29">client-python-k3s#29</a></td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/118" title="GitHub Issue: shakenfist/clingwrap #118">clingwrap#118</a></td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>development</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>divergulent</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>instar</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/113" title="GitHub Issue: shakenfist/occystrap #113">occystrap#113</a></td>
-</tr>
-<tr>
-<td>private-ci</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>sfui</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/14" title="GitHub Issue: shakenfist/sfui #14">sfui#14</a></td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-</tbody>
-</table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>agent-python</strong> (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment</li>
-<li><strong>client-python-k3s</strong> (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment</li>
-<li><strong>clingwrap</strong> (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment</li>
-<li><strong>occystrap</strong> (Status): 2 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering), python-unit-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment</li>
-<li><strong>sfui</strong> (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment</li>
-</ul>
-<!-- consistency-audit:end -->
+<p>Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+<a href="/components/development/audits/compliance/#expensive-lane-path-filter">the compliance page</a>.</p>
 
 
 

@@ -2465,6 +2465,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../" class="md-nav__link">
         
   
@@ -2668,6 +2696,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13269,118 +13325,9 @@ reports, so the two cannot disagree about what counts as broken.</p>
 other third-party actions that way. Repositories that enable renovate's
 pre-commit manager will have the <code>rev</code> kept current automatically.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<!-- consistency-audit:begin -->
-<p><em>Generated 2026-08-26T06:56:26.297909+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>Status</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>actions</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>agent-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/125" title="GitHub Issue: shakenfist/agent-python #125">agent-python#125</a></td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/366" title="GitHub Issue: shakenfist/client-python #366">client-python#366</a></td>
-</tr>
-<tr>
-<td>client-python-k3s</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/35" title="GitHub Issue: shakenfist/client-python-k3s #35">client-python-k3s#35</a></td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/120" title="GitHub Issue: shakenfist/clingwrap #120">clingwrap#120</a></td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/cloudgood/issues/8" title="GitHub Issue: shakenfist/cloudgood #8">cloudgood#8</a></td>
-</tr>
-<tr>
-<td>development</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>divergulent</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/514" title="GitHub Issue: shakenfist/instar #514">instar#514</a></td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/359" title="GitHub Issue: shakenfist/kerbside #359">kerbside#359</a></td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/119" title="GitHub Issue: shakenfist/occystrap #119">occystrap#119</a></td>
-</tr>
-<tr>
-<td>private-ci</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>sfui</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/25" title="GitHub Issue: shakenfist/sfui #25">sfui#25</a></td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3832" title="GitHub Issue: shakenfist/shakenfist #3832">shakenfist#3832</a></td>
-</tr>
-</tbody>
-</table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>agent-python</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>client-python</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>client-python-k3s</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>clingwrap</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>cloudgood</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>instar</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>kerbside</strong> (Status): skillsaw does not run from a CI workflow</li>
-<li><strong>occystrap</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>sfui</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>shakenfist</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-</ul>
-<!-- consistency-audit:end -->
+<p>Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+<a href="/components/development/audits/compliance/#llm-context-lint-ci">the compliance page</a>.</p>
 
 
 

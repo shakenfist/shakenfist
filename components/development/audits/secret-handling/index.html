@@ -2537,6 +2537,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../" class="md-nav__link">
         
   
@@ -2740,6 +2768,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13523,113 +13579,9 @@ repository, as <code>shakenfist/tools/gitleaks-scan.sh</code> does. It then runs
 the same way locally as in CI, which is the only way anyone will check
 a change to it before pushing.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<!-- consistency-audit:begin -->
-<p><em>Generated 2026-08-26T06:56:26.297909+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>Status</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>actions</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>agent-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/113" title="GitHub Issue: shakenfist/agent-python #113">agent-python#113</a></td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/354" title="GitHub Issue: shakenfist/client-python #354">client-python#354</a></td>
-</tr>
-<tr>
-<td>client-python-k3s</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/111" title="GitHub Issue: shakenfist/clingwrap #111">clingwrap#111</a></td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>development</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>divergulent</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>instar</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/library-utilities/issues/41" title="GitHub Issue: shakenfist/library-utilities #41">library-utilities#41</a></td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/101" title="GitHub Issue: shakenfist/occystrap #101">occystrap#101</a></td>
-</tr>
-<tr>
-<td>private-ci</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>sfui</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>compliant</td>
-<td>-</td>
-</tr>
-</tbody>
-</table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>agent-python</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
-<li><strong>client-python</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
-<li><strong>clingwrap</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
-<li><strong>library-utilities</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
-<li><strong>occystrap</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
-</ul>
-<!-- consistency-audit:end -->
+<p>Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+<a href="/components/development/audits/compliance/#secret-handling">the compliance page</a>.</p>
 
 
 

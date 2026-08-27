@@ -2482,6 +2482,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../" class="md-nav__link">
         
   
@@ -2685,6 +2713,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13343,112 +13399,9 @@ worked example of the shape.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- this is a code-level pattern.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
-<!-- consistency-audit:begin -->
-<p><em>Generated 2026-08-26T06:56:26.297909+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
-<table>
-<thead>
-<tr>
-<th>Project</th>
-<th>Status</th>
-<th>Issue</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>actions</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>agent-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/128" title="GitHub Issue: shakenfist/agent-python #128">agent-python#128</a></td>
-</tr>
-<tr>
-<td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/371" title="GitHub Issue: shakenfist/client-python #371">client-python#371</a></td>
-</tr>
-<tr>
-<td>client-python-k3s</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>clingwrap</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>cloudgood</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>development</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>divergulent</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>instar</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>kerbside-patches</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>library-utilities</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>occystrap</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/124" title="GitHub Issue: shakenfist/occystrap #124">occystrap#124</a></td>
-</tr>
-<tr>
-<td>private-ci</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>ryll</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>sfui</td>
-<td>N/A</td>
-<td>-</td>
-</tr>
-<tr>
-<td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3909" title="GitHub Issue: shakenfist/shakenfist #3909">shakenfist#3909</a></td>
-</tr>
-</tbody>
-</table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>agent-python</strong> (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_agent/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
-<li><strong>client-python</strong> (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_client/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
-<li><strong>occystrap</strong> (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- occystrap/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
-<li><strong>shakenfist</strong> (Status): 2 of 2 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist/client/backup.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler); shakenfist/client/ctl.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
-</ul>
-<!-- consistency-audit:end -->
+<p>Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+<a href="/components/development/audits/compliance/#console-logging">the compliance page</a>.</p>
 
 
 

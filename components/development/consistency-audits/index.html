@@ -2507,6 +2507,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/" class="md-nav__link">
         
   
@@ -2710,6 +2738,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13338,7 +13394,7 @@ why each rule exists, is in
 <tr>
 <td>Specification</td>
 <td><code>docs/audits/&lt;check-id&gt;.md</code></td>
-<td>Humans and agents. Why the rule exists, what is checked, what it does not cover, which template implements it, and a generated per-project compliance table.</td>
+<td>Humans and agents. Why the rule exists, what is checked, what it does not cover, which template implements it, and a link to its section of the compliance page. Hand-written throughout.</td>
 </tr>
 <tr>
 <td>Check</td>
@@ -13352,13 +13408,20 @@ itself, and it is what an agent or a person reads when they pick up an
 issue, so it links the template that implements the rule. The check is
 what actually measures, and it is allowed to be narrower than the
 specification: some criteria have no check at all, because judging
-them takes reading rather than matching. A
-criterion with no check has no <code>consistency-audit</code> marker block in its
-spec file, which is how to find the current set -- at the time of
+them takes reading rather than matching. The current set is listed
+under "Criteria with no automated check" at the foot of
+<a href="/components/development/audits/compliance/"><code>docs/audits/compliance.md</code></a>, generated from
+<code>AUDIT_METADATA</code> rather than written by hand -- at the time of
 writing, <code>test-coverage</code>.</p>
+<p>That listing replaced an older tell. Every specification used to
+carry its own generated table, so a criterion with no check was the
+one with no <code>consistency-audit</code> marker block in its file. Moving the
+tables onto one page took that away, and the page states the set
+instead, which a reader can see rather than having to grep for.</p>
 <p>Not every criterion maps to exactly one check. <code>workflow-standards</code>
 decomposes into several -- runner tags, permissions, linting, and more
--- which all render into the one spec file as separate columns.</p>
+-- which all render into its one section of the compliance page as
+separate columns.</p>
 <h2 id="what-a-daily-run-does">What a daily run does<a class="headerlink" href="#what-a-daily-run-does" title="Permanent link">&para;</a></h2>
 <p><code>.github/workflows/consistency-audit.yml</code> runs at 06:00 UTC, after
 <code>export-repo-config</code> at 00:30, and can be started by hand with
@@ -13375,17 +13438,22 @@ Visibility is queried live rather than hardcoded because it changes.</p>
 <p>The skillsaw pin is deliberate, and so is the assertion next to it.
 <code>llm-context-lint</code> reports what skillsaw calls an error, and skillsaw's
 rule set moves between releases, so an unpinned upgrade would change the
-compliance table for reasons nobody chose.</p>
+compliance page for reasons nobody chose.</p>
 <p><strong>2. <code>manage-issues</code></strong> -- downloads every artifact and runs
 <code>scripts/audit-manage-issues.py</code>, which files and closes issues. See
 <a href="#issues-are-the-work-tracking">Issues are the work tracking</a> below.</p>
 <p><strong>3. <code>update-docs</code></strong> -- runs <code>scripts/audit-update-docs.py</code>, which
-rewrites the compliance table between the <code>&lt;!-- consistency-audit:begin
---&gt;</code> and <code>&lt;!-- consistency-audit:end --&gt;</code> markers in each <code>docs/audits/*.md</code>
-from the same results, linking the issues the previous job just filed.
-<code>scripts/commit-audit-docs.sh</code> then commits and pushes the result to
-<code>main</code> as <code>shakenfist-bot</code>, rebasing first in case another push landed
-while the audit ran.</p>
+rewrites everything between the <code>&lt;!-- consistency-audit:begin --&gt;</code> and
+<code>&lt;!-- consistency-audit:end --&gt;</code> markers in
+<a href="/components/development/audits/compliance/"><code>docs/audits/compliance.md</code></a> from the same
+results -- one table per criterion, linking the issues the previous job
+just filed. <code>scripts/commit-audit-docs.sh</code> then commits and pushes
+that one file to <code>main</code> as <code>shakenfist-bot</code>, rebasing first in case
+another push landed while the audit ran.</p>
+<p>It writes that page and nothing else. The criterion specifications are
+hand-written, and are in scope for whole-file human review because of
+it; a generated block in one would carry a timestamp that changes
+daily and no review mark could survive it.</p>
 <p>The tables are therefore always a rendering of the most recent run.
 Never edit one by hand: the next run overwrites it.</p>
 <p><strong>4. <code>report-failure</code></strong> -- runs only when one of the above fails, and
@@ -13441,9 +13509,12 @@ ones.</p>
    <code>audit-manage-issues.py</code> and <code>audit-update-docs.py</code> read this
    module.</li>
 <li><strong><code>docs/audits/&lt;check-id&gt;.md</code></strong> -- the specification, following the
-   structure in <code>docs/audits/README.md</code>. Include an empty
-   <code>consistency-audit</code> marker block under <code>## Projects</code>; the first run
-   fills it in.</li>
+   structure in <code>docs/audits/README.md</code>. Under <code>## Projects</code>, link
+   <code>compliance.md#&lt;check-id&gt;</code>; the section appears there at the first
+   run. Do not add a <code>consistency-audit</code> marker block -- the tables
+   live on the compliance page so that every specification stays
+   reviewable, and <code>test_audit_update_docs.py</code> fails on a marker in a
+   spec.</li>
 <li><strong><code>scripts/audit-update-docs.py</code></strong> -- only if the check joins an
    existing spec file rather than getting its own. Add a column heading
    for the id to <code>COLUMN_NAMES</code>.</li>
@@ -13512,13 +13583,19 @@ repository. Test that half against local clones:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python3 scripts/audit-check.py --repo-path ~/src/shakenfist/&lt;repo&gt; \
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    --repo-name &lt;repo&gt; &gt; /tmp/results/audit-result-&lt;repo&gt;.json
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>python3 scripts/audit-manage-issues.py --results-dir /tmp/results/ --dry-run
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>python3 scripts/audit-update-docs.py --results-dir /tmp/results/ --no-issues
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>python3 scripts/audit-update-docs.py --results-dir /tmp/results/ \
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    --no-issues --page /tmp/compliance.md
 </code></pre></div>
 <p>Always pass <code>--dry-run</code> to <code>audit-manage-issues.py</code>. Without it the
-script creates and closes real issues on real repositories.
-<code>audit-update-docs.py</code> rewrites <code>docs/audits/*.md</code> in place; discard the
-result with <code>git restore docs/audits/</code> afterwards, because a locally
-generated table only covers the repositories you fed it.</p>
+script creates and closes real issues on real repositories.</p>
+<p>Pass <code>--page</code> as well, as above. A locally generated page only covers
+the repositories you fed it, so it is never what you want to keep, and
+without <code>--page</code> the script rewrites the real
+<code>docs/audits/compliance.md</code> in place. The old advice here was to
+discard the result with <code>git restore docs/audits/</code>, which is now
+actively dangerous: the other 35 files in that directory are
+hand-written, and a <code>git restore</code> of the directory throws away
+whatever you were editing along with the generated page.</p>
 <p><code>ci.yml</code> also runs the audit against this repository as a smoke test,
 via <code>scripts/check-audit-smoke.py</code>. Linting cannot reach the scheduled
 workflow's runtime assumptions -- the 2026-08-20 outage was a bare

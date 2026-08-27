@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/development/audits/">
       
       
-        <link rel="prev" href="workflow-standards/">
+        <link rel="prev" href="compliance/">
       
       
         <link rel="next" href="../plans/">
@@ -2382,6 +2382,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="compliance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -2707,6 +2735,34 @@
     
   
     Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-audit-compliance-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: split the generated compliance tables out of the audit specifications
   
 
     
@@ -13307,8 +13363,12 @@
 <p>Every Shaken Fist project is expected to be packaged, documented,
 tested and automated the same way. This directory is the statement of
 what that means: one file per criterion, each defining what we check
-and why, linking the template that implements it, and carrying a
-per-project compliance table regenerated every morning.</p>
+and why, and linking the template that implements it.</p>
+<p>Who currently passes what is on <a href="/components/development/audits/compliance/">compliance.md</a>,
+regenerated every morning by the consistency audit and committed by
+it. It is the only generated file here; every criterion page beside it
+is hand-written, and each links its own section of the compliance
+page.</p>
 <p>It sits under <code>docs/</code> so that it publishes to shakenfist.com with
 everything else. What we hold a project to is documentation, and a
 criterion nobody outside the fleet can read is a criterion nobody
@@ -13320,7 +13380,7 @@ per criterion to check every project against it in parallel.</p>
 a whole: what the daily run does, how issues are filed and closed, how
 the compliance tables are regenerated, how to add a criterion, and how
 to bring a repository into scope. Read it before adding a file here --
-a new criterion touches five files (six if it shares a spec file with
+a new criterion touches four files (five if it shares a spec file with
 another check), and a spec file on its own does not measure anything.</p>
 <h2 id="file-structure">File structure<a class="headerlink" href="#file-structure" title="Permanent link">&para;</a></h2>
 <p>Each audit file follows this structure:</p>
@@ -13335,11 +13395,17 @@ another check), and a spec file on its own does not measure anything.</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="gu">## Projects</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>&lt;!-- consistency-audit:begin --&gt;
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>*(Awaiting the first automated regeneration by the consistency
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>audit workflow.)*
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>&lt;!-- consistency-audit:end --&gt;
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>Per-project compliance for this criterion is regenerated
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>every morning by the consistency audit: see
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>[<span class="nt">the compliance page</span>](<span class="na">/components/development/audits/compliance/#&lt;name&gt;</span>).
 </code></pre></div>
+<p>The whole file is hand-written, including that link -- the anchor is
+the file's own basename, and the section it points at appears on
+<a href="/components/development/audits/compliance/">compliance.md</a> at the next run after the check is
+registered. Never put a <code>consistency-audit</code> marker block in a
+criterion page: the generated block carries a timestamp that moves
+daily, and a file carrying it can never hold a human review mark,
+which is why the tables were moved to one page in the first place.</p>
 <h2 id="in-scope-projects">In-scope projects<a class="headerlink" href="#in-scope-projects" title="Permanent link">&para;</a></h2>
 <p>The following projects are subject to consistency audits:</p>
 <ul>
