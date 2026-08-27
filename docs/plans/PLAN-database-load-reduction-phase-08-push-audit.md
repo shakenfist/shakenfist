@@ -259,7 +259,398 @@ provisional against it so the regression detector cannot canonise it).
 
 ## Findings
 
-*(Written by steps 8b through 8h.)*
+Six agents ran: wave 1 (8b), the four `PUSH-AUDIT.md` judgment headings
+(8c-8f), and the decision-4 freshness lens (8g). Every heading below
+names what it examined, per decision 7.
+
+### Wave 1 (8b) — passed
+
+`pre-commit run --all-files` green (ten hooks); `tox` green in 265s,
+3714 tests, no failures. Style greps run against each of the ten ranges
+individually: no line over 120 characters, no stray `print(`, one
+`etcd` hit which is a historical comment in `mariadb.py:144` explaining
+the cache's design lineage. **Proto freshness is not applicable**, with
+evidence: `git diff --name-only` over all ten ranges matches nothing
+under `protos/` or `shakenfist/protos/`, so `tox -e genprotos` was
+correctly not run.
+
+The pushdown grep hit twice, and decision 1's net-state rule changed
+the answer for both. `baseobject.py` `_maintain_version_cache()` was
+untagged when phase 2 landed it and carries `# nopushdown: every node
+wanted` today, added later by unrelated commit `2feb509bb` -- an audit
+reading ranges alone would have filed a fixed defect. `ctl.py:585` is
+still untagged on the phase 7 branch (F-R1 below).
+
+### The three defects
+
+**F-D1. The floating IP reaper still reads one full table per address,
+and the budget now records the residue as expected load.** BLOCKING.
+Code merged (#3818); budget on the open branch (#3893).
+
+`floating_ip_reaper.py:55,70` calls `ipam.is_free(addr)` once per
+floating gateway and once per floating interface. `IPAM.is_free()` is
+`address not in self.in_use` (`ipam.py:207`) and `in_use` is a property
+issuing a fresh `mariadb.get_addresses_in_use()` RPC on every access
+(`ipam.py:186`). That is one whole-table read per address -- the exact
+shape #3655 and phase 6 existed to remove, surviving in a second helper.
+`:45` spends another RPC building a `LOG.debug` argument evaluated
+regardless of log level.
+
+Phase 6's Definition of done claims "#3655 is fixed and closed, with a
+functional-CI assertion that the reservation sweep issues one bulk read
+per pass rather than one per address". The assertion is
+`test_reaper_read_count_does_not_grow_with_address_count`
+(`test_reservation_sweeps.py:111`), whose comment says it "actually
+holds the fix in place". It cannot: its fake sets `self.in_use` as a
+plain set attribute (`:21`) and overrides `is_free()` as a local dict
+lookup (`:42`), so neither touches the `per_address_reads` counter the
+test asserts is zero. The fake makes free precisely the call that costs
+a round trip in production.
+
+The budget then canonised it. `GetAddressesInUse`/`net` carries
+`per_instance_qps: 0.114` at a measured mean of 5.1/s, with the note
+"the loop #3655 reduced from one read per address to one bulk read per
+pass" -- false as written. Its replacement `GetReservationsForIPAM`/`net`
+sits beside it at 0.6/s with the note "It is meant to be flat in
+instance count; a slope here is a regression". The plan wrote down the
+test for this regression and applied it to the wrong call. Step 7a's
+brief said "**Use post-phase-6 numbers, not today's** -- this file
+defends a floor, and encoding a regression as the budget is the exact
+failure the phase 5 plan warned about"; this is that failure.
+
+Honesty caveat: the call path is proven, but attributing the 0.114
+coefficient specifically to these sites is inference, not measurement
+(its r-squared is 0.457 and it has not been re-measured on sfcbr).
+
+**F-D2. The queues dispatcher backs off when its worker pool is full,
+not only when the queue is empty.** BLOCKING, medium. Merged (#3506).
+
+`dequeue_job()` returns `False` for two unrelated conditions and its
+own docstring says so at `daemon.py:665-666`: "Returns True if at least
+one job was started, False if the pool is full or there was nothing
+eligible to claim." The pool-full return is at `:671-672`, *before* the
+`mariadb.dequeue_work_items` call at `:714`. `queues/main.py:170-173`
+treats both identically and sleeps `poll_backoff.next_empty_interval()`.
+
+So a saturated node climbs 0.2 -> 2.0s over three seconds of continuous
+fullness and then notices a freed worker slot up to 2.0s late, mean
+~1.0s, against 0.2s before #3506. The backoff exists to remove database
+load, but the pool-full branch issues *no* database call, so the sleep
+buys nothing and costs dispatch throughput. `IDLE_POLL_MAX_SECONDS`'
+own comment at `daemon.py:73-77` claims "a burst is still drained at
+full speed and only the idle->work transition pays the extra latency",
+which is false exactly when a burst is large enough to fill the pool.
+
+It is invisible to everything this plan built: the pool-full branch
+makes no database call, so `Dequeue`/`queues` does not move and the
+budget's `per_node_base_qps: 0.512` is the idle rate with no busy
+counterpart. A saturated dispatcher and an idle one are
+indistinguishable in the metrics. This is the "a poll that no longer
+runs has no line to review" shape decision 4 exists to catch.
+
+The other two `IdlePollBackoff` call sites are the control and got it
+right: `network/workitem.py:232` backs off only on `if not items:`,
+with saturation handled by bounded worker queues; `transfers/main.py:136`
+keys on an empty reply rather than on whether a worker started.
+
+Coverage gap that hid it: `test_daemon_dequeue_job.py` sets
+`pool.workers = {}` in every case, so the pool-full return is never
+exercised, and `test_daemon_idle_poll_backoff.py` tests the backoff
+class in isolation, never against a loop.
+
+**F-D3. `_OBJECT_CACHE` is unbounded, never swept, and unmeasured.**
+BLOCKING, medium. Merged (#3473, extended by #3508). Found
+independently by 8f (as F2) and 8g (as D2), which is why it is graded
+here rather than filed.
+
+The complete symbol grep is nine lines (`mariadb.py:163,164,204,205,
+211,227,228,234,235`). Entries leave by exactly two paths: a read of
+the same key after expiry (`:211`), or an explicit evict from an
+`update_*`/`delete_*` **in the evicting process only** (`:234-238`).
+There is no sweeper, no LRU, no maximum size and no config knob for
+one. An object read once and never read again stays resident for the
+life of the process, and a delete evicts only in the process that
+performed it -- every other process keeps the entry regardless. The
+cache is therefore every object uuid a process has ever read, not a
+working set.
+
+Phase 2's plan anticipated this and deferred it: "Memory growth (blobs
+number in the thousands). Bounded by TTL expiry; if needed, add a size
+cap in a follow-up (noted, not built)." The premise is wrong in one
+word -- expiry is lazy and access-triggered, so it bounds *staleness*,
+not *residency*. The follow-up was never filed.
+
+No privileged position is needed to grow it: an authenticated tenant
+doing ordinary create/read/delete cycles grows the resident set of
+every sf-api worker, sf-queues, sf-net and sf-cluster process. Nothing
+observes it -- the hit/miss/eviction counters report rates, not
+occupancy, and per F-U5 they are scraped from three daemons of about
+twelve.
+
+### Rule violations and smaller findings
+
+**F-R1.** `ctl.py:585` calls `mariadb.get_all_node_metrics()` with no
+`# nopushdown:` tag. The scan is substantively correct -- `_cluster_shape()`
+genuinely wants every node and `instances_active` is not in
+`NODE_METRICS_EXTRACTION_SPEC` -- but the rule is mechanical, its
+sibling at `baseobject.py:79` carries the tag, and nothing enforces it,
+so this fails every future audit until tagged. Phase 7 branch, fix in
+#3893.
+
+**F-R2.** Six late uncommented imports of `set_caller_identity`
+(`ctl.py:152`, `nodelock/main.py:51`, `privexec/main.py:711`,
+`sentinel_first/main.py:38`, `sentinel_last/main.py:35`,
+`gunicorn_config.py:100`). `daemon.py:33` and `database/main.py:70`
+import the same symbol at module top, which proves there is no cycle to
+justify lateness. `gunicorn_config.py` may have a real reason (gunicorn
+loads it before the app), in which case the fix is the comment, not the
+move. Merged, advisory.
+
+**F-R3.** `# noqa: E501` at `daemons/database/main.py:6170` is dead --
+the line is 101 characters and flake8 runs at `--max-line-length=120`.
+Merged, advisory.
+
+**F-R4.** Triple-single-quoted strings at
+`tools/generate-database-load-rules.py:43,209`, against CLAUDE.md's
+unconditional rule. Both are templates embedding `"`, so the choice is
+defensible; flake8 does not enforce it. Phase 7 branch, advisory.
+
+**F-R5.** Copyright headers are internally inconsistent within the same
+PRs: `metrics_scrape.py`, `caller_identity.py`, `load_budget.py` and
+both `tools/` scripts say 2026; `schema/database_load_budget.py` and
+`database_tier.py` say 2019, which is the repo convention. Advisory.
+
+**F-R6.** `IPAM.get_allocation_age()` (`ipam.py:406`) is dead -- phase 6
+removed its only production caller and left the method, which two test
+fakes still simulate. It is also misnamed: it returns `reserved_at`, a
+timestamp, not an age. Merged, advisory.
+
+### Undocumented constraints (the decision-4 lens)
+
+**F-U1. The immutable tier's documented membership and its documented
+*criterion* are both wrong.** `ipam` joined the 300s tier at
+`mariadb.py:17366` (#3508) and appears in none of the three places that
+enumerate it (`config.py:362-364`, `docs/operator_guide/database.md:283`,
+`docs/developer_guide/database_internals.md:104-105`). Worse, all three
+justify the tier as "types with no post-creation writer", which is
+false for two of its five members: `update_ipam` (`mariadb.py:17357`)
+and `update_network_interface` (`:16955`) both exist. Both evict, so
+the code is correct -- but an editor who adds an updater to an
+immutable-tier type and believes the documented criterion will conclude
+no eviction hook is needed. Merged, fix here.
+
+**F-U2. A hard-deleted object hydrates as a live, database-backed
+object for up to 300s in every process that had it cached, and this
+interacts with the `in_memory_only` guard.** `Network.__init__`
+(`network/network.py:73-79`) chooses `in_memory_only=True` *only when*
+`IPAM.from_db` returns `None`. A stale cache entry makes it return a
+hit, so a network whose IPAM was hard-deleted on the elected node can
+hydrate elsewhere with a fully database-backed IPAM for the TTL -- the
+object shape whose write path issue 3532's guard exists to close.
+Graded undocumented rather than defect: no concrete caller was traced
+that writes through such an IPAM inside the window (`find_*` iterators
+are uncached and would not enumerate the deleted network). But
+CLAUDE.md pitfall 5's invariant now has a second way to be violated
+that has nothing to do with adding a persistence path. Wants a sentence
+at the wiring site and in `coding_rules.md`. Merged.
+
+**F-U3. Pulling the documented cache kill switch fires the phase 7
+alerts, and neither section says so.** `docs/operator_guide/database.md:286-288`
+presents `OBJECT_CACHE_TTL_*=0` as "a fast rollback to pure read-through".
+The budget was derived with the cache *on*, so the pairs the cache
+suppresses now sit under the inclusion cut and are governed by
+`unbudgeted_fixed_rate_per_node_qps: 0.05`. `GetIPAM`/`cluster` alone
+ran at 5.5/s pre-cache. Disabling the cache therefore puts a large set
+of pairs an order of magnitude over the unbudgeted ceiling and fires
+`ShakenFistUnbudgetedDatabasePolling` cluster-wide for as long as the
+rollback is in effect -- arguably correct alerting, but an operator
+pulling an emergency lever should be told in advance, and the budget's
+own "do not edit the budget to make an alert stop" instruction leaves
+them nowhere to go. Phase 7 branch, fix in #3893.
+
+**F-U4. The real worst-case daemon-state staleness is 60s, not the 2s
+the budget notes cite.** `DAEMON_STATE_POLL_MAX_INTERVAL = 60`
+(`daemon.py:67`) doubles the interval on every `DatabaseUnavailable`,
+reaching the cap after six consecutive failures. Six budget notes say
+"rate-limited to `DAEMON_STATE_POLL_INTERVAL` (2s)" with no mention of
+the backoff, so a cluster whose database is struggling reads *below*
+its own budget for this pair -- the one direction `base_term_caveat`
+does not cover. The constant arrived out of range (#3715) but it is
+phase 1's net state. Note text on the phase 7 branch, fix in #3893.
+
+**F-U5. The object-cache counters are scraped from three daemons of
+about twelve.** `start_http_server` is called only in
+`daemons/cluster/main.py:75`, `daemons/resources/main.py:211` and
+`daemons/database/main.py:6424`. The counters are module-scope so they
+exist in every process that imports `mariadb`, but the client-side
+caches in sf-api, sf-net, sf-queues, sf-cleaner, sf-transfers and
+sf-sidechannel -- where most of the hit rate and all of F-D3's memory
+lives -- are unobservable. Phase 2's plan knew and accepted this;
+`docs/operator_guide/database.md:288-292` does not carry the caveat and
+reads as though the counters describe the cluster. Merged, fix here.
+
+**F-U6. The stray-lock escalation threshold now equals its own scan
+interval.** `STRAY_LOCK_CHECK_INTERVAL = 30` (`queues/main.py:25`)
+moved the scan from every ~0.2s to every 30s; the warning-to-error
+escalation at `:160` still uses a 30s threshold, so escalation lands on
+the second or third scan depending on jitter. Nothing acts on a stray
+lock (the sweep only logs), so the consequence is detection latency.
+Two constants that must not be equal now are, and nothing says so.
+Merged, advisory.
+
+**F-U7. `subsystem_internals.md:315-316` still restates the elected-loop
+poll as a literal** ("sleeps on `lock.lost_event.wait(5)`"). Phase 7
+named that constant `ELECTED_LOOP_POLL_SECONDS` precisely so it would
+be greppable; this is now the only place in the tree restating the
+number and the one place an editor changing it would not find. Phase 7
+branch, fix in #3893.
+
+### Security (8f)
+
+Nothing critical or high. Six low/medium and four informational; F2 is
+recorded above as F-D3. The rest:
+
+* **Unvalidated `caller_daemon` label** (`database/main.py:6162-6167`):
+  whatever arrives in gRPC metadata becomes a permanently-retained
+  prometheus child, with no allowlist, length cap or charset check.
+  Low, because anyone who can reach the insecure port at `:6652` can
+  already read and write the whole database -- the marginal loss is the
+  monitoring path. Merged, fix here (three lines).
+* **Metrics parsers ignore Prometheus escaping**
+  (`metrics_scrape.py:37-46` and the deliberate copy at
+  `load_budget.py:128-136`): both split label blocks on `,` and `=`
+  without honouring `\"`, so a crafted label forges an
+  `(operation, caller)` pair. Chained with the previous item this is an
+  attack on the regression detector itself -- false positives, or
+  diluting a real pair below its ceiling. Low; phase 7 branch.
+* **`ci-install-promtool.sh` skips verification on the cache-hit path**
+  (`:32-46`): the download checks SHA256, but `if [ ! -x
+  "${DEST}/promtool" ]` skips everything when a file is already at the
+  predictable `/tmp/promtool-3.14.0`, on static runners whose own
+  comment says `/tmp` persists between jobs. Low, riding on the larger
+  pre-existing exposure that those runners execute untrusted PR code
+  with a shared `/tmp`. Phase 7 branch.
+* **The scrape has no response-size cap and no total-time bound**
+  (`metrics_scrape.py:60-63`): `requests`' `timeout` is a
+  read-inactivity timeout, not a transfer deadline. Client-side denial
+  of service on an admin CLI. Low; phase 7 branch.
+* **`check_daemon_state()` crashes on a malformed `NODE_UUID`**
+  (`daemon.py`): `uuid.UUID(node_uuid)` sits inside a `try` catching
+  only `DatabaseUnavailable`, so a bad `SHAKENFIST_NODE_UUID` raises an
+  uncaught `ValueError` every 2s in every daemon. `config.NODE_UUID` has
+  no validator and `_resolve_node_uuid()` returns early when it is
+  truthy, so the value never reaches `Node._load_persisted_uuid()`'s
+  guard. Operator-misconfiguration availability only. Low, one line,
+  merged.
+* **The cache extends tenant-secret residency** (advisory): `ssh_key`
+  and `user_data` are plain `str` on `InstanceData` and instances sit
+  in the 300s tier, so cloud-init credentials stay resident past the
+  last read (and per F-D3 are never actually freed). No cross-tenant
+  read path exists -- the cache is keyed by object identity and callers
+  still authorise -- so this is secret-lifetime defence-in-depth, not
+  an access-control break. File rather than fix.
+* **Informational:** the sf-database gRPC and metrics ports are
+  unauthenticated and documented nowhere (both predate this plan, but
+  phase 4 put an attribution story and phase 7 a monitoring story on
+  top of that port, so this is where it became worth writing down); the
+  docs ask operators to attach `sf-ctl database-load --json` to a
+  public issue tracker, and that JSON carries internal mesh IPs; agent
+  get-file paths are now logged at INFO with tenant-controlled,
+  unsanitised content.
+
+Clean with evidence: zero new SQL of any kind across the ten ranges (no
+`text()`, no f-string SQL, no concatenation); no range adds a REST
+endpoint or gRPC method; `yaml.safe_load` throughout and no `pickle`,
+`eval` or `exec`; no `shell=True` or `os.system`; no credential logged,
+evented or returned. Lock ordering: `_OBJECT_CACHE_LOCK` guards three
+pure dict operations with no I/O and no nested acquisition (the
+prometheus increments are deliberately outside it), so it can be taken
+while a `ClusterLock` is held but never the reverse and no inversion is
+constructible.
+
+### Test coverage (8d)
+
+No blocking findings; the gaps are missing regression tests for code
+that is correct today.
+
+* **The wake path is untested everywhere.** `transfers` has tests for
+  all-idle and all-busy but not the transition, which is the case that
+  matters; `queues/main.py`'s dequeue loop and `network/workitem.py`'s
+  dispatcher have no coverage of either path. "Sleeping longer is only
+  safe if waking still works" is asserted nowhere in this plan. This is
+  also the gap that hid F-D2.
+* **`test_object_cache.py:5-7` claims coverage that does not exist:**
+  "the per-type wiring... is covered in the object-type test modules".
+  `grep -rl '_object_cache\|OBJECT_CACHE' shakenfist/tests/` returns
+  that file alone. The cache is wired into eleven types; the
+  read-evict-delete cycle is proven for `blob` and `ipam` only.
+  Upgraded from the agent's advisory grade because a false claim in the
+  tree is what stops the next reviewer looking -- it conceals the gap
+  rather than merely leaving it. `instance` and `namespace` are the
+  ones worth covering.
+* `idle()` is never tested for breaking early when `abort_path` appears
+  mid-loop -- the existing test mocks `os.path.exists` to `False`
+  throughout, so it proves the interval and nothing about promptness.
+  `exit_gracefully()` has no coverage at all (pre-existing).
+* The functional-only positive control in `database_tier.py` was
+  assessed rather than discovered, and is **acceptable, not a gap**:
+  the untestable half genuinely needs a live cluster, and every piece
+  of arithmetic beneath it is unit tested, including the constant-parity
+  tests pinning the harness's duplicated constants to the daemon code.
+
+### Documentation (8e)
+
+No blocking findings. Three gaps against merged code, all fixable here:
+the `ipam` omission from the immutable-tier enumeration (recorded above
+as F-U1); caller attribution has no `docs/developer_guide/` coverage,
+so a developer adding a daemon entry point is not told that skipping
+`set_caller_identity()` reports their load as `caller_daemon="unknown"`;
+and the idle-poll backoff has no developer-guide coverage either, only
+code comments pointing at plan documents, which is the wrong home for
+"how does this behave today".
+
+Clean with evidence: `README.md` untouched by all ten ranges;
+`AGENTS.md` untouched by the nine merged ones, and its single phase 7
+bullet links out rather than restating; no `state_targets` change
+anywhere, so the state-machine check is not applicable; no schema
+change, so migration guidance is not applicable; every `phase N` leak
+in `docs/` outside plans directories traces to other plans.
+`tools/check-plan-status.py` passes.
+
+One vindication of decision 1's net-state rule: #3473 really did add a
+25-line cache deep-dive to `ARCHITECTURE.md`, a genuine
+llm-doc-discipline violation at landing -- and unrelated commit
+`f9117ca3d` later moved it into `docs/developer_guide/`. An audit
+reading ranges alone would have filed a fixed defect.
+
+Survey finding 5 (`CLAUDE.md:163` listing a `cache.py` deleted by
+#2870) was assessed as instructed rather than rediscovered: the #3466
+edit was a narrowly-scoped correction to a *different* module's row in
+the Core Components table, 43 lines from the stale directory listing,
+so missing it was reasonable. The underlying hazard -- two independent
+enumerations of the same module inventory with no single source of
+truth -- is the finding worth keeping.
+
+### Management spot-checks (decision 7, DoD)
+
+Eleven claims verified directly against the tree rather than accepted
+from a report: the `is_free` -> `in_use` -> RPC path and both reaper
+call sites; the reaper test's fake attributes; the two budget entries
+and their contradictory notes; `dequeue_job`'s docstring and the
+pool-full return preceding `dequeue_work_items`; the complete
+`_OBJECT_CACHE` symbol grep; `uuid.UUID()` inside the
+`DatabaseUnavailable`-only `try`; `_object_cache_put('ipam', ...)` at
+the immutable TTL against all three doc enumerations; the
+`test_object_cache.py` docstring against
+`grep -rl '_object_cache' shakenfist/tests/`; `exit_gracefully` absent
+from the test tree; `check-plan-status.py` passing; and the absence of
+`shakenfist/cache.py` with its deletion attributed to #2870.
+
+Two agent claims did not survive contact and are recorded as such
+above: the `baseobject.py` pushdown tag (already fixed by an unrelated
+commit) and the `ARCHITECTURE.md` growth (already moved). Both would
+have been filed by an audit that read ranges without checking the tree,
+which is what decision 1's second paragraph exists to prevent.
 
 ## Back brief
 
