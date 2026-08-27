@@ -357,7 +357,7 @@ class PrivExecJob:
             f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
         inner_floating_interface = f'{floating_interface}-i'
 
-        success = privexec_util.create_interface(
+        success, create_error = privexec_util.create_interface(
             floating_interface, 'veth',
             ['peer', 'name', inner_floating_interface],
             inner_namespace=req.network_uuid
@@ -377,7 +377,7 @@ class PrivExecJob:
                 floating_interface)
             success = returncode == 0
             if success:
-                success = privexec_util.create_interface(
+                success, create_error = privexec_util.create_interface(
                     floating_interface, 'veth',
                     ['peer', 'name', inner_floating_interface],
                     inner_namespace=req.network_uuid
@@ -392,7 +392,7 @@ class PrivExecJob:
                 error_text = (
                     f'failed to create veth pair {floating_interface} / '
                     f'{inner_floating_interface} with inner end in '
-                    f'namespace {req.network_uuid}')
+                    f'namespace {req.network_uuid}: {create_error}')
             return privexec_pb2.PrivExecReply(
                 add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
                     network_uuid=req.network_uuid,

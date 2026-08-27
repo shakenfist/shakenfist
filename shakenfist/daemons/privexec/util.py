@@ -122,9 +122,17 @@ def _get_safe_interface_name(interface):
 
 def create_interface(interface, interface_type, extra, mtu=None,
                      inner_namespace=None):
+    """Create an interface, returning (success, error_detail).
+
+    error_detail is the empty string on success. On failure it names the
+    step which failed and carries that command's stderr, which includes
+    the kernel's errno text -- for example "No such file or directory"
+    when inner_namespace was torn down underneath us. Swallowing that
+    detail left CREATE_INTERFACE_FAILED undiagnosable (issue 3608).
+    """
     interface = _get_safe_interface_name(interface)
     if check_for_interface(interface):
-        return True
+        return True, ''
 
     if not mtu:
         mtu = config.MAX_HYPERVISOR_MTU - 50
@@ -140,12 +148,13 @@ def create_interface(interface, interface_type, extra, mtu=None,
     while True:
         last_attempt = attempts == 3
 
-        _, _, returncode = command_helper(
+        _, stderr, returncode = command_helper(
             *command, failure_is_error=last_attempt)
         if returncode == 0:
             break
         if last_attempt:
-            return False
+            return False, (
+                f'ip link add exited {returncode}: {stderr.strip()}')
 
         time.sleep(0.2)
         attempts += 1
@@ -155,11 +164,13 @@ def create_interface(interface, interface_type, extra, mtu=None,
             locate_command('ip'), 'link', 'set', f'{interface}-i',
             'netns', inner_namespace
         ]
-        _, _, returncode = command_helper(*command)
+        _, stderr, returncode = command_helper(*command)
         if returncode != 0:
-            return False
+            return False, (
+                f'ip link set netns {inner_namespace} exited '
+                f'{returncode}: {stderr.strip()}')
 
-    return True
+    return True, ''
 
 
 def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
@@ -173,11 +184,12 @@ def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
 
     if not check_for_interface(vx_interface):
         log.debug('vxlan interface absent, creating')
-        rc = create_interface(
+        rc, error = create_interface(
             vx_interface, 'vxlan',
             ['id', str(vx_id), 'dev', str(mesh_interface), 'dstport', '0']
         )
-        log.with_fields({'create_interface_rc': rc}).debug(
+        log.with_fields({'create_interface_rc': rc,
+                         'create_interface_error': error}).debug(
             'create_interface returned for vxlan interface')
 
         command = ['sysctl', '-w',
@@ -190,8 +202,9 @@ def create_vx_interface(vx_interface, vx_id, vx_bridge, mesh_interface):
 
     if not check_for_interface(vx_bridge):
         log.debug('vxlan bridge absent, creating')
-        rc = create_interface(vx_bridge, 'bridge', [])
-        log.with_fields({'create_interface_rc': rc}).debug(
+        rc, error = create_interface(vx_bridge, 'bridge', [])
+        log.with_fields({'create_interface_rc': rc,
+                         'create_interface_error': error}).debug(
             'create_interface returned for vxlan bridge')
 
         command = ['sysctl', '-w', f'net.ipv4.conf.{vx_bridge}.arp_notify=1']

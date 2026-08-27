@@ -88,7 +88,7 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
 
     def _patch_utils(self, addresses=None):
         for name, value in [
-                ('create_interface', True),
+                ('create_interface', (True, '')),
                 ('check_for_interface', True),
                 ('get_interface_addresses', addresses or []),
                 ('add_address_to_interface', True)]:
@@ -168,11 +168,12 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
     def test_add_reports_stranded_recreate_failure(self):
         # The stranded pair is detected (inner end not in the namespace),
         # the delete succeeds, but recreating the pair fails. This surfaces
-        # the generic create failure message.
+        # the create failure message including the underlying detail.
         self.patch_commands(results={' -C ': ('', '', 1)})
         self._patch_utils()
         self.mock_check_for_interface.return_value = False
-        self.mock_create_interface.side_effect = [True, False]
+        self.mock_create_interface.side_effect = [
+            (True, ''), (False, 'ip link add exited 1: veth boom')]
 
         reply = self.job._add_floating_ip(self._request())
 
@@ -183,6 +184,28 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
         self.assertIn('failed to create veth pair',
                       reply.add_floating_ip_reply.error_text)
         self.assertIn(FLOATING_INTERFACE,
+                      reply.add_floating_ip_reply.error_text)
+        self.assertIn('veth boom', reply.add_floating_ip_reply.error_text)
+
+    def test_add_reports_create_failure_with_detail(self):
+        # A failed initial create must carry the underlying command
+        # failure in the error text -- the flt-* failures in issue 3608
+        # were undiagnosable because the ip stderr (which names the
+        # errno, e.g. a torn-down namespace) was dropped on the floor.
+        self.patch_commands()
+        self._patch_utils()
+        self.mock_create_interface.return_value = (
+            False,
+            f'ip link set netns {NETWORK_UUID} exited 1: Cannot open '
+            f'network namespace "{NETWORK_UUID}": No such file or '
+            f'directory')
+
+        reply = self.job._add_floating_ip(self._request())
+
+        self.assertEqual(
+            privexec_pb2.AddFloatingIPReply.CREATE_INTERFACE_FAILED,
+            reply.add_floating_ip_reply.error)
+        self.assertIn('No such file or directory',
                       reply.add_floating_ip_reply.error_text)
 
     def test_add_reports_dnat_append_failure(self):
