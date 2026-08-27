@@ -55,33 +55,6 @@ Security settings: UI-only configuration, no template needed.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#81 |
-| client-python | compliant | - |
-| client-python-k3s | compliant | - |
-| clingwrap | compliant | - |
-| cloudgood | non-compliant | shakenfist/cloudgood#5 |
-| development | compliant | - |
-| divergulent | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
-| kerbside-patches | compliant | - |
-| library-utilities | non-compliant | shakenfist/library-utilities#36 |
-| occystrap | compliant | - |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3056 |
-
-Details for non-compliant projects:
-
-- **agent-python** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
-- **cloudgood** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
-- **library-utilities** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
-- **shakenfist** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#github-security).

@@ -6,10 +6,12 @@
 review, and **coverage for it is reported by the
 [push-audit](/components/development/audits/push-audit/) audit**, which checks that every
 repository carries the current `functional-test-coverage` shared block
-in its `PUSH-AUDIT.md`. There is no per-repository table on this page,
-because a table of who carries the block would be a second copy of the
-one that audit already publishes -- and a table of who has *good
-tests* is not something any script can fill in.
+in its `PUSH-AUDIT.md`. This criterion has no compliance table of its
+own on [compliance.md](/components/development/audits/compliance/), which lists it under the
+criteria with no automated check: a table of who carries the block
+would be a second copy of the one that audit already publishes -- and
+a table of who has *good tests* is not something any script can fill
+in.
 
 This page remains the statement of the standard.
 

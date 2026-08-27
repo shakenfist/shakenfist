@@ -103,37 +103,6 @@ See: `templates/renovate/README.md`
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#122 |
-| client-python | non-compliant | shakenfist/client-python#362 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#28 |
-| clingwrap | non-compliant | shakenfist/clingwrap#117 |
-| cloudgood | non-compliant | shakenfist/cloudgood#2 |
-| development | compliant | - |
-| divergulent | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
-| kerbside-patches | compliant | - |
-| library-utilities | non-compliant | shakenfist/library-utilities#33 |
-| occystrap | non-compliant | shakenfist/occystrap#112 |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3757 |
-
-Details for non-compliant projects:
-
-- **agent-python** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **client-python** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **client-python-k3s** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **clingwrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
-- **library-utilities** (Status): Missing: .github/workflows/renovate.yml, renovate.json
-- **occystrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **shakenfist** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#renovate).

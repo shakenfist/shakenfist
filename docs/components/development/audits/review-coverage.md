@@ -36,33 +36,6 @@ when the backlog has grown regardless.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#29 |
-| agent-python | N/A | - |
-| client-python | N/A | - |
-| client-python-k3s | N/A | - |
-| clingwrap | N/A | - |
-| cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#45 |
-| divergulent | N/A | - |
-| instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#227 |
-| kerbside-patches | N/A | - |
-| library-utilities | N/A | - |
-| occystrap | N/A | - |
-| private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#304 |
-| sfui | N/A | - |
-| shakenfist | N/A | - |
-
-Details for non-compliant projects:
-
-- **actions** (Status): 0 of 89 in-scope files reviewed at HEAD; 89 need review (threshold 5)
-- **development** (Status): 14 of 77 in-scope files reviewed at HEAD; 63 need review (threshold 5)
-- **kerbside** (Status): 125 of 194 in-scope files reviewed at HEAD; 69 need review (threshold 5)
-- **ryll** (Status): 97 of 178 in-scope files reviewed at HEAD; 81 need review (threshold 5)
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#review-coverage).

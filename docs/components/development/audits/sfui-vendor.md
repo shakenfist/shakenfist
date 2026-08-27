@@ -50,26 +50,6 @@ template.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | N/A | - |
-| agent-python | N/A | - |
-| client-python | N/A | - |
-| client-python-k3s | N/A | - |
-| clingwrap | N/A | - |
-| cloudgood | N/A | - |
-| development | N/A | - |
-| divergulent | N/A | - |
-| instar | N/A | - |
-| kerbside | compliant | - |
-| kerbside-patches | N/A | - |
-| library-utilities | N/A | - |
-| occystrap | N/A | - |
-| private-ci | compliant | - |
-| ryll | N/A | - |
-| sfui | N/A | - |
-| shakenfist | N/A | - |
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#sfui-vendor).

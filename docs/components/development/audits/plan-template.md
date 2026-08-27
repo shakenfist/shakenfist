@@ -108,35 +108,6 @@ matching section of the repository's `PLAN-TEMPLATE.md`.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Status | Issue |
-|---------|--------|--------|
-| actions | N/A | - |
-| agent-python | N/A | - |
-| client-python | N/A | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#33 |
-| clingwrap | N/A | - |
-| cloudgood | N/A | - |
-| development | N/A | - |
-| divergulent | non-compliant | shakenfist/divergulent#79 |
-| instar | non-compliant | shakenfist/instar#523 |
-| kerbside | non-compliant | shakenfist/kerbside#368 |
-| kerbside-patches | N/A | - |
-| library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#117 |
-| private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3892 |
-
-Details for non-compliant projects:
-
-- **client-python-k3s** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **divergulent** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **instar** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **kerbside** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **occystrap** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **shakenfist** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#plan-template).

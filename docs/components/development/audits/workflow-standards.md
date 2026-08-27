@@ -190,34 +190,6 @@ structured workflows.
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
-
-| Project | Permissions | Linting | Review marks | flake8wrap | Runners | Static tags | devpi fallback | devpi IP | Issue |
-|---------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
-| actions | compliant | compliant | compliant | N/A | compliant | compliant | N/A | compliant | - |
-| agent-python | compliant | compliant | N/A | non-compliant | non-compliant | compliant | N/A | compliant | shakenfist/agent-python#105, shakenfist/agent-python#82 |
-| client-python | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| client-python-k3s | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| clingwrap | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| cloudgood | N/A | compliant | N/A | N/A | N/A | N/A | N/A | N/A | - |
-| development | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| divergulent | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| instar | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| kerbside | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | - |
-| kerbside-patches | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| library-utilities | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| occystrap | compliant | compliant | N/A | non-compliant | compliant | compliant | N/A | compliant | shakenfist/occystrap#67 |
-| private-ci | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
-| ryll | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| sfui | compliant | compliant | N/A | N/A | compliant | compliant | compliant | compliant | - |
-| shakenfist | compliant | compliant | N/A | non-compliant | compliant | compliant | non-compliant | compliant | shakenfist/shakenfist#3057, shakenfist/shakenfist#3418 |
-
-Details for non-compliant projects:
-
-- **agent-python** (flake8wrap): Missing shellcheck disable=SC2086 directive
-- **agent-python** (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
-- **occystrap** (flake8wrap): Missing shellcheck disable=SC2086 directive
-- **shakenfist** (flake8wrap): Missing shellcheck disable=SC2086 directive
-- **shakenfist** (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:102, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: https://pypi.org/simple/" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#workflow-standards).

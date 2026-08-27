@@ -3,8 +3,13 @@
 Every Shaken Fist project is expected to be packaged, documented,
 tested and automated the same way. This directory is the statement of
 what that means: one file per criterion, each defining what we check
-and why, linking the template that implements it, and carrying a
-per-project compliance table regenerated every morning.
+and why, and linking the template that implements it.
+
+Who currently passes what is on [compliance.md](/components/development/audits/compliance/),
+regenerated every morning by the consistency audit and committed by
+it. It is the only generated file here; every criterion page beside it
+is hand-written, and each links its own section of the compliance
+page.
 
 It sits under `docs/` so that it publishes to shakenfist.com with
 everything else. What we hold a project to is documentation, and a
@@ -20,7 +25,7 @@ per criterion to check every project against it in parallel.
 a whole: what the daily run does, how issues are filed and closed, how
 the compliance tables are regenerated, how to add a criterion, and how
 to bring a repository into scope. Read it before adding a file here --
-a new criterion touches five files (six if it shares a spec file with
+a new criterion touches four files (five if it shares a spec file with
 another check), and a spec file on its own does not measure anything.
 
 ## File structure
@@ -39,11 +44,18 @@ See: `templates/<name>/README.md`
 
 ## Projects
 
-<!-- consistency-audit:begin -->
-*(Awaiting the first automated regeneration by the consistency
-audit workflow.)*
-<!-- consistency-audit:end -->
+Per-project compliance for this criterion is regenerated
+every morning by the consistency audit: see
+[the compliance page](/components/development/audits/compliance/#<name>).
 ```
+
+The whole file is hand-written, including that link -- the anchor is
+the file's own basename, and the section it points at appears on
+[compliance.md](/components/development/audits/compliance/) at the next run after the check is
+registered. Never put a `consistency-audit` marker block in a
+criterion page: the generated block carries a timestamp that moves
+daily, and a file carrying it can never hold a human review mark,
+which is why the tables were moved to one page in the first place.
 
 ## In-scope projects
 

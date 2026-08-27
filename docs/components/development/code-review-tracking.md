@@ -388,6 +388,36 @@ A session therefore looks like:
    what to `git add`. The (signed) commit that lands contains the
    marks, the stamps, and the regenerated `REVIEWS.md` together.
 
+### Reviewing a file that is out of scope
+
+`stamp` ends with a banner naming any marked file the scope config
+excludes, and exits non-zero. It is deliberately the loudest thing
+the tool prints, because the mistake is otherwise close to
+undetectable from the outside: an out-of-scope review *does* get a
+row in the `REVIEWS.md` table, so it looks recorded, but the
+coverage count above that table only counts in-scope files and does
+not move. `status` cannot see it either, so the `review-coverage`
+audit goes on reporting the file as outstanding, and `next` never
+offered it in the first place. The reviewer reads a file carefully
+and the number they are trying to move stays where it was.
+
+The banner repeats on every run, not just the one that first stamps
+the file. A mark noticed once and left alone is precisely the case
+that needs saying again, and the second run is when the reviewer is
+looking for confirmation that the count moved.
+
+Two ways out, and which one is right is a judgement call:
+
+* If reviewing the file was a mistake, un-mark it in weAudit and
+  re-run `stamp`, which drops the stamp along with the mark.
+* If the file should have been in scope, widen the include or
+  exclude patterns in `.vscode/review-scope.toml` and say why in
+  the commit message. The exclusions in that file are argued rather
+  than incidental -- each one carries a comment explaining what
+  would go wrong if the file were in the queue -- so an addition
+  that does not engage with the argument is likely to be reverted
+  by whoever wrote it.
+
 ## Staleness
 
 A review applies to the file content that was read, not the path:
@@ -420,10 +450,11 @@ Three behaviours worth knowing about:
   reviewed file changes, the only path forward is prune then
   re-review. This is what prevents a stale review being silently
   refreshed at the file's current content. `stamp` reports such a
-  file and exits non-zero rather than passing over it, so the
-  pre-commit hook stops the commit that would carry the stale mark:
-  until this was checked it skipped the file in silence, and because
-  a review-only commit is exempt from CI, the mark then survived to
+  file and exits non-zero rather than passing over it, which is the
+  last chance anything gets to say so: `stamp` runs by hand and not
+  from a hook, so nothing downstream will stop the commit. Until
+  this was checked it skipped the file in silence, and because a
+  review-only commit is exempt from CI, the mark then survived to
   the default branch where `prune-reviews` deleted it -- discarding
   the review rather than the staleness, which is the wrong half.
 * When every file in a directory is reviewed, weAudit adds a
