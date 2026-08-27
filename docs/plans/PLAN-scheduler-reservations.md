@@ -355,12 +355,13 @@ table entirely (decision D8).
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
+| 4b. Client support for claims | PLAN-scheduler-reservations-phase-04b-client.md | Not started |
+| 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
-| 9. Client support for claims | PLAN-scheduler-reservations-phase-09-client.md | Not started |
-| 10. Push audit | PLAN-scheduler-reservations-phase-10-push-audit.md | Not started |
+| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
 
 ### Phase status notes
 
@@ -491,8 +492,11 @@ maintained row per node and needs no such trick.
 first-class object with REST CRUD (D15), advisory-mode
 ceiling enforcement with structured events (D16), opt-in
 semantics and best-effort accounting for unclaimed
-namespaces (D14/D17). The conductor-side integration (D18)
-lands in private-ci once this phase ships. Superseded in
+namespaces (D14/D17). The conductor-side integration (D18) is
+phase 4c; this stub used to assert it would "land in
+private-ci once this phase ships", which was an assumption
+about work happening elsewhere rather than a tracked phase,
+and nothing had implemented it ten days later. Superseded in
 detail by the phase plan, which moved client verbs out of
 scope (D7 there) and discharged this stub's prerequisite:
 the admission transaction's P7 fail-open (`guarded = enforce
@@ -503,12 +507,86 @@ node-independent. It is now three flags, and the claim one
 is gated on `CLAIM_ENFORCEMENT_HARD` rather than on the
 node's row.
 
+**Phase 4b — client support for claims.** Add `apiclient`
+verbs for the claims API in `shakenfist/client-python`,
+tracked as client-python#364, and then move this repository's
+functional coverage onto them.
+
+Phase 4's decision D7 put client verbs out of scope for a
+real reason: CI installs the released client from PyPI, so a
+test written against new `apiclient` methods cannot pass
+until a client release exists, and no server pull request can
+produce one. That reasoning was sound and is now spent --
+the API has shipped, so the release can happen.
+
+Two obligations fall out of it, and the phase is not done
+until both are met. The first is the verbs themselves, in the
+other repository; issue #364 already carries the full surface
+including the field-mask semantics of `PUT`, the status codes
+worth typed exceptions, and the `state` /
+`coverage_state` distinction a client view must not collapse.
+The second is here:
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`
+currently reaches past the public surface via
+`apiclient.Client._request_url()`, with a docstring saying
+not to "fix" it onto verbs until a release exists. Once one
+does, the test moves onto the verbs, because the verbs are
+then what an operator actually uses and so what is worth
+defending.
+
+The server-side prerequisite is met: the API advertises
+`auth: namespace-claims` in its capability list as of the
+phase 4a close-out, so a client can feature-detect claims and
+an un-upgraded one degrades rather than failing. Phase 4
+shipped without that string; it was found by a question at
+close-out rather than by any review, and the miss is recorded
+in phase 4's Future work.
+
+This phase depends on a client release, which is outside this
+repository's control. If that release has not happened when
+the rest of the plan is otherwise finished, the honest move
+is to leave this phase open and say so rather than to close
+the plan around it.
+
+**Phase 4c — conductor claim integration.** Implement D18 in
+the private CI conductor (the `shakenfist/private-ci`
+repository): a claim per runner namespace, sized from the
+workflow cost data the conductor already collects, created
+before the runner is provisioned and deleted at teardown, with
+a capacity refusal handled as back-pressure that leaves the
+job queued rather than as a failure.
+
+The phase exists for two reasons and the second is the more
+important. The first is the integration itself. The second is
+that D16 makes the ceiling advisory for one release *so that
+exceedances are observed before they are refused*, and that
+observation window is worthless without a consumer: between
+phase 4 merging on 2026-08-17 and this phase being written on
+2026-08-27, every claim that had ever existed on sfcbr was
+created by a test and deleted by the same test. Phase 5 would
+otherwise flip `CLAIM_ENFORCEMENT_HARD` on the strength of a
+measurement period that measured nothing.
+
+The plan is
+[PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md),
+and it deviates from the usual convention that a plan lives
+with the code it plans: the plan is here, in the public
+repository beside its master plan and its sibling phases, and
+the implementation lands in private-ci. The reasoning is in
+that plan's decision E1.
+
 **Phase 5 — caller migration and hard ceiling.** Migrate the
 three `Scheduler()` call sites per D11 (queue worker to the
 claim-consuming path; API-side feasibility precheck;
 admin capacity view), remove the legacy in-Python capacity
 filtering, and flip the ceiling from advisory to hard one
 release after phase 4 (D16).
+
+*Correction (2026-08-27):* "one release after phase 4" is the
+wrong gate, and phase 4c replaces it. The advisory release
+exists to collect calibration data, so what phase 5 waits on is
+that data existing, not time elapsing. Phase 5 does not start
+until phase 4c's observation record is written.
 
 **Phase 6 — affinity rework.** Binary soft affinity plus
 hard require constraints, weighted-form deprecation mapping,
@@ -562,48 +640,7 @@ capacity (including the two service classes and the
 reconciler), developer-guide write-up of the guarded-UPDATE
 idiom (D10), user-facing affinity migration notes.
 
-**Phase 9 — client support for claims.** Add `apiclient`
-verbs for the claims API in `shakenfist/client-python`,
-tracked as client-python#364, and then move this repository's
-functional coverage onto them.
-
-Phase 4's decision D7 put client verbs out of scope for a
-real reason: CI installs the released client from PyPI, so a
-test written against new `apiclient` methods cannot pass
-until a client release exists, and no server pull request can
-produce one. That reasoning was sound and is now spent --
-the API has shipped, so the release can happen.
-
-Two obligations fall out of it, and the phase is not done
-until both are met. The first is the verbs themselves, in the
-other repository; issue #364 already carries the full surface
-including the field-mask semantics of `PUT`, the status codes
-worth typed exceptions, and the `state` /
-`coverage_state` distinction a client view must not collapse.
-The second is here:
-`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py`
-currently reaches past the public surface via
-`apiclient.Client._request_url()`, with a docstring saying
-not to "fix" it onto verbs until a release exists. Once one
-does, the test moves onto the verbs, because the verbs are
-then what an operator actually uses and so what is worth
-defending.
-
-The server-side prerequisite is met: the API advertises
-`auth: namespace-claims` in its capability list as of the
-phase 4a close-out, so a client can feature-detect claims and
-an un-upgraded one degrades rather than failing. Phase 4
-shipped without that string; it was found by a question at
-close-out rather than by any review, and the miss is recorded
-in phase 4's Future work.
-
-This phase depends on a client release, which is outside this
-repository's control. If that release has not happened when
-the rest of the plan is otherwise finished, the honest move
-is to leave this phase open and say so rather than to close
-the plan around it.
-
-**Phase 10 — push audit.** Run
+**Phase 9 — push audit.** Run
 the repository's pre-push audit over everything this plan
 built, as a single body of work rather than one branch at a
 time.
@@ -647,7 +684,7 @@ Findings land as their own pull request, and the plan is not
 complete until each is resolved or declined in writing here.
 If the audit finds nothing, that is recorded in one sentence.
 
-Run this last, after phase 9, so the documentation the audit
+Run this last, after every other phase, so the documentation the audit
 checks is the documentation the plan intended to ship and the
 client surface it reviews is the final one.
 
