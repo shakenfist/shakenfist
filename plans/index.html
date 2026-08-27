@@ -13444,9 +13444,9 @@ checker's blind spot, and the only numbers here it cannot recompute.</p>
 <tr>
 <td>2026-05-24</td>
 <td><a href="PLAN-queue-performance/">Queue performance and coalescing</a></td>
-<td>Batched dequeue and cluster-operation coalescing. The wait tail is gone and explicit fairness was not needed, though those numbers were measured while coalescing was inert -- a push audit found it had never worked (#3878), and review of that fix found it would have folded per-node mesh ops across nodes (#3884)</td>
-<td>Complete</td>
-<td>8 of 8</td>
+<td>Batched dequeue and cluster-operation coalescing. The wait tail is gone and explicit fairness was not needed, though those numbers were measured while coalescing was inert -- a push audit found it had never worked (#3878), and review of that fix found it would have folded per-node mesh ops across nodes (#3884). Reopened for three phases: proving coalescing works on a running cluster and measuring what it costs, the flat 15 second dependency wait (#3863), and a multi-column fold key (#3884)</td>
+<td>In progress</td>
+<td>8 of 11</td>
 </tr>
 <tr>
 <td>2026-06-01</td>

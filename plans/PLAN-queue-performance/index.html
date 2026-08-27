@@ -13126,6 +13126,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#phases-9-to-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phases 9 to 11
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-step-7-measured" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13220,7 +13231,12 @@
 
 <h1 id="plan-queue-performance-and-coalescing">PLAN: Queue performance and coalescing<a class="headerlink" href="#plan-queue-performance-and-coalescing" title="Permanent link">&para;</a></h1>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>Complete.</p>
+<p>In progress.</p>
+<p>Reopened on 2026-08-25 with three further phases. The plan reached 8
+of 8 while explicitly recording two things it had not proven and two
+follow-ups it had not built; those are now phases 9, 10 and 11 rather
+than issues nobody is scheduled to reach. Phases 1-8 are unchanged and
+remain complete.</p>
 <p>Steps 1-6 merged to <code>develop</code> as PR #3194 on 2026-05-26. Step 7
 measured the result and decided against explicit fairness; the
 measurement, the exclusions it rests on and the decision are in
@@ -13233,11 +13249,16 @@ enqueue-side dedup and the worker-side fold -- joined
 never match: an undashed uuid against a dashed one, and an enum value
 against an enum name. Both primitives therefore always returned
 "nothing found", and the <code>coalesced sibling ops</code> event had fired zero
-times in seven days on <code>sfcbr</code>. Fixed here as #3878, with eight tests
-which execute the real statements against a real database; #3879
-tracks the missing functional coverage that let the defect sit
-unnoticed since 2026-05-26. The full audit, including the three
-headings which found nothing, is in
+times in seven days on <code>sfcbr</code>. Fixed here as #3878, with thirteen tests
+in <code>shakenfist/tests/test_mariadb_coalescing.py</code> which execute the
+real statements against an in-memory sqlite database built from
+<code>mariadb.py</code>'s own table definitions. That is enough to catch a join
+which can never match, which is what #3878 was, and explicitly not
+enough for the fold's <code>FOR UPDATE</code> half: the sqlite dialect emits
+nothing at all for <code>FOR UPDATE</code>, so every one of those tests runs
+uncontended. #3879 tracks the missing functional coverage that let
+the defect sit unnoticed since 2026-05-26, and phase 9 addresses it.
+The full audit, including the three headings which found nothing, is in
 <a href="../PLAN-queue-performance-phase-08-push-audit/">PLAN-queue-performance-phase-08-push-audit.md</a>.</p>
 <p>Review of that fix found a second defect it would have activated:
 <code>network_ensure_mesh</code> was declared coalescible, but it does node-local
@@ -13258,8 +13279,8 @@ multi-column key that would let per-node tasks coalesce properly.</p>
   <code>claim_coalescible_siblings</code> is recorded in <code>baseoperation.py</code> as
   costing ~200 ms under load, and it now also takes <code>FOR UPDATE</code>
   locks on <code>object_states</code> rows and issues an UPDATE against a hot
-  table. Re-measuring both is folded into #3879, alongside the
-  functional coverage.</li>
+  table. Both are re-measured in phase 9, alongside the functional
+  coverage.</li>
 </ul>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
@@ -13310,6 +13331,21 @@ multi-column key that would let per-node tasks coalesce properly.</p>
 <td>8. Push audit</td>
 <td><a href="../PLAN-queue-performance-phase-08-push-audit/">PLAN-queue-performance-phase-08-push-audit.md</a></td>
 <td>Complete</td>
+</tr>
+<tr>
+<td>9. Prove coalescing works</td>
+<td><a href="../PLAN-queue-performance-phase-09-prove-coalescing/">PLAN-queue-performance-phase-09-prove-coalescing.md</a></td>
+<td>In progress</td>
+</tr>
+<tr>
+<td>10. The 15 second dependency wait</td>
+<td>(not yet planned)</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>11. Multi-column coalescing key</td>
+<td>(not yet planned)</td>
+<td>Not started</td>
 </tr>
 </tbody>
 </table>
@@ -13408,6 +13444,53 @@ audit:</p>
    finding is resolved, or declined in writing, before this plan
    is marked complete. If the audit finds nothing, that is
    recorded in one sentence.</p>
+</li>
+</ol>
+<h2 id="phases-9-to-11">Phases 9 to 11<a class="headerlink" href="#phases-9-to-11" title="Permanent link">&para;</a></h2>
+<p>Added on 2026-08-25. Steps 1-8 answered the question the plan was
+written to ask -- the wait tail is gone -- but left three things
+behind, each of which is now a phase rather than an issue waiting
+for someone to notice it.</p>
+<ol>
+<li>
+<p><strong>Prove coalescing works.</strong> Step 7's numbers were gathered while
+   coalescing was inert, and the fold's cost has never been
+   measured. There is also still no functional coverage anywhere
+   that coalescing matches a row on a running cluster (#3879),
+   which is what let #3878 sit on <code>develop</code> for three months. This
+   phase makes the fold's evidence durable enough to assert on,
+   adds that assertion to the functional suite, instruments the
+   fold's cost onto the event <code>tools/queue-wait-report.py</code> already
+   reads, and re-measures on <code>sfcbr</code>. See
+   <a href="../PLAN-queue-performance-phase-09-prove-coalescing/">PLAN-queue-performance-phase-09-prove-coalescing.md</a>.</p>
+</li>
+<li>
+<p><strong>The 15 second dependency wait.</strong> Step 7 measured a p50 of
+    15.78 s on the <code>user_waiting</code> queue and traced all of it to
+    deferral: a dependency wait re-enqueues a flat 15 seconds into
+    the future on the queues <code>sf-queues</code> drains, where <code>sf-net</code>
+    instead backs off from 0.1 s to a 15 s cap. Restricted to
+    operations which never deferred, the same p50 is 0.77 s. This
+    is the largest user-visible latency in the whole sample and it
+    has nothing to do with queue order, which is why step 7 excluded
+    it from the fairness question and filed it as #3863 instead.
+    Not yet planned.</p>
+</li>
+<li>
+<p><strong>Multi-column coalescing key.</strong> The fold keys on a single
+    target column, which for <code>net_op</code> means "the same network". A
+    per-node task therefore cannot be coalesced: two hypervisors'
+    operations look identical to both dedup paths while doing
+    different work on different hosts. That is why
+    <code>network_ensure_mesh</code> was removed from <code>COALESCIBLE_TASKS</code> in
+    phase 8, and why <code>network_apply_create_hypervisor</code> -- fanned out
+    per instance during node startup, and idempotent -- has never
+    been coalescible despite the step 6 audit identifying it.
+    Generalising the key to a list of <code>(column, value)</code> pairs lets
+    both back in. Filed as #3884. Not yet planned. Phase 9 comes
+    first deliberately: generalising a primitive that was silently
+    broken for three months, before anything proves it works on a
+    running cluster, repeats the mistake.</p>
 </li>
 </ol>
 <h2 id="what-step-7-measured">What step 7 measured<a class="headerlink" href="#what-step-7-measured" title="Permanent link">&para;</a></h2>
@@ -13551,7 +13634,8 @@ documentation, which claimed 30 day retention, is corrected.</p>
   node), which the current <code>target_column</code> parameter does not
   support. Generalising to a list of <code>(column, value)</code> pairs is
   straightforward; deferred so step 5's CI run gives us
-  measurable baseline numbers first.</p>
+  measurable baseline numbers first. Now scheduled as phase 11,
+  behind phase 9, and tracked as #3884.</p>
 </li>
 <li>
 <p><strong>Explicit fairness for low-priority queues</strong>. The dequeue
