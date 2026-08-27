@@ -77,6 +77,119 @@ from another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.
 
+## CI headroom instrumentation
+
+Phase 1 of `docs/plans/PLAN-ci-cloud-sizing.md` (see
+`docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md` for the
+decisions behind it) added two data-gathering instruments to every
+functional cluster job, so that later phases can size CI's clouds from
+a distribution instead of the handful of hand-collected numbers the
+plan started from. Neither instrument gates anything -- see "Nothing
+here is a quality gate" below -- so a reader troubleshooting a CI
+failure can skip this section; it matters when reading a job's bundle
+afterwards, or when working on the sizing plan itself.
+
+### Two instruments, not one
+
+**The headroom series** is a poll. `tools/ci_headroom_probe.py` (in
+this repository) runs in the background on the cluster primary for the
+whole functional test step, sampling `GET /admin/resources` and the
+node roster (`GET /nodes`) every 15 seconds and appending one JSON
+record per sample to a JSONL file.
+
+**The refusal census** is a scrape. After the tests finish,
+`tools/ci_headroom_collect.sh` (in `shakenfist/actions`) runs a
+filtered Loki query for every scheduler admission event the run
+produced. `Scheduler._log_and_raise_on_error()` logs one at *every*
+stage, whether or not candidates survived, so a green run's refusals
+are on the record too, not only a failing one's.
+
+The two are not substitutes for each other. A fifteen-second poll
+cannot see a refusal, which begins and ends between samples; a census
+cannot see a cloud sitting half empty for an hour, which is the
+oversizing case the whole plan exists to catch. Reporting one number
+derived from both would hide which of the two produced it, so they
+are built, collected and reported separately.
+
+### Where the output lands
+
+Both instruments write into `/srv/ci/traces/` on the cluster primary:
+`headroom.jsonl` (the series) and `headroom-census.json` (the raw
+Loki `query_range` response the census reads). Neither gets its own
+`upload-artifact` step -- the existing `Gather logs` step already
+scp's the whole of `/srv/ci/traces/` into the job's 90-day artifact
+bundle, so a reader looking at a bundle finds both files sitting
+beside the other logs, with no separate download to go and find.
+
+`tools/ci_headroom_report.py` (also in this repository) turns the two
+into a printed summary at the end of the job log: p90 and peak
+committed vCPU and memory, cluster-wide and per node, both absolute
+and as a fraction of the admission ledger, plus the refusal census
+broken out by stage.
+
+### The series record format
+
+Phase 2 parses `headroom.jsonl` as a contract, so treat the shape
+below as load-bearing rather than as prose to paraphrase; the tool's
+own docstring is the source of truth if the two ever disagree. Each
+line is one JSON object. A successful sample carries:
+
+* `sampled_at` -- float, unix epoch seconds, wall clock at sample
+  start.
+* `resources` -- the verbatim `/admin/resources` payload
+  (`client.get_cluster_resources()`).
+* `nodes` -- the node roster at the time of the sample, reduced to
+  `uuid`, `fqdn`, `is_hypervisor`, `is_network_node` and
+  `is_database_node` for each entry.
+
+A failed sample carries only `sampled_at` and `error` (the exception
+text) -- `resources` and `nodes` are absent, not null. The probe never
+raises: a failure just writes an error record and the polling loop
+continues, so one bad sample never costs the run the rest of the
+series.
+
+The roster is recorded on *every* sample, not once at the start of the
+run, and that is deliberate. `summarize_resources()` silently omits
+from `per_node` any node that is not a hypervisor, whose metrics are
+older than 120 seconds, or whose queue is unreasonably long, and does
+not say which of those applied. A node missing from a given sample's
+`per_node` therefore has several possible explanations, and only a
+roster captured in that same sample can tell "not a hypervisor" apart
+from "metrics gone stale" or "the node did not exist yet" -- a roster
+fetched once at the top of the run cannot, because cluster membership
+itself can change mid-run.
+
+### Four capacity stages, and a naming trap
+
+The scheduler's admission checks that can refuse a candidate node for
+being full are `sufficient_idle_cpu`, `sufficient_idle_memory`,
+`sufficient_free_disk` and `sufficient_idle_disk`. The last two are
+easy to swap: `sufficient_free_disk` is disk *space*, but
+`sufficient_idle_disk` is disk *bandwidth* -- a rate predicate on
+disk-busy delta, not a capacity check at all, and not something that
+more or bigger disks in the same shape would fix. The cloud-sizing
+plan itself named the wrong one as "disk" before this phase's survey
+caught the mistake, which is why it is worth calling out here: read a
+`sufficient_idle_disk` row in a census as a disk I/O problem, never as
+evidence the cloud needs more disk capacity.
+
+### Nothing here is a quality gate
+
+Every workflow step this phase added is `continue-on-error`, and
+`ci_headroom_report.py` always exits 0 whatever it finds -- even an
+internal error in the report is printed, not raised. The band verdict
+it prints (committed vCPU as a fraction of the admission ledger,
+against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
+phase 0 set those bounds with no distribution to check them against,
+phase 2 replaces or defends them, and any enforcement is phase 5's to
+add. Nothing in CI today can fail because of this instrumentation.
+
+An absent census is not zero refusals. When the Loki query failed or
+log shipping was unhealthy, the report says so explicitly rather than
+printing "0 refusals", which would look exactly like a run that
+refused nothing. Read a bundle's `headroom-census.json` the same way
+by hand: missing or empty means "unknown", never "clean".
+
 ## Coverage the functional suite does not have
 
 ### Upgrade data verification

@@ -358,7 +358,11 @@ sourced from these same counters rather than a separate walk,
 alongside `cpu_committed_row_present`: a node the reconciler has not
 yet sized reports `cpu_committed` as zero *and*
 `cpu_committed_row_present` as false, which distinguishes a genuinely
-idle node from one that is admitting unguarded.
+idle node from one that is admitting unguarded. It also publishes the
+capacity row's own `limit_cpus` as `cpu_limit`, so a reader can compare
+it against the live-derived `cpu_hard_max` and see the two ledgers
+disagree; a node with no capacity row reports `cpu_limit` as `None`
+rather than falling back to `cpu_hard_max`.
 
 ## Namespace capacity claims
 
@@ -735,8 +739,8 @@ The admin resources API (`/admin/resources`, surfaced by
 `cpu_schedulable`, `memory_reserved_mb`, `cpu_available` and RAM
 headroom using the same pre-filter arithmetic as the pipeline above.
 It also breaks the CPU decision out into `cpu_hard_max`,
-`cpu_measured` and `cpu_committed` -- see [Admission is a guarded
-capacity claim](#admission-is-a-guarded-capacity-claim) for what
+`cpu_measured`, `cpu_committed` and `cpu_limit` -- see [Admission is a
+guarded capacity claim](#admission-is-a-guarded-capacity-claim) for what
 `cpu_committed` and its `cpu_committed_row_present` companion actually
 mean.
 

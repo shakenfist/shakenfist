@@ -767,6 +767,7 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.assertEqual(5, node2['cpu_committed'])
         self.assertTrue(node2['cpu_committed_row_present'])
         self.assertEqual(0, node2['cpu_measured'])
+        self.assertEqual(16, node2['cpu_limit'])
         self.assertEqual(16.0 - 5, node2['cpu_available'])
 
     def test_summarize_resources_reports_a_node_with_no_row(self):
@@ -779,6 +780,7 @@ class CapacityCounterTestCase(SchedulerTestCase):
         node3 = resources['per_node'][self._node_uuid('node3')]
         self.assertEqual(0, node3['cpu_committed'])
         self.assertFalse(node3['cpu_committed_row_present'])
+        self.assertIsNone(node3['cpu_limit'])
         self.assertEqual(16.0, node3['cpu_available'])
 
     def test_summarize_resources_takes_the_larger_of_the_two(self):

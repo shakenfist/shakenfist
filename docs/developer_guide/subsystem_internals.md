@@ -127,8 +127,11 @@ that is what the guard behind it will use, while `/admin/resources`
 derives the limit live from the node's metrics. The arithmetic is the
 same (`mariadb._derive_cpu_memory_limits()`), but the row refreshes
 only once a reconcile period, so the published headroom can differ from
-what admission would grant for up to that long. Both inputs to the
-charge are published (`cpu_measured`, `cpu_committed`, and
+what admission would grant for up to that long. The capacity row's own
+`limit_cpus` is published too, as `cpu_limit` -- with no fallback to
+the live-derived `cpu_hard_max` when the row is absent, so `cpu_limit`
+is `None` exactly when there is no row to disagree with. Both inputs to
+the charge are published (`cpu_measured`, `cpu_committed`, and
 `cpu_committed_row_present` to say whether a zero means "unsized" or
 "idle"), so which of the two binds is answerable from the response.
 The reconciler maintains the
