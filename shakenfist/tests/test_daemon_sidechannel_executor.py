@@ -169,6 +169,42 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
         self.assertIsNone(job.agentop.failure_reason)
 
 
+class SideChannelPreConnectionWaitTestCase(base.ShakenFistTestCase):
+    """The pre-connection wait in SideChannelJob.execute() must be
+    abortable, or the reaper can resolve a wedged operation and still not
+    free the instance's executor slot (step 5d)."""
+
+    def _make_job(self, instance_path):
+        # Built with __new__ rather than the real __init__ so abort_path
+        # can point at a temp file instead of the real /run/sf location.
+        job = sidechannel.SideChannelJob.__new__(sidechannel.SideChannelJob)
+        job.instance = mock.Mock(instance_path=instance_path)
+        job.abort_path = os.path.join(instance_path, 'abort')
+        job.thread_name = 'fake-instance'
+        job.log = mock.MagicMock()
+        return job
+
+    def test_wait_returns_promptly_when_aborted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = self._make_job(tmp)
+
+            def _set_abort_path_instead_of_sleeping(seconds):
+                # Stands in for the reaper setting the abort path while
+                # this thread is blocked in the wait.
+                sidechannel.daemon.set_abort_path(job.abort_path, 'test')
+
+            with mock.patch.object(
+                    sidechannel.time, 'sleep',
+                    side_effect=_set_abort_path_instead_of_sleeping) as m_sleep:
+                job.execute()
+
+            # Exactly one sleep: the loop notices the abort path on its very
+            # next check, rather than looping again or falling through to
+            # the vsock connection attempt.
+            self.assertEqual(1, m_sleep.call_count)
+            job.instance.socket_on_vsock_channel.assert_not_called()
+
+
 class ExecutorGetFileGuardTestCase(base.ShakenFistTestCase):
     """The get-file transfer guards in _handle_stat_result() and
     _handle_file_chunk() must raise GetException when no transfer is in

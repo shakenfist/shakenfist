@@ -143,6 +143,11 @@ class SideChannelJob(util_concurrency.Job):
         # the instance doesn't actually every write to the serial console.
         console_path = os.path.join(self.instance.instance_path, 'console.log')
         while not os.path.exists(console_path):
+            if not daemon.check_abort_path(self.abort_path):
+                self.log.with_fields({
+                    'abort_path': self.abort_path
+                }).debug('Abort path set, exiting')
+                return
             time.sleep(1)
         self.log.debug('Detected console log')
 
