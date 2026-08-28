@@ -14004,7 +14004,7 @@ verdict, and see
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-08-26T06:56:26.297909+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-08-27T17:28:50.740134+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -14028,8 +14028,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/367" title="GitHub Issue: shakenfist/client-python #367">client-python#367</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -14106,7 +14106,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>agent-python</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch</li>
-<li><strong>client-python</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch</li>
 <li><strong>client-python-k3s</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh); it is unused, and its workflow holds contents: write on the pull request branch</li>
 <li><strong>clingwrap</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch</li>
 <li><strong>cloudgood</strong> (Status): Missing workflows: pr-re-review.yml</li>
@@ -14141,8 +14140,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/371" title="GitHub Issue: shakenfist/client-python #371">client-python#371</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -14211,17 +14210,15 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3909" title="GitHub Issue: shakenfist/shakenfist #3909">shakenfist#3909</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 </tbody>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>agent-python</strong> (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_agent/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
-<li><strong>client-python</strong> (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_client/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
 <li><strong>occystrap</strong> (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- occystrap/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
-<li><strong>shakenfist</strong> (Status): 2 of 2 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist/client/backup.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler); shakenfist/client/ctl.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)</li>
 </ul>
 <h2 id="default-branch-naming">default-branch-naming<a class="headerlink" href="#default-branch-naming" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/default-branch-naming/">default-branch-naming.md</a></p>
@@ -14958,8 +14955,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/366" title="GitHub Issue: shakenfist/client-python #366">client-python#366</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -15036,7 +15033,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>agent-python</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
-<li><strong>client-python</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
 <li><strong>client-python-k3s</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
 <li><strong>clingwrap</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
 <li><strong>cloudgood</strong> (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow</li>
@@ -15667,8 +15663,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/365" title="GitHub Issue: shakenfist/client-python #365">client-python#365</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -15744,7 +15740,6 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>client-python</strong> (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered</li>
 <li><strong>client-python-k3s</strong> (Status): docs/plans/index.md is missing, so none of the 2 plan(s) in docs/plans/ are registered</li>
 <li><strong>instar</strong> (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): instar amend subcommand ("1.1 (qcow2 v2⇔v3 version transition, ...")</li>
 <li><strong>library-utilities</strong> (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered</li>
@@ -15851,7 +15846,7 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>shakenfist</strong> (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:151, docs/developer_guide/subsystem_internals.md:153, docs/developer_guide/subsystem_internals.md:172, docs/developer_guide/subsystem_internals.md:226, docs/developer_guide/subsystem_internals.md:243, docs/developer_guide/subsystem_internals.md:447 (+7 more)</li>
+<li><strong>shakenfist</strong> (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:158, docs/developer_guide/subsystem_internals.md:160, docs/developer_guide/subsystem_internals.md:179, docs/developer_guide/subsystem_internals.md:233, docs/developer_guide/subsystem_internals.md:250, docs/developer_guide/subsystem_internals.md:454 (+7 more)</li>
 </ul>
 <h2 id="plan-source-references">plan-source-references<a class="headerlink" href="#plan-source-references" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-source-references/">plan-source-references.md</a></p>
@@ -15896,7 +15891,7 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>N/A</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -16390,8 +16385,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/345" title="GitHub Issue: shakenfist/client-python #345">client-python#345</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -16468,7 +16463,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>agent-python</strong> (Status): 5 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, docs/developer-guide.md, docs/index.md, docs/protocol.md</li>
-<li><strong>client-python</strong> (Status): 3 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, RELEASE-SETUP.md</li>
 <li><strong>clingwrap</strong> (Status): 5 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, RELEASE-SETUP.md, docs/, docs/index.md</li>
 <li><strong>library-utilities</strong> (Status): 1 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): docs/log-record-fields.md</li>
 </ul>
@@ -16495,8 +16489,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/353" title="GitHub Issue: shakenfist/client-python #353">client-python#353</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -16572,7 +16566,6 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>client-python</strong> (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation</li>
 <li><strong>client-python-k3s</strong> (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation</li>
 </ul>
 <h2 id="release-process">release-process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
@@ -16696,8 +16689,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/362" title="GitHub Issue: shakenfist/client-python #362">client-python#362</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -16774,7 +16767,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>agent-python</strong> (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently</li>
-<li><strong>client-python</strong> (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently</li>
 <li><strong>client-python-k3s</strong> (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently</li>
 <li><strong>clingwrap</strong> (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently</li>
 <li><strong>cloudgood</strong> (Status): Missing: .github/workflows/renovate.yml, renovate.json</li>
@@ -16883,7 +16875,7 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>actions</strong> (Status): 0 of 89 in-scope files reviewed at HEAD; 89 need review (threshold 5)</li>
-<li><strong>development</strong> (Status): 14 of 77 in-scope files reviewed at HEAD; 63 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 24 of 112 in-scope files reviewed at HEAD; 88 need review (threshold 5)</li>
 <li><strong>kerbside</strong> (Status): 125 of 194 in-scope files reviewed at HEAD; 69 need review (threshold 5)</li>
 <li><strong>ryll</strong> (Status): 97 of 178 in-scope files reviewed at HEAD; 81 need review (threshold 5)</li>
 </ul>
@@ -17008,8 +17000,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/354" title="GitHub Issue: shakenfist/client-python #354">client-python#354</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -17086,7 +17078,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>agent-python</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
-<li><strong>client-python</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
 <li><strong>clingwrap</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
 <li><strong>library-utilities</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
 <li><strong>occystrap</strong> (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow</li>
@@ -17626,7 +17617,7 @@ does.</p>
 <li><strong>agent-python</strong> (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment</li>
 <li><strong>occystrap</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
 <li><strong>shakenfist</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
-<li><strong>shakenfist</strong> (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:102, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: <a href="https://pypi.org/simple/">https://pypi.org/simple/</a>" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"</li>
+<li><strong>shakenfist</strong> (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:133, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: <a href="https://pypi.org/simple/">https://pypi.org/simple/</a>" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"</li>
 </ul>
 <h2 id="criteria-with-no-automated-check">Criteria with no automated check<a class="headerlink" href="#criteria-with-no-automated-check" title="Permanent link">&para;</a></h2>
 <p>These criteria are written down and judged by a person, so they have no table above. Each says why in its own page:</p>
