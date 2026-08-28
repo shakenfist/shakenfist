@@ -444,7 +444,13 @@ class SFConfig(BaseSettings):
         description=(
             'How much vRAM per real unit of RAM, that is if Kernel Shared '
             'Memory (KSM) is enabled, how much to overcommit memory because '
-            'of shared pages.'
+            'of shared pages. The default of 3.0 assumes KSM deduplicates '
+            'most guest memory, which holds only for fleets of many '
+            'near-identical, mostly-idle guests. Workloads which dirty '
+            'most of their allocation with unique pages (CI, databases, '
+            'container hosts) get little KSM profit and should run much '
+            'closer to 1.0-1.25, or the hosts will swap and eventually '
+            'OOM-kill instances.'
         )
     )
     SCHEDULER_DISK_OVERCOMMIT: float = Field(

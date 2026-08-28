@@ -254,12 +254,13 @@ class Scheduler:
 
         return True, None
 
-    def _has_sufficient_ram(self, log_ctx, memory, node):
+    def _has_sufficient_ram(self, log_ctx, inst, node, capacity):
         # There are two things to track here... We must always leave the
         # node's published memory reservation (operating system tasks, plus
         # cluster-wide daemons on infra-role nodes) untouched -- assume
         # there is no overlap with existing VMs when checking this. Note as
         # well that metrics are in MB...
+        memory = inst.memory
         reserved = self._memory_reserved_mb(node)
         available = self.metrics[node].get('memory_available', 0) - reserved
         if available - memory < 0.0:
@@ -295,6 +296,37 @@ class Scheduler:
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'KSM overcommit ratio exceeded')
             return False, reason
+
+        # ...Both checks above are measurements, and both lag placement:
+        # a just-placed instance which has not yet booted reduces neither
+        # memory_available nor memory_total_instance_actual, so a burst
+        # of near-simultaneous creates passes them all against the same
+        # stale snapshot (issue 3636). As with _has_sufficient_cpu(), the
+        # node is therefore also charged the memory its capacity ledger
+        # already records, against the ledger's own limit -- exactly the
+        # arithmetic the guard will apply -- so a node whose RAM is fully
+        # committed leaves the candidate list here rather than surviving
+        # to attract, and then be refused, an entire burst. A node with
+        # no row is guarded by nothing and must not be refused on a
+        # ledger which does not exist (P7).
+        row = capacity.get(node)
+        if row:
+            committed_mb = row['used_memory_mb']
+            # An instance already placed here is in used_memory_mb, and a
+            # reschedule which lands it back on the same node does not
+            # charge it a second time.
+            if committed_mb and instance.placement_filter(node, inst):
+                committed_mb = max(0, committed_mb - memory)
+            if committed_mb + memory > row['limit_memory_mb']:
+                reason = {
+                    'reason': 'would exceed committed memory',
+                    'committed_memory_mb': committed_mb,
+                    'requested_memory_mb': memory,
+                    'limit_memory_mb': row['limit_memory_mb'],
+                }
+                log_ctx.with_fields({'node': node, **reason}).debug(
+                    'Scheduling on node would exceed committed memory')
+                return False, reason
 
         return True, None
 
@@ -469,10 +501,13 @@ class Scheduler:
                 related_objects, 'sufficient_idle_cpu', candidates,
                 dropped=dropped)
 
-            # Do we have enough idle RAM?
+            # Do we have enough idle RAM? Like the CPU stage this reads
+            # the capacity counters as well as the metrics, because a
+            # node whose RAM ledger is full measures as unchanged until
+            # its instances boot and fault their allocations in.
             dropped = {}
             for c in list(candidates):
-                ok, reason = self._has_sufficient_ram(log_ctx, inst.memory, c)
+                ok, reason = self._has_sufficient_ram(log_ctx, inst, c, capacity)
                 if not ok:
                     dropped[c] = reason
                     candidates.remove(c)
@@ -634,18 +669,43 @@ class Scheduler:
             by_load = defaultdict(list)
             load_detail = {}
             denominators = {}
+            ram_headrooms = {}
             for c in list(candidates):
                 raw_load = self.metrics[c].get('cpu_load_1', 0)
                 denom, from_fallback = self._schedulable_threads(c)
                 denom = denom or 1
                 normalised = raw_load / denom
-                bucket = math.floor(normalised / 0.25)
+
+                # RAM commitment ranks alongside CPU load (issue 3636): a
+                # node carrying RAM-heavy but CPU-idle instances otherwise
+                # looks like the best candidate precisely because of the
+                # workload that makes it dangerous, and attracts every
+                # large instance in a burst until the capacity guard
+                # finally refuses it. The committed fraction is read from
+                # the same counters the guard draws down, so unlike the
+                # metrics it moves with every admission. A node ranks by
+                # whichever of its two pressures is worse, in the same
+                # coarse 0.25-wide bands so that similar nodes stay
+                # interchangeable and a burst still spreads.
+                ram_fraction = 0.0
+                row = capacity.get(c)
+                if row and row['limit_memory_mb'] > 0:
+                    committed_mb = max(
+                        row['used_memory_mb'],
+                        self.metrics[c].get('memory_total_instance_actual', 0))
+                    ram_fraction = committed_mb / row['limit_memory_mb']
+                ram_headrooms[c] = max(0.1, 1.0 - ram_fraction)
+
+                bucket = max(
+                    math.floor(normalised / 0.25),
+                    math.floor(ram_fraction / 0.25))
                 denominators[c] = denom
                 load_detail[c] = {
                     'cpu_load_1': raw_load,
                     'cpu_schedulable': denom,
                     'cpu_schedulable_from_fallback': from_fallback,
                     'normalised_load': normalised,
+                    'ram_committed_fraction': ram_fraction,
                     'bucket': bucket,
                 }
                 by_load[bucket].append(c)
@@ -684,10 +744,14 @@ class Scheduler:
                 tier = by_load[bucket]
                 for c in tier:
                     raw_load = self.metrics[c].get('cpu_load_1', 0)
+                    # Load headroom toward the target, scaled by the
+                    # node's uncommitted RAM fraction, so that within a
+                    # band a RAM-committed node draws a proportionally
+                    # smaller share of a burst.
                     weights[c] = max(
                         0.1,
                         (config.SCHEDULER_TARGET_LOAD * denominators[c] -
-                         raw_load))
+                         raw_load)) * ram_headrooms[c]
                 tier.sort(
                     key=lambda c: random.random() ** (1.0 / weights[c]),
                     reverse=True)
@@ -780,7 +844,10 @@ class Scheduler:
             resources['per_node'][n]['cpu_load_15'] = self.metrics[n].get(
                 'cpu_load_15', 0)
 
-            # Memory. As with CPU, this must match _has_sufficient_ram().
+            # Memory. As with CPU, this must match _has_sufficient_ram():
+            # published headroom is bounded by the committed ledger as
+            # well as the measurements, because that ledger is what both
+            # the pre-filter and the guard refuse on.
             reserved = self._memory_reserved_mb(n)
             resources['per_node'][n]['memory_reserved_mb'] = reserved
             resources['per_node'][n]['ram_max_per_instance'] = \
@@ -788,9 +855,15 @@ class Scheduler:
             resources['per_node'][n]['ram_max'] = \
                 self.metrics[n].get('memory_max', 0) * \
                 config.RAM_OVERCOMMIT_RATIO
-            resources['per_node'][n]['ram_available'] = \
+            committed_mb = row['used_memory_mb'] if row else 0
+            resources['per_node'][n]['ram_committed'] = committed_mb
+            ram_available = \
                 (self.metrics[n].get('memory_max', 0) * config.RAM_OVERCOMMIT_RATIO -
                  self.metrics[n].get('memory_total_instance_actual', 0))
+            if row:
+                ram_available = min(
+                    ram_available, row['limit_memory_mb'] - committed_mb)
+            resources['per_node'][n]['ram_available'] = ram_available
             resources['total']['ram_available'] += max(
                 0, resources['per_node'][n]['ram_available'])
 

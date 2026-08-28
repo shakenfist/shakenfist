@@ -29,8 +29,11 @@ a placement decision can be reconstructed after the fact (see
    vCPUs and the `used_cpus` its capacity counters already record.
    See [CPU overcommit](#cpu-overcommit).
 4. **RAM admission** -- the node must retain its published memory
-   reservation after placement, and KSM overcommit must stay
-   under `RAM_OVERCOMMIT_RATIO`. See [Guest memory returned to the
+   reservation after placement, KSM overcommit must stay
+   under `RAM_OVERCOMMIT_RATIO`, and -- because both of those are
+   measurements which lag placement -- the memory the node's capacity
+   counters already record must leave room under the counters' own
+   limit. See [Guest memory returned to the
    host](#guest-memory-returned-to-the-host) for how much of a guest's
    memory a node is actually charged.
 5. **Disk capacity** -- requested disk must fit while leaving the
@@ -46,9 +49,9 @@ a placement decision can be reconstructed after the fact (see
 8. **Disk bandwidth** -- nodes whose disks are saturated (busy
    more than 120% of wall time across spindles) are excluded.
 9. **Load ordering and weighted selection** -- the survivors are
-   ordered by load, best first, and a weighted-random shuffle
-   spreads work across similar nodes. No node is dropped here.
-   See below.
+   ordered by CPU load and committed RAM, best first, and a
+   weighted-random shuffle spreads work across similar nodes. No
+   node is dropped here. See below.
 
 Stages 1 to 5 are **pre-filters**: they answer, from a metrics
 snapshot up to a minute stale, whether a node probably can host the
@@ -195,6 +198,22 @@ sized machines compare fairly: an idle 24-thread node and a
 struggling 12-thread node no longer look equivalent just because
 both have a load average under 1.0.
 
+RAM commitment participates in the same banding: each node's
+committed memory (the larger of its capacity counters'
+`used_memory_mb` and its measured instance allocation) as a
+fraction of its memory limit is quantised into the same 0.25-wide
+bands, and a node ranks by whichever of its two bands is worse.
+Without this, a node carrying RAM-heavy but CPU-idle instances
+looks like the *best* candidate precisely because of the workload
+that makes it dangerous, and attracts every large instance in a
+burst until the capacity guard finally refuses it -- observed on a
+production cluster as one node at 109% of physical RAM sustaining
+swap and OOM kills while its peers sat a third full (issue 3636).
+Because the committed fraction is read from the counters that
+admission draws down, it moves with every placement rather than
+with the metrics refresh, so even a burst against one frozen
+metrics snapshot sees each placement land.
+
 This stage **orders** the candidate list; it does not shorten it. A
 band says a node looks busier right now, not that it cannot host the
 instance -- every node reaching this stage has already passed every
@@ -212,14 +231,30 @@ so a burst spreads across them.
 
 Within a band, ordering is a weighted shuffle rather than a uniform
 one. A node's weight is its load headroom toward
-`SCHEDULER_TARGET_LOAD` (default 0.75 per schedulable thread):
+`SCHEDULER_TARGET_LOAD` (default 0.75 per schedulable thread),
+scaled by its uncommitted RAM fraction:
 
     weight = max(0.1, SCHEDULER_TARGET_LOAD x cpu_schedulable - cpu_load_1)
+             x max(0.1, 1 - ram_committed_fraction)
 
 A machine with twice the headroom draws roughly twice the share of
 a burst. Every band is shuffled this way, not just the first choice
 from the best one, because callers fall through to later candidates
 when a placement fails.
+
+### RAM overcommit
+
+`RAM_OVERCOMMIT_RATIO` (default 3.0) bounds allocated guest memory
+per unit of physical RAM, both in the RAM pre-filter and in the
+capacity counters' memory limit. The default is **KSM-optimistic**:
+it assumes most guest pages deduplicate, which holds for fleets of
+many near-identical, mostly-idle guests and does not hold for
+workloads that dirty most of their allocation with unique pages
+(CI runs, databases, container hosts). On one production CI cluster
+KSM recovered ~11.5 GB on a 64 GB node carrying ~96 GB of nominal
+guest RAM -- nowhere near the deficit -- and the node took repeated
+OOM kills of instance kvm processes. Low-dedup fleets should set
+the ratio much closer to 1.0-1.25 via cluster config.
 
 ## CPU overcommit
 
@@ -249,8 +284,12 @@ measurement alone lags reality, because an instance still fetching
 its image has no domain to measure yet, so a node whose capacity is
 fully claimed can measure as completely idle for minutes. Reading the
 counters here means such a node leaves the candidate list at this
-stage instead of surviving to be refused by the guard. RAM and disk
-pre-filters remain sized from published measurements alone.
+stage instead of surviving to be refused by the guard. The RAM
+pre-filter reads the counters the same way -- a just-placed instance
+that has not yet faulted its allocation in is invisible to
+`memory_available` for even longer than it is to the vCPU count --
+so only the disk pre-filter remains sized from published
+measurements alone.
 
 An instance being rescheduled is not charged for itself on the node
 it is already placed on, and a node with no capacity row -- one
@@ -663,15 +702,16 @@ tells the whole story:
   schedulable base used, whether it came from the `cpu_schedulable`
   field or the pre-reservation fallback, and the measured vCPU count
   compared against the hard maximum; for RAM it includes the
-  reservation subtracted.
+  reservation subtracted, or the committed memory compared against
+  the counters' limit.
 - `schedule have highest affinity` includes the winning score and
   a per-candidate `affinity_detail` breakdown of which neighbouring
   instances contributed what. `schedule keeping affinity despite
   transient load` follows it when load shedding was ignored to
   honour that group.
 - `schedule have lowest cpu load` includes per-node `load_detail`:
-  raw `cpu_load_1`, the denominator used, the normalised load and
-  the bucket.
+  raw `cpu_load_1`, the denominator used, the normalised load, the
+  committed-RAM fraction and the bucket.
 - `schedule final candidates` records the weighted ordering and
   each node's selection weight.
 - Once a candidate is walked for admission, `schedule candidate
