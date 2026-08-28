@@ -9,36 +9,28 @@ is *recorded* rather than refused (D16's advisory period). None of that
 is exercised by a test which mocks the database away, so it is exercised
 here.
 
-Why this file reaches past the client library
----------------------------------------------
+What this file defends
+----------------------
 
-Every other test in this suite talks to the API through
-``shakenfist_client.apiclient``. This one drives the claim endpoints
-through ``apiclient.Client._request_url()`` -- the client's generic
-authenticated request path -- and that is deliberate.
+The client verbs, which are what an operator actually uses. Every
+request here goes through ``shakenfist_client.apiclient``'s claim
+methods, via the ``_claim_api()`` adapter below -- which exists because
+the verbs raise typed exceptions and a refusal's *status code* is
+frequently the assertion, so it hands each request back as a
+``(status, body)`` pair.
 
-The client has no claim verbs, and cannot get them here: the collection
-installs ``shakenfist-client`` from PyPI by default, so a test written
-against new ``apiclient`` methods would not pass in CI until a client
-release exists, and no server pull request can produce one. Phase 4's
-decision D7 (docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md)
-therefore puts client verbs out of scope and puts functional coverage on
-the raw request path.
-
-The verbs themselves are shakenfist/client-python issue 364, which
-carries the endpoint and payload detail a client implementation needs.
-
-So: do not "fix" this into ``self.system_client.create_namespace_claim(...)``
-until that client release has actually shipped. When it has, this file
-should move onto the verbs, because the verbs are then the surface an
-operator uses and the surface worth defending.
-
-``_request_url()`` gives us authentication, the base URL (which differs
-between a direct gunicorn conversation and one through an operator's
-reverse proxy, so every path here is relative to it, exactly as the
-client's own methods are) and typed exceptions per status code. The
-exceptions are unwrapped by ``_claim_api()`` below, because a refusal's
-*status code* is frequently the assertion.
+This file used to drive the endpoints through
+``apiclient.Client._request_url()`` instead, on the reasoning that the
+collection installs ``shakenfist-client`` from PyPI, so a test written
+against new ``apiclient`` methods could not pass in CI until a client
+release existed. That reasoning (phase 4's decision D7) was wrong, and
+had been wrong since 2026-06-24: cluster CI does not install the
+released client. It builds a wheel from a ``client-python`` checkout at
+``develop`` -- see "Where the functional jobs get their code" in
+``docs/developer_guide/ci.md`` -- so a verb is available here as soon
+as it merges, with no release involved. Phase 4b
+(``docs/plans/PLAN-scheduler-reservations-phase-04b-client.md``) added
+the verbs and moved this file onto them.
 
 Why success assertions retry 507
 --------------------------------
@@ -85,10 +77,13 @@ What this file deliberately does not assert
   every counter from ground truth every five minutes; asserting the
   agreement means waiting out a period, which belongs in a soak rather
   than in the suite.
-* **Anything about the command line.** There are no claim verbs to run
-  (D7, above), so nothing here covers ``sf-client``.
+* **Anything about the command line.** ``sf-client namespace claim``
+  exists as of phase 4b, but its argument parsing and output formatting
+  are covered by unit tests in ``client-python``. What this file defends
+  is the API surface those commands sit on.
 """
 
+import functools
 import json
 import time
 
@@ -139,8 +134,27 @@ CAPACITY_ACCOUNTING_WAIT = 420
 CLUSTER_HEADROOM_WAIT = 420
 
 
+class _ClaimTarget:
+    """What a claim request is aimed at: a namespace, and maybe a claim.
+
+    The request itself goes through the client verbs, which build their
+    own paths; this carries the equivalent path only so that a failure
+    message can name what was asked for.
+    """
+
+    def __init__(self, namespace, claim_uuid=None):
+        self.namespace = namespace
+        self.claim_uuid = claim_uuid
+
+    def __str__(self):
+        path = '/auth/namespaces/%s/claims' % self.namespace
+        if self.claim_uuid:
+            path = '%s/%s' % (path, self.claim_uuid)
+        return path
+
+
 class ClaimAPIMixin:
-    """The claim endpoints, driven through the raw request path (D7)."""
+    """The claim endpoints, driven through the client verbs."""
 
     def setUp(self):
         super().setUp()
@@ -155,47 +169,101 @@ class ClaimAPIMixin:
         # rest of the suite, until the cluster daemon collected the
         # namespace CLEANER_DELAY (an hour, by default) later.
         problems = []
-        for claim_uuid in getattr(self, '_created_claims', []):
-            status, body = self._claim_api(
-                'DELETE', self._claim_url(claim_uuid))
-            if status not in (200, 404):
-                problems.append(
-                    '%s: DELETE answered %s'
-                    % (claim_uuid, self._describe(status, body)))
-
-        super().tearDown()
+        try:
+            for claim_uuid in getattr(self, '_created_claims', []):
+                status, body = self._claim_api(
+                    'DELETE', self._claim_target(claim_uuid))
+                if status not in (200, 404):
+                    problems.append(
+                        '%s: DELETE answered %s'
+                        % (claim_uuid, self._describe(status, body)))
+        except Exception as e:
+            # _claim_api() unwraps APIException and nothing else. A client
+            # which predates the verbs (AttributeError), a connection
+            # error or a client-side timeout would otherwise escape this
+            # loop and skip the namespace delete below, leaking a
+            # namespace and its instances on a shared CI cluster -- a
+            # worse outcome than the leaked claim this method exists to
+            # prevent.
+            problems.append(
+                'the claim delete loop raised %s: %s'
+                % (type(e).__name__, e))
+        finally:
+            super().tearDown()
 
         if problems:
             self.fail(
                 'Claims could not be removed, so they hold cluster capacity '
                 'until they expire: %s' % '; '.join(problems))
 
-    def _claims_url(self, namespace=None):
-        return '/auth/namespaces/%s/claims' % (
+    def _claims_target(self, namespace=None):
+        return _ClaimTarget(
             self.namespace if namespace is None else namespace)
 
-    def _claim_url(self, claim_uuid, namespace=None):
-        return '%s/%s' % (self._claims_url(namespace), claim_uuid)
+    def _claim_target(self, claim_uuid, namespace=None):
+        return _ClaimTarget(
+            self.namespace if namespace is None else namespace, claim_uuid)
 
-    def _claim_api(self, method, url, data=None, client=None):
-        """One claim request, as (status_code, body).
+    def _claim_api(self, method, target, data=None, client=None):
+        """One claim request through the client verbs, as (status, body).
 
-        The client maps status codes onto typed exceptions, which is the
+        The verbs map status codes onto typed exceptions, which is the
         wrong shape for a test whose assertion is often the code itself,
         so they are unwrapped here. The body is the decoded JSON where
         there is any -- a refusal body is ``{"error": ..., "status":
         ...}`` -- and the raw text otherwise, so a failure message can
         always print something.
+
+        The success status is structural rather than observed: a verb
+        returns decoded JSON and not a response, so a 200 from here
+        means "the verb returned" rather than "the server said 200".
+        That is exact for every claim endpoint today -- none of them is
+        asynchronous -- but it does mean the success-path status
+        assertions can no longer fail, and would not notice an endpoint
+        which grew a 202.
+
+        Keeping this adapter, rather than calling the verbs from each
+        test, is deliberate. Every status assertion in this file stays
+        as it was written; ``shakenfist_ci.retries`` keeps its
+        (status, body) contract and its freedom from ``shakenfist_client``
+        imports, which ``shakenfist/tests/test_ci_claims_headroom.py``
+        checks by loading it by path; and every request in the file goes
+        through a verb, which is the point of the exercise.
         """
         if client is None:
             client = self.system_client
 
+        namespace = target.namespace
+        claim_uuid = target.claim_uuid
+        if data and method in ('GET', 'DELETE'):
+            raise NotImplementedError(
+                'no claim verb sends a request body with %s, so the data '
+                'passed for %s would be silently discarded'
+                % (method, target))
+        data = data or {}
+
+        if method == 'GET' and claim_uuid is None:
+            call = functools.partial(client.get_namespace_claims, namespace)
+        elif method == 'GET':
+            call = functools.partial(
+                client.get_namespace_claim, namespace, claim_uuid)
+        elif method == 'POST':
+            call = functools.partial(
+                client.create_namespace_claim, namespace, **data)
+        elif method == 'PUT':
+            call = functools.partial(
+                client.update_namespace_claim, namespace, claim_uuid, **data)
+        elif method == 'DELETE':
+            call = functools.partial(
+                client.delete_namespace_claim, namespace, claim_uuid)
+        else:
+            raise NotImplementedError(
+                'no claim verb for %s %s' % (method, target))
+
         try:
-            r = client._request_url(method, url, data=data)
-            try:
-                return r.status_code, r.json()
-            except ValueError:
-                return r.status_code, r.text
+            # Every claim endpoint answers 200 on success -- none of them
+            # is asynchronous, so there is no 202 to distinguish.
+            return 200, call()
         except apiclient.APIException as e:
             try:
                 return e.status_code, json.loads(e.text)
@@ -206,7 +274,7 @@ class ClaimAPIMixin:
         return 'HTTP %s with body %s' % (
             status, json.dumps(body, sort_keys=True, default=str))
 
-    def _claim_api_awaiting_accounting(self, method, url, data=None):
+    def _claim_api_awaiting_accounting(self, method, target, data=None):
         """A claim request, retried for as long as the cluster says 503.
 
         503 is the transient half of the refusal mapping. It means
@@ -225,11 +293,11 @@ class ClaimAPIMixin:
         *refusal* is the assertion.
         """
         return retries.retry_while_transient(
-            lambda: self._claim_api(method, url, data=data),
+            lambda: self._claim_api(method, target, data=data),
             transient_statuses=(503,),
             deadline=time.time() + CAPACITY_ACCOUNTING_WAIT)
 
-    def _claim_api_awaiting_headroom(self, method, url, data=None):
+    def _claim_api_awaiting_headroom(self, method, target, data=None):
         """A claim request the caller will assert succeeded, retried
         while the cluster is full as well as while it says 503.
 
@@ -251,7 +319,7 @@ class ClaimAPIMixin:
         retry that refusal for the whole wait before handing it back.
         """
         return retries.retry_while_transient(
-            lambda: self._claim_api(method, url, data=data),
+            lambda: self._claim_api(method, target, data=data),
             transient_statuses=(503, 507),
             deadline=time.time() + CLUSTER_HEADROOM_WAIT)
 
@@ -265,11 +333,11 @@ class ClaimAPIMixin:
             'expires_in_seconds': expires_in_seconds
         }
         status, claim = self._claim_api_awaiting_headroom(
-            'POST', self._claims_url(), data=body)
+            'POST', self._claims_target(), data=body)
         self.assertEqual(
             200, status,
             'POST %s with %s did not create a claim, it answered %s'
-            % (self._claims_url(), json.dumps(body, sort_keys=True),
+            % (self._claims_target(), json.dumps(body, sort_keys=True),
                self._describe(status, claim)))
 
         self.addDetail(detail, content.text_content(json.dumps(
@@ -279,11 +347,11 @@ class ClaimAPIMixin:
 
     def _get_claim(self, claim_uuid):
         status, claim = self._claim_api(
-            'GET', self._claim_url(claim_uuid))
+            'GET', self._claim_target(claim_uuid))
         self.assertEqual(
             200, status,
             'GET %s did not return the claim, it answered %s'
-            % (self._claim_url(claim_uuid), self._describe(status, claim)))
+            % (self._claim_target(claim_uuid), self._describe(status, claim)))
         return claim
 
     def _claim_used(self, claim):
@@ -373,10 +441,10 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
     def test_claim_lifecycle_and_refusals(self):
         # A namespace with no claim lists none. Asserted rather than
         # assumed, because every count below is a delta from here.
-        status, listing = self._claim_api('GET', self._claims_url())
+        status, listing = self._claim_api('GET', self._claims_target())
         self.assertEqual(
             200, status,
-            'GET %s answered %s' % (self._claims_url(),
+            'GET %s answered %s' % (self._claims_target(),
                                     self._describe(status, listing)))
         self.assertEqual(
             [], listing,
@@ -389,7 +457,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
         # already holds an active claim is refused with 409 by the
         # earlier probe and would never reach the capacity guard.
         status, body = self._claim_api_awaiting_accounting(
-            'POST', self._claims_url(),
+            'POST', self._claims_target(),
             data={'limit_cpus': IMPOSSIBLE_CPUS, 'limit_memory_mb': 1,
                   'limit_disk_gb': 1,
                   'expires_in_seconds': CLAIM_EXPIRY_SECONDS})
@@ -441,18 +509,18 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
             'GET of claim %s returned claim %s'
             % (claim['uuid'], fetched['uuid']))
 
-        status, listing = self._claim_api('GET', self._claims_url())
+        status, listing = self._claim_api('GET', self._claims_target())
         self.assertEqual(
             [claim['uuid']], [c['uuid'] for c in listing],
             'The namespace should list exactly the claim it was given, '
             'but %s answered %s'
-            % (self._claims_url(), self._describe(status, listing)))
+            % (self._claims_target(), self._describe(status, listing)))
 
         # The namespace segment of the claim URL is not decorative: a
         # claim addressed through a namespace which does not own it is
         # the same 404 a missing claim is, so the URL cannot be used to
         # discover which claims exist elsewhere.
-        other = self._claim_url(claim['uuid'], namespace='system')
+        other = self._claim_target(claim['uuid'], namespace='system')
         status, body = self._claim_api('GET', other)
         self.assertEqual(
             404, status,
@@ -462,7 +530,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
 
         # One active claim per namespace.
         status, body = self._claim_api(
-            'POST', self._claims_url(),
+            'POST', self._claims_target(),
             data={'limit_cpus': 1, 'limit_memory_mb': 1, 'limit_disk_gb': 1,
                   'expires_in_seconds': CLAIM_EXPIRY_SECONDS})
         self.assertEqual(
@@ -475,7 +543,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
         # zeroing of every dimension the caller did not mention (the
         # field mask, CLAUDE.md pitfall 3).
         status, body = self._claim_api(
-            'PUT', self._claim_url(claim['uuid']))
+            'PUT', self._claim_target(claim['uuid']))
         self.assertEqual(
             400, status,
             'An update naming no fields should be refused, but the API '
@@ -493,7 +561,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
         # the claim's usage is always admissible, so it needs no free
         # cluster capacity and no headroom tolerance.
         status, shrunk = self._claim_api_awaiting_accounting(
-            'PUT', self._claim_url(claim['uuid']),
+            'PUT', self._claim_target(claim['uuid']),
             data={'limit_cpus': 2 * INSTANCE_CPUS})
         self.assertEqual(
             200, status,
@@ -511,7 +579,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
         # awaiting-headroom wrapper covers the window in which a
         # concurrent test takes even that.
         status, grown = self._claim_api_awaiting_headroom(
-            'PUT', self._claim_url(claim['uuid']),
+            'PUT', self._claim_target(claim['uuid']),
             data={'limit_cpus': 3 * INSTANCE_CPUS})
         self.assertEqual(
             200, status,
@@ -527,7 +595,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
         # The two values are compared against each other rather than
         # against this host's clock for exactly that reason.
         status, redated = self._claim_api_awaiting_accounting(
-            'PUT', self._claim_url(claim['uuid']),
+            'PUT', self._claim_target(claim['uuid']),
             data={'expires_in_seconds': 2 * CLAIM_EXPIRY_SECONDS})
         self.assertEqual(
             200, status,
@@ -543,7 +611,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
         # endpoints are admin only, and the namespace's own key must not
         # reach them.
         status, body = self._claim_api(
-            'GET', self._claims_url(), client=self.test_client)
+            'GET', self._claims_target(), client=self.test_client)
         self.assertEqual(
             401, status,
             'The namespace\'s own credential reached the admin-only claim '
@@ -553,7 +621,7 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
         # nothing left: no row to fetch, nothing in the listing, and a
         # second delete is harmless.
         status, deleted = self._claim_api(
-            'DELETE', self._claim_url(claim['uuid']))
+            'DELETE', self._claim_target(claim['uuid']))
         self.assertEqual(
             200, status,
             'Deleting claim %s answered %s'
@@ -563,20 +631,20 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
             'Deleting claim %s answered with claim %s'
             % (claim['uuid'], deleted.get('uuid')))
 
-        status, body = self._claim_api('GET', self._claim_url(claim['uuid']))
+        status, body = self._claim_api('GET', self._claim_target(claim['uuid']))
         self.assertEqual(
             404, status,
             'Claim %s is still fetchable after being deleted: %s'
             % (claim['uuid'], self._describe(status, body)))
 
-        status, listing = self._claim_api('GET', self._claims_url())
+        status, listing = self._claim_api('GET', self._claims_target())
         self.assertEqual(
             [], listing,
             'The namespace still lists claims after its only claim was '
             'deleted: %s' % json.dumps(listing, sort_keys=True, default=str))
 
         status, body = self._claim_api(
-            'DELETE', self._claim_url(claim['uuid']))
+            'DELETE', self._claim_target(claim['uuid']))
         self.assertEqual(
             404, status,
             'Deleting claim %s twice should be harmless, but the second '
@@ -762,7 +830,7 @@ class TestNamespaceClaimAccounting(ClaimAPIMixin,
         # cpu below the drawdown is refused...
         below = footprint[0] - 1
         status, body = self._claim_api_awaiting_accounting(
-            'PUT', self._claim_url(claim['uuid']),
+            'PUT', self._claim_target(claim['uuid']),
             data={'limit_cpus': below})
         self.assertEqual(
             409, status,
@@ -781,7 +849,7 @@ class TestNamespaceClaimAccounting(ClaimAPIMixin,
 
         # ...and shrinking to exactly the drawdown is allowed.
         status, shrunk = self._claim_api_awaiting_accounting(
-            'PUT', self._claim_url(claim['uuid']),
+            'PUT', self._claim_target(claim['uuid']),
             data={'limit_cpus': footprint[0]})
         self.assertEqual(
             200, status,

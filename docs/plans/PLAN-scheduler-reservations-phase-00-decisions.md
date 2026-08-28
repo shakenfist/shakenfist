@@ -523,6 +523,16 @@ hard form returns HTTP 403 with a structured body naming the
 claim uuid, per-dimension limit, current drawdown and
 shortfall, so "grow the claim by X" is mechanical.
 
+*Correction (2026-08-27): the advisory release needs a
+consumer, and "one release" is the wrong unit.* The point of
+the advisory window is that learned footprints calibrate
+before rejections start. Nothing calibrates against an empty
+population: phase 4 merged on 2026-08-17 and reached sfcbr on
+2026-08-22, and as of 2026-08-27 every claim that had ever
+existed on the cluster was created by a test and deleted by
+the same test. The gate on the hard flip is therefore phase
+4c's observation record, not elapsed releases.
+
 **D17 (unclaimed namespaces): opt-in claims; unclaimed is
 best-effort.** Confirmed as the working position: two service
 classes (claimed capacity honoured absolutely; unclaimed
@@ -631,6 +641,45 @@ vCPU across its jobs, so workflow-level sizing would claim
 the worst job's footprint for every job. The 15-minute
 anti-starvation constant stays provisional; no deferral data
 can exist until claims are enforced.
+
+*Correction (2026-08-27), from the phase 4c survey.* Three
+things D18 assumes are not true of the conductor as it stands,
+and phase 4c decides them differently:
+
+* **There are no "existing deferral mechanics" to defer a
+  refused runner through.** The conductor's only deferral is of
+  namespace *deletion*, while queued network deletes settle
+  (`conductor/provisioner.py:717`). Provisioning has no
+  deferral queue. The working analogue is the image-builder
+  quarantine path in `create_workers()`, which skips a label
+  and leaves its jobs queued for a later cycle -- simpler than
+  what this decision imagined, and sufficient.
+* **Expiry cannot be per-workflow.** The conductor does not
+  know a job's `timeout-minutes`: GitHub's queued-job data
+  carries repo, workflow, job name, labels and URL, and not
+  the timeout. Phase 4c uses a flat six hours -- twice the
+  longest `timeout-minutes` in this repository -- as a leak
+  backstop, and relies on explicit deletion at teardown for
+  prompt release. An expiry set too short is a silent fault:
+  `coverage_state` flips to `expired` under a still-running
+  job and its instances stop being charged to the claim.
+* **The sizing data needs a new accessor, not the existing
+  one.** `db.get_cost_observations()` groups by `(repo,
+  workflow_name, job_name, runner_size)` with a three-run
+  minimum, which is right for the runner-size recommender it
+  serves and wrong for claims: this decision's sharpened key is
+  `(repo, job_name)`, and the topology-determinism finding
+  above is what makes a single observation a sufficient seed.
+
+One thing D18 did not anticipate is now the main risk. Claim
+*creation* is a hard guarded admission against the cluster
+singleton even while the *ceiling* is advisory, and issue
+#3907 recorded the functional claims tests failing three times
+in one day with 507 because sibling tests held the cluster's
+cpus. On a busy cluster the conductor will be refused
+routinely -- which is the back-pressure this design wants, but
+only if a refusal leaves the job queued rather than failing
+it. Phase 4c's decision E6 turns on that.
 
 ### New finding for phase 3: disk needs an overcommit ratio
 
