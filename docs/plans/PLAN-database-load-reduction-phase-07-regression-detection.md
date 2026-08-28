@@ -667,6 +667,59 @@ the skipped ones, and that is the number to read before moving
 the disabled check of decision 3 wearing a different hat, so this is
 worth looking at after a few merges rather than after a regression.
 
+### What the merge queue found, third time: a true positive
+
+The two properties above cut the third attempt down to a single pair, and
+that pair was real. `GetNamespace`/`cluster` read 0.27/s, 0.32/s and
+0.33/s across the jobs that ran the check, against the 0.25/s unbudgeted
+ceiling. Nothing about it was noise: it is a fixed-rate read issued by the
+elected cluster daemon, exactly what this check was built to name.
+
+**The loop, and why the cache never helped it.** The orphan artifact sweep
+in `_cluster_wide_cleanup` asked, once per artifact, whether that
+artifact's namespace still existed. `Namespace.from_db()` overrides the
+cached base implementation, and the `mariadb.get_namespace()` underneath
+it caches on `OBJECT_CACHE_TTL_MUTABLE`, which is 30s. The maintenance
+pass runs every 60s. A cache entry written during one pass has always
+expired before the next pass looks for it, so the sweep paid a real
+database read for every distinct namespace holding an artifact, forever,
+and no amount of cache tuning short of doubling the TTL past the loop
+period would have changed that. The two constants are in different files
+and neither mentions the other.
+
+**Why it is absent from the budget, and why that was correct.** On sfcbr
+namespaces are few and long lived, so the pair costs a handful of reads a
+minute and sits under `derive-database-load-budget.py`'s 0.10/s inclusion
+cut — it is one of the 296 pairs the coverage note accounts for. The
+functional suite has the opposite shape: `base.py` gives every test class
+its own uniquified namespace, so the number of namespaces holding
+artifacts tracks the number of concurrent tests rather than staying flat,
+and the same loop costs twenty reads a minute. This is the mirror image of
+the rule stated above. There, absence from the budget did not mean a pair
+should be near zero. Here it did mean that on the derivation cluster, and
+the CI cluster's different shape is what made a loop that is quietly
+wasteful everywhere loud enough to see.
+
+**The fix is in the server.** Not in the discriminator, which was right,
+and not in the budget, whose header forbids exactly the edit that would
+have silenced this. The sweep now lists namespace names once per pass and
+tests membership, so the cost is one read per pass whatever the artifact
+count — under the inclusion cut on any cluster, and a small unconditional
+saving on every deployment rather than a CI accommodation. One guard came
+with it: `_direct_get_all_namespace_names()` returns `[]` on
+`OperationalError`, and this loop is the one caller whose reaction to "no
+namespaces" is destructive, so an empty list skips the sweep and waits for
+the next pass instead of deleting every artifact in the cluster. Three
+unit tests hold the three halves of that up — one listing, the same
+keep/delete decision as before, and nothing deleted when the list is
+empty — and all three fail against the previous implementation.
+
+Worth recording as the phase's own justification: the check paid for
+itself before it merged, on a loop that had been running in every
+deployment since the sweep was written, that no review caught, and that
+the nightly report could not have surfaced because on sfcbr it is genuinely
+small.
+
 ## Risks and mitigations
 
 * **The budget encodes the regression.** If 7a is derived before phase 6

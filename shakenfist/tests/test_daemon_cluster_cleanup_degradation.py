@@ -47,6 +47,11 @@ class ClusterCleanupBlobReadFailureTestCase(base.ShakenFistTestCase):
             self, mock_mariadb, mock_ipam, mock_network,
             mock_remove_uploads, mock_artifact, mock_instance, mock_blob,
             mock_low_disk, mock_nodes):
+        # The orphan artifact sweep lists namespaces once per pass and
+        # treats an empty list as an unreadable one, skipping the rest
+        # of the cleanup. A bare MagicMock iterates empty, so this has
+        # to be set for the sections below to be reached at all.
+        mock_mariadb.get_all_namespace_names.return_value = ['system']
         mock_mariadb.delete_stale_transfers.return_value = 0
         mock_mariadb.delete_stale_cluster_operation_targets.return_value = 0
         mock_ipam.IPAMs.return_value = []
@@ -106,6 +111,11 @@ class ClusterCleanupBlobReadFailureTestCase(base.ShakenFistTestCase):
         # The negative control for the assertion above: the skip is
         # conditional on the failed read, not on the reaper having been
         # quietly disabled.
+        # The orphan artifact sweep lists namespaces once per pass and
+        # treats an empty list as an unreadable one, skipping the rest
+        # of the cleanup. A bare MagicMock iterates empty, so this has
+        # to be set for the sections below to be reached at all.
+        mock_mariadb.get_all_namespace_names.return_value = ['system']
         mock_mariadb.delete_stale_transfers.return_value = 0
         mock_mariadb.delete_stale_cluster_operation_targets.return_value = 0
         mock_ipam.IPAMs.return_value = []

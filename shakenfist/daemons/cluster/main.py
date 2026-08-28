@@ -17,7 +17,6 @@ from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist import ipam
-from shakenfist import namespace
 from shakenfist import node_health
 from shakenfist.network import network
 from shakenfist.schema.ipam_reservation import ReservationType
@@ -196,16 +195,54 @@ class Monitor(daemon.Daemon):
         remove_abandoned_uploads()
 
         # Cleanup orphan artifacts, delete old versions, and record blobs used
-        # by artifacts
+        # by artifacts.
+        #
+        # The namespace names are read once for the whole sweep rather than
+        # once per artifact. Namespace.from_db() overrides the cached base
+        # implementation and its mariadb.get_namespace() caches on
+        # OBJECT_CACHE_TTL_MUTABLE, which is 30s -- half this loop's 60s
+        # period -- so every lookup here was a guaranteed cache miss and the
+        # pair cost one GetNamespace per distinct namespace per pass forever.
+        # On a deployed cluster that is small because namespaces are few and
+        # long lived, which is why it sits under the load budget's 0.10/s
+        # inclusion cut and is absent from that file. In the functional suite
+        # it is not small: every test class creates its own uniquified
+        # namespace, so the sweep sees as many namespaces as there are
+        # concurrent tests holding artifacts and the pair read 0.33/s against
+        # the unbudgeted ceiling of 0.25/s -- which is what
+        # test_no_unbudgeted_fixed_rate_database_polling ejected this branch
+        # from the merge queue for. One call per pass regardless of artifact
+        # count is both the cheaper thing and the honest one.
+        namespace_names = set(mariadb.get_all_namespace_names())
+        if not namespace_names:
+            # Never possible on a healthy cluster -- the system namespace
+            # always exists -- so an empty answer means the read failed
+            # rather than that every namespace is gone. The direct MariaDB
+            # path returns [] on OperationalError, and this loop is the one
+            # caller whose reaction to "no namespaces" is destructive: it
+            # would delete every artifact in the cluster.
+            #
+            # The whole pass is abandoned rather than just this section,
+            # which is the opposite of the choice made for an unreadable
+            # active blob list below. The reason is the blob accounting the
+            # sweep feeds: the loop below records artifact-backed blobs in
+            # in_use_blobs, and record_usage() further down is the only
+            # thing that refreshes last_used for a blob nothing reopens.
+            # Running on with an empty in_use_blobs would let the reaper
+            # treat every artifact-backed blob as unused, which is the
+            # failure the blobs_readable flag exists to avoid one section
+            # further down.
+            LOG.warning(
+                'No namespaces returned; abandoning this maintenance pass')
+            return
+
         in_use_blobs = defaultdict(int)
         for a in artifact.Artifacts([]):
             self.pet_watchdog()
 
             # If the artifact's namespace is deleted then we should remove the
             # artifact
-            ns = namespace.Namespace.from_db(
-                a.namespace, suppress_failure_audit=True)
-            if not ns:
+            if a.namespace not in namespace_names:
                 a.delete()
                 continue
 

@@ -206,6 +206,12 @@ class CascadeDispatchTestCase(base.ShakenFistTestCase):
         }
         with mock.patch.multiple(
                 'shakenfist.daemons.cluster.main', **patches) as mocks:
+            # The orphan artifact sweep lists namespaces once per pass and
+            # treats an empty list as an unreadable one, skipping the rest
+            # of the cleanup. A bare MagicMock iterates empty, so this has
+            # to be set for the sections below to be reached at all.
+            mocks['mariadb'].get_all_namespace_names.return_value = [
+                'system']
             mocks['mariadb'].delete_stale_transfers.return_value = 0
             mocks['mariadb'].delete_stale_cluster_operation_targets \
                 .return_value = 0
@@ -247,6 +253,12 @@ class CascadeDispatchTestCase(base.ShakenFistTestCase):
                 artifact=mock.DEFAULT, remove_abandoned_uploads=mock.DEFAULT,
                 nodes_by_free_disk_descending=mock.DEFAULT,
                 Nodes=mock.DEFAULT) as mocks:
+            # The orphan artifact sweep lists namespaces once per pass and
+            # treats an empty list as an unreadable one, skipping the rest
+            # of the cleanup. A bare MagicMock iterates empty, so this has
+            # to be set for the sections below to be reached at all.
+            mocks['mariadb'].get_all_namespace_names.return_value = [
+                'system']
             mocks['mariadb'].delete_stale_transfers.return_value = 0
             mocks['mariadb'].delete_stale_cluster_operation_targets \
                 .return_value = 0
