@@ -390,6 +390,11 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
         s = scheduler.Scheduler()
         wins = {self._node_uuid('node2'): 0, self._node_uuid('node3'): 0}
         for _ in range(1000):
+            # These draws can take minutes on a loaded CI worker; keep
+            # the mock's metrics rows fresh so the scheduler's periodic
+            # refresh does not discard them as stale mid-test.
+            for row in self.mock_mariadb.node_metrics_store.values():
+                row['timestamp'] = time.time()
             nodes = s.find_candidates(fake_inst)
             self.assertSetEqual(
                 self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
@@ -659,7 +664,8 @@ class CapacityCounterTestCase(SchedulerTestCase):
         # be refused by the guard.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
         self.mock_mariadb.set_node_capacity(
-            self._node_uuid('node2'), limit_cpus=16, used_cpus=16)
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            used_cpus=16)
 
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
@@ -689,7 +695,8 @@ class CapacityCounterTestCase(SchedulerTestCase):
         fake_inst = self.mock_mariadb.create_instance(
             'fake-inst', cpus=4, place_on_node='node2')
         self.mock_mariadb.set_node_capacity(
-            self._node_uuid('node2'), limit_cpus=16, used_cpus=16)
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            used_cpus=16)
 
         nodes = scheduler.Scheduler().find_candidates(fake_inst)
         self.assertIn(self._node_uuid('node2'), nodes)
@@ -720,7 +727,8 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.mock_mariadb.set_node_metrics_same(self._baseline())
         for node in ('node2', 'node3', 'node4'):
             self.mock_mariadb.set_node_capacity(
-                self._node_uuid(node), limit_cpus=16, used_cpus=1)
+                self._node_uuid(node), limit_cpus=16,
+                limit_memory_mb=100000, used_cpus=1)
 
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
         with mock.patch(
@@ -751,7 +759,8 @@ class CapacityCounterTestCase(SchedulerTestCase):
         # admission will refuse to use, and admission is the counters.
         self.mock_mariadb.set_node_metrics_same(self._baseline())
         self.mock_mariadb.set_node_capacity(
-            self._node_uuid('node2'), limit_cpus=16, used_cpus=5)
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            used_cpus=5)
 
         resources = scheduler.Scheduler().summarize_resources()
         node2 = resources['per_node'][self._node_uuid('node2')]
@@ -780,17 +789,210 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.mock_mariadb.update_node_metrics(
             'node2', {'cpu_total_instance_vcpus': 9})
         self.mock_mariadb.set_node_capacity(
-            self._node_uuid('node2'), limit_cpus=16, used_cpus=3)
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            used_cpus=3)
         self.mock_mariadb.update_node_metrics(
             'node3', {'cpu_total_instance_vcpus': 2})
         self.mock_mariadb.set_node_capacity(
-            self._node_uuid('node3'), limit_cpus=16, used_cpus=7)
+            self._node_uuid('node3'), limit_cpus=16, limit_memory_mb=100000,
+            used_cpus=7)
 
         resources = scheduler.Scheduler().summarize_resources()
         node2 = resources['per_node'][self._node_uuid('node2')]
         node3 = resources['per_node'][self._node_uuid('node3')]
         self.assertEqual(16.0 - 9, node2['cpu_available'])
         self.assertEqual(16.0 - 7, node3['cpu_available'])
+
+
+class RamCapacityCounterTestCase(SchedulerTestCase):
+    """The RAM pre-filter reads the counters the guard will draw down.
+
+    Both RAM measurements (memory_available and
+    memory_total_instance_actual) lag placement: an instance which has
+    not yet booted and faulted its allocation in reduces neither, so a
+    burst of near-simultaneous creates passes them all against the same
+    stale snapshot -- the issue 3636 OOM shape. The committed ledger
+    moves at admission time, so the pre-filter charges it against the
+    ledger's own limit, exactly as the guard will.
+    """
+
+    def _baseline(self, **overrides):
+        metrics = {
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'cpu_schedulable': 2,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*GiB,
+            'cpu_total_instance_vcpus': 0,
+            'cpu_available': 12,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def test_prefilter_drops_a_node_whose_ram_ledger_is_full(self):
+        # node2 has been placed with instances filling its memory limit,
+        # none of which have booted: both memory measurements still look
+        # idle, but the ledger is full and the guard would refuse, so
+        # the node leaves the candidate list here instead of attracting
+        # the create.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=32, limit_memory_mb=8192,
+            used_memory_mb=8192)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+    def test_prefilter_keeps_a_node_with_ram_ledger_headroom(self):
+        # Exactly enough ledger headroom for the default 1024 MB
+        # instance admits.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=32, limit_memory_mb=8192,
+            used_memory_mb=8192-1024)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertIn(self._node_uuid('node2'), nodes)
+
+    def test_ram_prefilter_does_not_charge_an_instance_for_itself(self):
+        # A reschedule runs against an instance which is already placed,
+        # and its memory is already in that node's used_memory_mb.
+        # Charging it a second time would drop the node the instance is
+        # on from its own candidate list.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', place_on_node='node2')
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=32, limit_memory_mb=8192,
+            used_memory_mb=8192)
+
+        nodes = scheduler.Scheduler().find_candidates(fake_inst)
+        self.assertIn(self._node_uuid('node2'), nodes)
+
+    def test_summarize_resources_bounds_ram_available_by_the_ledger(self):
+        # node2's ledger says 25000 of its 30000 MB limit is committed,
+        # even though nothing has booted: published headroom is the
+        # ledger's 5000, not the measurement's 36000. node3 has no row
+        # and keeps the measurement-based figure.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=66, limit_memory_mb=30000,
+            used_memory_mb=25000)
+
+        resources = scheduler.Scheduler().summarize_resources()
+        node2 = resources['per_node'][self._node_uuid('node2')]
+        node3 = resources['per_node'][self._node_uuid('node3')]
+        self.assertEqual(25000, node2['ram_committed'])
+        self.assertEqual(30000 - 25000, node2['ram_available'])
+        self.assertEqual(0, node3['ram_committed'])
+        self.assertEqual(24000 * 1.5, node3['ram_available'])
+
+
+class RamAwareOrderingTestCase(SchedulerTestCase):
+    """RAM commitment participates in ranking alongside CPU load.
+
+    The issue 3636 funnel: a node whose instances are RAM-heavy but
+    CPU-idle wins the load ranking precisely because of the workload
+    that makes it dangerous, and attracts every large instance in a
+    burst until the capacity guard finally refuses it -- observed as
+    one 64 GB node carrying 96 GB of nominal guest RAM into OOM kills
+    while its peers sat a third full. Committed RAM therefore bands
+    and weights the ordering too, read from the counters admission
+    draws down rather than the stale metrics.
+    """
+
+    def _seed_metrics(self):
+        self.mock_mariadb.set_node_metrics_same()
+        for n in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.update_node_metrics(n, {
+                'cpu_max': 24, 'cpu_schedulable': 22})
+
+    def test_ram_committed_node_is_ordered_last_not_dropped(self):
+        # node2 is the funnel shape: CPU-idle (its RAM-heavy instances
+        # contribute almost no load, normalised load 0.02 -> band 0)
+        # but 87% RAM committed (band 3). Its peers carry moderate CPU
+        # load (band 1) and little RAM. node2 must not win the ordering
+        # -- but must stay in the list for the walk to fall through to.
+        self._seed_metrics()
+        self.mock_mariadb.update_node_metrics('node2', {'cpu_load_1': 0.5})
+        for n in ('node3', 'node4'):
+            self.mock_mariadb.update_node_metrics(n, {'cpu_load_1': 6.0})
+        for n in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(n), limit_cpus=66, limit_memory_mb=64000,
+                used_memory_mb=56000 if n == 'node2' else 8000)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        for seed in range(20):
+            random.seed(seed)
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+            self.assertSetEqual(
+                self._node_uuids_set('node3', 'node4'), set(nodes[:2]))
+            self.assertEqual(self._node_uuid('node2'), nodes[-1])
+
+    def test_ram_commitment_weights_selection_within_a_band(self):
+        # node2 and node3 share the winning band with equal CPU load
+        # headroom; node2 is 90% RAM committed, node3 at 5%. node3 must
+        # draw a clearly larger share of first places. Fixed seed makes
+        # the draw deterministic; the bound is deliberately loose.
+        self._seed_metrics()
+        for n in ('node2', 'node3'):
+            self.mock_mariadb.update_node_metrics(n, {'cpu_load_1': 17.6})
+        self.mock_mariadb.update_node_metrics('node4', {'cpu_load_1': 25.0})
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=66, limit_memory_mb=64000,
+            used_memory_mb=57600)
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node3'), limit_cpus=66, limit_memory_mb=64000,
+            used_memory_mb=3200)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        random.seed(42)
+        s = scheduler.Scheduler()
+        wins = {self._node_uuid('node2'): 0, self._node_uuid('node3'): 0}
+        for _ in range(1000):
+            # These draws can take minutes on a loaded CI worker; keep
+            # the mock's metrics rows fresh so the scheduler's periodic
+            # refresh does not discard them as stale mid-test.
+            for row in self.mock_mariadb.node_metrics_store.values():
+                row['timestamp'] = time.time()
+            nodes = s.find_candidates(fake_inst)
+            self.assertSetEqual(
+                self._node_uuids_set('node2', 'node3'), set(nodes[:2]))
+            self.assertEqual(self._node_uuid('node4'), nodes[-1])
+            wins[nodes[0]] += 1
+
+        ratio = (wins[self._node_uuid('node3')] /
+                 wins[self._node_uuid('node2')])
+        self.assertGreater(
+            ratio, 3.0,
+            f'Expected node3 to lead far more often than node2, got {ratio} '
+            f'({wins})')
+
+    def test_measured_allocation_also_feeds_the_committed_fraction(self):
+        # The ranking charges whichever ledger is larger, as the CPU
+        # pre-filter does: a node whose counters have drifted low but
+        # whose running domains measure large must still rank as
+        # committed.
+        self._seed_metrics()
+        for n in ('node2', 'node3', 'node4'):
+            self.mock_mariadb.update_node_metrics(
+                n, {'cpu_load_1': 0.5, 'memory_max': 64000})
+            self.mock_mariadb.set_node_capacity(
+                self._node_uuid(n), limit_cpus=66, limit_memory_mb=64000,
+                used_memory_mb=0)
+        self.mock_mariadb.update_node_metrics(
+            'node2', {'memory_total_instance_actual': 56000})
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        for seed in range(20):
+            random.seed(seed)
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+            self.assertEqual(self._node_uuid('node2'), nodes[-1])
 
 
 class DiskReservationAdmissionTestCase(SchedulerTestCase):
