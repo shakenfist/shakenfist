@@ -13796,11 +13796,11 @@ conductor.</p>
 <tbody>
 <tr>
 <td>0</td>
-<td>n/a</td>
-<td>management session</td>
+<td>low</td>
+<td>sonnet</td>
 <td>none</td>
-<td>Prerequisite gate. Phase 4b (client support for claims, renumbered from phase 9) must be complete and released, including the 503 mapping in <code>STATUS_CODES_TO_ERRORS</code> from finding 3, before any step below starts. Confirm the deployed conductor's <code>shakenfist_client</code> version actually carries the claim methods -- the conductor runs a released client, and finding 2's <code>CLEANUP_EXCEPTIONS</code> pattern in <code>provisioner.py:170-179</code> exists because it has been out of step with the server before.</td>
-<td>Not started</td>
+<td>Prerequisite gate, <strong>rewritten 2026-08-29</strong>. Phase 4b must have merged its verbs and the 503 mapping in <code>STATUS_CODES_TO_ERRORS</code> (finding 3) to client-python's <code>develop</code> -- which it did on 2026-08-28 as <code>135ab53</code>. It does <strong>not</strong> need a release: the conductor pip-installs <code>git+https://github.com/shakenfist/client-python@develop</code> with <code>state: latest</code> and has since 2026-07-12, per phase 4b's finding 8 and decision D7. So the gate is a deploy, not a tag. Verify against the host rather than the playbook, because <code>state: latest</code> only re-pulls when the playbook runs: <code>/srv/shakenfist/private-ci/venv/bin/python -c 'import shakenfist_client.apiclient as a; print(a.Client.create_namespace_claim, a.ServiceUnavailableException)'</code>. Both names must resolve. The conductor runs on <code>maui</code>, so this is <code>ssh maui</code> and the command above. If either name does not resolve, the conductor has not been deployed since 2026-08-28 and running <code>conductor.yml</code> (<code>manage.yml</code>, tag <code>conductor</code>) is what opens this phase -- a deploy makes the gate true whatever it says now, so running the playbook is a valid substitute for checking it. Phase 4b's close-out on 2026-08-29 also carries the "deployed venv resolves the verbs" item that used to sit in its own definition of done: it was moved here, because a conductor deploy is this phase's entry gate and not 4b's deliverable. That close-out attempted the check and could not make it -- <code>ssh</code> to <code>maui</code> is refused from the development host for both <code>ansible@</code> and the default user -- so it is genuinely open rather than assumed. Record the version and the date checked here.</td>
+<td>Not started -- the gate has not been evaluated; see the brief</td>
 </tr>
 <tr>
 <td>1</td>
@@ -13880,11 +13880,37 @@ explicit deletion at teardown (step 3), the six-hour expiry
 (E5), and <code>Namespace.hard_delete()</code> deleting claims through the
 object (finding 8). Checked in step 5 by looking for reconciler
 drift.</p>
-<p><strong>The client is out of step with the server.</strong> The conductor runs
-a released <code>shakenfist_client</code>, and has been out of step before
--- <code>CLEANUP_EXCEPTIONS</code> (<code>provisioner.py:170-179</code>) looks its
-exception classes up defensively for exactly this reason.
-Mitigated by step 0's explicit version gate.</p>
+<p><strong>The client is out of step with the server.</strong> Rewritten
+2026-08-29: the conductor does <em>not</em> run a released
+<code>shakenfist_client</code>. It tracks client-python's <code>develop</code> with
+<code>state: latest</code>, so the skew it is exposed to runs in both
+directions and changes shape.</p>
+<p>It can be <em>behind</em> the branch, between a client merge and the
+next conductor deploy -- which is exactly what step 0 checks,
+and the reason that check reads the host rather than the
+playbook. It can also be <em>ahead</em> of a server it talks to, or
+carried somewhere unintended by a client change nobody meant for
+it: <code>state: latest</code> re-pulls on every deploy, so the conductor
+inherits whatever <code>develop</code> holds at that moment. This is not
+hypothetical -- the branch tracking was introduced on 2026-07-12
+<em>because</em> a released client was behind a server contract and
+wedged the main loop overnight, and the fix traded one skew
+direction for the other knowingly.</p>
+<p><code>CLEANUP_EXCEPTIONS</code> (<code>provisioner.py:170-179</code>) is the existing
+local mitigation: it builds its tuple with
+<code>getattr(apiclient, name) ... if hasattr(apiclient, name)</code>,
+with a comment saying the newer classes are looked up
+defensively because older clients "including the current PyPI
+release" predate them. Step 2's refusal handling should follow
+it for <code>ServiceUnavailableException</code> specifically, which is the
+newest name of the three it needs and the one an older venv
+would lack -- <code>APIException</code> and <code>InsufficientResourcesException</code>
+have been in the client for years and can be named directly.
+A module-level <code>except</code> clause built from a missing attribute
+fails at import, which on this daemon means a crash-loop under
+the systemd watchdog rather than a caught error.</p>
+<p>Mitigated further by step 0's gate and by client-python's own CI
+gating its <code>develop</code>.</p>
 <p><strong>The observation window is quiet.</strong> Seven days of CI might not
 include the load pattern that produces interesting refusals. If
 the window passes with no capacity refusals at all, that is
