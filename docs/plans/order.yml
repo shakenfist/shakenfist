@@ -44,3 +44,4 @@
 - PLAN-agent-operation-deadlines.md: Agent operation deadlines and progress detection
 - PLAN-agent-operation-dependencies.md: Dependency-aware agent operations
 - PLAN-grpc-bounded-replies.md: Bound the size of DatabaseService gRPC replies
+- PLAN-ci-cloud-sizing.md: Right-size the CI test clouds
