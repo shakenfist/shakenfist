@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-26T06:56:26.297909+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-08-27T17:28:50.740134+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -31,7 +31,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#126 |
-| client-python | non-compliant | shakenfist/client-python#367 |
+| client-python | compliant | - |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#36 |
 | clingwrap | non-compliant | shakenfist/clingwrap#121 |
 | cloudgood | non-compliant | shakenfist/cloudgood#1 |
@@ -50,7 +50,6 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 Details for non-compliant projects:
 
 - **agent-python** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch
-- **client-python** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch
 - **client-python-k3s** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh); it is unused, and its workflow holds contents: write on the pull request branch
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
@@ -70,7 +69,7 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 |---------|--------|--------|
 | actions | N/A | - |
 | agent-python | non-compliant | shakenfist/agent-python#128 |
-| client-python | non-compliant | shakenfist/client-python#371 |
+| client-python | compliant | - |
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
@@ -84,14 +83,12 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3909 |
+| shakenfist | compliant | - |
 
 Details for non-compliant projects:
 
 - **agent-python** (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_agent/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)
-- **client-python** (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_client/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)
 - **occystrap** (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- occystrap/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)
-- **shakenfist** (Status): 2 of 2 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist/client/backup.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler); shakenfist/client/ctl.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)
 
 ## default-branch-naming
 
@@ -295,7 +292,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#125 |
-| client-python | non-compliant | shakenfist/client-python#366 |
+| client-python | compliant | - |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#35 |
 | clingwrap | non-compliant | shakenfist/clingwrap#120 |
 | cloudgood | non-compliant | shakenfist/cloudgood#8 |
@@ -314,7 +311,6 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 Details for non-compliant projects:
 
 - **agent-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **client-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **client-python-k3s** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **clingwrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
@@ -486,7 +482,7 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 |---------|--------|--------|
 | actions | N/A | - |
 | agent-python | N/A | - |
-| client-python | non-compliant | shakenfist/client-python#365 |
+| client-python | compliant | - |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#32 |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
@@ -504,7 +500,6 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 
 Details for non-compliant projects:
 
-- **client-python** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
 - **client-python-k3s** (Status): docs/plans/index.md is missing, so none of the 2 plan(s) in docs/plans/ are registered
 - **instar** (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): instar amend subcommand ("1.1 (qcow2 v2⇔v3 version transition, ...")
 - **library-utilities** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
@@ -537,7 +532,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 
 Details for non-compliant projects:
 
-- **shakenfist** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:151, docs/developer_guide/subsystem_internals.md:153, docs/developer_guide/subsystem_internals.md:172, docs/developer_guide/subsystem_internals.md:226, docs/developer_guide/subsystem_internals.md:243, docs/developer_guide/subsystem_internals.md:447 (+7 more)
+- **shakenfist** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:158, docs/developer_guide/subsystem_internals.md:160, docs/developer_guide/subsystem_internals.md:179, docs/developer_guide/subsystem_internals.md:233, docs/developer_guide/subsystem_internals.md:250, docs/developer_guide/subsystem_internals.md:454 (+7 more)
 
 ## plan-source-references
 
@@ -551,7 +546,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | N/A | - |
+| development | compliant | - |
 | divergulent | compliant | - |
 | instar | non-compliant | shakenfist/instar#516 |
 | kerbside | compliant | - |
@@ -691,7 +686,7 @@ Criterion: [readme-absolute-links.md](/components/development/audits/readme-abso
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#107 |
-| client-python | non-compliant | shakenfist/client-python#345 |
+| client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#108 |
 | cloudgood | N/A | - |
@@ -710,7 +705,6 @@ Criterion: [readme-absolute-links.md](/components/development/audits/readme-abso
 Details for non-compliant projects:
 
 - **agent-python** (Status): 5 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, docs/developer-guide.md, docs/index.md, docs/protocol.md
-- **client-python** (Status): 3 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, RELEASE-SETUP.md
 - **clingwrap** (Status): 5 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, RELEASE-SETUP.md, docs/, docs/index.md
 - **library-utilities** (Status): 1 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): docs/log-record-fields.md
 
@@ -722,7 +716,7 @@ Criterion: [readme-structure.md](/components/development/audits/readme-structure
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | compliant | - |
-| client-python | non-compliant | shakenfist/client-python#353 |
+| client-python | compliant | - |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#22 |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
@@ -740,7 +734,6 @@ Criterion: [readme-structure.md](/components/development/audits/readme-structure
 
 Details for non-compliant projects:
 
-- **client-python** (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation
 - **client-python-k3s** (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation
 
 ## release-process
@@ -775,7 +768,7 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#122 |
-| client-python | non-compliant | shakenfist/client-python#362 |
+| client-python | compliant | - |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#28 |
 | clingwrap | non-compliant | shakenfist/clingwrap#117 |
 | cloudgood | non-compliant | shakenfist/cloudgood#2 |
@@ -794,7 +787,6 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 Details for non-compliant projects:
 
 - **agent-python** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **client-python** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **client-python-k3s** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **clingwrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
@@ -829,7 +821,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 89 in-scope files reviewed at HEAD; 89 need review (threshold 5)
-- **development** (Status): 14 of 77 in-scope files reviewed at HEAD; 63 need review (threshold 5)
+- **development** (Status): 24 of 112 in-scope files reviewed at HEAD; 88 need review (threshold 5)
 - **kerbside** (Status): 125 of 194 in-scope files reviewed at HEAD; 69 need review (threshold 5)
 - **ryll** (Status): 97 of 178 in-scope files reviewed at HEAD; 81 need review (threshold 5)
 
@@ -865,7 +857,7 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#113 |
-| client-python | non-compliant | shakenfist/client-python#354 |
+| client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#111 |
 | cloudgood | N/A | - |
@@ -884,7 +876,6 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 Details for non-compliant projects:
 
 - **agent-python** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
-- **client-python** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **clingwrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **library-utilities** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **occystrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
@@ -1002,7 +993,7 @@ Details for non-compliant projects:
 - **agent-python** (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **occystrap** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **shakenfist** (flake8wrap): Missing shellcheck disable=SC2086 directive
-- **shakenfist** (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:102, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: https://pypi.org/simple/" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"
+- **shakenfist** (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:133, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: https://pypi.org/simple/" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"
 
 ## Criteria with no automated check
 
