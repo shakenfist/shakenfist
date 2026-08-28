@@ -1284,30 +1284,35 @@ class Monitor(daemon.Daemon):
     def _request_all_threads_exit(self):
         LOG.info('Requesting all threads exit')
 
-        all_monitors = list(self.monitors.keys())
-        for instance_uuid in all_monitors:
+        for instance_uuid in list(self.monitors.keys()):
             self._request_thread_exit(
-                instance_uuid, self.monitors[instance_uuid])
+                instance_uuid, self.monitors, 'monitor')
 
-        all_executors = list(self.executors.keys())
-        for instance_uuid in all_executors:
+        for instance_uuid in list(self.executors.keys()):
             self._request_thread_exit(
-                instance_uuid, self.executors[instance_uuid])
+                instance_uuid, self.executors, 'executor')
 
-    def _request_thread_exit(self, instance_uuid, t):
+    def _request_thread_exit(self, instance_uuid, threads, thread_type):
+        # threads is the dictionary the record lives in (self.monitors or
+        # self.executors), so the join, the deletion and the audit events
+        # all follow the thread actually being shut down.
+        t = threads.get(instance_uuid)
+        if not t:
+            return
+
         daemon.set_abort_path(
             t['object'].abort_path, 'from _request_thread_exit')
         add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-            'side channel monitor instructed to exit')
-        self.monitors[instance_uuid]['thread'].join(0.5)
+            f'side channel {thread_type} instructed to exit')
+        t['thread'].join(0.5)
 
         if not t['thread'].is_alive():
-            del self.monitors[instance_uuid]
+            del threads[instance_uuid]
             daemon.clear_abort_path(t['object'].abort_path)
             add_event(
                 EVENT_TYPE_AUDIT, 'instance', instance_uuid,
-                'side channel monitor finished')
+                f'side channel {thread_type} finished')
 
     def _dispatch_loop(self, generation):
         """Dispatch queued agent operations to instances with ready agents.
@@ -1500,7 +1505,7 @@ class Monitor(daemon.Daemon):
                     # Cleanup extra monitors
                     for instance_uuid in extra_instances:
                         self._request_thread_exit(
-                            instance_uuid, self.monitors[instance_uuid])
+                            instance_uuid, self.monitors, 'monitor')
 
                     self.idle(1)
 
@@ -1510,15 +1515,18 @@ class Monitor(daemon.Daemon):
 
         LOG.info('Stopping')
         send_systemd_stopping()
+        self._wait_for_all_threads_exit()
+        LOG.info('Stopped')
 
-        while self.monitors:
-            LOG.info(f'There are {len(self.monitors)} threads remaining')
+    def _wait_for_all_threads_exit(self):
+        while self.monitors or self.executors:
+            LOG.info(f'There are {len(self.monitors) + len(self.executors)} '
+                     'threads remaining')
             self._request_all_threads_exit()
-            if self.monitors:
+            if self.monitors or self.executors:
                 time.sleep(5)
 
-        LOG.info(f'There are {len(self.monitors)} threads remaining')
-        LOG.info('Stopped')
+        LOG.info('There are 0 threads remaining')
 
 
 def main():
