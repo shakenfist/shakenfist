@@ -88,13 +88,30 @@ class GetException(Exception):
 
 
 class SideChannelJob(util_concurrency.Job):
-    def __init__(self, inst):
+    def __init__(self, inst, abort_name=None):
         super().__init__()
         self.instance = inst
         self.instance_ready = constants.AGENT_NEVER_TALKED
         self.thread_name = str(self.instance.uuid)
 
-        self.abort_path = f'/run/sf/sidechannel-{self.thread_name}.abort'
+        # abort_name is what keeps the two job types for one instance
+        # from sharing an abort file, and it is a constructor argument
+        # rather than something a subclass overwrites afterwards
+        # because both halves of doing it later are wrong. The base
+        # class clears whatever path it derives, so an executor built
+        # while the daemon is shutting down would clear the monitor's
+        # abort file and un-stop it; and a subclass which reassigns
+        # abort_path after super().__init__() leaves the derivation
+        # depending on the order of two assignments in two files,
+        # which is how the monitor and the executor came to share one
+        # file in the first place. Sharing matters because the reaper
+        # sets this path to stop a wedged executor: with one file that
+        # also stops the instance's monitor, and the monitor's restart
+        # clears the file again -- possibly before the wedged
+        # executor's one second poll has read it, leaving it wedged
+        # with the instance's executor slot held.
+        self.abort_path = (
+            f'/run/sf/sidechannel-{abort_name or self.instance.uuid}.abort')
         daemon.clear_abort_path(self.abort_path)
 
         # A count of the number of sent but not yet acknowledged command
@@ -172,8 +189,10 @@ class SideChannelJob(util_concurrency.Job):
 
 class SideChannelMonitorJob(SideChannelJob):
     def __init__(self, inst):
+        # No abort_name: the monitor keeps the historical
+        # per-instance path, because operators and the daemon's own
+        # shutdown path both know it by that name.
         super().__init__(inst)
-        self.abort_path = f'/run/sf/sidechannel-{inst.uuid}.abort'
         self.log = LOG.with_fields({'instance': self.instance.uuid})
 
         self.instance.agent_state = constants.AGENT_NEVER_TALKED
@@ -574,7 +593,12 @@ def resolve_abandoned_operation(agentop, reason, terminal):
 
 class SideChannelExecutorJob(SideChannelJob):
     def __init__(self, inst, agentop):
-        super().__init__(inst)
+        # Keyed by instance rather than by operation, which matches
+        # the one-executor-per-instance invariant the dispatcher
+        # enforces and means the file is reclaimed by the next
+        # executor's clear rather than accumulating one per operation
+        # in /run/sf.
+        super().__init__(inst, abort_name=f'executor-{inst.uuid}')
         self.agentop = agentop
         self.affected_objects = [self.instance, self.agentop]
         self.thread_name = f'{self.instance.uuid}-{self.agentop.uuid}'
@@ -642,6 +666,20 @@ class SideChannelExecutorJob(SideChannelJob):
                     'sidechannel executor exited before the operation '
                     'completed',
                     terminal=self.agentop.fail)
+
+            # Unconditional, and outside the guard above: a half
+            # finished get-file must not survive this exit whatever the
+            # operation's state, and the call is a no-op unless a
+            # transfer is actually in flight (the success path in
+            # _handle_file_chunk() has already nilled it). It matters
+            # more now than it did: a retried operation runs
+            # GetFileCommand.dispatch() again, which mints a fresh blob
+            # uuid, so without this an operation whose connection drops
+            # mid-transfer leaves one orphaned .partial file per attempt
+            # in blob storage for the cleaner to find. The budget path
+            # in expire_if_out_of_budget() already does this; this exit
+            # did not.
+            self._abandon_get_file_transfer()
 
     def _handle_command_error(self, reply):
         """Fail the operation when the agent reports a command error.
@@ -1123,9 +1161,10 @@ class SideChannelExecutorJob(SideChannelJob):
                 # deleted operation with commands left would be
                 # re-dispatched on every pass and the loop would never
                 # reach its exit.
-                if self.agentop.state.value in AgentOperation.TERMINAL_STATES:
+                state_value = self.agentop.state.value
+                if state_value in AgentOperation.TERMINAL_STATES:
                     self.log.with_fields({
-                        'state': self.agentop.state.value
+                        'state': state_value
                     }).warning('Operation became terminal during dispatch, '
                                'not sending its command')
                     self.commands = []
@@ -1137,6 +1176,36 @@ class SideChannelExecutorJob(SideChannelJob):
                 add_event_multi(
                     EVENT_TYPE_STATUS, self.affected_objects,
                     'executing agent command', extra=extra)
+
+                # An attempt is counted here, on the transition into
+                # executing, and nowhere else. Counting it where the
+                # dispatcher starts the thread instead looks simpler but
+                # measures the wrong thing: an executor which never
+                # reaches the agent -- NoSuchChannel or a socket error
+                # swallowed by the base execute(), or the thirty second
+                # wait for a welcome which never comes -- leaves the
+                # operation queued for a later dispatch, and the
+                # dispatcher retries every five seconds, so an instance
+                # with a flaky agent channel would burn the whole cap
+                # inside fifteen seconds without a single command having
+                # been sent. The first genuine stall would then be
+                # terminal immediately, which is the opposite of what
+                # this cap is for.
+                #
+                # The guard makes this once per attempt rather than once
+                # per command: the assignment below is a no-op for the
+                # second and later commands of one operation (
+                # baseobject._state_update() returns early when the value
+                # is unchanged), and those are the same attempt.
+                #
+                # Ordering is safe by construction. Everything which
+                # reads the counter -- resolve_abandoned_operation(),
+                # from either executor exit or from the reaper -- can
+                # only be reached with the operation already EXECUTING,
+                # so the increment for this attempt has always happened
+                # before its own comparison against the cap.
+                if state_value != AgentOperation.STATE_EXECUTING:
+                    self.agentop.record_attempt()
                 self.agentop.state = AgentOperation.STATE_EXECUTING
 
                 self.log.with_fields({
@@ -1372,6 +1441,16 @@ class Monitor(daemon.Daemon):
                 t['thread'].join(1)
                 del self.monitors[instance_uuid]
 
+                # The reaper only ever examines instances which have a
+                # monitor, so its rate limiter has nothing to say about
+                # one which does not. Dropping the entry here keeps the
+                # dictionary the same size as self.monitors instead of
+                # growing for the daemon's lifetime on a node with
+                # instance churn, and costs nothing when the monitor
+                # comes back: an absent entry reads as zero, which is
+                # what makes the first pass after a restart immediate.
+                self.reaper_attempts.pop(instance_uuid, None)
+
     def start_instance_executor(self, instance_uuid, agentop):
         self.executor_attempts[instance_uuid] = time.time()
 
@@ -1387,27 +1466,27 @@ class Monitor(daemon.Daemon):
             return
 
         sc_obj = SideChannelExecutorJob(inst, agentop)
-
-        # Attempts are counted on dispatch, not on retry, so an operation
-        # reads attempts == 1 while its first attempt is running and
-        # AGENT_OPERATION_MAX_ATTEMPTS is a count of dispatches. It is
-        # recorded before the thread starts because the thread is what reads
-        # it back: an executor which exits immediately would otherwise resolve
-        # the operation against an attempt count which does not yet include
-        # its own dispatch. Failing here is safe for the reason noted above --
-        # the operation stays at the head of the queue and is dispatched
-        # again.
-        agentop.record_attempt()
-
         sc_thread = threading.Thread(
             target=sc_obj.run, daemon=True, name=instance_uuid)
-        sc_thread.start()
 
+        # Registered before the thread starts, not after. The executor
+        # is what the reaper reads to tell "nothing is working on this
+        # operation" from "something is": between start() and this
+        # assignment the operation can already be EXECUTING with no
+        # entry here, and a reaper running in that window would take
+        # case one and requeue an operation which is actively running.
+        # Within one dispatcher thread that window cannot be observed,
+        # but supervise_dispatcher() deliberately leaves a replaced
+        # generation alive, so the old thread can be here while the new
+        # generation reaps. thread_ident is therefore read after the
+        # start, since it does not exist before it.
         self.executors[instance_uuid] = {
             'object': sc_obj,
             'thread': sc_thread,
             'instance_uuid': instance_uuid
         }
+        sc_thread.start()
+
         add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
             'side channel executor started',
@@ -1434,6 +1513,15 @@ class Monitor(daemon.Daemon):
             t = self.executors[executor_id]
             if not t['thread'].is_alive():
                 t['thread'].join(1)
+
+                # The reaper below sets this executor's abort path to
+                # stop a wedged thread, and nothing else clears it.
+                # Clearing it once the thread is confirmed dead is what
+                # keeps /run/sf from accumulating a file per reaped
+                # executor; the next executor for this instance would
+                # otherwise start life already aborted if its
+                # constructor's clear were ever removed.
+                daemon.clear_abort_path(t['object'].abort_path)
                 add_event(
                     EVENT_TYPE_AUDIT, 'instance', t['instance_uuid'],
                     'side channel executor ended',

@@ -280,17 +280,28 @@ class SFConfig(BaseSettings):
     )
     AGENT_OPERATION_MAX_ATTEMPTS: int = Field(
         3,
+        ge=1,
         description=(
-            'The number of times an agent operation is dispatched before '
-            'it is allowed to reach a terminal state, counting the initial '
-            'dispatch plus retries -- so the default of 3 means one '
-            'dispatch and two retries. This is the only bound on an '
-            'operation created with an explicit deadline_seconds of 0, '
-            'which otherwise has no wall-clock deadline at all. Retrying '
+            'The number of times an agent operation may reach the '
+            'executing state before it is allowed to reach a terminal '
+            'state, counting the first attempt plus retries -- so the '
+            'default of 3 means one attempt and two retries. An attempt '
+            'is counted when a command is actually sent to the agent, '
+            'not when the sidechannel daemon starts an executor: a '
+            'dispatch which cannot open the channel, or which the agent '
+            'never welcomes, leaves the operation queued and is retried '
+            'without being counted here. This is therefore a bound on '
+            'retries of an operation which reached the agent, and is not '
+            'a bound on dispatch. An operation created with an explicit '
+            'deadline_seconds of 0 and a progress_timeout_seconds of 0 '
+            'has no wall-clock bound at all, and this option does not '
+            'give it one if its executor never connects. Retrying '
             'restarts the command list from index 0, which an execute '
             'operation cannot do without repeating a side effect the '
             'agent cannot take back, so execute operations are never '
-            'retried whatever this is set to.'
+            'retried whatever this is set to. A value below 1 is '
+            'refused at startup rather than accepted as a silent way to '
+            'disable retry.'
         )
     )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(

@@ -123,6 +123,15 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
             sidechannel.SideChannelExecutorJob)
         job.agentop = _FakeAgentOp(state_value)
         job.log = mock.MagicMock()
+
+        # The finally block tears down any in-flight get-file whatever
+        # the operation's state, so these have to be set for the same
+        # reason __init__() sets them: without them the teardown raises
+        # AttributeError rather than being the no-op it is meant to be.
+        job._blob_uuid = None
+        job._stat_result = None
+        job._agent_path_for_get = None
+        job._blob_partial_file = None
         return job
 
     def test_marks_error_when_exit_while_executing(self):
@@ -169,40 +178,121 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
         self.assertIsNone(job.agentop.failure_reason)
 
 
+class SideChannelAbortPathTestCase(base.ShakenFistTestCase):
+    """A monitor and an executor for one instance need separate abort files.
+
+    The reaper stops a wedged executor by setting its abort path. When
+    the two jobs shared a file that also stopped the instance's agent
+    monitor, and the monitor's restart cleared the file again --
+    possibly before the wedged executor's one second poll had read it,
+    leaving it wedged with the executor slot still held, which is the
+    thing steps 5b and 5d exist to prevent.
+
+    These construct real jobs. A hand-built object would pass whatever
+    the derivation did, which is exactly how the two came to share a
+    file.
+    """
+
+    def _jobs(self):
+        inst = _FakeInstance()
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            monitor = sidechannel.SideChannelMonitorJob(inst)
+            executor = sidechannel.SideChannelExecutorJob(
+                inst, _FakeAgentOp(AgentOperation.STATE_QUEUED))
+        return monitor, executor
+
+    def test_the_two_job_types_do_not_share_an_abort_path(self):
+        monitor, executor = self._jobs()
+        self.assertNotEqual(monitor.abort_path, executor.abort_path)
+
+    def test_the_monitor_keeps_the_historical_path(self):
+        # Operators and the daemon's own shutdown path know the monitor
+        # by this name, so the executor is the one which moved.
+        monitor, _ = self._jobs()
+        self.assertEqual(
+            '/run/sf/sidechannel-fake-instance.abort', monitor.abort_path)
+
+    def test_the_executor_path_is_per_instance(self):
+        # Not per operation: the dispatcher runs one executor per
+        # instance, and a per-operation name would leave a file behind
+        # in /run/sf for every operation the reaper ever stopped.
+        _, executor = self._jobs()
+        self.assertEqual(
+            '/run/sf/sidechannel-executor-fake-instance.abort',
+            executor.abort_path)
+
+    def test_building_an_executor_does_not_clear_the_monitors_abort(self):
+        # The base constructor clears whatever path it derives. While
+        # the two were shared, constructing an executor during shutdown
+        # un-stopped the monitor.
+        inst = _FakeInstance()
+        with mock.patch.object(sidechannel.daemon,
+                               'clear_abort_path') as clear:
+            monitor = sidechannel.SideChannelMonitorJob(inst)
+            clear.reset_mock()
+            sidechannel.SideChannelExecutorJob(
+                inst, _FakeAgentOp(AgentOperation.STATE_QUEUED))
+
+        cleared = [c[0][0] for c in clear.call_args_list]
+        self.assertNotIn(monitor.abort_path, cleared)
+
+
 class SideChannelPreConnectionWaitTestCase(base.ShakenFistTestCase):
     """The pre-connection wait in SideChannelJob.execute() must be
     abortable, or the reaper can resolve a wedged operation and still not
     free the instance's executor slot (step 5d)."""
 
     def _make_job(self, instance_path):
-        # Built with __new__ rather than the real __init__ so abort_path
-        # can point at a temp file instead of the real /run/sf location.
-        job = sidechannel.SideChannelJob.__new__(sidechannel.SideChannelJob)
-        job.instance = mock.Mock(instance_path=instance_path)
-        job.abort_path = os.path.join(instance_path, 'abort')
-        job.thread_name = 'fake-instance'
+        # The real constructor, so the abort path is the one production
+        # derives rather than one the test chose; only its directory is
+        # redirected away from /run/sf, which a test cannot write to.
+        # An earlier version of this built the object with __new__ and
+        # assigned abort_path by hand, which is why it could not have
+        # caught the monitor and the executor sharing a file.
+        inst = mock.MagicMock(
+            uuid='fake-instance', instance_path=instance_path)
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            job = sidechannel.SideChannelExecutorJob(
+                inst, _FakeAgentOp(AgentOperation.STATE_QUEUED))
+
+        self.assertEqual(
+            '/run/sf/sidechannel-executor-fake-instance.abort',
+            job.abort_path)
+        job.abort_path = os.path.join(
+            instance_path, os.path.basename(job.abort_path))
         job.log = mock.MagicMock()
         return job
 
-    def test_wait_returns_promptly_when_aborted(self):
+    def test_the_wait_exits_when_the_abort_path_is_set(self):
+        # Deliberately no patch of time.sleep. sidechannel.time is the
+        # global time module, so patching sleep there is process wide
+        # for the duration of the test, and this suite does not need
+        # it: an abort path which is already set is checked before the
+        # first sleep, so the loop exits without sleeping at all.
         with tempfile.TemporaryDirectory() as tmp:
             job = self._make_job(tmp)
+            sidechannel.daemon.set_abort_path(job.abort_path, 'test')
 
-            def _set_abort_path_instead_of_sleeping(seconds):
-                # Stands in for the reaper setting the abort path while
-                # this thread is blocked in the wait.
-                sidechannel.daemon.set_abort_path(job.abort_path, 'test')
+            started = time.time()
+            job.execute()
+
+            self.assertLess(time.time() - started, 1)
+            job.instance.socket_on_vsock_channel.assert_not_called()
+
+    def test_the_wait_ends_when_the_console_log_appears(self):
+        # The other exit, so the test above cannot pass merely because
+        # the loop never runs: with no abort path set and the console
+        # log present, execute() falls through to the connection
+        # attempt on its first pass.
+        with tempfile.TemporaryDirectory() as tmp:
+            job = self._make_job(tmp)
+            open(os.path.join(tmp, 'console.log'), 'w').close()
 
             with mock.patch.object(
-                    sidechannel.time, 'sleep',
-                    side_effect=_set_abort_path_instead_of_sleeping) as m_sleep:
+                    sidechannel.SideChannelExecutorJob, '_execute_inner'):
                 job.execute()
 
-            # Exactly one sleep: the loop notices the abort path on its very
-            # next check, rather than looping again or falling through to
-            # the vsock connection attempt.
-            self.assertEqual(1, m_sleep.call_count)
-            job.instance.socket_on_vsock_channel.assert_not_called()
+            job.instance.socket_on_vsock_channel.assert_called_once()
 
 
 class ExecutorGetFileGuardTestCase(base.ShakenFistTestCase):
@@ -818,6 +908,40 @@ class ExecutorPartialBlobTeardownTestCase(base.ShakenFistTestCase):
         job._abandon_get_file_transfer()
         self.assertIsNone(job._blob_partial_file)
 
+    def test_an_executor_exit_removes_it_too(self):
+        # execute()'s finally is the third way out, and until the review
+        # of this phase it was the one which did not clean up. It
+        # matters more now than it did: a retried operation runs
+        # GetFileCommand.dispatch() again and mints a fresh blob uuid,
+        # so a dropped connection mid-transfer would otherwise leave one
+        # orphaned .partial file per attempt.
+        agentop = _BudgetAgentOp()
+        job = self._make_executor(agentop)
+        self.assertTrue(os.path.exists(self.partial_path))
+
+        with mock.patch.object(sidechannel.SideChannelJob, 'execute',
+                               return_value=None), \
+                mock.patch.object(sidechannel, 'add_event_multi'):
+            job.execute()
+
+        self.assertFalse(os.path.exists(self.partial_path))
+        self.assertIsNone(job._blob_partial_file)
+
+    def test_an_executor_exit_with_no_transfer_is_a_noop(self):
+        # The teardown is outside the state guard in the finally, so it
+        # runs for a completed operation too. It must be a no-op there.
+        agentop = _BudgetAgentOp()
+        agentop.state = AgentOperation.STATE_COMPLETE
+        job = self._make_executor(agentop, in_flight=False)
+
+        with mock.patch.object(sidechannel.SideChannelJob, 'execute',
+                               return_value=None), \
+                mock.patch.object(sidechannel, 'add_event_multi'):
+            job.execute()
+
+        self.assertEqual(AgentOperation.STATE_COMPLETE, agentop.state.value)
+        self.assertIsNone(job._blob_partial_file)
+
     def test_a_failure_to_unlink_is_not_fatal(self):
         # This runs while an operation is already being abandoned, so
         # it must never be the thing that raises.
@@ -1058,13 +1182,19 @@ class ExecutorRetryTestCase(base.ShakenFistTestCase):
         self.assertIsNone(agentop.expired_reason)
 
     def test_an_executor_exit_retries_to_the_cap_and_then_errors(self):
-        # The whole loop, one dispatch at a time. attempts is written
-        # on dispatch, so the first executor to exit sees 1.
+        # The whole loop, one attempt at a time. attempts is written
+        # when the operation transitions into executing, which is what
+        # the assignment inside the loop below stands in for, so the
+        # first executor to exit sees 1.
         agentop = self._op(commands=[{'command': 'get-file'}], attempts=0)
         job = sidechannel.SideChannelExecutorJob.__new__(
             sidechannel.SideChannelExecutorJob)
         job.agentop = agentop
         job.log = mock.MagicMock()
+        job._blob_uuid = None
+        job._stat_result = None
+        job._agent_path_for_get = None
+        job._blob_partial_file = None
 
         cap = sidechannel.config.AGENT_OPERATION_MAX_ATTEMPTS
         states = []
@@ -1100,45 +1230,49 @@ class _DispatchMonitor:
         self.executors = {}
 
 
-class DispatchRecordsAnAttemptTestCase(base.ShakenFistTestCase):
-    """Dispatch is what counts an attempt.
+class DispatchRegistrationOrderTestCase(base.ShakenFistTestCase):
+    """The executor must be registered before its thread starts.
 
-    Nothing else writes the attempts counter, so if this call is lost
-    the counter stays at zero, every comparison against
-    AGENT_OPERATION_MAX_ATTEMPTS is false, and a stalling operation
-    retries until its deadline -- or forever, for the deadline_seconds
-    of 0 case the cap exists to be the only bound on.
+    self.executors is what the reaper reads to tell "nothing is working
+    on this operation" from "something is". Between start() and the
+    registration the operation can already be executing with no entry
+    there, and a reaper running in that window requeues an operation
+    which is actively running -- clearing its results underneath it.
+    Within one dispatcher thread the window is unobservable, but
+    supervise_dispatcher() deliberately leaves a replaced generation
+    alive, so an old thread can be here while the new generation reaps.
     """
 
-    def _dispatch(self, agentop):
+    def test_the_entry_exists_before_the_thread_is_started(self):
         mon = _DispatchMonitor()
         mon.monitors['inst'] = {'object': mock.Mock()}
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+        registered_at_start = []
+
+        thread = mock.Mock()
+        thread.start.side_effect = lambda: registered_at_start.append(
+            'inst' in mon.executors)
 
         with mock.patch.object(sidechannel.instance.Instance, 'from_db',
                                return_value=mock.Mock()), \
                 mock.patch.object(sidechannel, 'SideChannelExecutorJob'), \
-                mock.patch.object(sidechannel.threading, 'Thread'), \
+                mock.patch.object(sidechannel.threading, 'Thread',
+                                  return_value=thread), \
                 mock.patch.object(sidechannel, 'add_event'):
             sidechannel.Monitor.start_instance_executor(mon, 'inst', agentop)
-        return mon
 
-    def test_dispatch_records_an_attempt(self):
-        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
-        self._dispatch(agentop)
-        self.assertEqual(1, agentop.attempts)
+        self.assertEqual([True], registered_at_start)
 
-    def test_each_dispatch_records_another(self):
-        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
-        self._dispatch(agentop)
-        self._dispatch(agentop)
-        self._dispatch(agentop)
-        self.assertEqual(3, agentop.attempts)
-
-    def test_an_instance_with_no_monitor_records_nothing(self):
-        # The early return above the counter. Dispatch did not happen,
-        # so it must not be counted against the operation's cap.
-        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+    def test_dispatch_alone_records_no_attempt(self):
+        # Attempts are counted on the transition into executing, not
+        # here. An executor which never reaches the agent leaves the
+        # operation queued for a later dispatch, and the dispatcher
+        # retries every five seconds, so counting here would burn the
+        # whole cap on an instance with a flaky agent channel without a
+        # single command having been sent.
         mon = _DispatchMonitor()
+        mon.monitors['inst'] = {'object': mock.Mock()}
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
 
         with mock.patch.object(sidechannel.instance.Instance, 'from_db',
                                return_value=mock.Mock()), \
@@ -1148,6 +1282,75 @@ class DispatchRecordsAnAttemptTestCase(base.ShakenFistTestCase):
             sidechannel.Monitor.start_instance_executor(mon, 'inst', agentop)
 
         self.assertEqual(0, agentop.attempts)
+
+
+class DispatchRecordsAnAttemptTestCase(base.ShakenFistTestCase):
+    """Reaching the agent is what counts an attempt.
+
+    Nothing else writes the attempts counter, so if this call is lost
+    the counter stays at zero, every comparison against
+    AGENT_OPERATION_MAX_ATTEMPTS is false, and a stalling operation
+    retries until its deadline -- or forever, for an operation with no
+    deadline at all.
+    """
+
+    def _make_executor(self, state_value, commands=2):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = _FakeAgentOp(state_value)
+        job.instance = _FakeInstance()
+        job.affected_objects = [job.instance, job.agentop]
+        job.commands = [{'command': 'execute', 'commandline': 'true'}
+                        for _ in range(commands)]
+        job.command_handlers = {'execute': _DispatchHandler()}
+        job.in_flight_handler = None
+        job.outstanding_message_count = 0
+        job.ready = True
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+        job._send_commands_single_envelope = mock.MagicMock()
+        return job
+
+    def _dispatch(self, job):
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            job._dispatch_next_command(mock.MagicMock())
+
+    def test_reaching_the_agent_records_an_attempt(self):
+        job = self._make_executor(AgentOperation.STATE_QUEUED)
+        self._dispatch(job)
+        self.assertEqual(
+            AgentOperation.STATE_EXECUTING, job.agentop.state.value)
+        self.assertEqual(1, job.agentop.attempts)
+
+    def test_a_second_command_is_the_same_attempt(self):
+        # The state assignment is a no-op the second time round, and
+        # those commands are the same attempt at the same operation.
+        # Counting per command would divide the cap by the length of
+        # the command list.
+        job = self._make_executor(AgentOperation.STATE_QUEUED)
+        self._dispatch(job)
+        self._dispatch(job)
+        self.assertEqual(1, job.agentop.attempts)
+
+    def test_a_retry_records_another_attempt(self):
+        # The requeue and re-dispatch that resolve_abandoned_operation()
+        # produces: back to queued, dispatched again, counted again.
+        job = self._make_executor(AgentOperation.STATE_QUEUED)
+        self._dispatch(job)
+        job.agentop.state = AgentOperation.STATE_QUEUED
+
+        job.commands = [{'command': 'execute', 'commandline': 'true'}]
+        self._dispatch(job)
+        self.assertEqual(2, job.agentop.attempts)
+
+    def test_a_terminal_operation_records_nothing(self):
+        # The guard above the counter. Nothing was sent, so nothing is
+        # counted against the operation's cap.
+        job = self._make_executor(AgentOperation.STATE_EXPIRED)
+        self._dispatch(job)
+        self.assertEqual(0, job.agentop.attempts)
 
 
 class _QueuedInstance:
@@ -1187,6 +1390,7 @@ class _ReaperMonitor:
         self.monitors = {}
         self.executors = {}
         self.reaper_attempts = {}
+        self.monitor_attempts = {}
 
 
 class ExecutorReaperTestCase(base.ShakenFistTestCase):
@@ -1207,6 +1411,14 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
 
     INSTANCE = 'fake-instance'
 
+    # The path a real SideChannelExecutorJob for this instance derives,
+    # asserted against below rather than an arbitrary one, so the abort
+    # cannot silently be sent to the instance's monitor instead. That is
+    # not hypothetical: the two shared a file until the review of this
+    # phase. SideChannelAbortPathTestCase is what ties this constant to
+    # the real derivation.
+    EXECUTOR_ABORT = '/run/sf/sidechannel-executor-fake-instance.abort'
+
     def _monitor(self, queue=(), executor_alive=None):
         """A reaper self with one monitored instance, and maybe an executor.
 
@@ -1226,7 +1438,7 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
             thread = mock.Mock()
             thread.is_alive.return_value = executor_alive
             mon.executors[self.INSTANCE] = {
-                'object': mock.Mock(abort_path='/run/sf/an.abort'),
+                'object': mock.Mock(abort_path=self.EXECUTOR_ABORT),
                 'thread': thread,
                 'instance_uuid': self.INSTANCE
             }
@@ -1238,6 +1450,7 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
                                return_value=agentop) as from_db, \
                 mock.patch.object(sidechannel, 'add_event'), \
                 mock.patch.object(sidechannel, 'add_event_multi'), \
+                mock.patch.object(sidechannel.daemon, 'clear_abort_path'), \
                 mock.patch.object(sidechannel.daemon,
                                   'set_abort_path') as abort:
             sidechannel.Monitor.reap_instance_executors(mon)
@@ -1288,6 +1501,24 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         self.assertEqual({}, mon.executors)
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
 
+    def test_sweeping_a_dead_executor_clears_its_abort_path(self):
+        # The reaper is the only thing which sets this file and nothing
+        # else clears it, so without this /run/sf accumulates one file
+        # per reaped executor for the daemon's lifetime.
+        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
+        mon, _ = self._monitor(queue=['an-operation'], executor_alive=False)
+
+        with mock.patch.object(sidechannel.AgentOperation, 'from_db',
+                               return_value=agentop), \
+                mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel, 'add_event_multi'), \
+                mock.patch.object(sidechannel.daemon, 'set_abort_path'), \
+                mock.patch.object(sidechannel.daemon,
+                                  'clear_abort_path') as clear:
+            sidechannel.Monitor.reap_instance_executors(mon)
+
+        clear.assert_called_once_with(self.EXECUTOR_ABORT)
+
     def test_an_idle_instance_reads_no_operation(self):
         # An instance with nothing queued costs one attributes peek and
         # nothing else. Reading an operation here would put a database
@@ -1337,7 +1568,7 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
             'the sidechannel executor was wedged and made no progress, and '
             'the operation deadline has passed',
             agentop.expired_reason)
-        self.assertEqual('/run/sf/an.abort', abort.call_args[0][0])
+        self.assertEqual(self.EXECUTOR_ABORT, abort.call_args[0][0])
 
     def test_a_live_executor_inside_its_budget_is_left_alone(self):
         # The reaper acts on evidence, never on suspicion. A progress
@@ -1386,6 +1617,20 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
             time.time() - sidechannel.EXECUTOR_REAP_INTERVAL - 1)
         self._reap(mon)
         self.assertEqual(2, inst.peeks)
+
+    def test_reaping_a_monitor_drops_its_rate_limiter_entry(self):
+        # The reaper only ever examines instances which have a monitor,
+        # so its rate limiter has nothing to say about one which does
+        # not. Without this the dictionary grows for the daemon's
+        # lifetime on a node with instance churn.
+        mon, _ = self._monitor(queue=[])
+        mon.monitors[self.INSTANCE]['thread'].is_alive.return_value = False
+        mon.reaper_attempts[self.INSTANCE] = time.time()
+
+        sidechannel.Monitor.reap_instance_monitors(mon)
+
+        self.assertEqual({}, mon.monitors)
+        self.assertEqual({}, mon.reaper_attempts)
 
     def test_an_invalid_queue_entry_is_left_for_the_dispatcher(self):
         # Retiring it takes the instance's attribute lock, which the
