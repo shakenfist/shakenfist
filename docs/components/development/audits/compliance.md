@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-27T17:28:50.740134+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-08-28T18:21:59.716129+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -32,7 +32,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#126 |
 | client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#36 |
+| client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#121 |
 | cloudgood | non-compliant | shakenfist/cloudgood#1 |
 | development | compliant | - |
@@ -50,7 +50,6 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 Details for non-compliant projects:
 
 - **agent-python** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch
-- **client-python-k3s** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh); it is unused, and its workflow holds contents: write on the pull request branch
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
 - **instar** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
@@ -184,13 +183,12 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3792 |
+| shakenfist | compliant | - |
 
 Details for non-compliant projects:
 
 - **cloudgood** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/index.md -> more-fundamentals.md, docs/virtualization-history.md -> more-fundamentals.md
 - **instar** (Status): 46 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/amend.md -> ../src/crates/amend/src/qcow2.rs, docs/amend.md -> ../tests/test_amend.py, docs/bench.md -> ../src/crates/bench/, docs/bench.md -> ../src/crates/qcow2-write-exec/, docs/bench.md -> ../src/crates/qcow2-write/, docs/bench.md -> ../src/operations/bench/, docs/bench.md -> ../tests/test_bench.py, docs/bitmap.md -> ../src/crates/bitmap/, docs/bitmap.md -> ../src/operations/bitmap/, docs/bitmap.md -> ../tests/test_bitmap.py (+36 more)
-- **shakenfist** (Status): 13 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/operator_guide/database.md -> ../../shakenfist/schema/object_filter.py, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/instance.py#L177-L183, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/instance.py#L344, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/network/network.py#L182, docs/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network.md -> shakenfist/network/network.py#L964, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/artifact.py#L609, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/external_api/artifact.py#L387, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/external_api/instance.py#L893, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/external_api/network.py#L292, docs/plans/PLAN-sql-pushdown-filtering-phase-04-iterators.md -> shakenfist/instance.py#L2137 (+3 more)
 
 ## expensive-lane-path-filter
 
@@ -201,7 +199,7 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#123 |
 | client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#29 |
+| client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#118 |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -219,7 +217,6 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 Details for non-compliant projects:
 
 - **agent-python** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-- **client-python-k3s** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **clingwrap** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **occystrap** (Status): 2 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering), python-unit-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **sfui** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
@@ -293,7 +290,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#125 |
 | client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#35 |
+| client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#120 |
 | cloudgood | non-compliant | shakenfist/cloudgood#8 |
 | development | compliant | - |
@@ -311,7 +308,6 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 Details for non-compliant projects:
 
 - **agent-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **client-python-k3s** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **clingwrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **instar** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
@@ -483,7 +479,7 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#32 |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -500,7 +496,6 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): docs/plans/index.md is missing, so none of the 2 plan(s) in docs/plans/ are registered
 - **instar** (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): instar amend subcommand ("1.1 (qcow2 v2⇔v3 version transition, ...")
 - **library-utilities** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
 - **occystrap** (Status): index has no plan table (it must list plans in a table led by Date and Plan columns, not as prose or a bullet list); 4 master plan(s) not listed in the index: PLAN-make-the-speed.md, PLAN-post-write-verification.md, PLAN-registry-proxy.md, PLAN-structured-logging.md
@@ -540,7 +535,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | N/A | - |
+| actions | non-compliant | shakenfist/actions#43 |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -560,6 +555,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 Details for non-compliant projects:
 
+- **actions** (Status): 3 of 3 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): .github/workflows/smoke-cluster.yml:244 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:14 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_launch.sh:13 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md
 - **instar** (Status): 2 of 197 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): src/crates/qcow2-write-exec/src/growth.rs:13 -> docs/plans/PLAN-qcow2-write-infrastructure-phase-07-write.md, tests/test_adversarial.py:8 -> PLAN-adversarial-images.md
 
 ## plan-template
@@ -571,7 +567,7 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#33 |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
@@ -588,7 +584,6 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **divergulent** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **instar** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **kerbside** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
@@ -604,7 +599,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#26 |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -621,7 +616,6 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **divergulent** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **instar** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **kerbside** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
@@ -717,7 +711,7 @@ Criterion: [readme-structure.md](/components/development/audits/readme-structure
 | actions | compliant | - |
 | agent-python | compliant | - |
 | client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#22 |
+| client-python-k3s | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -731,10 +725,6 @@ Criterion: [readme-structure.md](/components/development/audits/readme-structure
 | ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
-
-Details for non-compliant projects:
-
-- **client-python-k3s** (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation
 
 ## release-process
 
@@ -769,7 +759,7 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#122 |
 | client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#28 |
+| client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#117 |
 | cloudgood | non-compliant | shakenfist/cloudgood#2 |
 | development | compliant | - |
@@ -787,7 +777,6 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 Details for non-compliant projects:
 
 - **agent-python** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **client-python-k3s** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **clingwrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **library-utilities** (Status): Missing: .github/workflows/renovate.yml, renovate.json
@@ -820,10 +809,10 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 0 of 89 in-scope files reviewed at HEAD; 89 need review (threshold 5)
+- **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
 - **development** (Status): 24 of 112 in-scope files reviewed at HEAD; 88 need review (threshold 5)
-- **kerbside** (Status): 125 of 194 in-scope files reviewed at HEAD; 69 need review (threshold 5)
-- **ryll** (Status): 97 of 178 in-scope files reviewed at HEAD; 81 need review (threshold 5)
+- **kerbside** (Status): 124 of 194 in-scope files reviewed at HEAD; 70 need review (threshold 5)
+- **ryll** (Status): 97 of 182 in-scope files reviewed at HEAD; 85 need review (threshold 5)
 
 ## rust-unwrap-lint
 
@@ -902,13 +891,12 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 | private-ci | N/A | - |
 | ryll | non-compliant | shakenfist/ryll#322 |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3910 |
+| shakenfist | compliant | - |
 
 Details for non-compliant projects:
 
 - **divergulent** (Status): 2 of 2 HTTP request handler class(es) do not sanitize header values: divergulent/tests/test_fetch.py:164 (ErrorHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through; divergulent/tests/test_fetch.py:37 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
 - **ryll** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tools/browser-offer-probe.py:68 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
-- **shakenfist** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_federation.py:57 (_JWKSHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
 
 ## sfui-vendor
 
@@ -925,14 +913,19 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | development | N/A | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
-| kerbside | compliant | - |
+| kerbside | non-compliant | shakenfist/kerbside#373 |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | compliant | - |
+| private-ci | non-compliant | shakenfist/private-ci#17 |
 | ryll | N/A | - |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
+
+Details for non-compliant projects:
+
+- **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## version-file-gitignore
 
