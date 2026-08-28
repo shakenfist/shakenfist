@@ -13475,20 +13475,20 @@ splits them into three buckets:</p>
 <p><strong>Migrate to namespace kwarg</strong> (predicates that are exactly
 <code>partial(baseobject.namespace_filter, ns)</code>):</p>
 <ul>
-<li><a href="shakenfist/artifact.py#L609">shakenfist/artifact.py:609</a>
+<li><a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/artifact.py#L609">shakenfist/artifact.py:609</a>
   (<code>artifacts_in_namespace</code>)</li>
-<li><a href="shakenfist/network/network.py#L1016">shakenfist/network/network.py:1016</a>
+<li><a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/network.py#L1016">shakenfist/network/network.py:1016</a>
   (equivalent network helper)</li>
-<li><a href="shakenfist/instance.py#L2137">shakenfist/instance.py:2137</a>
+<li><a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L2137">shakenfist/instance.py:2137</a>
   (<code>instances_in_namespace</code>)</li>
-<li><a href="shakenfist/external_api/network.py#L292">shakenfist/external_api/network.py:292</a></li>
-<li><a href="shakenfist/external_api/instance.py#L893">shakenfist/external_api/instance.py:893</a></li>
+<li><a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/external_api/network.py#L292">shakenfist/external_api/network.py:292</a></li>
+<li><a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/external_api/instance.py#L893">shakenfist/external_api/instance.py:893</a></li>
 </ul>
 <p><strong>Migrate to namespace kwarg with a tweak</strong>
 (predicates that are <code>partial(namespace_exact_filter, ns)</code> —
 exact match, no 'system' special case):</p>
 <ul>
-<li><a href="shakenfist/external_api/artifact.py#L387">shakenfist/external_api/artifact.py:387</a></li>
+<li><a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/external_api/artifact.py#L387">shakenfist/external_api/artifact.py:387</a></li>
 </ul>
 <p>For this one the caller knows namespace is never 'system'
 (it's an admin path or a pre-checked tenant lookup), so

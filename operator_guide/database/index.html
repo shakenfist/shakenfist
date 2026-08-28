@@ -14690,7 +14690,7 @@ remains the same because MariaDB maintains MySQL protocol compatibility.</p>
 <h3 id="sql-filter-pushdown">SQL Filter Pushdown<a class="headerlink" href="#sql-filter-pushdown" title="Permanent link">&para;</a></h3>
 <p>Object iteration uses a single indexed SQL query per call rather than materialising all rows and filtering in Python.</p>
 <p>The filter criteria shape is <code>ObjectFilterCriteria</code> in
-<a href="../../shakenfist/schema/object_filter.py"><code>shakenfist/schema/object_filter.py</code></a>:</p>
+<a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/schema/object_filter.py"><code>shakenfist/schema/object_filter.py</code></a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.object_filter</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObjectFilterCriteria</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">criteria</span> <span class="o">=</span> <span class="n">ObjectFilterCriteria</span><span class="p">(</span>

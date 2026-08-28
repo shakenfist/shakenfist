@@ -13319,7 +13319,7 @@ document each.</p>
   classmethods — kept as the documented predicate fallback
   per the master plan.</li>
 <li><code>all_instances()</code> at
-  <a href="shakenfist/instance.py#L2113">shakenfist/instance.py:2113</a>
+  <a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L2113">shakenfist/instance.py:2113</a>
   — uses <code>get_all_instance_uuids()</code> + per-UUID <code>from_db()</code>.
   N+1 but bounded (instance counts are moderate in practice
   and it's not on any REST hot path). Leave it; revisit in
@@ -13338,7 +13338,7 @@ document each.</p>
 <h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
 <h3 id="networkinterfaces">NetworkInterfaces<a class="headerlink" href="#networkinterfaces" title="Permanent link">&para;</a></h3>
 <p><code>NetworkInterfaces</code> at
-<a href="shakenfist/network/interface.py#L300-L349">shakenfist/network/interface.py:300-349</a>
+<a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/interface.py#L300-L349">shakenfist/network/interface.py:300-349</a>
 is the exact hybrid pattern Artifacts / Instances /
 Networks had before phase 4: it resolves prefilter to
 target_states, calls <code>get_objects_by_state</code> for UUIDs,

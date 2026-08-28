@@ -13343,11 +13343,11 @@ constructors (not a Pydantic model), so the override must
 convert the <code>InstanceData</code> / <code>NetworkData</code> returned by
 <code>find_*</code> via <code>_static_values_to_dict</code> before calling <code>cls(...)</code>.
 This is visible at
-<a href="shakenfist/instance.py#L344">shakenfist/instance.py:344</a>:</p>
+<a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L344">shakenfist/instance.py:344</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">obj</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_static_values_to_dict</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
 </code></pre></div>
 <p>and at
-<a href="shakenfist/network/network.py#L182">shakenfist/network/network.py:182</a>.
+<a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/network.py#L182">shakenfist/network/network.py:182</a>.
 Artifact's constructor accepted the Pydantic directly, so
 its phase-2 override used <code>cls(matches[0])</code> — that does not
 port.</p>
@@ -13386,7 +13386,7 @@ port.</p>
 <ul>
 <li><code>Instance.ACTIVE_STATES</code> is a larger set than Artifact's
   (nine state strings including error variants, see
-  <a href="shakenfist/instance.py#L177-L183">shakenfist/instance.py:177-183</a>).
+  <a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L177-L183">shakenfist/instance.py:177-183</a>).
   <code>list(...)</code> flattens it to the <code>list[str]</code> shape
   <code>ObjectFilterCriteria.states</code> expects; MariaDB builds an
   <code>IN (...)</code> clause.</li>
@@ -13424,7 +13424,7 @@ port.</p>
 <ul>
 <li><strong><code>FLOATING_NETWORK_UUID</code> singleton.</strong> The <code>Networks</code>
   iterator skips this UUID
-  (<a href="shakenfist/network/network.py#L964">shakenfist/network/network.py:964</a>)
+  (<a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/network.py#L964">shakenfist/network/network.py:964</a>)
   because it is a bookkeeping sentinel, not a real tenant
   network. The <code>from_db_by_ref</code> path does not need the same
   skip: the floating network has <code>namespace=None</code> (or some
