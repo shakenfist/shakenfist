@@ -308,6 +308,21 @@ talks to the database has its own cache, so the numbers you can scrape are a
 sample of the cluster's caching rather than a total; `sf-api` in particular
 is invisible here.
 
+Expect that rollback to set off database load alerts while it is in effect,
+and plan for it rather than being surprised by it. The load budget was
+derived with the cache on, so the pairs the cache suppresses now sit under
+the budget's inclusion cut and are policed by the unbudgeted-polling ceiling
+of 0.05/s per node instead of by an entry of their own. `GetIPAM` from
+`sf-cluster` read 5.5/s before the cache and 0.02/s after it, and turning the
+cache off puts it — and a good many pairs like it — two orders of magnitude
+over that ceiling, firing `ShakenFistUnbudgetedDatabasePolling` for each.
+The alert is not wrong: pure read-through really does cost that much, which
+is the reason the cache exists. Silence the alert for the duration of the
+rollback. Do not raise the budget to accommodate it, because the same file
+also feeds `sf-ctl database-load` and the nightly report, and a level edited
+to quiet an alert stops being a description of a healthy cluster. The alert
+waits an hour before firing, so a short restart-and-observe will not trip it.
+
 ### Attributing database load to callers
 
 Alongside the per-operation `database_<op>_total` counters, sf-database

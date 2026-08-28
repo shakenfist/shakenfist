@@ -501,9 +501,15 @@ Merged, advisory.
 **F-U7. `subsystem_internals.md:315-316` still restates the elected-loop
 poll as a literal** ("sleeps on `lock.lost_event.wait(5)`"). Phase 7
 named that constant `ELECTED_LOOP_POLL_SECONDS` precisely so it would
-be greppable; this is now the only place in the tree restating the
-number and the one place an editor changing it would not find. Phase 7
-branch, fix in #3893.
+be greppable, and this restates the number where an editor changing the
+constant would not find it. Phase 7 branch, fixed in #3893.
+
+  The finding as first written said this was "the only place in the tree"
+  and that was wrong; fixing it turned up three more live sites --
+  `tools/derive-database-load-budget.py:211`, the
+  `GetNodeDaemonState`/`cluster` note in the budget, and `CLAUDE.md:317`.
+  All four now name the constant. The plan files also restate it and were
+  left alone: they record what was true when they were written.
 
 ### Security (8f)
 
@@ -651,6 +657,66 @@ above: the `baseobject.py` pushdown tag (already fixed by an unrelated
 commit) and the `ARCHITECTURE.md` growth (already moved). Both would
 have been filed by an audit that read ranges without checking the tree,
 which is what decision 1's second paragraph exists to prevent.
+
+### What the audit missed (8h)
+
+Fixing the metrics parser finding turned up a third copy of that parser
+which the audit did not name: `scrape_operation_requests()` in
+`database_tier.py`. The security finding listed `metrics_scrape.py` and
+"the deliberate copy" in `load_budget.py` and stopped counting at two,
+because that is how the parity test and both docstrings describe the
+arrangement -- the finding inherited the tree's own account of itself
+instead of grepping for the sample name, which returns three files.
+
+The third copy was worse than the two that were found. It matched label
+substrings against the raw line, so the escaping weakness was there too;
+it read the *last* whitespace field as the value, which is the trailing
+timestamp bug the other two copies had already been fixed for and which
+their tests and comments describe as fixed; and splitting the line on
+whitespace truncated the label block at the first space inside a quoted
+value. `scrape_database_counters()` beside it read the last field as
+well. Both are corrected, and `scrape_operation_requests()` now shares
+the parser rather than carrying a third one.
+
+The general lesson is the one this plan already applies to code and did
+not apply to itself: a docstring saying "there are two copies and a test
+asserts they agree" is a claim about the tree, and claims about the tree
+get checked against the tree. Decision 7 required "nothing found" to
+list what was examined; it should equally require a count to say how it
+was arrived at.
+
+### Disposition of every finding (8h)
+
+Landed on this branch, against `develop`, in `c56d687c7`: F-D1 with its
+blind test fake, the cache residency bound and its per-type eviction
+coverage, the immutable-tier description in three places, the
+`NODE_UUID` `ValueError`, and the `caller_daemon` label allowlist.
+
+Landed on this branch afterwards: F-U3, the cache kill switch. Routed to
+#3893 when it was written, because the alerts it fires are phase 7's, and
+moved here because phase 8 rewrites the very paragraph it annotates and
+merges after phase 7 -- so the alert exists by the time the warning
+does, and neither branch conflicts with the other.
+
+Landed in #3893: the metrics parser escaping and the two trailing
+timestamp reads described above, the `nopushdown` tag on
+`ctl.py`, cache-hit verification in `ci-install-promtool.sh`, F-U4's
+backoff caveat on six budget notes, F-U7 at all four sites, and F-R4.
+The `GetAddressesInUse`/`net` note is there too rather than here,
+because `database_load_budget.yaml` does not exist on `develop` at all
+-- it arrives with phase 7 -- so the note correcting a claim about the
+reaper had to go on the branch that carries the file, even though the
+reaper fix itself is here. The note says so, and says which direction
+the un-refitted coefficient now errs in.
+
+Filed rather than fixed: #3942 (dispatcher pool-full backoff) and #3944
+(secret residency), both labelled `automated-fix-attempted` because each
+needs a design decision rather than a same-day patch; #3943 (wake-path
+and per-writer cache eviction coverage), left unlabelled because an
+independent automated fix is welcome there.
+
+Left as advisory and not acted on: F-R5's copyright header years and
+F-R6's dead `IPAM.get_allocation_age()`, both recorded above.
 
 ## Back brief
 
