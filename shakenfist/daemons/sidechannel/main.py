@@ -937,17 +937,28 @@ class SideChannelExecutorJob(SideChannelJob):
         )
 
     def expire_if_out_of_budget(self):
-        """Expire this operation if a caller-set timing budget is spent.
+        """Resolve this operation if a caller-set timing budget is spent.
 
-        Returns True if the executor should stop. Expiring before the
-        caller returns is what makes this safe: execute()'s finally
-        block only rewrites an operation which is still executing, so
-        a terminal state set here is preserved.
+        Returns True if the executor should stop. Two budgets are
+        checked, and which one ran out decides what happens, because
+        since this phase they are no longer the same kind of event.
 
-        This replaces a fixed 900 second backstop. Two budgets are
-        checked, and exhausting either is the same outcome -- expired,
-        with a message saying which -- because both are numbers the
-        caller chose rather than faults of the operation.
+        An exhausted wall-clock deadline is final: the caller's time
+        is gone, so there is nothing a further attempt could deliver
+        in time, and the operation expires. A progress timeout says
+        only that this attempt got nowhere, so it goes through
+        resolve_abandoned_operation() and may return the operation to
+        queued for another attempt; it expires when it cannot,
+        because the timeout is still a number the caller chose rather
+        than a fault of the operation.
+
+        Writing the new state before returning is what makes both
+        safe. execute()'s finally block only rewrites an operation
+        which is still executing, so it cannot overwrite a terminal
+        state set here, and it cannot overwrite a requeue either --
+        queued is not executing.
+
+        This replaced a fixed 900 second backstop.
         """
         # Rate limited, because the caller is the socket loop and the
         # deadline_passed() call below can be a database read; see
@@ -1434,8 +1445,7 @@ class Monitor(daemon.Daemon):
         }
 
     def reap_instance_monitors(self):
-        all_monitors = list(self.monitors.keys())
-        for instance_uuid in all_monitors:
+        for instance_uuid in list(self.monitors.keys()):
             t = self.monitors[instance_uuid]
             if not t['thread'].is_alive():
                 t['thread'].join(1)
@@ -1485,7 +1495,19 @@ class Monitor(daemon.Daemon):
             'thread': sc_thread,
             'instance_uuid': instance_uuid
         }
-        sc_thread.start()
+
+        # A start() which raises (RuntimeError, when the process cannot
+        # make another thread) must not leave the entry behind. The
+        # sweep skips an unstarted thread rather than joining it, so
+        # the entry would never be collected, and while it sits there
+        # the instance looks to the reaper like it has a live executor
+        # -- so an operation left executing on this instance would
+        # never be resolved again for the lifetime of the daemon.
+        try:
+            sc_thread.start()
+        except RuntimeError:
+            del self.executors[instance_uuid]
+            raise
 
         add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
@@ -1511,6 +1533,19 @@ class Monitor(daemon.Daemon):
         all_executors = list(self.executors.keys())
         for executor_id in all_executors:
             t = self.executors[executor_id]
+
+            # ident is None until the thread has been started, and
+            # is_alive() is False then too, so testing liveness alone
+            # would take this branch for an entry which is registered
+            # but not yet running and join() would raise "cannot join
+            # thread before it is started". That entry exists on
+            # purpose -- registering before start() is what stops a
+            # replaced dispatcher generation reaping an operation which
+            # is about to run -- so the window has to be tolerated
+            # here rather than closed there.
+            if t['thread'].ident is None:
+                continue
+
             if not t['thread'].is_alive():
                 t['thread'].join(1)
 
@@ -1522,6 +1557,16 @@ class Monitor(daemon.Daemon):
                 # otherwise start life already aborted if its
                 # constructor's clear were ever removed.
                 daemon.clear_abort_path(t['object'].abort_path)
+
+                # Let the reaper look at this instance on the next
+                # pass rather than making it wait out the rate limit.
+                # An executor which has just died is the case the
+                # reaper exists for, and the peek it costs is one, so
+                # keeping the limiter's clock running here would block
+                # the instance's queue for up to EXECUTOR_REAP_INTERVAL
+                # seconds for no saving worth having.
+                self.reaper_attempts.pop(executor_id, None)
+
                 add_event(
                     EVENT_TYPE_AUDIT, 'instance', t['instance_uuid'],
                     'side channel executor ended',
@@ -1612,12 +1657,27 @@ class Monitor(daemon.Daemon):
             # died with the process and no finally block ever ran, or the
             # thread was swept out by the loop above without resolving
             # it. The evidence either way is the absence of the thread.
+            #
+            # The terminal outcome is fail(), not expire(), because
+            # decision 3 splits the two on what went wrong rather than
+            # on who noticed: a stall which cannot be retried expires,
+            # an executor which went away errors. This is an executor
+            # which went away -- the only difference from the exit
+            # handled in SideChannelExecutorJob.execute()'s finally is
+            # that the process died before the finally could run, and
+            # the same failure should not report differently for that.
+            # The difference is not cosmetic: expired is in
+            # constants.FINAL_OBJECT_STATES and error is not, so
+            # expiring here would sweep the daemon-restart case for
+            # hard deletion while the finally case persisted, and the
+            # restart is the one an operator most wants to still be
+            # able to see.
             log.warning(
                 'Agent operation is executing with no executor; resolving it')
             resolve_abandoned_operation(
                 agentop,
                 'no sidechannel executor was running for this operation',
-                terminal=agentop.expire)
+                terminal=agentop.fail)
             return
 
         if not agentop.deadline_passed(state=state):
@@ -1649,6 +1709,32 @@ class Monitor(daemon.Daemon):
 
     def _request_all_threads_exit(self):
         LOG.info('Requesting all threads exit')
+
+        # Signal everything first, then join. Two reasons, and the
+        # first is a correctness one this phase created.
+        #
+        # Until this phase an executor and its instance's monitor
+        # shared one abort file, so the monitors loop below stopped
+        # every executor as a side effect. Now that each has its own
+        # path, an executor is only signalled by its own
+        # _request_thread_exit() call -- and that method joins and
+        # deletes out of self.monitors whichever dictionary the entry
+        # came from, so it raises KeyError as soon as the monitors
+        # loop has already removed that instance's entry, and there is
+        # no try/except at the call site. The first executor would be
+        # signalled and every executor after it would not, where
+        # previously the shared file meant all of them were. That
+        # bug is #3931, fixed separately in b915cb018 because it
+        # predates this plan; this loop means shutdown does not
+        # depend on which version of that method is in the tree.
+        #
+        # The second reason is plain: _request_thread_exit() joins for
+        # half a second per thread, so signalling inside that loop
+        # makes each thread's notice wait on the previous thread's
+        # join. Threads which are told to stop together stop together.
+        for t in list(self.monitors.values()) + list(self.executors.values()):
+            daemon.set_abort_path(
+                t['object'].abort_path, 'from _request_all_threads_exit')
 
         for instance_uuid in list(self.monitors.keys()):
             self._request_thread_exit(

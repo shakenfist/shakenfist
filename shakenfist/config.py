@@ -278,30 +278,43 @@ class SFConfig(BaseSettings):
             'the expired state, which is distinct from error.'
         )
     )
+    # An attempt is counted at the point the operation transitions to
+    # executing, which is immediately before its first command is
+    # written to the socket. Two consequences worth knowing, neither
+    # of which belongs in text an operator reads:
+    #
+    # A dispatch which never reaches the agent -- the channel will not
+    # open, or the agent never welcomes us -- leaves the operation
+    # queued and costs nothing, because the transition never happens.
+    # Counting dispatches instead would let an instance with a flaky
+    # agent channel burn the whole cap in seconds without a command
+    # ever being sent.
+    #
+    # A socket error on that first send does cost an attempt, since
+    # the counter moves with the state machine rather than with the
+    # wire. That is deliberate: an operation which is executing with
+    # an uncounted attempt would compare against the cap wrongly for
+    # the rest of its life.
+    #
+    # ge=1 rather than ge=0 because 0 does not mean "no retries", it
+    # makes the first cap comparison true and disables retry entirely
+    # while reporting "after 1 attempts" -- indistinguishable in the
+    # logs from a working configuration.
     AGENT_OPERATION_MAX_ATTEMPTS: int = Field(
         3,
         ge=1,
         description=(
-            'The number of times an agent operation may reach the '
-            'executing state before it is allowed to reach a terminal '
+            'The number of times an agent operation may be dispatched '
+            'to the agent before it is allowed to reach a terminal '
             'state, counting the first attempt plus retries -- so the '
-            'default of 3 means one attempt and two retries. An attempt '
-            'is counted when a command is actually sent to the agent, '
-            'not when the sidechannel daemon starts an executor: a '
-            'dispatch which cannot open the channel, or which the agent '
-            'never welcomes, leaves the operation queued and is retried '
-            'without being counted here. This is therefore a bound on '
-            'retries of an operation which reached the agent, and is not '
-            'a bound on dispatch. An operation created with an explicit '
-            'deadline_seconds of 0 and a progress_timeout_seconds of 0 '
-            'has no wall-clock bound at all, and this option does not '
-            'give it one if its executor never connects. Retrying '
-            'restarts the command list from index 0, which an execute '
-            'operation cannot do without repeating a side effect the '
-            'agent cannot take back, so execute operations are never '
-            'retried whatever this is set to. A value below 1 is '
-            'refused at startup rather than accepted as a silent way to '
-            'disable retry.'
+            'default of 3 means one attempt and two retries. It bounds '
+            'retries of an operation which reached the agent, and is '
+            'not a bound on how many times the sidechannel daemon will '
+            'try to dispatch one whose agent it cannot talk to. '
+            'Retrying restarts the command list from index 0, which an '
+            'execute operation cannot do without repeating a side '
+            'effect the agent cannot take back, so execute operations '
+            'are never retried whatever this is set to.'
         )
     )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(

@@ -6,6 +6,7 @@ import tempfile
 import time
 from unittest import mock
 
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations.agentoperation import AgentOperation
@@ -235,6 +236,98 @@ class SideChannelAbortPathTestCase(base.ShakenFistTestCase):
 
         cleared = [c[0][0] for c in clear.call_args_list]
         self.assertNotIn(monitor.abort_path, cleared)
+
+
+class RequestAllThreadsExitTestCase(base.ShakenFistTestCase):
+    """Every thread must be told to stop, whatever happens to the joins.
+
+    Until this phase a monitor and its instance's executor shared one
+    abort file, so the monitors loop stopped every executor as a side
+    effect. Separating the files (which the reaper needs, or its abort
+    for a wedged executor also stops the monitor) removed that
+    accident, and what it was masking is #3931: _request_thread_exit()
+    joins and deletes out of self.monitors whichever dictionary the
+    entry came from, so it raises KeyError once the monitors loop has
+    already removed an entry, with no try/except at the call site.
+    Signalling up front is what makes shutdown independent of that.
+    """
+
+    class _ShutdownMonitor:
+        _request_all_threads_exit = sidechannel.Monitor.\
+            _request_all_threads_exit
+        _request_thread_exit = sidechannel.Monitor._request_thread_exit
+
+        def __init__(self, instances):
+            self.monitors = {}
+            self.executors = {}
+            for uuid in instances:
+                # The monitor threads stop promptly, so the monitors
+                # loop deletes their entries. That is what arms
+                # #3931: the executors loop then reaches into
+                # self.monitors for an entry which is gone. Without
+                # it this fixture would never reproduce the bug,
+                # because a monitor which is still alive is not
+                # deleted and the KeyError never happens.
+                monitor_thread = mock.Mock()
+                monitor_thread.is_alive.return_value = False
+                self.monitors[uuid] = {
+                    'object': mock.Mock(
+                        abort_path=f'/run/sf/sidechannel-{uuid}.abort'),
+                    'thread': monitor_thread,
+                    'instance_uuid': uuid
+                }
+                self.executors[uuid] = {
+                    'object': mock.Mock(
+                        abort_path=(
+                            f'/run/sf/sidechannel-executor-{uuid}.abort')),
+                    'thread': mock.Mock(),
+                    'instance_uuid': uuid
+                }
+
+    def test_every_thread_is_signalled(self):
+        mon = self._ShutdownMonitor(['inst-a', 'inst-b'])
+
+        with mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel.daemon, 'clear_abort_path'), \
+                mock.patch.object(sidechannel.daemon,
+                                  'set_abort_path') as abort:
+            try:
+                mon._request_all_threads_exit()
+            except KeyError:
+                # #3931, which lives in _request_thread_exit() and is
+                # fixed separately. The point of this test is that the
+                # signalling above it has already happened.
+                pass
+
+        signalled = {c[0][0] for c in abort.call_args_list}
+        for uuid in ('inst-a', 'inst-b'):
+            self.assertIn(f'/run/sf/sidechannel-{uuid}.abort', signalled)
+            self.assertIn(
+                f'/run/sf/sidechannel-executor-{uuid}.abort', signalled)
+
+    def test_signalling_happens_before_any_join(self):
+        # Signalling inside the per-thread loop makes each thread's
+        # notice wait on the previous thread's half second join, so
+        # threads told to stop together would not stop together.
+        mon = self._ShutdownMonitor(['inst-a', 'inst-b'])
+        order = []
+
+        for entry in list(mon.monitors.values()) + list(
+                mon.executors.values()):
+            entry['thread'].join.side_effect = (
+                lambda *a, **kw: order.append('join'))
+
+        with mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel.daemon, 'clear_abort_path'), \
+                mock.patch.object(
+                    sidechannel.daemon, 'set_abort_path',
+                    side_effect=lambda *a: order.append('signal')):
+            try:
+                mon._request_all_threads_exit()
+            except KeyError:
+                pass
+
+        self.assertEqual(4, order[:4].count('signal'))
 
 
 class SideChannelPreConnectionWaitTestCase(base.ShakenFistTestCase):
@@ -1263,6 +1356,32 @@ class DispatchRegistrationOrderTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([True], registered_at_start)
 
+    def test_a_failed_start_does_not_leave_the_entry_behind(self):
+        # start() raises RuntimeError when the process cannot make
+        # another thread. The sweep skips an unstarted thread rather
+        # than joining it, so an entry left here would never be
+        # collected -- and while it sat there the instance would look
+        # to the reaper like it had a live executor, so an operation
+        # left executing on it would never be resolved again.
+        mon = _DispatchMonitor()
+        mon.monitors['inst'] = {'object': mock.Mock()}
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+
+        thread = mock.Mock()
+        thread.start.side_effect = RuntimeError('cannot start new thread')
+
+        with mock.patch.object(sidechannel.instance.Instance, 'from_db',
+                               return_value=mock.Mock()), \
+                mock.patch.object(sidechannel, 'SideChannelExecutorJob'), \
+                mock.patch.object(sidechannel.threading, 'Thread',
+                                  return_value=thread), \
+                mock.patch.object(sidechannel, 'add_event'):
+            self.assertRaises(
+                RuntimeError, sidechannel.Monitor.start_instance_executor,
+                mon, 'inst', agentop)
+
+        self.assertEqual({}, mon.executors)
+
     def test_dispatch_alone_records_no_attempt(self):
         # Attempts are counted on the transition into executing, not
         # here. An executor which never reaches the agent leaves the
@@ -1435,7 +1554,10 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         }
 
         if executor_alive is not None:
-            thread = mock.Mock()
+            # ident is set because the reaper skips a thread which has
+            # never been started; see
+            # test_an_unstarted_executor_is_not_joined.
+            thread = mock.Mock(ident=12345)
             thread.is_alive.return_value = executor_alive
             mon.executors[self.INSTANCE] = {
                 'object': mock.Mock(abort_path=self.EXECUTOR_ABORT),
@@ -1468,11 +1590,24 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         self._reap(mon, agentop)
 
         self.assertIn(agentop.state.value, AgentOperation.TERMINAL_STATES)
-        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+
+        # error, not expired. Decision 3 splits the two on what went
+        # wrong rather than on who noticed, and this is an executor
+        # which went away -- the same failure the finally block
+        # handles, differing only in that the process died first. The
+        # difference is load bearing: expired is in
+        # FINAL_OBJECT_STATES and error is not, so expiring here would
+        # sweep the daemon-restart case for hard deletion while the
+        # finally case persisted.
+        self.assertEqual(AgentOperation.STATE_ERROR, agentop.state.value)
         self.assertEqual(
             'no sidechannel executor was running for this operation, and '
             'the operation cannot be safely retried',
-            agentop.expired_reason)
+            agentop.failure_reason)
+        self.assertIn(
+            AgentOperation.STATE_EXPIRED, constants.FINAL_OBJECT_STATES)
+        self.assertNotIn(
+            AgentOperation.STATE_ERROR, constants.FINAL_OBJECT_STATES)
 
     def test_a_retryable_operation_is_requeued_instead(self):
         # The same case for an operation which can be run again: it
@@ -1499,7 +1634,31 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         self._reap(mon, agentop)
 
         self.assertEqual({}, mon.executors)
-        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(AgentOperation.STATE_ERROR, agentop.state.value)
+
+    def test_an_unstarted_executor_is_not_joined(self):
+        # Registering before start() leaves a window in which the
+        # thread exists but has never run, and is_alive() is False for
+        # such a thread exactly as it is for a finished one. join()
+        # raises RuntimeError there, which without the ident guard
+        # would abort the whole reap pass -- and a replaced dispatcher
+        # generation reaping while the old one is mid-dispatch is
+        # precisely the case the registration order exists for.
+        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
+        mon, _ = self._monitor(queue=['an-operation'], executor_alive=False)
+        thread = mon.executors[self.INSTANCE]['thread']
+        thread.ident = None
+        thread.join.side_effect = RuntimeError(
+            'cannot join thread before it is started')
+
+        self._reap(mon, agentop)
+
+        # Not swept, not joined, and not mistaken for an absent
+        # executor: the operation is left alone for the thread to run.
+        self.assertIn(self.INSTANCE, mon.executors)
+        thread.join.assert_not_called()
+        self.assertEqual(
+            AgentOperation.STATE_EXECUTING, agentop.state.value)
 
     def test_sweeping_a_dead_executor_clears_its_abort_path(self):
         # The reaper is the only thing which sets this file and nothing

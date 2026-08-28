@@ -124,3 +124,21 @@ class AgentOperationRetryTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ['results'], mock_update.call_args.kwargs['fields'])
         self.assertEqual({}, mock_update.call_args.args[0].results)
+
+    def test_clear_results_emits_an_event(self):
+        # This is the only place results are destroyed rather than
+        # overwritten. Without an event the operation's stream shows
+        # results appearing and then simply not being there, with
+        # nothing tying the disappearance to the retry which caused
+        # it -- and the project's stated goal is to keep event
+        # coverage good enough to audit from.
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        op.add_result(0, {'stdout': 'hello'})
+        op.add_result(1, {'stdout': 'world'})
+
+        with mock.patch.object(op, 'add_event') as mock_event:
+            op.clear_results()
+
+        mock_event.assert_called_once()
+        self.assertEqual('clear results', mock_event.call_args.args[1])
+        self.assertEqual(2, mock_event.call_args.kwargs['extra']['cleared'])

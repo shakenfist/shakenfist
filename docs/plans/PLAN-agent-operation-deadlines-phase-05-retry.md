@@ -213,6 +213,19 @@ decisions 3, 5 and 6 was found to be wrong.
    message. The distinction survives the retry loop rather than
    collapsing into one outcome.
 
+   **Extended during the second review round** (item 4): the split is
+   on *what went wrong*, not on who noticed, so the reaper's
+   no-executor case errors as well. That case is an executor exit --
+   the only difference from the one handled in `execute()`'s `finally`
+   is that the process died before the `finally` could run -- and the
+   same failure must not report differently for that. The difference
+   is not cosmetic: `expired` is in `constants.FINAL_OBJECT_STATES`
+   and `error` is not, so expiring there would sweep the
+   daemon-restart case for hard deletion while the `finally` case
+   persisted, and the restart is the one an operator most wants to
+   still be able to see. The reaper's wedged-live-executor case still
+   expires, because a passed deadline genuinely is a budget outcome.
+
 4. **Retryability is a property of the whole command list, not of
    the command in flight.** Because retry restarts at index 0, an
    operation containing any non-retryable command must not be
@@ -435,6 +448,8 @@ By inspection, each falsifiable:
 
 ## Review follow-ups
 
+### First round
+
 The automated review of [#3941](https://github.com/shakenfist/shakenfist/pull/3941)
 raised eleven items. All eleven were acted on or answered; the two
 which changed a decision this plan had already taken are corrected at
@@ -454,19 +469,72 @@ their source above rather than only here.
 | 10 | The reaper is documented only in the plan and the code | Deferred to phase 7, which the reviewer agreed is consistent with the agreed scope. Recorded in *Future work* so it is not lost. |
 | 11 | `record_attempt()` is an unlocked read-modify-write | No change, and the reviewer agreed. One thread writes the column, the field mask is correct so there is no cross-attribute lost update, and `record_progress()` has the identical shape. Moving the increment to the executing transition does not add a writer: the executor for an instance is still one thread. |
 
+### Second round
+
+The re-review after those fixes raised twelve more, two of which were
+consequences of the fixes above -- which is what a second round is
+for.
+
+| # | Item | Outcome |
+|---|---|---|
+| 1 | The reaper joins a thread which may never have been started | Fixed, and caused by round one's item 5. Registering before `start()` leaves a window where the thread exists unstarted, where `is_alive()` is False and `join()` raises. The sweep now skips a thread with no `ident`, and a `start()` which raises removes the entry rather than leaving one that can never be collected and that makes the instance look permanently busy to the reaper. |
+| 2 | Executors are no longer aborted on daemon shutdown | Fixed, and caused by round one's item 1. The shared abort file used to stop executors as a side effect of the monitors loop; separating the files removed that accident and exposed [#3931](https://github.com/shakenfist/shakenfist/issues/3931) on the executor teardown path. `_request_all_threads_exit()` now signals every thread before joining any, which is correct whichever version of `_request_thread_exit()` is in the tree, and stops each thread's notice waiting on the previous thread's join. |
+| 3 | A NULL-deadline operation's budget restarts on every retry | Documented in `effective_deadline()`'s docstring and in *Future work* for phase 7's release note. |
+| 4 | The reaper's no-executor case expires where an executor exit errors | Fixed by erroring; decision 3 is extended above with the reasoning and with the `FINAL_OBJECT_STATES` consequence which makes it more than cosmetic. |
+| 5 | `expire_if_out_of_budget()`'s docstring no longer described what it does | Fixed. It is the third comment this phase made stale, after the two survey finding 7 named. |
+| 6 | Queue recovery after an executor dies can wait out the reaper's rate limit | Fixed, though the review rated it not worth doing alone: the dead-executor sweep drops the limiter entry, so the instance is examined on the next pass rather than up to `EXECUTOR_REAP_INTERVAL` later. It costs one extra peek per executor death. |
+| 7 | `clear_results()` emitted no mutate event where `add_result()` does | Fixed. This is the only place results are destroyed rather than overwritten, and `CLAUDE.md` asks for event coverage good enough to audit from. |
+| 8 | The reaper and the cap have no operator-facing documentation | Still deferred to phase 7, with the *Future work* entry expanded to name the three cases, the two blind shapes, the grep-able message strings, and the not-a-bound-on-dispatch rule. |
+| 9 | The config description was a fifteen-line essay | Fixed. The operator-facing text is four sentences; the counting rationale and the `ge=1` justification moved to a comment above the `Field`, where the audience is a developer. |
+| 10 | The unknown-state branch is a good defensive addition | No change; informational. |
+| 11 | No test covered the shutdown path with separated abort files | Fixed alongside item 2. The fixture makes the monitor threads stop promptly, which is what arms #3931's `KeyError` -- without that the test would pass against the bug. |
+| 12 | An attempt is counted just before the send, not after | No change, and the review agreed counting after the send would make the counter lag the state machine. The description now says "dispatched to the agent" rather than "actually sent". |
+
 ## Future work
 
-- **The reaper has no operator-facing documentation.** Review item 10.
-  It is a new recovery mechanism with consequences an operator will
-  see without being told where they come from: `no sidechannel
-  executor was running for this operation` expiries after a daemon
-  restart, and an instance queue which no longer drains on its own
-  once its monitor is gone. `docs/developer_guide/state_machine.md`
-  gains the one new edge in this phase because that page is a
-  rendering of `state_targets`; everything else about timing belongs
-  in the single pass phase 7 makes over the operator and user guides,
-  so the three reaper cases and the two shapes it deliberately cannot
-  see should be written up there.
+- **The reaper and the attempt cap have no operator-facing
+  documentation.** Review items 10 and 8.
+  `docs/developer_guide/state_machine.md` gains the one new edge in
+  this phase because that page is a rendering of `state_targets`;
+  everything else about timing belongs in the single pass phase 7
+  makes over the operator and user guides. What that pass must cover,
+  so it is not rediscovered:
+
+  - The reaper's **three cases**: an operation `executing` with no
+    executor entry (resolved, and erroring when it cannot retry); a
+    live executor whose wall-clock deadline has passed (resolved, then
+    its abort path set); and a live executor still inside its budgets
+    (left entirely alone, because the progress timeout is that
+    executor's own job).
+  - The **two shapes it deliberately cannot see**, both recorded in
+    their own entries below: an instance with no monitor entry, and a
+    `deadline_seconds=0` executor wedged before it connects.
+  - The **message strings an operator will grep for**, since they are
+    what appears in `object_states.message`: `no sidechannel executor
+    was running for this operation`, `the sidechannel executor was
+    wedged and made no progress`, and `sidechannel executor exited
+    before the operation completed`, each suffixed by the reason no
+    retry happened -- `and the operation cannot be safely retried`,
+    `and the operation deadline has passed`, or `after N attempts`.
+  - That `AGENT_OPERATION_MAX_ATTEMPTS` **is not a bound on dispatch**.
+    An operation whose agent channel never opens is re-dispatched
+    without consuming an attempt, so with both timing budgets disabled
+    it is not bounded by this option either.
+  - The **`executing -> queued` retry edge itself**, which is new in
+    any operator-visible state listing.
+
+- **A retry restarts a NULL-deadline operation's budget.** Review
+  item 3. `effective_deadline()` anchors a NULL `deadline` column on
+  the current state's `update_time`, which phase 4 accepted because
+  the budget then restarts at each transition. A retry adds two
+  transitions, so such an operation is handed a fresh
+  `AGENT_OPERATION_DEFAULT_DEADLINE` per attempt and its real ceiling
+  is the attempt cap times the default -- 30 minutes rather than 10,
+  at the shipped values. It is bounded, and it only affects rows
+  written by an API server predating deadlines, so it is a
+  rolling-upgrade property rather than a permanent one. Recorded in
+  the method's docstring and belonging in phase 7's release note
+  beside the other upgrade-visible timing changes.
 
 - **`_request_thread_exit()` operates on the wrong dictionary for
   executors.** Survey finding 8. `daemons/sidechannel/main.py:1297-1310`
