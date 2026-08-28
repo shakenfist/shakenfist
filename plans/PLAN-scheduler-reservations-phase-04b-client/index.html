@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-04b-client/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 00a: Load-aware ordering and system reservations - Shaken Fist</title>
+        <title>Scheduler reservations phase 4b: client support for claims - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-00a-load-aware-ordering-and-system-reservations" class="md-skip">
+        <a href="#scheduler-reservations-phase-4b-client-support-for-claims" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 00a: Load-aware ordering and system reservations
+              Scheduler reservations phase 4b: client support for claims
             
           </span>
         </div>
@@ -13138,10 +13138,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#context" class="md-nav__link">
+  <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Context
+        Prompt
       
     </span>
   </a>
@@ -13149,10 +13149,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#key-references-in-the-existing-code" class="md-nav__link">
+  <a href="#planning-effort" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key references in the existing code
+        Planning effort
       
     </span>
   </a>
@@ -13160,10 +13160,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#decisions-from-the-management-session-discussion" class="md-nav__link">
+  <a href="#situation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Decisions (from the management-session discussion)
+        Situation
       
     </span>
   </a>
@@ -13171,10 +13171,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
+  <a href="#mission-and-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step-level guidance
+        Mission and problem statement
       
     </span>
   </a>
@@ -13182,10 +13182,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-ordering-and-dependencies" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step ordering and dependencies
+        Scope
       
     </span>
   </a>
@@ -13193,10 +13193,110 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
+  <a href="#what-the-survey-found-2026-08-27" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Success criteria
+        What the survey found (2026-08-27)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the survey found (2026-08-27)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#corrections-made-at-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Corrections made at source
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cross-repository-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-repository ordering
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-implementation-established" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the implementation established
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future work
       
     </span>
   </a>
@@ -13211,89 +13311,6 @@
       
     </span>
   </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#review-checklist-for-the-management-session" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Review checklist for the management session
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#measurements-appendix-filled-by-step-00a-1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Measurements (appendix, filled by step 00a-1)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#post-deploy-observation-2026-08-27" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Post-deploy observation (2026-08-27)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Post-deploy observation (2026-08-27)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-was-measured-and-why-three-ways" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What was measured, and why three ways
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-numbers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The numbers
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#one-finding-this-raises-for-phase-6" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One finding this raises, for phase 6
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#method" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Method
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -13318,187 +13335,301 @@
   
 
 
-<h1 id="phase-00a-load-aware-ordering-and-system-reservations">Phase 00a: Load-aware ordering and system reservations<a class="headerlink" href="#phase-00a-load-aware-ordering-and-system-reservations" title="Permanent link">&para;</a></h1>
-<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>This is phase 00a of
-<a href="../PLAN-scheduler-reservations/"><code>PLAN-scheduler-reservations.md</code></a>:
-a set of <strong>static quick wins</strong> that land ahead of the phase 0
-research pass because sfcbr is hurting today. Observed
-2026-07-17: a CI burst stacked three 16 GB VMs onto the 12-core
-network+database node (load ~15) while two idle 24-core nodes
-sat ~90% free.</p>
-<p>The root causes, confirmed in code:</p>
-<ol>
-<li><strong>Load bucketing ignores machine size.</strong> Candidates are
-   bucketed by <code>math.floor(cpu_load_1)</code> — raw load, not
-   normalised by core count (<code>scheduler.py:447-468</code>). An idle
-   24-core node (load 0.5) and a struggling 12-core node
-   (load 0.9) share bucket 0.</li>
-<li><strong>Uniform random selection ignores machine size.</strong> Within
-   the winning bucket, <code>random.shuffle</code> gives a 12-core node
-   the same burst share as a 24-core node
-   (<code>scheduler.py:470-476</code>).</li>
-<li><strong>Node roles are invisible.</strong> <code>is_network_node</code> /
-   <code>is_database_node</code> are published into <code>node_metrics</code>
-   (<code>daemons/resources/main.py:64-66</code>) but never read by the
-   scheduler. There is no CPU analogue of
-   <code>RAM_SYSTEM_RESERVATION</code>, and no extra RAM held back for
-   MariaDB / the network daemons.</li>
-<li><strong>CPU admission never rejects.</strong> The hard check is
-   allocated vCPUs vs <code>cpu_max × CPU_OVERCOMMIT_RATIO</code>
-   (default 16, OpenStack folklore), so a 12-core node admits
-   192 vCPUs. RAM always binds first; the CPU ratio is
-   decorative for CI-shaped (large, correlated) workloads.</li>
-</ol>
-<p>One subtlety constrains the fix: metrics are up to ~60 s stale
-(resources daemon refresh interval) and the scheduler caches
-for <code>SCHEDULER_CACHE_TIMEOUT</code> (5 s), so an entire CI burst
-schedules against one frozen snapshot. The floor()-bucket +
-shuffle is <em>accidentally</em> the only thing preventing a burst
-from stacking onto a single "best" node. Naive fine-grained
-load ranking would make bursts <strong>worse</strong>. Every change below
-preserves spreading within a band of similar nodes.</p>
-<p>Everything in this phase is an ordering / soft-preference or
-published-metric change. Nothing here is throwaway: the
-ordering terms translate mechanically into the ORDER BY /
-tie-break surface of the reservation model (master plan open
-questions 6-7), and the published reservation-adjusted
-capacity fields are exactly what the phase 2 conditional
-INSERT's WHERE clause will reference. The static demand
-constants chosen here are the degenerate case of the learned
-demand model (master plan open question 13).</p>
-<p>No schema changes, no API changes, no new daemons. Callers
-(<code>external_api/instance.py:787-798</code>,
-<code>external_api/admin.py:80</code>,
-<code>operations/node_inst_netdesc_op.py:153</code>) are untouched — the
-<code>find_candidates()</code> interface is unchanged and all three
-benefit automatically.</p>
-<h2 id="key-references-in-the-existing-code">Key references in the existing code<a class="headerlink" href="#key-references-in-the-existing-code" title="Permanent link">&para;</a></h2>
+<h1 id="scheduler-reservations-phase-4b-client-support-for-claims">Scheduler reservations phase 4b: client support for claims<a class="headerlink" href="#scheduler-reservations-phase-4b-client-support-for-claims" title="Permanent link">&para;</a></h1>
+<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
+<p>Before responding to questions or discussion points in this
+document, explore both the shakenfist and client-python
+codebases thoroughly. Read relevant source files, understand
+existing patterns (<code>apiclient</code>'s verb shape and its
+status-code-to-exception mapping, the <code>sf-client</code> click groups,
+the functional suite's relationship to a deployed cluster), and
+ground your answers in what the code actually does today. Do not
+speculate about the codebase when you could read it instead.
+Flag any uncertainty explicitly rather than guessing.</p>
+<p>The client library lives in the <code>shakenfist/client-python</code>
+repository, checked out beside this one. Consult its <code>AGENTS.md</code>
+and <code>CLAUDE.md</code> for its own conventions, which are not identical
+to this repository's.</p>
+<!-- shared-block: plan-file-conventions v1 -->
+<p>Plan file conventions (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+<code>templates/shared-blocks/plan-file-conventions.md</code>):</p>
 <ul>
-<li><code>shakenfist/scheduler.py</code> — <code>_has_sufficient_cpu()</code>
-  (<code>:114-130</code>, the overcommit admission check),
-  <code>_has_sufficient_ram()</code> (<code>:132-165</code>, consumes
-  <code>RAM_SYSTEM_RESERVATION</code> directly from config), the load
-  bucketing (<code>:447-468</code>), the final shuffle (<code>:470-476</code>),
-  <code>summarize_resources()</code> (<code>:478-544</code>, duplicates the
-  admission formulas for the admin API and <strong>must stay
-  consistent</strong>).</li>
-<li><code>shakenfist/daemons/resources/main.py</code> — role flags into
-  metrics (<code>:62-67</code>), CPU counts via libvirt (<code>:69-76</code>),
-  loadavg (<code>:84-92</code>), memory (<code>:94-106</code>), per-instance vCPU /
-  memory totals (<code>:273-277</code>).</li>
-<li><code>shakenfist/util/libvirt.py</code> — <code>get_cpu_map()</code> (<code>:114</code>)
-  wraps <code>getCPUMap()</code>, which returns <strong>logical CPUs
-  (threads)</strong>. <code>cpu_max</code> is therefore a thread count.</li>
-<li><code>shakenfist/config.py</code> — the scheduler options block
-  (<code>:179-201</code>): <code>SCHEDULER_CACHE_TIMEOUT</code>,
-  <code>CPU_OVERCOMMIT_RATIO</code>, <code>RAM_OVERCOMMIT_RATIO</code>,
-  <code>RAM_SYSTEM_RESERVATION</code>, <code>MINIMUM_FREE_DISK</code>. New knobs
-  land here.</li>
-<li><code>shakenfist/tests/test_scheduler.py</code> — 354 lines,
-  metrics-dict driven via the mock helper
-  (<code>set_node_metrics_same()</code>); easy to extend with
-  heterogeneous-cluster cases. Note <code>node1_net</code> is excluded
-  in fixtures only because it is marked <em>not a hypervisor</em> —
-  there is no role awareness to preserve.</li>
-<li><code>tools/sfcbr-capacity.sh</code> in the 33fl repo — per-node
-  load-per-core plus infra-role tags; the validation probe
-  for this phase.</li>
-<li>Intel hybrid topology (P/E cores) is readable from
-  <code>/sys/devices/cpu_core/cpus</code> and <code>/sys/devices/cpu_atom/cpus</code>
-  (absent on non-hybrid parts).</li>
+<li>All planning documents live in <code>docs/plans/</code>.</li>
+<li>Detailed planning gets one plan file per phase. Phase files are
+  named for their master plan, sit in the same directory as it,
+  and append <code>-phase-NN-descriptive</code> before the <code>.md</code> extension.</li>
+<li>The master plan tracks its phases in a table under its Execution
+  section:</li>
 </ul>
-<h2 id="decisions-from-the-management-session-discussion">Decisions (from the management-session discussion)<a class="headerlink" href="#decisions-from-the-management-session-discussion" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Schema migration</td>
+<td>PLAN-thing-phase-01-schema.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>2. Public API</td>
+<td>PLAN-thing-phase-02-api.md</td>
+<td>Not started</td>
+</tr>
+</tbody>
+</table>
 <ul>
-<li><strong>D1 — rank by load per schedulable thread, in coarse
-  buckets, keeping randomised selection within a bucket.</strong>
-  Bucket key: <code>cpu_load_1 / cpu_schedulable</code> quantised to
-  0.25-wide bands. Loadavg counts runnable tasks and logical
-  CPUs run them, so threads (not physical cores) is the
-  semantically matching denominator; both counts are
-  published either way. Coarse bands + randomised selection
-  preserve burst spreading among genuinely similar nodes
-  (see the staleness subtlety above).</li>
-<li><strong>D2 — core-denominated system reservations, computed and
-  published by the resources daemon,</strong> not the scheduler. The
-  daemon knows the role flags and the CPU topology; the
-  scheduler stays dumb and the future conditional-INSERT
-  WHERE clause just references a column that is already
-  there. Policy: reserve <code>CPU_SYSTEM_RESERVATION</code> (default 1)
-  physical cores on every hypervisor for the OS, plus
-  <code>CPU_INFRA_ROLE_RESERVATION</code> (default 1) additional cores
-  if the node carries <strong>any</strong> cluster-wide daemon role
-  (network node or database node — one extra core total, not
-  one per role). Reserved cores convert to threads via
-  <code>ceil(cpu_threads / cpu_cores)</code> threads per core
-  (conservative on hybrid parts where threads-per-core is an
-  average). RAM gets the symmetric treatment:
-  <code>RAM_SYSTEM_RESERVATION</code> stays as-is (2 GB, every node) and
-  a new <code>RAM_INFRA_ROLE_RESERVATION</code> (default 4.0 GB) is
-  added for infra-role nodes; the daemon publishes the
-  combined <code>memory_reserved_mb</code> and the scheduler consumes
-  the published value instead of reading config directly.</li>
-<li><strong>D3 — headroom-weighted selection within the winning
-  bucket.</strong> Replace the uniform <code>random.shuffle</code> with a
-  weighted shuffle where a node's weight is its load headroom
-  toward a target:
-  <code>max(0.1, SCHEDULER_TARGET_LOAD × cpu_schedulable − cpu_load_1)</code>.
-  A 24-core node then draws roughly twice the burst share of
-  a 12-core node even from a stale snapshot, and the "target
-  CPU load per hypervisor" concept from open question 13
-  enters as an ordering input with zero learning machinery.
-  <code>SCHEDULER_TARGET_LOAD</code> (per schedulable thread) defaults
-  to 0.75 pending step 00a-1 measurement. Use the
-  Efraimidis-Spirakis A-Res method (<code>key = u**(1/w)</code>, sort
-  descending) so the <em>whole list</em> is weighted-shuffled
-  without replacement — callers take <code>candidates[0]</code> but
-  fall back down the list on failure, so the tail order
-  matters too.</li>
-<li><strong>D4 — <code>CPU_OVERCOMMIT_RATIO</code> stays thread-denominated but
-  narrows to schedulable threads, with a measured default.</strong>
-  Back-brief outcome (2026-07-17): since loadavg counts
-  against logical CPUs, accounting and admission stay
-  thread-denominated for now — the ratio keeps meaning
-  "vCPUs per logical CPU", only the base narrows from all
-  threads to schedulable threads and the default drops from
-  folklore 16 to the measured value (3.0 — see the
-  Measurements appendix; today's viable packing on plain
-  nodes is 2.3-3.0 vCPUs/thread with RAM binding first, so
-  3.0 preserves normal operation while biting early on
-  reserved-core infra nodes). Admission becomes
-  <code>cpu_total_instance_vcpus + requested &gt; cpu_schedulable × ratio</code>.
-  This is the only user-visible semantic change in the phase;
-  it gets its own commit and a release note (a cluster
-  already past the new cap refuses <em>new</em> schedules until it
-  drains; existing VMs are untouched). A per-core
-  redefinition is deferred until there is evidence
-  thread-counting misranks (revisit alongside open question
-  13's demand model).</li>
-<li><strong>D5 — track P-cores vs E-cores, don't act on them.</strong>
-  Publish <code>cpu_cores_performance</code> / <code>cpu_cores_efficiency</code>
-  when the sysfs paths exist; omit otherwise. No scheduling
-  arithmetic consumes them — SF doesn't pin vCPUs, the kernel
-  scheduler decides core-type placement, and load-per-thread
-  already captures contention. An "effective cores" weighting
-  is deferred until OTel-era measurements justify a
-  coefficient.</li>
-<li><strong>D6 — mixed-version tolerance.</strong> Metrics rows written by a
-  not-yet-upgraded resources daemon lack the new fields. The
-  scheduler must fall back per-node to the old arithmetic
-  (<code>cpu_max</code> threads, config-read RAM reservation, weight 1)
-  when <code>cpu_schedulable</code> is absent. The exposure window is
-  one deploy roll (rows older than 120 s are already
-  ignored), but the scheduler must not crash or misrank
-  during it.</li>
+<li>One commit per logical change, and at minimum one commit per
+  phase. Unrelated changes are not batched into a single commit.
+  Each commit is self-contained: it builds, passes tests, and has
+  a message explaining what changed and why.</li>
 </ul>
-<h2 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h2>
-<p>Steps are sequential and dependent (00a-3 and 00a-4 consume
-fields 00a-2 publishes; 00a-4's default comes from 00a-1).
-Isolation <code>none</code> throughout — the management session reviews
-and commits each step before the next. One commit per step.</p>
-<p>Step 00a-1 is a <strong>management-session task</strong>, not a sub-agent
-task: it needs live sfcbr access and operator judgement about
-an acceptable saturation point.</p>
+<!-- shared-block-end -->
+
+<h2 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h2>
+<p>Planned at high effort. The implementation is mechanical -- five
+verbs over an API that already exists -- but the phase turns on a
+premise that has been repeated in four places and is false, and
+on how a 720-line functional test that asserts status codes moves
+onto a surface that raises exceptions. Both are judgement calls
+that are expensive to get wrong and cheap to decide here.</p>
+<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p>Phase 4 shipped the namespace capacity claims API. The client
+library has no verbs for it, so the only way to reach it is to
+build requests by hand, which is what this repository's own
+functional coverage does: <code>test_namespace_claims.py</code> drives the
+endpoints through <code>apiclient.Client._request_url()</code>, with a
+docstring explaining that this is deliberate and asking the next
+reader not to "fix" it onto verbs until a client release exists.</p>
+<p>That constraint came from phase 4's decision D7, is restated in
+the master plan's stub for this phase, is restated again in
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/364" title="GitHub Issue: shakenfist/client-python #364">client-python#364</a>, and is restated a fourth time in the test's
+own docstring. It says: the collection installs
+<code>shakenfist-client</code> from PyPI, so a test written against new
+<code>apiclient</code> methods cannot pass in CI until a client release
+exists, and no server pull request can produce one.</p>
+<p>The survey below establishes that this is not true, and has not
+been true since 2026-06-24. Cluster CI does not install the
+released client. It builds a wheel from a <code>client-python</code>
+checkout at <code>develop</code> and installs that. A verb merged to the
+client's <code>develop</code> is in this repository's cluster CI on the next
+merge-queue run, with no release involved.</p>
+<p>This phase therefore has less of a dependency than it was
+written to have, and one real one it was not written to have: the
+conductor in phase 4c <em>does</em> run a released client from PyPI, so
+a release still has to be cut -- just not before the functional
+coverage can move.</p>
+<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Give the claims API a client surface worth defending, move this
+repository's functional coverage onto it, and cut the release
+that phase 4c depends on.</p>
+<p>Correct the false premise at each of the four places it is
+written down, so that the next person to touch claims does not
+inherit a constraint that was already gone when it was recorded.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>In scope:</p>
+<ul>
+<li><code>apiclient</code> verbs for the five claim endpoints, in
+  <code>shakenfist/client-python</code>.</li>
+<li>A typed exception for HTTP 503, which the claims API uses for
+  both of its retryable refusals.</li>
+<li><code>sf-client namespace claim</code> CLI verbs.</li>
+<li>Moving
+  <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py</code>
+  onto the verbs.</li>
+<li>Cutting a client release, because phase 4c needs one.</li>
+<li>Correcting the CI premise in the four places it is stated, and
+  documenting how cluster CI actually obtains its client.</li>
+</ul>
+<p>Out of scope:</p>
+<ul>
+<li><strong>Any server change.</strong> The API is shipped and advertised; this
+  phase consumes it.</li>
+<li><strong>A cluster-wide capacity view.</strong> <code>sf-client namespace claim
+  list</code> cannot tell an operator how much unclaimed room is left,
+  because no endpoint publishes <code>cluster_capacity</code>. That is
+  phase 5's "admin capacity view" call site, and inventing an
+  endpoint here would duplicate it.</li>
+<li><strong>Anything about enforcement.</strong> Exceeding a claim is recorded,
+  not refused, in this release. Help text must not promise
+  otherwise; see D4.</li>
+<li><strong>The conductor.</strong> That is phase 4c, which this phase unblocks.</li>
+</ul>
+<h2 id="what-the-survey-found-2026-08-27">What the survey found (2026-08-27)<a class="headerlink" href="#what-the-survey-found-2026-08-27" title="Permanent link">&para;</a></h2>
+<p>Surveyed against shakenfist <code>45332ff81</code> and client-python
+<code>8e04857</code>. The first finding is the reason this phase's scope
+changed.</p>
+<p><strong>1. Cluster CI does not install the released client.</strong> The
+deploy path is: <code>functional-tests.yml</code>'s <code>(collection)</code> matrix →
+the reusable smoke-cluster workflow →
+<code>shakenfist/actions</code>'s <code>build-smoke-cluster</code> action →
+<code>tools/deploy-collection.sh</code>, which invokes the collection's
+example playbook with <code>sf_build_local_wheels=true</code>,
+<code>repo_path=${GITHUB_WORKSPACE}/shakenfist</code> and
+<code>client_repo_path=${GITHUB_WORKSPACE}/client-python</code>. Play 0 of
+<code>examples/_shared/site.yml</code> builds both wheels from those
+checkouts, play 1 copies them to every node, and the node role
+installs the wheel paths instead of the PyPI names
+(<code>roles/node/tasks/bootstrap.yml:150-192</code>). The checkouts come
+from <code>shakenfist/actions</code>'s <code>setup-test-environment</code>, which
+checks out <code>shakenfist/client-python</code> with no <code>ref</code> -- so the
+repository's default branch, <code>develop</code>.</p>
+<p>The local-wheel mechanism landed on 2026-06-24 (<code>05751666e</code>,
+"Add example consumer playbooks for the collection"), which is
+seven weeks before phase 4 wrote D7 around the assumption that
+it did not exist. The premise was stale when it was written, not
+made stale afterwards.</p>
+<p>Two caveats worth stating precisely, because "CI uses develop"
+is easy to over-read. The default for a real operator deploy is
+still the PyPI name, so an unreleased verb reaches CI and
+nothing else. And the conductor (phase 4c) installs a released
+client, so its dependency on a release is real and unaffected by
+this finding.</p>
+<p><strong>2. The functional test asserts status codes, not results.</strong>
+<code>test_namespace_claims.py</code> is 720 lines built on <code>_claim_api()</code>,
+which calls <code>_request_url()</code>, catches the typed exception, and
+returns a <code>(status, body)</code> pair -- because for most of this
+file the <em>status code</em> is the assertion (<code>409</code> for a duplicate
+claim, <code>507</code> for one the cluster cannot promise, <code>503</code> for
+accounting not yet built, <code>404</code> for a claim read through the
+wrong namespace). Two retry wrappers,
+<code>_claim_api_awaiting_accounting()</code> and
+<code>_claim_api_awaiting_headroom()</code>, sit on top of that pair shape
+via <code>shakenfist_ci/retries.py</code>. A naive "move onto verbs" that
+replaced <code>_claim_api()</code> with direct verb calls would have to
+rewrite every assertion in the file and would break both retry
+wrappers. D3 decides how this actually happens.</p>
+<p><strong>3. <code>retries.py</code> is deliberately import-free.</strong> It was added
+six days ago by the #3907 fix and its docstring says it is kept
+free of imports from the rest of the suite <em>and</em> of
+<code>shakenfist_client</code>, so the unit tests in <code>shakenfist/tests</code> can
+load it by path and drive it with a fake clock
+(<code>test_ci_claims_headroom.py</code>). Any design that made the retry
+loop catch <code>apiclient</code> exceptions would break that property and
+the unit test that depends on it.</p>
+<p><strong>4. An unmapped status already raises a usable exception.</strong>
+<code>_actual_request_url()</code> guards its lookup: <code>if r.status_code in
+STATUS_CODES_TO_ERRORS</code> raises the typed class, and anything
+else outside <code>[200, 202]</code> raises a bare <code>APIException</code>
+(<code>apiclient.py:328-337</code>). <code>APIException</code> carries <code>status_code</code>
+and <code>text</code> (<code>apiclient.py:41-47</code>). So a 503 today is
+distinguishable by attribute, not only by message.</p>
+<p><em>Correction at source:</em> the phase 4c plan's finding 3 says a
+caller "must string-match to tell 'retry in a moment' from a
+durable error". That overstates it, and is corrected in that
+plan as part of this planning commit. The recommendation to add
+the mapping is unchanged -- catching <code>ServiceUnavailable</code> reads
+better than inspecting an attribute on a generic exception, and
+phase 4c's decision E6 branches on exactly that distinction --
+but it is ergonomics rather than a gap.</p>
+<p><strong>5. Everything else the phase stub asserts is true.</strong> The
+capability string <code>namespace-claims</code> is advertised
+(<code>external_api/app.py:304-311</code>, checked by
+<code>tests/external_api/test_root.py</code>), and <code>check_capability()</code>
+exists in the client (<code>apiclient.py:253</code>) for a caller that
+wants to feature-detect. Issue <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/364" title="GitHub Issue: shakenfist/client-python #364">client-python#364</a> is open and
+carries an accurate description of the API, including the <code>PUT</code>
+field-mask semantics and the <code>state</code> versus <code>coverage_state</code>
+distinction. The five endpoints are routed as the issue
+describes (<code>external_api/app.py:435-438</code>).</p>
+<p><strong>6. The client has a natural home for CLI verbs.</strong>
+<code>shakenfist_client/commandline/namespace.py</code> is a click group
+with sixteen subcommands including key and trust management, and
+unit tests live beside it in
+<code>shakenfist_client/tests/</code>.</p>
+<p><strong>7. Releases are tag-driven and Michael controls them.</strong>
+<code>RELEASE-SETUP.md</code> describes PyPI trusted publishing from a
+<code>release.yml</code> workflow gated on a GitHub environment with
+required reviewers, triggered by a <code>v*</code> tag. The most recent tag
+is <code>v0.8.3</code>. The master plan's phase stub calls the release
+"outside this repository's control", which is true of <em>this</em>
+repository but reads as though it were outside the project's
+control; it is one tag and one approval.</p>
+<h3 id="corrections-made-at-source">Corrections made at source<a class="headerlink" href="#corrections-made-at-source" title="Permanent link">&para;</a></h3>
+<p>As part of the planning commit:</p>
+<ul>
+<li>The master plan's phase 4b stub no longer says the phase
+  depends on a client release before its functional coverage can
+  move, and says what CI actually installs.</li>
+<li>The phase 4c plan's finding 3 is corrected per finding 4
+  above.</li>
+</ul>
+<p>Three things are deliberately left to the steps that touch
+their files rather than done here: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/364" title="GitHub Issue: shakenfist/client-python #364">client-python#364</a>'s "Why
+this needs an issue rather than just happening" section (step
+5), <code>test_namespace_claims.py</code>'s docstring (step 4), and the
+new <code>docs/developer_guide/ci.md</code> subsection (step 5). The last
+of those is not a correction at all -- nothing in that file is
+wrong -- but a missing fact that has now cost the project one
+deliberate design compromise and four repetitions of a false
+constraint.</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<p><strong>D1. The functional coverage moves before the release, not
+after.</strong> Finding 1 removes the ordering constraint everyone has
+been working around. The only ordering that remains is between
+repositories: the client change must be merged to
+client-python's <code>develop</code> before the shakenfist pull request
+enters the merge queue, because that is when the cluster job
+builds the wheel. Not before the shakenfist PR is <em>opened</em> --
+cluster tests are skipped on <code>pull_request</code> and run on
+<code>merge_group</code>.</p>
+<p><strong>D2. CLI verbs are in scope, though nothing requires them.</strong>
+Issue #364 scopes them out as "a natural companion but not
+required by anything", and that is true of the code. It is not
+true of the phase after next: phase 8 writes an operator guide
+for claims, and an operator guide whose worked examples are
+<code>curl</code> invocations would be a poor outcome for a surface that is
+otherwise complete. A release is also a heavyweight event -- a
+tag plus a human approval -- so the marginal cost of shipping
+the CLI in the same one is close to zero, and the cost of a
+second release later is not. This is the decision most likely to
+be argued with, since it widens a phase whose master-plan stub
+mentions only <code>apiclient</code> verbs.</p>
+<p><strong>D3. The functional test keeps <code>_claim_api()</code> and puts the
+verbs underneath it.</strong> Not a rewrite of every assertion. The
+adapter changes from "call <code>_request_url()</code>, catch the typed
+exception, return <code>(status, body)</code>" to "call the verb, catch the
+typed exception, return <code>(status, body)</code>", reading the pair off
+<code>APIException.status_code</code> and <code>.text</code> per finding 4. Three
+things follow, and all three are why this is the right shape:
+the status-code assertions that are the point of the file
+survive unchanged; <code>retries.py</code> keeps the pair contract and its
+import-free property (finding 3), so
+<code>test_ci_claims_headroom.py</code> keeps passing; and the verbs are
+genuinely exercised, because every request in the file now goes
+through one.</p>
+<p>The alternative -- assert on exception classes directly -- loses
+resolution rather than gaining it: <code>409</code> covers <code>exists</code>,
+<code>below_usage</code> and <code>not_active</code>, which the file distinguishes
+today and would then have to distinguish by message anyway.</p>
+<p><strong>D4. The CLI says what this release actually does.</strong> Exceeding
+a claim is recorded, not refused, until phase 5 flips
+<code>CLAIM_ENFORCEMENT_HARD</code>. Help text that says a claim
+"reserves" or "guarantees" capacity would be wrong in a way an
+operator would only discover by being surprised. The verbs
+describe a claim as a declared ceiling that the cluster
+<em>accounts against</em>, and <code>claim show</code> prints <code>coverage_state</code>
+beside <code>state</code> rather than merging them into one status column
+(#364 asks for this explicitly, and it is the client half of a
+distinction the server was careful about).</p>
+<p><strong>D5. No feature detection in the verbs.</strong> <code>check_capability()</code>
+exists and a caller may use it, but the verbs do not call it:
+against a server without claims the request 404s, which is a
+clear enough answer, and a verb that silently no-oped on an old
+server would be worse than one that failed. The conductor's own
+version gate (phase 4c step 0) is where this actually matters.</p>
+<p><strong>D6. One typed exception, not a family.</strong> Add
+<code>ServiceUnavailableException</code> for 503. Do not add
+claim-specific exception classes for the individual refusal
+reasons: the reason is in the message, the status is on the
+exception, and a class per refusal reason would be a vocabulary
+the server does not itself have.</p>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -13507,390 +13638,201 @@ an acceptable saturation point.</p>
 <th>Model</th>
 <th>Isolation</th>
 <th>Brief for sub-agent</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>00a-1 — measure sfcbr demand</td>
+<td>1</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>worktree</td>
+<td>(client-python) The five verbs and the exception. In <code>shakenfist_client/apiclient.py</code>, add <code>get_namespace_claims(namespace)</code>, <code>get_namespace_claim(namespace, claim_uuid)</code>, <code>create_namespace_claim(namespace, limit_cpus, limit_memory_mb, limit_disk_gb, expires_in_seconds)</code>, <code>update_namespace_claim(namespace, claim_uuid, limit_cpus=None, limit_memory_mb=None, limit_disk_gb=None, expires_in_seconds=None)</code> and <code>delete_namespace_claim(namespace, claim_uuid)</code>, beside the namespace key and trust verbs at <code>:1245-1290</code> and following their shape exactly (build the path by concatenation, <code>self._request_url(...)</code>, return <code>r.json()</code>). Two things are not boilerplate. <code>update_namespace_claim</code> sends <strong>only</strong> the keyword arguments the caller passed -- the server treats the body as a field mask, so sending all four with values read from a previous GET turns a re-date into a resize race; build the data dict from the non-<code>None</code> arguments and let the server reject an empty one. And <code>expires_in_seconds</code> is a duration against the cluster's clock, so pass it through and do not convert a datetime. Add <code>ServiceUnavailableException(APIException)</code> and map <code>503</code> to it in <code>STATUS_CODES_TO_ERRORS</code> (<code>:118-127</code>); read <code>_actual_request_url()</code> at <code>:328-337</code> first to confirm the guarded lookup means this changes an exception's class and nothing else. Unit tests in <code>shakenfist_client/tests/test_client_apiclient.py</code>, following that file's <code>_request_url</code> mocking pattern -- cover each verb's method and path, that <code>update_namespace_claim</code> omits unpassed fields, and that a 503 now raises the new class. Read <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/364" title="GitHub Issue: shakenfist/client-python #364">client-python#364</a> for the API detail. Commit subject: <code>Add namespace capacity claim verbs.</code></td>
+<td>Proposed, not merged: <a href="https://github.com/shakenfist/client-python/pull/375">client-python#375</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>worktree</td>
+<td>(client-python) CLI verbs, per D2 and D4. Add a <code>claim</code> subgroup to the <code>namespace</code> click group in <code>shakenfist_client/commandline/namespace.py</code>, following the key and trust subcommands' patterns for arguments, <code>shell_complete</code> and output formatting: <code>namespace claim list &lt;namespace&gt;</code>, <code>claim show &lt;namespace&gt; &lt;uuid&gt;</code>, <code>claim create &lt;namespace&gt; --cpus --memory-mb --disk-gb --expires-in</code>, <code>claim update &lt;namespace&gt; &lt;uuid&gt; [--cpus] [--memory-mb] [--disk-gb] [--expires-in]</code> and <code>claim delete &lt;namespace&gt; &lt;uuid&gt;</code>. <code>update</code> passes through only the options the operator supplied, for the field-mask reason in step 1 -- click's default of <code>None</code> for an unsupplied option is what makes that natural, so do not give them defaults. Output must print <code>coverage_state</code> beside <code>state</code> as two columns and never merge them (D4). Help text describes a claim as capacity the cluster accounts against, not capacity it reserves or guarantees, because exceeding a claim is recorded rather than refused in this release. Do not add a "how much room is left" display: no endpoint publishes cluster totals, and that view is phase 5's. Tests beside <code>shakenfist_client/tests/test_client_commandline_instance.py</code>, mirroring its approach. Commit subject: <code>Add namespace claim commands to sf-client.</code></td>
+<td>Proposed, not merged: <a href="https://github.com/shakenfist/client-python/pull/375">client-python#375</a>, which carries steps 1 and 2 together</td>
+</tr>
+<tr>
+<td>3</td>
 <td>n/a</td>
 <td>management session</td>
 <td>none</td>
-<td>Sample <code>node_metrics</code> on sfcbr across several CI bursts (via <code>tools/sfcbr-capacity.sh</code> in 33fl and/or direct <code>sf-ctl</code> / DB queries): per node, record <code>cpu_load_1</code>, <code>cpu_total_instance_vcpus</code>, <code>cpu_max</code>, core count, roles. Compute the achieved demand-per-vCPU (<code>load / allocated vCPUs</code>) at points where load-per-thread crosses ~0.75-1.0. Outputs, recorded in a <strong>Measurements</strong> appendix to this plan: (a) the chosen <code>CPU_OVERCOMMIT_RATIO</code> per-core default; (b) confirmation or revision of <code>SCHEDULER_TARGET_LOAD = 0.75</code>; (c) the observed demand-per-vCPU range, as the seed constant for open question 13. If burst sampling is impractical quickly, proceed with the hypothesis values and mark the appendix provisional — do not block 00a-2/00a-3.</td>
+<td>(client-python) Merge steps 1 and 2 to <code>develop</code>, then cut a release: tag <code>v0.8.4</code> and approve the <code>release</code> environment per <code>RELEASE-SETUP.md</code>. The release is not needed for step 4 (finding 1) but is needed by phase 4c, and cutting it here means one release rather than two. Confirm the release appears on PyPI before phase 4c's step 0 gate is evaluated.</td>
+<td>Not started</td>
 </tr>
 <tr>
-<td>00a-2 — resources daemon: topology + reservations</td>
-<td>medium</td>
-<td>opus</td>
-<td>none</td>
-<td>In <code>daemons/resources/main.py</code> <code>_get_stats()</code>: publish <code>cpu_cores</code> (<code>psutil.cpu_count(logical=False)</code>), <code>cpu_threads</code> (<code>psutil.cpu_count(logical=True)</code>; keep <code>cpu_max</code> as-is for compatibility), and on Intel hybrid parts <code>cpu_cores_performance</code> / <code>cpu_cores_efficiency</code> parsed from <code>/sys/devices/cpu_core/cpus</code> and <code>/sys/devices/cpu_atom/cpus</code> (CPU-list format, e.g. <code>0-15</code>; omit both fields when the paths are absent). Compute <code>cpu_cores_reserved = CPU_SYSTEM_RESERVATION + (CPU_INFRA_ROLE_RESERVATION if config.NODE_IS_NETWORK_NODE or config.NODE_IS_DATABASE_NODE else 0)</code>, <code>threads_per_core = ceil(cpu_threads / cpu_cores)</code>, <code>cpu_schedulable = max(1, cpu_threads - cpu_cores_reserved * threads_per_core)</code>, <code>cpu_cores_schedulable = max(1, cpu_cores - cpu_cores_reserved)</code>; publish all of these. Publish <code>memory_reserved_mb = int((config.RAM_SYSTEM_RESERVATION + (config.RAM_INFRA_ROLE_RESERVATION if infra-role else 0)) * 1024)</code>. Add to <code>config.py</code> next to the existing scheduler options (<code>:179-201</code>): <code>CPU_SYSTEM_RESERVATION: int = Field(1, ...)</code>, <code>CPU_INFRA_ROLE_RESERVATION: int = Field(1, ...)</code>, <code>RAM_INFRA_ROLE_RESERVATION: float = Field(4.0, ...)</code> with descriptions saying cores (not threads) and GB, and that infra-role means network node or database node. Unit tests: reservation arithmetic for HT (2 threads/core), non-HT, and hybrid (24 threads / 16 cores → ceil = 2) topologies; infra-role vs plain hypervisor; sysfs absent → no P/E fields; <code>cpu_schedulable</code> floor of 1. Guard the sysfs parsing with try/except (log and omit on parse failure). Commit subject: <code>resources: publish CPU topology and system reservations.</code></td>
-</tr>
-<tr>
-<td>00a-3 — scheduler: load-per-thread ordering + weighted selection</td>
+<td>4</td>
 <td>high</td>
 <td>opus</td>
-<td>none</td>
-<td>In <code>scheduler.py</code>, replace the load bucketing (<code>:447-468</code>): per candidate, <code>denom = metrics.get('cpu_schedulable') or metrics.get('cpu_max', 1)</code> (D6 fallback), <code>normalised = cpu_load_1 / denom</code>, bucket key <code>math.floor(normalised / 0.25)</code>. Keep the existing lowest-bucket-wins structure and event shape; extend <code>load_detail</code> with <code>cpu_load_1</code>, <code>cpu_schedulable</code>, <code>normalised_load</code>, <code>bucket</code>. Replace the final <code>random.shuffle</code> (<code>:470-476</code>) with an Efraimidis-Spirakis weighted shuffle over the winning bucket: <code>weight = max(0.1, config.SCHEDULER_TARGET_LOAD * denom - cpu_load_1)</code>, sort by <code>random.random() ** (1.0 / weight)</code> descending; record per-node weights in the final-candidates audit event. Add <code>SCHEDULER_TARGET_LOAD: float = Field(0.75, ...)</code> to <code>config.py</code> (description: target sustained load per schedulable thread used for selection weighting). Unit tests (extend <code>tests/test_scheduler.py</code>, seed <code>random</code> for determinism): (a) <strong>sfcbr regression case</strong> — a 12-thread node at load 9 plus two 24-thread idle nodes: the loaded node must not be in the winning bucket even though floor(raw load) logic would have needed load ≥ 1.0 differences; (b) heterogeneous idle nodes land in the same bucket (spreading preserved); (c) weighted selection: over many seeded draws, a node with 2× headroom wins first place roughly 2× as often (assert a loose ratio band, not exact); (d) D6 fallback: a metrics row without <code>cpu_schedulable</code> schedules without error using <code>cpu_max</code>; (e) existing tests still pass unmodified where behaviour is unchanged. Commit subject: <code>scheduler: rank by load per schedulable thread.</code></td>
+<td>worktree</td>
+<td>(shakenfist) Move the functional coverage onto the verbs, per D3. In <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py</code>, change <code>_claim_api()</code> (<code>:180-204</code>) to dispatch to the client verbs instead of <code>_request_url()</code>, reading the returned <code>(status, body)</code> pair off <code>APIException.status_code</code> and <code>.text</code> for the failure path and returning <code>(200, result)</code> for the success path. Keep the method's signature and contract, so <code>_claim_api_awaiting_accounting()</code>, <code>_claim_api_awaiting_headroom()</code> and every assertion in the file are untouched -- and so <code>shakenfist_ci/retries.py</code> keeps its pair contract and its freedom from <code>shakenfist_client</code> imports, which <code>shakenfist/tests/test_ci_claims_headroom.py</code> asserts by loading it by path. <code>_claims_url()</code> and <code>_claim_url()</code> become namespace and uuid arguments rather than paths; keep or remove them as the dispatch makes natural, but do not leave a helper that builds a URL nothing uses. Then rewrite the file's "Why this file reaches past the client library" docstring section: it currently explains a constraint that no longer exists, and should instead say that the verbs are what an operator uses and so what this file defends, and note that cluster CI builds the client from a <code>develop</code> checkout rather than installing the release. This step cannot be verified on a <code>pull_request</code> run -- the <code>(collection)</code> matrix is skipped there and runs on <code>merge_group</code> (<code>docs/developer_guide/coding_rules.md:341-352</code>) -- so drive the changed helper against a real cluster before proposing the commit, per that same rule. Requires step 1 merged to client-python's <code>develop</code> first. Commit subject: <code>tests: drive claims through the client verbs.</code></td>
+<td>Complete</td>
 </tr>
 <tr>
-<td>00a-4 — admission + summarize_resources on reserved capacity</td>
-<td>medium</td>
-<td>opus</td>
-<td>none</td>
-<td>In <code>scheduler.py</code> <code>_has_sufficient_cpu()</code> (<code>:114-130</code>): <code>hard_max_cpus = metrics.get('cpu_schedulable', metrics.get('cpu_max', 0)) * config.CPU_OVERCOMMIT_RATIO</code> — the ratio stays thread-denominated (D4) but multiplies schedulable threads, falling back to the old all-threads count for un-upgraded rows (D6; slightly generous during the roll, which is the safe direction). Change the <code>CPU_OVERCOMMIT_RATIO</code> default in <code>config.py</code> from 16 to 3.0 (measured, see appendix) and rewrite its description to say vCPUs per schedulable logical CPU (thread). In <code>_has_sufficient_ram()</code> (<code>:132-165</code>): <code>reserved = metrics.get('memory_reserved_mb', config.RAM_SYSTEM_RESERVATION * 1024)</code>; subtract that instead of the direct config read. Update <code>summarize_resources()</code> (<code>:478-544</code>) to use identical arithmetic for <code>cpu_available</code> and <code>ram_max_per_instance</code> so the admin resources API agrees with admission. Update rejection-reason dicts to include the new fields (<code>cpu_cores_schedulable</code>, <code>memory_reserved_mb</code>) so audit events stay diagnosable. Unit tests: admission flips at the schedulable-thread boundary; infra-role node admits less than an identical plain node; RAM check honours published reservation and falls back to config; <code>summarize_resources</code> matches <code>_has_sufficient_cpu</code> for the same inputs. Add a release note (<code>docs/release_notes/</code> if present, else the changelog convention in the repo) covering the ratio semantic change and the drain caveat. Commit subject: <code>scheduler: admit against reserved, core-denominated capacity.</code></td>
-</tr>
-<tr>
-<td>00a-5 — docs + validation</td>
+<td>5</td>
 <td>medium</td>
 <td>sonnet</td>
-<td>none</td>
-<td>Documentation: update <code>docs/operator_guide/</code> with a scheduler page (create if missing) covering the ordering model (load per schedulable thread, coarse buckets, headroom-weighted selection), the reservation knobs (<code>CPU_SYSTEM_RESERVATION</code>, <code>CPU_INFRA_ROLE_RESERVATION</code>, <code>RAM_SYSTEM_RESERVATION</code>, <code>RAM_INFRA_ROLE_RESERVATION</code>), the new <code>CPU_OVERCOMMIT_RATIO</code> semantics with the migration note, and <code>SCHEDULER_TARGET_LOAD</code>. Touch <code>ARCHITECTURE.md</code> (scheduler section) and <code>AGENTS.md</code> (point at the new metrics fields). Validation: extend or add a <code>deploy/shakenfist_ci/cluster_ci_tests</code> assertion that a node's published metrics include <code>cpu_schedulable</code> and <code>memory_reserved_mb</code> and that an infra-role node reports reduced schedulable capacity. Post-deploy sfcbr validation is a management-session task: run a CI burst, confirm via <code>tools/sfcbr-capacity.sh</code> that the network+DB node no longer takes a disproportionate share; record the observation in this plan. Commit subject: <code>docs, tests: load-aware scheduling and system reservations.</code></td>
+<td>worktree</td>
+<td>(shakenfist) The documentation half. Add a short subsection to <code>docs/developer_guide/ci.md</code> saying how cluster CI obtains its code: the <code>(collection)</code> matrix deploys through <code>shakenfist/actions</code>, which checks out <code>shakenfist</code>, <code>client-python</code> and <code>agent-python</code> (the triggering repository at its ref, the others at <code>develop</code>), and <code>tools/deploy-collection.sh</code> passes <code>sf_build_local_wheels=true</code> so the collection builds and installs wheels from those checkouts rather than the PyPI packages an operator would get. Say the consequence plainly, because it is the part that was missed for two months: an unreleased client change is available to cluster CI as soon as it merges to the client's <code>develop</code>. Then close the loop on <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/364" title="GitHub Issue: shakenfist/client-python #364">client-python#364</a> -- comment correcting its "Why this needs an issue rather than just happening" section and close it if steps 1 and 2 satisfy it. Commit subject: <code>docs: say where CI gets its client from.</code></td>
+<td>Complete, except the GitHub half (correcting and closing <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/364" title="GitHub Issue: shakenfist/client-python #364">client-python#364</a>), which waits on the release</td>
+</tr>
+<tr>
+<td>6</td>
+<td>low</td>
+<td>sonnet</td>
+<td>worktree</td>
+<td>(shakenfist) Close-out. Set the phase 4b row to <code>Complete</code> in the master plan Execution table and confirm <code>docs/plans/index.md</code>'s arithmetic. Check the phase 4c plan's step 0 gate now reads true (a released client carrying the verbs) and say so in that plan rather than leaving the reader to check PyPI. Commit subject: <code>scheduler: close out phase 4b.</code></td>
+<td>Not started</td>
 </tr>
 </tbody>
 </table>
-<h2 id="step-ordering-and-dependencies">Step ordering and dependencies<a class="headerlink" href="#step-ordering-and-dependencies" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>00a-1 first</strong> (or in parallel with 00a-2); its outputs
-  gate only 00a-4's default value. If measurement stalls,
-  00a-4 proceeds with hypothesis values and the appendix is
-  marked provisional.</li>
-<li><strong>00a-2 before 00a-3 and 00a-4</strong> — both consume the
-  published fields (though both carry D6 fallbacks, tests
-  target the new fields).</li>
-<li><strong>00a-3 and 00a-4 are independent of each other</strong> but run
-  sequentially, one commit each. 00a-3 is the higher-risk
-  change (ordering behaviour); land and soak it first.</li>
-<li><strong>00a-5 last.</strong></li>
+<h3 id="cross-repository-ordering">Cross-repository ordering<a class="headerlink" href="#cross-repository-ordering" title="Permanent link">&para;</a></h3>
+<p>D1's ordering constraint is checked here rather than left to
+memory, because the failure it produces reads as a claims bug.</p>
+<p>Steps 1 and 2 are proposed together as
+<a href="https://github.com/shakenfist/client-python/pull/375">client-python#375</a>
+(branch <code>namespace-claim-verbs</code>), which adds all five verbs and
+<code>ServiceUnavailableException</code>, and whose checks are green. As of
+2026-08-28 it is <strong>open, not merged</strong>.</p>
+<p>Until it is on client-python's <code>develop</code>, the step 4 branch must
+not enter this repository's merge queue: the collection builds
+the client wheel from that checkout, so every test in
+<code>test_namespace_claims.py</code> would die with <code>AttributeError</code> --
+which <code>_claim_api()</code> does not catch -- and the <code>(collection)</code>
+matrix is skipped on <code>pull_request</code>, so nothing before the merge
+queue would notice. The pull request opening this work says so in
+its first paragraph.</p>
+<p>When #375 merges, record its merge commit here and set steps 1
+and 2 to <code>Complete</code>.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<p><strong>The two-repository ordering goes wrong.</strong> A shakenfist pull
+request that reaches the merge queue before the client change is
+on client-python's <code>develop</code> fails its cluster jobs, and the
+failure looks like a claims bug rather than an ordering mistake.
+Mitigated by D1 stating the ordering explicitly and by step 4's
+brief naming step 1 as a prerequisite. Checked by the management
+session before the step 4 branch is enqueued.</p>
+<p><strong>Step 4 cannot be verified on a pull request.</strong> The
+<code>(collection)</code> matrix is skipped on <code>pull_request</code>, so a green
+PR says nothing about whether the rewritten helper works -- the
+exact trap <code>coding_rules.md</code> documents with the federation test
+that died in <code>setUp</code> for four commits. Mitigated by the step's
+brief requiring the helper to be driven against a real cluster
+before the commit is proposed, which is cheap: the file's own
+helpers are importable given a scratch venv, and sfcbr is
+available.</p>
+<p><strong>Cluster CI is exposed to the client's <code>develop</code>.</strong> Finding 1
+cuts both ways: an unrelated regression merged to client-python
+breaks this repository's cluster CI with no change here. That is
+already true today and is not introduced by this phase, but it
+is now written down, which makes it something someone can decide
+about later. Recorded as future work rather than addressed.</p>
+<p><strong>The release stalls.</strong> Step 3 needs a human approval, and phase
+4c's step 0 gates on it. If the release does not happen, phase
+4b's own work is still complete and phase 4c waits -- which is
+the honest outcome and does not block phases 5 through 9.</p>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No <em>call</em> to <code>_request_url</code> remains in
+      <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_namespace_claims.py</code>.
+      The name still appears once, in the docstring explaining what the
+      file used to do and why that reasoning was wrong, which is worth
+      keeping.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>shakenfist/tests/test_ci_claims_headroom.py</code> still passes,
+      and <code>shakenfist_ci/retries.py</code> still imports nothing from
+      <code>shakenfist_client</code>.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The <code>(collection)</code> matrix passes with the rewritten test,
+      observed in a merge-queue run rather than inferred from a
+      pull request.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>sf-client namespace claim show</code> prints <code>state</code> and
+      <code>coverage_state</code> as separate values.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>update_namespace_claim</code> with one keyword argument sends a
+      body with one key, asserted by a unit test.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A <code>shakenfist-client</code> release carrying the verbs is on
+      PyPI, and phase 4c's step 0 gate reads true.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No document in either repository still says a client
+      release is required before functional coverage can use the
+      verbs: the master plan stub, the test docstring, and
+      <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/364" title="GitHub Issue: shakenfist/client-python #364">client-python#364</a> are each corrected or closed. This
+      repository's three sites are corrected; #364 is closed by
+      step 5's GitHub half, which waits on the release.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/developer_guide/ci.md</code> says where cluster CI gets its
+      client from.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes in each repository.</li>
 </ul>
-<h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<h2 id="what-the-implementation-established">What the implementation established<a class="headerlink" href="#what-the-implementation-established" title="Permanent link">&para;</a></h2>
+<p>Recorded here as it was found, because two of these were open questions
+the plan asked to have answered before code was written.</p>
+<p><strong>An over-large claim on a claim-free namespace answers 507</strong>, as
+<code>InsufficientResourcesException</code>, with a per-dimension body: <code>the
+cluster does not have the capacity to promise this claim: cpus (limit
+234, used 114, requested 100000)</code>. Checked against sfcbr on 2026-08-27.
+The same request against a namespace which <em>already</em> holds a claim
+answers 409, because the <code>exists</code> branch is evaluated first -- which is
+what the phase 4a soak recorded, and why its "impossible claim is
+refused" line said 409 rather than 507. This answers phase 4c's step 2
+open question directly: the conductor creates its claim on a namespace
+it has just made, so the refusal it must handle is 507, and E6's first
+branch catches <code>InsufficientResourcesException</code>.</p>
+<p><strong>Every dispatch path of the rewritten <code>_claim_api()</code> behaves against a
+real cluster.</strong> Collection and single <code>GET</code>, <code>POST</code>, a refused second
+<code>POST</code>, a <code>PUT</code> naming no fields (400), a <code>PUT</code> naming one dimension
+(the others unmoved), a cross-namespace read (404, not disclosed),
+<code>DELETE</code>, and <code>DELETE</code> of a claim already gone (404). D3's claim that no
+assertion in the file needed to change held.</p>
+<p><strong>The dispatch is guarded within this repository.</strong>
+<code>test_ci_claims_headroom.py</code> already parsed the claims suite's AST,
+because <code>shakenfist_client</code> is not a test dependency here; it now also
+asserts that <code>_claim_api()</code> names exactly the five verbs and that no
+call to <code>_request_url()</code> survives. That catches a typo or a rename
+seconds after the edit rather than at the merge gate, which is the only
+place the <code>(collection)</code> matrix runs. It cannot check the names against
+an installed client -- that skew is what the ordering record above is
+for. Both assertions were mutation-tested: renaming a verb and
+reintroducing a <code>_request_url()</code> call each fail exactly the guard that
+names them.</p>
+<p><strong>The headroom-tolerant wiring is real, not decorative.</strong> Routing
+<code>_create_claim</code> off <code>_claim_api_awaiting_headroom</code> fails exactly one
+test in <code>test_ci_claims_headroom.py</code>, so the assertion added by the
+issue-3907 fix does what it says.</p>
+<h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
-<li>The sfcbr incident shape is a regression test: a loaded
-  small node ranks below idle large nodes even when every
-  raw load is in today's bucket 0.</li>
-<li>Burst spreading is preserved: similar idle nodes share a
-  bucket and weighted selection distributes across them
-  (seeded statistical test, loose bounds — no flaky
-  assertions).</li>
-<li>An infra-role (network / database) node publishes and is
-  scheduled against reduced CPU and RAM capacity; a plain
-  hypervisor loses exactly one core and 2 GB.</li>
-<li><code>summarize_resources()</code> and admission use identical
-  arithmetic (asserted by test, not inspection).</li>
-<li>A metrics row from an un-upgraded resources daemon
-  schedules correctly via the fallbacks (no crash, no
-  misrank beyond old behaviour).</li>
-<li><code>CPU_OVERCOMMIT_RATIO</code> default is either measured or
-  explicitly marked provisional in the Measurements
-  appendix; the semantic change has a release note.</li>
-<li>P/E core counts appear in <code>node_metrics</code> on hybrid
-  hardware and are absent (not zero, not crashing) elsewhere;
-  nothing consumes them yet.</li>
-<li><code>pre-commit run --all-files</code> passes.</li>
-<li>Post-deploy: a real sfcbr CI burst observed via
-  <code>tools/sfcbr-capacity.sh</code> no longer concentrates on the
-  network+DB node; observation recorded here.</li>
+<li><strong>Pinning the client for cluster CI.</strong> Building from
+  <code>develop</code> gives fast feedback and couples two repositories'
+  CI. Whether that trade is right is a question this phase
+  raises and does not answer.</li>
+<li><strong>A cluster capacity endpoint</strong>, so <code>claim list</code> can show an
+  operator how much unclaimed room is left. Phase 5's admin
+  capacity view is where this belongs.</li>
+<li><strong>Client-side claim helpers for the conductor's shape</strong> --
+  "create a claim sized to this footprint, or tell me it was
+  refused" -- if phase 4c finds itself writing the same wrapper
+  twice.</li>
 </ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
-<p>Before executing, back-brief the operator: confirm the
-decision set (D1-D6), especially (a) threads vs cores as the
-load denominator, (b) the one-extra-core-total (not per-role)
-infra reservation, (c) <code>RAM_INFRA_ROLE_RESERVATION = 4.0</code> GB
-default, (d) the 0.25 bucket width and <code>SCHEDULER_TARGET_LOAD
-= 0.75</code> placeholder, and (e) whether 00a-1 measurement happens
-before or in parallel with implementation.</p>
-<p><strong>Back-brief outcomes (2026-07-17):</strong> (a) threads confirmed as
-the accounting and load denominator "at least for now", since
-loadavg counts against logical CPUs — D4 revised accordingly
-(track cores, decide on threads); (b) confirmed; (c) 4.0 GB
-confirmed as a configurable default; (d) confirmed, and
-<code>SCHEDULER_TARGET_LOAD = 0.75</code> upgraded from placeholder to
-measured (appendix); (e) measurement ran first — appendix
-filled from live sfcbr snapshots. Implement all of 00a, then
-soak on sfcbr.</p>
-<h2 id="review-checklist-for-the-management-session">Review checklist for the management session<a class="headerlink" href="#review-checklist-for-the-management-session" title="Permanent link">&para;</a></h2>
-<p>Standard checklist from the master plan, plus:</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The weighted shuffle is without replacement over the
-      whole winning bucket (callers walk the list on
-      failure) — not a single weighted draw.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No behaviour change for the forced-candidate path
-      (<code>placed_on</code>): reservations still apply to admission,
-      ordering is irrelevant there.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Audit <code>load_detail</code> / final-candidates events carry at
-      least as much diagnostic detail as before (raw load,
-      normalised load, bucket, weight per node).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> All three <code>Scheduler()</code> call sites still behave (no
-      interface change leaked).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The D6 fallbacks are per-node, not global — a mixed
-      snapshot (some upgraded rows, some not) must not poison
-      ranking for upgraded nodes.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> mypy coverage on the touched scheduler code is at least
-      as good as before.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Randomised tests are seeded; no statistical flake
-      surface in CI.</li>
-</ul>
-<h2 id="measurements-appendix-filled-by-step-00a-1">Measurements (appendix, filled by step 00a-1)<a class="headerlink" href="#measurements-appendix-filled-by-step-00a-1" title="Permanent link">&para;</a></h2>
-<p>Sampled 2026-07-17 from live sfcbr snapshots during active CI
-(<code>tools/sfcbr-capacity.sh</code> plus per-node libvirt / loadavg
-probes). Point-in-time samples, not a tracked burst peak; the
-burst figure below is estimated from the 2026-07-17 incident.</p>
-<table>
-<thead>
-<tr>
-<th>node</th>
-<th>CPU</th>
-<th>cores/threads</th>
-<th>roles</th>
-<th>vCPUs alloc</th>
-<th>load1</th>
-<th>load15</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>sf-1</td>
-<td>Ryzen 5 3600</td>
-<td>6/12</td>
-<td>N+D+H</td>
-<td>36</td>
-<td>4.66</td>
-<td>12.23</td>
-</tr>
-<tr>
-<td>sf-2</td>
-<td>Ryzen 5 3600</td>
-<td>6/12</td>
-<td>D+H</td>
-<td>0</td>
-<td>0.75</td>
-<td>4.54</td>
-</tr>
-<tr>
-<td>sf-3</td>
-<td>Ryzen 5 3600</td>
-<td>6/12</td>
-<td>H</td>
-<td>28</td>
-<td>4.51</td>
-<td>6.21</td>
-</tr>
-<tr>
-<td>sf-4</td>
-<td>Ryzen 5 3600</td>
-<td>6/12</td>
-<td>H</td>
-<td>32</td>
-<td>7.21</td>
-<td>7.57</td>
-</tr>
-<tr>
-<td>sf-5</td>
-<td>i9-12900</td>
-<td>16/24</td>
-<td>H</td>
-<td>0</td>
-<td>0.17</td>
-<td>7.16</td>
-</tr>
-<tr>
-<td>sf-6</td>
-<td>i9-12900</td>
-<td>16/24</td>
-<td>H</td>
-<td>9</td>
-<td>1.05</td>
-<td>5.14</td>
-</tr>
-</tbody>
-</table>
-<p>Findings:</p>
-<ul>
-<li><strong>Achieved packing today</strong>: busy plain nodes run 2.3-3.0
-  allocated vCPUs per thread with RAM binding first. The
-  incident node (sf-1, N+D+H) at 3.0 vCPUs/thread is the
-  crush case the reservations are designed to prevent.</li>
-<li><strong>Chosen <code>CPU_OVERCOMMIT_RATIO</code> (per schedulable thread,
-  D4): 3.0.</strong> Preserves today's viable packing on plain nodes
-  (where RAM continues to bind first) while capping infra
-  nodes meaningfully once reserved cores are subtracted: sf-1
-  (2 reserved cores → 8 schedulable threads) caps at 24
-  vCPUs vs 36 allocated at measurement time and 192 under
-  the old default.</li>
-<li><strong><code>SCHEDULER_TARGET_LOAD</code> (per schedulable thread): 0.75</strong>
-  confirmed. sf-1 at load15/threads ≈ 1.0 was degraded; the
-  incident at ~1.25 sustained was an outage-shaped problem.</li>
-<li><strong>Observed demand-per-vCPU</strong> (<code>cpu_load_1 /
-  allocated_vcpus</code>): 0.12-0.35 in steady CI; burst peak
-  estimated ~0.6 from the incident (load ~15 on ~24
-  allocated vCPUs). Seed constant for open question 13's
-  expected-demand model: ~0.33 steady / 0.6 conservative.</li>
-<li><strong>P/E sysfs validated on real hardware</strong>: i9-12900 nodes
-  report <code>/sys/devices/cpu_core/cpus</code> = <code>0-15</code> and
-  <code>/sys/devices/cpu_atom/cpus</code> = <code>16-23</code>; the paths are
-  absent on the AMD nodes (D5's omit-when-absent behaviour
-  is correct).</li>
-<li>Incidental: sf-5 was NOT-READY (<code>/readyz</code> failing, zero
-  VMs, host reachable) at measurement time — unrelated to
-  this plan, flagged to the operator.</li>
-</ul>
-<h2 id="post-deploy-observation-2026-08-27">Post-deploy observation (2026-08-27)<a class="headerlink" href="#post-deploy-observation-2026-08-27" title="Permanent link">&para;</a></h2>
-<p>The last outstanding item of this phase: a real sfcbr CI burst,
-observed to check that placement no longer concentrates on the
-network+database node. The burst was a full day of ordinary CI
-load, and the observation ran for an hour of it.</p>
-<p><strong>The criterion is met.</strong> Placement does not concentrate on
-sf-1.</p>
-<h3 id="what-was-measured-and-why-three-ways">What was measured, and why three ways<a class="headerlink" href="#what-was-measured-and-why-three-ways" title="Permanent link">&para;</a></h3>
-<p>A single snapshot is not an answer to this question, and the
-first one taken was actively misleading: at that instant sf-1
-held 14.0% of the cluster's committed vCPU against 7.7% of its
-hard-max capacity, or 1.82x its share, which reads like the
-original incident. Three things had to be separated before that
-number meant anything.</p>
-<p><em>Stock from flow.</em> sfcbr carries two populations. Eighteen
-instances were ephemeral conductor runners in <code>sfcbr-*</code>
-namespaces, minutes old; eight were static runners placed five
-days earlier. Only the first says anything about the scheduler
-as it behaves now. (The external instance view publishes no
-<code>created_at</code>, so age came from <code>agent_system_boot_time</code>, which
-every live instance had.)</p>
-<p><em>Small samples from real bias.</em> Counting only ephemeral
-instances at that first instant gave sf-1 1.90x its share --
-which is one extra four-vCPU runner on the smallest node in the
-cluster. Accumulating distinct placements over the hour instead
-moved it to 1.32x, and counting only placements made <em>during</em>
-the window -- excluding the opening stock entirely -- to 0.84x.</p>
-<p><em>The ranking from the outcome.</em> The scheduler publishes its own
-working in <code>schedule have lowest cpu load</code> and <code>schedule final
-candidates</code> events, which say what it saw and what it kept.</p>
-<h3 id="the-numbers">The numbers<a class="headerlink" href="#the-numbers" title="Permanent link">&para;</a></h3>
-<p>Thirty-five placements were made during the hour, excluding the
-stock present when it started. As a multiple of each node's
-share of cluster hard-max capacity, where 1.00x is proportional:</p>
-<table>
-<thead>
-<tr>
-<th>node</th>
-<th>roles</th>
-<th>schedulable</th>
-<th>hard max</th>
-<th>placements</th>
-<th>vCPU</th>
-<th>share</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>sf-1</td>
-<td>N+D+H</td>
-<td>6</td>
-<td>18</td>
-<td>3</td>
-<td>7</td>
-<td>0.78x</td>
-</tr>
-<tr>
-<td>sf-2</td>
-<td>D+H</td>
-<td>8</td>
-<td>24</td>
-<td>5</td>
-<td>11</td>
-<td>0.92x</td>
-</tr>
-<tr>
-<td>sf-3</td>
-<td>H</td>
-<td>10</td>
-<td>30</td>
-<td>4</td>
-<td>24</td>
-<td>1.60x</td>
-</tr>
-<tr>
-<td>sf-4</td>
-<td>H</td>
-<td>10</td>
-<td>30</td>
-<td>2</td>
-<td>8</td>
-<td>0.53x</td>
-</tr>
-<tr>
-<td>sf-5</td>
-<td>H</td>
-<td>22</td>
-<td>66</td>
-<td>8</td>
-<td>27</td>
-<td>0.82x</td>
-</tr>
-<tr>
-<td>sf-6</td>
-<td>H</td>
-<td>22</td>
-<td>66</td>
-<td>13</td>
-<td>40</td>
-<td>1.21x</td>
-</tr>
-</tbody>
-</table>
-<p>Read that table with its sample size in mind. Thirty-five
-placements across six nodes is not enough to pin any single
-node's share, and watching it accumulate makes that obvious: the
-node sitting above parity moved from sf-6 (1.61x at n=21) to
-sf-3 (1.69x at n=32) as the window grew, which is what
-small-sample noise looks like rather than a bias.</p>
-<p>What does not move is the node this phase is about. sf-1's share
-was 0.69x, 0.84x, 0.73x, 0.82x and 0.78x at n = 21, 23, 26, 32
-and 35 -- below proportional at every point, on a node which was
-89% filled by commitment when the window opened. The
-network+database node is not being concentrated on, and the bulk
-of new work lands on the two large hypervisors. That is the
-behaviour this phase was for.</p>
-<p>Two of its other success criteria are evidenced by the same
-events rather than by inspection. The infra-role reservation is
-live: sf-1 publishes <code>cpu_schedulable</code> 6 where the same-sized
-sf-3 and sf-4 publish 10. And the load-per-thread ordering reads
-the typed columns phase 1 added, not the fallback --
-<code>cpu_schedulable_from_fallback</code> is <code>false</code> on every node in
-every decision observed.</p>
-<h3 id="one-finding-this-raises-for-phase-6">One finding this raises, for phase 6<a class="headerlink" href="#one-finding-this-raises-for-phase-6" title="Permanent link">&para;</a></h3>
-<p>The load stage narrows to the lowest occupied bucket <em>before</em>
-headroom weighting, so it can discard nodes with far more room
-than the ones it keeps. In one observed decision the survivors
-were sf-1 (weight 3.67) and sf-4 (6.02), while sf-5 (9.55) and
-sf-6 (7.64) were eliminated for being in bucket 1 rather than
-bucket 0. Across 60 decisions on 30 live runners, 8 (13%)
-discarded a node whose headroom weight was higher than the best
-survivor's, and 34 left only a single survivor.</p>
-<p>The mechanism is that <code>cpu_load_1</code> measures activity, not
-occupancy. A node packed with idle CI runners looks emptier than
-a busy one with room to spare -- and sf-1, at 89% of its hard
-max by commitment, sat in bucket 0 with the lowest normalised
-load in the cluster.</p>
-<p>This is not concentrating placement today, because the capacity
-filters reject sf-1 for most runner sizes before ranking ever
-runs: it has six schedulable threads and, at the time of
-observation, two available vCPUs. So the risk is contained by
-the capacity filter rather than removed by the ranking, which is
-a weaker guarantee than it looks and worth knowing before the
-ranking is reworked. Recorded here rather than fixed: phase 6
-owns the ranking model, and D6's open question about whether a
-preference may bid against a hard ceiling is the same question
-in a different coat.</p>
-<h3 id="method">Method<a class="headerlink" href="#method" title="Permanent link">&para;</a></h3>
-<p>An hour of sampling every two minutes, recording each instance
-uuid the first time it was seen along with the node it landed
-on, so that what is counted is placements rather than the same
-stock counted repeatedly. Sixty-one distinct instances were
-seen; 35 of them were ephemeral runners placed after the window
-opened, and those are the table above.</p>
-<p>Read-only, against the live cluster: <code>tools/sfcbr-capacity.sh</code>
-in the <code>33fl</code> repository (not this one, which is what this
-plan's step 00a-5 brief implies), <code>/admin/resources</code> through the
-client for the per-node ledger, and the instances' own
-scheduling events for the ranking detail.</p>
+<p>Before implementation starts, the implementing session states
+back to the management session:</p>
+<ol>
+<li>The exact <code>(status, body)</code> pair <code>_claim_api()</code> will return
+   for each of the five verbs' success and failure paths,
+   demonstrated against a real cluster for at least one refusal,
+   so D3's claim that no assertion in the file needs to change
+   is checked rather than assumed.</li>
+<li>The <code>update_namespace_claim</code> body for a call passing only
+   <code>expires_in_seconds</code>, as JSON.</li>
+<li>Whether <code>_claims_url()</code> and <code>_claim_url()</code> survive the
+   rewrite, and if so what they return.</li>
+</ol>
+<p>Step 2's CLI shape -- the subgroup name, the option names, and
+the columns <code>claim list</code> prints -- is worth agreeing before it
+is built, being cheap to propose and tedious to redo once tests
+and documentation reference it.</p>
 
 
 
@@ -13911,7 +13853,7 @@ scheduling events for the ranking detail.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-scheduler-reservations-phase-04b-client.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-scheduler-reservations-phase-04b-client.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-scheduler-reservations-phase-04b-client/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
