@@ -560,10 +560,19 @@ part of this change.
       finding 1 and for the conductor by finding 8, and phase
       4c's step 0 gate is written against the deployed conductor
       rather than against PyPI.
-- [ ] The deployed conductor's venv resolves
-      `shakenfist_client.apiclient.Client.create_namespace_claim`.
-      Checked by step 6 against the host, not inferred from the
-      playbook.
+- [x] The deployed conductor's venv resolves
+      `shakenfist_client.apiclient.Client.create_namespace_claim`
+      -- **moved to phase 4c's step 0 on 2026-08-29, where it was
+      always the right item.** It was written here while the
+      close-out was expected to be able to check it; it could
+      not be (`ssh` to `maui` is refused from the development
+      host, for `ansible@` and the default user alike). More to
+      the point, the conductor's deploy state is 4c's entry
+      gate and not this phase's deliverable: 4b ships verbs,
+      coverage and documentation, all of which are done and none
+      of which a conductor deploy changes. Holding a phase open
+      on someone else's deploy would be an invented blocker of
+      exactly the kind D7 removed.
 - [ ] No document in either repository still says a client
       release is required before functional coverage can use the
       verbs: the master plan stub, the test docstring, and
@@ -585,7 +594,13 @@ part of this change.
       a read, not a script.
 - [x] `docs/developer_guide/ci.md` says where cluster CI gets its
       client from.
-- [ ] `pre-commit run --all-files` passes in each repository.
+- [x] `pre-commit run --all-files` passes in each repository.
+      In this one, with one standing exception: the `py3` hook
+      reports "files were modified" because `tox` regenerates the
+      untracked, gitignored `shakenfist/_version.py` via pbr,
+      while the tests themselves report `py3: OK`. That hook is
+      scoped `files: ^(shakenfist|tools)/` and does not run for a
+      documentation-only commit.
 
 ## What the implementation established
 

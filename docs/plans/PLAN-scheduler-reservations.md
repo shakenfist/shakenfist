@@ -355,7 +355,7 @@ table entirely (decision D8).
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
-| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | In progress |
+| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
@@ -405,8 +405,7 @@ is here.
   phase plan).
 - **Phase 4b** landed its client verbs (client-python#375,
   merged 2026-08-28) and its functional coverage (PR #3930,
-  merged 2026-08-28). Two things remain: correcting and closing
-  client-python#364, and the close-out. Its step 3 -- cut a
+  merged 2026-08-28), and completed on 2026-08-29. Its step 3 -- cut a
   `v0.8.4` release -- was **superseded on 2026-08-29 by its
   decision D7**: no consumer this plan depends on installs a
   release, so no release is cut for phases 4b to 7 and phase 8
