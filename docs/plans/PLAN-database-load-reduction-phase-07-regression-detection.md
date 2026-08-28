@@ -623,6 +623,42 @@ the traffic *other* than itself, since a dominant pair is most of its own
 denominator and would otherwise damp the variation it is being compared
 against — the direction of error which hides a big new poll.
 
+**The second merge queue run found the measuring instrument in the
+measurement.** With `independent_of_activity()` in place the twelve blob
+pairs went away and one pair was left, in one job of three:
+`GetObjectEvents`/`api` at 0.37/s against a 0.30/s ceiling, on a run
+whose `activity_spread` was 2.29 and whose positive control recognised
+all seven `GetNodeDaemonState` pairs. Nothing was wrong with the
+measurement, and `over_budget` was empty. The traffic was this suite: the
+await helpers in `shakenfist_ci/base.py` read an object's events endpoint
+on a `time.sleep(5)` timer for as long as any worker is waiting on an
+object, and about two workers were. sf-api runs no loop of its own, so
+that rate is set by a constant in the harness rather than by the cluster,
+which makes it steady across windows *and* independent of the tier's
+activity — both properties this check uses to name a poll, held for the
+one reason no statistical test can see.
+
+**A third property would not have helped, and the budget was the wrong
+home.** There is no measurable difference between a client polling on a
+timer and a server polling on a timer, so the discriminator was not the
+place to fix it. Writing the pair into
+`shakenfist/data/database_load_budget.yaml` was worse: that file models a
+deployed cluster, no deployed cluster polls the events API on a timer —
+`GetObjectEvents` does not clear the file's own 0.10/s inclusion cut on
+sfcbr — and every consumer of it would have inherited a level that only
+CI produces, which is the hand-edit the file's header forbids. So the
+pair is named in `HARNESS_DRIVEN_PAIRS` in `load_budget.py`, reported in
+the run summary under `harness_driven` rather than dropped, and left in
+the budget's blind spot only for CI: the generated
+`ShakenFistUnbudgetedDatabasePolling` rule takes its exclusions from the
+budget file, so a real cluster still watches the pair at the same
+ceiling. The cost is stated in the constant's comment — this check can no
+longer see a regression in event reads per request — and two unit tests
+hold the exemption's two halves up, one asserting the pair is not also
+budgeted and one deriving from `base.py` that the suite still polls an
+events endpoint at all, so the exemption fails rather than rots if those
+waits are ever rewritten.
+
 **What is not yet known.** How often a real merge queue run clears the
 activity gate is a prediction, not a measurement — the summary records
 `activity_spread` and `activity_qps_per_window` on every run including

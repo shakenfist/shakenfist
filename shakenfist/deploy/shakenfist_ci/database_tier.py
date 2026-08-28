@@ -630,11 +630,22 @@ class DatabaseTierTestsMixin:
 
         over = []
         unbudgeted = []
+        harness = []
         reported = []
         for key, measured in sorted(metronomic.items()):
             entry = entries.get(key)
             if entry is None:
-                if measured > unbudgeted_ceiling:
+                if measured <= unbudgeted_ceiling:
+                    continue
+                # Traffic this suite polls for itself looks exactly like a
+                # server side poll to everything above, because it is one
+                # -- it is just on the wrong side of the API. Listed and
+                # argued in lb.HARNESS_DRIVEN_PAIRS, and reported below
+                # rather than dropped, because an exemption nobody can see
+                # in the run detail is an exemption nobody will revisit.
+                if lb.harness_driven(key):
+                    harness.append((key, measured))
+                else:
                     unbudgeted.append((key, measured))
                 continue
             modelled = lb.expected_qps(entry, node_count, standing_instances)
@@ -668,6 +679,9 @@ class DatabaseTierTestsMixin:
             'unbudgeted': [
                 {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
                 for k, m in unbudgeted],
+            'harness_driven': [
+                {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
+                for k, m in harness],
             'over_budget_but_not_enforced': [
                 {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
                  'modelled': mod} for k, m, mod, _ in reported],
@@ -709,7 +723,10 @@ class DatabaseTierTestsMixin:
             'following the rest of the suite, which is what a new '
             'fixed-rate poll looks like and what a busy test does not. If '
             'the traffic is meant to be there, add it to the budget with a '
-            'note naming the loop which produces it. summary=%s'
+            'note naming the loop which produces it -- or, if this suite '
+            'is what produces it rather than the cluster, to '
+            'HARNESS_DRIVEN_PAIRS in load_budget.py, which says what such '
+            'an entry has to argue. summary=%s'
             % (unbudgeted_ceiling, json.dumps(summary, sort_keys=True)))
 
         self.assertEqual(

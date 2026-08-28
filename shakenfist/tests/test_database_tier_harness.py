@@ -185,6 +185,76 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             self.assertEqual(entry.enforced, harness.enforced(raw[entry.key]),
                              '%s/%s' % entry.key)
 
+    def test_harness_driven_pairs_are_not_budgeted(self):
+        # The two mechanisms answer for different pairs and must not both
+        # answer for one. A budgeted pair never reaches the unbudgeted
+        # branch, so an entry which is in both places is dead here and
+        # silently carries CI-only traffic into the model every consumer
+        # of the budget file reads -- which is the thing
+        # HARNESS_DRIVEN_PAIRS exists to avoid rather than cause.
+        budgeted = {e['operation'] + '/' + e['caller_daemon']
+                    for e in harness.load_budget()['entries']}
+        overlap = sorted(
+            {'%s/%s' % pair for pair in harness.HARNESS_DRIVEN_PAIRS}
+            & budgeted)
+        self.assertEqual(
+            [], overlap,
+            'These pairs are exempted as harness traffic and are also in '
+            'shakenfist/data/database_load_budget.yaml. Either a real '
+            'cluster produces the traffic, and it belongs only in the '
+            'budget, or this suite does, and it belongs only in '
+            'HARNESS_DRIVEN_PAIRS.')
+
+    def test_harness_driven_reads_a_pair_either_way_round(self):
+        self.assertTrue(harness.harness_driven(('GetObjectEvents', 'api')))
+        self.assertTrue(harness.harness_driven(['GetObjectEvents', 'api']))
+        self.assertFalse(harness.harness_driven(('GetObjectEvents', 'net')))
+        self.assertFalse(harness.harness_driven(('GetNodeDaemonState', 'net')))
+
+    def test_the_suite_still_polls_an_events_endpoint(self):
+        # The whole argument for exempting GetObjectEvents/api is that this
+        # suite's own await helpers read an events endpoint on a timer. If
+        # they stop -- because the waits move onto an operation or a
+        # notification -- the exemption stops being an explanation and
+        # becomes a hole, and the pair should go back to failing the build.
+        # Derived from base.py rather than asserted about it, for the same
+        # reason test_non_polling_daemons_do_not_reach_the_tier derives its
+        # list: a comment cannot notice that it went stale.
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(os.path.dirname(here))
+        path = os.path.join(root, 'shakenfist', 'deploy', 'shakenfist_ci',
+                            'base.py')
+        with open(path, encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+
+        polling_loops = []
+        for loop in ast.walk(tree):
+            if not isinstance(loop, (ast.While, ast.For)):
+                continue
+            sleeps = False
+            events = False
+            for node in ast.walk(loop):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if (isinstance(func, ast.Attribute)
+                        and func.attr == 'sleep'):
+                    sleeps = True
+                if (isinstance(func, ast.Attribute)
+                        and func.attr.endswith('_events')
+                        and func.attr.startswith('get_')):
+                    events = True
+            if sleeps and events:
+                polling_loops.append(loop.lineno)
+
+        self.assertNotEqual(
+            [], polling_loops,
+            'No loop in shakenfist_ci/base.py both sleeps and reads an '
+            'events endpoint, so this suite no longer polls for events on '
+            'a timer. That is the entire justification for exempting '
+            'GetObjectEvents/api in HARNESS_DRIVEN_PAIRS -- drop the '
+            'exemption and let the idle load check see the pair again.')
+
     def test_harness_reads_the_shipped_budget_not_a_copy(self):
         # If the harness ever grows its own copy of the numbers this stops
         # being true, which is the failure decision 2 of the phase plan is

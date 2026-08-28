@@ -163,6 +163,49 @@ DAEMON_STATE_RUNNING = 'daemon-running'
 POLL_UNDERCOUNT_TOLERANCE = 0.75
 POLL_OVERCOUNT_TOLERANCE = 1.60
 
+# Traffic this suite produces itself, which nothing below can tell apart
+# from a new polling loop in the server.
+#
+# The await helpers in shakenfist_ci/base.py -- _await_agent_state,
+# _await_instance_create, _await_instance_event, _await_objects_ready --
+# read an object's events endpoint on a time.sleep(5) timer for as long as
+# any worker is waiting on an object, and every one of those requests
+# becomes one GetObjectEvents from api. sf-api runs no loop of its own (it
+# is gunicorn over external_api, which is why it is in NON_POLLING_DAEMONS
+# above), so that rate is set by a constant in the harness rather than by
+# what the cluster is doing: it holds steady across windows, which is
+# fixed_rate(), and it does not move with the tier's activity, which is
+# independent_of_activity(). That is precisely the signature the check
+# calls a new poll, and in the merge queue job which found this it read
+# 0.37/s against a 0.30/s ceiling -- about two workers waiting, at a fifth
+# of a request each per second.
+#
+# Excluded here rather than written into the budget on purpose. The budget
+# in shakenfist/data/database_load_budget.yaml models a deployed cluster,
+# and no deployed cluster polls the events API on a timer -- the pair does
+# not even clear that file's 0.10/s inclusion cut on sfcbr. Adding it
+# would raise a real deployment's ceiling to cover load only CI produces,
+# and every consumer of that file -- sf-ctl database-load, the generated
+# Prometheus rules, the nightly report -- would inherit the fiction. The
+# yaml header says not to hand-edit levels to make a check pass, and that
+# is the same instruction.
+#
+# What it costs, said plainly because a silent exemption reads as
+# coverage: this check can no longer see a regression which raises the
+# number of event reads the API makes per request, since the pair is
+# skipped whatever its rate. That blind spot is CI's alone.
+# ShakenFistUnbudgetedDatabasePolling takes its exclusions from the budget
+# file and not from here, so the same pair is still watched at the same
+# ceiling on every real cluster.
+#
+# Anything added here needs the same two things: a named loop in this
+# suite which produces it, and a reason the budget is the wrong home for
+# it. test_harness_driven_pairs_are_not_budgeted and
+# test_the_suite_still_polls_an_events_endpoint hold both ends of that up.
+HARNESS_DRIVEN_PAIRS = frozenset([
+    ('GetObjectEvents', 'api'),
+])
+
 
 def load_budget():
     """The shipped database load budget, as plain dicts.
@@ -236,6 +279,18 @@ def expected_qps(entry, nodes, standing_instances):
     qps += entry.get('cluster_base_qps', 0.0)
     qps += entry.get('per_instance_qps', 0.0) * standing_instances
     return max(0.0, qps)
+
+
+def harness_driven(key):
+    """Whether a pair is traffic this test suite produces itself.
+
+    Separate from enforced() because the two answer different questions
+    about different things: that one asks whether a budgeted pair running
+    high is worth failing on, this asks whether an unbudgeted pair is the
+    measuring instrument rather than the thing measured. See
+    HARNESS_DRIVEN_PAIRS for why the answer is not simply a budget entry.
+    """
+    return tuple(key) in HARNESS_DRIVEN_PAIRS
 
 
 def enforced(entry):
