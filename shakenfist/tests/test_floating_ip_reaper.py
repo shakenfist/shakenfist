@@ -23,17 +23,35 @@ from shakenfist.tests import base
 
 
 class FakeIPAM:
-    def __init__(self, free_addresses, in_use=None, reservations=None):
-        self.free_addresses = free_addresses
+    """A fake which costs what the real IPAM costs.
+
+    The real ``in_use`` is a property issuing a whole-table read on every
+    access, and ``is_free()`` is defined in terms of it. This fake used to
+    hold ``in_use`` as a plain set and answer ``is_free()`` from a separate
+    ``free_addresses``, which made the two disagree in ways the real object
+    cannot, and made free precisely the access that costs a round trip.
+    The phase 8 push audit found a per-address sweep surviving behind that
+    gap. ``in_use`` is now a counting property and ``is_free()`` derives
+    from it, so a caller which walks addresses one at a time shows up in
+    ``table_reads``.
+    """
+
+    def __init__(self, in_use=None, reservations=None):
         self.reserve_calls = []
         self.released = []
-        self.in_use = in_use if in_use is not None else set()
+        self._in_use = in_use if in_use is not None else set()
         self.reservations = reservations or {}
         self.broadcast_address = '192.168.10.255'
         self.network_address = '192.168.10.0'
+        self.table_reads = 0
+
+    @property
+    def in_use(self):
+        self.table_reads += 1
+        return set(self._in_use)
 
     def is_free(self, address):
-        return address in self.free_addresses
+        return address not in self.in_use
 
     def reserve(self, address, user, reservation_type, comment):
         self.reserve_calls.append(
@@ -50,6 +68,7 @@ class FakeIPAM:
         return self.reservations.get(address)
 
     def get_all_reservations(self):
+        self.table_reads += 1
         return dict(self.reservations)
 
     def get_allocation_age(self, address):
@@ -111,7 +130,9 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
         fake_ni.unique_label.return_value = (
             ObjectType.INTERFACE, 'iface-uuid')
 
-        ipam = FakeIPAM(free_addresses={'192.168.10.42'})
+        # The gateway is reserved; the interface's floating address is
+        # not, which is the state the rescue path exists to repair.
+        ipam = FakeIPAM(in_use={'192.168.10.11'})
         self.assertTrue(self._sweep(
             ipam, networks=[fake_gw_network], interfaces=[fake_ni]))
 
@@ -130,7 +151,7 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
     def test_unowned_address_is_not_reaped_on_first_sighting(self):
         # The first time an address looks leaked we merely remember it.
         # A network delete in flight briefly presents exactly this way.
-        ipam = FakeIPAM(free_addresses=set(), in_use={'192.168.10.154'})
+        ipam = FakeIPAM(in_use={'192.168.10.154'})
 
         self.assertTrue(self._sweep(ipam))
 
@@ -140,7 +161,7 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
     def test_address_is_reaped_once_confirmed(self):
         # An address which has looked leaked for longer than the
         # confirmation period really has leaked, so release it.
-        ipam = FakeIPAM(free_addresses=set(), in_use={'192.168.10.154'})
+        ipam = FakeIPAM(in_use={'192.168.10.154'})
         floating_ip_reaper._leak_candidates['192.168.10.154'] = (
             time.time() - floating_ip_reaper.LEAK_CONFIRMATION_SECONDS - 1)
 
@@ -161,7 +182,7 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
             ObjectType.NETWORK, 'network-uuid')
 
         ipam = FakeIPAM(
-            free_addresses=set(), in_use={'192.168.10.154'})
+            in_use={'192.168.10.154'})
         self.assertTrue(self._sweep(ipam, networks=[fake_network]))
 
         self.assertEqual([], ipam.released)
@@ -172,7 +193,7 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
         # moments ago is mid-teardown, not leaked. It must not even
         # start accruing confirmation time.
         ipam = FakeIPAM(
-            free_addresses=set(), in_use={'192.168.10.154'},
+            in_use={'192.168.10.154'},
             reservations={
                 '192.168.10.154': _reservation(
                     user_type=ObjectType.NETWORK, user_uuid='network-uuid')
@@ -196,7 +217,7 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
         # reservation has looked leaked for longer than the confirmation
         # period.
         ipam = FakeIPAM(
-            free_addresses=set(), in_use={'192.168.10.154'},
+            in_use={'192.168.10.154'},
             reservations={
                 '192.168.10.154': _reservation(
                     user_type=ObjectType.NETWORK, user_uuid='network-uuid')
@@ -216,3 +237,53 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
             self.assertTrue(self._sweep(ipam))
 
         self.assertEqual(['192.168.10.154'], ipam.released)
+
+
+class FloatingIPReaperReadShapeTestCase(base.ShakenFistTestCase):
+    """The sweep's cost must not grow with the number of addresses.
+
+    Issue 3655 is about access shape, not outcome, so these assert on
+    the read count. Phase 6 removed the per-address get_reservation()
+    and left is_free() reaching the same table once per address through
+    the in_use property; the phase 8 push audit found it because the
+    budget recorded a per-instance slope on GetAddressesInUse that its
+    replacement was explicitly documented not to have.
+    """
+
+    def _sweep_with(self, address_count):
+        interfaces = []
+        for i in range(address_count):
+            ni = mock.MagicMock()
+            ni.uuid = 'iface-%d' % i
+            # Addresses the IPAM already knows about, so the rescue path
+            # does not fire and we measure the walk rather than repairs.
+            ni.floating = {'floating_address': '192.168.10.%d' % (20 + i)}
+            ni.unique_label.return_value = (ObjectType.INTERFACE, ni.uuid)
+            interfaces.append(ni)
+
+        in_use = {'192.168.10.%d' % (20 + i) for i in range(address_count)}
+        ipam = FakeIPAM(in_use=in_use)
+
+        fake_floating_network = mock.MagicMock()
+        fake_floating_network.ipam = ipam
+        with mock.patch.object(
+                floating_ip_reaper.network, 'floating_network',
+                return_value=fake_floating_network), \
+            mock.patch.object(
+                floating_ip_reaper.network, 'Networks', return_value=[]), \
+            mock.patch.object(
+                floating_ip_reaper.interface, 'NetworkInterfaces',
+                return_value=interfaces):
+            self.assertTrue(floating_ip_reaper.reap_floating_ips())
+        return ipam.table_reads
+
+    def test_the_sweep_reads_the_table_a_fixed_number_of_times(self):
+        few = self._sweep_with(2)
+        many = self._sweep_with(40)
+
+        # Guard against measuring nothing at all.
+        self.assertGreater(few, 0)
+        self.assertEqual(
+            few, many,
+            'the sweep issued %d whole-table reads for 40 addresses against '
+            '%d for 2, so its database cost grows per address' % (many, few))

@@ -454,8 +454,21 @@ class Daemon:
         if not node_uuid:
             return
         try:
+            parsed_node_uuid = uuid.UUID(node_uuid)
+        except ValueError:
+            # A misconfigured SHAKENFIST_NODE_UUID reaches here unvalidated:
+            # config.NODE_UUID has no validator, and _resolve_node_uuid()
+            # returns early when it is already set, so the value never meets
+            # Node._load_persisted_uuid()'s guard. Left to propagate this
+            # raises out of every daemon's idle loop every couple of seconds.
+            self._log_stability(
+                LOG, 'NODE_UUID is not a valid uuid, cannot check daemon '
+                     'state')
+            return
+
+        try:
             row = mariadb.get_node_daemon_state(
-                uuid.UUID(node_uuid), self.daemon_name, bounded=True)
+                parsed_node_uuid, self.daemon_name, bounded=True)
         except DatabaseUnavailable:
             # Back off rather than re-asking a database which just told us it
             # could not answer within the bounded deadline. See the comment on

@@ -159,7 +159,11 @@ class Monitor(daemon.Daemon):
         fn = network.floating_network()
         if fn:
             # One read for the whole table rather than one per address
-            # (issue 3655); this sweep runs every 60 seconds.
+            # (issue 3655); this sweep runs every 60 seconds. Iterate the
+            # snapshot for the reservation bodies, but still iterate
+            # fn.ipam.in_use: an address in use with no reservation row is a
+            # state this sweep must still see, so the second read buys
+            # robustness for one round trip per pass.
             reservations = fn.ipam.get_all_reservations()
             for addr in fn.ipam.in_use:
                 self.pet_watchdog()

@@ -101,12 +101,32 @@ so a create-after-lookup or delete-then-lookup is never masked); every public
 persist routes through the public `update_<type>`, the cache self-heals after
 an upgrade; and every entry is TTL-bounded, which is the only bound on
 staleness from a write made by another process. Two tiers set the TTL —
-`OBJECT_CACHE_TTL_IMMUTABLE` (default 300 s) for types with no post-creation
-writer (instance, network, networkinterface, agentoperation) and
+`OBJECT_CACHE_TTL_IMMUTABLE` (default 300 s) for types whose static row
+changes only on create, delete, or a version-upgrade persist (instance,
+network, networkinterface, agentoperation, ipam) and
 `OBJECT_CACHE_TTL_MUTABLE` (default 30 s) for the upgradeable types (node,
 blob, artifact, upload, dnsmasq, namespace). Setting either to 0 disables that
-tier. Effectiveness is visible in the `database_object_cache_{hits,misses,
-evictions}_total` counters and in reduced `database_get_<type>_total` rates.
+tier. Two of the immutable tier's members do have an `update_<type>`
+(`update_ipam`, `update_network_interface`); both evict, which is what keeps
+the tier correct, so an updater added to a type in this tier must evict too.
+
+TTL bounds staleness, not residency. Expiry is lazy -- an entry is reclaimed
+only when its own key is read again -- so `OBJECT_CACHE_MAX_ENTRIES` (default
+20000) bounds how much a process retains. Without it the cache holds every
+object a process has ever read rather than its working set, because an object
+read once and never read again is never revisited, and a delete in another
+process evicts nothing here. On overflow expired entries go first, then the
+entries closest to expiry.
+
+Effectiveness is visible in the `database_object_cache_{hits,misses,
+evictions}_total` counters and in reduced `database_get_<type>_total` rates;
+`database_object_cache_entries` reports occupancy and
+`database_object_cache_capacity_evictions_total` reports pressure against the
+bound. Note that only `sf-cluster`, `sf-resources` and `sf-database` serve a
+metrics endpoint, so the client-side caches in `sf-api`, `sf-net`,
+`sf-queues`, `sf-cleaner`, `sf-transfers` and `sf-sidechannel` -- where most
+of the hit rate and most of the memory lives -- are not visible in Prometheus
+today.
 
 ## SQL Filter-Pushdown Discipline
 

@@ -67,6 +67,7 @@ from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
+from shakenfist.util.caller_identity import KNOWN_CALLERS
 from shakenfist.util.caller_identity import set_caller_identity
 
 
@@ -6160,10 +6161,20 @@ def _method_to_operation(method: str) -> str:
 
 
 def _caller_from_metadata(metadata: Any) -> str:
-    """Read caller-daemon from invocation metadata, defaulting to unknown."""
+    """Read caller-daemon from invocation metadata, defaulting to unknown.
+
+    The value is client-asserted and this port is unauthenticated, so
+    anything not in KNOWN_CALLERS is reported as 'unknown' rather than
+    becoming a label of its own. An unfiltered label here is an unbounded
+    prometheus cardinality leak -- every distinct value creates a child
+    which is retained for the life of the process -- and the exposition
+    it corrupts is what sf-ctl database-load, the drop-in alerting rules
+    and the functional CI budget check all parse.
+    """
     for key, value in (metadata or ()):
         if key == 'caller-daemon':
-            return str(value)
+            caller = str(value)
+            return caller if caller in KNOWN_CALLERS else 'unknown'
     return 'unknown'
 
 

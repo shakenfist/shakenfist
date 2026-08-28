@@ -564,7 +564,10 @@ class Job(util_concurrency.Job):
                 # installation at the moment and I am not sure why. I suspect
                 # a startup race.
                 # One read for the whole table, not one per address --
-                # this runs every maintenance cycle (issue 3655).
+                # this runs every maintenance cycle (issue 3655). Iterate
+                # the reservation bodies from the snapshot but still walk
+                # fn.ipam.in_use, so an in-use address with no reservation
+                # row is not silently skipped.
                 reservations = fn.ipam.get_all_reservations()
                 for addr in fn.ipam.in_use:
                     resv = reservations.get(addr)

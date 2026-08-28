@@ -42,8 +42,30 @@ def reap_floating_ips():
     floating_network = network.floating_network()
     if not floating_network:
         return False
-    LOG.debug('Floating network registrations: %s'
-              % floating_network.ipam.in_use)
+
+    # One read of the reservation table for the whole pass. Every loop below
+    # walks the in-use addresses, and IPAM.in_use is a property that issues a
+    # fresh GetAddressesInUse round trip on each access -- so reading it per
+    # address, or even once per loop, is the per-address access shape issue
+    # 3655 exists to remove.
+    #
+    # in_use is snapshotted rather than derived from the reservations dict.
+    # The two are the same SELECT differing only in projected columns, so
+    # their keys agree -- but the loops below deliberately handle an address
+    # which is in use with no reservation row, that being the leak this sweep
+    # exists to find, and deriving one from the other would quietly delete
+    # that path along with its tests.
+    #
+    # Snapshot skew is safe. On the rescue paths a stale entry means at worst
+    # a reserve() which returns False, and read-then-reserve was never atomic
+    # anyway. On the leak path an address must look leaked across
+    # LEAK_CONFIRMATION_SECONDS -- ten consecutive sweeps -- before anything
+    # is released, so an address reserved after this snapshot drops out on
+    # the next pass long before it could be reaped.
+    reservations = floating_network.ipam.get_all_reservations()
+    in_use = floating_network.ipam.in_use
+
+    LOG.debug('Floating network registrations: %s' % in_use)
 
     # Collect floating gateways and floating IPs, while ensuring that
     # they are correctly reserved on the floating network as well.
@@ -52,7 +74,7 @@ def reap_floating_ips():
         fg = n.floating_gateway
         if fg:
             floating_gateways.append(fg)
-            if floating_network.ipam.is_free(fg):
+            if fg not in in_use:
                 floating_network.ipam.reserve(
                     fg, n.unique_label(), ReservationType.GATEWAY,
                     'Rescued from incorrect registration')
@@ -67,7 +89,7 @@ def reap_floating_ips():
         fa = ni.floating.get('floating_address')
         if fa:
             floating_addresses.append(fa)
-            if floating_network.ipam.is_free(fa):
+            if fa not in in_use:
                 floating_network.ipam.reserve(
                     fa, ni.unique_label(), ReservationType.FLOATING,
                     'Rescued from incorrect registration')
@@ -77,14 +99,8 @@ def reap_floating_ips():
                 }).error('Floating address not reserved correctly')
     LOG.info('Found floating addresses: %s' % floating_addresses)
 
-    # Read the reservation table once and use it for both passes below.
-    # Each of those walks every in-use address, and the second one used
-    # to read each address twice -- once for its age and once for the
-    # reservation itself (issue 3655).
-    reservations = floating_network.ipam.get_all_reservations()
-
     floating_routed = []
-    for addr in floating_network.ipam.in_use:
+    for addr in in_use:
         reservation = reservations.get(addr)
         if not reservation:
             continue
@@ -127,7 +143,7 @@ def reap_floating_ips():
     now = time.time()
     leaks = []
     candidates = {}
-    for ip in floating_network.ipam.in_use:
+    for ip in in_use:
         if ip not in itertools.chain(floating_gateways,
                                      floating_addresses,
                                      floating_routed,

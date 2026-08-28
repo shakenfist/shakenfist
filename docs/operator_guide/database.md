@@ -274,22 +274,39 @@ in memory, so repeatedly loading the same node, blob or instance does not hit
 `sf-database` every time. Mutable data (object state, metadata, attributes,
 IPAM, daemon states) is never cached. The cache invalidates itself when this
 process updates or deletes an object; a change made by another process is
-picked up when the entry's TTL expires.
+picked up when the entry's TTL expires. On a multi-gateway tier that means a
+delete routed to one gateway leaves the others serving the row to their own
+clients until the TTL runs out.
 
-Two settings control it, both in seconds:
+Three settings control it:
 
 | Setting | Default | Applies to |
 |---------|---------|-----------|
-| `OBJECT_CACHE_TTL_IMMUTABLE` | 300 | instance, network, networkinterface, agentoperation (no post-creation writer) |
+| `OBJECT_CACHE_TTL_IMMUTABLE` | 300 | instance, network, networkinterface, agentoperation, ipam (static row changes only on create, delete or a version upgrade) |
 | `OBJECT_CACHE_TTL_MUTABLE` | 30 | node, blob, artifact, upload, dnsmasq, namespace (rewritten only by an online version upgrade) |
+| `OBJECT_CACHE_MAX_ENTRIES` | 20000 | how many entries a process retains, across both tiers |
 
-Setting a value to `0` disables caching for that tier — a fast rollback to
+The first two are in seconds. The third is a count, and it exists because a
+TTL bounds how *stale* an entry may be, not how many entries are kept: expiry
+only happens when that same object is looked up again, so an object read once
+and never read again would otherwise sit in memory for the life of the
+process. If you see `database_object_cache_capacity_evictions_total` climbing
+steadily, the working set no longer fits and the hit rate is suffering;
+`database_object_cache_entries` reports current occupancy.
+
+Setting a TTL to `0` disables caching for that tier — a fast rollback to
 pure read-through that needs only a config change and a restart, no code
 change. The `database_object_cache_hits_total`,
 `database_object_cache_misses_total` and `database_object_cache_evictions_total`
 Prometheus counters (labelled by `object_type`) report cache behaviour, and a
 working cache shows up as reduced `database_get_<type>_total` rates on the
 `sf-database` tier.
+
+These counters only reach Prometheus from the daemons which serve a metrics
+endpoint — `sf-cluster`, `sf-resources` and `sf-database`. Every process that
+talks to the database has its own cache, so the numbers you can scrape are a
+sample of the cluster's caching rather than a total; `sf-api` in particular
+is invisible here.
 
 ### Attributing database load to callers
 
