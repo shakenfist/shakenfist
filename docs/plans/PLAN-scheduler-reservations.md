@@ -403,6 +403,19 @@ is here.
   is admitted and recorded as an audit event, and phase 5 flips
   `CLAIM_ENFORCEMENT_HARD`. Client verbs moved out of scope (D7 in the
   phase plan).
+- **Phase 4b** landed its client verbs (client-python#375,
+  merged 2026-08-28) and its functional coverage (PR #3930,
+  merged 2026-08-28). Two things remain: correcting and closing
+  client-python#364, and the close-out. Its step 3 -- cut a
+  `v0.8.4` release -- was **superseded on 2026-08-29 by its
+  decision D7**: no consumer this plan depends on installs a
+  release, so no release is cut for phases 4b to 7 and phase 8
+  owns the one an operator needs. One caveat on #3930: its
+  merge-queue run failed on twelve unrelated
+  `507 ... sufficient_idle_cpu` refusals (issue #3772) and it was
+  merged by hand. The three claims tests passed on all three
+  cluster platforms inside that failed run, so the evidence is
+  sound, but the gate was bypassed rather than met.
 - **Phase 4a** was inserted on 2026-08-22, between phases 4 and 5,
   because #3813 was a live defect in phase 3's shipped admission code
   and phase 5 makes that code the sole gate on placement. It completed
@@ -553,11 +566,34 @@ merged to the client's `develop` is in this repository's
 cluster CI on the next merge-queue run. D7's reasoning was
 already stale when phase 4 wrote it down.
 
-A release is still needed, but by phase 4c rather than by this
-phase's own functional coverage: the conductor installs a
-released client from PyPI. Cutting it is one tag and one
-approval in `shakenfist/client-python`, not something outside
-the project's control.
+*Second correction (2026-08-29).* The paragraph above used to
+continue: "A release is still needed, but by phase 4c rather
+than by this phase's own functional coverage: the conductor
+installs a released client from PyPI." That is false too. The
+conductor's deployment playbook pip-installs
+`git+https://github.com/shakenfist/client-python@develop` with
+`state: latest`, and has since 2026-07-12 (`f4d0e48e`), for the
+same reason cluster CI builds from a checkout -- `develop` moves
+API contracts faster than releases do, and a released client
+behind a server contract once wedged the conductor's main loop
+overnight. **No consumer this plan depends on installs a
+release.**
+
+The strategy is now explicit rather than accidental: while
+scheduling iterates through phases 5 to 7, the client's
+`develop` is what CI and the conductor track, and no release is
+cut per phase. Phase 8 owns the release, because an operator
+guide documenting `sf-client namespace claim` cannot ship
+against a PyPI version that lacks it. See decision D7 in the
+phase 4b plan for the reasoning and the costs.
+
+Twice now this stub has asserted where a consumer gets its
+client from, and twice it has been wrong in the same direction
+-- assuming a release where a branch was already being tracked.
+Both assumptions were inherited by restatement rather than
+checked. The general lesson is worth more than either
+correction: check the install path, do not read it off another
+plan.
 
 The plan is
 [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md).
@@ -667,6 +703,18 @@ reads the new events.
 capacity (including the two service classes and the
 reconciler), developer-guide write-up of the guarded-UPDATE
 idiom (D10), user-facing affinity migration notes.
+
+This phase also owns **the client release**, added here on
+2026-08-29 by phase 4b's D7. Phases 4b through 7 deliberately
+cut none: CI and the conductor track client-python's `develop`,
+so a release buys them nothing and would put a tag and a human
+approval on each phase's critical path. An operator is a
+different matter -- this phase's guide documents `sf-client
+namespace claim`, which no released client has. So phase 8
+cuts one release covering everything phases 4b to 7 accumulate,
+and the guide must not merge claiming a command an operator
+cannot install. That ordering is this phase's obligation and
+nobody else's.
 
 **Phase 9 — push audit.** Run
 the repository's pre-push audit over everything this plan
