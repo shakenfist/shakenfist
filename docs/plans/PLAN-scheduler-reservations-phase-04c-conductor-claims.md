@@ -452,7 +452,7 @@ conductor.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent | Status |
 |------|--------|-------|-----------|---------------------|--------|
-| 0 | n/a | management session | none | Prerequisite gate. Phase 4b (client support for claims, renumbered from phase 9) must be complete and released, including the 503 mapping in `STATUS_CODES_TO_ERRORS` from finding 3, before any step below starts. Confirm the deployed conductor's `shakenfist_client` version actually carries the claim methods -- the conductor runs a released client, and finding 2's `CLEANUP_EXCEPTIONS` pattern in `provisioner.py:170-179` exists because it has been out of step with the server before. | Not started |
+| 0 | low | sonnet | none | Prerequisite gate, **rewritten 2026-08-29**. Phase 4b must have merged its verbs and the 503 mapping in `STATUS_CODES_TO_ERRORS` (finding 3) to client-python's `develop` -- which it did on 2026-08-28 as `135ab53`. It does **not** need a release: the conductor pip-installs `git+https://github.com/shakenfist/client-python@develop` with `state: latest` and has since 2026-07-12, per phase 4b's finding 8 and decision D7. So the gate is a deploy, not a tag. Verify against the host rather than the playbook, because `state: latest` only re-pulls when the playbook runs: `/srv/shakenfist/private-ci/venv/bin/python -c 'import shakenfist_client.apiclient as a; print(a.Client.create_namespace_claim, a.ServiceUnavailableException)'`. Both names must resolve. The conductor runs on `maui`, so this is `ssh maui` and the command above. If either name does not resolve, the conductor has not been deployed since 2026-08-28 and running `conductor.yml` (`manage.yml`, tag `conductor`) is what opens this phase -- a deploy makes the gate true whatever it says now, so running the playbook is a valid substitute for checking it. Phase 4b's close-out on 2026-08-29 also carries the "deployed venv resolves the verbs" item that used to sit in its own definition of done: it was moved here, because a conductor deploy is this phase's entry gate and not 4b's deliverable. That close-out attempted the check and could not make it -- `ssh` to `maui` is refused from the development host for both `ansible@` and the default user -- so it is genuinely open rather than assumed. Record the version and the date checked here. | Not started -- the gate has not been evaluated; see the brief |
 | 1 | medium | sonnet | worktree | (private-ci) Sizing accessor. Add `get_claim_sizes()` to `conductor/db.py` beside `get_cost_observations()` (`:1419`), returning the worst observed `peak_allocated_cpus`, `peak_allocated_ram_mb` and `peak_allocated_disk_gb` grouped by `(repo, job_name)` with no minimum run count, from the same summary table that function reads. Read that function first: the peaks it exposes are already a MAX over summary rows, so this is a re-grouping of the same data, not a new measurement. Write the docstring to say why the key and threshold differ from its sibling -- claims cover the whole namespace and peaks are topology-deterministic, so one observation seeds a claim, whereas a runner-size recommendation needs three runs before it changes anything. Unit tests beside `conductor/tests/test_provisioner_costs.py`'s existing coverage. Commit subject: `conductor: size claims from observed peaks.` | Not started |
 | 2 | high | opus | worktree | (private-ci) Claim creation and refusal handling in `conductor/provisioner.py`, per Design and E3/E4/E6. Add the sizing helper (max of `CI_SIZES[ci_size]` and 1.2x the step 1 peaks, ceiling per dimension), the claim request in `create_workers()` between `add_namespace_trust()` and `allocate_network()`, and the three-branch refusal handling. This was checked against sfcbr on 2026-08-27 during phase 4b and needs no re-checking: an over-large claim on a claim-free namespace answers **507**, raised as `InsufficientResourcesException`, with a per-dimension body naming the limit, the current usage and the request. The same request against a namespace which already holds a claim answers 409, because `exists` is evaluated first -- which is what the phase 4a soak recorded and why its "impossible claim" line said 409. The conductor claims on a namespace it has just created, so 507 is the case E6's first branch must catch. Add the metrics from Design. The namespace teardown on refusal must not be able to raise past the loop. Tests: the refusal branches, the sizing floor when no observation exists, and that a refused combination leaves `requested` unchanged. Commit subject: `conductor: claim capacity before starting a runner.` | Not started |
 | 3 | medium | sonnet | worktree | (private-ci) Claim deletion in `remove_namespace()` (`provisioner.py:606`), per Design: list the namespace's claims through the client, delete each, count them, catch as broadly as the neighbouring steps and never raise. Place it after `collect_namespace_costs()` and before `delete_all_instances()`, and comment why that position rather than after the instances are gone. Note that `delete_namespace` later in the same function is routinely deferred while network deletes settle (`:705-719`), which is why this cannot be left to the namespace's own `hard_delete()`. Commit subject: `conductor: release capacity claims at teardown.` | Not started |
@@ -492,11 +492,40 @@ explicit deletion at teardown (step 3), the six-hour expiry
 object (finding 8). Checked in step 5 by looking for reconciler
 drift.
 
-**The client is out of step with the server.** The conductor runs
-a released `shakenfist_client`, and has been out of step before
--- `CLEANUP_EXCEPTIONS` (`provisioner.py:170-179`) looks its
-exception classes up defensively for exactly this reason.
-Mitigated by step 0's explicit version gate.
+**The client is out of step with the server.** Rewritten
+2026-08-29: the conductor does *not* run a released
+`shakenfist_client`. It tracks client-python's `develop` with
+`state: latest`, so the skew it is exposed to runs in both
+directions and changes shape.
+
+It can be *behind* the branch, between a client merge and the
+next conductor deploy -- which is exactly what step 0 checks,
+and the reason that check reads the host rather than the
+playbook. It can also be *ahead* of a server it talks to, or
+carried somewhere unintended by a client change nobody meant for
+it: `state: latest` re-pulls on every deploy, so the conductor
+inherits whatever `develop` holds at that moment. This is not
+hypothetical -- the branch tracking was introduced on 2026-07-12
+*because* a released client was behind a server contract and
+wedged the main loop overnight, and the fix traded one skew
+direction for the other knowingly.
+
+`CLEANUP_EXCEPTIONS` (`provisioner.py:170-179`) is the existing
+local mitigation: it builds its tuple with
+`getattr(apiclient, name) ... if hasattr(apiclient, name)`,
+with a comment saying the newer classes are looked up
+defensively because older clients "including the current PyPI
+release" predate them. Step 2's refusal handling should follow
+it for `ServiceUnavailableException` specifically, which is the
+newest name of the three it needs and the one an older venv
+would lack -- `APIException` and `InsufficientResourcesException`
+have been in the client for years and can be named directly.
+A module-level `except` clause built from a missing attribute
+fails at import, which on this daemon means a crash-loop under
+the systemd watchdog rather than a caught error.
+
+Mitigated further by step 0's gate and by client-python's own CI
+gating its `develop`.
 
 **The observation window is quiet.** Seven days of CI might not
 include the load pattern that produces interesting refusals. If

@@ -49,18 +49,33 @@ involved. A test in this repository may be written against a new `apiclient`
 verb the moment that verb merges next door.
 
 Two things this does not mean. An operator deploying the collection normally
-gets the PyPI packages, since `sf_build_local_wheels` defaults to false --
-so an unreleased verb reaches CI and nothing else, and anything that runs
-against a *released* client (the private CI conductor, for one) still needs a
-release. And the coupling runs both ways: a regression merged to
-`client-python`'s `develop` breaks this repository's functional jobs with no
-change here.
+gets the PyPI packages, since `sf_build_local_wheels` defaults to false -- so
+an unreleased verb reaches CI, and no operator. And the coupling runs both
+ways: a regression merged to `client-python`'s `develop` breaks this
+repository's functional jobs with no change here.
+
+The private CI conductor is on the same footing, not the opposite one. Its
+deployment playbook pip-installs `client-python@develop` into the conductor
+virtualenv with `state: latest`, overriding the unpinned `shakenfist-client`
+its `requirements.txt` resolves from PyPI, and has since 2026-07-12 -- for
+the same reason: `develop` moves API contracts faster than releases do, and
+a released client that was behind a server contract once wedged the
+conductor's main loop overnight. So the conductor picks up a client change
+on its next deploy, and a release is not what gets a verb to it.
+
+That leaves a released client mattering to exactly one audience -- operators
+-- which is worth knowing before treating a release as a prerequisite for
+anything internal.
 
 Phase 4 of `docs/plans/PLAN-scheduler-reservations.md` reasoned from the
 opposite belief and deliberately wrote its functional coverage against
 `apiclient.Client._request_url()` to work around a constraint which had
-already been gone for seven weeks. If you find yourself about to do something
-similar, check this section first.
+already been gone for seven weeks. Its phase 4b then made the same mistake
+about the conductor, in the same document that corrected the first one --
+because it checked this repository's install path and took the conductor's
+from another plan. If you find yourself about to do something similar, check
+this section first, and check the install path itself rather than a
+description of it.
 
 ## Coverage the functional suite does not have
 
