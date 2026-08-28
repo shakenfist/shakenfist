@@ -237,19 +237,71 @@ class DocAnchorCheckTestCase(base.ShakenFistTestCase):
             sources = list(checker.markdown_files(docs, root_dir=tmp))
             self.assertEqual([os.path.join(docs, 'index.md')], sources)
 
-    def test_plans_and_components_excluded(self):
+    def test_plans_and_components_excluded_from_anchor_checks(self):
         with tempfile.TemporaryDirectory() as tmp:
-            # The exclusions are relative to the real docs directory, so
-            # exercise them there rather than in a tempdir.
-            self.assertTrue(
-                checker.EXCLUDED_PREFIXES[0].endswith(
-                    os.path.join('docs', 'plans')))
-            self.assertTrue(
-                checker.EXCLUDED_PREFIXES[1].endswith(
-                    os.path.join('docs', 'components')))
+            self._write(tmp, 'index.md', '# Index\n')
+            self._write(tmp, 'plans/plan.md',
+                        'See [idx](../index.md#missing-anchor).\n')
+            self._write(tmp, 'components/thing.md',
+                        'See [gone](../gone.md#nope).\n')
 
-            self._write(tmp, 'index.md', 'ok\n')
             self.assertEqual([], checker.check_anchors(docs_dir=tmp, root_dir=tmp))
+
+    def test_link_out_of_docs_is_reported(self):
+        # A relative link to a file which exists elsewhere in the repository
+        # renders fine locally but breaks when the docs site imports docs/,
+        # so it must be an absolute URL (the docs-external-links audit).
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = os.path.join(tmp, 'docs')
+            self._write(tmp, 'shakenfist/code.py', '# code\n')
+            self._write(docs, 'guide.md',
+                        'See [code](../shakenfist/code.py).\n')
+
+            problems = checker.check_anchors(docs_dir=docs, root_dir=tmp)
+            self.assertEqual(1, len(problems))
+            self.assertIn('../shakenfist/code.py', problems[0])
+            self.assertIn('absolute', problems[0])
+
+    def test_plan_link_out_of_docs_is_reported(self):
+        # The issue-3792 shape: a plan referencing code by a repo-root
+        # relative path, which resolves to nothing inside docs/. Plans skip
+        # anchor checking but still get the escaping-link check; an absolute
+        # https URL for the same target is fine.
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = os.path.join(tmp, 'docs')
+            self._write(docs, 'index.md', '# Index\n')
+            self._write(docs, 'plans/plan.md',
+                        'See [code](shakenfist/instance.py#L344), '
+                        '[abs](https://github.com/shakenfist/shakenfist/'
+                        'blob/develop/shakenfist/instance.py#L344) and '
+                        '[idx](../index.md#missing-anchor).\n')
+
+            problems = checker.check_anchors(docs_dir=docs, root_dir=tmp)
+            self.assertEqual(1, len(problems))
+            self.assertIn('shakenfist/instance.py#L344', problems[0])
+            self.assertIn('absolute', problems[0])
+
+    def test_components_not_scanned_for_escaping_links(self):
+        # Components are synchronised in from other repositories, so a fix
+        # made here would be overwritten by the next synchronisation.
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = os.path.join(tmp, 'docs')
+            self._write(docs, 'index.md', '# Index\n')
+            self._write(docs, 'components/instar/bench.md',
+                        'See [tests](../tests/test_bench.py).\n')
+
+            self.assertEqual([], checker.check_anchors(docs_dir=docs, root_dir=tmp))
+
+    def test_root_files_may_link_outside_docs(self):
+        # The root markdown files are not part of the imported docs tree, so
+        # the absolute-URL rule does not apply to them.
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = os.path.join(tmp, 'docs')
+            self._write(docs, 'index.md', '# Index\n')
+            self._write(tmp, 'GOALS.md', '# Goals\n')
+            self._write(tmp, 'README.md', 'See [goals](GOALS.md).\n')
+
+            self.assertEqual([], checker.check_anchors(docs_dir=docs, root_dir=tmp))
 
 
 class ShippedDocsTestCase(base.ShakenFistTestCase):

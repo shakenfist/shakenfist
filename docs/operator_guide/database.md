@@ -140,7 +140,7 @@ remains the same because MariaDB maintains MySQL protocol compatibility.
 Object iteration uses a single indexed SQL query per call rather than materialising all rows and filtering in Python.
 
 The filter criteria shape is `ObjectFilterCriteria` in
-[`shakenfist/schema/object_filter.py`](../../shakenfist/schema/object_filter.py):
+[`shakenfist/schema/object_filter.py`](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/schema/object_filter.py):
 
 ```python
 from shakenfist.schema.object_filter import ObjectFilterCriteria

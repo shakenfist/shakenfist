@@ -53,14 +53,14 @@ constructors (not a Pydantic model), so the override must
 convert the `InstanceData` / `NetworkData` returned by
 `find_*` via `_static_values_to_dict` before calling `cls(...)`.
 This is visible at
-[shakenfist/instance.py:344](shakenfist/instance.py#L344):
+[shakenfist/instance.py:344](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L344):
 
 ```python
 obj = cls(cls._static_values_to_dict(data))
 ```
 
 and at
-[shakenfist/network/network.py:182](shakenfist/network/network.py#L182).
+[shakenfist/network/network.py:182](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/network.py#L182).
 Artifact's constructor accepted the Pydantic directly, so
 its phase-2 override used `cls(matches[0])` — that does not
 port.
@@ -103,7 +103,7 @@ Key points:
 
 * `Instance.ACTIVE_STATES` is a larger set than Artifact's
   (nine state strings including error variants, see
-  [shakenfist/instance.py:177-183](shakenfist/instance.py#L177-L183)).
+  [shakenfist/instance.py:177-183](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L177-L183)).
   `list(...)` flattens it to the `list[str]` shape
   `ObjectFilterCriteria.states` expects; MariaDB builds an
   `IN (...)` clause.
@@ -144,7 +144,7 @@ Considerations specific to Network:
 
 * **`FLOATING_NETWORK_UUID` singleton.** The `Networks`
   iterator skips this UUID
-  ([shakenfist/network/network.py:964](shakenfist/network/network.py#L964))
+  ([shakenfist/network/network.py:964](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/network.py#L964))
   because it is a bookkeeping sentinel, not a real tenant
   network. The `from_db_by_ref` path does not need the same
   skip: the floating network has `namespace=None` (or some

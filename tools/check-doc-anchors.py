@@ -22,9 +22,19 @@ Sources are every page under `docs/` plus the root markdown files, which
 documents in their own right, so their links are the ones a heading rename is
 most likely to break, and mkdocs never sees them at all.
 
-`docs/plans/` and `docs/components/` are excluded as sources: plans are
-point-in-time records which are not maintained after they land, and components
-are synchronised in from other repositories. Both remain valid link targets.
+`docs/plans/` and `docs/components/` are excluded as anchor-check sources:
+plans are point-in-time records which are not maintained after they land, and
+components are synchronised in from other repositories. Both remain valid link
+targets.
+
+Separately, every page under `docs/` other than `docs/components/` -- plans
+included -- must not link out of `docs/` with a relative path. The docs site
+imports this tree, so a relative link whose target is elsewhere in the
+repository (or a repo-root-relative path which resolves nowhere at all) breaks
+on import; such links must be absolute `https://github.com/...` URLs instead
+(the docs-external-links consistency audit, issue 3792). Components stay
+excluded because a fix made here would be overwritten by the next
+synchronisation.
 """
 
 import os
@@ -33,10 +43,8 @@ import sys
 
 
 DOCS_DIR = 'docs'
-EXCLUDED_PREFIXES = (
-    os.path.join(DOCS_DIR, 'plans'),
-    os.path.join(DOCS_DIR, 'components'),
-)
+ANCHOR_EXCLUDED_DIRS = ('plans', 'components')
+ESCAPE_ONLY_DIRS = ('plans',)
 
 # Root markdown files which link into docs/. These are not part of the mkdocs
 # site, so nothing else validates them.
@@ -88,6 +96,27 @@ def repo_root_for(docs_dir):
     return os.path.dirname(docs_dir) or os.curdir
 
 
+def _docs_markdown(docs_dir, subdirs=None, excluded_dirs=()):
+    """Markdown files under docs_dir, or under the named subdirs of it."""
+    roots = [docs_dir]
+    if subdirs is not None:
+        roots = [os.path.join(docs_dir, subdir) for subdir in subdirs]
+    excluded = tuple(
+        os.path.join(os.path.normpath(docs_dir), d) + os.sep
+        for d in excluded_dirs)
+
+    for root in roots:
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames.sort()
+            for filename in sorted(filenames):
+                if not filename.endswith('.md'):
+                    continue
+                path = os.path.join(dirpath, filename)
+                if os.path.normpath(path).startswith(excluded):
+                    continue
+                yield path
+
+
 def markdown_files(docs_dir=DOCS_DIR, root_dir=None):
     if root_dir is None:
         root_dir = repo_root_for(docs_dir)
@@ -96,15 +125,17 @@ def markdown_files(docs_dir=DOCS_DIR, root_dir=None):
         if os.path.isfile(path):
             yield path
 
-    for dirpath, dirnames, filenames in os.walk(docs_dir):
-        dirnames.sort()
-        for filename in sorted(filenames):
-            if not filename.endswith('.md'):
-                continue
-            path = os.path.join(dirpath, filename)
-            if path.startswith(EXCLUDED_PREFIXES):
-                continue
-            yield path
+    yield from _docs_markdown(docs_dir, excluded_dirs=ANCHOR_EXCLUDED_DIRS)
+
+
+def escape_only_files(docs_dir=DOCS_DIR):
+    """Markdown checked only for links which do not stay inside docs/.
+
+    Plans are excluded from anchor checking because they are point-in-time
+    records, but a relative link out of docs/ still breaks the docs site
+    import there, so they get the escaping-link check and nothing else.
+    """
+    yield from _docs_markdown(docs_dir, subdirs=ESCAPE_ONLY_DIRS)
 
 
 def resolve_target(source, target_path, docs_dir=DOCS_DIR):
@@ -132,9 +163,15 @@ def check_anchors(docs_dir=DOCS_DIR, root_dir=None):
     problems = []
     cache = {}
 
-    for source in markdown_files(docs_dir, root_dir=root_dir):
+    docs_prefix = os.path.normpath(docs_dir) + os.sep
+    sources = [(path, True) for path in markdown_files(docs_dir, root_dir=root_dir)]
+    sources += [(path, False) for path in escape_only_files(docs_dir)]
+
+    for source, anchors_checked in sources:
         with open(source, errors='replace') as f:
             content = f.read()
+
+        in_docs = os.path.normpath(source).startswith(docs_prefix)
 
         for match in LINK_RE.finditer(content):
             link = match.group(1)
@@ -148,6 +185,26 @@ def check_anchors(docs_dir=DOCS_DIR, root_dir=None):
                 continue
 
             target = resolve_target(source, target_path, docs_dir=docs_dir)
+
+            if in_docs and target_path:
+                # The docs site imports this tree, so a relative link whose
+                # target is not a file inside docs/ breaks on import: either
+                # it resolves to a file elsewhere in the repository, or it is
+                # a repo-root-relative path which resolves nowhere at all.
+                # For anchor-checked sources the latter case falls through to
+                # the more precise 'no such file' report below.
+                escapes = (target is not None and
+                           not os.path.normpath(target).startswith(docs_prefix))
+                if escapes or (target is None and not anchors_checked):
+                    problems.append(
+                        f'{source}: {link} -> does not resolve to a file '
+                        'inside docs/; links out of docs/ must be absolute '
+                        'https://github.com/... URLs')
+                    continue
+
+            if not anchors_checked:
+                continue
+
             if not target:
                 problems.append(
                     f'{source}: {link} -> no such file')

@@ -39,7 +39,7 @@ Non-goals for this phase:
   classmethods — kept as the documented predicate fallback
   per the master plan.
 * `all_instances()` at
-  [shakenfist/instance.py:2113](shakenfist/instance.py#L2113)
+  [shakenfist/instance.py:2113](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/instance.py#L2113)
   — uses `get_all_instance_uuids()` + per-UUID `from_db()`.
   N+1 but bounded (instance counts are moderate in practice
   and it's not on any REST hot path). Leave it; revisit in
@@ -60,7 +60,7 @@ Non-goals for this phase:
 ### NetworkInterfaces
 
 `NetworkInterfaces` at
-[shakenfist/network/interface.py:300-349](shakenfist/network/interface.py#L300-L349)
+[shakenfist/network/interface.py:300-349](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/network/interface.py#L300-L349)
 is the exact hybrid pattern Artifacts / Instances /
 Networks had before phase 4: it resolves prefilter to
 target_states, calls `get_objects_by_state` for UUIDs,
