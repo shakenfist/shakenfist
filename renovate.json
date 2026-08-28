@@ -8,6 +8,10 @@
   "schedule": [
     "after 9pm"
   ],
+  "pre-commit": {
+    "description": "Renovate's pre-commit manager is opt-in. Without this the hook revisions in .pre-commit-config.yaml are the one dependency file nobody is watching.",
+    "enabled": true
+  },
   "packageRules": [
     {
       "description": "Automatically merge minor and patch-level updates",
