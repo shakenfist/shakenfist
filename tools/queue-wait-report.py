@@ -42,11 +42,27 @@ This reads that stream as newline delimited JSON on stdin. The same lines
 reach three different places and all three work here:
 
     loki-query '{job="shakenfist"} |= "execution duration"' \\
-        --tenant sfcbr --since 24h --limit 20000 | tools/queue-wait-report.py
+        --tenant sfcbr --since 6h | tools/queue-wait-report.py
 
     journalctl -u 'sf-*.service' -o cat | tools/queue-wait-report.py
 
     unzip -p bundle.zip 'journal-*.txt' | tools/queue-wait-report.py
+
+Loki caps a query at 5000 lines. Asking for more fails the request outright,
+and asking for exactly 5000 succeeds while silently returning only the most
+recent 5000 lines -- which is the dangerous case, because a truncated window
+looks like a complete one. A busy cluster produces roughly 600 of these
+events an hour, which puts a 24 hour window past the ceiling. For anything longer than
+a few hours, page the window through the query_range API in half-hour chunks
+and check that no chunk comes back holding exactly the limit -- one that does
+was truncated. Totals for a whole window are better taken from a metric
+query, which is not subject to the line ceiling at all:
+
+    sum(count_over_time({job="shakenfist"} |= "execution duration" [42h]))
+
+Phase 9 of PLAN-queue-performance.md was measured that way; the first attempt
+at it, using the single-shot invocation above over 24 hours, undercounted the
+majority outcome by a factor of three without saying so.
 
 Lines which are not JSON, and JSON objects which are not queue-wait events,
 are ignored rather than being an error: every one of those sources carries
@@ -105,14 +121,21 @@ CLASS_UNKNOWN = 'unknown'
 
 # What one deferral costs, by queue class. A dependency wait re-enqueues the
 # operation into the future, and the delay is the dispatcher's choice rather
-# than the operation's: sf-queues calls op.defer() with no argument and takes
-# its flat fifteen second default (shakenfist/daemons/queues/workitem.py),
-# while sf-net backs off from INITIAL_DEFER_DELAY doubling to MAX_DEFER_DELAY
-# (0.1s to a 15s cap, shakenfist/daemons/network/workitem.py). So a
-# defer_count of 3 is 45s of deliberate wait on one and under a second on the
-# other, which is worth knowing before reading a row's defers column as
-# fifteen seconds a piece.
-SF_QUEUES_DEFER = 'drained by sf-queues, a flat 15s per defer'
+# than the operation's. Both dispatchers now back off from
+# INITIAL_DEFER_DELAY doubling to MAX_DEFER_DELAY (0.1s to a 15s cap), so a
+# defer_count of 3 is under a second of deliberate wait rather than 45s.
+# They arrive at it differently: sf-net keeps the depth in a per-worker map
+# (shakenfist/daemons/network/workitem.py), while sf-queues derives it
+# statelessly from the persisted defer_count via dependency_defer_delay()
+# because its jobs are one-shot threads
+# (shakenfist/daemons/queues/workitem.py).
+#
+# sf-queues took a flat fifteen second default until #3916 landed on
+# 2026-08-27 (issue #3863). Data captured before then has a wildly different
+# meaning in the defers column on the sf-queues classes, so check the window
+# before comparing a defer count against a newer one.
+SF_QUEUES_DEFER = ('drained by sf-queues, 0.1s per defer doubling to a 15s '
+                   'cap (flat 15s before #3916)')
 SF_NET_DEFER = 'drained by sf-net, 0.1s per defer doubling to a 15s cap'
 
 DEFER_SCHEDULES = collections.OrderedDict([

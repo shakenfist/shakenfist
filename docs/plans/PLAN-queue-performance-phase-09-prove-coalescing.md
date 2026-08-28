@@ -341,10 +341,10 @@ Confirm before starting, and stop at the gate:
 
 ## Results
 
-Steps 9a to 9e are done. Step 9f is not, and cannot be until this
-branch is deployed to `sfcbr` and a day of traffic has passed
-through it; the phase stays `In progress` until then, as the risk
-section said it would.
+Steps 9a to 9f are done. The phase stays `In progress` for one
+remaining item only: the cluster mutation run described below, which
+needs the five node CI environment. Everything else this plan set out
+to do has landed and been measured.
 
 ### What was built
 
@@ -516,12 +516,61 @@ still records an outcome, and
 rendered row's cell values rather than on column headings which are
 printed whenever any row exists at all.
 
+### What 9f measured
+
+The instrumented build reached `sfcbr` on 2026-08-27 at 13:13, and
+9f ran against the 41h56m window from then to 2026-08-29 07:00 --
+26,229 operations. The numbers are written up in full under "What
+step 9 measured" in the master plan; the three things this phase
+existed to settle are:
+
+* **The fold is cheap.** p50 3.7 ms, p90 5.2 ms, max 149.5 ms over
+  1,335 executions. The `~200 ms under load` figure both comments in
+  `baseoperation.py` were built on is wrong by roughly 50x at the
+  median, and is corrected in place. It was measured while #3878
+  made every timed query unmatchable, so it was timing a query that
+  could never match.
+* **Coalescing works and rarely fires.** 7 of 1,335 folds matched
+  anything, folding one sibling each. The fix was necessary and is
+  confirmed working; its yield on this workload is seven avoided
+  operations in nearly two days. The master plan records the three
+  readings consistent with that and does not choose between them.
+* **The two data sources agree.** `increase()` on
+  `database_claim_coalescible_siblings_total` over the same window
+  gives 1,336.5 against the log-derived 1,335.
+
+The closeout also happened: #3879 is closed with a note saying what
+was built, and the real-MariaDB concurrency coverage decision 5
+declined to build is filed as #3948.
+
+Two things were found along the way. The first is fixed here: the
+measurement invocation in `tools/queue-wait-report.py`'s docstring
+did not work, because Loki silently truncates at a 5000 line
+`--limit`, so the documented 24 hour single-shot query undercounted
+the majority outcome threefold. The docstring now describes paging
+through `query_range` and taking totals from `count_over_time`, and
+the same file's claim that `sf-queues` defers a flat 15 s is
+corrected for #3916. The second is recorded rather than fixed: there
+is no counter for enqueue-side dedup *hits*, only for calls, so that
+half of coalescing has no equivalent of `coalesce_folded`. That
+asymmetry belongs with #3884's work on the key and is noted in the
+master plan.
+
+The window is also the first `sfcbr` data carrying #3863's back-off
+fix, which merged just before it opened. It shows the back-off is
+live, and it shows something the fix does not explain: about 400 of
+823 first deferrals still sit at 15-17 s, and the transient-failure
+retry path which uses a 15 s first delay fired zero times in the
+window. The master plan records this under "What this window says
+about phase 10", along with why the p50 comparison against step 7 is
+not a controlled before-and-after. Phase 10 needs re-scoping against
+that data, not planning as written.
+
 ### Still outstanding
 
-* **9f**, in full: the `sfcbr` measurement, the verdict on the
-  ~200 ms figure in `baseoperation.py:327`, the Prometheus
-  cross-check, filing the real-MariaDB concurrency issue from
-  decision 5, and closing #3879.
-* The cluster mutation run described above.
+* The cluster mutation run described above. `functional-tests.yml`
+  accepts `workflow_dispatch` and its cluster matrix runs on that
+  event, so the run is a push of a branch with `COALESCIBLE_TASKS`
+  emptied plus one `gh workflow run`. It has not been done.
 * Neither the master plan's phase 9 row nor its `index.md` row
-  moves to `Complete` until both are done.
+  moves to `Complete` until it is.

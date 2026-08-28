@@ -71,7 +71,7 @@ Two things this plan changed are deliberately still unproven:
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
 | 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
 | 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | In progress |
-| 10. The 15 second dependency wait | (not yet planned) | Not started |
+| 10. The 15 second dependency wait | (not yet planned, and see below -- #3863 was fixed by #3916) | Not started |
 | 11. Multi-column coalescing key | (not yet planned) | Not started |
 
 ## Problem
@@ -181,7 +181,14 @@ for someone to notice it.
    phase makes the fold's evidence durable enough to assert on,
    adds that assertion to the functional suite, instruments the
    fold's cost onto the event `tools/queue-wait-report.py` already
-   reads, and re-measures on `sfcbr`. See
+   reads, and re-measures on `sfcbr`. All of that has landed and the
+   measurement is written up under "What step 9 measured" below: the
+   fold is cheap (3.7 ms median, not the ~200 ms the code asserted)
+   and it fires very rarely (7 matches in 1,335 folds over 42
+   hours). #3879 is closed; the deterministic concurrency coverage
+   the phase declined to build is #3948. One item is outstanding --
+   observing the new functional test fail with `COALESCIBLE_TASKS`
+   emptied, which needs the cluster CI environment. See
    [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md).
 
 10. **The 15 second dependency wait.** Step 7 measured a p50 of
@@ -193,7 +200,21 @@ for someone to notice it.
     is the largest user-visible latency in the whole sample and it
     has nothing to do with queue order, which is why step 7 excluded
     it from the fairness question and filed it as #3863 instead.
-    Not yet planned.
+
+    **The subject moved.** #3916 landed a fix on 2026-08-27 --
+    `dependency_defer_delay()` in
+    `shakenfist/daemons/queues/workitem.py` gives `sf-queues` the
+    same 0.1 s doubling to a 15 s cap that `sf-net` already had,
+    derived statelessly from the persisted `defer_count` -- and
+    #3863 was closed as completed. Phase 9's window is the first
+    data carrying it. That window says the back-off is live and also
+    says the story is not finished: the lane's p99 is still 17.18 s,
+    1,568 operations deferred at least once, and about 400 first
+    deferrals still sit at 15-17 s for reasons #3916 does not
+    explain. See "What this window says about phase 10" below, which
+    also explains why the headline p50 improvement is not a
+    controlled comparison. Re-scope this phase against that data
+    before planning it.
 
 11. **Multi-column coalescing key.** The fold keys on a single
     target column, which for `net_op` means "the same network". A
@@ -284,6 +305,158 @@ operation is hard deleted 30 seconds after it completes and takes its
 events' object references with it, so the numbers had to come from the
 log echo instead. That gap is filed as #3864 and the operator
 documentation, which claimed 30 day retention, is corrected.
+
+## What step 9 measured
+
+Step 7's numbers were captured while coalescing was inert. Step 9
+instrumented the fold itself and re-measured on `sfcbr` once the
+instrumented build was deployed, so for the first time these numbers
+describe a cluster on which the fold actually matches rows.
+
+One window, through the same `tools/queue-wait-report.py`:
+
+* **`sfcbr`**, 41h56m, 26,229 operations
+  (2026-08-27T13:03Z to 2026-08-29T07:00Z). Production steady state.
+  147 of those operations predate the instrumented build and are
+  excluded from the coalescing tables by the tool, which is the
+  deploy boundary showing up in the data.
+
+### The fold is cheap -- the ~200 ms estimate was wrong by 50x
+
+`claim_coalescible_siblings`, over all 1,335 executions which reached
+it:
+
+| p50 | p90 | p99 | max |
+|-----|-----|-----|-----|
+| 3.7 ms | 5.2 ms | 88.6 ms | 149.5 ms |
+
+The comment in `baseoperation.py` asserted "~200 ms under load" from a
+CI-bundle profile, and used that figure to justify the
+`dispatcher_batch_size == 1` guard. The measured median is 3.7 ms and
+the single most expensive fold observed in nearly 42 hours did not
+reach 200 ms. Both comments are corrected in place.
+
+The estimate was not merely imprecise, it was measuring something
+else: it was taken while #3878 was live, so every call it timed was a
+query that could never match, and it inferred "under load" from a
+CI bundle rather than from a cluster carrying real traffic. The guard it justifies is still
+worth keeping -- skipping a query that cannot help is free -- but it
+is a tidiness optimisation, not a latency defence, and nothing else
+should be justified by that number.
+
+### Coalescing works, and on this workload it almost never fires
+
+Of 8,661 `net_op` executions, the outcome breakdown was:
+
+| Outcome | n | Share |
+|---------|---|-------|
+| `not_cluster_wide` | 3,661 | 42% |
+| `batch_size_one` | 3,343 | 39% |
+| `ran` | 1,335 | 15% |
+| `no_coalescible_tasks` | 322 | 4% |
+
+Of the 1,335 folds which ran, **7 folded anything**, each folding
+exactly one sibling: seven operations avoided in 41h56m. The seven are
+spread across six separate hours on both days rather than clustered in
+one burst, and all of them landed on the
+`networknode / user_facing_high_io` class.
+
+No other operation type coalesces at all: the remaining 17,421
+instrumented operations recorded `type_not_coalescible`, which is the
+expected shape today -- `NetOp` is the only type that declares a
+coalescing key.
+
+So the phase 8 fix was necessary and is confirmed working, but its
+practical yield on this cluster is small. Three readings are
+consistent with the data and this plan does not pretend to choose
+between them without more evidence:
+
+1. `sfcbr` genuinely does not generate concurrent duplicate network
+   work very often, and the fold is correctly rare.
+2. The two guards are too aggressive. 81% of `net_op` executions
+   never reach the fold, and `batch_size_one` alone accounts for 39%
+   -- a dispatcher that dequeued in slightly larger batches would
+   expose more foldable pairs.
+3. The single-column key is the limit, which is what #3884 already
+   describes: the per-node tasks most likely to be duplicated are the
+   ones the key cannot express.
+
+Reading 3 is the one already funded as a phase. Reading 2 is new and
+worth a measurement before anyone acts on it.
+
+### Cross-check against the counters
+
+The Prometheus counters agree with the log-derived numbers, which is
+the point of taking both:
+
+| Counter | 42h increase | Log-derived |
+|---------|--------------|-------------|
+| `database_claim_coalescible_siblings_total` | 1,336.5 | 1,335 |
+| `database_find_existing_coalescible_op_total` | 2,364.9 | not derivable |
+
+The 1.5 difference is `increase()` extrapolating across scrape
+boundaries, not a discrepancy. The enqueue-side dedup runs about 1.8
+times as often as the worker-side fold, which is expected -- it is
+consulted on every enqueue, not only on dequeued batches.
+
+**There is no counter for enqueue-side dedup _hits_.** We can see how
+often `find_existing_coalescible_op` was asked and not how often it
+found something, so the enqueue-side half of coalescing has no
+equivalent of the `coalesce_folded` number above. That asymmetry is
+recorded here rather than fixed, because the fix belongs with #3884's
+work on the key.
+
+### What this window says about phase 10, which is less than it looks
+
+#3916 merged on 2026-08-27 at 10:11 and `sfcbr` was redeployed at
+13:13, so this is the first window carrying the dependency-wait
+back-off. The `user_waiting` lane reads:
+
+| | p50 | p90 | p99 | max |
+|---|-----|-----|-----|-----|
+| all | 1.20 s | 7.28 s | 17.18 s | 42.83 s |
+| never deferred | 0.86 s | 1.82 s | 2.30 s | 9.08 s |
+
+against step 7's 15.78 s p50 for the same lane. **Do not read that as
+a controlled before-and-after.** Two things get in the way. The
+windows are different workloads a week apart, with no attempt to hold
+load constant. And `wait_seconds` is `start_time - created_at`
+(`baseoperation.py:162`) -- time since the operation was *created*,
+not since its last deferral -- so it is not a direct reading of the
+defer delay at all.
+
+What the window does establish is narrower and still worth having:
+
+* Sub-second waits now appear on operations with `defer_count == 1`,
+  which a flat fifteen second delay could not produce. The back-off
+  is live.
+* 1,568 operations in the window still deferred at least once, and
+  the lane's p99 is 17.18 s. Deferral has not stopped mattering.
+* Roughly 400 of the 823 first deferrals sit at 15-17 s. That is
+  **not** the transient-failure retry path -- `defer_with_backoff`
+  uses a `(15, 30, 60)` schedule and emits `scheduling retry after
+  transient failure`, which occurs **zero** times in this window. What
+  those operations were waiting for has not been established.
+
+So phase 10 is not "already fixed by #3916". Its subject moved, and
+the remaining question -- what the 15-17 s population is waiting on --
+is a different question from the one #3863 asked. Re-scope it against
+this data before planning it.
+
+### Method note
+
+The invocation in `tools/queue-wait-report.py`'s docstring did not
+work as written. Loki caps a query at 5000 lines: asking for more
+fails outright, and asking for exactly 5000 silently returns the most
+recent 5000 lines. A 24 hour window of this cluster is past that
+ceiling, so the documented invocation returned a truncated stream
+which looked complete -- the first pass at this measurement
+undercounted the majority outcome threefold before that was caught.
+The
+docstring now shows a `query_range` loop that pages the window in
+half-hour chunks, and points at `count_over_time` for totals. Anyone
+repeating this measurement should check that no chunk comes back at
+the ceiling.
 
 ## Audit findings (step 6)
 
