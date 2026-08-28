@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from shakenfist.schema import database_load_budget  # noqa: E402
 
 
-HEADER = '''# Prometheus rules for Shaken Fist database load.
+HEADER = """# Prometheus rules for Shaken Fist database load.
 #
 # GENERATED FILE. Do not edit: run
 # tools/generate-database-load-rules.py and commit the result. The numbers
@@ -101,7 +101,7 @@ groups:
   - name: shakenfist-database-load
     interval: 5m
     rules:
-'''
+"""
 
 
 INDENT = ' ' * 10
@@ -151,7 +151,7 @@ def main():
 
     out = [HEADER]
 
-    out.append('''      # The shape of this cluster. sf-resources publishes
+    out.append("""      # The shape of this cluster. sf-resources publishes
       # instances_active from every node whatever its roles, so counting
       # the series counts nodes and summing them counts standing
       # instances.
@@ -176,7 +176,7 @@ def main():
       - record: sf_database:request_rate:total
         expr: sum(sf_database:request_rate)
 
-''')
+""")
 
     out.append(coefficient_rule(
         'sf_database:budget:per_node_base', entries, 'per_node_base_qps',
@@ -205,7 +205,7 @@ def main():
         'coupled, meaning its level is\n      # set by what your users and '
         'tooling do rather than by a loop of ours.'))
 
-    out.append('''
+    out.append("""
       # The model, evaluated for this cluster. Clamped at zero because of
       # the negative cluster term described above.
       - record: sf_database:modelled_rate
@@ -338,7 +338,7 @@ def main():
             That looks exactly like a healthy cluster, which is why this
             alert exists. Scrape sf-resources on RESOURCES_METRICS_PORT
             (13007 by default) on every node.
-'''.format(multiplier=defaults.tolerance_multiplier,
+""".format(multiplier=defaults.tolerance_multiplier,
            floor=defaults.tolerance_floor_qps,
            unbudgeted=defaults.unbudgeted_fixed_rate_qps,
            unbudgeted_per_node=defaults.unbudgeted_fixed_rate_per_node_qps))

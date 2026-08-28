@@ -582,7 +582,7 @@ def _cluster_shape() -> tuple[int, int]:
     room enough to hide the regression this command exists to find.
     """
     now = time.time()
-    fresh = [m for m in mariadb.get_all_node_metrics()
+    fresh = [m for m in mariadb.get_all_node_metrics()  # nopushdown: every node wanted
              if now - float(m.get('timestamp') or 0)
              < NODE_METRICS_STALE_SECONDS]
     if not fresh:

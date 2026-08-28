@@ -208,7 +208,8 @@ FALLBACK_DEFAULTS = collections.OrderedDict([
 # the measurement would be wrong to commit. GetNodeDaemonState/cluster is the
 # only one today: every daemon polls its own state row at
 # 1/DAEMON_STATE_POLL_INTERVAL from idle(), but the single elected cluster
-# daemon polls from a loop which sleeps lock.lost_event.wait(5), so the
+# daemon polls from a loop which sleeps for ELECTED_LOOP_POLL_SECONDS, so
+# the
 # cluster-wide rate is 0.5 per node less 0.3. Measuring it instead gives
 # whatever the cluster is running: before #3874 the elected daemon did not
 # poll at all and the pair read 5/6 of its siblings, and a cluster which has

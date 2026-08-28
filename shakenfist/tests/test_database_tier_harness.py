@@ -118,6 +118,8 @@ METRICS = textwrap.dedent("""\
     database_get_node_total 48.0
     database_requests_total{caller_daemon="net"} 3.0
     database_requests_total{caller_daemon="cleaner",operation="Sweep"} 5.0 1700000000000
+    database_requests_total{caller_daemon="api",operation="Get Node"} 17.0
+    database_requests_total{caller_daemon="api",operation="Forge\\",caller_daemon=\\"net"} 13.0
     """)
 
 
@@ -148,7 +150,7 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         with mock.patch.object(harness.requests, 'get',
                                return_value=FakeResponse(METRICS)):
             pairs = harness.scrape_request_pairs('10.0.0.1')
-        self.assertEqual(4, len(pairs))
+        self.assertEqual(6, len(pairs))
 
     def test_a_trailing_timestamp_is_not_the_value(self):
         # The exposition format allows a sample to carry a trailing
@@ -549,6 +551,31 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         self.assertNotIn(
             ('Poll', 'net'),
             harness.independent_of_activity(wobbling_poll(just_outside)))
+
+    def test_a_space_in_a_label_value_does_not_truncate_the_sample(self):
+        # Label values may contain spaces. Splitting the line on
+        # whitespace, which every copy of this parser used to do, cuts the
+        # label block in half and then reads the rest of the labels as the
+        # value -- so the sample was dropped on the float() rather than
+        # misread, which is why nothing noticed.
+        with mock.patch.object(harness.requests, 'get',
+                               return_value=FakeResponse(METRICS)):
+            pairs = harness.scrape_request_pairs('10.0.0.1')
+        self.assertEqual(17.0, pairs[('Get Node', 'api')])
+
+    def test_an_escaped_quote_cannot_forge_a_pair(self):
+        # The fixture line is api's, and its operation value contains the
+        # text of a caller_daemon="net" label. Splitting on ',' and '='
+        # without honouring \" reads that text as a real label and credits
+        # the sample to a caller which never made it -- which is a way to
+        # push a pair over its ceiling, or to dilute a real one under it,
+        # from anything that can set an operation name.
+        with mock.patch.object(harness.requests, 'get',
+                               return_value=FakeResponse(METRICS)):
+            pairs = harness.scrape_request_pairs('10.0.0.1')
+        self.assertEqual(13.0, pairs[('Forge",caller_daemon="net', 'api')])
+        self.assertNotIn(('Forge\\', '\\"net'), pairs)
+        self.assertEqual(41.0, pairs[('GetNode', 'net')])
 
     def test_parser_matches_the_server_side_parser(self):
         # shakenfist/util/metrics_scrape.py is the same parser for

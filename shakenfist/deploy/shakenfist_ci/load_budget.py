@@ -15,6 +15,7 @@ harness puts it. What must not be duplicated is the data.
 """
 
 import os
+import re
 
 import requests
 import yaml
@@ -303,6 +304,56 @@ def enforced(entry):
     return 'provisional' not in entry and not entry.get('activity_coupled')
 
 
+# The deliberate copy of the sample parser in
+# shakenfist/util/metrics_scrape.py, kept here because this suite imports
+# nothing from the server package. Every comment justifying the shape of
+# these three is on that copy; test_parser_matches_the_server_side_parser
+# asserts the two agree, which is only worth anything while the fixture it
+# runs on carries the awkward cases.
+_SAMPLE_RE = re.compile(
+    r'^database_requests_total\{(?P<labels>.*)\}\s+(?P<value>\S+)')
+_LABEL_RE = re.compile(r'([a-zA-Z_][a-zA-Z0-9_]*)="((?:[^"\\]|\\.)*)"')
+_ESCAPES = {'n': '\n', '"': '"', '\\': '\\'}
+
+
+def _unescape(value):
+    """Undo label value escaping, per the exposition format."""
+    if '\\' not in value:
+        return value
+
+    out = []
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char != '\\' or index + 1 >= len(value):
+            out.append(char)
+            index += 1
+            continue
+        following = value[index + 1]
+        if following in _ESCAPES:
+            out.append(_ESCAPES[following])
+            index += 2
+        else:
+            out.append(char)
+            index += 1
+    return ''.join(out)
+
+
+def parse_request_samples(text):
+    """Every database_requests_total sample, as (labels, value)."""
+    for line in text.splitlines():
+        match = _SAMPLE_RE.match(line)
+        if not match:
+            continue
+        try:
+            value = float(match.group('value'))
+        except ValueError:
+            continue
+        yield ({name: _unescape(raw)
+                for name, raw in _LABEL_RE.findall(match.group('labels'))},
+               value)
+
+
 def scrape_request_pairs(mesh_ip):
     """Every (operation, caller_daemon) counter on one tier node.
 
@@ -311,40 +362,18 @@ def scrape_request_pairs(mesh_ip):
     answers "what is this node serving at all", which is what a check for
     traffic nobody budgeted for needs -- it cannot ask about a pair whose
     name it does not know yet.
-
-    Reads the second whitespace field as the value, not the last, for the
-    reason given in shakenfist/util/metrics_scrape.py: a sample may carry
-    a trailing timestamp. The two copies are asserted to agree by
-    test_parser_matches_the_server_side_parser, which is only worth
-    anything if the fixture it runs on contains the case.
     """
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
     resp = requests.get(url, timeout=METRICS_TIMEOUT)
     resp.raise_for_status()
 
     pairs = {}
-    for line in resp.text.splitlines():
-        if not line.startswith('database_requests_total{'):
-            continue
-        parts = line.split()
-        if len(parts) < 2:
-            continue
-        labels = parts[0][len('database_requests_total{'):].rstrip('}')
-        operation = caller = None
-        for label in labels.split(','):
-            name, _, value = label.partition('=')
-            value = value.strip('"')
-            if name.strip() == 'operation':
-                operation = value
-            elif name.strip() == 'caller_daemon':
-                caller = value
+    for labels, value in parse_request_samples(resp.text):
+        operation = labels.get('operation')
+        caller = labels.get('caller_daemon')
         if operation is None or caller is None:
             continue
-        try:
-            pairs[(operation, caller)] = (
-                pairs.get((operation, caller), 0.0) + float(parts[1]))
-        except ValueError:
-            continue
+        pairs[(operation, caller)] = pairs.get((operation, caller), 0.0) + value
     return pairs
 
 

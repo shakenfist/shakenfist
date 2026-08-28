@@ -169,8 +169,16 @@ entries:
       mean_qps: 5.1
       r2: 0.457
     note: >-
-      The floating network maintenance sweep. This is the loop #3655
-      reduced from one read per address to one bulk read per pass.
+      The floating network maintenance sweep. #3655 converted the
+      maintenance loop from one read per address to one bulk read per
+      pass, but not the floating IP reaper beside it, which kept a
+      per-address is_free() reaching the same table through the in_use
+      property. This level was fitted while that was still true, so it
+      carries a per-address term the code no longer has once the reaper
+      change lands. Left as measured rather than adjusted by hand, per
+      this file's header: it now over-predicts, which loosens this
+      pair's ceiling rather than tightening it, and the next derivation
+      from post-fix data will bring it down on its own.
   - operation: GetNetworkInterfaceAttributes
     caller_daemon: net
     per_instance_qps: 0.313
@@ -223,7 +231,13 @@ entries:
     note: >-
       Every daemon polls its own node_daemon_states row from
       Daemon.check_daemon_state(), called on each 0.2s idle() tick and
-      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s). That interval is
+      a floor, not a fixed period: every DatabaseUnavailable doubles it
+      up to DAEMON_STATE_POLL_MAX_INTERVAL (60s), snapping back on the
+      first successful read. A cluster whose tier is struggling
+      therefore reads this pair well under the modelled level -- the one
+      direction base_term_caveat does not describe, and the reason a
+      sudden drop here is a symptom rather than an improvement.
   - operation: GetNodeDaemonState
     caller_daemon: sidechannel
     per_node_base_qps: 0.497
@@ -233,7 +247,13 @@ entries:
     note: >-
       Every daemon polls its own node_daemon_states row from
       Daemon.check_daemon_state(), called on each 0.2s idle() tick and
-      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s). That interval is
+      a floor, not a fixed period: every DatabaseUnavailable doubles it
+      up to DAEMON_STATE_POLL_MAX_INTERVAL (60s), snapping back on the
+      first successful read. A cluster whose tier is struggling
+      therefore reads this pair well under the modelled level -- the one
+      direction base_term_caveat does not describe, and the reason a
+      sudden drop here is a symptom rather than an improvement.
   - operation: GetNodeDaemonState
     caller_daemon: resources
     per_node_base_qps: 0.497
@@ -243,7 +263,13 @@ entries:
     note: >-
       Every daemon polls its own node_daemon_states row from
       Daemon.check_daemon_state(), called on each 0.2s idle() tick and
-      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s). That interval is
+      a floor, not a fixed period: every DatabaseUnavailable doubles it
+      up to DAEMON_STATE_POLL_MAX_INTERVAL (60s), snapping back on the
+      first successful read. A cluster whose tier is struggling
+      therefore reads this pair well under the modelled level -- the one
+      direction base_term_caveat does not describe, and the reason a
+      sudden drop here is a symptom rather than an improvement.
   - operation: GetNodeDaemonState
     caller_daemon: net
     per_node_base_qps: 0.497
@@ -253,7 +279,13 @@ entries:
     note: >-
       Every daemon polls its own node_daemon_states row from
       Daemon.check_daemon_state(), called on each 0.2s idle() tick and
-      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s). That interval is
+      a floor, not a fixed period: every DatabaseUnavailable doubles it
+      up to DAEMON_STATE_POLL_MAX_INTERVAL (60s), snapping back on the
+      first successful read. A cluster whose tier is struggling
+      therefore reads this pair well under the modelled level -- the one
+      direction base_term_caveat does not describe, and the reason a
+      sudden drop here is a symptom rather than an improvement.
   - operation: GetNodeDaemonState
     caller_daemon: queues
     per_node_base_qps: 0.496
@@ -263,7 +295,13 @@ entries:
     note: >-
       Every daemon polls its own node_daemon_states row from
       Daemon.check_daemon_state(), called on each 0.2s idle() tick and
-      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s). That interval is
+      a floor, not a fixed period: every DatabaseUnavailable doubles it
+      up to DAEMON_STATE_POLL_MAX_INTERVAL (60s), snapping back on the
+      first successful read. A cluster whose tier is struggling
+      therefore reads this pair well under the modelled level -- the one
+      direction base_term_caveat does not describe, and the reason a
+      sudden drop here is a symptom rather than an improvement.
   - operation: GetInstanceAttributes
     caller_daemon: sidechannel
     per_node_base_qps: 0.075
@@ -282,7 +320,13 @@ entries:
     note: >-
       Every daemon polls its own node_daemon_states row from
       Daemon.check_daemon_state(), called on each 0.2s idle() tick and
-      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s).
+      rate-limited to DAEMON_STATE_POLL_INTERVAL (2s). That interval is
+      a floor, not a fixed period: every DatabaseUnavailable doubles it
+      up to DAEMON_STATE_POLL_MAX_INTERVAL (60s), snapping back on the
+      first successful read. A cluster whose tier is struggling
+      therefore reads this pair well under the modelled level -- the one
+      direction base_term_caveat does not describe, and the reason a
+      sudden drop here is a symptom rather than an improvement.
   - operation: GetObjectState
     caller_daemon: api
     per_node_base_qps: 0.155
@@ -311,8 +355,8 @@ entries:
     note: >-
       As for every other daemon, except on the one node holding the
       cluster maintenance lock: the elected loop sleeps
-      lock.lost_event.wait(5) rather than idle(), so it polls once per
-      5s instead of once per 2s. That is the -0.3 constant. Before
+      lock.lost_event.wait(ELECTED_LOOP_POLL_SECONDS) rather than
+      idle(), so it polls once per 5s instead of once per 2s. That is the -0.3 constant. Before
       #3874 the elected daemon did not poll at all and this pair read
       5/6 of its siblings.
   - operation: GetObjectState

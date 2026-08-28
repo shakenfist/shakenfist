@@ -79,7 +79,11 @@ def scrape_database_counters(mesh_ip):
         if not name.startswith('database_') or not name.endswith('_total'):
             continue
         try:
-            counters[name] = float(parts[-1])
+            # parts[1], not parts[-1]: a sample may carry a trailing
+            # millisecond timestamp, which the last field would return as
+            # the counter. Unlabelled samples only, so splitting the line
+            # on whitespace is safe here in a way it is not above.
+            counters[name] = float(parts[1])
         except ValueError:
             continue
     return counters
@@ -91,28 +95,26 @@ def scrape_operation_requests(mesh_ip, operation, caller_daemon):
     ``operation`` may be None to sum every operation that caller has
     made. The samples this reads are labelled, so their names do not end
     in _total and scrape_database_counters() skips them.
+
+    Shares lb.parse_request_samples() with scrape_request_pairs() rather
+    than testing label substrings against the raw line. That was a third
+    copy of this parser, and the only one still reading the last
+    whitespace field as the value: a sample carrying a trailing timestamp
+    counted the timestamp, and a label value containing a space truncated
+    the line before the labels being matched on. Matching whole labels
+    also means a crafted label value cannot forge one.
     """
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
     resp = requests.get(url, timeout=METRICS_TIMEOUT)
     resp.raise_for_status()
 
-    wanted = ['caller_daemon="%s"' % caller_daemon]
-    if operation:
-        wanted.append('operation="%s"' % operation)
-
     total = 0.0
-    for line in resp.text.splitlines():
-        if not line.startswith('database_requests_total{'):
+    for labels, value in lb.parse_request_samples(resp.text):
+        if labels.get('caller_daemon') != caller_daemon:
             continue
-        parts = line.split()
-        if len(parts) < 2:
+        if operation and labels.get('operation') != operation:
             continue
-        if not all(w in parts[0] for w in wanted):
-            continue
-        try:
-            total += float(parts[-1])
-        except ValueError:
-            continue
+        total += value
     return total
 
 

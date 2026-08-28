@@ -312,7 +312,8 @@ will kill the process once `WatchdogSec` elapses, even though the
 daemon is working normally. The existing explicit callers are:
 
 - the `sf-cluster` elected loop, which sleeps on
-  `lock.lost_event.wait(5)` rather than `idle()` and so pets at the top
+  `lock.lost_event.wait(ELECTED_LOOP_POLL_SECONDS)` rather than `idle()`
+  and so pets at the top
   of each iteration;
 - `sf-cluster`'s `_cluster_wide_cleanup`, and `sf-cleaner`'s
   `update_power_states`, `_maintain_blobs` and `_find_missing_blobs`,
