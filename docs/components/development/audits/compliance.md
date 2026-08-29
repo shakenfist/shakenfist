@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-28T18:21:59.716129+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-08-29T12:30:13.234079+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -527,7 +527,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 
 Details for non-compliant projects:
 
-- **shakenfist** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:158, docs/developer_guide/subsystem_internals.md:160, docs/developer_guide/subsystem_internals.md:179, docs/developer_guide/subsystem_internals.md:233, docs/developer_guide/subsystem_internals.md:250, docs/developer_guide/subsystem_internals.md:454 (+7 more)
+- **shakenfist** (Status): 18 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/ci.md:70, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:158, docs/developer_guide/subsystem_internals.md:160, docs/developer_guide/subsystem_internals.md:179, docs/developer_guide/subsystem_internals.md:233, docs/developer_guide/subsystem_internals.md:250 (+8 more)
 
 ## plan-source-references
 
@@ -772,7 +772,7 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3757 |
+| shakenfist | compliant | - |
 
 Details for non-compliant projects:
 
@@ -781,7 +781,6 @@ Details for non-compliant projects:
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **library-utilities** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **occystrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
-- **shakenfist** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 
 ## review-coverage
 
@@ -810,9 +809,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 24 of 112 in-scope files reviewed at HEAD; 88 need review (threshold 5)
+- **development** (Status): 41 of 112 in-scope files reviewed at HEAD; 71 need review (threshold 5)
 - **kerbside** (Status): 124 of 194 in-scope files reviewed at HEAD; 70 need review (threshold 5)
-- **ryll** (Status): 97 of 182 in-scope files reviewed at HEAD; 85 need review (threshold 5)
+- **ryll** (Status): 96 of 183 in-scope files reviewed at HEAD; 87 need review (threshold 5)
 
 ## rust-unwrap-lint
 
