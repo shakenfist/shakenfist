@@ -1,4 +1,9 @@
-# Skill: Add Mypy Type Coverage
+---
+name: add-mypy-coverage
+description: Use this skill when adding mypy type annotations to a Shaken Fist module, expanding the incremental mypy rollout in tox.ini, or fixing type errors found during development.
+---
+
+# Add Mypy Type Coverage
 
 This skill guides adding mypy type annotations to Shaken Fist modules. Type
 annotations help catch errors at development time rather than runtime, and
@@ -28,7 +33,7 @@ error: Argument 1 has incompatible type "str"; expected "ObjectType"
 
 ## Current Coverage
 
-Files already checked in `tox -e mypy`:
+Files already checked in `tox -e mypy` include:
 
 - `shakenfist/schema/*.py` (strict)
 - `shakenfist/mariadb.py` (strict, follow-imports=silent)
@@ -38,9 +43,8 @@ Files already checked in `tox -e mypy`:
 - `shakenfist/client/ctl.py`
 - `shakenfist/blob.py`
 - `shakenfist/eventlog.py`
-- `shakenfist/etcd.py`
 
-Check `tox.ini` `[testenv:mypy]` for the current list.
+Check `tox.ini` `[testenv:mypy]` for the authoritative, current list.
 
 ## Implementation Steps
 
@@ -355,25 +359,15 @@ class Child:
 
 ## Priority Files for Type Coverage
 
-Based on the mypy rollout plan, these files have high impact:
+Improving mypy coverage is a standing development goal (see `CLAUDE.md`).
+Files not yet in `tox.ini` `[testenv:mypy]` with high impact include:
 
-1. **Phase 1 - Database Layer:**
-   - `shakenfist/etcd.py` (done)
-   - `shakenfist/mariadb.py`
-
-2. **Phase 2 - Base Objects:**
-   - `shakenfist/baseobject.py`
-
-3. **Phase 3 - Event Logging:**
-   - `shakenfist/eventlog.py` (done)
-
-4. **Phase 4 - Constants:**
-   - `shakenfist/constants.py`
-
-See `PLAN-mypy-rollout.md` for detailed function signatures.
+- `shakenfist/baseobject.py` - Base framework for all persistable objects
+- `shakenfist/constants.py` - Constants and object type mappings
 
 ## Related Documentation
 
-- [PLAN-mypy-rollout.md](../../PLAN-mypy-rollout.md) - Detailed rollout plan
+- [docs/developer_guide/mypy.md](../../../docs/developer_guide/mypy.md) -
+  Rollout strategy and guidelines
 - [mypy documentation](https://mypy.readthedocs.io/)
 - [PEP 484 - Type Hints](https://peps.python.org/pep-0484/)
