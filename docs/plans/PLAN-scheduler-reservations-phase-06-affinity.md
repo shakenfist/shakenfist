@@ -290,9 +290,25 @@ assumed it did, and every investigation since has been looking
 for the scheduler defect behind an assertion that was too strong.
 
 **F3. The test skips, rather than passes, on a degenerate
-candidate set.** If the scheduler had one candidate, the run
-carries no information about affinity and must not be counted as
-evidence that affinity works. A pass in that case is exactly the
+candidate set --- measured at affinity-scoring time.** If the
+scheduler had one candidate, the run carries no information about
+affinity and must not be counted as evidence that affinity works.
+
+*Where the count comes from matters, and the obvious answer is
+wrong.* `schedule final candidates` is published at the end of
+the pipeline, after `candidates = narrowed` (`scheduler.py:658`)
+has already reduced the list to the winning affinity tier. On a
+healthy cluster where inst2's affinity works exactly as intended,
+that tier is the single node carrying the tag --- so the final
+list holds one candidate and a gate reading it would skip every
+run where affinity is *correct*, permanently and silently,
+because a skip is green. That is precisely the false coverage
+this decision exists to prevent, which is a good illustration of
+why the gate needs the count the scorer actually had.
+
+The count therefore comes from `len(affinity_detail)` in the
+`schedule have highest affinity` event, which has one entry per
+candidate the scorer considered, before any narrowing. A pass in that case is exactly the
 false green finding 3 describes --- inst2's co-location "passing"
 for the same reason inst3's anti-affinity failed. `skipTest` with
 the candidate count in the message keeps the failure visible in
@@ -308,10 +324,33 @@ through a mechanical mapping for one release.** Per D6:
 filters, `prefer_*` contribute +/-1 per matching co-located
 instance in the ranking term that already exists. Weighted specs
 map positive to `prefer_with_tag` and negative to
-`prefer_without_tag`, losing the magnitude, which is the point
---- the magnitude has never meant anything a caller could reason
-about, since it is summed across an unbounded number of
-co-located instances.
+`prefer_without_tag`, losing the magnitude.
+
+*The scoring is count-proportional, not set-membership, and the
+rationale is corrected to match (2026-08-29).* This decision
+originally justified dropping caller magnitudes on the grounds
+that a magnitude is "summed across an unbounded number of
+co-located instances" --- but `+/-1 per matching instance` is
+summed across that same unbounded number, so the stated reason
+argued against the mechanism the decision adopts. The genuinely
+bounded alternative is set-membership: `+/-1` if any matching
+instance is present, regardless of count.
+
+Count-proportional is chosen. A node carrying five instances of
+an affinity group really is more "with the group" than one
+carrying a single instance, and for the anti-affinity direction a
+node carrying five instances you asked to avoid really is worse
+than one carrying one. Set-membership discards exactly that
+signal, which is the one a pack-or-spread request is about.
+
+The corrected rationale for dropping caller magnitudes is
+therefore not the summation but the scaling: a caller choosing
+`100` rather than `1` is choosing a multiplier on a neighbour
+count they cannot predict, so the two are not comparable to each
+other or to anything else. Removing the multiplier leaves a
+quantity that is defined --- how many matching neighbours a node
+has --- which is what the ranking should be comparing. Step 1's
+inst3 mutation test is written against this choice.
 
 Finding 7 means the mapping is exercised from the moment it
 exists, because `test_affinity` is a weighted caller. Whether
@@ -396,9 +435,28 @@ distinguishable by value type without ambiguity:
 
 A dict whose values are integers is the old form; a dict whose
 keys are the four reserved names and whose values are lists is
-the new one. Anything else is a 400. That check is mechanical,
-which matters because the validator is the only place a caller
-gets told they got it wrong.
+the new one. Anything else must be a 400. That check is
+mechanical, which matters because the validator is the only place
+a caller gets told they got it wrong.
+
+*It cannot tell them today.* The existing validator coerces with
+`int(dv)` inside a `try` that catches only `ValueError`, and
+`int()` raises `TypeError` --- not `ValueError` --- for a list, a
+dict or `None`. Confirmed at the interpreter: `int(['a'])`,
+`int({'x': 1})` and `int(None)` all raise `TypeError`. So the new
+binary shape, whose values are lists, posted against today's
+server produces an uncaught `TypeError` and a **500**, and
+`_validate_instance_metadata` is shared by instance create
+(`:797`) and both metadata endpoints (`:1375`, `:1425`), so all
+three paths reach it --- today, for any caller who guesses the
+new syntax early. Step 3 widens the except clause rather than
+layering a new shape on top of the hole; step 2 files it, because
+it is a live 500 on a public API and should be tracked whether or
+not this phase lands.
+
+One related imprecision worth carrying: `int()` also accepts
+floats and numeric strings, so "values must be integers"
+describes the intent rather than the coercion.
 
 The mapping in F4 is then: for each `tag: n` in a weighted spec,
 emit `prefer_with_tag: [tag]` when `n > 0` and
@@ -409,11 +467,10 @@ nothing, which is what it already means.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent | Status |
 |------|--------|-------|-----------|---------------------|--------|
-| 1 | high | opus | worktree | (shakenfist) Rewrite `test_affinity` onto the audit events, per F2 and F3. In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_scheduler.py`, keep the three-instance setup unchanged and replace the two placement assertions (`:124-131`, whose
-`['node']` arguments are on `:125` and `:129`) with assertions read from the scheduler's own events. The events are already fetched by `_add_scheduler_detail()` (`:19-35`), which filters `get_instance_events()` to messages starting with `schedule` -- factor its fetch out into a helper returning the events so both the detail-attachment and the assertions use one read, rather than fetching twice. Assert, for inst2: that `schedule have highest affinity` scored inst1's node in the winning tier. For inst3: that inst1's node was **not** in the winning tier. Then **skip, do not pass**, when `schedule final candidates` lists fewer than two candidates, with the count and the node in the skip message (F3) -- a single-candidate run carries no information and a green result there is the false pass finding 3 describes. Read the 2026-08-26 comment on issue #3565 first: it contains the exact event payloads from a failing run, including an `affinity_detail` that scored a node `-100` and placed there anyway, and it is the specification for what these assertions must distinguish. Do not assert final co-location anywhere -- that is the guarantee F2 establishes the product does not make. This runs only on `merge_group` (`docs/developer_guide/coding_rules.md:341-352`), so exercise it against sfcbr before proposing the commit. Commit subject: `tests: assert what soft affinity actually promises.` | Not started |
-| 2 | low | sonnet | none | (GitHub) The #3565 disposition, once step 1 has merged. Comment on #3565 recording F2: the traced 2026-08-26 run shows a single-candidate set, so affinity was never consulted, and both halves of the assertion had the same cause; the issue is closed by candidate fix 2 rather than by a scheduler change; D6's three positions are disposed of by F2 and F7. Close it. Then file the forced-candidate retry defect from finding 6 as its own issue -- the retry re-forces the single node the capacity guard has just refused, so it cannot succeed -- with the event excerpt from that same comment, and cross-reference it from #3565's closing comment (F8). Also comment on `PLAN-ci-cloud-sizing`'s tracking of #3565 that its "needs a disposition in phase 0 before phase 4" is now satisfied. Include *(Triage assisted by Claude Code)*. | Not started |
-| 3 | high | opus | worktree | (shakenfist) The binary model. Per F4 and the Design section: accept the new value shape under the `affinity` metadata key, validate it at `external_api/instance.py:1395-1406` alongside the weighted form (four reserved keys, list-of-string values, 400 on anything else), and consume it in `scheduler.py`. `require_with_tag` / `require_without_tag` become a filter stage placed **with** the admission filters and before affinity scoring, publishing a dropped map through `_log_and_raise_on_error()` like every other filter, with its own stage name so a refusal says which constraint ejected the node. `prefer_with_tag` / `prefer_without_tag` contribute +1 / -1 per matching co-located instance into the existing scoring loop (`:529-600`), which already has the per-candidate `affinity_detail` shape the events publish -- extend it rather than replacing it, because step 1's assertions read it. Unit tests in `shakenfist/tests/test_scheduler.py` beside the existing ordering cases. Note that a hard `require` which ejects every candidate must produce a clean no-candidate refusal, not a traceback. Commit subject: `Add binary affinity constraints to the scheduler.` | Not started |
-| 4 | medium | sonnet | worktree | (shakenfist) The transition mapping, per F4. Map weighted specs mechanically at the point the scheduler reads them: positive value to `prefer_with_tag`, negative to `prefer_without_tag`, zero to nothing. Emit a deprecation event (not a log line -- this needs to reach an operator) the first time an instance with a weighted spec is scheduled. Decide and record whether `test_affinity` moves to the binary form or stays weighted: there is a real argument for staying, since finding 7 makes it the only automated proof the mapping works, and a separate binary case can be added beside it. Do not remove the weighted form; that is a later release, and the removal needs its own deprecation window. Unit tests for the mapping including the zero and mixed-sign cases. Commit subject: `Map weighted affinity onto the binary form.` | Not started |
+| 1 | high | opus | worktree | (shakenfist) Rewrite `test_affinity` onto the audit events, per F2 and F3. In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_scheduler.py`, keep the three-instance setup unchanged and replace the two placement assertions (`:124-131`, whose `['node']` arguments are on `:125` and `:129`) with assertions read from the scheduler's own events. The events are already fetched by `_add_scheduler_detail()` (`:19-35`), which filters `get_instance_events()` to messages starting with `schedule` -- factor its fetch out into a helper returning the events so both the detail-attachment and the assertions use one read, rather than fetching twice. Assert, for inst2: that `schedule have highest affinity` scored inst1's node in the winning tier. For inst3: that inst1's node was **not** in the winning tier. Then **skip, do not pass**, when the scorer had fewer than two candidates to choose among, with the count in the skip message (F3). Take that count from `len(affinity_detail)` in the `schedule have highest affinity` event, **not** from `schedule final candidates`: that event is published after `candidates = narrowed` (`scheduler.py:658`) has already cut the list to the winning affinity tier, so on a run where affinity works perfectly it holds one node and the gate would skip exactly the runs it is meant to validate. Note that in the brief so the next reader does not reintroduce it. `affinity_detail` has two shapes -- the normal `{'score', 'instance_count', 'considered'}` (`:594-598`) and `{'score': 0, 'reason': 'node row not found'}` (`:548-551`) for a candidate whose node row could not be read -- so count its entries but do not index inside them unconditionally, or a transient node-row failure becomes a `KeyError` and an unreadable test error instead of a diagnosable skip -- a single-candidate run carries no information and a green result there is the false pass finding 3 describes. Read the 2026-08-26 comment on issue #3565 first: it contains the exact event payloads from a failing run, including an `affinity_detail` that scored a node `-100` and placed there anyway, and it is the specification for what these assertions must distinguish. Do not assert final co-location anywhere -- that is the guarantee F2 establishes the product does not make. This runs only on `merge_group` (`docs/developer_guide/coding_rules.md:341-352`), so exercise it against sfcbr before proposing the commit. Commit subject: `tests: assert what soft affinity actually promises.` | Not started |
+| 2 | low | sonnet | none | (GitHub) The #3565 disposition, once step 1 has merged. Comment on #3565 recording F2: the traced 2026-08-26 run shows a single-candidate set, so affinity was never consulted, and both halves of the assertion had the same cause; the issue is closed by candidate fix 2 rather than by a scheduler change; D6's three positions are disposed of by F2 and F7. Close it. Then file the forced-candidate retry defect from finding 6 as its own issue -- the retry re-forces the single node the capacity guard has just refused, so it cannot succeed -- with the event excerpt from that same comment, and cross-reference it from #3565's closing comment (F8). Also file the validator defect from the Design section as its own issue --- `_validate_instance_metadata`'s `except ValueError` does not catch the `TypeError` that `int()` raises for a list, a dict or `None`, so a malformed `affinity` value returns 500 rather than 400 from instance create and both metadata endpoints --- because it is a live fault on a public API and should be tracked whether or not this phase lands. Reference it from step 3, which fixes it. Also comment on `PLAN-ci-cloud-sizing`'s tracking of #3565 that its "needs a disposition in phase 0 before phase 4" is now satisfied. Include *(Triage assisted by Claude Code)*. | Not started |
+| 3 | high | opus | worktree | (shakenfist) The binary model. Per F4 and the Design section: accept the new value shape under the `affinity` metadata key, validate it at `external_api/instance.py:1395-1406` alongside the weighted form (four reserved keys, list-of-string values, 400 on anything else). **Widen the existing `except ValueError` to `except (TypeError, ValueError)` as part of this**: `int()` raises `TypeError` for a list, a dict or `None`, so the current branch lets those escape as a 500 rather than refusing them with a 400, and that hole is reachable today from instance create (`:797`) and both metadata endpoints (`:1375`, `:1425`). Add unit tests for the list-valued and `None`-valued weighted cases, which are the ones that 500 now, and consume it in `scheduler.py`. `require_with_tag` / `require_without_tag` become a filter stage placed **with** the admission filters and before affinity scoring, publishing a dropped map through `_log_and_raise_on_error()` like every other filter, with its own stage name so a refusal says which constraint ejected the node. `prefer_with_tag` / `prefer_without_tag` contribute +1 / -1 per matching co-located instance into the existing scoring loop (`:529-600`), which already has the per-candidate `affinity_detail` shape the events publish -- extend it rather than replacing it, because step 1's assertions read it. Unit tests in `shakenfist/tests/test_scheduler.py` beside the existing ordering cases. Note that a hard `require` which ejects every candidate must produce a clean no-candidate refusal, not a traceback. Commit subject: `Add binary affinity constraints to the scheduler.` | Not started |
+| 4 | medium | sonnet | worktree | (shakenfist) The transition mapping, per F4. Map weighted specs mechanically at the point the scheduler reads them: positive value to `prefer_with_tag`, negative to `prefer_without_tag`, zero to nothing. Emit a deprecation event (not a log line -- this needs to reach an operator) the first time an instance with a weighted spec is scheduled, **once per instance**: the instance is the object the event attaches to and the deprecated spec is a property of that instance, so per-instance is the scope that matches the thing being deprecated. Do not make it per-process (it would reset on every daemon restart) or per-schedule (the scheduler runs this path on every create *and* every reschedule). Confirm the change against `shakenfist/data/database_load_budget.yaml` before proposing the commit: an unbounded per-schedule event on a still-supported path is exactly the kind of addition that moves a measurement CI enforces, and the weighted form is expected to survive at least one more release. Decide and record whether `test_affinity` moves to the binary form or stays weighted: there is a real argument for staying, since finding 7 makes it the only automated proof the mapping works, and a separate binary case can be added beside it. Do not remove the weighted form; that is a later release, and the removal needs its own deprecation window. Unit tests for the mapping including the zero and mixed-sign cases. Commit subject: `Map weighted affinity onto the binary form.` | Not started |
 | 5 | medium | sonnet | worktree | (shakenfist) Documentation. In `docs/`, state what soft affinity promises and --- more importantly --- what it does not: a preference is consulted when there is a choice, and a single-candidate placement is not a preference being honoured or violated. Document the four binary constraints, the weighted form's deprecation and its mapping, and the fact that `require_*` can make a create fail with no candidates where the weighted form would silently place anywhere. Include the diagnostic recipe, which is the durable output of this whole investigation: read `schedule have highest affinity` and `schedule final candidates` from the instance's events to tell "scored wrong" from "had no choice". `AGENTS.md` and `ARCHITECTURE.md` are unlikely to need touching; check rather than assume. Commit subject: `docs: say what soft affinity promises.` | Not started |
 | 6 | low | sonnet | worktree | (shakenfist) Close-out. Set phase 6 to `Complete` in the master plan Execution table, confirm `docs/plans/index.md`'s arithmetic, and record in the phase status notes that #3565 closed on a test change rather than a scheduler change, with F2's one-line reason so a later reader does not reopen it looking for the missing fix. Commit subject: `scheduler: close out phase 6.` | Not started |
 
@@ -464,25 +521,45 @@ step 4.
 
 ## Definition of done
 
-- [ ] `test_affinity` makes no assertion about final instance
-      placement. Checked with
-      `grep -n "\['node'\]" cluster_ci_tests/test_scheduler.py`,
-      which today returns exactly lines 125 and 129 --- the two
-      assertion arguments --- and must return nothing inside an
-      assertion afterwards. (Run at planning time: the more
-      obvious `inst\['node'\]` matches nothing, because the
-      assertions name `inst1`, `inst2` and `inst3`.)
+- [ ] No assertion in `test_affinity` compares `inst2['node']`
+      or `inst3['node']` to anything. Checked with
+      `grep -n "inst[23]\['node'\]" cluster_ci_tests/test_scheduler.py`,
+      which today returns lines 125 and 129 and must return
+      nothing inside an assertion afterwards. Stated this way
+      rather than as a ban on `['node']` outright, because step 1
+      needs `inst1['node']` as the *lookup value* it checks
+      against the winning affinity tier --- that is not a
+      placement assertion, and a blanket grep would either fail a
+      correct implementation or push step 1 into deriving inst1's
+      node from events to satisfy a check. F2's guarantee is
+      about inst2 and inst3. (Run at planning time: the more
+      obvious `inst\['node'\]` matches nothing at all, because
+      the assertions name `inst1`, `inst2` and `inst3`.)
 - [ ] `test_affinity` skips, with a message naming the candidate
-      count, when `schedule final candidates` lists fewer than
-      two candidates.
+      count, when the `schedule have highest affinity` event's
+      `affinity_detail` holds fewer than two entries --- and
+      **not** when `schedule final candidates` holds fewer than
+      two, which is a post-narrowing list that legitimately holds
+      one node whenever affinity works. Checked by confirming the
+      test skips on a single-candidate run and does *not* skip on
+      a healthy three-node run where inst2's tier is one node.
 - [ ] Mutating the scorer to ignore negative affinity
       contributions fails the inst3 assertion and no other test.
 - [ ] A create with `require_with_tag` naming a tag no node
       carries fails with a no-candidate refusal naming that
       stage, not a traceback and not a silent placement.
 - [ ] A weighted spec and its mapped binary equivalent produce
-      the same candidate ordering, asserted by a unit test that
-      builds both and compares.
+      the same candidate ordering **for specs where every weight
+      shares a sign and each tag is requested alone**, asserted
+      by a unit test that builds both and compares. Mixed
+      magnitudes are *expected to diverge* and this is asserted
+      too, not left as an unstated exception: `{'a': 100, 'b': 1}`
+      maps to `prefer_with_tag: ['a', 'b']`, so a node carrying
+      only `b` and a node carrying only `a` tie at +1 where the
+      weighted form ranked them 1 against 100. F4 discards the
+      magnitude deliberately, so a criterion demanding identical
+      ordering in every case would be a gate step 4 cannot pass,
+      and the only way to pass it would be to abandon F4.
 - [ ] #3565 is closed with the F2 reasoning recorded on it, and
       the forced-candidate retry defect exists as its own issue,
       referenced from #3565.
@@ -491,6 +568,9 @@ step 4.
       both corrected by the planning commit.
 - [ ] `docs/` states that a single-candidate placement is neither
       a preference honoured nor violated.
+- [ ] A metadata `affinity` value which is a list, a dict or
+      `None` is refused with a 400 from instance create and from
+      both metadata endpoints. Today all three return 500.
 - [ ] `pre-commit run --all-files` passes.
 
 ## Future work
