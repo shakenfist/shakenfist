@@ -294,6 +294,16 @@ process. If you see `database_object_cache_capacity_evictions_total` climbing
 steadily, the working set no longer fits and the hit rate is suffering;
 `database_object_cache_entries` reports current occupancy.
 
+When the cap is reached the cache drops expired entries first and then, if
+that is not enough, live entries nearest to their expiry. Be aware of what
+that means with two TTL tiers in one pool: a 30 second mutable entry is
+always nearer its expiry than a 300 second immutable one inserted up to 270
+seconds earlier, so sustained capacity pressure sheds essentially the whole
+mutable tier — blob, node, artifact, namespace, upload, dnsmasq — before it
+touches a single instance, network or ipam entry. If blob caching in
+particular matters to your workload, raise the cap rather than relying on
+the tiers competing for the space.
+
 Setting a TTL to `0` disables caching for that tier — a fast rollback to
 pure read-through that needs only a config change and a restart, no code
 change. The `database_object_cache_hits_total`,

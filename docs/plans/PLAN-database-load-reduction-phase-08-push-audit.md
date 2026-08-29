@@ -718,6 +718,67 @@ independent automated fix is welcome there.
 Left as advisory and not acted on: F-R5's copyright header years and
 F-R6's dead `IPAM.get_allocation_age()`, both recorded above.
 
+### What the automated reviewer caught that this audit did not (#3950)
+
+The audit fixed three defects and then introduced two of its own, both
+of which the automated PR review found and this audit's own reading of
+its own diff had not. That is worth recording in the same spirit as
+"what the audit missed" above.
+
+**The occupancy gauge did not count the read path.** The residency bound
+added `database_object_cache_entries`, set in `_object_cache_put()` and
+`_object_cache_evict()` but not in `_object_cache_get()`, which is where
+a lazily-expired entry is actually dropped. Since reads outnumber writes
+— the entire premise of the cache — the gauge over-reported occupancy
+indefinitely, and the operator guide written in the same change points
+operators at it as authoritative. The mechanism is the one this phase
+already documented for a different defect: the finding that a metric was
+unasserted (test-coverage gap 4, "OBJECT_CACHE_SIZE is never asserted")
+was written down and then not acted on, and the bug it predicted was
+sitting in the diff at the time. `test_the_occupancy_gauge_tracks_the_
+lazy_expiry_read_path` now closes it, and fails against the pre-fix code
+with `0 != 10.0`.
+
+**The trim amortisation was defeated in a band.** `OBJECT_CACHE_TRIM_
+TARGET` exists so the O(n) pass runs once per `cap - target` inserts
+rather than once per insert, but only the sort branch trimmed to target;
+the expired sweep trimmed to `cap`. Where roughly one entry expires per
+insert, freeing that one entry left the cache at exactly `cap`, so the
+next insert was over again and rescanned every entry under the lock —
+a full scan on every put, which is the amortisation inverted rather than
+applied. Both branches now trim to target. `test_a_full_scan_is_
+amortised_when_one_entry_expires_per_insert` counts `items()` calls
+because both O(n) passes walk the dict that way: 120 scans over 200
+inserts before the fix, under 60 after.
+
+**The NODE_UUID guard traded a crash for silence.** The audit's own fix
+for the malformed-`SHAKENFIST_NODE_UUID` crash routed through
+`_log_stability()`, which logs at debug and dedupes within 10s. That is
+right for transient cluster-version churn and wrong here: the condition
+is a permanent operator error, so at default log level nothing was
+emitted at all, the offending value was not named, and the early return
+means the daemon can never reach `set_abort_path()` and will not observe
+a stopping or stopped transition for the life of the process. Now logged
+once at error with the value. `test_daemon_node_uuid_guard.py` covers
+all three properties, including a vacuity guard that a valid uuid still
+reaches `get_node_daemon_state()`.
+
+Also corrected: the master plan's Execution table had phase 7 as "Not
+started" while phase 8 was "In progress", contradicting `index.md` and
+this plan's own survey finding 4, which asserted the two agreed. Phase 7
+is #3893.
+
+The reviewer's remaining findings were left as recorded advice. Its
+merge-ordering finding (the operator guide naming phase 7 artifacts
+absent from `develop`) proposes gating this PR behind #3893, which is
+already decision 2's disposition. Its observation that the capacity trim
+sheds the whole 30s mutable tier before touching a 300s immutable entry
+is a real and undocumented consequence of sorting mixed TTLs by absolute
+expiry. The behaviour is now stated in the operator guide, and changing
+the policy — sorting by remaining fraction of TTL so the tiers compete on
+equal terms — is filed as #3953, because that is a design decision this
+phase should not make on its way out.
+
 ## Back brief
 
 Before executing any step of this plan, back brief the operator on your

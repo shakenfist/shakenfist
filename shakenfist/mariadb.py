@@ -226,6 +226,7 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
     cache_key = _object_cache_key(object_type, key)
     now = time.monotonic()
     hit = None
+    size = None
     with _OBJECT_CACHE_LOCK:
         entry = _OBJECT_CACHE.get(cache_key)
         if entry is not None:
@@ -234,6 +235,14 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
                 hit = model
             else:
                 del _OBJECT_CACHE[cache_key]
+                # Expiry is lazy, so this is the only place most entries ever
+                # leave the cache. Reads outnumber writes -- that is the point
+                # of a cache -- so a gauge moved only by _object_cache_put()
+                # and _object_cache_evict() drifts high indefinitely, and the
+                # operator guide sends operators here for occupancy.
+                size = len(_OBJECT_CACHE)
+    if size is not None:
+        OBJECT_CACHE_SIZE.set(size)
     if hit is not None:
         OBJECT_CACHE_HITS.labels(object_type=object_type).inc()
         return hit
@@ -262,13 +271,20 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
         # ceiling.
         cap = config.OBJECT_CACHE_MAX_ENTRIES
         if cap > 0 and len(_OBJECT_CACHE) > cap:
+            # Both branches trim to target, not to cap. Trimming the expired
+            # sweep to cap would leave the cache at exactly cap whenever it
+            # freed even one entry, so the next insert would be over again and
+            # would rescan every entry under the lock. In the band where about
+            # one entry expires per insert that is a full O(n) pass on every
+            # put, which is precisely what the amortisation exists to avoid.
+            target = int(cap * OBJECT_CACHE_TRIM_TARGET)
+
             for cache_key in [k for k, (expiry, _) in _OBJECT_CACHE.items()
                               if expiry <= now]:
                 del _OBJECT_CACHE[cache_key]
                 dropped += 1
 
-            if len(_OBJECT_CACHE) > cap:
-                target = int(cap * OBJECT_CACHE_TRIM_TARGET)
+            if len(_OBJECT_CACHE) > target:
                 by_expiry = sorted(_OBJECT_CACHE.items(),
                                    key=lambda item: item[1][0])
                 for cache_key, _ in by_expiry[:len(_OBJECT_CACHE) - target]:

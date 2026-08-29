@@ -26,6 +26,8 @@ import time
 import uuid
 from unittest import mock
 
+import fixtures
+
 from shakenfist import mariadb
 from shakenfist.tests import base
 
@@ -297,6 +299,73 @@ class ObjectCacheResidencyTestCase(base.ShakenFistTestCase):
     def test_a_zero_cap_disables_the_bound(self):
         self._fill(300)
         self.assertEqual(300, len(mariadb._OBJECT_CACHE))
+
+    @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
+    def test_the_occupancy_gauge_tracks_the_lazy_expiry_read_path(self):
+        # The operator guide sends operators to this gauge for occupancy, and
+        # a read is where most entries actually leave the cache -- expiry is
+        # lazy, so an entry nothing reads again is reclaimed by the next read
+        # of its own key. A gauge moved only by put and evict therefore drifts
+        # high forever in exactly the workload the cache exists for.
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            for i in range(10):
+                mariadb._object_cache_put(
+                    'instance', f'obj-{i}', object(), ttl=1)
+            self.assertEqual(10, mariadb.OBJECT_CACHE_SIZE._value.get())
+
+            clock[0] = 2000.0
+            for i in range(10):
+                mariadb._object_cache_get('instance', f'obj-{i}')
+
+        self.assertEqual(0, len(mariadb._OBJECT_CACHE))
+        self.assertEqual(
+            0, mariadb.OBJECT_CACHE_SIZE._value.get(),
+            'the gauge kept counting entries the read path had dropped')
+
+    @mock.patch('shakenfist.config.config.OBJECT_CACHE_MAX_ENTRIES', 100)
+    def test_a_full_scan_is_amortised_when_one_entry_expires_per_insert(self):
+        # The steady state the TRIM_TARGET amortisation exists for. Both O(n)
+        # passes in the trim walk the dict via items(), so counting items()
+        # calls counts full scans. If the expired sweep trims back to the cap
+        # rather than to the target, freeing a single entry leaves the cache
+        # at exactly the cap, the very next insert is over again, and every
+        # single put performs a full scan while holding the cache lock --
+        # which is the amortisation defeated rather than applied.
+        class CountingDict(dict):
+            scans = 0
+
+            def items(self):
+                CountingDict.scans += 1
+                return super().items()
+
+        cache = CountingDict()
+        self.useFixture(
+            fixtures.MockPatchObject(mariadb, '_OBJECT_CACHE', cache))
+
+        clock = [1000.0]
+        with mock.patch('time.monotonic', side_effect=lambda: clock[0]):
+            # Staggered expiries, so that advancing the clock by one second
+            # per insert expires exactly one entry per insert.
+            for i in range(100):
+                mariadb._object_cache_put(
+                    'instance', f'old-{i}', object(), ttl=50 + i)
+
+            CountingDict.scans = 0
+            for i in range(200):
+                clock[0] = 1050.0 + i
+                mariadb._object_cache_put(
+                    'instance', f'new-{i}', object(), ttl=10000)
+
+        # Trimming only to the cap scans on all 200 inserts. Trimming to
+        # TRIM_TARGET frees cap-target entries per pass, so a pass runs at
+        # most once every cap-target inserts.
+        self.assertLess(
+            CountingDict.scans, 60,
+            'the cache performed a full scan on nearly every insert')
+        self.assertGreater(
+            CountingDict.scans, 0,
+            'the trim never ran, so this test proves nothing')
 
 
 class ObjectCacheEveryTypeEvictsTestCase(base.ShakenFistTestCase):

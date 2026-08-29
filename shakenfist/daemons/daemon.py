@@ -312,6 +312,7 @@ class Daemon:
 
         self.last_stability = None
         self.last_stability_log = 0
+        self.node_uuid_invalid_logged = False
         self._last_watchdog = 0.0
         self._last_daemon_state_check = 0.0
         self._daemon_state_poll_interval = DAEMON_STATE_POLL_INTERVAL
@@ -461,9 +462,19 @@ class Daemon:
             # returns early when it is already set, so the value never meets
             # Node._load_persisted_uuid()'s guard. Left to propagate this
             # raises out of every daemon's idle loop every couple of seconds.
-            self._log_stability(
-                LOG, 'NODE_UUID is not a valid uuid, cannot check daemon '
-                     'state')
+            # Not _log_stability(): that logs at debug and is built for
+            # transient cluster-version churn which resolves itself. This is a
+            # permanent misconfiguration which never will, and the early
+            # return below means this daemon can no longer reach
+            # set_abort_path() -- it will not observe a stopping or stopped
+            # transition for the life of the process. Say so once, loudly,
+            # with the offending value.
+            if not self.node_uuid_invalid_logged:
+                self.node_uuid_invalid_logged = True
+                LOG.error(
+                    'NODE_UUID %r is not a valid uuid; cannot check daemon '
+                    'state, and this daemon will not observe shutdown '
+                    'transitions until it is corrected', node_uuid)
             return
 
         try:
