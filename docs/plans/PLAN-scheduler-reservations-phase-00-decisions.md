@@ -331,7 +331,14 @@ times since. The audit trail from the 2026-08-15 occurrence
 shows why: the node affinity wanted was removed by
 `sufficient_idle_cpu`, an **admission** filter at
 `scheduler.py:473-481`, thirty lines before affinity scoring
-begins at `scheduler.py:505`. Ranking cannot rank a candidate
+begins at `scheduler.py:505`. *(Line references as of
+2026-08-16; the current locations are `:487-501` and
+`:529-600`, and the hard ceiling cited below is now
+`:187-256`. Also, per a 2026-08-26 comment on 3565, the stage
+which binds has moved from `sufficient_idle_cpu` to
+`sufficient_idle_memory` -- the mechanism is unchanged, an
+admission filter emptying the set before ranking, but a fix
+aimed only at CPU admission would now miss.)* Ranking cannot rank a candidate
 that is no longer in the candidate list. "Hard filters →
 affinity score → load" is already the ordering; the
 hard-filter step is what eats the node.
@@ -340,7 +347,11 @@ Closing 3565 therefore needs a decision this document has not
 taken: **may a soft affinity preference bid against a hard
 admission ceiling?** Today `hard_max_cpus` is absolute
 (`scheduler.py:260`). Three positions, for phase 6 to choose
-between:
+between --- *all three disposed of on 2026-08-29 by the phase
+6 plan's F2 and F7, which found the traced mechanism to be a
+candidate set of one and none of these three to address it.
+Kept as written, because a decision record should show what
+was on offer:*
 
 1. **Hard require only.** `require_with_tag` turns silent
    mis-placement into an explicit no-candidate refusal.
