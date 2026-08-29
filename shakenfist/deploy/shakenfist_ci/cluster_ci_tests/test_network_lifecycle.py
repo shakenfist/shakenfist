@@ -102,6 +102,15 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
         # synchronously at create time), else the presence assertions below
         # would be testing the wrong nodes.
         self.assertEqual(node['uuid'], inst['node'])
+        # The create response is built from the API process's in-memory
+        # object; a fresh GET hydrates from the database. The requested
+        # placement must survive that round trip, because it is what
+        # preflight's honour-or-error guard reads -- when it was silently
+        # dropped at the database write, a preflight capacity blip
+        # redirected a targeted create to the other hypervisor and the
+        # node assertion above flaked (issue 3496).
+        fetched = self.test_client.get_instance(inst['uuid'])
+        self.assertEqual(node['uuid'], fetched.get('requested_placement'))
         return inst
 
     def test_network_plumbing_lifecycle(self):

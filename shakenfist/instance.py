@@ -287,9 +287,12 @@ class Instance(dbowo):
         # Also write static values to MariaDB
         _uuid = object_uuid if isinstance(object_uuid, UUID) else UUID(object_uuid)
 
-        # Normalize values for Pydantic validation
+        # Normalize values for Pydantic validation. The requested
+        # placement is the node uuid string the API resolved from the
+        # caller's placed_on; a dict-only check here used to discard it,
+        # which defeated preflight's honour-or-error guard (issue 3496).
         requested_placement = metadata.get('requested_placement')
-        if not isinstance(requested_placement, dict):
+        if not isinstance(requested_placement, str) or not requested_placement:
             requested_placement = None
 
         video = metadata.get('video', {})

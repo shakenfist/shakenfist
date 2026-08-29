@@ -191,6 +191,28 @@ class InstanceTestCase(base.ShakenFistTestCase):
         s = str(i)
         self.assertEqual('instance(%s)' % instance_uuid, s)
 
+    def test_requested_placement_survives_the_database(self):
+        # The requested placement is the node uuid string the API
+        # resolved from the caller's placed_on. _db_create used to
+        # discard it (a dict-only normalization), so preflight never saw
+        # a targeted create as targeted and silently redirected it to
+        # another node (issue 3496).
+        instance_uuid = str(uuid.uuid4())
+        node_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', instance_uuid, requested_placement=node_uuid)
+        i = instance.Instance.from_db(instance_uuid)
+        self.assertEqual(node_uuid, i.requested_placement)
+
+    def test_no_requested_placement_stored_as_none(self):
+        # An untargeted create (the mock helper's default is the empty
+        # string, matching etcd-era callers) must normalize to None so
+        # preflight's truthiness guard does not fire.
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', instance_uuid)
+        i = instance.Instance.from_db(instance_uuid)
+        self.assertIsNone(i.requested_placement)
+
     def test_delete_runs_both_phases(self):
         instance_uuid = str(uuid.uuid4())
         self.mock_mariadb.create_instance('cirros', instance_uuid)
