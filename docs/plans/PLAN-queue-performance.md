@@ -70,7 +70,7 @@ Two things this plan changed are deliberately still unproven:
 | 6. Caller-site audit | (in PR #3194) | Complete |
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
 | 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
-| 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | In progress |
+| 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | Complete |
 | 10. The 15 second dependency wait | (not yet planned, and see below -- #3863 was fixed by #3916) | Not started |
 | 11. Multi-column coalescing key | (not yet planned) | Not started |
 
@@ -186,9 +186,10 @@ for someone to notice it.
    fold is cheap (3.7 ms median, not the ~200 ms the code asserted)
    and it fires very rarely (7 matches in 1,335 folds over 42
    hours). #3879 is closed; the deterministic concurrency coverage
-   the phase declined to build is #3948. One item is outstanding --
-   observing the new functional test fail with `COALESCIBLE_TASKS`
-   emptied, which needs the cluster CI environment. See
+   the phase declined to build is #3948. The functional test has
+   also been observed to fail with `COALESCIBLE_TASKS` emptied, on a
+   real cluster (run 33219587241), so the assertion is known to be
+   load bearing rather than assumed to be. See
    [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md).
 
 10. **The 15 second dependency wait.** Step 7 measured a p50 of
