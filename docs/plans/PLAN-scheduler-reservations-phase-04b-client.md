@@ -572,13 +572,19 @@ part of this change.
       coverage and documentation, all of which are done and none
       of which a conductor deploy changes. Holding a phase open
       on someone else's deploy would be an invented blocker of
-      exactly the kind D7 removed.
-- [ ] No document in either repository still says a client
+      exactly the kind D7 removed. Answered on 2026-08-29, the
+      same day: both names resolve on `maui`, so 4c's gate is met
+      and this phase's client work is demonstrably in the hands
+      of its consumer.
+- [x] No document in either repository still says a client
       release is required before functional coverage can use the
       verbs: the master plan stub, the test docstring, and
       client-python#364 are each corrected or closed. This
-      repository's three sites are corrected; #364 is closed by
-      step 5's GitHub half, which D7 unblocks.
+      repository's three sites are corrected, and #364 was
+      commented and closed on 2026-08-29 -- its "Why this needs
+      an issue rather than just happening" section named both
+      false premises, so the comment corrects both rather than
+      just declaring the work done.
 - [x] No document in either repository still says the conductor
       runs a released client. Five sites, all corrected by the
       change that adds finding 8: this plan's situation and
