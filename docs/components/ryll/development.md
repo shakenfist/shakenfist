@@ -158,6 +158,34 @@ orchestrator, fixed in `370d8ce5`) and remain in tree:
   `--cfg tokio_unstable` to a release build; the regular
   `make build` does not need it.
 
+### Measuring idle CPU
+
+`tools/measure-idle-cpu.sh <pid> [seconds]` reports where a running
+ryll's CPU actually goes, per thread and per thread group, as a
+percentage of one core. It samples `utime + stime` from
+`/proc/<pid>/task/<tid>/stat` across a window, so it is Linux-only.
+
+```
+tools/measure-idle-cpu.sh "$(pgrep -f 'ryll --direct')" 60
+```
+
+Reach for it rather than `top` when the question is about CPU cost.
+On a machine with no GPU the expensive threads are Mesa's `llvmpipe-*`
+rasterisers, not ryll's own — a 6-core idle client once looked like a
+43% main thread under `top` while 16 rasteriser threads carried the
+rest. The per-group breakdown is what makes that visible.
+
+Two readings are worth taking together. Idle, with the client
+connected and untouched, should sit under 10% of one core; the same
+measurement while the mouse moves over the surface should climb
+sharply. A low idle number on its own does not distinguish "sleeps
+correctly" from "stopped waking up", and only the second reading
+tells them apart.
+
+This is a manual diagnostic, not a test. The idle-wedge test below
+runs headless, where there is no renderer and so no CPU cost of this
+kind to see.
+
 ### Idle-wedge regression test
 
 `make test-k1-idle` (driver: `tools/test-k1-idle.sh`) guards

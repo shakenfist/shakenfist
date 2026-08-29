@@ -18,7 +18,8 @@ Version history:
   `dropped` events.
 - **1.1** — added the `surface_drawn` event (one wire event per
   display draw command) so a loadtest can compute
-  keypress-to-screen latency rather than PING/PONG round-trip.
+  keypress-to-screen latency rather than the `latency` event's
+  PING-interval sample.
   Added the `digest_updated` event behind the `digest-decode`
   Cargo feature.  Backwards-compatible at the major-version
   level: v1.0 clients can still hello and operate; they just
@@ -674,12 +675,22 @@ has subscribed to. All events share the same envelope shape:
 
 ### `latency`
 
-Emitted on every PING/PONG return path through the SPICE main channel.
-The latency is the round-trip time from when Ryll sent the PING to when
-it received the PONG, measured in milliseconds. (The `--latency-file`
-flag was intended to write this metric to disk in headless mode, but
-is currently declared and unused — this event stream is the working
-way to collect latency samples.)
+Emitted once per server PING on the SPICE main channel.
+
+The sample is **not** a round-trip time. SPICE has no client-originated
+probe — `SPICE_MSG_PING` is server→client only — so Ryll cannot measure
+network RTT. What it measures instead is the client-observed interval
+between two consecutive server PINGs, which includes the server's own
+send cadence as well as the network path and Ryll's receive turnaround.
+Spikes indicate a network or server stall; the absolute value largely
+reflects how often the server chose to ping. See
+[diagnostics.md](/components/ryll/diagnostics/) for the same explanation from the UI
+side. (The `--latency-file` flag was intended to write this metric to
+disk in headless mode, but is currently declared and unused — this
+event stream is the working way to collect samples.)
+
+The field names are unchanged, so this is a correction to the
+description rather than a change to the wire contract.
 
 High-frequency callers (e.g. a latency loadtest) should subscribe to
 this event and accumulate samples client-side rather than polling with
@@ -689,8 +700,8 @@ Data fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `sample_ms` | f64 | Round-trip latency in milliseconds. Always non-negative. Sub-millisecond values are possible on loopback connections. |
-| `wallclock_us` | u64 | Unix timestamp in microseconds at the moment Ryll received the PONG. Useful for aligning latency samples with external wall-clock logs. |
+| `sample_ms` | f64 | Interval between consecutive server PINGs, in milliseconds. Always non-negative. |
+| `wallclock_us` | u64 | Unix timestamp in microseconds at the moment Ryll emitted the sample, which is just *after* it responded to the PING. Useful for aligning samples with external wall-clock logs. |
 
 Worked example:
 
