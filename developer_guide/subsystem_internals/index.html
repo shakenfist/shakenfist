@@ -13568,7 +13568,8 @@ will kill the process once <code>WatchdogSec</code> elapses, even though the
 daemon is working normally. The existing explicit callers are:</p>
 <ul>
 <li>the <code>sf-cluster</code> elected loop, which sleeps on
-  <code>lock.lost_event.wait(5)</code> rather than <code>idle()</code> and so pets at the top
+  <code>lock.lost_event.wait(ELECTED_LOOP_POLL_SECONDS)</code> rather than <code>idle()</code>
+  and so pets at the top
   of each iteration;</li>
 <li><code>sf-cluster</code>'s <code>_cluster_wide_cleanup</code>, and <code>sf-cleaner</code>'s
   <code>update_power_states</code>, <code>_maintain_blobs</code> and <code>_find_missing_blobs</code>,

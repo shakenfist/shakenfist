@@ -12925,6 +12925,56 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#understanding-database-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding database load
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding database load">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#checking-your-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking your cluster
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standing-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standing monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-a-pair-is-over-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a pair is over budget
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#monitoring-sf-database-with-grpc-health-probe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13981,6 +14031,56 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#understanding-database-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding database load
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understanding database load">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#checking-your-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking your cluster
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standing-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standing monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-a-pair-is-over-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a pair is over budget
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#monitoring-sf-database-with-grpc-health-probe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14874,11 +14974,118 @@ the matching <code>database_&lt;op&gt;_total</code> rate (the <code>operation</c
 PascalCase RPC name, e.g. <code>GetNode</code>, so it reads as the CamelCase form of the
 counter suffix). The <code>caller-node</code> metadata is also sent but not yet a label;
 it is reserved for the mTLS peer-identity cross-check.</p>
+<h3 id="understanding-database-load">Understanding database load<a class="headerlink" href="#understanding-database-load" title="Permanent link">&para;</a></h3>
+<p>"Is this much database load normal?" has no useful absolute answer,
+because Shaken Fist's load is mostly polling and polling rates are set by
+how many things exist rather than by how much work anybody is doing. A
+number that is right for a six node cluster running eight instances is
+wrong for everybody else. So what ships instead of a number is a model,
+in <code>shakenfist/data/database_load_budget.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>expected_qps = per_node_base_qps x nodes
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>             + cluster_base_qps                (once for the whole cluster)
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>             + per_instance_qps x standing_instances
+</code></pre></div>
+<p>with one entry per <code>(operation, caller_daemon)</code> pair, each carrying a note
+naming the loop that produces it. There are three terms because there are
+three kinds of load. Most of it is a loop running on every node, so it
+scales with cluster size. Some is the elected cluster daemon's maintenance
+sweep, which runs once cluster-wide however many nodes you have. The rest
+scales with standing instances, because it is work done per instance,
+interface or blob.</p>
+<p>What the model is for is telling apart the two reasons load goes up: you
+grew, or something broke. An absolute ceiling cannot do that, and it is
+why the first thing to check when the tier looks busy is the cluster's
+shape rather than the queries per second.</p>
+<h4 id="checking-your-cluster">Checking your cluster<a class="headerlink" href="#checking-your-cluster" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sf-ctl<span class="w"> </span>database-load
+</code></pre></div>
+<p>Scrapes every gateway in <code>MARIADB_GATEWAY_HOSTS</code> twice over a minute and
+prints what the tier is serving next to what the model predicts for your
+cluster, sorted by how far over budget each pair is.</p>
+<p>Most of the pairs a cluster serves have no budget entry at all, because
+they are activity driven and near zero when nothing is happening -- around
+three hundred of them on a cluster the size of ours. The table leaves
+those out unless one is above its ceiling; <code>--all-pairs</code> prints them. The
+<code>--json</code> output always carries every pair, so it is the one to attach to a
+bug report.</p>
+<p>Two flags in that output mean "expected, do not report":</p>
+<ul>
+<li><code>provisional:#NNNN</code> -- the level is a known defect rather than a floor
+  worth defending. Read the issue: it may already be fixed, in which case
+  the entry over-predicts until the budget is next re-derived. Either way
+  the pair is reported and never enforced.</li>
+<li><code>activity</code> -- the level is set by what you and your tooling do rather
+  than by one of our loops, so only you can say whether it is reasonable.</li>
+</ul>
+<p>If a gateway does not answer, the command says which and reports on the
+rest. It never quietly reports part of the tier as the whole of it,
+because a total missing a gateway reads as load having fallen.</p>
+<p>The footer distinguishes two things, because they carry different weights
+of evidence. A <em>budgeted</em> pair above its ceiling is measured against a
+model of your cluster and is worth reporting. A pair with <em>no</em> budget
+entry above the unbudgeted ceiling has only been seen for one short
+window, and a burst of ordinary work looks the same over sixty seconds as
+a new polling loop does; the command asks you to re-run with a longer
+<code>--window</code> first. The Prometheus alert for the same thing wants an hour
+of it before it fires, for the same reason.</p>
+<p>An absent entry means the pair was too quiet to model on the cluster the
+budget was derived from, not that it ought to be near zero. A cluster
+whose workload mix differs from that one -- fetching blobs harder, say --
+can run such a pair well above the ceiling with nothing wrong, which is
+why both this footer and the alert ask for more evidence before you act
+on one.</p>
+<p>The unbudgeted ceiling is itself a model rather than a number: the pairs
+left out of the budget are mostly per-node loops, so the ceiling is
+<code>unbudgeted_fixed_rate_per_node_qps</code> per node with
+<code>unbudgeted_fixed_rate_qps</code> as a floor for small clusters. A flat
+threshold would be one that ordinary traffic crosses on a large enough
+cluster, permanently, with nothing wrong -- and an alert that always fires
+gets silenced, while a silenced alert still reads as coverage.</p>
+<h4 id="standing-monitoring">Standing monitoring<a class="headerlink" href="#standing-monitoring" title="Permanent link">&para;</a></h4>
+<p><a href="https://github.com/shakenfist/shakenfist/blob/develop/examples/prometheus-database-load-rules.yaml"><code>examples/prometheus-database-load-rules.yaml</code></a>
+is a drop-in Prometheus rule file, generated from the same budget, with
+installation instructions in its comments. It records the model as
+<code>sf_database:modelled_rate</code> and the measurement as
+<code>sf_database:request_rate</code>, and carries three alerts: a budgeted pair
+well above its model, a pair nobody budgeted for polling steadily, and
+one for the model going blind because <code>instances_active</code> is not being
+scraped.</p>
+<p>The alerts compare a one day rate against a one day average of the model
+(<code>sf_database:modelled_rate:1d</code>), rather than against the model evaluated
+right now. Both halves have to cover the same window: a cluster that
+halves its standing instance count overnight would otherwise have every
+per-instance pair sitting above an immediately-shrunken ceiling until the
+measurement caught up, for up to a day, which <code>for: 1h</code> does not cover and
+which is not a regression. That last one matters: without <code>sf-resources</code> scraped the
+modelled series are empty and neither of the other two can ever fire,
+which looks exactly like a healthy cluster.</p>
+<p><a href="https://github.com/shakenfist/shakenfist/blob/develop/examples/grafana-dashboard.json"><code>examples/grafana-dashboard.json</code></a>
+has matching panels for load by caller, measured against modelled, and
+the count of pairs over budget.</p>
+<p>On the measured-against-modelled panel, watch the enforced pair of lines
+rather than the totals. The totals include every <code>activity</code> pair, and
+those coefficients were fitted against the API traffic of the cluster the
+budget was derived from -- which is ours, and is mostly CI. If your users
+and tooling call the API differently, and they will, those two lines
+diverge steadily and permanently without anything being wrong. The
+<code>enforced</code> lines cover only the pairs produced by Shaken Fist's own loops,
+so they are comparable across deployments, and they are the ones which
+should track each other as the cluster grows.</p>
+<h4 id="when-a-pair-is-over-budget">When a pair is over budget<a class="headerlink" href="#when-a-pair-is-over-budget" title="Permanent link">&para;</a></h4>
+<p>Please report it, with the output of <code>sf-ctl database-load --json</code>
+attached, at
+<a href="https://github.com/shakenfist/shakenfist/issues">the issue tracker</a>. A
+pair well above its model is usually one of two things: a loop of ours
+that has stopped batching a read it used to batch, or a workload shape the
+model does not describe. Both are worth knowing about, and the second is
+how the shipped coefficients get better for clusters that are not ours.</p>
+<p>Do not edit the budget to make an alert stop. A budget that tracks
+whatever the code currently does is not a budget.</p>
 <h3 id="monitoring-sf-database-with-grpc-health-probe">Monitoring sf-database with grpc-health-probe<a class="headerlink" href="#monitoring-sf-database-with-grpc-health-probe" title="Permanent link">&para;</a></h3>
 <p><code>sf-database</code> reports live MariaDB reachability through the standard
 <code>grpc.health.v1/Check</code> RPC on the empty-string (<code>""</code>) service name.
 Operators can probe this with <code>grpc-health-probe</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>grpc-health-probe<span class="w"> </span>-addr<span class="o">=</span>&lt;sf-database-host&gt;:13005
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>grpc-health-probe<span class="w"> </span>-addr<span class="o">=</span>&lt;sf-database-host&gt;:13005
 </code></pre></div>
 <p>The status reflects the outcome of the most recent ~10 s background poll:
 <code>SERVING</code> means <code>sf-database</code> can reach MariaDB; <code>NOT_SERVING</code> means the
@@ -14952,7 +15159,7 @@ These commands are typically used during cluster bootstrap and maintenance.</p>
 <h3 id="ensure-mariadb-schema">ensure-mariadb-schema<a class="headerlink" href="#ensure-mariadb-schema" title="Permanent link">&para;</a></h3>
 <p>Ensures the MariaDB schema exists and is up to date. This command must be run
 on a node with direct database access (i.e. <code>MARIADB_HOST</code> configured):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sf-ctl<span class="w"> </span>ensure-mariadb-schema
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sf-ctl<span class="w"> </span>ensure-mariadb-schema
 </code></pre></div>
 <p>The command first performs a compatibility check against the requirements
 listed in <a href="#mariadb-compatibility-requirements">MariaDB compatibility requirements</a>
@@ -14975,12 +15182,12 @@ database tier first.</p>
 <h3 id="initialise-node">initialise-node<a class="headerlink" href="#initialise-node" title="Permanent link">&para;</a></h3>
 <p>Creates a node record in the database. By default, it uses the local node's
 configuration:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sf-ctl<span class="w"> </span>initialise-node
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sf-ctl<span class="w"> </span>initialise-node
 </code></pre></div>
 <p>From a database-tier node (one with <code>MARIADB_HOST</code> already in
 <code>/etc/sf/config</code>), the command can initialise any node in the cluster without
 any env-var prefix:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sf-ctl<span class="w"> </span>initialise-node<span class="w"> </span>--node-name<span class="w"> </span>sf-2<span class="w"> </span>--node-mesh-ip<span class="w"> </span><span class="m">10</span>.0.0.2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sf-ctl<span class="w"> </span>initialise-node<span class="w"> </span>--node-name<span class="w"> </span>sf-2<span class="w"> </span>--node-mesh-ip<span class="w"> </span><span class="m">10</span>.0.0.2
 </code></pre></div>
 <h3 id="gateway-health">gateway-health<a class="headerlink" href="#gateway-health" title="Permanent link">&para;</a></h3>
 <p>Checks that an <code>sf-database</code> gateway reports <code>SERVING</code> via the standard
@@ -14989,8 +15196,8 @@ otherwise. On <code>sf-database</code>, <code>SERVING</code> means MariaDB is re
 schema was current at startup — a stronger signal than the port merely
 accepting connections. By default it probes this node's own gateway
 (<code>NODE_MESH_IP</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sf-ctl<span class="w"> </span>gateway-health
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>sf-ctl<span class="w"> </span>gateway-health<span class="w"> </span>--host<span class="w"> </span><span class="m">10</span>.0.0.2<span class="w"> </span>--timeout<span class="w"> </span><span class="m">5</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sf-ctl<span class="w"> </span>gateway-health
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>sf-ctl<span class="w"> </span>gateway-health<span class="w"> </span>--host<span class="w"> </span><span class="m">10</span>.0.0.2<span class="w"> </span>--timeout<span class="w"> </span><span class="m">5</span>
 </code></pre></div>
 <p>This is the health gate the deploy's serial rolling restart waits on
 before moving to the next database-tier node (see
@@ -15000,11 +15207,11 @@ needs no extra binary installed on the node.</p>
 <h3 id="register-daemon">register-daemon<a class="headerlink" href="#register-daemon" title="Permanent link">&para;</a></h3>
 <p>Registers one or more daemons on a node. By default, it registers on the local
 node:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>sentinel-first<span class="w"> </span>privexec<span class="w"> </span>nodelock
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>sentinel-first<span class="w"> </span>privexec<span class="w"> </span>nodelock
 </code></pre></div>
 <p>From a database-tier node (one with <code>MARIADB_HOST</code> already in
 <code>/etc/sf/config</code>), daemons can be registered against any node in the cluster:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>database<span class="w"> </span>--node-name<span class="w"> </span>sf-1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>sf-ctl<span class="w"> </span>register-daemon<span class="w"> </span>database<span class="w"> </span>--node-name<span class="w"> </span>sf-1
 </code></pre></div>
 <h2 id="mariadb-table-inventory">MariaDB Table Inventory<a class="headerlink" href="#mariadb-table-inventory" title="Permanent link">&para;</a></h2>
 <p>The MariaDB schema uses different table patterns depending on the data
@@ -15230,7 +15437,7 @@ which drops them when it loses the lock, so during a leadership handoff
 there is a window with no capacity gauges at all until the new leader's
 first pass. Alert on the reconciler falling behind rather than on a
 gauge disappearing, and make the alert cluster-scoped:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>time() - max(scheduler_capacity_reconcile_last_success_timestamp) &gt; 900
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>time() - max(scheduler_capacity_reconcile_last_success_timestamp) &gt; 900
 </code></pre></div>
 <p>The <code>max()</code> matters. Unlike the capacity gauges, the last-success
 timestamp is not cleared on demotion — it records when <em>that node</em> last
@@ -15351,7 +15558,7 @@ a sweep that has since recovered reads zero. Do not build an <code>== 0</code> o
 broken metric — that is what a cluster with nothing wrong looks like.
 The same applies immediately after a leadership change, which drops the
 label sets. A sample alert:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>max by (sweep, object_type) (cluster_sweep_work_list_failure_streak) &gt; 2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>max by (sweep, object_type) (cluster_sweep_work_list_failure_streak) &gt; 2
 </code></pre></div>
 <p>Two consecutive failures is noise (a database gateway restart lands
 inside a single pass); a streak that keeps climbing means that sweep has
@@ -15716,15 +15923,15 @@ UUID files left over from a previous node installation.</p>
 <p>Each attribute table follows the same pattern — typed scalar columns
 for hot-path fields, JSON columns for complex structures, and one
 indexed FK column per parent — for example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">node_attributes</span><span class="w"> </span><span class="p">(</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span><span class="n">uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="n">last_seen</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="n">installed_version</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">64</span><span class="p">),</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="c1">-- Complex structures as JSON</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">    </span><span class="n">roles</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="n">daemons</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="n">metrics</span><span class="w"> </span><span class="n">JSON</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">node_attributes</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">    </span><span class="n">uuid</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span><span class="n">last_seen</span><span class="w"> </span><span class="n">DOUBLE</span><span class="p">,</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="n">installed_version</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">64</span><span class="p">),</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span><span class="c1">-- Complex structures as JSON</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">    </span><span class="n">roles</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">    </span><span class="n">daemons</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">    </span><span class="n">metrics</span><span class="w"> </span><span class="n">JSON</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="p">);</span>
 </code></pre></div>
 <p>Cached lists of <em>child</em> object UUIDs are deliberately not stored on
 the parent attribute table — querying the child table by an indexed
@@ -15750,29 +15957,29 @@ have tables. For example:</p>
 <h3 id="pydantic-models-as-schema-source">Pydantic Models as Schema Source<a class="headerlink" href="#pydantic-models-as-schema-source" title="Permanent link">&para;</a></h3>
 <p>Each table is defined by a Pydantic model that serves as the single source of
 truth:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">UUID4</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLNativeUUID</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">DnsMasqData</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">    </span><span class="sd">"""Schema for DnsMasq static values in MariaDB."""</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">UUID4</span><span class="p">,</span> <span class="n">SQLNativeUUID</span><span class="p">()]</span>
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>    <span class="n">namespace</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
-<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>    <span class="n">owner_type</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
-<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>    <span class="n">owner_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
-<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">int</span>
-<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>    <span class="n">provide_dhcp</span><span class="p">:</span> <span class="nb">bool</span>
-<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>    <span class="n">provide_dns</span><span class="p">:</span> <span class="nb">bool</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">UUID4</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLNativeUUID</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">DnsMasqData</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">    </span><span class="sd">"""Schema for DnsMasq static values in MariaDB."""</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">UUID4</span><span class="p">,</span> <span class="n">SQLNativeUUID</span><span class="p">()]</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    <span class="n">namespace</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>    <span class="n">owner_type</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>    <span class="n">owner_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>    <span class="n">provide_dhcp</span><span class="p">:</span> <span class="nb">bool</span>
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="n">provide_dns</span><span class="p">:</span> <span class="nb">bool</span>
 </code></pre></div>
 <p>The table is then generated from this model:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">pydantic_to_sqlalchemy_table</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">DnsMasqData</span><span class="p">,</span> <span class="s1">'dnsmasq'</span><span class="p">,</span> <span class="n">metadata</span><span class="p">,</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">primary_key_field</span><span class="o">=</span><span class="s1">'uuid'</span><span class="p">,</span> <span class="n">include_id_column</span><span class="o">=</span><span class="kc">False</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">pydantic_to_sqlalchemy_table</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    <span class="n">DnsMasqData</span><span class="p">,</span> <span class="s1">'dnsmasq'</span><span class="p">,</span> <span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="n">primary_key_field</span><span class="o">=</span><span class="s1">'uuid'</span><span class="p">,</span> <span class="n">include_id_column</span><span class="o">=</span><span class="kc">False</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="p">)</span>
 </code></pre></div>
 <h3 id="adding-new-attributes">Adding New Attributes<a class="headerlink" href="#adding-new-attributes" title="Permanent link">&para;</a></h3>
 <p>When adding a new attribute to an object type:</p>
@@ -15812,38 +16019,38 @@ multiple purposes:</p>
 <p>Schema definitions live in <code>shakenfist/schema/</code>. For example, cluster operations
 have their schemas defined in <code>shakenfist/schema/operations/</code>.</p>
 <p>A typical schema looks like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">UUID4</span>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">model_tasks</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="n">verify_size_and_checksum</span> <span class="o">=</span> <span class="mi">1</span>
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>    <span class="n">ensure_local</span> <span class="o">=</span> <span class="mi">2</span>
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">model</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">UUID4</span>
-<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>    <span class="n">node_uuid</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>    <span class="n">blob_uuid</span><span class="p">:</span> <span class="n">UUID4</span>
-<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="n">priority</span><span class="p">:</span> <span class="n">PRIORITY</span>
-<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>    <span class="n">request_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
-<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="n">tasks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">model_tasks</span><span class="p">]</span>
-<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">UUID4</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">model_tasks</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>    <span class="n">verify_size_and_checksum</span> <span class="o">=</span> <span class="mi">1</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>    <span class="n">ensure_local</span> <span class="o">=</span> <span class="mi">2</span>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">model</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">UUID4</span>
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>    <span class="n">node_uuid</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>    <span class="n">blob_uuid</span><span class="p">:</span> <span class="n">UUID4</span>
+<a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a>    <span class="n">priority</span><span class="p">:</span> <span class="n">PRIORITY</span>
+<a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>    <span class="n">request_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a>    <span class="n">tasks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">model_tasks</span><span class="p">]</span>
+<a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a>    <span class="n">version</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="sqlalchemy-table-generation">SQLAlchemy Table Generation<a class="headerlink" href="#sqlalchemy-table-generation" title="Permanent link">&para;</a></h3>
 <p>The <code>shakenfist.schema.sqlalchemy</code> module provides utilities to automatically
 convert Pydantic models to SQLAlchemy tables. This keeps the schema definition
 in one place and avoids hand-writing SQL.</p>
 <h4 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">pydantic_to_sqlalchemy_table</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sa</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="n">metadata</span> <span class="o">=</span> <span class="n">sa</span><span class="o">.</span><span class="n">MetaData</span><span class="p">()</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span>
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="n">MyModel</span><span class="p">,</span>
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>    <span class="s1">'my_table'</span><span class="p">,</span>
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>    <span class="n">metadata</span><span class="p">,</span>
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>    <span class="n">primary_key_field</span><span class="o">=</span><span class="s1">'uuid'</span>
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">pydantic_to_sqlalchemy_table</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sa</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="n">metadata</span> <span class="o">=</span> <span class="n">sa</span><span class="o">.</span><span class="n">MetaData</span><span class="p">()</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>    <span class="n">MyModel</span><span class="p">,</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>    <span class="s1">'my_table'</span><span class="p">,</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>    <span class="n">metadata</span><span class="p">,</span>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>    <span class="n">primary_key_field</span><span class="o">=</span><span class="s1">'uuid'</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="p">)</span>
 </code></pre></div>
 <h4 id="type-mapping">Type Mapping<a class="headerlink" href="#type-mapping" title="Permanent link">&para;</a></h4>
 <p>Python types are mapped to SQL column types:</p>
@@ -15902,33 +16109,33 @@ in one place and avoids hand-writing SQL.</p>
 <code>Annotated</code> types. This keeps index definitions co-located with the schema.</p>
 <h4 id="single-column-indexes">Single-Column Indexes<a class="headerlink" href="#single-column-indexes" title="Permanent link">&para;</a></h4>
 <p>Use <code>SQLIndex()</code> or <code>SQLUniqueIndex()</code> markers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>           <span class="c1"># Creates idx_users_uuid</span>
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>    <span class="n">email</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span><span class="p">()]</span>    <span class="c1"># Creates uidx_users_email</span>
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>                                   <span class="c1"># No index</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="n">uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>           <span class="c1"># Creates idx_users_uuid</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">email</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span><span class="p">()]</span>    <span class="c1"># Creates uidx_users_email</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>                                   <span class="c1"># No index</span>
 </code></pre></div>
 <h4 id="compound-indexes">Compound Indexes<a class="headerlink" href="#compound-indexes" title="Permanent link">&para;</a></h4>
 <p>For indexes spanning multiple columns, use the model's configuration:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">Event</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>            <span class="s1">'sql_indexes'</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>                <span class="p">(</span><span class="s1">'object_type'</span><span class="p">,</span> <span class="s1">'object_uuid'</span><span class="p">),</span>  <span class="c1"># Compound index</span>
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>                <span class="p">(</span><span class="s1">'timestamp'</span><span class="p">,),</span>                   <span class="c1"># Single column via config</span>
-<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>            <span class="p">]</span>
-<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>        <span class="p">}</span>
-<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>    <span class="p">)</span>
-<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>
-<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>    <span class="n">object_type</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>    <span class="n">object_uuid</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>    <span class="n">timestamp</span><span class="p">:</span> <span class="nb">float</span>
-<a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>    <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">Event</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>            <span class="s1">'sql_indexes'</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>                <span class="p">(</span><span class="s1">'object_type'</span><span class="p">,</span> <span class="s1">'object_uuid'</span><span class="p">),</span>  <span class="c1"># Compound index</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>                <span class="p">(</span><span class="s1">'timestamp'</span><span class="p">,),</span>                   <span class="c1"># Single column via config</span>
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>            <span class="p">]</span>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>        <span class="p">}</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>    <span class="p">)</span>
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>    <span class="n">object_type</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>    <span class="n">object_uuid</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>    <span class="n">timestamp</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>    <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>
 </code></pre></div>
 <h4 id="generated-index-names">Generated Index Names<a class="headerlink" href="#generated-index-names" title="Permanent link">&para;</a></h4>
 <p>Index names follow a predictable pattern:</p>
@@ -15938,27 +16145,27 @@ in one place and avoids hand-writing SQL.</p>
 </ul>
 <h3 id="table-lifecycle">Table Lifecycle<a class="headerlink" href="#table-lifecycle" title="Permanent link">&para;</a></h3>
 <p>The <code>ensure_table_exists()</code> function handles idempotent table creation:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">,</span>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    <span class="n">ensure_table_exists</span>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="p">)</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="c1"># Create table definition</span>
-<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span><span class="n">MyModel</span><span class="p">,</span> <span class="s1">'my_table'</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
-<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>
-<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="c1"># Create table and indexes in database (idempotent)</span>
-<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="n">ensure_table_exists</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>    <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">,</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="n">ensure_table_exists</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="p">)</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="c1"># Create table definition</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="n">table</span> <span class="o">=</span> <span class="n">pydantic_to_sqlalchemy_table</span><span class="p">(</span><span class="n">MyModel</span><span class="p">,</span> <span class="s1">'my_table'</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="c1"># Create table and indexes in database (idempotent)</span>
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="n">ensure_table_exists</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="schema-comparison">Schema Comparison<a class="headerlink" href="#schema-comparison" title="Permanent link">&para;</a></h3>
 <p>To detect schema drift between the Pydantic model and the database:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_schemas</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="n">differences</span> <span class="o">=</span> <span class="n">compare_schemas</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Returns: {</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="c1">#     'missing_columns': [...],  # In model but not in DB</span>
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="c1">#     'extra_columns': [...],    # In DB but not in model</span>
-<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1">#     'type_mismatches': [...]   # Different types</span>
-<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="c1"># }</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_schemas</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="n">differences</span> <span class="o">=</span> <span class="n">compare_schemas</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Returns: {</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="c1">#     'missing_columns': [...],  # In model but not in DB</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="c1">#     'extra_columns': [...],    # In DB but not in model</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="c1">#     'type_mismatches': [...]   # Different types</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="c1"># }</span>
 </code></pre></div>
 <h2 id="object-state-storage">Object State Storage<a class="headerlink" href="#object-state-storage" title="Permanent link">&para;</a></h2>
 <p>Object state (e.g., "created", "deleted", "error") is stored in a dedicated
@@ -15967,34 +16174,34 @@ database service's gRPC interface for all daemons except the database daemon
 itself.</p>
 <h3 id="the-object_states-table">The object_states Table<a class="headerlink" href="#the-object_states-table" title="Permanent link">&para;</a></h3>
 <p>The <code>object_states</code> table stores state for all object types:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Optional</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span>
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span>
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>
-<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">ObjectState</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
-<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>            <span class="s1">'sql_indexes'</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>                <span class="p">[</span><span class="s1">'object_type'</span><span class="p">,</span> <span class="s1">'state_value'</span><span class="p">],</span>  <span class="c1"># Efficient queries by type+state</span>
-<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>            <span class="p">]</span>
-<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>        <span class="p">}</span>
-<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a>    <span class="p">)</span>
-<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>
-<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a>    <span class="n">object_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)]</span>
-<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a>    <span class="n">object_type</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)]</span>
-<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>    <span class="n">state_value</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)]</span>
-<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>    <span class="n">update_time</span><span class="p">:</span> <span class="nb">float</span>
-<a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>    <span class="n">message</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Optional</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLIndex</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">ObjectState</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>            <span class="s1">'sql_indexes'</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>                <span class="p">[</span><span class="s1">'object_type'</span><span class="p">,</span> <span class="s1">'state_value'</span><span class="p">],</span>  <span class="c1"># Efficient queries by type+state</span>
+<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a>            <span class="p">]</span>
+<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a>        <span class="p">}</span>
+<a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a>    <span class="p">)</span>
+<a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a>
+<a id="__codelineno-26-14" name="__codelineno-26-14" href="#__codelineno-26-14"></a>    <span class="n">object_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLUniqueIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)]</span>
+<a id="__codelineno-26-15" name="__codelineno-26-15" href="#__codelineno-26-15"></a>    <span class="n">object_type</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)]</span>
+<a id="__codelineno-26-16" name="__codelineno-26-16" href="#__codelineno-26-16"></a>    <span class="n">state_value</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)]</span>
+<a id="__codelineno-26-17" name="__codelineno-26-17" href="#__codelineno-26-17"></a>    <span class="n">update_time</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-26-18" name="__codelineno-26-18" href="#__codelineno-26-18"></a>    <span class="n">message</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 </code></pre></div>
 <h3 id="state-class">State Class<a class="headerlink" href="#state-class" title="Permanent link">&para;</a></h3>
 <p>The <code>State</code> class is a Pydantic model that replaces the original <code>baseobject.State</code>
 class. It provides the same interface for backwards compatibility:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.object_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">State</span>
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="n">state</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s1">'created'</span><span class="p">,</span> <span class="n">update_time</span><span class="o">=</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span> <span class="n">message</span><span class="o">=</span><span class="s1">'optional msg'</span><span class="p">)</span>
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>        <span class="c1"># 'created'</span>
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">update_time</span><span class="p">)</span>  <span class="c1"># 1234567890.123</span>
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">obj_dict</span><span class="p">())</span>   <span class="c1"># {'value': 'created', 'update_time': 1234567890.123}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.object_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">State</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="n">state</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s1">'created'</span><span class="p">,</span> <span class="n">update_time</span><span class="o">=</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span> <span class="n">message</span><span class="o">=</span><span class="s1">'optional msg'</span><span class="p">)</span>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>        <span class="c1"># 'created'</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">update_time</span><span class="p">)</span>  <span class="c1"># 1234567890.123</span>
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">obj_dict</span><span class="p">())</span>   <span class="c1"># {'value': 'created', 'update_time': 1234567890.123}</span>
 </code></pre></div>
 <h2 id="ipam-reservation-storage">IPAM Reservation Storage<a class="headerlink" href="#ipam-reservation-storage" title="Permanent link">&para;</a></h2>
 <p>IPAM (IP Address Manager) reservations are stored in MariaDB for atomic address
@@ -16008,25 +16215,25 @@ allocation. This provides:</p>
 </ul>
 <h3 id="the-ipam_reservations-table">The ipam_reservations Table<a class="headerlink" href="#the-ipam_reservations-table" title="Permanent link">&para;</a></h3>
 <p>The <code>ipam_reservations</code> table uses a composite primary key on (ipam_uuid, address):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ipaddress</span><span class="w"> </span><span class="kn">import</span> <span class="n">IPv4Address</span>
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">IPAMReservation</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>            <span class="s1">'sql_indexes'</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>                <span class="p">[</span><span class="s1">'ipam_uuid'</span><span class="p">,</span> <span class="s1">'address'</span><span class="p">],</span>      <span class="c1"># Composite unique key</span>
-<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>                <span class="p">[</span><span class="s1">'user_type'</span><span class="p">,</span> <span class="s1">'user_uuid'</span><span class="p">],</span>    <span class="c1"># Query by user</span>
-<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>            <span class="p">]</span>
-<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a>        <span class="p">}</span>
-<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a>    <span class="p">)</span>
-<a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a>
-<a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a>    <span class="n">ipam_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)]</span>
-<a id="__codelineno-26-14" name="__codelineno-26-14" href="#__codelineno-26-14"></a>    <span class="n">address</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">IPv4Address</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>  <span class="c1"># Maps to INET4 column</span>
-<a id="__codelineno-26-15" name="__codelineno-26-15" href="#__codelineno-26-15"></a>    <span class="n">reservation_type</span><span class="p">:</span> <span class="n">ReservationType</span>            <span class="c1"># Enum stored as VARCHAR</span>
-<a id="__codelineno-26-16" name="__codelineno-26-16" href="#__codelineno-26-16"></a>    <span class="n">user_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
-<a id="__codelineno-26-17" name="__codelineno-26-17" href="#__codelineno-26-17"></a>    <span class="n">user_uuid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)</span>
-<a id="__codelineno-26-18" name="__codelineno-26-18" href="#__codelineno-26-18"></a>    <span class="n">reserved_at</span><span class="p">:</span> <span class="nb">float</span>
-<a id="__codelineno-26-19" name="__codelineno-26-19" href="#__codelineno-26-19"></a>    <span class="n">comment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ipaddress</span><span class="w"> </span><span class="kn">import</span> <span class="n">IPv4Address</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">IPAMReservation</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>        <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>            <span class="s1">'sql_indexes'</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>                <span class="p">[</span><span class="s1">'ipam_uuid'</span><span class="p">,</span> <span class="s1">'address'</span><span class="p">],</span>      <span class="c1"># Composite unique key</span>
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>                <span class="p">[</span><span class="s1">'user_type'</span><span class="p">,</span> <span class="s1">'user_uuid'</span><span class="p">],</span>    <span class="c1"># Query by user</span>
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>            <span class="p">]</span>
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>        <span class="p">}</span>
+<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>    <span class="p">)</span>
+<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>
+<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>    <span class="n">ipam_uuid</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">(),</span> <span class="n">Field</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)]</span>
+<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>    <span class="n">address</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">IPv4Address</span><span class="p">,</span> <span class="n">SQLIndex</span><span class="p">()]</span>  <span class="c1"># Maps to INET4 column</span>
+<a id="__codelineno-28-15" name="__codelineno-28-15" href="#__codelineno-28-15"></a>    <span class="n">reservation_type</span><span class="p">:</span> <span class="n">ReservationType</span>            <span class="c1"># Enum stored as VARCHAR</span>
+<a id="__codelineno-28-16" name="__codelineno-28-16" href="#__codelineno-28-16"></a>    <span class="n">user_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<a id="__codelineno-28-17" name="__codelineno-28-17" href="#__codelineno-28-17"></a>    <span class="n">user_uuid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">36</span><span class="p">)</span>
+<a id="__codelineno-28-18" name="__codelineno-28-18" href="#__codelineno-28-18"></a>    <span class="n">reserved_at</span><span class="p">:</span> <span class="nb">float</span>
+<a id="__codelineno-28-19" name="__codelineno-28-19" href="#__codelineno-28-19"></a>    <span class="n">comment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 </code></pre></div>
 <p>The <code>address</code> field uses Python's <code>ipaddress.IPv4Address</code> type, which maps to
 MariaDB's <code>INET4</code> column type. This provides efficient 4-byte storage and native

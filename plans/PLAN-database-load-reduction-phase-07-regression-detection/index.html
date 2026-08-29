@@ -13171,6 +13171,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the survey found
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13193,6 +13204,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-implementation-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What implementation found
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What implementation found">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-review-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What review found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-second-review-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the second review found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-merge-queue-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the merge queue found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-merge-queue-found-third-time-a-true-positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the merge queue found, third time: a true positive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#risks-and-mitigations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13208,6 +13280,17 @@
     <span class="md-ellipsis">
       
         Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
       
     </span>
   </a>
@@ -13248,7 +13331,12 @@
 
 <h1 id="phase-7-regression-detection-a-deployer-can-run">Phase 7 — regression detection a deployer can run<a class="headerlink" href="#phase-7-regression-detection-a-deployer-can-run" title="Permanent link">&para;</a></h1>
 <p>Master plan: <a href="../PLAN-database-load-reduction/">PLAN-database-load-reduction.md</a></p>
-<p><strong>Status: Not started.</strong></p>
+<p><strong>Status: In progress.</strong> Planned 2026-08-19 alongside phase 6,
+re-surveyed 2026-08-25 once phase 6 landed, and implemented the same
+day. All five steps are committed and every Definition of done item
+except functional CI is checked; see "What the survey found" for what
+the re-survey changed and "What implementation found" for the two
+things the plan did not anticipate.</p>
 <h2 id="why-this-phase-exists">Why this phase exists<a class="headerlink" href="#why-this-phase-exists" title="Permanent link">&para;</a></h2>
 <p>Phase 5 built a ratchet and the ratchet worked: it correctly refused to
 call an instance-count increase a regression, and it caught the real
@@ -13296,16 +13384,16 @@ measured coefficients as the shipped defaults.</p>
 <li><strong>The counter is already public.</strong> <code>database_requests_total{operation,
   caller_daemon}</code> is served from every <code>sf-database</code> on
   <code>MARIADB_GATEWAY_METRICS_PORT</code> (default 13006,
-  <code>shakenfist/config.py:647</code>). Phase 4 deliberately made <code>caller_node</code> a
+  <code>shakenfist/config.py:655</code>). Phase 4 deliberately made <code>caller_node</code> a
   metadata field rather than a label, so summing across tier instances is
   the natural read and label cardinality stays sane.</li>
 <li><strong>A scrape-and-diff harness already exists in the CI suite.</strong>
   <code>shakenfist/deploy/shakenfist_ci/database_tier.py</code> has
   <code>scrape_database_counters()</code> (<code>:48</code>) and
   <code>scrape_operation_requests(mesh_ip, operation, caller_daemon)</code> (<code>:70</code>),
-  plus <code>_database_nodes()</code> and <code>_sum_requests()</code> on the test base class,
-  and <code>cluster_ci_tests/test_database_tier.py</code> already contains
-  <code>test_instance_get_fetches_the_attributes_row_once</code> — a working
+  plus <code>_database_nodes()</code> (<code>:109</code>) and <code>_sum_requests()</code> (<code>:135</code>) on
+  <code>DatabaseTierTestsMixin</code> in that same module, and
+  <code>test_instance_get_fetches_the_attributes_row_once</code> (<code>:199</code>) — a working
   before/after delta assertion guarding the #3654 fix. The pattern this
   phase needs is already proven in-tree on one operation; it needs
   generalising, not inventing.</li>
@@ -13319,6 +13407,72 @@ measured coefficients as the shipped defaults.</p>
   database-tier panels at all. The good dashboard is the private one. That
   is exactly backwards.</li>
 </ul>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>Re-surveyed 2026-08-25, after phase 6 merged. Most of the foundation
+above held; three things did not, and the corrections are recorded at
+their source in the section above and in the step briefs, so a later step
+does not need to rediscover them.</p>
+<p><strong>The delta test is not where this plan said it was, and it must not go
+there.</strong> <code>test_instance_get_fetches_the_attributes_row_once</code> lives in
+<code>shakenfist/deploy/shakenfist_ci/database_tier.py:199</code>, inside
+<code>DatabaseTierTestsMixin</code>, not in <code>cluster_ci_tests/test_database_tier.py</code>.
+That is not an accident of tidying. The module docstring (<code>:1-17</code>) records
+why: stestr discovers tests per directory and the two suites are disjoint,
+so <strong>a test defined in <code>cluster_ci_tests/</code> runs for the first time in the
+merge queue</strong> — which is how #3694 landed two broken things at once and
+blocked the queue for four days. The mixin is subclassed from both
+<code>smoke_ci_tests/test_database_tier.py</code> and
+<code>cluster_ci_tests/test_database_tier.py</code> so the shared tests run in PR CI,
+where a break is cheap to find. The cluster suite's own file holds exactly
+one test, <code>test_grpc_lb_fans_out_across_sf_database_instances</code>, and holds
+it because it genuinely requires N&gt;=2 <code>sf-database</code> instances. 7b's brief
+originally said to add the new test beside a test that is not there; it now
+says to put it in the mixin, and decision 8 records why.</p>
+<p><strong>There is no established location for shipped runtime data.</strong>
+<code>[tool.setuptools.package-data]</code> in <code>pyproject.toml</code> names only
+<code>deploy/**</code>, which reads as "a new YAML under <code>shakenfist/</code> will not be
+installed". That reading is wrong, and it was worth checking rather than
+guessing, because the failure it would cause is the nastiest shape
+available: <code>sf-ctl database-load</code> working in a source checkout and in CI,
+and raising <code>FileNotFoundError</code> on a real deployment, where nodes install a
+<strong>wheel</strong> built by <code>python3 -m build</code>
+(<code>deploy/collection/roles/node/tasks/bootstrap.yml:186-191</code>). Building the
+wheel and listing it settles it: <code>setuptools_scm</code> supplies the file finder
+and <code>include-package-data</code> defaults on, so every git-tracked file under
+<code>shakenfist/</code> ships. <code>shakenfist/kerbside/*.md</code> and <code>shakenfist/protos/*.pyi</code>
+are already carried this way despite matching no <code>package-data</code> entry. So
+the budget file may live in the package, no packaging change is needed --
+and 7a owes a test that proves it, because the mechanism is implicit and a
+future <code>package-data</code> tidy-up would silently break it.</p>
+<p><strong>The positive control's arithmetic changed the day after phase 6
+merged.</strong> Phase 6's 6g section found the elected cluster daemon never
+called <code>check_daemon_state()</code>, so <code>GetNodeDaemonState</code> ran at exactly 5/6
+of the expected rate on <code>sfcbr</code>; that was filed as #3874 and fixed in
+<code>b00f2b6fb</code>, which added the call to the elected loop
+(<code>daemons/cluster/main.py:642</code>). The plan's risk bullet still said the
+arithmetic "excludes the elected cluster daemon", which is now false. It is
+also not simply back to <code>daemon_count / DAEMON_STATE_POLL_INTERVAL</code>: the
+elected loop sleeps <code>lock.lost_event.wait(5)</code> (<code>:692</code>) rather than
+<code>idle()</code>, so its poll is rate-limited by its own 5s loop rather than by the
+2s interval. Decision 9 states the corrected expression, and the risk
+bullet is fixed.</p>
+<p><strong>One budgeted pair is a known open bug.</strong> #3876 — <code>GetReferencesFrom</code>/api
+running 11.6x its paired <code>GetReferencesTo</code>/api, localised by 6g to
+unpaired reads in <code>Blob.external_view()</code> and <code>Artifact.external_view()</code> --
+is one of the six per-instance coefficient pairs 7a is told to seed from
+(0.32 QPS per standing instance). Measuring it today and committing the
+result is precisely "encode the regression as the budget". Decision 10
+handles it without blocking the phase on the fix.</p>
+<p><strong>What held.</strong> The counter is public on <code>MARIADB_GATEWAY_METRICS_PORT</code>
+(default 13006, <code>config.py:655</code> — the plan said <code>:647</code>, corrected above);
+<code>examples/loki-secret-alert.yaml</code> is the drop-in precedent and is
+documented from <code>docs/operator_guide/logging.md:239</code>;
+<code>examples/grafana-dashboard.json</code> still carries <code>etcd Traffic</code> and <code>etcd DB
+Size</code> panels and contains no reference to <code>database_requests_total</code> at all.
+<code>docs/operator_guide/database.md</code> already has an "Attributing database load
+to callers" section (<code>:294</code>) with a working <code>topk</code> example, so 7e extends a
+section rather than starting one, and no operator-facing page states a load
+expectation that phase 6 withdrew.</p>
 <h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Ship a model, not a number.</strong> The budget file expresses expected load
@@ -13360,7 +13514,59 @@ measured coefficients as the shipped defaults.</p>
    committed budget file instead of its own baseline, so the two cannot
    disagree. That change is small, belongs in that repository, and is out
    of scope here beyond noting the contract it depends on.</li>
+<li><strong>The CI check goes in <code>DatabaseTierTestsMixin</code>, not the cluster
+   suite.</strong> A test defined under <code>cluster_ci_tests/</code> runs for the first
+   time in the merge queue, which is the #3694 failure mode the mixin was
+   created to avoid. The idle-load check needs no particular topology --
+   it needs a quiet cluster and a known daemon count, both of which the
+   smoke topology has — so it belongs where it runs in PR CI. The one
+   test that legitimately lives in the cluster suite is there because it
+   requires N&gt;=2 <code>sf-database</code> instances; this one does not.</li>
+<li><strong>The positive control is a stated expression with a named exception,
+   not a round number.</strong> On an idle cluster every daemon polls its own
+   state row through <code>idle()</code>, which calls <code>check_daemon_state()</code> on each
+   0.2s tick under a <code>DAEMON_STATE_POLL_INTERVAL</code> rate limit, giving
+   <code>1/2</code> per second per daemon. The single <strong>elected</strong> cluster daemon is
+   the exception: since #3874 it does poll, but from a loop that sleeps
+   <code>lock.lost_event.wait(5)</code>, so it contributes <code>1/5</code> per second. The
+   control is therefore</li>
 </ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>expected_qps(GetNodeDaemonState) = (daemons - 1)/2 + 1/5
+</code></pre></div>
+<p>and it is an <strong>upper bound</strong>, exact only when every daemon is idle: a
+   daemon doing work calls <code>check_daemon_state()</code> less often than the rate
+   limit allows, and <code>DAEMON_STATE_POLL_MAX_INTERVAL</code> backs the poll off
+   further while the database is unreachable. The check must therefore be
+   one-sided — fail on materially <em>below</em> expected, since that is the
+   "harness cannot see the whole cluster" signal, and tolerate above only
+   within noise. Encode the expression, not the number, so that changing
+   <code>DAEMON_STATE_POLL_INTERVAL</code> or the elected loop's sleep updates the
+   control rather than silently invalidating it.
+10. <strong>A budget entry may be marked provisional, and provisional entries
+    do not fail CI.</strong> <code>GetReferencesFrom</code>/api is a budgeted pair <em>and</em> an
+    open bug (#3876). Committing today's measurement makes the bug the
+    defended floor; blocking the phase on the fix makes a detection phase
+    wait on an unrelated repair. So the schema carries <code>provisional:</code> with
+    an issue reference and a one-line reason, 7b reports provisional pairs
+    without failing on them, 7c emits them as recording rules but not
+    alerting rules, and 7d prints them flagged. When #3876 lands, the fix
+    re-measures the pair and drops the flag — a small, obvious follow-up
+    rather than a silent inheritance.
+11. <strong>The budget ships inside the package as YAML, and a test proves it
+    is installed.</strong> YAML rather than a Python dict because the Prometheus
+    generator, the private nightly report and any deployer's own tooling
+    are not all Python; inside the package rather than <code>examples/</code> because
+    <code>sf-ctl database-load</code> must read it on a node, where only the wheel
+    exists. <em>(Revised during review: the plan reasoned that the wheel
+    carries it anyway — <code>setuptools_scm</code> finds every git-tracked file and
+    <code>include-package-data</code> defaults on — and that a test reading it
+    through <code>importlib.resources</code> would therefore catch a packaging
+    regression. It would not. A source checkout resolves
+    <code>shakenfist.data</code> as a namespace package whatever <code>pyproject.toml</code>
+    says, so that test passes either way. The file is now declared in
+    <code>[tool.setuptools.package-data]</code>, and the test asserts the
+    declaration covers it. The resources test stays, as an assertion
+    about the runtime path every consumer takes.)</em></p>
 <h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -13378,14 +13584,14 @@ measured coefficients as the shipped defaults.</p>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td><strong>Derive and commit the budget.</strong> Produce <code>shakenfist/data/database_load_budget.yaml</code> (or the repo's established data location — check where other shipped data files live before choosing) holding, per <code>(operation, caller_daemon)</code>: a <code>per_node_base_qps</code>, an optional <code>per_instance_qps</code>, and a short <code>note</code> naming the loop that produces it. Seed it from the coefficients established by hunt 2026-01 (<code>GetObjectState</code>/net 0.31, <code>GetReferencesFrom</code>/api 0.32, <code>GetInstanceAttributes</code>/net 0.29, <code>GetInstanceAttributes</code>/api 0.27, <code>GetNetworkInterfaceAttributes</code>/net 0.23, <code>FindNetworkInterfaces</code>/net 0.08 QPS per standing instance) and from the per-node pairs (<code>GetNodeDaemonState</code> per daemon, <code>Dequeue</code>, <code>GetBlobTransfersForNode</code>, <code>GetExistingLocks</code>) whose slope is near zero. <strong>Use post-phase-6 numbers, not today's</strong> — this file defends a floor, and encoding a regression as the budget is the exact failure the phase 5 plan warned about. Those seed coefficients predate #3708 and so were measured across four of six nodes; treat them as the right <em>shape</em> and re-derive the levels (phase 6's 6g section has the method and the post-fix model <code>QPS ~= 32 + 4.9 x nodes + 4.65 x standing_instances</code>). Include a <code>_doc</code> block stating the window the numbers came from, the cluster shape, and how to re-derive them. Add a schema and a unit test that validates the file parses and every entry has either a base or a coefficient.</td>
+<td><strong>Derive and commit the budget.</strong> Produce <code>shakenfist/data/database_load_budget.yaml</code> — the survey settled the location, see decision 11 — holding, per <code>(operation, caller_daemon)</code>: a <code>per_node_base_qps</code>, an optional <code>per_instance_qps</code>, an optional <code>provisional</code> block (issue reference plus a one-line reason, see decision 10), and a short <code>note</code> naming the loop that produces it. Seed it from the coefficients established by hunt 2026-01 (<code>GetObjectState</code>/net 0.31, <code>GetReferencesFrom</code>/api 0.32, <code>GetInstanceAttributes</code>/net 0.29, <code>GetInstanceAttributes</code>/api 0.27, <code>GetNetworkInterfaceAttributes</code>/net 0.23, <code>FindNetworkInterfaces</code>/net 0.08 QPS per standing instance) and from the per-node pairs (<code>GetNodeDaemonState</code> per daemon, <code>Dequeue</code>, <code>GetBlobTransfersForNode</code>, <code>GetExistingLocks</code>) whose slope is near zero. <strong>Use post-phase-6 numbers, not today's</strong> — this file defends a floor, and encoding a regression as the budget is the exact failure the phase 5 plan warned about. Those seed coefficients predate #3708 and so were measured across four of six nodes; treat them as the right <em>shape</em> and re-derive the levels (phase 6's 6g section has the method and the post-fix model <code>QPS ~= 32 + 4.9 x nodes + 4.65 x standing_instances</code>). Include a <code>_doc</code> block stating the window the numbers came from, the cluster shape, and how to re-derive them. Add a schema and unit tests that validate: the file parses; every entry has either a base or a coefficient; every <code>provisional</code> entry names an open issue; and the file is readable through <code>importlib.resources</code> rather than a path relative to <code>__file__</code>, because that is what proves the wheel carries it. Mark <code>GetReferencesFrom</code>/<code>api</code> provisional against #3876 — it is a known open bug and its measured value today is the thing the budget must not canonise.</td>
 </tr>
 <tr>
 <td>7b</td>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td><strong>Generalise the CI harness and add the idle-load check.</strong> <code>shakenfist/deploy/shakenfist_ci/database_tier.py</code> already has <code>scrape_database_counters()</code> (<code>:48</code>) and <code>scrape_operation_requests()</code> (<code>:70</code>); add a function returning the <em>full</em> per-<code>(operation, caller_daemon)</code> delta over a window across all tier nodes, and put the new test in <code>cluster_ci_tests/test_database_tier.py</code> beside <code>test_instance_get_fetches_the_attributes_row_once</code>, which is the working precedent for the delta shape. The test: (1) emits the <strong>positive control</strong> by asserting <code>GetNodeDaemonState</code> appears at approximately <code>daemon_count / DAEMON_STATE_POLL_INTERVAL</code> — if that pair is absent or far off, fail with a message saying the harness is not measuring, because that is the vacuous case; (2) quiesces, sleeps a measured idle window, and diffs; (3) fails on any pair above its budget by more than the tolerance in 7a's file, and on any <em>unbudgeted</em> pair above a fixed-rate threshold, naming the pair and its rate. Per decision 3 the tolerance is generous — this catches a new poll, not a 10% drift. Commit subject: "ci: fail the build on a new fixed-rate database poll."</td>
+<td><strong>Generalise the CI harness and add the idle-load check.</strong> <code>shakenfist/deploy/shakenfist_ci/database_tier.py</code> already has <code>scrape_database_counters()</code> (<code>:48</code>) and <code>scrape_operation_requests()</code> (<code>:70</code>); add a function returning the <em>full</em> per-<code>(operation, caller_daemon)</code> delta over a window across all tier nodes, and put the new test in <code>DatabaseTierTestsMixin</code> in that same module beside <code>test_instance_get_fetches_the_attributes_row_once</code> (<code>:199</code>), which is the working precedent for the delta shape. <strong>Not</strong> in <code>cluster_ci_tests/test_database_tier.py</code> — the module docstring explains why (decision 8, and #3694). Note <code>METRICS_PORT</code> is hardcoded at <code>:29</code> in this module rather than read from config; leave that alone here, but do not copy the habit into 7d. The test: (1) emits the <strong>positive control</strong> by asserting <code>GetNodeDaemonState</code> appears at approximately <code>(daemons - 1)/DAEMON_STATE_POLL_INTERVAL + 1/5</code>, the expression derived in decision 9 — compute it from the constants, do not write the number down, and make the check one-sided since the bound is an upper one; if that pair is absent or materially below, fail with a message saying the harness is not measuring, because that is the vacuous case; (2) quiesces, sleeps a measured idle window, and diffs; (3) fails on any pair above its budget by more than the tolerance in 7a's file, and on any <em>unbudgeted</em> pair above a fixed-rate threshold, naming the pair and its rate — but reports rather than fails for entries marked <code>provisional</code> (decision 10). Per decision 3 the tolerance is generous — this catches a new poll, not a 10% drift. Commit subject: "ci: fail the build on a new fixed-rate database poll."</td>
 </tr>
 <tr>
 <td>7c</td>
@@ -13399,7 +13605,7 @@ measured coefficients as the shipped defaults.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td><strong><code>sf-ctl database-load</code>.</strong> A subcommand in <code>shakenfist/client/ctl.py</code> (see the <code>@click.command()</code> pattern at <code>:180</code> onwards) that scrapes every <code>MARIADB_GATEWAY_HOSTS</code> entry on <code>MARIADB_GATEWAY_METRICS_PORT</code> twice over a <code>--window</code> (default 60s), diffs, and prints a table of <code>(operation, caller_daemon)</code>, measured QPS, modelled QPS from the budget for this cluster's node and instance counts, and the ratio — sorted by excess, not by absolute rate, because excess is what a deployer needs to see. Support <code>--json</code> for scripting. It must degrade honestly: if a tier node is unreachable, say which and report on the rest rather than silently under-reporting. This is the no-monitoring-stack path from decision 5 and the thing to ask for in a bug report.</td>
+<td><strong><code>sf-ctl database-load</code>.</strong> A subcommand in <code>shakenfist/client/ctl.py</code> (see the <code>@click.command()</code> pattern at <code>:180</code> onwards) that scrapes every <code>MARIADB_GATEWAY_HOSTS</code> entry on <code>MARIADB_GATEWAY_METRICS_PORT</code> — read from config, not hardcoded — twice over a <code>--window</code> (default 60s), diffs, and prints a table of <code>(operation, caller_daemon)</code>, measured QPS, modelled QPS from the budget for this cluster's node and instance counts, and the ratio — sorted by excess, not by absolute rate, because excess is what a deployer needs to see. Support <code>--json</code> for scripting. It must degrade honestly: if a tier node is unreachable, say which and report on the rest rather than silently under-reporting. Flag provisional entries in the output so a deployer is not told to file an issue we already have. Register it with <code>cli.add_command()</code> alongside <code>gateway_health</code> (<code>ctl.py:518</code>), which is the closest existing precedent — same shape of command, and it shows <code>sf-ctl</code> reaching the tier from a node. This is the no-monitoring-stack path from decision 5 and the thing to ask for in a bug report.</td>
 </tr>
 <tr>
 <td>7e</td>
@@ -13410,6 +13616,413 @@ measured coefficients as the shipped defaults.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="what-implementation-found">What implementation found<a class="headerlink" href="#what-implementation-found" title="Permanent link">&para;</a></h2>
+<p>Three things the plan did not anticipate, all caught by checking output
+against real data rather than by reasoning about it. A fourth section
+below records what the automated reviewer found once the code existed.</p>
+<p><strong>The budget's inclusion cut has to sit below the unbudgeted threshold.</strong>
+7a derived at 0.30/s, which seemed a reasonable place to stop: 73 pairs
+carrying 93% of load, and everything below covered by the "any unbudgeted
+pair above 0.25/s is a new poll" rule. Evaluating 7c's generated rules
+against sfcbr's own one-day rates showed five pairs that would have fired
+<code>ShakenFistUnbudgetedDatabasePolling</code> immediately —
+<code>GetObjectsByState</code>/cluster, <code>GetNamespaceAttributes</code>/api,
+<code>GetClusterOperation</code>/queues, <code>GetDnsMasq</code>/net and
+<code>SetObjectState</code>/queues. None is a new poll. Each was simply under 0.30/s
+across a window averaging 18 standing instances and over 0.25/s once the
+same cluster reached 32. An inclusion cut above the threshold that
+decides what counts as new traffic can only produce that. Re-deriving at
+0.10/s takes the budget to 105 pairs and 97.2% of load, leaves the largest
+unbudgeted pair at 0.099/s, and both alerts now evaluate to nothing on
+sfcbr. Shipping rules that fire on the cluster they were derived from
+would have been the production version of the flaky-check problem in
+decision 3: an alert that always fires gets silenced, and a silenced
+alert still reads as coverage.</p>
+<p><strong>A CI cluster is never idle, because stestr runs the suite in
+parallel.</strong> 7b's brief said to quiesce and measure an idle window. There
+is no idle window: other workers are creating and deleting things
+throughout, and a single window cannot tell a new polling loop from the
+test in the next worker. The check now measures two consecutive windows
+and considers only pairs that ran at the same rate in both, which is a
+better expression of what the ratchet actually knew — the question is not
+"how much load is there" but "is any of this load metronomic". The
+tolerance is wide enough that a loop with a one minute period straddling
+two sixty second windows still counts, which is asserted directly.</p>
+<p>Two windows turned out not to be enough, and same-rate-in-every-window
+turned out not to be the whole of metronomic: see <em>What the merge queue
+found</em> below.</p>
+<p><strong>Not every daemon runs the base class' loop, so not every daemon
+polls.</strong> The positive control predicts a <code>GetNodeDaemonState</code> rate for
+each daemon a node reports running, from the premise that every daemon
+reads its own row from <code>Daemon.idle()</code>. That premise is false for three
+of them, and the first functional CI run said so: <code>api</code>, <code>nodelock</code> and
+<code>privexec</code> each measured 0.00/s against a predicted 0.50/s while the
+other seven matched their prediction to two decimal places. None is
+unhealthy. sf-api is gunicorn over <code>external_api</code> and is not a daemon
+module at all; sf-nodelock is a bespoke Unix socket <code>accept()</code> loop and
+sf-privexec a gRPC serve loop, and neither subclasses <code>Daemon</code>. The
+hand-written exemption list held only <code>database</code> and the two sentinels.</p>
+<p>The fix is not three more names — a list of names is how this went wrong
+once already. <code>NON_POLLING_DAEMONS</code> is now asserted to equal
+<code>Node.VALID_DAEMONS</code> minus the daemons which actually reach
+<code>check_daemon_state()</code>, plus those back which hold
+<code>mariadb.DIRECT_MARIADB_CALLERS</code> and so never cross the tier at all. The
+poller set is derived by parsing each daemon's module for a class
+deriving from <code>Daemon</code> — parsed rather than imported, since importing a
+daemon's <code>main</code> to ask about its shape runs its module level code — and
+the daemon-name-to-module map is read from the console scripts in
+<code>pyproject.toml</code>, which is where that mapping stops being the identity
+(<code>sf-net</code> is <code>shakenfist.daemons.network</code>). A second test pins that the
+derivation actually finds <code>net</code> and does not find <code>nodelock</code>, because the
+first assertion passes vacuously if the derivation finds nothing.</p>
+<p>Four mutations were checked to bite: dropping <code>api</code> from the list,
+exempting a daemon that really does poll, blinding the derivation so it
+finds no pollers, and assuming the name and the module directory are the
+same string. Two things corroborate the fix beyond CI going green. The
+shipped budget, derived independently from a day of sfcbr data, contains
+<code>GetNodeDaemonState</code> entries for exactly the seven pollers and none for
+these three — so production agrees they never poll. And the failure was
+the control doing its job: it fired before the budget assertions could
+pass vacuously, which is what it is for.</p>
+<p>Three smaller notes. The elected cluster daemon's contribution to the
+positive control could not be verified against production, because #3874
+merged about an hour before the measurement window closed and sfcbr had
+not deployed it — <code>GetNodeDaemonState</code>/cluster still read exactly 5/6 of
+its siblings. That entry is therefore arithmetic about the code rather
+than a fit, <code>tools/derive-database-load-budget.py</code> carries the override in
+<code>CODE_DERIVED_TERMS</code> so a re-derivation cannot silently revert it, and a
+unit test asserts it against <code>DAEMON_STATE_POLL_INTERVAL</code> itself. The
+rules generator initially rendered the <em>previous</em> budget because running
+a script in <code>tools/</code> resolves <code>shakenfist</code> from site-packages rather than
+the checkout; the drift test caught it, which is the reason it exists.
+And the whole scrape-and-model path was exercised against the live sfcbr
+tier: 201.2/s measured against 177.6/s modelled at six nodes and 32
+standing instances, nothing over budget, at a cluster shape well outside
+the range the coefficients were fitted over.</p>
+<h3 id="what-review-found">What review found<a class="headerlink" href="#what-review-found" title="Permanent link">&para;</a></h3>
+<p>The automated reviewer's findings are worth recording, because five of
+them are variations on one theme the plan stated as its central claim and
+did not actually deliver: <em>every consumer reads one budget file so they
+cannot disagree about what normal load is.</em> Reading the same file turns
+out not to be enough. The three consumers also have to evaluate it the
+same way, and they did not.</p>
+<p><strong>They disagreed about what a standing instance is.</strong> The per-instance
+coefficients were fitted by regressing against <code>sum(instances_active)</code>,
+which counts running libvirt domains. The generated Prometheus rules use
+that series. <code>sf-ctl database-load</code> counted every instance in the
+<code>created</code> state, powered off ones included, and the CI check counted every
+instance the API returned — three quantities, one model. Because the
+ceiling is <code>modelled x 2.0 + 0.5</code>, over-counting instances inflates a
+cluster's own ceiling by roughly the coefficient per spurious instance,
+and the larger coefficients are around 0.5/s each. A cluster with a lot of
+powered-off instances was therefore quietly raising the bar for the
+regression this phase exists to detect. <code>_cluster_shape()</code> now reads
+<code>instances_active</code> from the node metrics rows (ignoring rows staler than
+five minutes, because Prometheus drops such a series and a departed node
+must not keep charging the per-node term), the CI check counts instances
+whose <code>power_state</code> is <code>on</code>, and <code>_doc.method</code> in the budget now says
+which quantity the coefficients were fitted against so a re-derivation
+uses the matching regressor.</p>
+<p><strong>They disagreed about whether unbudgeted traffic is a problem.</strong>
+<code>ShakenFistUnbudgetedDatabasePolling</code> fires on it and
+<code>test_no_unbudgeted_fixed_rate_database_polling</code> fails the build on it,
+but <code>sf-ctl database-load</code> computed <code>over_budget</code> as <code>measured &gt; ceiling
+and (entry is not None and entry.enforced)</code>, which is unconditionally
+false when there is no entry — which is what unbudgeted means. So a brand
+new polling loop at 5/s printed as a flagged row and then the footer said
+"Nothing is over budget; the rows above are flagged rather than
+excessive." The one-word fix is <code>entry is None or entry.enforced</code>; the
+test that pins it also pins the other half, that a quiet unbudgeted pair
+is still not over budget.</p>
+<p><strong>Both measurement paths divided by the window they slept rather than the
+time they measured.</strong> A counter delta covers the sleep plus the scrapes.
+For <code>sf-ctl</code> that is a few percent. For the CI harness it is worse:
+<code>_all_pairs</code> retries a failed scrape up to three times with a five second
+timeout and a two second backoff, per node, per sample, so two slow tier
+nodes can add tens of seconds to a 60s divisor and inflate every rate by
+most of a factor. Both windows inflate together so the fixed-rate filter
+does not drop it, and the result is a budgeted pair pushed past its
+ceiling and a build failed for a regression that is not there — decision
+3's flaky check, arriving by a route the plan did not consider. Both paths
+now divide by a monotonic measurement (per gateway in <code>sf-ctl</code>, by the
+difference of per-sweep means in CI) and report it, so a slow run is
+visible instead of silently scaling the numbers.</p>
+<p><strong>The generator could not regenerate the file it generated.</strong> <code>emit()</code>
+wrote five of the ten <code>_doc</code> keys, no provisional block and no notes, so
+running the command in the tool's own docstring produced a budget that
+failed <code>test_doc_block_records_its_provenance</code> and
+<code>test_provisional_entries_name_an_issue_and_are_not_enforced</code>. It also
+re-emitted <code>tolerance_multiplier</code>, <code>tolerance_floor_qps</code> and
+<code>unbudgeted_fixed_rate_qps</code> as literals, so tuning one in the file and
+re-deriving silently put it back — the same failure mode
+<code>CODE_DERIVED_TERMS</code> was introduced to prevent for entry terms. The static
+caveats are now module constants, and the defaults, notes and provisional
+markings are carried forward from <code>--previous</code> (defaulting to the shipped
+file), with a stderr line naming the pairs that are genuinely new and
+still need a note written. Six round-trip tests assert the output is a
+budget this repository accepts; mutating the carry-forward back out fails
+two of them.</p>
+<p><strong>The packaging test did not test packaging.</strong> <code>shakenfist/schema/
+database_load_budget.py</code> and this plan's definition of done both claimed
+that reading the budget through <code>importlib.resources</code> is "what proves the
+wheel carries it". It is not: a source checkout resolves <code>shakenfist.data</code>
+as a namespace package whatever <code>pyproject.toml</code> says, so narrowing
+<code>package-data</code> would have left the test green and broken <code>sf-ctl
+database-load</code> on a node. Nothing declared the file at all — it reached
+the wheel through the undeclared union of the setuptools_scm file finder
+with <code>include-package-data</code>. <code>data/*.yaml</code> is now declared, a test asserts
+the declaration matches the resource path, and the claim has been removed
+from the docstring, the schema module and the definition of done. A wheel
+was built by hand to confirm the file ships.</p>
+<p>Five smaller ones, all taken. The CI harness had no negative-delta guard,
+so an sf-database restart mid-measurement produced a negative rate and
+failed the positive control with a message about #3708 coverage — it now
+says a gateway restarted, because that is what happened. Three Grafana
+panels kept <code>bps</code> on the y-axis from the etcd panel they replaced, so
+201 QPS rendered as "201 b/s". <code>test_every_budgeted_pair_is_in_every_
+coefficient_series</code> compared operations rather than pairs, so dropping
+<code>GetInstanceAttributes</code>/net would have gone unnoticed while its six other
+callers kept the operation present. <code>FIXED_RATE_MIN_RATIO</code> and
+<code>FIXED_RATE_MAX_RATIO</code> were only ever used as the quotient
+<code>MAX / MIN = 2.83</code>, so anybody tuning one would have moved the threshold
+somewhere they did not predict; they are one <code>FIXED_RATE_MAX_SPREAD</code> now.
+And both metrics parsers read the last whitespace field as the counter
+value, which the exposition format permits to be a trailing millisecond
+timestamp — both copies made the same mistake, so the parity test agreed
+with itself; the fixture now contains a timestamped sample.</p>
+<p>One finding was recorded rather than fixed: the measured-versus-modelled
+<em>total</em> includes every activity-coupled pair, whose coefficients were
+fitted against our own cluster's API traffic, so on a deployment whose
+users behave differently the two total lines diverge permanently for a
+reason that is not a regression. Rather than only caveat it, the rules now
+also record <code>sf_database:request_rate:enforced_total</code> and
+<code>sf_database:modelled_rate:enforced_total</code> over the enforced pairs alone,
+and the Grafana panel plots those alongside — that pair is comparable
+across deployments and is the one that should track.</p>
+<p>Finally, rebasing onto develop brought in the fix for #3876, which the
+budget describes as an open defect. The entry stays provisional, because a
+level nobody has re-measured is not a floor worth defending either, but
+its note now says the fix landed and the coefficient predates it.</p>
+<h3 id="what-the-second-review-found">What the second review found<a class="headerlink" href="#what-the-second-review-found" title="Permanent link">&para;</a></h3>
+<p>A second pass over the result found twelve more things. The theme this
+time is narrower and worth naming too: <em>a file which says it is generated
+has to actually be what its generator produces, or the thing it says about
+itself is the first thing to go stale.</em></p>
+<p><strong>The budget had already drifted from its own generator.</strong> The shipped
+<code>_doc.method</code> described the ordinary least squares fit without naming the
+regressor — which is precisely the question AGENTS.md sends a new consumer
+to <code>_doc.method</code> to answer, and precisely what the fix above was supposed
+to have made the file self-describing about. The generator's <code>DOC_METHOD</code>
+did say it; the committed file predated that and nothing compared them.
+<code>base_term_caveat</code>, <code>coverage_of_total</code> and the file header had drifted
+the same way, in both directions: the file carried a hand-written
+explanation of where the inclusion cut sits which the generator would have
+deleted on the next re-derivation. Both halves are now in the tool, the
+committed file is what the tool writes, and
+<code>test_the_shipped_budget_says_what_its_generator_says</code> fails if they part
+company again. The rules file has had that guard since it was written; the
+budget, which is the file everything else reads, had none.</p>
+<p><strong>The unbudgeted threshold was a flat number in a system built on the
+premise that flat numbers are useless.</strong> Every entry in the budget is a
+model because "a number that is right for a six node cluster is wrong for
+everybody else" — and then a pair with <em>no</em> entry was measured against a
+cluster-wide constant 0.25/s, in all three consumers. The pairs
+deliberately left below the inclusion cut are mostly per-node loops, so
+the largest of them crosses 0.25/s at around twenty nodes and
+<code>ShakenFistUnbudgetedDatabasePolling</code> then fires forever on a cluster
+where nothing is wrong. The plan's own words for this failure are two
+sections up: an alert that always fires gets silenced, and a silenced
+alert still reads as coverage. <code>defaults</code> now carries
+<code>unbudgeted_fixed_rate_per_node_qps</code>, and the flat value became the floor
+small clusters get.</p>
+<p><strong>The alerts compared a one day rate to an instantaneous ceiling.</strong>
+<code>sf_database:budget_ceiling</code> was derived from the model evaluated at the
+cluster's shape right now, while <code>ShakenFistDatabasePairOverBudget</code>
+compares it against <code>sf_database:request_rate:1d</code>. Halve a cluster's
+standing instances overnight and the ceiling drops at once while the
+measurement still carries yesterday's cluster, so every per-instance pair
+sits over budget for up to a day — which <code>for: 1h</code> does not cover, and
+which is not a regression. The ceiling is now built from
+<code>sf_database:modelled_rate:1d</code>, so both halves cover the same window.</p>
+<p><strong>The positive control used the minimum window for both of its bounds.</strong>
+Which is the most jitter-prone choice for the undercount assertion (the
+one that detects the harness having gone blind, a persistent condition a
+single restart-straddling window would fail the build over) and the most
+lenient for the overcount assertion (the one that detects
+<code>check_daemon_state()</code> losing its rate limit, which a single bad window is
+enough to prove). Both now read the busiest window, and the per-window
+rates are recorded in the test detail either way.</p>
+<p><strong>The generated PromQL was never parsed.</strong> Everything asserted about the
+rules file read it as data, which a mismatched paren, a <code>group_left</code>
+Prometheus rejects, or a <code>label_replace</code> with its arguments swapped all
+survive. The first thing to notice would be an operator's Prometheus
+refusing to load the group — and a group which did not load fires no
+alerts, which is the exact failure <code>ShakenFistDatabaseLoadModelBlind</code>
+exists for and cannot cover, being inside the group itself. The sanity
+checks job now installs promtool (<code>tools/ci-install-promtool.sh</code>, cached
+on the runner because promtool ships only inside a 100MB tarball) and
+<code>test_the_generated_promql_parses</code> runs it.</p>
+<p>The rest were smaller: <code>sf-ctl database-load</code> printed roughly three
+hundred quiet unbudgeted rows by default and then pointed the deployer at
+the issue tracker for a single sixty second sample of an unbudgeted pair —
+weaker evidence than either of the other two consumers requires before
+they say anything; the elected cluster loop's five second sleep was a bare
+literal restated in four places with nothing pinning them together, and is
+now <code>ELECTED_LOOP_POLL_SECONDS</code>; two unused imports; two late <code>import
+yaml</code> statements without the comment the convention asks for; and
+<code>_daemon_node_counts()</code> moved into <code>load_budget.py</code> so its key parsing can
+be tested without building a cluster. Two findings were observations and
+took no change: the check's two minutes of wall clock, and the base-term
+split being assigned rather than fitted — though the caveat now names the
+direction of that error which fails a build, rather than only the
+direction which under-predicts.</p>
+<h3 id="what-the-merge-queue-found">What the merge queue found<a class="headerlink" href="#what-the-merge-queue-found" title="Permanent link">&para;</a></h3>
+<p>The check passed every run on the branch and failed all three cluster
+jobs the first time it reached the merge queue, because the branch's own
+functional job is the single node smoke suite and the cluster and tier
+topologies are gated on <code>merge_group</code>. The single node run was also the
+shape the budget was derived against, so the first multi-node exercise of
+this check was the one that had to gate a merge.</p>
+<p><strong>Steady is not metronomic, and on this cluster the difference matters.</strong>
+Each of the three jobs reported a different set of "fixed rate"
+unbudgeted pairs, with no pair common to all three: twelve pairs of blob
+and transfer traffic in one, a different five in another, two in the
+third. Nothing there was polling. <code>CreateClusterOperationTarget</code> and
+<code>DeleteClusterOperationTarget</code> reported rates equal to fifteen decimal
+places, as did <code>RecordRelationship</code> and <code>UpdateBlobLastUsed</code>, because
+each pair is written once per blob fetched — a blob heavy test running
+flat out for the two minutes being measured, not a loop. Two minutes is
+well inside the length of a single test, so "the same rate in both
+windows" is a property an ordinary test has.</p>
+<p>This is the flaky-check failure of decision 3 arriving by a third route,
+and worth stating as a rule: <em>absence from the budget does not mean a
+pair should be near zero.</em> The budget holds what cleared the inclusion
+cut on sfcbr. <code>derive-database-load-budget.py</code> already lowered that cut
+to 0.10 for the neighbouring reason — a pair quiet in the derivation
+window and louder on a busier cluster reads as new traffic — but the cut
+cannot cover a cluster with a <em>different workload mix</em>, and CI fetches
+blobs far harder relative to its size than sfcbr ever does.</p>
+<p><strong>The fix is a second property, not a wider tolerance.</strong> Neither raising
+<code>unbudgeted_fixed_rate_qps</code> nor lowering the inclusion cut again was
+open: the budget file forbids editing levels to make a check pass, and
+both would have traded away the detection this phase exists for. What
+separates a poll from a busy test is not steadiness but what each does
+when the suite gets busier around it. A poll's rate is set by
+configuration, so it holds while its share of the tier's traffic falls;
+work the suite drives rises and falls with everything else, so its share
+is the steadier of its two measurements. <code>independent_of_activity()</code> is
+that comparison, <code>LOAD_WINDOW_COUNT</code> goes to four so the spreads have
+more than two points and the measurement crosses test boundaries, and
+the steady set is narrowed by it before either budget assertion reads it.</p>
+<p><strong>A comparison that cannot decide must say so, not guess.</strong> The
+comparison is meaningless if the suite ran level throughout, because
+dividing every window by the same number cannot change a ratio: on such a
+run every pair's share is exactly as steady as its rate, poll and
+workload alike. So the test records <code>activity_spread</code> and skips when it
+is under <code>ACTIVITY_DISCRIMINATION_SPREAD</code>, and skips again if no
+<code>GetNodeDaemonState</code> pair — the one traffic on the cluster certainly
+polling — survived the filter. A skip is visible in the run log; a pass
+on a measurement that proved nothing reads as coverage, which is what
+this module's header already warns about.</p>
+<p><strong>The margin arithmetic is squared, and the obvious reading is wrong by a
+square root.</strong> A pair which itself rises by <code>p</code> while the traffic around
+it rises by <code>a</code> has its share move by <code>a/p</code>, because the pair is in the
+numerator. The condition is therefore <code>p² × ACTIVITY_INDEPENDENCE_MARGIN
+&lt; a</code>, not <code>p × margin &lt; a</code>. Written the obvious way, 1.25 and 1.5 promise
+a poll a fifth of wobble and deliver a tenth; the constants are 1.25 and
+1.8, and a unit test pins the square so the next person to tune one does
+not silently halve the headroom. A pair's share is also measured against
+the traffic <em>other</em> than itself, since a dominant pair is most of its own
+denominator and would otherwise damp the variation it is being compared
+against — the direction of error which hides a big new poll.</p>
+<p><strong>The second merge queue run found the measuring instrument in the
+measurement.</strong> With <code>independent_of_activity()</code> in place the twelve blob
+pairs went away and one pair was left, in one job of three:
+<code>GetObjectEvents</code>/<code>api</code> at 0.37/s against a 0.30/s ceiling, on a run
+whose <code>activity_spread</code> was 2.29 and whose positive control recognised
+all seven <code>GetNodeDaemonState</code> pairs. Nothing was wrong with the
+measurement, and <code>over_budget</code> was empty. The traffic was this suite: the
+await helpers in <code>shakenfist_ci/base.py</code> read an object's events endpoint
+on a <code>time.sleep(5)</code> timer for as long as any worker is waiting on an
+object, and about two workers were. sf-api runs no loop of its own, so
+that rate is set by a constant in the harness rather than by the cluster,
+which makes it steady across windows <em>and</em> independent of the tier's
+activity — both properties this check uses to name a poll, held for the
+one reason no statistical test can see.</p>
+<p><strong>A third property would not have helped, and the budget was the wrong
+home.</strong> There is no measurable difference between a client polling on a
+timer and a server polling on a timer, so the discriminator was not the
+place to fix it. Writing the pair into
+<code>shakenfist/data/database_load_budget.yaml</code> was worse: that file models a
+deployed cluster, no deployed cluster polls the events API on a timer —
+<code>GetObjectEvents</code> does not clear the file's own 0.10/s inclusion cut on
+sfcbr — and every consumer of it would have inherited a level that only
+CI produces, which is the hand-edit the file's header forbids. So the
+pair is named in <code>HARNESS_DRIVEN_PAIRS</code> in <code>load_budget.py</code>, reported in
+the run summary under <code>harness_driven</code> rather than dropped, and left in
+the budget's blind spot only for CI: the generated
+<code>ShakenFistUnbudgetedDatabasePolling</code> rule takes its exclusions from the
+budget file, so a real cluster still watches the pair at the same
+ceiling. The cost is stated in the constant's comment — this check can no
+longer see a regression in event reads per request — and two unit tests
+hold the exemption's two halves up, one asserting the pair is not also
+budgeted and one deriving from <code>base.py</code> that the suite still polls an
+events endpoint at all, so the exemption fails rather than rots if those
+waits are ever rewritten.</p>
+<p><strong>What is not yet known.</strong> How often a real merge queue run clears the
+activity gate is a prediction, not a measurement — the summary records
+<code>activity_spread</code> and <code>activity_qps_per_window</code> on every run including
+the skipped ones, and that is the number to read before moving
+<code>ACTIVITY_DISCRIMINATION_SPREAD</code>. A check that skips most of the time is
+the disabled check of decision 3 wearing a different hat, so this is
+worth looking at after a few merges rather than after a regression.</p>
+<h3 id="what-the-merge-queue-found-third-time-a-true-positive">What the merge queue found, third time: a true positive<a class="headerlink" href="#what-the-merge-queue-found-third-time-a-true-positive" title="Permanent link">&para;</a></h3>
+<p>The two properties above cut the third attempt down to a single pair, and
+that pair was real. <code>GetNamespace</code>/<code>cluster</code> read 0.27/s, 0.32/s and
+0.33/s across the jobs that ran the check, against the 0.25/s unbudgeted
+ceiling. Nothing about it was noise: it is a fixed-rate read issued by the
+elected cluster daemon, exactly what this check was built to name.</p>
+<p><strong>The loop, and why the cache never helped it.</strong> The orphan artifact sweep
+in <code>_cluster_wide_cleanup</code> asked, once per artifact, whether that
+artifact's namespace still existed. <code>Namespace.from_db()</code> overrides the
+cached base implementation, and the <code>mariadb.get_namespace()</code> underneath
+it caches on <code>OBJECT_CACHE_TTL_MUTABLE</code>, which is 30s. The maintenance
+pass runs every 60s. A cache entry written during one pass has always
+expired before the next pass looks for it, so the sweep paid a real
+database read for every distinct namespace holding an artifact, forever,
+and no amount of cache tuning short of doubling the TTL past the loop
+period would have changed that. The two constants are in different files
+and neither mentions the other.</p>
+<p><strong>Why it is absent from the budget, and why that was correct.</strong> On sfcbr
+namespaces are few and long lived, so the pair costs a handful of reads a
+minute and sits under <code>derive-database-load-budget.py</code>'s 0.10/s inclusion
+cut — it is one of the 296 pairs the coverage note accounts for. The
+functional suite has the opposite shape: <code>base.py</code> gives every test class
+its own uniquified namespace, so the number of namespaces holding
+artifacts tracks the number of concurrent tests rather than staying flat,
+and the same loop costs twenty reads a minute. This is the mirror image of
+the rule stated above. There, absence from the budget did not mean a pair
+should be near zero. Here it did mean that on the derivation cluster, and
+the CI cluster's different shape is what made a loop that is quietly
+wasteful everywhere loud enough to see.</p>
+<p><strong>The fix is in the server.</strong> Not in the discriminator, which was right,
+and not in the budget, whose header forbids exactly the edit that would
+have silenced this. The sweep now lists namespace names once per pass and
+tests membership, so the cost is one read per pass whatever the artifact
+count — under the inclusion cut on any cluster, and a small unconditional
+saving on every deployment rather than a CI accommodation. One guard came
+with it: <code>_direct_get_all_namespace_names()</code> returns <code>[]</code> on
+<code>OperationalError</code>, and this loop is the one caller whose reaction to "no
+namespaces" is destructive, so an empty list skips the sweep and waits for
+the next pass instead of deleting every artifact in the cluster. Three
+unit tests hold the three halves of that up — one listing, the same
+keep/delete decision as before, and nothing deleted when the list is
+empty — and all three fail against the previous implementation.</p>
+<p>Worth recording as the phase's own justification: the check paid for
+itself before it merged, on a loop that had been running in every
+deployment since the sweep was written, that no review caught, and that
+the nightly report could not have surfaced because on sfcbr it is genuinely
+small.</p>
 <h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>The budget encodes the regression.</strong> If 7a is derived before phase 6
@@ -13428,11 +14041,12 @@ measured coefficients as the shipped defaults.</p>
   for the <em>shape</em> only and must be re-derived before they are committed as
   levels. <em>Mitigation:</em> 7a states the coverage its numbers were taken under
   in the file's <code>_doc</code> block, and 7b's positive control is a coverage check
-  as much as a harness check — <code>GetNodeDaemonState</code> at
-  <code>daemon_count / DAEMON_STATE_POLL_INTERVAL</code> only holds if every node is
-  being counted, so it fails loudly if a routing change ever hides one
-  again. Note the arithmetic excludes the elected cluster daemon, which
-  sleeps on its lock rather than in <code>idle()</code> and so never polls.</li>
+  as much as a harness check — the <code>GetNodeDaemonState</code> expression in
+  decision 9 only holds if every node is being counted, so it fails loudly
+  if a routing change ever hides one again. That expression is the
+  corrected one: this plan previously said the arithmetic excluded the
+  elected cluster daemon, which was true when it was written and stopped
+  being true when #3874 was fixed in <code>b00f2b6fb</code>.</li>
 <li><strong>The CI check flakes and gets disabled.</strong> A load assertion on shared CI
   hardware is the classic flaky test, and a disabled check is worse than
   no check because it reads as coverage. <em>Mitigation:</em> decision 3 — CI
@@ -13455,24 +14069,93 @@ measured coefficients as the shipped defaults.</p>
   subcommand and one docs section. Anything beyond that is future work.</li>
 </ul>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Each item names the check that settles it. All of these were run at
+planning time and every one reported "not done", which is what makes
+them worth keeping — a criterion that already passes before the work
+starts is not a criterion. They were all run again after
+implementation; every one passes. Functional CI needed the branch
+pushed, and its first run failed on the positive control's premise
+about which daemons poll; its second passed. The automated review that
+followed found eleven things, nine of them fixed and two recorded; a
+second review of the result found twelve more, ten of them fixed and two
+observations — see "What implementation found" and the two review
+subsections under it.</p>
 <ul>
-<li>A committed, schema-validated database load budget expressing expected
-  load as a per-node base plus per-standing-object coefficients, derived
-  from a post-phase-6 window, with its derivation method documented.</li>
-<li>Functional CI fails when a change introduces a new fixed-rate poll or
-  pushes a budgeted pair well outside its budget, and the check carries a
-  positive control that fails loudly if the harness stops measuring.</li>
-<li>A drop-in Prometheus rules file, generated from the budget and tested
-  against it, plus an alert an operator can confirm fires.</li>
-<li><code>sf-ctl database-load</code> reports measured versus modelled per-caller load
-  on any cluster, with <code>--json</code>, and degrades honestly when a tier node is
-  unreachable.</li>
-<li><code>examples/grafana-dashboard.json</code> no longer references etcd and has
-  database-tier panels.</li>
-<li><code>docs/operator_guide/database.md</code> explains the load model in operator
-  terms.</li>
-<li><code>pre-commit run --all-files</code> green; functional CI green.</li>
+<li><strong>The budget exists, validates, and ships.</strong> <code>shakenfist/data/
+  database_load_budget.yaml</code> parses; every entry carries a base or a
+  coefficient; every <code>provisional</code> entry names an open issue; and the file
+  is reachable through <code>importlib.resources</code>, and <code>pyproject.toml</code>
+  declares it as package data. The last two are the ones that matter, and
+  they are two different questions — see decision 11:</li>
 </ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>build<span class="w"> </span>--wheel<span class="w"> </span>--outdir<span class="w"> </span>/tmp/wheel<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>unzip<span class="w"> </span>-l<span class="w"> </span>/tmp/wheel/*.whl<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>database_load_budget.yaml
+</code></pre></div>
+<p>must print a line. <em>(Done: it does. At planning time the file did not
+  exist, and the wheel carried 555 entries including
+  <code>shakenfist/kerbside/*.md</code>, which was the evidence that a git-tracked
+  data file ships without a <code>package-data</code> entry — true, but not a reason
+  to leave it undeclared, which is what review pointed out.)</em>
+* <strong>The budget's levels are post-phase-6.</strong> Its <code>_doc</code> block names the
+  measurement window, the cluster shape it was taken on, and the fact that
+  figures before 2026-08-11 undercount by two nodes and the cluster
+  daemon. No coefficient is copied from hunt 2026-01 without re-derivation.
+* <strong>The positive control is an expression, not a number.</strong> <code>grep -rn
+  'DAEMON_STATE_POLL_INTERVAL' shakenfist/deploy/shakenfist_ci/</code> finds the
+  new check computing its expectation from the constant, and the elected
+  cluster daemon's <code>1/5</code> term is present and commented. A reviewer can
+  change <code>DAEMON_STATE_POLL_INTERVAL</code> in a scratch branch and the check's
+  expectation moves with it.
+* <strong>The check runs in PR CI, not only in the merge queue.</strong> The new test
+  is defined in <code>database_tier.py</code>'s <code>DatabaseTierTestsMixin</code>, so
+  <code>grep -c 'def test_' shakenfist/deploy/shakenfist_ci/cluster_ci_tests/
+  test_database_tier.py</code> still reports 1. <em>(Done: still 1. The new check
+  is <code>test_no_unbudgeted_fixed_rate_database_polling</code>, in
+  <code>DatabaseTierTestsMixin</code>, which both suites subclass.)</em>
+* <strong>The rules cannot drift from the budget.</strong> A test regenerates
+  <code>examples/prometheus-database-load-rules.yaml</code> from the committed budget
+  and asserts byte equality with the committed rules, and it fails if
+  either is edited alone. A second test parses the result as PromQL with
+  promtool, which the sanity checks job installs, so an expression
+  Prometheus would reject at rule-load time fails the build instead.
+* <strong>The budget cannot drift from the tool that writes it.</strong> The committed
+  file starts with the generator's header, and its <code>_doc</code> prose is what
+  the generator's <code>DOC_*</code> constants say word for word — asserted by
+  <code>test_the_shipped_budget_says_what_its_generator_says</code>. Review found the
+  file had already drifted here, in a way that made AGENTS.md point a
+  contributor at text which did not answer the question it was sent to
+  answer.
+* <strong>The unbudgeted threshold is a model, not a number.</strong> <code>defaults</code>
+  carries <code>unbudgeted_fixed_rate_per_node_qps</code> as well as the flat floor,
+  all three consumers compute the ceiling from the cluster's node count,
+  and the CI harness's copy is asserted equal to the server's across five
+  cluster sizes. A flat threshold fires forever on a large cluster where
+  nothing is wrong, which is the failure mode this phase's own reasoning
+  rejects everywhere else.
+* <strong><code>sf-ctl database-load</code> works against a cluster.</strong> It appears in <code>sf-ctl
+  --help</code>, prints measured versus modelled per-caller load sorted by
+  excess, supports <code>--json</code>, flags provisional entries, and when one tier
+  host is unreachable it names that host and still reports on the rest --
+  demonstrated by pointing <code>MARIADB_GATEWAY_HOSTS</code> at a live host plus a
+  dead one.
+* <strong>The public dashboard is no longer worse than useless.</strong> <code>grep -c etcd
+  examples/grafana-dashboard.json</code> reports 0 and <code>grep -c
+  database_requests_total examples/grafana-dashboard.json</code> reports more
+  than 0. <em>(Done: 0 and 1. At planning time it was 6 and 0.)</em>
+* <strong>The operator can answer "is this normal for my cluster?" from the
+  docs.</strong> <code>docs/operator_guide/database.md</code> gains a load-model subsection
+  after "Attributing database load to callers" (<code>:294</code>) covering the
+  decomposition, <code>sf-ctl database-load</code>, where the rules file goes, and
+  what to do when a pair exceeds budget. No page states an absolute
+  cluster-wide QPS expectation, since phase 6 withdrew that framing.
+* <code>pre-commit run --all-files</code> green; functional CI green.</p>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step, back brief the operator: which artefact the
+step produces, which of decisions 8-11 constrain it, and — for 7a
+specifically — the measurement window and cluster shape the coefficients
+will be derived from, before any number is written down. 7a is the step
+whose output every later step inherits, so a wrong window there is
+expensive to unwind and cheap to catch in the brief.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Query-result churn.</strong> The truest definition of wasteful polling is a
