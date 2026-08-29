@@ -10742,43 +10742,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
+  <a href="#items-deferred-from-the-push-audit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Items deferred from the push audit
       
     </span>
   </a>
@@ -13578,43 +13545,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
+  <a href="#items-deferred-from-the-push-audit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Items deferred from the push audit
       
     </span>
   </a>
@@ -13851,37 +13785,37 @@ guest). Out of scope for this plan.</p>
 <td>1. Profile idle CPU</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/">PLAN-idle-cpu-and-latency-phase-01-profile.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td>6d52665</td>
 </tr>
 <tr>
 <td>2. Repaint cadence fix</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/">PLAN-idle-cpu-and-latency-phase-02-repaint.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td>6d52665</td>
 </tr>
 <tr>
 <td>3. Demote protocol logging</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/">PLAN-idle-cpu-and-latency-phase-03-logging.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td>6d52665</td>
 </tr>
 <tr>
 <td>4. Real latency from PING/PONG</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/">PLAN-idle-cpu-and-latency-phase-04-latency.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td>6d52665</td>
 </tr>
 <tr>
 <td>5. Capture runtime metrics in bug reports</td>
 <td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/">PLAN-idle-cpu-and-latency-phase-05-metrics.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td>6d52665</td>
 </tr>
 <tr>
 <td>6. Push audit</td>
-<td>PLAN-idle-cpu-and-latency-phase-06-push-audit.md</td>
-<td>Not started</td>
-<td>—</td>
+<td><a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-06-push-audit/">PLAN-idle-cpu-and-latency-phase-06-push-audit.md</a></td>
+<td>Complete</td>
+<td>bf7a16f, with the findings fixed in 6fecb50 and 192265f</td>
 </tr>
 </tbody>
 </table>
@@ -13895,10 +13829,14 @@ readability and a missing is_verbose() guard on the
 playback channel.</em>  Phase 4 is independent of 1-3 but
 should land last so its sparkline data is visible once the
 other CPU-eating problems are fixed.</p>
-<p>Phase 2 is <code>In progress</code> rather than <code>Complete</code>: the repaint
-bridge code landed, but the CPU reduction it is supposed to
-deliver has not been confirmed on the reporter's machine, so
-the phase stays open until a user run verifies it.</p>
+<p>Phase 2 was held at <code>In progress</code> for four months after its
+code landed, because the CPU reduction it is supposed to
+deliver had not been confirmed on the reporter's machine.
+<em>Verified 2026-08-27 on that machine: 2.80% of one core
+idle, against the 6.24-core baseline, with a synthetic
+pointer sweep taking the process to 269.5% and back to
+prove egui still wakes on input.</em>  The numbers and the
+method are in the phase 2 plan under <em>Step 2b result</em>.</p>
 <p>Phase 5 was added after the original incident: had ryll
 captured its own per-thread CPU into bug reports, the user
 report would have included the llvmpipe breakdown directly
@@ -13919,10 +13857,31 @@ the audit finds nothing, that gets recorded here in one
 sentence.</p>
 <p>Phases 1-5 have already merged, so <code>develop...HEAD</code> is empty
 on the audit branch and the accumulated diff has to be
-assembled from those phases' merge commits.  None of the five
-recorded one, so phase 6 starts by reconstructing them from
-<code>git log</code> and writing them into the <code>Merged</code> column of the
-table above.  <em>Two ways this runbook is invoked</em> in
+assembled from where those phases landed.  The <code>Merged</code>
+column above now records it, reconstructed 2026-08-27, and
+the answer is not the one this paragraph assumed: all five
+phases landed in a <em>single</em> merge, PR #36 (<code>6d52665</code>), not
+one merge each.  <code>PUSH-AUDIT.md</code> cites this plan as its
+worked example of a range that cannot be derived after the
+fact, and on the per-phase question it is right — but the
+plan's commits turn out to run contiguously on the
+<code>screenshot</code> branch, from <code>90a954b</code> (the master plan) to
+<code>1c28d6f</code>, so the audit range is exactly
+<code>AUDIT_BASE=90a954b^1</code>, <code>AUDIT_HEAD=1c28d6f</code>.</p>
+<p>Two things that range does not cover, and phase 6 must
+handle explicitly.  <code>85bc901</code> ("Address automated reviewer
+feedback on PR #36") sits above <code>AUDIT_HEAD</code> and may touch
+this plan's code, so it has to be inspected separately.
+And PR #36 also carried the screenshot-and-latency-HUD
+plan's work, which sits <em>below</em> <code>AUDIT_BASE</code> — excluded by
+the bound, but a reminder that the merge diff of <code>6d52665</code>
+is the wrong patch to hand the judgment agents.</p>
+<p>The larger caveat is age.  These commits are from April; the
+crate extraction has since moved most of this code into
+<code>shakenfist-spice-renderer</code>, and the web frontend was built
+on the same event path.  Findings drawn from the April diff
+have to be re-checked against current <code>develop</code> before they
+are actionable.  <em>Two ways this runbook is invoked</em> in
 <code>PUSH-AUDIT.md</code> has the rest.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
@@ -13953,24 +13912,210 @@ is subtle).</p>
 </ul>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
+<p>Checked 2026-08-27, at the point phase 2 closed.</p>
 <ul>
-<li>Idle CPU under 10% of one core (measured: connected,
-  no input, no display activity, mouse outside window).</li>
-<li><code>Latency: Xms</code> label and sparkline show real numbers
-  from PING round-trip, not zero.</li>
-<li>Protocol logs at <code>debug!</code> level by default; visible with
-  <code>-v</code>. Embedded <code>[unix_ts]</code> removed.</li>
-<li><code>pre-commit run --all-files</code> passes; <code>make test</code> passes.</li>
-<li><code>README.md</code> updated if the verbose logging section
-  changes.</li>
-<li><code>ARCHITECTURE.md</code> "Statistics and Instrumentation"
-  section mentions the PING-based latency source.</li>
-<li>Bug-report ZIPs include a <code>runtime-metrics.json</code> (or
-  fields in <code>metadata.json</code>) with process CPU%, per-thread
-  CPU and thread names, and RSS, sampled over a short
-  window.  Linux-first; non-Linux platforms can omit
-  gracefully.</li>
+<li><strong>Met.</strong>  Idle CPU under 10% of one core (measured:
+  connected, no input, no display activity).  2.80%, with
+  the pointer over the window rather than outside it.  See
+  <em>Step 2b result</em> in the phase 2 plan.</li>
+<li><strong>Met, but this criterion was mis-stated.</strong>  The
+  <code>Latency: Xms</code> label and sparkline show real non-zero
+  numbers.  They are <em>not</em> a PING round-trip, and could
+  never have been: <code>SPICE_MSG_PING</code> is server→client only,
+  so the client has no probe to time a round trip with, a
+  point this plan's own <em>Situation</em> section makes and its
+  success criterion then forgot.  What shipped is the
+  interval between consecutive server PINGs
+  (<code>main_channel.rs</code>, the <code>main_server::PING</code> arm), which
+  <code>docs/diagnostics.md</code> documents accurately.  The
+  criterion is corrected here rather than left to read as
+  though something else was delivered.</li>
+<li><strong>Met.</strong>  Protocol logs at <code>debug!</code> level by default,
+  visible with <code>-v</code>; the embedded <code>[unix_ts]</code> is gone
+  (<code>shakenfist-spice-protocol/src/logging.rs:251</code>).</li>
+<li><strong>Met.</strong>  <code>pre-commit run --all-files</code> and <code>make test</code>
+  both pass.</li>
+<li><strong>Met, in a different file.</strong>  The criterion names
+  <code>README.md</code>'s verbose-logging section; the README-as-pitch
+  restructure since moved that material out, and <code>-v</code> is now
+  documented in <code>docs/configuration.md:79</code> and <code>:255</code>, with
+  usage in <code>docs/troubleshooting.md:343</code>.  Again the
+  intended shape, not a miss.</li>
+<li><strong>Met, in a different file.</strong>  The criterion names
+  <code>ARCHITECTURE.md</code>'s "Statistics and Instrumentation"
+  section; the doc-discipline restructure since moved that
+  material to <code>docs/diagnostics.md</code>, where the PING-based
+  latency source is described at line 18.  <code>ARCHITECTURE.md</code>
+  indexes it.  That is the intended shape, not a miss.</li>
+<li><strong>Met.</strong>  Bug-report ZIPs carry <code>runtime-metrics.json</code>
+  with process CPU%, per-thread CPU and names, and RSS
+  (<code>bugreport.rs</code>, <code>shakenfist_spice_renderer::metrics</code>;
+  covered by <code>test_bug_report_runtime_metrics_in_zip</code>).
+  Linux-first, with an <code>unavailable</code> variant elsewhere.</li>
 </ul>
+<p>One observation for phase 6 rather than a criterion: on the
+loopback test guest the label read <code>Latency: 0.1ms</code>, which
+is a gap <em>within</em> a server ping burst, not a steady-state
+cadence — phase 1 recorded sf-3 sending "a burst of 2 pings
+at connect time then going quiet".  A statistic whose value
+depends on whether the server happens to be bursting is
+worth a look before release.  Recorded, not fixed: it is
+phase 4's design, not phase 2's, and changing it is outside
+what closing phase 2 authorises.</p>
+<h3 id="items-deferred-from-the-push-audit">Items deferred from the push audit<a class="headerlink" href="#items-deferred-from-the-push-audit" title="Permanent link">&para;</a></h3>
+<p>Phase 6 produced 22 findings.  Every one is fixed or
+declined below, which is what the phase's definition of
+done requires.  The findings table, with current locations
+and triage status, is in
+<a href="/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-06-push-audit/">the phase 6 plan</a>.</p>
+<p><strong>Fixed in #325.</strong></p>
+<ul>
+<li><strong>T1</strong> — <code>test-audit-range.sh</code> inherited <code>AUDIT_BASE</code> /
+  <code>AUDIT_HEAD</code>, so following <code>PUSH-AUDIT.md</code> failed wave 1.
+  Landed in #325.</li>
+<li><strong>T5</strong> — wave 1's fatal <code>println!</code> check scanned four
+  hardcoded crates and had stopped seeing 46% of the
+  workspace.  Landed in #325, along with the test-region
+  filter it depended on.</li>
+<li><strong>T4</strong> — the renderer watchdog's <code>eprintln!</code> calls are
+  deliberate (the tracing subscriber cannot be trusted when
+  the main thread is wedged) and now carry an
+  <code>audit-allow-println</code> marker.  Review of #325 pointed out
+  that the marker exempts a whole file, so on
+  <code>main_channel.rs</code> it blinded the fatal print check to the
+  largest file in the crate the same PR exists to make
+  visible.  The watchdog moved to
+  <code>channels/watchdog.rs</code>, scoping the exemption from 1934
+  lines to about 130.  Landed in #325.
+<strong>Fixed in #327</strong>, except T2 and T3, which folded into</li>
+</ul>
+<h1 id="325-because-it-already-owned-that-file">325 because it already owned that file.<a class="headerlink" href="#325-because-it-already-owned-that-file" title="Permanent link">&para;</a></h1>
+<ul>
+<li><strong>T2, T3</strong> — the unguarded-<code>log_message</code> check greps a
+  directory the crate extraction deleted, and keys on the
+  <code>is_verbose()</code> convention all seven channels abandoned.
+  Repointed at the renderer's channels and rewritten
+  against <code>log_config.verbose</code>.  The heuristic itself was
+  also inverted -- it cleared its flag on a guard and
+  re-set it on the <code>log_message</code> line that followed, so a
+  guard <em>above</em> a call, which is every guard in the
+  codebase, never counted -- and it reported at most one
+  site.  Both fixed.</li>
+<li><strong>D1</strong> — the 2 s <code>thread::sleep</code> in <code>BugReport::new</code> ran
+  on the egui UI thread.  Moved off it, and the comment
+  claiming the path is "gated on a file dialog" is deleted:
+  it was never true for <code>generate_bug_report</code>, which
+  resolves <code>--bug-report-dir</code>, <code>&lt;capture&gt;/bug-reports/</code>, or
+  <code>current_dir()</code>.</li>
+</ul>
+<p>A note for anyone reading the finding rather than the
+  fix: the audit recommended <code>tokio::task::spawn_blocking</code>,
+  copying the two call sites that already use it.  That
+  would panic.  <code>eframe::run_native</code> is called outside any
+  tokio runtime, and every runtime in the GUI build is
+  created inside a <code>std::thread::spawn</code>, so there is no
+  runtime on the UI thread to spawn onto.  The pattern for
+  this side is a named <code>std::thread::Builder</code> writing into
+  a slot the UI polls, which
+  <code>PLAN-bugreport-trigger-snapshot-phase-02-snapshot.md:422</code>
+  already spells out — "not <code>tokio::spawn_blocking</code>".</p>
+<p>Two things the finding did not mention turned up in the
+  doing.  No guard stopped a second bug report starting
+  while the first was sampling — all three submit paths
+  clear the dialog state immediately, so F12 was live again
+  at once; <code>pending_bug_report.is_some()</code> is now that
+  guard.  And deferring the report by two seconds would
+  have cropped <code>screenshot-region.png</code> from a frame two
+  seconds after the user drew the region, so the surface
+  pixels are copied at submit time.
+* <strong>D2</strong> — the PING handler emitted <code>Latency</code> before
+  writing PONG.  Moved below the PONG write.
+* <strong>D3</strong> — the status bar said <code>Latency:</code> for a
+  server-chosen inter-PING interval.  Relabelled <em>PING
+  interval</em>, and the sample now follows <code>Ping::read()</code> so a
+  truncated PING produces none.
+* <strong>D4</strong> — <code>sample()</code>'s unguarded <code>window_secs</code> divisor and
+  its non-total <code>partial_cmp</code> sort.  Fixed by mirroring the
+  macOS path, which already had the guard, <code>sort_by_key</code>
+  and a zero-window regression test.
+* <strong>D6</strong> — <code>libc</code> is dead in <code>ryll</code> (no <code>libc::</code> reference
+  remains) and was deleted there; the renderer's live copy
+  is gated <code>cfg(any(target_os = "linux", target_os =
+  "macos"))</code>.  Note the audit's original suggestion of
+  <code>cfg(target_os = "linux")</code> would have broken the macOS
+  build.
+* <strong>A1</strong> — the hand-paired <code>send_event(...)</code> /
+  <code>notify_one()</code> sites collapsed into a single <code>EventSink</code>
+  whose <code>emit()</code> does both, so a missed pairing can no
+  longer be written.  Three judgment agents found the
+  duplication independently and two proposed this fix.
+  <strong>All three also reported the pairing complete, and it
+  was not.</strong>  Implementing the fix turned up 62 event sends
+  against 59 notifies on <code>develop</code>: <code>main_channel.rs</code>
+  emitted <code>AgentConnected(true)</code> and <code>AgentConnected(false)</code>
+  with no notify at all, so the UI did not repaint on guest
+  agent connect or disconnect until the 1 Hz fallback
+  fired.  Low severity — bounded to a second of staleness —
+  but a real defect, and exactly the silent failure this
+  refactor makes unwriteable.  Worth recording that three
+  independent enumerations agreeing did not make the claim
+  true; the structural fix found what the reading did not.
+* <strong>A2, A3, A4</strong> — the <code>Notify as RepaintNotify</code> import
+  inconsistency, the twice-written CPU-percent formula, and
+  the <code>SAFETY</code> comment that justified an FFI call with
+  async-signal-safety, which is the wrong concept.
+* <strong>B1, B5</strong> — <code>linux::sample()</code> and the PING interval
+  computation were untestable because they were fused to
+  I/O and to a message-dispatch arm.  Extracted as pure
+  <code>diff_snapshots()</code> and <code>ping_interval_ms()</code> and unit
+  tested.</p>
+<p><strong>Declined, with reasons.</strong></p>
+<ul>
+<li><strong>B2, B3, B4, B8</strong> — remaining test gaps: adversarial
+  <code>/proc</code> inputs (truncated lines, non-numeric fields, no
+  parens), the bug-report ZIP test covering only the
+  <code>Unavailable</code> variant, and tests asserting on raw JSON
+  substrings rather than deserialising.  Declined for now:
+  every <code>/proc</code> failure path already degrades to
+  <code>RuntimeMetrics::unavailable</code> through <code>?</code> and <code>.ok()</code>
+  rather than panicking, so these are coverage gaps rather
+  than latent defects, and B1's extraction makes the
+  arithmetic they would guard testable directly.  Worth
+  revisiting if the metrics module grows.</li>
+<li><strong>D7</strong> — demoting protocol logging <code>info!</code> → <code>debug!</code> did
+  not shrink <code>/tmp/ryll.log</code>, because the file layer is
+  constructed only under <code>--verbose</code> and filtered at
+  <code>DEBUG</code>.  The demotion quieted non-verbose stderr, which
+  is where the CPU concern was.  The <code>EnvFilter</code> question
+  is already tracked as #313; declined here as a duplicate.</li>
+</ul>
+<p><strong>Already fixed before the audit ran.</strong></p>
+<ul>
+<li><strong>B7</strong> — playback gated <code>log_message</code> on
+  <code>settings::is_verbose()</code> while the other six channels did
+  not.  All seven have since converged on
+  <code>self.log_config.verbose</code>.  This is also why T3's
+  heuristic became a false-positive generator.</li>
+</ul>
+<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The UI did not repaint when the guest agent connected or
+  disconnected.  <code>main_channel.rs</code> sent
+  <code>ChannelEvent::AgentConnected</code> twice without the paired
+  repaint notification, so the status bar showed the change
+  only when the 1 Hz fallback next fired.  Found while
+  implementing A1's <code>EventSink</code>, not by the audit passes
+  that read the same code.  Fixed by construction.</li>
+</ul>
+<p>Beyond that, the audit found no bug that phases 1-5
+introduced into shipped behaviour.  What it did find, and what #325 fixes,
+is that the audit harness itself had not been updated when
+the crates were split: three of wave 1's four range-scoped
+checks were pointed at paths that no longer existed, and
+the only check that can fail a build had stopped seeing
+46% of the workspace.  The remaining code findings are
+robustness and honesty fixes rather than defects with a
+reproducer, and are listed above.</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <ul>
 <li>True keystroke-to-display latency measurement (would
@@ -13983,8 +14128,6 @@ is subtle).</p>
   collapsed to fewer tokio tasks (one task per channel
   may be overkill for sparse channels like cursor/inputs).</li>
 </ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>(To be filled in as we go.)</p>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When created: add to <code>docs/plans/index.md</code> Master plans
 table and <code>order.yml</code>. Mark Complete when all phases land.</p>

@@ -14126,7 +14126,8 @@ implementing a verb.</p>
   <code>dropped</code> events.</li>
 <li><strong>1.1</strong> — added the <code>surface_drawn</code> event (one wire event per
   display draw command) so a loadtest can compute
-  keypress-to-screen latency rather than PING/PONG round-trip.
+  keypress-to-screen latency rather than the <code>latency</code> event's
+  PING-interval sample.
   Added the <code>digest_updated</code> event behind the <code>digest-decode</code>
   Cargo feature.  Backwards-compatible at the major-version
   level: v1.0 clients can still hello and operate; they just
@@ -14986,12 +14987,20 @@ and do not correspond to a request. The client receives only events it
 has subscribed to. All events share the same envelope shape:
 <code>{"event": "&lt;name&gt;", "data": {...}}</code>.</p>
 <h3 id="latency"><code>latency</code><a class="headerlink" href="#latency" title="Permanent link">&para;</a></h3>
-<p>Emitted on every PING/PONG return path through the SPICE main channel.
-The latency is the round-trip time from when Ryll sent the PING to when
-it received the PONG, measured in milliseconds. (The <code>--latency-file</code>
-flag was intended to write this metric to disk in headless mode, but
-is currently declared and unused — this event stream is the working
-way to collect latency samples.)</p>
+<p>Emitted once per server PING on the SPICE main channel.</p>
+<p>The sample is <strong>not</strong> a round-trip time. SPICE has no client-originated
+probe — <code>SPICE_MSG_PING</code> is server→client only — so Ryll cannot measure
+network RTT. What it measures instead is the client-observed interval
+between two consecutive server PINGs, which includes the server's own
+send cadence as well as the network path and Ryll's receive turnaround.
+Spikes indicate a network or server stall; the absolute value largely
+reflects how often the server chose to ping. See
+<a href="/components/ryll/diagnostics/">diagnostics.md</a> for the same explanation from the UI
+side. (The <code>--latency-file</code> flag was intended to write this metric to
+disk in headless mode, but is currently declared and unused — this
+event stream is the working way to collect samples.)</p>
+<p>The field names are unchanged, so this is a correction to the
+description rather than a change to the wire contract.</p>
 <p>High-frequency callers (e.g. a latency loadtest) should subscribe to
 this event and accumulate samples client-side rather than polling with
 <code>status</code> calls.</p>
@@ -15008,12 +15017,12 @@ this event and accumulate samples client-side rather than polling with
 <tr>
 <td><code>sample_ms</code></td>
 <td>f64</td>
-<td>Round-trip latency in milliseconds. Always non-negative. Sub-millisecond values are possible on loopback connections.</td>
+<td>Interval between consecutive server PINGs, in milliseconds. Always non-negative.</td>
 </tr>
 <tr>
 <td><code>wallclock_us</code></td>
 <td>u64</td>
-<td>Unix timestamp in microseconds at the moment Ryll received the PONG. Useful for aligning latency samples with external wall-clock logs.</td>
+<td>Unix timestamp in microseconds at the moment Ryll emitted the sample, which is just <em>after</em> it responded to the PING. Useful for aligning samples with external wall-clock logs.</td>
 </tr>
 </tbody>
 </table>

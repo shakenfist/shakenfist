@@ -9630,6 +9630,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#measuring-idle-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring idle CPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#idle-wedge-regression-test" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13454,6 +13465,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#measuring-idle-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring idle CPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#idle-wedge-regression-test" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13759,6 +13781,27 @@ orchestrator, fixed in <code>370d8ce5</code>) and remain in tree:</p>
   <code>--cfg tokio_unstable</code> to a release build; the regular
   <code>make build</code> does not need it.</li>
 </ul>
+<h3 id="measuring-idle-cpu">Measuring idle CPU<a class="headerlink" href="#measuring-idle-cpu" title="Permanent link">&para;</a></h3>
+<p><code>tools/measure-idle-cpu.sh &lt;pid&gt; [seconds]</code> reports where a running
+ryll's CPU actually goes, per thread and per thread group, as a
+percentage of one core. It samples <code>utime + stime</code> from
+<code>/proc/&lt;pid&gt;/task/&lt;tid&gt;/stat</code> across a window, so it is Linux-only.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tools/measure-idle-cpu.sh "$(pgrep -f 'ryll --direct')" 60
+</code></pre></div>
+<p>Reach for it rather than <code>top</code> when the question is about CPU cost.
+On a machine with no GPU the expensive threads are Mesa's <code>llvmpipe-*</code>
+rasterisers, not ryll's own — a 6-core idle client once looked like a
+43% main thread under <code>top</code> while 16 rasteriser threads carried the
+rest. The per-group breakdown is what makes that visible.</p>
+<p>Two readings are worth taking together. Idle, with the client
+connected and untouched, should sit under 10% of one core; the same
+measurement while the mouse moves over the surface should climb
+sharply. A low idle number on its own does not distinguish "sleeps
+correctly" from "stopped waking up", and only the second reading
+tells them apart.</p>
+<p>This is a manual diagnostic, not a test. The idle-wedge test below
+runs headless, where there is no renderer and so no CPU cost of this
+kind to see.</p>
 <h3 id="idle-wedge-regression-test">Idle-wedge regression test<a class="headerlink" href="#idle-wedge-regression-test" title="Permanent link">&para;</a></h3>
 <p><code>make test-k1-idle</code> (driver: <code>tools/test-k1-idle.sh</code>) guards
 against the K1 deadlock regressing. It launches ryll headless
@@ -13772,15 +13815,15 @@ variables override the defaults, and the test sets
 and the historical wedge fingerprint shows up there regardless.</p>
 <h2 id="pre-commit-hooks">Pre-commit hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>The project uses pre-commit hooks to enforce code quality:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Install pre-commit hooks</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pre-commit<span class="w"> </span>install
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Run checks manually on all files</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Or use the script directly</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>./scripts/check-rust.sh<span class="w"> </span>check<span class="w">   </span><span class="c1"># Check mode</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>./scripts/check-rust.sh<span class="w"> </span>fix<span class="w">     </span><span class="c1"># Auto-fix mode</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Install pre-commit hooks</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pre-commit<span class="w"> </span>install
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Run checks manually on all files</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Or use the script directly</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>./scripts/check-rust.sh<span class="w"> </span>check<span class="w">   </span><span class="c1"># Check mode</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>./scripts/check-rust.sh<span class="w"> </span>fix<span class="w">     </span><span class="c1"># Auto-fix mode</span>
 </code></pre></div>
 <p>The pre-commit hooks run:</p>
 <ul>
@@ -13902,9 +13945,9 @@ driving the guest, and prints a summary in the same shape as the
 it when a change could plausibly affect memory or CPU over minutes
 rather than seconds — the WebRTC write path especially, where the
 integration tests only ever exercise a few seconds.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>test-qemu<span class="w">                       </span><span class="c1"># guest, SPICE on 5900, QMP socket</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span><span class="p">&amp;</span><span class="w"> </span><span class="c1"># the process to sample</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>tools/web-soak.sh<span class="w"> </span>--pid<span class="w"> </span><span class="nv">$!</span><span class="w"> </span>--qmp<span class="w"> </span>/tmp/ryll-test-qemu-qmp.sock
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>make<span class="w"> </span>test-qemu<span class="w">                       </span><span class="c1"># guest, SPICE on 5900, QMP socket</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900<span class="w"> </span><span class="p">&amp;</span><span class="w"> </span><span class="c1"># the process to sample</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>tools/web-soak.sh<span class="w"> </span>--pid<span class="w"> </span><span class="nv">$!</span><span class="w"> </span>--qmp<span class="w"> </span>/tmp/ryll-test-qemu-qmp.sock
 </code></pre></div>
 <p>Defaults are a 20-minute run sampled every 30 s, which is what the
 baseline used; both are overridable. Per sample it records RSS,
@@ -13937,8 +13980,8 @@ with <code>spice-vdagent</code>, an <code>intel-hda</code> audio device, user-mo
 networking and a cloud-init seed ISO. XFCE autologins as <code>debian</code>
 (password <code>ryll</code>), and the image ships with the screensaver and
 lock screen disabled.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>make<span class="w"> </span>test-qemu-desktop
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>target/release/ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>make<span class="w"> </span>test-qemu-desktop
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>target/release/ryll<span class="w"> </span>--web<span class="w"> </span>--direct<span class="w"> </span>localhost:5900
 </code></pre></div>
 <p>Each run starts from a fresh qcow2 overlay, so the downloaded base
 image stays pristine and repeated runs begin from identical state.
@@ -13976,8 +14019,8 @@ a symptom that looks like a client bug:</p>
 <code>pulseaudio-utils</code> or libcanberra — so there is nothing in it that
 can make a sound, and the audio check below cannot be done until you
 add one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>alsa-utils<span class="w">      </span><span class="c1"># in the guest</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>speaker-test<span class="w"> </span>-t<span class="w"> </span>sine<span class="w"> </span>-f<span class="w"> </span><span class="m">440</span><span class="w"> </span>-l<span class="w"> </span><span class="m">3</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>alsa-utils<span class="w">      </span><span class="c1"># in the guest</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>speaker-test<span class="w"> </span>-t<span class="w"> </span>sine<span class="w"> </span>-f<span class="w"> </span><span class="m">440</span><span class="w"> </span>-l<span class="w"> </span><span class="m">3</span>
 </code></pre></div>
 <p>The guest has user-mode networking, so that works out of the box.
 Worth knowing before you conclude the audio path is broken: silence
@@ -14024,8 +14067,8 @@ omitting it from the offer — so the capability list is not evidence.
 serves a page to a browser, prints the video codecs from the offer the
 page actually generated with <code>getCapabilities</code> beside them, and exits
 non-zero when the two disagree:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>tools/browser-offer-probe.py<span class="w"> </span>--browser<span class="w"> </span>chromium
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>tools/browser-offer-probe.py<span class="w"> </span>--browser<span class="w"> </span>firefox-esr<span class="w"> </span>--profile<span class="w"> </span>~/.mozilla/firefox/&lt;profile&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>tools/browser-offer-probe.py<span class="w"> </span>--browser<span class="w"> </span>chromium
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>tools/browser-offer-probe.py<span class="w"> </span>--browser<span class="w"> </span>firefox-esr<span class="w"> </span>--profile<span class="w"> </span>~/.mozilla/firefox/&lt;profile&gt;
 </code></pre></div>
 <p>Pass a real <code>--profile</code> for Firefox. Without one it uses a throwaway
 profile, which has never downloaded OpenH264 and would report no H.264
@@ -14039,9 +14082,9 @@ deciding whether the probe itself is telling the truth.</p>
 <p><code>tools/pcap-inspect.py</code> is a pure-Python helper (no tshark
 or scapy dependency) for sifting through a ryll capture.
 Three subcommands:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
 </code></pre></div>
 <p>Typical use: when investigating a rendering artefact,
 <code>opcodes</code> tells you whether the problem window even
@@ -14058,7 +14101,7 @@ stream. The helper handles that without any extra flags.</p>
 <p><code>tools/web-smoke.sh</code> verifies that <code>ryll --web</code> starts,
 binds the HTTP server, and shuts down cleanly on SIGTERM.
 Usage:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
 </code></pre></div>
 <p>Defaults to <code>target/release/ryll</code>; <code>WEB_PORT</code> env var
 overrides the port (default <code>18080</code>). The script creates a

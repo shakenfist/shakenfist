@@ -13253,6 +13253,78 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#step-2b-result-measured-2026-08-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2b result: measured 2026-08-27
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 2b result: measured 2026-08-27">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#idle-connected-no-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idle, connected, no input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#responsiveness-is-not-the-price-paid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsiveness is not the price paid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smoke-test-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoke-test items
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bonus-phase-4s-latency-criterion-also-verified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bonus: phase 4's latency criterion also verified
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13431,6 +13503,132 @@ status messages, the bandwidth tracker's <code>tick()</code>).</p>
   commit for step 2b (the measurement note appended to
   this file).</li>
 </ul>
+<h2 id="step-2b-result-measured-2026-08-27">Step 2b result: measured 2026-08-27<a class="headerlink" href="#step-2b-result-measured-2026-08-27" title="Permanent link">&para;</a></h2>
+<p>The measurement this phase was waiting on.  Step 2a landed
+in PR #36 in April; the verification run below is what
+closes the phase.</p>
+<h3 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h3>
+<p>Deliberately the same host phase 1 profiled, so the numbers
+are comparable rather than merely favourable: Kasm
+container, Debian, 16 cores, no GPU, Mesa llvmpipe software
+renderer, <code>DISPLAY=:10.0</code>.  Debug binary at
+<code>target/debug/ryll</code>, built by <code>make build</code> in the
+devcontainer — unoptimised, matching the baseline build.</p>
+<p>Phase 1 profiled against the production SPICE server at
+sf-3 over TLS; this run used the local <code>make test-qemu</code>
+UEFI latency guest at <code>localhost:5900</code>, 1280x800 surface.
+The contended resource is CPU rasterisation, not the
+network, so the substitution does not weaken the
+comparison — but it is a difference, and it is recorded
+rather than glossed.</p>
+<p>Method is phase 1's: sum <code>utime + stime</code> from
+<code>/proc/&lt;pid&gt;/task/&lt;tid&gt;/stat</code> across every thread, before
+and after a timed window, converted to percent of one core
+at <code>CLK_TCK</code> = 100.  That is now
+<a href="https://github.com/shakenfist/ryll/blob/develop/tools/measure-idle-cpu.sh"><code>tools/measure-idle-cpu.sh</code></a>
+rather than a recipe, so the next person to make a CPU
+claim about ryll can reproduce these numbers instead of
+quoting them:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>tools/measure-idle-cpu.sh "$(pgrep -f 'ryll --direct')" 60
+</code></pre></div>
+<p>It reports per-thread-group and per-thread figures as well
+as the total, which matters here: the whole finding was
+that the cost sat in 16 llvmpipe rasteriser threads rather
+than in anything <code>top</code> would show against the main
+thread.</p>
+<h3 id="idle-connected-no-input">Idle, connected, no input<a class="headerlink" href="#idle-connected-no-input" title="Permanent link">&para;</a></h3>
+<p><strong>2.80% of one core</strong> (168 jiffies over 60 s), against a
+baseline of <strong>6.24 cores</strong>.  A 223-fold reduction, and
+comfortably inside the under-10%-of-one-core target.</p>
+<table>
+<thead>
+<tr>
+<th>Thread group</th>
+<th>Threads</th>
+<th>Jiffies (60 s)</th>
+<th>% of one core</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>llvmpipe-0..15</td>
+<td>16</td>
+<td>128</td>
+<td>2.13</td>
+</tr>
+<tr>
+<td>ryll (main/egui)</td>
+<td>2</td>
+<td>27</td>
+<td>0.45</td>
+</tr>
+<tr>
+<td>Tokio workers</td>
+<td>16</td>
+<td>13</td>
+<td>0.22</td>
+</tr>
+<tr>
+<td>Everything else</td>
+<td>68</td>
+<td>0</td>
+<td>0.00</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>102</strong></td>
+<td><strong>168</strong></td>
+<td><strong>2.80</strong></td>
+</tr>
+</tbody>
+</table>
+<p>RSS 240 MB.  The llvmpipe residue is the 1 Hz fallback
+repaint doing its once-a-second rasterisation, which is the
+design.</p>
+<p>The pointer sat over the window rather than outside it for
+this run, so the number is measured under a slightly
+harsher condition than the criterion asks for.</p>
+<h3 id="responsiveness-is-not-the-price-paid">Responsiveness is not the price paid<a class="headerlink" href="#responsiveness-is-not-the-price-paid" title="Permanent link">&para;</a></h3>
+<p>Idle CPU that low would be worthless if egui had simply
+stopped waking.  Driving 864 synthetic X <code>MotionNotify</code>
+events across the surface over 18 s (XTEST, motion only)
+took the process to <strong>269.5% of one core</strong> for the
+duration, then back to idle.  egui wakes fully on input
+and rasterises at rate; it is asleep only when there is
+genuinely nothing to draw.</p>
+<h3 id="smoke-test-items">Smoke-test items<a class="headerlink" href="#smoke-test-items" title="Permanent link">&para;</a></h3>
+<ul>
+<li>(a) idle CPU under 10% of one core — <strong>2.80%</strong>, above.</li>
+<li>(b) mouse over the surface — repaints at full rate, above.</li>
+<li>(c) typing reaches the guest — verified through
+  <code>--cadence</code>, which injects a keystroke every 2 s through
+  ryll's own inputs channel.  Screenshots of the ryll
+  window 3 s apart sampled the guest surface at
+  srgb(152,152,152), then srgb(0,0,0), then srgb(0,152,0).
+  The latency guest changes screen colour per keystroke, so
+  this exercises the whole loop: cadence timer → inputs
+  channel → guest → display channel → repaint bridge → a
+  window whose pixels actually changed.  Using cadence
+  rather than synthetic X key events also kept stray
+  keystrokes out of whatever window held focus.</li>
+<li>(d) status-message expiry — <strong>not re-tested.</strong>  It needs
+  a keyboard event delivered to a focused ryll window, and
+  injecting blind keystrokes into a live desktop session
+  was not worth the risk for a path the 1 Hz fallback
+  covers by construction.</li>
+<li>(e) bandwidth sparkline — ticking, with <code>0 B/s</code> and a
+  populated history on the idle guest.</li>
+</ul>
+<p>Cadence mode itself costs <strong>10.43% of one core</strong>: a
+full-surface colour change every 2 s forces a complete
+re-rasterisation.  That is the cost of real display
+activity, not an idle figure, and it is recorded here so a
+future reader does not mistake one for the other.</p>
+<h3 id="bonus-phase-4s-latency-criterion-also-verified">Bonus: phase 4's latency criterion also verified<a class="headerlink" href="#bonus-phase-4s-latency-criterion-also-verified" title="Permanent link">&para;</a></h3>
+<p>The status bar read <code>Latency: 0.1ms</code> with a populated
+sparkline throughout, sourced from server PINGs on the main
+channel.  0.1 ms is plausible for a loopback SPICE server,
+and — the point of phase 4 — it is not zero.</p>
 
 
 
