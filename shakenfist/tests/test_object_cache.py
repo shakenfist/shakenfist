@@ -1,10 +1,13 @@
 # Copyright 2026 Michael Still and contributors
 
-"""Tests for the read-through static-object cache core in mariadb.py.
+"""Tests for the read-through static-object cache in mariadb.py.
 
-Only the cache primitives are exercised here; the per-type wiring
-(which get_<type>() reads the cache and which update_/delete_<type>()
-evict) is covered in the object-type test modules.
+ObjectCacheCoreTestCase exercises the cache primitives.
+ObjectCacheWiringTestCase covers the per-type wiring -- which
+get_<type>() reads the cache and which writers evict -- as end-to-end
+read-cache-write-evict cycles for representative types (blob, ipam,
+instance, namespace). It is not exhaustive over the eleven cached
+types; see issue #3943.
 """
 
 import time
@@ -142,6 +145,55 @@ class ObjectCacheWiringTestCase(base.ShakenFistTestCase):
                         return_value=True):
             mariadb.delete_ipam(self.uuid)
         mariadb.get_ipam(self.uuid)
+        self.assertEqual(3, mock_get.call_count)
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    @mock.patch('shakenfist.mariadb._direct_get_instance')
+    def test_instance_reader_caches_then_delete_evicts(
+            self, mock_get, _mock_use):
+        # Instance static values are immutable after creation, so there is no
+        # update_instance: delete_instance is the sole evicting writer, and
+        # create_instance relies on misses never being cached (covered by
+        # test_missing_row_is_not_cached). The instances table is the hottest
+        # write path, so its wiring is pinned per-writer here rather than
+        # left to the type-level sweep. See issue #3943.
+        model = mock.Mock(uuid=self.uuid)
+        mock_get.return_value = model
+
+        self.assertIs(model, mariadb.get_instance(self.uuid))
+        self.assertIs(model, mariadb.get_instance(self.uuid))
+        self.assertEqual(1, mock_get.call_count)
+
+        with mock.patch('shakenfist.mariadb._direct_delete_instance',
+                        return_value=True):
+            mariadb.delete_instance(self.uuid)
+        mariadb.get_instance(self.uuid)
+        self.assertEqual(2, mock_get.call_count)
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)
+    @mock.patch('shakenfist.mariadb._direct_get_namespace')
+    def test_namespace_reader_caches_then_writers_evict(
+            self, mock_get, _mock_use):
+        # Namespace holds trust-relevant static columns and is keyed by name
+        # rather than UUID; both of its writers (create and delete) must
+        # evict. See issue #3943.
+        model = mock.Mock()
+        mock_get.return_value = model
+
+        self.assertIs(model, mariadb.get_namespace('testns'))
+        self.assertIs(model, mariadb.get_namespace('testns'))
+        self.assertEqual(1, mock_get.call_count)
+
+        with mock.patch('shakenfist.mariadb._direct_create_namespace',
+                        return_value=True):
+            mariadb.create_namespace('testns', 1)
+        mariadb.get_namespace('testns')
+        self.assertEqual(2, mock_get.call_count)
+
+        with mock.patch('shakenfist.mariadb._direct_delete_namespace',
+                        return_value=True):
+            mariadb.delete_namespace('testns')
+        mariadb.get_namespace('testns')
         self.assertEqual(3, mock_get.call_count)
 
     @mock.patch('shakenfist.mariadb._use_database_service', return_value=False)

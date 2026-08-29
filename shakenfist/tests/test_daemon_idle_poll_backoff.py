@@ -1,5 +1,6 @@
 # Copyright 2019 Michael Still and contributors
 
+import signal
 from unittest import mock
 
 from shakenfist.daemons import daemon
@@ -59,3 +60,59 @@ class IdleRoundingTestCase(base.ShakenFistTestCase):
         d = self._make_daemon()
         d.idle(0.2)
         self.assertEqual(1, mock_sleep.call_count)
+
+    @mock.patch('shakenfist.daemons.daemon.Daemon.pet_watchdog')
+    @mock.patch('shakenfist.daemons.daemon.Daemon.check_daemon_state')
+    @mock.patch('shakenfist.daemons.daemon.time.sleep')
+    def test_abort_path_breaks_idle_early(
+            self, mock_sleep, _state, _watchdog):
+        d = self._make_daemon()
+        # The abort path appears after the second chunk of a ten chunk sleep:
+        # idle() must stop there rather than sleeping out the remaining 1.6s.
+        # This is what keeps shutdown prompt even at the backoff cap. See
+        # issue #3943.
+        with mock.patch('shakenfist.daemons.daemon.os.path.exists',
+                        side_effect=[False, True]):
+            d.idle(2.0)
+        self.assertEqual(2, mock_sleep.call_count)
+
+
+class ExitGracefullyTestCase(base.ShakenFistTestCase):
+    def _make_daemon(self):
+        d = daemon.Daemon.__new__(daemon.Daemon)
+        d.abort_path = '/run/sf/_test.abort'
+        d.daemon_name = 'unittest'
+        d.log = mock.MagicMock()
+        return d
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.Node')
+    def test_sigterm_marks_stopping_and_sets_abort(
+            self, mock_node, mock_set_abort):
+        d = self._make_daemon()
+        d.exit_gracefully(signal.SIGTERM, None)
+        mock_node.this_node.return_value.set_daemon_state.\
+            assert_called_once_with(
+                'unittest', mock_node.DAEMON_STATE_STOPPING)
+        mock_set_abort.assert_called_once_with(
+            d.abort_path, 'from exit_gracefully')
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.Node')
+    def test_other_signals_are_ignored(self, mock_node, mock_set_abort):
+        d = self._make_daemon()
+        d.exit_gracefully(signal.SIGINT, None)
+        mock_set_abort.assert_not_called()
+        mock_node.this_node.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.daemon.set_abort_path')
+    @mock.patch('shakenfist.daemons.daemon.Node')
+    def test_grpc_shutdown_race_still_sets_abort(
+            self, mock_node, mock_set_abort):
+        # A ValueError from gRPC already shutting down must not stop the
+        # abort path from being set, or SIGTERM would be lost.
+        mock_node.this_node.side_effect = ValueError('channel closed')
+        d = self._make_daemon()
+        d.exit_gracefully(signal.SIGTERM, None)
+        mock_set_abort.assert_called_once_with(
+            d.abort_path, 'from exit_gracefully')
