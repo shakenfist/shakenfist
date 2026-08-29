@@ -41,7 +41,8 @@ class InstanceData(BaseModel):
         memory: Memory allocation in MB.
         name: Human-readable instance name.
         namespace: The namespace this instance belongs to.
-        requested_placement: Optional placement hint dict, or None.
+        requested_placement: The node uuid the user requested placement
+            on, or None.
         ssh_key: SSH public key to inject, or None.
         user_data: Cloud-init user data string, or None.
         video: Video configuration dict (model, memory, vdi type).
@@ -74,8 +75,15 @@ class InstanceData(BaseModel):
     # Tenant namespace (indexed for filtered listings)
     namespace: Annotated[str, SQLIndex()]
 
-    # Optional placement hint (stored as JSON, nullable)
-    requested_placement: Optional[dict[str, Any]] = None
+    # The node uuid the user requested placement on, or None. The API
+    # resolves the caller's placed_on to a node uuid string before
+    # Instance.new(). Mistyping this as a dict silently discarded every
+    # requested placement at the MariaDB write, which let preflight
+    # redirect targeted creates to other nodes (issue 3496). LONGTEXT is
+    # deliberate: the column was created as LONGTEXT when the field was
+    # dict-typed, and _ensure_*_schema() has no ALTER path, so the
+    # marker keeps the generated DDL byte-identical.
+    requested_placement: Annotated[Optional[str], SQLLongText()] = None
 
     # SSH public key to inject (nullable, can be large)
     ssh_key: Annotated[Optional[str], SQLLongText()] = None

@@ -236,6 +236,24 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
             demand_hot, op.instance_uuid, op.net_desc, op.tasks,
             op.priority, op.request_id, depends_on=None)
 
+    def test_requested_placement_aborts_rather_than_redirects(self):
+        # A targeted create is honoured-or-error: when the requested
+        # node cannot take the instance at preflight, the create must
+        # abort rather than fall through to open scheduling on another
+        # node (issue 3496). The production guard reads the node uuid
+        # string _db_create stored; it fires on any truthy value.
+        inst = FakeInstance('created')
+        inst.requested_placement = str(uuid4())
+        other_node = str(uuid4())
+
+        _, mock_enqueue, raised = self._redirect(inst, [other_node])
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Requested node lacks resources', str(raised))
+        self.assertEqual([], inst.placement_attempts)
+        self.assertEqual([], inst.placed_on)
+        mock_enqueue.assert_not_called()
+
     def test_every_candidate_denied_aborts_the_start(self):
         # An exhausted candidate list means the cluster really is full,
         # which is the same outcome as the scheduler finding no
