@@ -38,8 +38,21 @@ poller with no cap of its own would keep polling a leaked VM indefinitely.
 The sampling loop never raises: a failed sample (a network error, an
 unexpected response shape, anything) is written as a record carrying an
 `error` key and the timestamp, and the loop continues to the next interval.
-The probe exists to give a later analysis step data to work with, so it
-must not itself be the reason a CI run ends up with none.
+The write is guarded on the same terms -- a value the json module cannot
+serialise, or a full disk, degrades to a bare error record or to a skipped
+line, never to a dead poller and a series which stops mid-run without
+saying why. The probe exists to give a later analysis step data to work
+with, so it must not itself be the reason a CI run ends up with none.
+
+Samples are paced to a deadline rather than by sleeping a fixed interval
+after each one. A sample is not free -- the API call behind
+`/admin/resources` constructs a Scheduler and refreshes node metrics, and
+it is slowest exactly when the cluster is busiest. Sleeping a constant
+interval afterwards would therefore stretch the gap between samples under
+load, so busy periods would be sampled less often than quiet ones and the
+percentiles a later phase reads would be biased toward idle. That bias
+points the wrong way: it would argue for shrinking a cloud which was in
+fact tight.
 
 Run it with /etc/sf/sfrc sourced, using the SF venv python so
 shakenfist_client is importable, for example:
@@ -99,6 +112,35 @@ def take_sample(client):
         }
 
 
+def write_record(f, record):
+    """Append one record, and never raise doing it.
+
+    Returns True if a line was written. A record which cannot be
+    serialised is retried as a minimal error record, so the series keeps
+    its cadence and says what happened rather than simply stopping.
+    """
+    try:
+        line = json.dumps(record)
+    except (TypeError, ValueError) as e:
+        try:
+            line = json.dumps({
+                'sampled_at': record.get('sampled_at', time.time()),
+                'error': 'sample could not be serialised: %s' % e,
+            })
+        except Exception:
+            return False
+    try:
+        f.write(line + '\n')
+        f.flush()
+        os.fsync(f.fileno())
+    except Exception:
+        # A full or read-only /srv must not end the run. The series is
+        # short a line; the alternative is that it is short every
+        # remaining line and nothing says so.
+        return False
+    return True
+
+
 def main():
     description = (
         'Poll /admin/resources and the node roster on an interval, appending one JSON record per '
@@ -121,14 +163,27 @@ def main():
         key=os.environ.get('SHAKENFIST_KEY'),
         base_url=os.environ.get('SHAKENFIST_API_URL', 'http://localhost:13000'))
 
+    if args.interval <= 0:
+        # Not an argparse error: D15 says nothing this phase adds may fail
+        # a build, and a non-positive interval would otherwise spin.
+        print('--interval must be positive, not %r; using 15.' % args.interval)
+        args.interval = 15
+
     start_time = time.time()
+    next_at = start_time
     with open(args.output, 'a') as f:
         while time.time() - start_time < args.max_seconds:
-            record = take_sample(client)
-            f.write(json.dumps(record) + '\n')
-            f.flush()
-            os.fsync(f.fileno())
-            time.sleep(args.interval)
+            write_record(f, take_sample(client))
+            next_at += args.interval
+            delay = next_at - time.time()
+            if delay > 0:
+                time.sleep(delay)
+            else:
+                # The sample overran its slot. Resume the cadence from now
+                # rather than firing catch-up samples back to back, which
+                # would perturb the cluster hardest exactly when it is
+                # already too busy to sample on time.
+                next_at = time.time()
 
     return 0
 

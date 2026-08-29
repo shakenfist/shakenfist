@@ -84,7 +84,7 @@ precise error this plan exists to avoid.
 Usage:
 
     python3 tools/ci_headroom_report.py --series /srv/ci/traces/headroom.jsonl \\
-        --census /srv/ci/traces/refusal-census.json --label slim-primary
+        --census /srv/ci/traces/headroom-census.json --label slim-primary
 """
 
 import argparse
@@ -245,9 +245,17 @@ class Sample:
                 self.nodes[node] = NodeSample(node, payload)
 
         # An empty capacity map makes every row-present flag false at once,
-        # which is a read failure wearing an idle cluster's clothes.
+        # which is a read failure wearing an idle cluster's clothes. The
+        # inference needs more than one node to carry that meaning: on a
+        # single-hypervisor topology one node which simply has no capacity
+        # row yet satisfies "all false" while being an ordinary per-node
+        # fact, and reading it as a failed read discards the entire CPU
+        # series -- on slim-primary, the first topology this phase's
+        # definition of done names.
         flags = [n.row_present for n in self.nodes.values()]
-        self.ledger_unreadable = bool(flags) and all(f is False for f in flags)
+        all_absent = bool(flags) and all(f is False for f in flags)
+        self.ledger_unreadable = all_absent and len(flags) > 1
+        self.sole_node_without_row = all_absent and len(flags) == 1
 
     def absences(self):
         """Classify every node the roster names but per_node does not.
@@ -291,6 +299,12 @@ class Sample:
 
     @property
     def cluster_committed_cpu(self):
+        """Committed vCPU over every node, ledgered or not.
+
+        The honest cluster total, and what the committed-vCPU column
+        reports. Deliberately not the fraction's numerator: see
+        cluster_cpu_fraction.
+        """
         return sum(n.committed_cpu for n in self.nodes.values())
 
     @property
@@ -298,6 +312,30 @@ class Sample:
         ledgers = [n.cpu_ledger for n in self.nodes.values()
                    if n.cpu_ledger is not None]
         return sum(ledgers) if ledgers else None
+
+    @property
+    def unledgered_nodes(self):
+        return [n for n in self.nodes.values() if n.cpu_ledger is None]
+
+    @property
+    def cluster_cpu_fraction(self):
+        """Committed vCPU over ledger, both summed over the same nodes.
+
+        A node publishing neither cpu_limit nor cpu_hard_max has committed
+        vCPU but no ledger. Counting it in the numerator while the
+        denominator skips it yields ratios above 1.0 -- an arithmetically
+        impossible number which prints as OVERSUBSCRIBED, that is, as a
+        recommendation to grow the cloud on the strength of one absent
+        field. Both sides are therefore summed over the ledgered nodes,
+        and the rest are reported by print_cluster_table rather than
+        folded in. Memory never had this problem: NodeSample sets
+        memory_ledger_mb and committed_memory_mb together or not at all.
+        """
+        paired = [n for n in self.nodes.values() if n.cpu_ledger is not None]
+        ledger = sum(n.cpu_ledger for n in paired)
+        if not ledger:
+            return None
+        return sum(n.committed_cpu for n in paired) / ledger
 
     @property
     def cluster_committed_memory_mb(self):
@@ -417,10 +455,25 @@ class Census:
         self.records = 0
         self.matched = 0
         self.unparseable_lines = 0
+        self.limit = None
 
     @property
     def available(self):
         return self.status == 'read'
+
+    @property
+    def truncated(self):
+        """True when the query returned every entry it was allowed to.
+
+        Loki caps a query_range at max_entries_limit_per_query (5000 by
+        default) and a response holding exactly the limit is
+        indistinguishable from a complete one. The scheduler emits an
+        event per stage per schedule, so a run creating a few hundred
+        instances can reach it -- and a census cut short reads as "the
+        cloud had room", which is the one misreading this tool exists to
+        prevent.
+        """
+        return self.limit is not None and self.records >= self.limit
 
     def tally(self, stage, aborted, dropped):
         if stage not in self.stages:
@@ -442,6 +495,26 @@ class Census:
     def capacity_shortage_drops(self):
         return sum(t.shortage_drops for stage, t in self.stages.items()
                    if stage in CAPACITY_STAGE_NOTES)
+
+    @property
+    def unclassified_shortage_drops(self):
+        """Shortage drops at stages CAPACITY_STAGE_NOTES does not name.
+
+        Per D10 the census tallies every stage string it sees, so a stage
+        added to the scheduler after this tool was written is counted and
+        printed. It cannot be counted into the capacity warning, though,
+        because nothing here knows whether it is a capacity stage. The
+        verdict names the total rather than staying silent, so a reader
+        is not told "no capacity-stage drops" while the table above shows
+        drops.
+        """
+        return sum(t.shortage_drops for stage, t in self.stages.items()
+                   if stage not in CAPACITY_STAGE_NOTES)
+
+    @property
+    def disk_bandwidth_drops(self):
+        tally = self.stages.get('sufficient_idle_disk')
+        return tally.shortage_drops if tally else 0
 
     @property
     def missing_data_drops(self):
@@ -466,7 +539,7 @@ def stage_of(message):
     return None, False
 
 
-def read_census(path):
+def read_census(path, limit=None):
     """Read a Loki query_range response and tally the refusals in it.
 
     Says explicitly when there is no census. Printing "0 refusals" for a
@@ -475,6 +548,7 @@ def read_census(path):
     ever refused, which is the finding this whole report exists to make.
     """
     census = Census()
+    census.limit = limit
     if path is None:
         return census
     census.path = path
@@ -656,20 +730,39 @@ def print_series_summary(series):
 def print_ledger_provenance(series):
     print_heading('Ledger provenance (D7)')
     fallback = 0
+    fallback_unreadable = 0
     from_row = 0
     missing = 0
+    sole = 0
     for sample in series.samples:
+        if sample.sole_node_without_row:
+            sole += 1
+        unreadable = sample.ledger_unreadable
         for node in sample.nodes.values():
             if node.cpu_ledger is None:
                 missing += 1
             elif node.cpu_ledger_from_fallback:
-                fallback += 1
+                if unreadable:
+                    fallback_unreadable += 1
+                else:
+                    fallback += 1
             else:
                 from_row += 1
-    total = fallback + from_row + missing
+    total = fallback + fallback_unreadable + from_row + missing
     print('  Node-samples with a capacity row (cpu_limit):     %d' % from_row)
     print('  Node-samples which fell back to cpu_hard_max:     %d' % fallback)
+    print('  Fallbacks inside ledger-unreadable samples:       %d'
+          % fallback_unreadable)
     print('  Node-samples with no CPU ledger at all:           %d' % missing)
+    if fallback_unreadable:
+        print('  The third figure is a failed capacity read, not evidence about')
+        print('  the two ledgers. Those samples are already excluded from the')
+        print('  headroom figures, and D7 should read the second line alone.')
+    if sole:
+        print('  %d %s had one visible node and no capacity row for it. That is'
+              % (sole, plural(sole, 'sample')))
+        print('  a per-node fact on a single-hypervisor topology, not a failed')
+        print('  read, so those samples are kept.')
     if not total:
         print('  No node-samples at all, so nothing to say about the ledger.')
         return
@@ -683,15 +776,27 @@ def print_ledger_provenance(series):
         print('  not, so the two ledgers can be compared directly here.')
 
 
+def cluster_cpu_fractions(series):
+    """The per-sample committed-over-ledger ratios the verdict is computed from.
+
+    Computed here rather than returned by print_cluster_table so the
+    verdict's one load-bearing input has a name, and so computing it does
+    not require having printed anything first.
+    """
+    fractions = []
+    for sample in series.usable_cpu_samples:
+        fraction = sample.cluster_cpu_fraction
+        if fraction is not None:
+            fractions.append(fraction)
+    return fractions
+
+
 def print_cluster_table(series):
     print_heading('Cluster-wide headroom')
     usable = series.usable_cpu_samples
     cpu = [s.cluster_committed_cpu for s in usable]
-    cpu_fractions = []
-    for sample in usable:
-        ledger = sample.cluster_cpu_ledger
-        if ledger:
-            cpu_fractions.append(sample.cluster_committed_cpu / ledger)
+    cpu_fractions = cluster_cpu_fractions(series)
+    unledgered = sorted({n.node for s in usable for n in s.unledgered_nodes})
 
     memory_samples = [s for s in series.samples
                       if s.cluster_committed_memory_mb is not None]
@@ -725,8 +830,17 @@ def print_cluster_table(series):
     print_table(
         ['', 'n', 'p90', 'peak', 'ledger', 'p90 frac', 'peak frac'], rows)
     print('  Fractions are computed per sample and then percentiled, so each')
-    print('  one is a ratio something actually stood at.')
-    return cpu_fractions
+    print('  one is a ratio something actually stood at. Both sides of the CPU')
+    print('  fraction are summed over the nodes which have a ledger, so it')
+    print('  cannot exceed 1.0 because a node was missing one.')
+    if unledgered:
+        print('  %d %s committed vCPU but no ledger, so %s excluded from the'
+              % (len(unledgered),
+                 plural(len(unledgered), 'node has', 'nodes have'),
+                 plural(len(unledgered), 'it is', 'they are')))
+        print('  CPU fraction while still counting in the committed column:')
+        for node in unledgered:
+            print('    %s' % node)
 
 
 def print_per_node_tables(series):
@@ -857,6 +971,13 @@ def print_census(census):
           '%d %s unparseable)'
           % (census.records, census.matched, census.unparseable_lines,
              plural(census.unparseable_lines, 'line')))
+    if census.truncated:
+        print('  CENSUS MAY BE TRUNCATED: the query returned %d entries and was'
+              % census.records)
+        print('  allowed %d. Loki gives no signal that it cut a response short,'
+              % census.limit)
+        print('  so treat every count below as a LOWER BOUND. An undercounted')
+        print('  census reads as a cluster with room, which is backwards.')
 
     if not census.stages:
         print('  No schedule stage events at all. Either nothing was scheduled')
@@ -945,11 +1066,26 @@ def print_verdict(cpu_fractions, census, series):
               % (shortage, plural(shortage, 'drop')))
         print('  Per D3 that is a warning in its own right, whatever the ratio')
         print('  says: a poll every fifteen seconds cannot see a refusal, which')
-        print('  begins and ends between samples. Note that drops at')
-        print('  sufficient_idle_disk are disk BANDWIDTH, a rate predicate no')
-        print('  amount of extra hardware in the same shape would fix.')
+        print('  begins and ends between samples.')
+        if census.disk_bandwidth_drops:
+            print('  %d of them are at sufficient_idle_disk, which is disk'
+                  % census.disk_bandwidth_drops)
+            print('  BANDWIDTH -- a rate predicate no amount of extra hardware')
+            print('  in the same shape would fix. Do not read those as a case')
+            print('  for a bigger cloud.')
     else:
         print('  Refusal warning: no capacity-stage drops in the census window.')
+    if census.unclassified_shortage_drops:
+        print('  %d further %s at stages this report does not classify (see the'
+              % (census.unclassified_shortage_drops,
+                 plural(census.unclassified_shortage_drops, 'drop')))
+        print('  census table above). They are not counted in the warning')
+        print('  either way, because nothing here knows whether they are')
+        print('  capacity stages -- a scheduler stage added since this tool')
+        print('  was written lands here.')
+    if census.truncated:
+        print('  The census may have been truncated, so every count above is a')
+        print('  lower bound. Absence of a warning is not evidence of absence.')
 
 
 def report(args):
@@ -960,12 +1096,13 @@ def report(args):
         print('Label:  %s' % args.label)
 
     series = read_series(args.series)
-    census = read_census(args.census)
+    census = read_census(args.census, limit=args.census_limit)
 
     print_series_summary(series)
     if series.samples:
         print_ledger_provenance(series)
-        cpu_fractions = print_cluster_table(series)
+        print_cluster_table(series)
+        cpu_fractions = cluster_cpu_fractions(series)
         print_per_node_tables(series)
         print_absences(series)
     else:
@@ -994,6 +1131,14 @@ def main(argv=None):
     parser.add_argument(
         '--label', default=None,
         help='A label for the run, printed at the top (typically the topology).')
+    parser.add_argument(
+        '--census-limit', type=int, default=5000,
+        help=('The entry limit the census query was issued with. A response '
+              'holding exactly this many entries is reported as possibly '
+              'truncated, because Loki gives no other signal that it cut one '
+              'short. Defaults to 5000, which is both Loki\'s default '
+              'max_entries_limit_per_query and the value used by '
+              'tools/ci_headroom_collect.sh in shakenfist/actions.'))
 
     try:
         args = parser.parse_args(argv)

@@ -190,6 +190,27 @@ printing "0 refusals", which would look exactly like a run that
 refused nothing. Read a bundle's `headroom-census.json` the same way
 by hand: missing or empty means "unknown", never "clean".
 
+A *short* census is not zero refusals either. The query carries an
+entry limit -- 5000, which is both Loki's default
+`max_entries_limit_per_query` and what `ci_headroom_collect.sh` asks
+for -- and Loki gives no signal when it cuts a response off at that
+limit. A response holding exactly the limit is indistinguishable from
+a complete one, and the scheduler emits an event per stage per
+schedule, so a run creating a few hundred instances can reach it. The
+report is told the limit via `--census-limit` and prints `CENSUS MAY
+BE TRUNCATED` when the count reaches it; every figure below that line
+is a lower bound.
+
+One trap is worth stating because it has already been fallen into. Do
+not add a `|= "Added event"` line filter to the census query. That is
+the message `eventlog.add_event_multi` logs under, but pylogrus'
+`JsonFormatter` merges the caller's fields over the record last and
+one of those fields is `message` -- so the shipped JSON's `message` is
+the *event's* message, and `Added event` never appears in the line at
+all. Such a filter matches nothing, and the empty census that results
+is reported honestly as "no schedule stage events at all", which reads
+like an idle cluster rather than a broken query.
+
 ## Coverage the functional suite does not have
 
 ### Upgrade data verification

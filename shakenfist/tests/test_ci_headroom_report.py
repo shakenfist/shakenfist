@@ -712,3 +712,223 @@ class PercentileTestCase(base.ShakenFistTestCase):
             'percentile() interpolated. A tail made of a handful of samples '
             'then reports a number nothing ever measured, which is why the '
             'original in queue-wait-report.py does not interpolate.')
+
+
+def unledgered_node_payload(cpu_committed=8):
+    """A node with committed vCPU and neither ledger field.
+
+    Both cpu_limit and cpu_hard_max are absent, which is the shape that
+    produced a cluster fraction above 1.0: committed vCPU with nothing to
+    divide it by.
+    """
+    payload = node_payload(cpu_measured=cpu_committed,
+                           cpu_committed=cpu_committed)
+    del payload['cpu_limit']
+    del payload['cpu_hard_max']
+    payload['cpu_available'] = 0
+    return payload
+
+
+class ReviewFixesTestCase(HeadroomReportTestCase):
+    """Readings which looked right and were not, found in review of phase 1."""
+
+    def test_an_unledgered_node_cannot_push_the_fraction_above_one(self):
+        """The fraction's two sides must be summed over the same nodes.
+
+        cluster_committed_cpu summed every node while cluster_cpu_ledger
+        summed only the ledgered ones, so a node publishing neither
+        cpu_limit nor cpu_hard_max landed in the numerator alone. Two
+        nodes at 5 committed vCPU, one with a ledger of 10, gave 10/10
+        rather than 5/10: a cluster sitting at half its ledger reported
+        as exactly full, and a WITHIN BAND run reported as
+        OVERSUBSCRIBED -- that is, as a case for a bigger cloud built on
+        one absent field.
+        """
+        path = self._series([
+            sample({
+                NODE_ONE: node_payload(cpu_measured=5, cpu_committed=5,
+                                       cpu_limit=10, cpu_hard_max=10),
+                NODE_TWO: unledgered_node_payload(cpu_committed=5),
+            }),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertNotIn(
+            'OVERSUBSCRIBED', output,
+            'A node with no ledger at all was allowed to push the cluster '
+            'fraction to 1.0 and the verdict to OVERSUBSCRIBED, when the '
+            'ledgered node was sitting at half its limit.')
+        self.assertIn(
+            '0.500', output,
+            'The cluster CPU fraction should be 5/10 over the one node '
+            'which has a ledger, not 10/10 over a numerator drawn from '
+            'both nodes and a denominator drawn from one.')
+        self.assertIn(
+            'no ledger', output,
+            'The excluded node was dropped silently. Which nodes the '
+            'fraction could not use is exactly what a reader needs to '
+            'judge whether the fraction means anything.')
+
+    def test_a_lone_node_without_a_capacity_row_still_reports(self):
+        """One node with no row is a per-node fact, not a failed read.
+
+        ledger_unreadable was 'every row_present is False', which a
+        single-hypervisor topology satisfies whenever its one node has no
+        capacity row yet. Every sample was then discarded and the run
+        printed NO VERDICT -- on slim-primary, the first topology this
+        phase's definition of done names.
+        """
+        path = self._series([
+            sample({NODE_ONE: node_payload(
+                cpu_measured=6, cpu_committed=6, cpu_limit=None,
+                cpu_hard_max=12, row_present=False)}),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertNotIn(
+            'NO VERDICT', output,
+            'A single-hypervisor sample whose one node had no capacity '
+            'row was treated as a failed capacity read, discarding the '
+            'whole CPU series on the topology phase 1 must report on.')
+        self.assertIn('0.500', output)
+        self.assertIn(
+            'one visible node and no capacity row', output,
+            'The one-node case should be described as what it is rather '
+            'than silently folded in with healthy samples.')
+
+    def test_two_nodes_with_no_rows_are_still_a_failed_read(self):
+        """The original inference must survive where it is meaningful."""
+        path = self._series([
+            sample({
+                NODE_ONE: node_payload(row_present=False),
+                NODE_TWO: node_payload(row_present=False),
+            }),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'NO VERDICT', output,
+            'An all-false sample across more than one node is still '
+            '_capacity_by_node() swallowing a read failure, and must '
+            'still not be averaged in as an idle cluster.')
+
+    def test_a_census_at_its_limit_is_reported_as_maybe_truncated(self):
+        """Loki gives no signal that it cut a response short.
+
+        A response holding exactly max_entries_limit_per_query looks
+        identical to a complete one, and a census cut short reads as a
+        cluster with room -- the one misreading this tool exists to
+        prevent.
+        """
+        census = self._census([
+            census_event('schedule at stage sufficient_idle_cpu',
+                         {NODE_ONE: {'reason': 'insufficient cpu'}}),
+            census_event('schedule at stage sufficient_idle_memory',
+                         {NODE_ONE: {'reason': 'insufficient memory'}}),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run(
+            '--series', path, '--census', census, '--census-limit', '2')
+        self.assertEqual(0, code)
+        self.assertIn(
+            'CENSUS MAY BE TRUNCATED', output,
+            'A census which returned exactly as many entries as it was '
+            'allowed was reported as complete.')
+        self.assertIn('LOWER BOUND', output)
+
+    def test_a_census_below_its_limit_is_not_called_truncated(self):
+        census = self._census([
+            census_event('schedule at stage sufficient_idle_cpu'),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run(
+            '--series', path, '--census', census, '--census-limit', '5000')
+        self.assertEqual(0, code)
+        self.assertNotIn('CENSUS MAY BE TRUNCATED', output)
+
+    def test_drops_at_an_unclassified_stage_are_named_in_the_verdict(self):
+        """D10 keeps them out of the warning; they must not vanish from it.
+
+        capacity_shortage_drops counts only stages in
+        CAPACITY_STAGE_NOTES, so a stage added to the scheduler after
+        this tool was written is tallied in the census table and
+        contributes nothing to the verdict. A reader who skips to the
+        verdict then sees 'no capacity-stage drops' above a table full
+        of them.
+        """
+        census = self._census([
+            census_event('schedule has no candidates at stage '
+                         'sufficient_flux_capacitors, aborting',
+                         {NODE_ONE: {'reason': 'insufficient flux'}}),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'does not classify', output,
+            'A drop at an unknown stage was tallied in the table but the '
+            'verdict said nothing about it, so the verdict reads as '
+            '"nothing was refused" while the table shows a refusal.')
+
+    def test_the_disk_bandwidth_caveat_is_absent_when_disk_did_not_drop(self):
+        """Stating it about drops which did not happen dilutes it.
+
+        The distinction is real and the plan itself got it wrong, so the
+        note earns its place -- but only over drops that are actually at
+        sufficient_idle_disk.
+        """
+        census = self._census([
+            census_event('schedule at stage sufficient_idle_cpu',
+                         {NODE_ONE: {'reason': 'insufficient cpu'}}),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('Refusal warning: YES', output)
+        self.assertNotIn(
+            'disk BANDWIDTH', output,
+            'The disk bandwidth caveat printed for a run whose only drops '
+            'were CPU, inviting the reader to attribute the warning to '
+            'disk I/O.')
+
+    def test_the_disk_bandwidth_caveat_is_present_when_disk_dropped(self):
+        census = self._census([
+            census_event('schedule at stage sufficient_idle_disk',
+                         {NODE_ONE: {'reason': 'insufficient disk bandwidth'}}),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('disk BANDWIDTH', output)
+
+    def test_a_read_failure_is_not_counted_as_a_ledger_fallback(self):
+        """D7 reads the fallback count as evidence about the two ledgers.
+
+        print_ledger_provenance walked every sample, so node-samples from
+        a ledger-unreadable sample were counted as having fallen back to
+        cpu_hard_max. That inflates the one number D7's reconciliation
+        asks phase 2 to read with failures which say nothing about it.
+        """
+        path = self._series([
+            sample({
+                NODE_ONE: node_payload(cpu_limit=None, cpu_hard_max=12),
+                NODE_TWO: node_payload(cpu_limit=None, cpu_hard_max=12),
+            }),
+            sample({
+                NODE_ONE: node_payload(cpu_limit=None, cpu_hard_max=12,
+                                       row_present=False),
+                NODE_TWO: node_payload(cpu_limit=None, cpu_hard_max=12,
+                                       row_present=False),
+            }, sampled_at=1756000015.0),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn('Node-samples which fell back to cpu_hard_max:     2',
+                      output)
+        self.assertIn('Fallbacks inside ledger-unreadable samples:       2',
+                      output)
+        self.assertIn(
+            'D7 should read the second line alone', output,
+            'The two causes of a fallback were reported as one number, '
+            'so a reader reconciling the ledgers cannot tell a real '
+            'fallback from a failed capacity read.')
