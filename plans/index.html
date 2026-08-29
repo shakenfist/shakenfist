@@ -13501,9 +13501,9 @@ checker's blind spot, and the only numbers here it cannot recompute.</p>
 <tr>
 <td>2026-05-24</td>
 <td><a href="PLAN-queue-performance/">Queue performance and coalescing</a></td>
-<td>Batched dequeue and cluster-operation coalescing. The wait tail is gone and explicit fairness was not needed, though those numbers were measured while coalescing was inert -- a push audit found it had never worked (#3878), and review of that fix found it would have folded per-node mesh ops across nodes (#3884). Reopened for three phases: proving coalescing works on a running cluster and measuring what it costs, the flat 15 second dependency wait (#3863), and a multi-column fold key (#3884)</td>
+<td>Batched dequeue and cluster-operation coalescing. The wait tail is gone and explicit fairness was not needed, though those numbers were measured while coalescing was inert -- a push audit found it had never worked (#3878), and review of that fix found it would have folded per-node mesh ops across nodes (#3884). Reopened for three phases: proving coalescing works on a running cluster and measuring what it costs, the flat 15 second dependency wait (#3863), and a multi-column fold key (#3884). Phase 9 has now measured <code>sfcbr</code> for 42 hours: the fold costs a 3.7 ms median rather than the ~200 ms the code asserted, and it matched 7 times in 1,335 attempts -- so coalescing is confirmed working and confirmed nearly inert on this workload, and the functional test is known to fail when coalescing is disabled. Phase 10's subject moved when #3916 fixed #3863, but the same window shows deferral still matters, so it needs re-scoping rather than closing</td>
 <td>In progress</td>
-<td>8 of 11</td>
+<td>9 of 11</td>
 </tr>
 <tr>
 <td>2026-06-01</td>

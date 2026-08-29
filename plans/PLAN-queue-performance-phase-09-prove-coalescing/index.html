@@ -13584,10 +13584,8 @@ commit, so no later step has to work around them:</p>
    agreed before the functional test is written against them.</li>
 </ol>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
-<p>Steps 9a to 9e are done. Step 9f is not, and cannot be until this
-branch is deployed to <code>sfcbr</code> and a day of traffic has passed
-through it; the phase stays <code>In progress</code> until then, as the risk
-section said it would.</p>
+<p>Steps 9a to 9f are done, and so is the cluster mutation run the
+phase deferred. The phase is complete.</p>
 <h3 id="what-was-built">What was built<a class="headerlink" href="#what-was-built" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
@@ -13644,12 +13642,44 @@ section said it would.</p>
 </li>
 </ul>
 <h3 id="the-mutation-run">The mutation run<a class="headerlink" href="#the-mutation-run" title="Permanent link">&para;</a></h3>
-<p>The definition of done requires the functional test to have been
-<em>observed</em> to fail with <code>COALESCIBLE_TASKS</code> emptied. That mutation
-cannot be run here: it needs the five node cluster CI environment,
-not a workstation.</p>
-<p>What was done instead is a unit-level mutation which proves the
-mechanism the functional assertion depends on:
+<p><strong>Done, on 2026-08-28.</strong> The functional test has now been observed to
+fail with <code>COALESCIBLE_TASKS</code> emptied, on a real cluster, so this is
+a result rather than an assertion.</p>
+<p>The mutation was pushed to a throwaway branch
+(<code>coalescing-mutation-run</code>) and run through cluster CI via
+<code>workflow_dispatch</code>, whose cluster matrix executes on that event.
+Run 33219587241, <code>Debian 12 cluster</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>FAIL: shakenfist_ci.cluster_ci_tests.test_coalescing.TestCoalescing.
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      test_duplicate_network_work_is_coalesced
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Ran: 105 tests   Passed: 99   Failed: 1
+</code></pre></div>
+<p>It was the <strong>only</strong> functional failure, which is the part that makes
+it evidence: the mutation removes coalescing and nothing else. The
+captured attachments show the burst did happen and produced nothing
+to assert on --</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Captured instances:            6 uuids
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Captured coalescing_events:    []
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Captured coalescing_mechanisms: {}
+</code></pre></div>
+<p>-- failing at the <code>assertNotEqual</code> which requires at least one
+coalescing event on the network.</p>
+<p>The unit suite on the same branch failed 14 tests out of 3,752, and
+all 14 are coalescing tests: twelve in <code>CoalescingExecuteTestCase</code>,
+plus <code>test_enqueue_side_dedup_reuses_existing_pending_op</code> and
+<code>test_the_guard_sees_a_coalescible_task_in_a_multi_task_list</code>. Both
+halves of coalescing are represented and 3,621 unrelated tests still
+pass, so the mutation is confined to what it was meant to touch.</p>
+<p>The first attempt (run 33213731004) returned no verdict: it
+dispatched the workflow unchanged, which fans out to four nested
+clusters at once, and all four runners were lost to #3696. The
+successful run trimmed the matrix to one cluster entry. That one
+cluster ran 42 minutes and survived, which is recorded on #3696 as
+evidence that the fan-out width rather than merge-queue concurrency
+is what saturates the under-cloud.</p>
+<p>The earlier workstation stand-in is retained below for the record.</p>
+<p>What was done at planning time instead, before the cluster run was
+possible, was a unit-level mutation proving the mechanism the
+functional assertion depends on:
 <code>test_emptying_the_coalescible_set_silences_both_signals</code> patches
 <code>NetOp.coalescible_tasks</code> to an empty frozenset and asserts the fold
 never runs, no <code>coalesced sibling ops</code> event is emitted, and the
@@ -13657,8 +13687,8 @@ outcome is <code>type_not_coalescible</code>. With nothing coalescible neither
 event can reach the network, so the functional assertion cannot
 pass. That is weaker than running the mutation against a cluster --
 it says nothing about whether the burst overlaps -- and the
-difference is recorded here rather than papered over. The cluster
-mutation should be run when this branch first reaches cluster CI.</p>
+difference was recorded rather than papered over until the cluster
+run above closed it.</p>
 <h3 id="test-coverage-added">Test coverage added<a class="headerlink" href="#test-coverage-added" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>shakenfist/tests/operations/test_baseoperation.py</code>: 37 tests
@@ -13760,16 +13790,60 @@ still records an outcome, and
 <code>test_reports_the_distribution_and_the_outcomes</code> now asserts on the
 rendered row's cell values rather than on column headings which are
 printed whenever any row exists at all.</p>
-<h3 id="still-outstanding">Still outstanding<a class="headerlink" href="#still-outstanding" title="Permanent link">&para;</a></h3>
+<h3 id="what-9f-measured">What 9f measured<a class="headerlink" href="#what-9f-measured" title="Permanent link">&para;</a></h3>
+<p>The instrumented build reached <code>sfcbr</code> on 2026-08-27 at 13:13, and
+9f ran against the 41h56m window from then to 2026-08-29 07:00 --
+26,229 operations. The numbers are written up in full under "What
+step 9 measured" in the master plan; the three things this phase
+existed to settle are:</p>
 <ul>
-<li><strong>9f</strong>, in full: the <code>sfcbr</code> measurement, the verdict on the
-  ~200 ms figure in <code>baseoperation.py:327</code>, the Prometheus
-  cross-check, filing the real-MariaDB concurrency issue from
-  decision 5, and closing #3879.</li>
-<li>The cluster mutation run described above.</li>
-<li>Neither the master plan's phase 9 row nor its <code>index.md</code> row
-  moves to <code>Complete</code> until both are done.</li>
+<li><strong>The fold is cheap.</strong> p50 3.7 ms, p90 5.2 ms, max 149.5 ms over
+  1,335 executions. The <code>~200 ms under load</code> figure both comments in
+  <code>baseoperation.py</code> were built on is wrong by roughly 50x at the
+  median, and is corrected in place. It was measured while #3878
+  made every timed query unmatchable, so it was timing a query that
+  could never match.</li>
+<li><strong>Coalescing works and rarely fires.</strong> 7 of 1,335 folds matched
+  anything, folding one sibling each. The fix was necessary and is
+  confirmed working; its yield on this workload is seven avoided
+  operations in nearly two days. The master plan records the three
+  readings consistent with that and does not choose between them.</li>
+<li><strong>The two data sources agree.</strong> <code>increase()</code> on
+  <code>database_claim_coalescible_siblings_total</code> over the same window
+  gives 1,336.5 against the log-derived 1,335.</li>
 </ul>
+<p>The closeout also happened: #3879 is closed with a note saying what
+was built, and the real-MariaDB concurrency coverage decision 5
+declined to build is filed as #3948.</p>
+<p>Two things were found along the way. The first is fixed here: the
+measurement invocation in <code>tools/queue-wait-report.py</code>'s docstring
+did not work, because Loki silently truncates at a 5000 line
+<code>--limit</code>, so the documented 24 hour single-shot query undercounted
+the majority outcome threefold. The docstring now describes paging
+through <code>query_range</code> and taking totals from <code>count_over_time</code>, and
+the same file's claim that <code>sf-queues</code> defers a flat 15 s is
+corrected for #3916. The second is recorded rather than fixed: there
+is no counter for enqueue-side dedup <em>hits</em>, only for calls, so that
+half of coalescing has no equivalent of <code>coalesce_folded</code>. That
+asymmetry belongs with #3884's work on the key and is noted in the
+master plan.</p>
+<p>The window is also the first <code>sfcbr</code> data carrying #3863's back-off
+fix, which merged just before it opened. It shows the back-off is
+live, and it shows something the fix does not explain: about 400 of
+823 first deferrals still sit at 15-17 s, and the transient-failure
+retry path which uses a 15 s first delay fired zero times in the
+window. The master plan records this under "What this window says
+about phase 10", along with why the p50 comparison against step 7 is
+not a controlled before-and-after. Phase 10 needs re-scoping against
+that data, not planning as written.</p>
+<h3 id="nothing-outstanding">Nothing outstanding<a class="headerlink" href="#nothing-outstanding" title="Permanent link">&para;</a></h3>
+<p>Every step and every definition-of-done item is met, including the
+cluster mutation run, so the phase is <code>Complete</code> in both the master
+plan and <code>index.md</code>.</p>
+<p>Two things leave this phase pointing elsewhere rather than being
+dropped: the deterministic <code>FOR UPDATE</code> concurrency coverage is</p>
+<h1 id="3948-and-the-missing-enqueue-side-dedup-hit-counter-is-recorded">3948, and the missing enqueue-side dedup hit counter is recorded<a class="headerlink" href="#3948-and-the-missing-enqueue-side-dedup-hit-counter-is-recorded" title="Permanent link">&para;</a></h1>
+<p>against #3884's work on the key.</p>
 
 
 
