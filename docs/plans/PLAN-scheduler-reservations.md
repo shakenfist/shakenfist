@@ -637,19 +637,39 @@ exists to collect calibration data, so what phase 5 waits on is
 that data existing, not time elapsing. Phase 5 does not start
 until phase 4c's observation record is written.
 
-*Input from phase 00a's post-deploy observation (2026-08-27):*
-the load stage narrows to the lowest occupied bucket before
-headroom weighting, so it can discard nodes with far more room
-than the ones it keeps -- 8 of 60 observed decisions on sfcbr
-did exactly that, and 34 left a single survivor. The mechanism
-is that `cpu_load_1` measures activity rather than occupancy,
-so a node packed with idle CI runners ranks as the emptiest in
-the cluster. It is not concentrating placement today only
-because the capacity filters reject the over-committed node
-before ranking runs, which is a weaker guarantee than it looks.
-Phase 6 owns the ranking model and should decide this
-deliberately; the detail is in
+*Input from phase 00a's post-deploy observation (2026-08-27),
+corrected 2026-08-29:* this paragraph used to say the load stage
+"can discard nodes with far more room than the ones it keeps",
+citing 8 of 60 observed decisions and 34 leaving a single
+survivor. **That is withdrawn.** The load stage discards
+nothing: `find_candidates()` extends its result with every
+bucket's tier (`shakenfist/scheduler.py:741-756`), which is the
+merge-CI single-candidate lockout fix `108a0cdbd` from
+2026-08-15 -- twelve days before the observation. The counts came
+from the `schedule have lowest cpu load` audit event, which
+publishes the lowest bucket alone by construction; the full
+ranking is in `schedule final candidates`. The finding also
+quoted headroom weights for the nodes it called eliminated, and
+a node only has a weight if it is in the returned list, so its
+own evidence refutes it.
+
+What survives for phase 6 is real but weaker: `cpu_load_1`
+measures activity rather than occupancy, so a node packed with
+idle CI runners *ranks ahead of* a busier node with more room.
+That is a mis-ordering, not a mis-elimination -- the emptier node
+is still reachable, later in a list the caller walks only on
+refusal. Phase 6 owns the ranking model and should decide
+whether an activity metric belongs in it now that the capacity
+counters supply an occupancy one. Detail and the withdrawn text
+are in
 [PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md).
+
+*Not evidence for phase 6:* the recurring
+`507 ... sufficient_idle_cpu` refusals in merge CI (#3772) come
+from the admission stage, which runs before ranking and reads
+the capacity counters. When it refuses every candidate no
+ranking model would have helped, so that family belongs to
+`PLAN-ci-cloud-sizing` and phase 6 should not adopt it.
 
 **Phase 6 — affinity rework.** Binary soft affinity plus
 hard require constraints, weighted-form deprecation mapping,
