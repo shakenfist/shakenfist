@@ -17,7 +17,6 @@ from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist import instance
 from shakenfist import ipam
-from shakenfist import namespace
 from shakenfist import node_health
 from shakenfist.network import network
 from shakenfist.schema.ipam_reservation import ReservationType
@@ -49,6 +48,18 @@ LOG, _ = logs.setup(__name__)
 # maintenance task last ran, cluster-wide. cluster_config already holds
 # non-configuration operational state (the Kerbside signing key).
 SCHEDULED_TASK_LAST_RUN_PREFIX = 'SCHEDULED_TASK_LAST_RUN_'
+
+# How long the elected maintenance loop sleeps between passes. Named
+# because it is not only a sleep: this loop polls its own daemon state row
+# once per iteration rather than once per DAEMON_STATE_POLL_INTERVAL from
+# idle(), so the value sets the elected node's GetNodeDaemonState rate and
+# is what the cluster_base_qps term of that pair in
+# shakenfist/data/database_load_budget.yaml is arithmetic about. Change it
+# and the budget entry, the functional suite's positive control, and the
+# generated Prometheus rules are all wrong together -- which is why
+# test_elected_cluster_daemon_poll_matches_the_daemon_code reads this
+# constant rather than restating the number.
+ELECTED_LOOP_POLL_SECONDS = 5
 
 
 class Monitor(daemon.Daemon):
@@ -184,16 +195,54 @@ class Monitor(daemon.Daemon):
         remove_abandoned_uploads()
 
         # Cleanup orphan artifacts, delete old versions, and record blobs used
-        # by artifacts
+        # by artifacts.
+        #
+        # The namespace names are read once for the whole sweep rather than
+        # once per artifact. Namespace.from_db() overrides the cached base
+        # implementation and its mariadb.get_namespace() caches on
+        # OBJECT_CACHE_TTL_MUTABLE, which is 30s -- half this loop's 60s
+        # period -- so every lookup here was a guaranteed cache miss and the
+        # pair cost one GetNamespace per distinct namespace per pass forever.
+        # On a deployed cluster that is small because namespaces are few and
+        # long lived, which is why it sits under the load budget's 0.10/s
+        # inclusion cut and is absent from that file. In the functional suite
+        # it is not small: every test class creates its own uniquified
+        # namespace, so the sweep sees as many namespaces as there are
+        # concurrent tests holding artifacts and the pair read 0.33/s against
+        # the unbudgeted ceiling of 0.25/s -- which is what
+        # test_no_unbudgeted_fixed_rate_database_polling ejected this branch
+        # from the merge queue for. One call per pass regardless of artifact
+        # count is both the cheaper thing and the honest one.
+        namespace_names = set(mariadb.get_all_namespace_names())
+        if not namespace_names:
+            # Never possible on a healthy cluster -- the system namespace
+            # always exists -- so an empty answer means the read failed
+            # rather than that every namespace is gone. The direct MariaDB
+            # path returns [] on OperationalError, and this loop is the one
+            # caller whose reaction to "no namespaces" is destructive: it
+            # would delete every artifact in the cluster.
+            #
+            # The whole pass is abandoned rather than just this section,
+            # which is the opposite of the choice made for an unreadable
+            # active blob list below. The reason is the blob accounting the
+            # sweep feeds: the loop below records artifact-backed blobs in
+            # in_use_blobs, and record_usage() further down is the only
+            # thing that refreshes last_used for a blob nothing reopens.
+            # Running on with an empty in_use_blobs would let the reaper
+            # treat every artifact-backed blob as unused, which is the
+            # failure the blobs_readable flag exists to avoid one section
+            # further down.
+            LOG.warning(
+                'No namespaces returned; abandoning this maintenance pass')
+            return
+
         in_use_blobs = defaultdict(int)
         for a in artifact.Artifacts([]):
             self.pet_watchdog()
 
             # If the artifact's namespace is deleted then we should remove the
             # artifact
-            ns = namespace.Namespace.from_db(
-                a.namespace, suppress_failure_audit=True)
-            if not ns:
+            if a.namespace not in namespace_names:
                 a.delete()
                 continue
 
@@ -735,8 +784,9 @@ class Monitor(daemon.Daemon):
                 # internally): an externally written stop request -- sf-ctl
                 # stop cluster -- is only noticed by check_daemon_state(),
                 # and without this call the elected node ignored it until it
-                # lost election (issue 3874). The wait(5) below bounds the
-                # added stop latency at 5s, inside TimeoutStopSec=30s.
+                # lost election (issue 3874). The wait below bounds the
+                # added stop latency at ELECTED_LOOP_POLL_SECONDS, inside
+                # TimeoutStopSec=30s.
                 self.pet_watchdog()
                 self.check_daemon_state()
 
@@ -780,15 +830,16 @@ class Monitor(daemon.Daemon):
 
                         last_loop_run = now
 
-                # Sleep up to 5s. Wakes early if the background refresher
-                # reports our lease was stolen, OR when the timeout fires
-                # so the outer ``not os.path.exists(self.abort_path)``
-                # check runs again. The maintenance work above is gated
-                # at 60 s; this short poll is just so SIGTERM during a
-                # quiet period gets observed inside the systemd
-                # ``TimeoutStopSec=30s`` budget (the old wait(60) parked
-                # past it and got SIGKILLed).
-                if self.lock.lost_event.wait(5):
+                # Sleep up to ELECTED_LOOP_POLL_SECONDS. Wakes early if
+                # the background refresher reports our lease was stolen,
+                # OR when the timeout fires so the outer ``not
+                # os.path.exists(self.abort_path)`` check runs again. The
+                # maintenance work above is gated at 60 s; this short
+                # poll is just so SIGTERM during a quiet period gets
+                # observed inside the systemd ``TimeoutStopSec=30s``
+                # budget (the old wait(60) parked past it and got
+                # SIGKILLed).
+                if self.lock.lost_event.wait(ELECTED_LOOP_POLL_SECONDS):
                     LOG.warning(
                         'Cluster maintenance lock lost; re-entering election')
                     self.is_elected = False

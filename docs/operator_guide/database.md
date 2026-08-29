@@ -316,6 +316,136 @@ PascalCase RPC name, e.g. `GetNode`, so it reads as the CamelCase form of the
 counter suffix). The `caller-node` metadata is also sent but not yet a label;
 it is reserved for the mTLS peer-identity cross-check.
 
+### Understanding database load
+
+"Is this much database load normal?" has no useful absolute answer,
+because Shaken Fist's load is mostly polling and polling rates are set by
+how many things exist rather than by how much work anybody is doing. A
+number that is right for a six node cluster running eight instances is
+wrong for everybody else. So what ships instead of a number is a model,
+in `shakenfist/data/database_load_budget.yaml`:
+
+```
+expected_qps = per_node_base_qps x nodes
+             + cluster_base_qps                (once for the whole cluster)
+             + per_instance_qps x standing_instances
+```
+
+with one entry per `(operation, caller_daemon)` pair, each carrying a note
+naming the loop that produces it. There are three terms because there are
+three kinds of load. Most of it is a loop running on every node, so it
+scales with cluster size. Some is the elected cluster daemon's maintenance
+sweep, which runs once cluster-wide however many nodes you have. The rest
+scales with standing instances, because it is work done per instance,
+interface or blob.
+
+What the model is for is telling apart the two reasons load goes up: you
+grew, or something broke. An absolute ceiling cannot do that, and it is
+why the first thing to check when the tier looks busy is the cluster's
+shape rather than the queries per second.
+
+#### Checking your cluster
+
+```bash
+sf-ctl database-load
+```
+
+Scrapes every gateway in `MARIADB_GATEWAY_HOSTS` twice over a minute and
+prints what the tier is serving next to what the model predicts for your
+cluster, sorted by how far over budget each pair is.
+
+Most of the pairs a cluster serves have no budget entry at all, because
+they are activity driven and near zero when nothing is happening -- around
+three hundred of them on a cluster the size of ours. The table leaves
+those out unless one is above its ceiling; `--all-pairs` prints them. The
+`--json` output always carries every pair, so it is the one to attach to a
+bug report.
+
+Two flags in that output mean "expected, do not report":
+
+* `provisional:#NNNN` -- the level is a known defect rather than a floor
+  worth defending. Read the issue: it may already be fixed, in which case
+  the entry over-predicts until the budget is next re-derived. Either way
+  the pair is reported and never enforced.
+* `activity` -- the level is set by what you and your tooling do rather
+  than by one of our loops, so only you can say whether it is reasonable.
+
+If a gateway does not answer, the command says which and reports on the
+rest. It never quietly reports part of the tier as the whole of it,
+because a total missing a gateway reads as load having fallen.
+
+The footer distinguishes two things, because they carry different weights
+of evidence. A *budgeted* pair above its ceiling is measured against a
+model of your cluster and is worth reporting. A pair with *no* budget
+entry above the unbudgeted ceiling has only been seen for one short
+window, and a burst of ordinary work looks the same over sixty seconds as
+a new polling loop does; the command asks you to re-run with a longer
+`--window` first. The Prometheus alert for the same thing wants an hour
+of it before it fires, for the same reason.
+
+An absent entry means the pair was too quiet to model on the cluster the
+budget was derived from, not that it ought to be near zero. A cluster
+whose workload mix differs from that one -- fetching blobs harder, say --
+can run such a pair well above the ceiling with nothing wrong, which is
+why both this footer and the alert ask for more evidence before you act
+on one.
+
+The unbudgeted ceiling is itself a model rather than a number: the pairs
+left out of the budget are mostly per-node loops, so the ceiling is
+`unbudgeted_fixed_rate_per_node_qps` per node with
+`unbudgeted_fixed_rate_qps` as a floor for small clusters. A flat
+threshold would be one that ordinary traffic crosses on a large enough
+cluster, permanently, with nothing wrong -- and an alert that always fires
+gets silenced, while a silenced alert still reads as coverage.
+
+#### Standing monitoring
+
+[`examples/prometheus-database-load-rules.yaml`](https://github.com/shakenfist/shakenfist/blob/develop/examples/prometheus-database-load-rules.yaml)
+is a drop-in Prometheus rule file, generated from the same budget, with
+installation instructions in its comments. It records the model as
+`sf_database:modelled_rate` and the measurement as
+`sf_database:request_rate`, and carries three alerts: a budgeted pair
+well above its model, a pair nobody budgeted for polling steadily, and
+one for the model going blind because `instances_active` is not being
+scraped.
+
+The alerts compare a one day rate against a one day average of the model
+(`sf_database:modelled_rate:1d`), rather than against the model evaluated
+right now. Both halves have to cover the same window: a cluster that
+halves its standing instance count overnight would otherwise have every
+per-instance pair sitting above an immediately-shrunken ceiling until the
+measurement caught up, for up to a day, which `for: 1h` does not cover and
+which is not a regression. That last one matters: without `sf-resources` scraped the
+modelled series are empty and neither of the other two can ever fire,
+which looks exactly like a healthy cluster.
+
+[`examples/grafana-dashboard.json`](https://github.com/shakenfist/shakenfist/blob/develop/examples/grafana-dashboard.json)
+has matching panels for load by caller, measured against modelled, and
+the count of pairs over budget.
+
+On the measured-against-modelled panel, watch the enforced pair of lines
+rather than the totals. The totals include every `activity` pair, and
+those coefficients were fitted against the API traffic of the cluster the
+budget was derived from -- which is ours, and is mostly CI. If your users
+and tooling call the API differently, and they will, those two lines
+diverge steadily and permanently without anything being wrong. The
+`enforced` lines cover only the pairs produced by Shaken Fist's own loops,
+so they are comparable across deployments, and they are the ones which
+should track each other as the cluster grows.
+
+#### When a pair is over budget
+
+Please report it, with the output of `sf-ctl database-load --json`
+attached, at
+[the issue tracker](https://github.com/shakenfist/shakenfist/issues). A
+pair well above its model is usually one of two things: a loop of ours
+that has stopped batching a read it used to batch, or a workload shape the
+model does not describe. Both are worth knowing about, and the second is
+how the shipped coefficients get better for clusters that are not ours.
+
+Do not edit the budget to make an alert stop. A budget that tracks
+whatever the code currently does is not a budget.
+
 ### Monitoring sf-database with grpc-health-probe
 
 `sf-database` reports live MariaDB reachability through the standard

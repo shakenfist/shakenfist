@@ -1,0 +1,1033 @@
+# Prometheus rules for Shaken Fist database load.
+#
+# GENERATED FILE. Do not edit: run
+# tools/generate-database-load-rules.py and commit the result. The numbers
+# come from shakenfist/data/database_load_budget.yaml, and a test asserts
+# this file is exactly what that budget renders to.
+#
+# What these are for
+# ------------------
+#
+# Shaken Fist's database load is mostly polling, and polling rates are set
+# by how many things exist rather than by how much work anybody is doing.
+# So "expect under N queries per second" is not a useful expectation for
+# anybody else's cluster. These rules evaluate a model instead: a per-node
+# base, a constant for the work the elected cluster daemon does once for
+# the whole cluster, and a coefficient per standing instance. The useful
+# question they answer is not "is my database busy" but "is my database
+# busier than a cluster of my shape should be" -- which is the difference
+# between load that grew because you grew, and load that grew because
+# something broke.
+#
+# Installing this
+# ---------------
+#
+#   1. Scrape sf-database. Every sf-database instance serves Prometheus
+#      metrics on MARIADB_GATEWAY_METRICS_PORT (13006 by default) on its
+#      mesh IP. All of the rules below sum across the tier, so scrape
+#      every instance rather than picking one.
+#
+#   2. Scrape sf-resources too, on RESOURCES_METRICS_PORT (13007). The
+#      model needs to know the shape of your cluster and that is where
+#      instances_active comes from. Without it every modelled value is
+#      empty and the alerts below can never fire -- which looks exactly
+#      like everything being fine.
+#
+#   3. Copy this file into your Prometheus rule directory, the one named
+#      by rule_files in prometheus.yml, and reload.
+#
+#   4. Confirm it evaluates: query sf_database:budget_ceiling in the
+#      expression browser. It should return one series per budgeted pair.
+#      If it returns nothing, step 2 is usually why.
+#
+# Confirming an alert actually fires, which is worth doing once: copy this
+# file, change the "* {multiplier}" in the ceiling rule to "* 0", and
+# reload. Every budgeted pair is then over its ceiling and
+# ShakenFistDatabasePairOverBudget fires for all of them within the hour.
+# Put the original back afterwards. A rule which is loaded but never
+# evaluated reads the same as a healthy cluster, and the only way to tell
+# them apart is to have seen it fire once.
+#
+# What to do when one fires
+# -------------------------
+#
+# Run "sf-ctl database-load --json" and attach its output to an issue at
+# https://github.com/shakenfist/shakenfist/issues. It reports the same
+# comparison this does, per caller, without needing Prometheus. See
+# docs/operator_guide/database.md.
+
+groups:
+  - name: shakenfist-database-load
+    interval: 5m
+    rules:
+      # The shape of this cluster. sf-resources publishes
+      # instances_active from every node whatever its roles, so counting
+      # the series counts nodes and summing them counts standing
+      # instances.
+      - record: sf_database:cluster_nodes
+        expr: count(instances_active)
+
+      - record: sf_database:standing_instances
+        expr: sum(instances_active)
+
+      # Measured load. The one hour rate is for graphing and the one day
+      # rate is what the alerts below use: this detects a regression
+      # rather than an incident, and a day of smoothing keeps a busy
+      # afternoon from reading as one.
+      - record: sf_database:request_rate
+        expr: |-
+          sum by (operation, caller_daemon) (rate(database_requests_total[1h]))
+
+      - record: sf_database:request_rate:1d
+        expr: |-
+          sum by (operation, caller_daemon) (rate(database_requests_total[1d]))
+
+      - record: sf_database:request_rate:total
+        expr: sum(sf_database:request_rate)
+
+      # Budget coefficients, rendered from database_load_budget.yaml. Every
+      # pair appears in all three, zero included, because PromQL arithmetic
+      # intersects label sets and a pair missing a term would drop out.
+      - record: sf_database:budget:per_node_base
+        expr: |-
+          label_replace(label_replace(vector(0.017), "operation", "AcquireLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "AcquireLock", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.138), "operation", "CountReferencesTo", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "CountReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.496), "operation", "Dequeue", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.512), "operation", "Dequeue", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.058), "operation", "FindInstances", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.028), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.02), "operation", "FindNamespaceKeys", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.034), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.108), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.072), "operation", "FindNetworks", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.503), "operation", "GetAddressesInUse", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.159), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.099), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.199), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.063), "operation", "GetArtifactAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetArtifactAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.14), "operation", "GetBlob", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.158), "operation", "GetBlob", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.138), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.149), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.509), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.009), "operation", "GetClusterOperation", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.016), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.033), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.01), "operation", "GetIPAM", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.009), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.15), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.008), "operation", "GetInstance", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.174), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.021), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.039), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.008), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.075), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(0.105), "operation", "GetLatestClusterOperationTarget", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.042), "operation", "GetNamespace", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.036), "operation", "GetNamespaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.03), "operation", "GetNamespaceKeyByName", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.014), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.06), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNetworkInterfaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNetworkInterfaceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.199), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.022), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.022), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.032), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.066), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.066), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.02), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.032), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.033), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.022), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.022), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.488), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.5), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.497), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.496), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.497), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.497), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(0.498), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.032), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.099), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.155), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.403), "operation", "GetObjectState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1.106), "operation", "GetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.113), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.293), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.229), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.057), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.02), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.084), "operation", "GetReferencesTo", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.1), "operation", "GetReservationsForIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.01), "operation", "HasPendingClusterOperationTarget", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.047), "operation", "RecordEventBatch", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.01), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.149), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.017), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.099), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.148), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.066), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.066), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+
+      # Work done once for the whole cluster rather than once per node. This
+      # one can be negative: the elected cluster daemon polls its daemon
+      # state row from a five second loop rather than the two second interval
+      # every other daemon idles at, so its pair is 0.5 per node less 0.3.
+      - record: sf_database:budget:cluster_base
+        expr: |-
+          label_replace(label_replace(vector(0.0), "operation", "AcquireLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1.071), "operation", "AcquireLock", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "CountReferencesTo", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(1.586), "operation", "CountReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "Dequeue", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "Dequeue", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNamespaceKeys", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNetworks", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAddressesInUse", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.951), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.182), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetArtifactAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.476), "operation", "GetArtifactAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlob", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlob", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1.319), "operation", "GetBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1.333), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.206), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1.096), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.206), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetIPAM", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetLatestClusterOperationTarget", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNamespace", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNamespaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNamespaceKeyByName", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNetworkInterfaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNetworkInterfaceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(-0.3), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.102), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1.986), "operation", "GetObjectState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.222), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesTo", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(1.378), "operation", "GetReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReservationsForIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "HasPendingClusterOperationTarget", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.086), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.973), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+
+      # Load which scales with how many instances are standing.
+      - record: sf_database:budget:per_instance
+        expr: |-
+          label_replace(label_replace(vector(0.026), "operation", "AcquireLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "AcquireLock", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "CountReferencesTo", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "CountReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "Dequeue", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.008), "operation", "Dequeue", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNamespaceKeys", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.02), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.132), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "FindNetworks", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.114), "operation", "GetAddressesInUse", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetArtifactAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetArtifactAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlob", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlob", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperation", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.015), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.005), "operation", "GetIPAM", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.016), "operation", "GetInstance", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.019), "operation", "GetInstance", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.31), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.027), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.042), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.356), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.026), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.014), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.134), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(0.025), "operation", "GetLatestClusterOperationTarget", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.008), "operation", "GetNamespace", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNamespaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.014), "operation", "GetNamespaceKeyByName", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.004), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.068), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.04), "operation", "GetNetworkInterfaceAttributes", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.313), "operation", "GetNetworkInterfaceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.078), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.09), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.016), "operation", "GetObjectState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.432), "operation", "GetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.04), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.005), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(0.544), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.026), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.021), "operation", "GetReferencesTo", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "GetReservationsForIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.038), "operation", "HasPendingClusterOperationTarget", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.027), "operation", "RecordEventBatch", "", ""), "caller_daemon", "api", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.007), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.016), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.026), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.006), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.008), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(0.013), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+
+      # The pairs worth alerting on. A pair is left out when its budget is
+      # provisional -- it records a known defect rather than a floor worth
+      # defending -- or when it is activity coupled, meaning its level is
+      # set by what your users and tooling do rather than by a loop of ours.
+      - record: sf_database:budget:enforced
+        expr: |-
+          label_replace(label_replace(vector(1), "operation", "AcquireLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "AcquireLock", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "CountReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "Dequeue", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "Dequeue", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "FindInstances", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "FindNetworkInterfaces", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "FindNetworks", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetAddressesInUse", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetAllArtifactIndexes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetAllNodeDaemonStates", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetAllNodeMetrics", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetArtifactAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetBlob", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetBlobAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetBlobHashes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetBlobTransfersForBlob", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetBlobTransfersForNode", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetClusterOperation", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetClusterOperationTargetsForObject", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetDnsMasq", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetExistingLocks", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstance", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstance", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNetworkAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNetworkInterfaceAttributes", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNode", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNode", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "sidechannel", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeDaemonState", "", ""), "caller_daemon", "transfers", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetReferencesTo", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "GetReservationsForIPAM", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "HasPendingClusterOperationTarget", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "Resolve", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cluster", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
+          or
+          label_replace(label_replace(vector(1), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+
+      # The model, evaluated for this cluster. Clamped at zero because of
+      # the negative cluster term described above.
+      - record: sf_database:modelled_rate
+        expr: |-
+          clamp_min(
+            sf_database:budget:per_node_base
+              * on() group_left() sf_database:cluster_nodes
+            + sf_database:budget:cluster_base
+            + sf_database:budget:per_instance
+              * on() group_left() sf_database:standing_instances,
+            0)
+
+      # The cluster total, measured against modelled. This pair is what
+      # the "Database tier load" panel in examples/grafana-dashboard.json
+      # draws, and is the quickest way to see whether load has moved for
+      # a reason the model already knows about.
+      - record: sf_database:modelled_rate:total
+        expr: sum(sf_database:modelled_rate)
+
+      # The same two numbers over the enforced pairs alone, which is the
+      # comparison that actually means something on a cluster which is
+      # not ours. The totals above include every activity coupled pair,
+      # whose level was fitted against the API traffic of the cluster the
+      # budget was derived from -- so on a deployment whose users and
+      # tooling behave differently the two total lines diverge steadily
+      # and permanently, for a reason which is not a regression. These
+      # two exclude those pairs and the provisional ones, so they are
+      # comparable across deployments and they are what
+      # ShakenFistDatabasePairOverBudget is summing up.
+      - record: sf_database:request_rate:enforced_total
+        expr: |-
+          sum(
+            sf_database:request_rate
+              and on (operation, caller_daemon) sf_database:budget:enforced
+          )
+
+      - record: sf_database:modelled_rate:enforced_total
+        expr: |-
+          sum(
+            sf_database:modelled_rate
+              and on (operation, caller_daemon) sf_database:budget:enforced
+          )
+
+      # The model, averaged over the window the alerts measure across.
+      # The alerts compare a one day rate; the modelled rate is evaluated
+      # from the cluster's shape right now. When a cluster shrinks --
+      # instances deleted, a node drained -- the model drops at once
+      # while the measurement still carries yesterday's larger cluster,
+      # and every per-instance pair reads over budget for up to a day for
+      # a reason which is not a regression. "for: 1h" does not cover a
+      # mismatch that lasts 24h, so smooth the model to match instead.
+      - record: sf_database:modelled_rate:1d
+        expr: avg_over_time(sf_database:modelled_rate[1d])
+
+      # The ceiling is deliberately generous. These rules exist to catch a
+      # new polling loop or one which lost its bulk read, not to police a
+      # ten percent drift.
+      - record: sf_database:budget_ceiling
+        expr: |-
+          sf_database:modelled_rate:1d * 2.0 + 0.5
+
+      # What a pair with no budget entry is allowed before it looks like a
+      # new polling loop. A model rather than a number for the same reason
+      # everything above is: the pairs deliberately left out of the budget
+      # are mostly per-node loops running under the inclusion cut, so a
+      # flat threshold is one the largest of them crosses on a cluster
+      # rather bigger than ours -- permanently, where nothing is wrong.
+      - record: sf_database:unbudgeted_ceiling
+        expr: |-
+          clamp_min(
+            sf_database:cluster_nodes * 0.05,
+            0.25)
+
+      - alert: ShakenFistDatabasePairOverBudget
+        expr: |-
+          (
+            sf_database:request_rate:1d > sf_database:budget_ceiling
+          ) and on (operation, caller_daemon) sf_database:budget:enforced
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            {{ $labels.caller_daemon }} is making far more
+            {{ $labels.operation }} calls than a cluster of this shape
+            should
+          description: >-
+            Measured {{ $value | printf "%.2f" }} calls per second
+            against a modelled ceiling for this cluster's node and
+            instance counts. Either something is doing more database work
+            than it used to, or the cluster changed shape in a way the
+            model does not capture. Run "sf-ctl database-load --json" and
+            attach the output to an issue.
+
+      - alert: ShakenFistUnbudgetedDatabasePolling
+        expr: |-
+          (
+            sf_database:request_rate:1d
+              unless on (operation, caller_daemon)
+                sf_database:budget:per_node_base
+          ) > on() group_left() sf_database:unbudgeted_ceiling
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            {{ $labels.caller_daemon }} is calling
+            {{ $labels.operation }} at a steady rate nobody budgeted
+            for
+          description: >-
+            This (operation, caller_daemon) pair is not in Shaken Fist's
+            shipped load budget and has sustained
+            {{ $value | printf "%.2f" }} calls per second for an hour,
+            which is more than a cluster of this many nodes should see
+            from traffic nobody budgeted for, and is what a new polling
+            loop looks like. If you are
+            running a modified Shaken Fist this may be yours; otherwise
+            please report it.
+
+      - alert: ShakenFistDatabaseLoadModelBlind
+        expr: absent(sf_database:cluster_nodes)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: The database load model cannot see the cluster's shape
+          description: >-
+            instances_active is absent, so every modelled value above is
+            empty and neither of the other alerts in this file can fire.
+            That looks exactly like a healthy cluster, which is why this
+            alert exists. Scrape sf-resources on RESOURCES_METRICS_PORT
+            (13007 by default) on every node.

@@ -176,6 +176,7 @@ packages = ["shakenfist"]
 
 [tool.setuptools.package-data]
 shakenfist = [
+    "data/*.yaml",
     "deploy/**"
 ]
 

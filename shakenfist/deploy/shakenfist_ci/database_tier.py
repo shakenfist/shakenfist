@@ -23,6 +23,7 @@ import requests
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import load_budget as lb
 
 
 METRICS_PORT = 13006
@@ -78,7 +79,11 @@ def scrape_database_counters(mesh_ip):
         if not name.startswith('database_') or not name.endswith('_total'):
             continue
         try:
-            counters[name] = float(parts[-1])
+            # parts[1], not parts[-1]: a sample may carry a trailing
+            # millisecond timestamp, which the last field would return as
+            # the counter. Unlabelled samples only, so splitting the line
+            # on whitespace is safe here in a way it is not above.
+            counters[name] = float(parts[1])
         except ValueError:
             continue
     return counters
@@ -90,28 +95,26 @@ def scrape_operation_requests(mesh_ip, operation, caller_daemon):
     ``operation`` may be None to sum every operation that caller has
     made. The samples this reads are labelled, so their names do not end
     in _total and scrape_database_counters() skips them.
+
+    Shares lb.parse_request_samples() with scrape_request_pairs() rather
+    than testing label substrings against the raw line. That was a third
+    copy of this parser, and the only one still reading the last
+    whitespace field as the value: a sample carrying a trailing timestamp
+    counted the timestamp, and a label value containing a space truncated
+    the line before the labels being matched on. Matching whole labels
+    also means a crafted label value cannot forge one.
     """
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
     resp = requests.get(url, timeout=METRICS_TIMEOUT)
     resp.raise_for_status()
 
-    wanted = ['caller_daemon="%s"' % caller_daemon]
-    if operation:
-        wanted.append('operation="%s"' % operation)
-
     total = 0.0
-    for line in resp.text.splitlines():
-        if not line.startswith('database_requests_total{'):
+    for labels, value in lb.parse_request_samples(resp.text):
+        if labels.get('caller_daemon') != caller_daemon:
             continue
-        parts = line.split()
-        if len(parts) < 2:
+        if operation and labels.get('operation') != operation:
             continue
-        if not all(w in parts[0] for w in wanted):
-            continue
-        try:
-            total += float(parts[-1])
-        except ValueError:
-            continue
+        total += value
     return total
 
 
@@ -148,6 +151,46 @@ class DatabaseTierTestsMixin:
                 'vacuously. Nodes seen: %s'
                 % json.dumps([n.get('name') for n in nodes], sort_keys=True))
         return database_nodes
+
+    def _all_pairs(self, database_nodes):
+        """Every (operation, caller_daemon) counter, summed across the tier.
+
+        Retried the same way and for the same reason as _sum_requests():
+        a refused scrape says nothing about the property under test, and
+        these tests gate every PR.
+
+        Returns the totals and the mean of the moments they were read at.
+        The caller turns two of these into rates, and the interval it
+        should divide by is the one between the reads, not the sleep it
+        put between them: a sweep of this tier costs up to
+        SCRAPE_ATTEMPTS x (METRICS_TIMEOUT + SCRAPE_RETRY_SECONDS) per
+        node when nodes are slow, which against a 60s window is enough
+        to push a budgeted pair past its ceiling and fail the build for
+        a regression which is not there. Differencing the means is
+        exact when every node is read at the same rate and close enough
+        otherwise, and it is what makes a slow sweep cancel rather than
+        accumulate.
+        """
+        totals = {}
+        read_at = []
+        for node in database_nodes:
+            last = None
+            for attempt in range(SCRAPE_ATTEMPTS):
+                try:
+                    for key, value in lb.scrape_request_pairs(node['ip']).items():
+                        totals[key] = totals.get(key, 0.0) + value
+                    read_at.append(time.monotonic())
+                    break
+                except Exception as e:
+                    last = e
+                    if attempt < SCRAPE_ATTEMPTS - 1:
+                        time.sleep(SCRAPE_RETRY_SECONDS)
+            else:
+                self.fail(
+                    'Failed to scrape database metrics from %s (%s) after '
+                    '%d attempts: %s'
+                    % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
+        return totals, sum(read_at) / len(read_at)
 
     def _sum_requests(self, database_nodes, operation, caller_daemon):
         """Sum one counter across the tier, retrying a failed scrape.
@@ -384,3 +427,315 @@ class DatabaseTierTestsMixin:
             'per blob rendered rather than once per request. '
             'measurement=%s'
             % (per_get, INSTANCE_WALK_CEILING_PER_GET, measurement))
+
+    def test_no_unbudgeted_fixed_rate_database_polling(self):
+        # Nothing in CI would have caught the load regression phase 6 spent
+        # a fortnight on. It ran for eleven days before anybody looked,
+        # because the only detector was a nightly job watching one
+        # production cluster. This is the review-time version.
+        #
+        # It asserts shape, not level. A CI cluster is small, short lived,
+        # shares hardware, and -- because stestr runs this suite in
+        # parallel -- is never idle while this runs. So rather than ask
+        # "how much load is there", which no assertion here could make
+        # stick, it asks "is any of this load metronomic".
+        #
+        # Metronomic takes two measurements, because the first one alone
+        # was not enough. A pair must run at the same rate in every window,
+        # which the test in the next worker creating an instance does not
+        # -- but a blob heavy test running flat out for the whole
+        # measurement does, and that is what made the check report a
+        # different handful of imaginary polling loops in each of three
+        # merge queue jobs. So a pair must also have held its rate while
+        # the rest of the suite got busier around it, which is what a rate
+        # set by configuration does and what work driven by the suite
+        # cannot.
+        database_nodes = self._database_nodes()
+        nodes = self.system_client.get_nodes()
+
+        windows = []
+        elapsed_seconds = []
+        restarted = []
+        counters, read_at = self._all_pairs(database_nodes)
+        for _ in range(lb.LOAD_WINDOW_COUNT):
+            time.sleep(lb.LOAD_WINDOW_SECONDS)
+            later, later_read_at = self._all_pairs(database_nodes)
+
+            # Divide by what was actually measured, not by what was
+            # slept. See _all_pairs().
+            elapsed = later_read_at - read_at
+            elapsed_seconds.append(round(elapsed, 1))
+
+            window = {}
+            for key, value in later.items():
+                delta = value - counters.get(key, 0.0)
+                if delta < 0:
+                    # A counter went backwards, so an sf-database
+                    # restarted inside this window and began again from
+                    # zero. sf-ctl's reader drops these for the same
+                    # reason; here they are also recorded, because
+                    # without that the assertions below see a pair which
+                    # simply stopped and report it as this harness
+                    # having lost sight of the cluster.
+                    restarted.append({'operation': key[0],
+                                      'caller_daemon': key[1],
+                                      'delta': delta})
+                    continue
+                window[key] = delta / elapsed
+            windows.append(window)
+            counters, read_at = later, later_read_at
+
+        # Said once, up front, rather than left to be inferred from
+        # whichever assertion below trips over the gap it leaves.
+        self.assertEqual(
+            [], restarted,
+            'A database_requests_total counter went backwards during the '
+            'measurement, which means an sf-database restarted inside it. '
+            'Every rate below is then measured across a window the tier '
+            'did not survive, so this run cannot say whether the cluster '
+            'is polling more than it should -- and the failure it would '
+            'otherwise report is a restart, not a regression. Look at why '
+            'sf-database restarted. counters=%s'
+            % json.dumps(restarted, sort_keys=True))
+
+        # The positive control, asserted first and without reference to the
+        # budget, because it is the check which says whether any of the
+        # rest of this measured anything at all. Every daemon polls its own
+        # node_daemon_states row on a schedule set by configuration rather
+        # than by workload, so its rate is predictable from the daemon
+        # inventory: if a pair which must be there is missing, or runs well
+        # under the rate the code dictates, then this harness cannot see
+        # part of the cluster and every "nothing is over budget"
+        # conclusion below is vacuous. That is not hypothetical -- until
+        # #3708 this counter could not see daemons co-located with MariaDB,
+        # which on our production cluster was two nodes of six, and phase 6
+        # spent a fortnight chasing the difference as though it were load.
+        daemon_nodes = lb.daemon_node_counts(nodes)
+        self.assertNotEqual(
+            {}, daemon_nodes,
+            'No node reported a running daemon, so the poll rates below '
+            'cannot be predicted and this test proves nothing. Nodes '
+            'seen: %s' % json.dumps([n.get('name') for n in nodes]))
+
+        # The highest rate seen in any window, for both halves of the
+        # control, because each half asks a different question of it.
+        #
+        # Undercount asks "can this harness see the whole cluster", which
+        # is a persistent condition: a daemon visible in either window is
+        # a daemon the harness can see, and taking the minimum instead
+        # fails the build whenever one window happens to straddle a
+        # daemon restart.
+        #
+        # Overcount asks "has the rate limit in check_daemon_state()
+        # stopped working", which is the opposite: a daemon polling at
+        # twice the permitted rate in one window and normally in the
+        # other has still lost its rate limit, and the minimum would let
+        # that through.
+        control = {}
+        for daemon, node_count in sorted(daemon_nodes.items()):
+            rates = [w.get(('GetNodeDaemonState', daemon), 0.0)
+                     for w in windows]
+            measured = max(rates)
+            expected = node_count / lb.DAEMON_STATE_POLL_INTERVAL
+            if daemon == 'cluster':
+                # One cluster daemon cluster-wide holds the maintenance
+                # lock, and its elected loop sleeps on the lock rather than
+                # in idle(), so it polls once per loop instead of once per
+                # interval. See #3874, which is what happened when it did
+                # not poll at all.
+                expected -= (1.0 / lb.DAEMON_STATE_POLL_INTERVAL
+                             - 1.0 / lb.ELECTED_CLUSTER_LOOP_SECONDS)
+            control[daemon] = {'nodes': node_count, 'expected_qps': expected,
+                               'measured_qps': measured,
+                               'measured_qps_per_window': [round(r, 3)
+                                                           for r in rates]}
+
+        self.addDetail('poll_positive_control', content.text_content(
+            json.dumps({'daemons': control,
+                        'measured_seconds': elapsed_seconds},
+                       indent=2, sort_keys=True)))
+
+        for daemon, seen in sorted(control.items()):
+            self.assertGreater(
+                seen['measured_qps'],
+                seen['expected_qps'] * lb.POLL_UNDERCOUNT_TOLERANCE,
+                'The %s daemon runs on %d node(s), and each one polls its '
+                'own daemon state row every %.1fs, so the tier should be '
+                'serving about %.2f GetNodeDaemonState/s for it. Its '
+                'busiest window served %.2f. Either this harness cannot '
+                'see the whole '
+                'cluster -- in which case nothing else this test asserts '
+                'means anything -- or those daemons have stopped polling. '
+                'control=%s'
+                % (daemon, seen['nodes'], lb.DAEMON_STATE_POLL_INTERVAL,
+                   seen['expected_qps'], seen['measured_qps'],
+                   json.dumps(control, sort_keys=True)))
+            self.assertLess(
+                seen['measured_qps'],
+                seen['expected_qps'] * lb.POLL_OVERCOUNT_TOLERANCE + 0.5,
+                'The %s daemon is polling its daemon state row faster than '
+                'DAEMON_STATE_POLL_INTERVAL allows (%.2f/s against an '
+                'expected %.2f/s). Either the rate limit in '
+                'Daemon.check_daemon_state() has stopped working, or '
+                'something else has started reading that row. control=%s'
+                % (daemon, seen['measured_qps'], seen['expected_qps'],
+                   json.dumps(control, sort_keys=True)))
+
+        # Now the budget. Only the metronomic pairs are considered, and
+        # each at its lowest observed rate.
+        budget = lb.load_budget()
+        defaults = budget['defaults']
+        entries = {(e['operation'], e['caller_daemon']): e
+                   for e in budget['entries']}
+        node_count = len(nodes)
+
+        # Powered on instances, not every instance. The per-instance
+        # coefficients were fitted against instances_active, which counts
+        # running libvirt domains, so a powered off instance contributes
+        # nothing to the model and must not contribute here either --
+        # counting it would raise every ceiling below by its coefficient
+        # for load it does not produce. power_state is the closest thing
+        # the API offers to that series; it is what the hypervisor last
+        # reported for the domain.
+        standing_instances = len(
+            [i for i in self.system_client.get_instances()
+             if i.get('power_state') == 'on'])
+        # Steady is not yet metronomic. A blob heavy test running at a
+        # level rate for the whole measurement is steady too, which is how
+        # the first version of this check came to report twelve pairs of
+        # blob and transfer traffic as new polling loops in one merge queue
+        # job and a different five in the next, with no pair common to
+        # both. So the steady set is narrowed to the pairs whose rate did
+        # not follow the rest of the suite, which is the property a poll
+        # has and a busy test does not.
+        steady = lb.fixed_rate(windows)
+        independent = lb.independent_of_activity(windows)
+        metronomic = {key: rate for key, rate in steady.items()
+                      if key in independent}
+        spread = lb.activity_spread(windows)
+        unbudgeted_ceiling = lb.unbudgeted_ceiling_qps(defaults, node_count)
+
+        # The discriminator's own positive control, which is the same
+        # argument as the poll control above and about a different thing:
+        # that one asks whether the harness can see the cluster, this asks
+        # whether this run's measurement can tell a poll from a test.
+        # GetNodeDaemonState is the traffic on this cluster which is
+        # definitely a poll -- every daemon reads its own row on a fixed
+        # interval, at a rate the control above just finished asserting.
+        # If the filter cannot recognise those, it would not recognise a
+        # new poll either, and an empty unbudgeted list below would mean
+        # nothing.
+        recognised = sorted(
+            '%s/%s' % (operation, daemon)
+            for operation, daemon in set(metronomic)
+            if operation == 'GetNodeDaemonState' and daemon in daemon_nodes)
+
+        over = []
+        unbudgeted = []
+        harness = []
+        reported = []
+        for key, measured in sorted(metronomic.items()):
+            entry = entries.get(key)
+            if entry is None:
+                if measured <= unbudgeted_ceiling:
+                    continue
+                # Traffic this suite polls for itself looks exactly like a
+                # server side poll to everything above, because it is one
+                # -- it is just on the wrong side of the API. Listed and
+                # argued in lb.HARNESS_DRIVEN_PAIRS, and reported below
+                # rather than dropped, because an exemption nobody can see
+                # in the run detail is an exemption nobody will revisit.
+                if lb.harness_driven(key):
+                    harness.append((key, measured))
+                else:
+                    unbudgeted.append((key, measured))
+                continue
+            modelled = lb.expected_qps(entry, node_count, standing_instances)
+            ceiling = (modelled * defaults['tolerance_multiplier']
+                       + defaults['tolerance_floor_qps'])
+            if measured <= ceiling:
+                continue
+            if lb.enforced(entry):
+                over.append((key, measured, modelled, ceiling))
+            else:
+                reported.append((key, measured, modelled, ceiling))
+
+        summary = {
+            'nodes': node_count,
+            'standing_instances': standing_instances,
+            'window_seconds': lb.LOAD_WINDOW_SECONDS,
+            'unbudgeted_ceiling_qps': round(unbudgeted_ceiling, 3),
+            'measured_seconds': elapsed_seconds,
+            'windows': lb.LOAD_WINDOW_COUNT,
+            'pairs_seen': len(windows[0]),
+            'pairs_fixed_rate': len(steady),
+            'pairs_metronomic': len(metronomic),
+            'activity_qps_per_window': [
+                round(level, 3) for level in lb.activity_levels(windows)],
+            'activity_spread': round(spread, 3),
+            'activity_spread_required': lb.ACTIVITY_DISCRIMINATION_SPREAD,
+            'known_polls_recognised': recognised,
+            'over_budget': [
+                {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
+                 'modelled': mod, 'ceiling': c} for k, m, mod, c in over],
+            'unbudgeted': [
+                {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
+                for k, m in unbudgeted],
+            'harness_driven': [
+                {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
+                for k, m in harness],
+            'over_budget_but_not_enforced': [
+                {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
+                 'modelled': mod} for k, m, mod, _ in reported],
+        }
+        self.addDetail('database_load', content.text_content(
+            json.dumps(summary, indent=2, sort_keys=True)))
+
+        # Both assertions below read the metronomic set, so both are
+        # vacuous unless this run could tell metronomic from busy. Where it
+        # could not, say so and stop: a skip is visible in the run log,
+        # where a pass on a measurement that proved nothing reads as
+        # coverage -- which is the failure this module's own header warns
+        # about.
+        if spread < lb.ACTIVITY_DISCRIMINATION_SPREAD:
+            self.skipTest(
+                'The tier ran at a level rate throughout the measurement '
+                '(busiest window over quietest was %.2f, and %.2f is '
+                'needed), so every pair here is exactly as steady in its '
+                'share of the traffic as it is in its rate, and this run '
+                'cannot tell a polling loop from a test which happened to '
+                'run at a constant rate. summary=%s'
+                % (spread, lb.ACTIVITY_DISCRIMINATION_SPREAD,
+                   json.dumps(summary, sort_keys=True)))
+
+        if not recognised:
+            self.skipTest(
+                'No GetNodeDaemonState pair survived the fixed-rate filter, '
+                'and those are the one kind of traffic on this cluster '
+                'which is certainly a poll. The filter therefore could not '
+                'have recognised a new poll either, so the empty result '
+                'below proves nothing. summary=%s'
+                % json.dumps(summary, sort_keys=True))
+
+        self.assertEqual(
+            [], unbudgeted,
+            'These (operation, caller_daemon) pairs are not in '
+            'shakenfist/data/database_load_budget.yaml, and ran above '
+            '%.2f/s at the same rate in every measurement window without '
+            'following the rest of the suite, which is what a new '
+            'fixed-rate poll looks like and what a busy test does not. If '
+            'the traffic is meant to be there, add it to the budget with a '
+            'note naming the loop which produces it -- or, if this suite '
+            'is what produces it rather than the cluster, to '
+            'HARNESS_DRIVEN_PAIRS in load_budget.py, which says what such '
+            'an entry has to argue. summary=%s'
+            % (unbudgeted_ceiling, json.dumps(summary, sort_keys=True)))
+
+        self.assertEqual(
+            [], over,
+            'These pairs are budgeted and ran steadily well above what the '
+            'model predicts for a cluster of this shape. Do not raise the '
+            'budget to make this pass: either the load is a regression '
+            'worth fixing, or the model has changed and that change '
+            'belongs in a commit which says so. summary=%s'
+            % json.dumps(summary, sort_keys=True))

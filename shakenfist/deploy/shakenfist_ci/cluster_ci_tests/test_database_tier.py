@@ -14,9 +14,9 @@ class TestDatabaseTier(database_tier.DatabaseTierTestsMixin,
                        base.BaseNamespacedTestCase):
     """The multi-node database tier assertions.
 
-    The two portable tests come from DatabaseTierTestsMixin and also run
-    in the smoke suite; this class adds the one assertion which needs
-    more than one sf-database instance to mean anything.
+    The portable tests come from DatabaseTierTestsMixin and also run in
+    the smoke suite; this class adds the one assertion which needs more
+    than one sf-database instance to mean anything.
     """
 
     def __init__(self, *args, **kwargs):
