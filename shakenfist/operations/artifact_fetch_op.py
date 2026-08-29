@@ -6,6 +6,9 @@ from shakenfist.artifact import Artifact
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.schema.operations import artifact_fetch_op as schema
 from shakenfist.eventlog import add_event_multi
+from shakenfist.exceptions import BlobFetchFailed
+from shakenfist.exceptions import BlobMissing
+from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.exceptions import HTTPError
 from shakenfist.exceptions import TooManyMatches
 from shakenfist import images
@@ -92,7 +95,19 @@ class ArtifactFetchOp(BaseClusterOperation):
             self.__getattribute__(f'_{task.name}')(inst)
         except Exception as e:
             util_exceptions.ignore_exception('artifact_fetch_op', e)
-            self.state = ArtifactFetchOp.STATE_ERROR
+
+            # A failure here must also drive the instance to an error state.
+            # The dependent instance start operation is aborted by the queue
+            # dispatcher without ever executing, so nothing downstream will --
+            # without this the instance sits in state initial forever
+            # (issue 3494).
+            if inst:
+                inst.enqueue_delete_due_error(f'failed to fetch image: {e}')
+
+            # The op might not be in executing if it has been aborted because
+            # the instance start request which created it has been aborted.
+            if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
+                self.state = ArtifactFetchOp.STATE_ERROR
 
     def _image_fetch(self, inst):
         try:
@@ -122,6 +137,42 @@ class ArtifactFetchOp(BaseClusterOperation):
         try:
             images.ImageFetchHelper(inst, a).get_image()
             a.add_event(EVENT_TYPE_AUDIT, 'artifact fetch complete')
+
+        except (BlobFetchFailed, BlobMissing, BlobTransferSetupFailed) as e:
+            # Replicating a blob from within the cluster failed -- for
+            # example every source node timed out awaiting our transfer
+            # connection because this node was too loaded to connect
+            # (issue 3494). This is usually transient, so retry with
+            # backoff before erroring out.
+            msg = str(e)
+            if self.defer_with_backoff(reason=msg):
+                a.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'transient blob replication failure, will retry',
+                    extra={
+                        'message': msg,
+                        'defer_count': self.current_defer_count + 1
+                    })
+                return
+
+            # Unlike an upstream fetch failure, a replication failure does
+            # not mean the artifact itself is bad -- other nodes still hold
+            # valid copies -- so only error the artifact if it has never had
+            # a good version.
+            if a.state.value in [Artifact.STATE_INITIAL,
+                                 Artifact.STATE_CREATING]:
+                a.state = Artifact.STATE_ERROR
+                a.error = msg
+
+            if inst:
+                inst.enqueue_delete_due_error(
+                    f'failed to replicate image to target node: {msg}')
+
+            # The op might not be in executing if it has been aborted
+            # because the instance start request which created it has been
+            # aborted.
+            if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
+                self.state = ArtifactFetchOp.STATE_ERROR
 
         except (HTTPError, requests.exceptions.RequestException,
                 requests.exceptions.ConnectionError) as e:
