@@ -338,7 +338,9 @@ begins at `scheduler.py:505`. *(Line references as of
 which binds has moved from `sufficient_idle_cpu` to
 `sufficient_idle_memory` -- the mechanism is unchanged, an
 admission filter emptying the set before ranking, but a fix
-aimed only at CPU admission would now miss.)* Ranking cannot rank a candidate
+aimed only at CPU admission would now miss.)*
+
+Ranking cannot rank a candidate
 that is no longer in the candidate list. "Hard filters →
 affinity score → load" is already the ordering; the
 hard-filter step is what eats the node.
