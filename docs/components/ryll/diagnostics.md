@@ -15,8 +15,9 @@ Ryll tracks:
   The window keeps the most recent 120 timestamps for an accurate
   short-term reading.
 - **Bytes in/out**: Network throughput per channel
-- **Latency**: Client-observed inter-PING interval on the main channel,
-  in milliseconds. SPICE has no client-originated probe (`SPICE_MSG_PING`
+- **PING interval**: Client-observed interval between server PINGs on the
+  main channel, in milliseconds, shown in the status bar under that
+  label. SPICE has no client-originated probe (`SPICE_MSG_PING`
   is server→client only), so ryll cannot measure absolute network RTT.
   Instead, the main-channel PING handler records `Instant::now()` and
   emits the gap to the previous PING as a sample. The number includes
@@ -160,9 +161,21 @@ writes the zip to the capture directory's `bug-reports/`
 subdirectory (if `--capture` is active) or the current working
 directory.
 
-`RyllApp::generate_bug_report()` is the high-level entry point
-that collects surface pixels, constructs the `BugReport`, and
-writes the zip.
+No caller may run that sample on a thread that has to stay
+responsive.  The auto-snapshot loop wraps the whole
+`BugReport::new()` call in `tokio::task::spawn_blocking`; the
+--pedantic observer samples in `spawn_blocking` and hands the
+result to `BugReport::write_pedantic()`.
+
+`RyllApp::finish_bug_report()` is the GUI entry point.  It
+captures the submit-time surface pixels, the trigger timestamps,
+and the precomputed PNG, starts the metrics sample on a dedicated
+`std::thread`, and parks the submission.
+`RyllApp::poll_pending_bug_report()` picks it up on the frame the
+sample lands, calls `BugReport::assemble()` with the sampled
+metrics, and writes the zip.  The window keeps painting throughout,
+and a notification announces the start of the capture as well as
+its result.  A second submission is refused while one is in flight.
 
 Display bug reports carry two PNGs. `screenshot.png` is the
 surface captured the moment the dialog opens — a background

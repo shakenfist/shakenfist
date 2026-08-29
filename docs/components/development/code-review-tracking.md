@@ -439,7 +439,7 @@ carrying review state). See the plan for the full design,
 including why the stamps live in a sidecar rather than in
 weAudit's own JSON.
 
-Three behaviours worth knowing about:
+Four behaviours worth knowing about:
 
 * Prune compares against whatever `HEAD` currently is -- run it
   with an old branch checked out and it will (correctly, but
@@ -457,6 +457,17 @@ Three behaviours worth knowing about:
   review-only commit is exempt from CI, the mark then survived to
   the default branch where `prune-reviews` deleted it -- discarding
   the review rather than the staleness, which is the wrong half.
+* A stamp going stale is not a CI failure. Editing a reviewed
+  file is the ordinary case rather than a mistake, and the change
+  that does it is often not a change that can re-review anything
+  -- a Renovate action bump touching stamped workflow files least
+  of all. Staleness is handled after the merge instead of gated
+  before it: `prune-reviews` discards the mark on the next push to
+  main, and the `review-coverage` audit recomputes coverage
+  against `HEAD` and raises an issue once the backlog reaches
+  five files. This repository briefly asserted the opposite at
+  commit time, and every dependency bump touching a stamped
+  workflow failed CI until somebody re-stamped by hand.
 * When every file in a directory is reviewed, weAudit adds a
   derived *directory* entry to `auditedFiles` alongside the
   per-file entries. The tooling treats these as pure UI state:

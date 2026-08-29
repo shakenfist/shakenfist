@@ -161,3 +161,113 @@ status messages, the bandwidth tracker's `tick()`).
 - Single commit for step 2a (the implementation), single
   commit for step 2b (the measurement note appended to
   this file).
+
+## Step 2b result: measured 2026-08-27
+
+The measurement this phase was waiting on.  Step 2a landed
+in PR #36 in April; the verification run below is what
+closes the phase.
+
+### Environment
+
+Deliberately the same host phase 1 profiled, so the numbers
+are comparable rather than merely favourable: Kasm
+container, Debian, 16 cores, no GPU, Mesa llvmpipe software
+renderer, `DISPLAY=:10.0`.  Debug binary at
+`target/debug/ryll`, built by `make build` in the
+devcontainer — unoptimised, matching the baseline build.
+
+Phase 1 profiled against the production SPICE server at
+sf-3 over TLS; this run used the local `make test-qemu`
+UEFI latency guest at `localhost:5900`, 1280x800 surface.
+The contended resource is CPU rasterisation, not the
+network, so the substitution does not weaken the
+comparison — but it is a difference, and it is recorded
+rather than glossed.
+
+Method is phase 1's: sum `utime + stime` from
+`/proc/<pid>/task/<tid>/stat` across every thread, before
+and after a timed window, converted to percent of one core
+at `CLK_TCK` = 100.  That is now
+[`tools/measure-idle-cpu.sh`](https://github.com/shakenfist/ryll/blob/develop/tools/measure-idle-cpu.sh)
+rather than a recipe, so the next person to make a CPU
+claim about ryll can reproduce these numbers instead of
+quoting them:
+
+```
+tools/measure-idle-cpu.sh "$(pgrep -f 'ryll --direct')" 60
+```
+
+It reports per-thread-group and per-thread figures as well
+as the total, which matters here: the whole finding was
+that the cost sat in 16 llvmpipe rasteriser threads rather
+than in anything `top` would show against the main
+thread.
+
+### Idle, connected, no input
+
+**2.80% of one core** (168 jiffies over 60 s), against a
+baseline of **6.24 cores**.  A 223-fold reduction, and
+comfortably inside the under-10%-of-one-core target.
+
+| Thread group | Threads | Jiffies (60 s) | % of one core |
+|---|---|---|---|
+| llvmpipe-0..15 | 16 | 128 | 2.13 |
+| ryll (main/egui) | 2 | 27 | 0.45 |
+| Tokio workers | 16 | 13 | 0.22 |
+| Everything else | 68 | 0 | 0.00 |
+| **Total** | **102** | **168** | **2.80** |
+
+RSS 240 MB.  The llvmpipe residue is the 1 Hz fallback
+repaint doing its once-a-second rasterisation, which is the
+design.
+
+The pointer sat over the window rather than outside it for
+this run, so the number is measured under a slightly
+harsher condition than the criterion asks for.
+
+### Responsiveness is not the price paid
+
+Idle CPU that low would be worthless if egui had simply
+stopped waking.  Driving 864 synthetic X `MotionNotify`
+events across the surface over 18 s (XTEST, motion only)
+took the process to **269.5% of one core** for the
+duration, then back to idle.  egui wakes fully on input
+and rasterises at rate; it is asleep only when there is
+genuinely nothing to draw.
+
+### Smoke-test items
+
+- (a) idle CPU under 10% of one core — **2.80%**, above.
+- (b) mouse over the surface — repaints at full rate, above.
+- (c) typing reaches the guest — verified through
+  `--cadence`, which injects a keystroke every 2 s through
+  ryll's own inputs channel.  Screenshots of the ryll
+  window 3 s apart sampled the guest surface at
+  srgb(152,152,152), then srgb(0,0,0), then srgb(0,152,0).
+  The latency guest changes screen colour per keystroke, so
+  this exercises the whole loop: cadence timer → inputs
+  channel → guest → display channel → repaint bridge → a
+  window whose pixels actually changed.  Using cadence
+  rather than synthetic X key events also kept stray
+  keystrokes out of whatever window held focus.
+- (d) status-message expiry — **not re-tested.**  It needs
+  a keyboard event delivered to a focused ryll window, and
+  injecting blind keystrokes into a live desktop session
+  was not worth the risk for a path the 1 Hz fallback
+  covers by construction.
+- (e) bandwidth sparkline — ticking, with `0 B/s` and a
+  populated history on the idle guest.
+
+Cadence mode itself costs **10.43% of one core**: a
+full-surface colour change every 2 s forces a complete
+re-rasterisation.  That is the cost of real display
+activity, not an idle figure, and it is recorded here so a
+future reader does not mistake one for the other.
+
+### Bonus: phase 4's latency criterion also verified
+
+The status bar read `Latency: 0.1ms` with a populated
+sparkline throughout, sourced from server PINGs on the main
+channel.  0.1 ms is plausible for a loopback SPICE server,
+and — the point of phase 4 — it is not zero.
