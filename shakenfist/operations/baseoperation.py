@@ -311,8 +311,9 @@ class BaseClusterOperation(BaseOperation):
         # nothing" from "the fold never ran" is how #3878 stayed
         # invisible for three months: zero looked exactly like
         # disabled. ``coalesce_seconds`` is the cost of the
-        # claim_coalescible_siblings call, which baseoperation has
-        # asserted to be ~200 ms under load without ever measuring it.
+        # claim_coalescible_siblings call, which baseoperation asserted
+        # to be ~200 ms under load until phase 9 measured it at a 3.7 ms
+        # median over 42 hours of sfcbr.
         # It is measured with a monotonic clock: it is a pure interval,
         # never differenced against a stored timestamp the way
         # ``wait_seconds`` is, so an NTP step during the call must not
@@ -423,11 +424,20 @@ class BaseClusterOperation(BaseOperation):
 
         # Skip the cross-op fold when the dispatcher just dequeued only us
         # (``dispatcher_batch_size == 1``). The ``claim_coalescible_siblings``
-        # call costs ~200 ms under load and almost always returns empty in
-        # the uncontended case -- profiling the latest CI bundle showed it
-        # was the largest single per-op cost we added in this branch. A
-        # ``None`` value (e.g. op loaded outside the queue path) is treated
-        # as "we don't know, be conservative" and the fold runs.
+        # call almost always returns empty in the uncontended case, so
+        # skipping a query which cannot help is free.
+        #
+        # This guard used to be justified by a "~200 ms under load" cost
+        # taken from a CI bundle profile. Phase 9 measured the call on
+        # sfcbr over 42 hours and found a 3.7 ms median, a 5.2 ms p90 and a
+        # 149.5 ms maximum -- the old figure was measured while #3878 made
+        # every one of those queries unmatchable, so it was timing the
+        # wrong thing. Keep the guard for tidiness; do not justify anything
+        # else with the cost of this call without measuring it again. See
+        # "What step 9 measured" in docs/plans/PLAN-queue-performance.md.
+        #
+        # A ``None`` value (e.g. op loaded outside the queue path) is
+        # treated as "we don't know, be conservative" and the fold runs.
         skip_due_to_empty_queue = self.dispatcher_batch_size == 1
 
         # Skip the cross-op fold for per-node queues. The fold query keys

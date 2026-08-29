@@ -614,6 +614,18 @@ itself):
   so a repeat of that defect fails CI rather than waiting for an
   audit.
 
+  **What to expect from these numbers.** A 42 hour window on a
+  moderately busy cluster (2026-08-27 to 2026-08-29) recorded a
+  `coalesce_seconds` median of 3.7 ms, a p90 of 5.2 ms and a maximum
+  of 149.5 ms, so a fold costing tens of milliseconds is normal and
+  one costing hundreds is worth looking at. Over the same window the
+  fold ran 1,335 times and folded a sibling on 7 of them. **A long
+  run of `coalesce_folded: 0` is the expected state, not a fault** —
+  the fold only matches when duplicate work for one network is in
+  flight at the same moment. What would indicate a fault is
+  `coalesce_outcome` never once reading `ran` on a cluster doing
+  network work, which is the shape #3878 had.
+
 * **`enqueue-side dedup: reused pending op`** (`EVENT_TYPE_AUDIT`).
   Emitted on the *existing* operation, and on the network, when a
   new enqueue was answered with an already-pending op instead of a
