@@ -44,7 +44,7 @@ dependencies = [
     "werkzeug==3.1.8",                    # bsd
     "prometheus-client==0.26.0",          # apache2
     "bcrypt==5.0.0",                      # apache2
-    "cryptography==50.0.0",               # apache2
+    "cryptography==50.0.1",               # apache2
     "python-magic==0.4.27",               # mit
     "webargs==8.7.1",                     # mit
     "py-cpuinfo==9.0.0",                  # mit
