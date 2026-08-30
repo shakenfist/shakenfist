@@ -406,10 +406,14 @@ class SFConfig(BaseSettings):
     OBJECT_CACHE_TTL_IMMUTABLE: int = Field(
         300,
         description=(
-            'Seconds to cache the static values of objects that have no '
-            'post-creation writer (instance, network, networkinterface, '
-            'agentoperation). Only cross-process deletion can make these '
-            'stale, so the TTL can be long. 0 disables this cache tier.'
+            'Seconds to cache the static values of objects whose static '
+            'row changes only on create, delete, or a version-upgrade '
+            'persist (instance, network, networkinterface, agentoperation, '
+            'ipam). Some of these do have an update_<type> -- it evicts, '
+            'which is what keeps the tier correct -- so an updater added to '
+            'a type in this tier must evict too. Only cross-process '
+            'deletion can make these stale, so the TTL can be long. '
+            '0 disables this cache tier.'
         )
     )
     OBJECT_CACHE_TTL_MUTABLE: int = Field(
@@ -419,6 +423,17 @@ class SFConfig(BaseSettings):
             'rewritten by an online version upgrade (node, blob, artifact, '
             'upload, dnsmasq, namespace). Kept short to bound cross-process '
             'upgrade staleness. 0 disables this cache tier.'
+        )
+    )
+    OBJECT_CACHE_MAX_ENTRIES: int = Field(
+        20000,
+        description=(
+            'Maximum entries held in the in-process static object cache. '
+            'TTL expiry is lazy -- an entry is only reclaimed when its own '
+            'key is read again -- so without this bound the cache retains '
+            'every object a process has ever read, not its working set. On '
+            'overflow, expired entries are dropped first and then the '
+            'entries closest to expiry. 0 disables the bound.'
         )
     )
     SCHEDULER_TARGET_LOAD: float = Field(

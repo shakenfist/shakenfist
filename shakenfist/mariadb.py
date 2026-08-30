@@ -36,6 +36,7 @@ from uuid import uuid4
 
 import grpc
 from prometheus_client import Counter
+from prometheus_client import Gauge
 from pydantic import SecretStr
 import sqlalchemy as sa
 from sqlalchemy import event as sa_event
@@ -158,10 +159,24 @@ MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
 #     the cache self-heals after an upgrade.
 #   * Every entry is TTL-bounded, which is the only bound on staleness from a
 #     write made by another process (no local eviction hook fires there).
+#
+# TTL bounds staleness, not residency. Expiry is lazy -- an entry is only
+# reclaimed when its own key is read again -- so an object read once and never
+# read again would sit here for the life of the process, and a delete in
+# another process never reclaims anything here at all. The cache would
+# therefore grow to every object uuid the process has ever touched rather than
+# its working set, which is why _object_cache_put enforces
+# OBJECT_CACHE_MAX_ENTRIES. Found by the phase 8 push audit; phase 2 deferred
+# the bound believing TTL expiry supplied it.
 # See PLAN-database-load-reduction-phase-02-static-cache.md.
 # ---------------------------------------------------------------------------
 _OBJECT_CACHE: dict[tuple[str, str], tuple[float, Any]] = {}
 _OBJECT_CACHE_LOCK = threading.Lock()
+
+# On overflow, trim to this fraction of OBJECT_CACHE_MAX_ENTRIES rather than
+# to the cap itself, so the sort runs once per (1 - fraction) of the cap of
+# inserts rather than on every insert once full.
+OBJECT_CACHE_TRIM_TARGET = 0.9
 
 
 def _object_cache_key(object_type: str, key: Any) -> tuple[str, str]:
@@ -190,6 +205,16 @@ OBJECT_CACHE_EVICTIONS = Counter(
     'Static-object cache entries evicted by an update or delete.',
     ['object_type']
 )
+OBJECT_CACHE_SIZE = Gauge(
+    'database_object_cache_entries',
+    'Static-object cache entries currently resident in this process.'
+)
+OBJECT_CACHE_CAPACITY_EVICTIONS = Counter(
+    'database_object_cache_capacity_evictions_total',
+    'Static-object cache entries dropped to stay under '
+    'OBJECT_CACHE_MAX_ENTRIES. A sustained rate here means the working set '
+    'no longer fits and the hit rate is suffering.'
+)
 
 
 def _object_cache_get(object_type: str, key: Any) -> Any:
@@ -201,6 +226,7 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
     cache_key = _object_cache_key(object_type, key)
     now = time.monotonic()
     hit = None
+    size = None
     with _OBJECT_CACHE_LOCK:
         entry = _OBJECT_CACHE.get(cache_key)
         if entry is not None:
@@ -209,6 +235,14 @@ def _object_cache_get(object_type: str, key: Any) -> Any:
                 hit = model
             else:
                 del _OBJECT_CACHE[cache_key]
+                # Expiry is lazy, so this is the only place most entries ever
+                # leave the cache. Reads outnumber writes -- that is the point
+                # of a cache -- so a gauge moved only by _object_cache_put()
+                # and _object_cache_evict() drifts high indefinitely, and the
+                # operator guide sends operators here for occupancy.
+                size = len(_OBJECT_CACHE)
+    if size is not None:
+        OBJECT_CACHE_SIZE.set(size)
     if hit is not None:
         OBJECT_CACHE_HITS.labels(object_type=object_type).inc()
         return hit
@@ -224,9 +258,43 @@ def _object_cache_put(object_type: str, key: Any, model: Any, ttl: int) -> None:
     """
     if ttl <= 0 or model is None:
         return
+    now = time.monotonic()
+    dropped = 0
     with _OBJECT_CACHE_LOCK:
-        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (
-            time.monotonic() + ttl, model)
+        _OBJECT_CACHE[_object_cache_key(object_type, key)] = (now + ttl, model)
+
+        # Enforce the residency bound. Expired entries go first because they
+        # are free to lose; only if that is not enough do we drop live ones,
+        # nearest-expiry first, since they are the entries a reader is least
+        # likely to want again. Trimming to TRIM_TARGET rather than to the cap
+        # keeps this O(n log n) pass rare instead of once per insert at the
+        # ceiling.
+        cap = config.OBJECT_CACHE_MAX_ENTRIES
+        if cap > 0 and len(_OBJECT_CACHE) > cap:
+            # Both branches trim to target, not to cap. Trimming the expired
+            # sweep to cap would leave the cache at exactly cap whenever it
+            # freed even one entry, so the next insert would be over again and
+            # would rescan every entry under the lock. In the band where about
+            # one entry expires per insert that is a full O(n) pass on every
+            # put, which is precisely what the amortisation exists to avoid.
+            target = int(cap * OBJECT_CACHE_TRIM_TARGET)
+
+            for cache_key in [k for k, (expiry, _) in _OBJECT_CACHE.items()
+                              if expiry <= now]:
+                del _OBJECT_CACHE[cache_key]
+                dropped += 1
+
+            if len(_OBJECT_CACHE) > target:
+                by_expiry = sorted(_OBJECT_CACHE.items(),
+                                   key=lambda item: item[1][0])
+                for cache_key, _ in by_expiry[:len(_OBJECT_CACHE) - target]:
+                    del _OBJECT_CACHE[cache_key]
+                    dropped += 1
+        size = len(_OBJECT_CACHE)
+
+    OBJECT_CACHE_SIZE.set(size)
+    if dropped:
+        OBJECT_CACHE_CAPACITY_EVICTIONS.inc(dropped)
 
 
 def _object_cache_evict(object_type: str, key: Any) -> None:
@@ -234,6 +302,8 @@ def _object_cache_evict(object_type: str, key: Any) -> None:
     with _OBJECT_CACHE_LOCK:
         present = _OBJECT_CACHE.pop(
             _object_cache_key(object_type, key), None) is not None
+        size = len(_OBJECT_CACHE)
+    OBJECT_CACHE_SIZE.set(size)
     if present:
         OBJECT_CACHE_EVICTIONS.labels(object_type=object_type).inc()
 

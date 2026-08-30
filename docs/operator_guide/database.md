@@ -274,22 +274,64 @@ in memory, so repeatedly loading the same node, blob or instance does not hit
 `sf-database` every time. Mutable data (object state, metadata, attributes,
 IPAM, daemon states) is never cached. The cache invalidates itself when this
 process updates or deletes an object; a change made by another process is
-picked up when the entry's TTL expires.
+picked up when the entry's TTL expires. On a multi-gateway tier that means a
+delete routed to one gateway leaves the others serving the row to their own
+clients until the TTL runs out.
 
-Two settings control it, both in seconds:
+Three settings control it:
 
 | Setting | Default | Applies to |
 |---------|---------|-----------|
-| `OBJECT_CACHE_TTL_IMMUTABLE` | 300 | instance, network, networkinterface, agentoperation (no post-creation writer) |
+| `OBJECT_CACHE_TTL_IMMUTABLE` | 300 | instance, network, networkinterface, agentoperation, ipam (static row changes only on create, delete or a version upgrade) |
 | `OBJECT_CACHE_TTL_MUTABLE` | 30 | node, blob, artifact, upload, dnsmasq, namespace (rewritten only by an online version upgrade) |
+| `OBJECT_CACHE_MAX_ENTRIES` | 20000 | how many entries a process retains, across both tiers |
 
-Setting a value to `0` disables caching for that tier — a fast rollback to
+The first two are in seconds. The third is a count, and it exists because a
+TTL bounds how *stale* an entry may be, not how many entries are kept: expiry
+only happens when that same object is looked up again, so an object read once
+and never read again would otherwise sit in memory for the life of the
+process. If you see `database_object_cache_capacity_evictions_total` climbing
+steadily, the working set no longer fits and the hit rate is suffering;
+`database_object_cache_entries` reports current occupancy.
+
+When the cap is reached the cache drops expired entries first and then, if
+that is not enough, live entries nearest to their expiry. Be aware of what
+that means with two TTL tiers in one pool: a 30 second mutable entry is
+always nearer its expiry than a 300 second immutable one inserted up to 270
+seconds earlier, so sustained capacity pressure sheds essentially the whole
+mutable tier — blob, node, artifact, namespace, upload, dnsmasq — before it
+touches a single instance, network or ipam entry. If blob caching in
+particular matters to your workload, raise the cap rather than relying on
+the tiers competing for the space.
+
+Setting a TTL to `0` disables caching for that tier — a fast rollback to
 pure read-through that needs only a config change and a restart, no code
 change. The `database_object_cache_hits_total`,
 `database_object_cache_misses_total` and `database_object_cache_evictions_total`
 Prometheus counters (labelled by `object_type`) report cache behaviour, and a
 working cache shows up as reduced `database_get_<type>_total` rates on the
 `sf-database` tier.
+
+These counters only reach Prometheus from the daemons which serve a metrics
+endpoint — `sf-cluster`, `sf-resources` and `sf-database`. Every process that
+talks to the database has its own cache, so the numbers you can scrape are a
+sample of the cluster's caching rather than a total; `sf-api` in particular
+is invisible here.
+
+Expect that rollback to set off database load alerts while it is in effect,
+and plan for it rather than being surprised by it. The load budget was
+derived with the cache on, so the pairs the cache suppresses now sit under
+the budget's inclusion cut and are policed by the unbudgeted-polling ceiling
+of 0.05/s per node instead of by an entry of their own. `GetIPAM` from
+`sf-cluster` read 5.5/s before the cache and 0.02/s after it, and turning the
+cache off puts it — and a good many pairs like it — two orders of magnitude
+over that ceiling, firing `ShakenFistUnbudgetedDatabasePolling` for each.
+The alert is not wrong: pure read-through really does cost that much, which
+is the reason the cache exists. Silence the alert for the duration of the
+rollback. Do not raise the budget to accommodate it, because the same file
+also feeds `sf-ctl database-load` and the nightly report, and a level edited
+to quiet an alert stops being a description of a healthy cluster. The alert
+waits an hour before firing, so a short restart-and-observe will not trip it.
 
 ### Attributing database load to callers
 
