@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -9619,10 +9647,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#per-opcode-baseline-all-channels-except-display" class="md-nav__link">
+  <a href="#per-opcode-baseline-all-channels" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-opcode baseline (all channels except display)
+        Per-opcode baseline (all channels)
       
     </span>
   </a>
@@ -13527,10 +13555,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#per-opcode-baseline-all-channels-except-display" class="md-nav__link">
+  <a href="#per-opcode-baseline-all-channels" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Per-opcode baseline (all channels except display)
+        Per-opcode baseline (all channels)
       
     </span>
   </a>
@@ -13807,7 +13835,7 @@ footgun and is consistent with the rest of the file.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="per-opcode-baseline-all-channels-except-display">Per-opcode baseline (all channels except display)<a class="headerlink" href="#per-opcode-baseline-all-channels-except-display" title="Permanent link">&para;</a></h3>
+<h3 id="per-opcode-baseline-all-channels">Per-opcode baseline (all channels)<a class="headerlink" href="#per-opcode-baseline-all-channels" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -13834,6 +13862,24 @@ footgun and is consistent with the rest of the file.</p>
 </tr>
 </tbody>
 </table>
+<p>All four are produced by the shared <code>OpcodeCounters</code> type in
+<code>shakenfist-spice-renderer/src/opcode_counters.rs</code>, which every
+channel owns one of. Two properties of that type matter when reading
+a report:</p>
+<ul>
+<li><strong>Only named opcodes get a map entry.</strong> The receive opcode is a
+  server-chosen <code>u16</code>, so an unbounded map is a denial-of-service
+  primitive: ~65 000 header-only messages (about 400 KB, sent once)
+  would leave every later snapshot publish cloning a 65 000-node map
+  under the snapshot mutex. An opcode the protocol crate's
+  <code>message_names</code> table has no name for therefore folds into
+  <code>last_unknown_opcode</code> / <code>unknown_opcode_count</code> instead of growing
+  <code>messages_recv_by_opcode</code>.</li>
+<li><strong><code>unknown_opcode_count</code> covers two cases.</strong> An opcode with no
+  protocol name at all, and a named opcode that reached the
+  handler's catch-all arm (a real coverage gap). Each message is
+  counted once, never both.</li>
+</ul>
 <p>A <code>recent_action_ring</code> field (a bounded ring of structured
 "interesting event" rows) was discussed as a fifth baseline addition
 but is deferred — display's <code>recent_decodes</code> is the only precedent and
@@ -13854,10 +13900,29 @@ retained for backwards compatibility with bug-report consumers that
 key on it), recent decode-duration rings, STREAM_REPORT fields, and a
 <code>streams_recently_destroyed</code> ring that feeds the stream-flap
 notifications.</p>
-<p>Display is the one channel without the four per-opcode baseline
-fields: its per-stream counters already answer the "what did the
-server send?" question in more useful terms than a flat opcode map
-would. Revisit if an unknown-opcode question ever arises on display.</p>
+<p>Display carries the four per-opcode baseline fields like every other
+channel. It also carries two stream-safety counters:</p>
+<ul>
+<li><code>streams_rejected_total</code> — <code>STREAM_CREATE</code> messages refused
+  because the concurrent-stream cap (<code>MAX_CONCURRENT_STREAMS</code>, 16)
+  was already reached. <code>stream_id</code> is a server-chosen <code>u32</code> and each
+  open stream owns a video decoder — an H.264 decoder costs
+  megabytes — so an uncapped map is a memory-exhaustion primitive. A
+  non-zero value means the server asked for more concurrent streams
+  than the client will carry decoders for.</li>
+<li>A re-<code>STREAM_CREATE</code> on a stream id that is still open retires the
+  previous stream through the normal teardown path, so it appears in
+  <code>streams_recently_destroyed</code> and is counted in
+  <code>streams_destroyed_total</code>. It is exempt from the cap, since
+  replacing an entry cannot grow the map, and the replacement
+  decoder is built <em>before</em> the teardown: a re-create naming a codec
+  this build cannot decode is ignored outright rather than
+  destroying the working stream and failing to replace it.</li>
+</ul>
+<p><code>image_cache_ids</code> is the 64 most recently used cache keys, MRU
+first — not the full key set. The cache can hold millions of entries
+and the snapshot is republished on every send; <code>image_cache_entries</code>
+carries the true total.</p>
 <h3 id="main">main<a class="headerlink" href="#main" title="Permanent link">&para;</a></h3>
 <p>Main has session identity (<code>session_id</code>), multimedia clock state
 (<code>mm_time_now</code>, <code>mm_time_set_count</code>, <code>last_mm_time_set_ts_secs</code> — a
@@ -13946,7 +14011,10 @@ instrumentation distinguishes the failure modes as designed.</p>
   each entry carries the USB vendor ID, product ID, device class,
   the time the redirect was established (<code>attached_at_secs</code>), and
   bytes transferred in each direction (<code>bytes_to_guest</code> /
-  <code>bytes_from_guest</code>)
+  <code>bytes_from_guest</code>). The byte counters cover usbredir-protocol
+  bytes — framed usbredir messages outbound, decompressed SPICEVMC
+  payload inbound — and reset on each attachment, so they are not
+  comparable with the channel-wide <code>bytes_in</code> / <code>bytes_out</code>
 - <code>device_connect_total</code> / <code>device_disconnect_total</code> — cumulative
   device connect/disconnect events since channel open
 - <code>last_device_event_ts_secs</code> — timestamp of the most recent device
@@ -13981,12 +14049,14 @@ point following the baseline template in this document.</p>
    <code>messages_send_by_opcode</code>, <code>last_unknown_opcode</code>,
    <code>unknown_opcode_count</code>). Add channel-specific fields below a
    separating comment.</li>
-<li><strong>Wire opcode counting</strong> in the channel's message-dispatch <code>match</code>
-   arm: increment <code>messages_recv_by_opcode[opcode]</code> on every receive
-   and <code>messages_send_by_opcode[opcode]</code> on every send. Treat
-   unrecognised opcodes as <code>unknown_opcode_count += 1</code> /
-   <code>last_unknown_opcode = Some(opcode)</code> rather than silently ignoring
-   them.</li>
+<li><strong>Wire opcode counting</strong> by giving the channel an
+   <code>OpcodeCounters</code> field, constructed with that channel's
+   <code>message_names</code> server and client functions. Call <code>record_recv</code>
+   before dispatch, <code>record_send</code> from the single send path,
+   <code>note_unknown</code> from the catch-all <code>match</code> arm, and
+   <code>publish_into(&amp;mut *snap)</code> from <code>update_snapshot</code>. Do not
+   hand-roll the four fields: the counters must stay bounded, and
+   <code>OpcodeCounters</code> is where that bound lives.</li>
 <li><strong>Extend <code>ChannelSnapshots</code></strong> in
    <code>shakenfist-spice-renderer/src/snapshots.rs</code>: add a field for the
    new snapshot type, initialise it in <code>new()</code>, and add arms in

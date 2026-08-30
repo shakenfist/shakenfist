@@ -6636,6 +6636,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13653,12 +13681,19 @@ the phases:</p>
   <code>kerbside/tests/unit/test_render_review.py</code>, which
   imports <code>tools/render-review.py</code> by path and would fail
   at collection the moment the script goes; a row in
-  <code>.claude/CLAUDE.md</code> (line 139) listing the workflow; a
-  cross-reference in <code>.github/workflows/pr-re-review.yml</code>
-  (line 10); and four review marks plus their weaudit
-  entries. Deleting only the four named files leaves a
-  repository whose unit tests do not run.</li>
+  <code>.claude/CLAUDE.md</code> (line 139) listing the workflow;
+  three cross-references in
+  <code>.github/workflows/pr-re-review.yml</code> (lines 10, 34 and
+  106); one in <code>tools/shellcheck-wrap.sh</code> (line 7); and
+  four review marks plus their weaudit entries. Deleting
+  only the four named files leaves a repository whose unit
+  tests do not run.</li>
 </ul>
+<p><em>Corrected during phase 2 planning:</em> this bullet
+  originally named one <code>pr-re-review.yml</code> reference and no
+  <code>shellcheck-wrap.sh</code> reference. The line 34 one is the
+  awkward case -- it is the stated reason for a live
+  <code>if:</code> guard that must outlive the workflow it cites.</p>
 <p>The two surviving GitHub-settings checkboxes were also
 re-checked against the API rather than the web interface:</p>
 <ul>
@@ -13725,8 +13760,8 @@ to forcing it.</p>
 </tr>
 <tr>
 <td>2. Retire the comment addresser</td>
-<td>PLAN-consistency-audit-phase-02-retire-addresser.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/">PLAN-consistency-audit-phase-02-retire-addresser.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -13768,8 +13803,10 @@ Delete <code>.github/workflows/pr-address-comments.yml</code>,
 <code>tools/render-review.py</code> and <code>tools/review-schema.json</code> in
 one commit, as the audit requires, along with
 <code>kerbside/tests/unit/test_render_review.py</code> which cannot
-survive them. Remove the <code>.claude/CLAUDE.md</code> row and fix the
-<code>pr-re-review.yml</code> cross-reference. Prune the four review
+survive them. Remove the <code>.claude/CLAUDE.md</code> row and repair
+the three <code>pr-re-review.yml</code> cross-references and the one in
+<code>tools/shellcheck-wrap.sh</code>, keeping the bot-comment guard
+whose justification one of them is. Prune the four review
 marks. The security argument is the point of the phase and
 belongs in the commit message: the workflow holds
 <code>contents: write</code> on the pull request branch, for automation

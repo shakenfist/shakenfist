@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13625,7 +13653,7 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap/">Stream caps and flap diagnostics</a></td>
 <td>Advertise the four SPICE display capabilities ryll is missing (<code>STREAM_REPORT</code>, <code>LZ4_COMPRESSION</code>, <code>MULTI_CODEC</code>+<code>CODEC_H264</code>, <code>PREF_COMPRESSION</code>+<code>PREF_VIDEO_CODEC_TYPE</code>), replace the pure-Rust MJPEG decoder with per-platform best-of-breed (ImageIO / WIC / VA-API / libjpeg-turbo), audit and complete per-channel diagnostic surface (especially playback), surface the spice-server's stream-flapping behaviour in the UI, add a vdagent responsiveness probe, and remove the now-redundant spurious-PONG keepalive. Spun out of test sessions 002 and 002b; phase 4 added after sessions 002d/002e exposed a playback observability gap.</td>
 <td>In progress</td>
-<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">1. STREAM_REPORT</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">2. LZ4</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">3. Fast JPEG decode</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">4. Channel diagnostics audit</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">5. Auto-snapshot mode</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">6. Multi-codec + H.264</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">7. Preference messages</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">8. Streaming indicator + flap notification</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">9. Vdagent probe</a>, 10. Docs (no separate plan; dispatched as a docs-audit catch-all), <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">11. Remove PONG keepalive</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">12. Bounded image cache</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/">13. Investigate intermittent server-side streaming</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">14. Status-bar pointer leak</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">15. build_tcp_frame warn</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/">16. Guest-driver viability</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/">17. Patched libspice validation</a>, 18. Push audit</td>
+<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">1. STREAM_REPORT</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">2. LZ4</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">3. Fast JPEG decode</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">4. Channel diagnostics audit</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">5. Auto-snapshot mode</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">6. Multi-codec + H.264</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">7. Preference messages</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">8. Streaming indicator + flap notification</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">9. Vdagent probe</a>, 10. Docs (no separate plan; dispatched as a docs-audit catch-all), <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">11. Remove PONG keepalive</a>, <a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">12. Bounded image cache</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/">13. Investigate intermittent server-side streaming</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">14. Status-bar pointer leak</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">15. build_tcp_frame warn</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/">16. Guest-driver viability</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/">17. Patched libspice validation</a>, <a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-18-push-audit/">18. Push audit</a></td>
 </tr>
 <tr>
 <td>2026-05-21</td>

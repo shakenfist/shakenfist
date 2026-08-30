@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13818,7 +13846,7 @@ written to JSON for bug reports.</p>
 <tr>
 <td><code>DisplaySnapshot</code></td>
 <td>Display</td>
-<td>Image cache size/IDs, recent decode results (last 20) with per-decode wall-time, decode/socket/ACK diagnostic counters, pcap writer-queue drop counter, ACK state, bytes in/out, image cache statistics (cap in bytes, LRU eviction count, bytes evicted) from <code>BoundedImageCache</code></td>
+<td>Image cache size and 64 most-recent IDs, per-opcode recv/send maps, unknown-opcode counter, stream lifecycle counters (created/destroyed/rejected), recent decode results (last 20) with per-decode wall-time, decode/socket/ACK diagnostic counters, pcap writer-queue drop counter, ACK state, bytes in/out, image cache statistics (cap in bytes, LRU eviction count, bytes evicted) from <code>BoundedImageCache</code></td>
 </tr>
 <tr>
 <td><code>InputsSnapshot</code></td>
@@ -13862,7 +13890,11 @@ written to JSON for bug reports.</p>
 <code>ping_recv_count</code>, <code>pong_send_count</code>, <code>last_ping_recv_ts_secs</code>,
 <code>writer_dropped_count</code>) plus four baseline additions
 (<code>messages_recv_by_opcode</code>, <code>messages_send_by_opcode</code>,
-<code>last_unknown_opcode</code>, <code>unknown_opcode_count</code>). See the
+<code>last_unknown_opcode</code>, <code>unknown_opcode_count</code>), produced by the
+shared <code>OpcodeCounters</code> type. Only opcodes the protocol crate has a
+name for get their own map entry — a server-chosen opcode this build
+does not recognise is folded into <code>unknown_opcode_count</code> so the map
+cannot be grown from the wire. See the
 <a href="/components/ryll/channel-diagnostics-audit/">channel diagnostics audit</a> for the full
 audit matrix and minimum-baseline rationale.</p>
 <p>The <code>ChannelSnapshots</code> struct in <code>ryll/src/bugreport.rs</code> holds the four
@@ -14062,6 +14094,19 @@ the main-channel client-side keepalive timeout fired
 RST), and embeds a per-channel diagnostics map so a
 maintainer can compare the dropped channel against the
 others' last-known traffic state.</p>
+<p>Two fields in that map are nullable, and the distinction
+matters when reading one. <code>client_keepalive_send_count</code>
+is <code>null</code> when the channel has no client-side keepalive
+mechanism at all, and <code>0</code> when it has one that never
+fired. Only the inputs channel implements one, so the
+other six report <code>null</code>; the main channel used to
+implement one and no longer does, and reporting a bare
+<code>0</code> for it would have claimed the mechanism ran and
+never fired — precisely the wrong answer for someone
+reading a main-channel disconnect report.
+<code>last_client_keepalive_send_ts_secs</code> is <code>null</code> both when
+no keepalive has been sent and when the channel has no
+mechanism.</p>
 <p>A 60 s cooldown bounds disk usage during a disconnect
 storm; the cooldown is updated even on write failure so
 a misconfigured output directory does not retry on every
@@ -14119,21 +14164,49 @@ like audio silences that last only 30 seconds.</p>
 <li><code>AutoSnapshotState</code> in <code>ryll/src/auto_snapshot.rs</code> bundles the
   Arc handles the task needs (traffic, channel snapshots, app
   snapshot, notifications, target host/port, output dir, cap,
-  interval). All are already Arc-backed on <code>RyllApp</code>.</li>
+  byte cap, interval). All are already Arc-backed on <code>RyllApp</code>.</li>
 <li>The task runs in its own std::thread with a dedicated
   <code>tokio::runtime::Builder::new_current_thread</code> runtime, spawned
-  once on the first <code>ChannelEvent::SessionInitialized</code> (a latch
-  prevents a second spawn on reconnect).</li>
+  on <code>ChannelEvent::SessionInitialized</code>. <code>reconnect()</code> replaces
+  the traffic and channel-snapshot Arcs wholesale, so each
+  session gets its own task: the app raises the outgoing task's
+  cancel flag at disconnect and again before spawning the
+  replacement, so at most one auto-snapshot task is <em>running</em> at
+  a time. Nothing joins those threads. Every retire runs on the
+  egui UI thread, and a thread already inside a zip write does
+  not observe the cancel flag until it finishes, so a join would
+  freeze the GUI for seconds. Outgoing handles are held in a
+  retiring set instead, reaped non-blockingly with
+  <code>JoinHandle::is_finished</code>, and a session declines to spawn at
+  all once more than four are still winding down (logged at
+  <code>warn!</code>). If the dedicated runtime cannot be built, the mode
+  simply does not start for that session and logs a warning.</li>
+<li>Two independent bounds keep a hostile server from driving
+  respawns. A repeated <code>SPICE_MSG_MAIN_INIT</code> naming the session
+  already in hand is discarded as a duplicate. Because the
+  session id is server-chosen, that check alone is defeated by
+  alternating ids, so a second guard ignores any
+  <code>SessionInitialized</code> arriving less than five seconds after the
+  last accepted one while still connected. A genuine re-link
+  without a visible disconnect is rare enough to tolerate the
+  delay; the cost to a hostile peer is one respawn per window
+  rather than one per 36-byte message.</li>
 <li>A startup <code>NotifySeverity::Info</code> notification confirms the mode
   is active: <code>"Auto-snapshot mode enabled — every {N}s, max {cap}
-  snapshots, saving to {path}"</code>.</li>
+  snapshots / {byte cap} MiB, saving to {path}"</code>.</li>
 <li>The stats panel renders <code>"Auto-snapshot: {saved}/{cap}"</code> when
   the mode is active; the line is hidden when disabled.</li>
 <li>Rolling cap: after each successful write, <code>prune_to_cap</code> lists
   <code>ryll-auto-snapshot-*.zip</code> in the output dir, sorts
   lexicographically (= chronologically by filename construction),
-  and deletes the oldest beyond cap. <code>auto_snapshots_pruned</code>
-  in <code>AppSnapshot</code> tracks the total deleted.</li>
+  and deletes the oldest until both budgets are satisfied — at
+  most <code>--auto-snapshot-cap</code> files <em>and</em> at most
+  <code>DEFAULT_AUTO_SNAPSHOT_BYTE_CAP</code> (512 MiB) of them. The byte
+  budget exists because the count alone does not bound disk use:
+  <code>traffic.pcap</code> is stored uncompressed and merges all six rings,
+  so a busy session's zip approaches the 50 MiB ring budget and
+  20 of those are roughly a gigabyte. <code>auto_snapshots_pruned</code> in
+  <code>AppSnapshot</code> tracks the total deleted.</li>
 <li>Write failures: <code>warn!</code> always; a <code>NotifySeverity::Warn</code>
   notification is pushed at most once per 5-minute cool-down so a
   persistent disk error does not spam the panel. The interval task

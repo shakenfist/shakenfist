@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13809,12 +13837,31 @@ survives.</p>
 </code></pre></div>
 <p><strong>Required system dependencies</strong> (Debian/Ubuntu):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>libxcb-render0-dev<span class="w"> </span>libxcb-shape0-dev<span class="w"> </span>libxcb-xfixes0-dev<span class="w"> </span>libxcb1-dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>libx11-dev<span class="w"> </span>libxkbcommon-dev<span class="w"> </span>libgl1-mesa-dev<span class="w"> </span>libegl1-mesa-dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>libwayland-dev<span class="w"> </span>libssl-dev<span class="w"> </span>pkg-config
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>build-essential<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>libxcb-render0-dev<span class="w"> </span>libxcb-shape0-dev<span class="w"> </span>libxcb-xfixes0-dev<span class="w"> </span>libxcb1-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>libx11-dev<span class="w"> </span>libxkbcommon-dev<span class="w"> </span>libgl1-mesa-dev<span class="w"> </span>libegl1-mesa-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span>libwayland-dev<span class="w"> </span>libssl-dev<span class="w"> </span>pkg-config
 </code></pre></div>
+<p><code>build-essential</code> provides the C/C++ compiler that two vendored
+codec crates need at build time: <code>openh264-sys2</code> (H.264, see
+<a href="#key-dependencies">Key dependencies</a> below) compiles Cisco's
+openh264 C++ sources, and <code>mozjpeg-sys</code> compiles vendored
+libjpeg-turbo (see
+<a href="/components/ryll/spice-protocol/#image-types-and-compression">spice-protocol.md</a>
+for why that buys a no-runtime-dependency JPEG fallback). Neither
+crate downloads a prebuilt binary, and neither is optional --
+they're unconditional dependencies of <code>shakenfist-spice-compression</code>
+and <code>shakenfist-spice-renderer</code>, so every <code>ryll</code> build compiles them
+regardless of which Cargo features are enabled. A missing compiler
+fails the build during their <code>cc</code>-crate compile step, not at link
+time, so the error surfaces early with a clear "no C compiler
+found"-style message. NASM (<code>nasm</code>) is not required for either
+crate -- both fall back to a slower, non-SIMD codec path if it is
+missing, so it's an optional install for anyone chasing codec
+throughput, not a build prerequisite.</p>
 <p><strong>macOS</strong> (Apple Silicon): No additional system libraries are needed --
-just Xcode Command Line Tools and Rust. See
+just Xcode Command Line Tools and Rust, which is also what provides
+the C/C++ compiler for the same two crates. See
 <a href="/components/ryll/development-macos/">development-macos.md</a> for full setup
 instructions.</p>
 <h2 id="cargo-features">Cargo features<a class="headerlink" href="#cargo-features" title="Permanent link">&para;</a></h2>

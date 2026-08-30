@@ -2384,6 +2384,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#repositories-that-ship-workflow-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repositories that ship workflow templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#python-version-constraints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6616,6 +6627,34 @@
     
   
     Consistency audit phase 1: shared blocks, vendor stamp and settings closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
   
 
     
@@ -13402,6 +13441,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#repositories-that-ship-workflow-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repositories that ship workflow templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#python-version-constraints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13500,11 +13550,29 @@ cargo, dockerfile and github-actions dependencies were current.</p>
 with no <code>.pre-commit-config.yaml</code>, or one whose hooks are all
 <code>repo: local</code>, passes without the manager. <code>sfui</code>'s
 <code>"pre-commit": {"enabled": true}</code> is the form the template carries.</p>
+<h3 id="repositories-that-ship-workflow-templates">Repositories that ship workflow templates<a class="headerlink" href="#repositories-that-ship-workflow-templates" title="Permanent link">&para;</a></h3>
+<p>Renovate's <code>github-actions</code> manager only reads
+<code>.github/workflows</code>, <code>.github/actions</code> and <code>workflow-templates</code>. A
+repository that keeps workflows anywhere else -- <code>development</code> ships
+the fleet's templates from <code>templates/</code> -- gets its own workflows
+bumped while the copies it hands out stay behind, so every repository
+onboarded after a bump starts life a version stale.</p>
+<p>Extending the manager's file patterns brings them into view. The
+patterns extend the defaults rather than replacing them, so only the
+extra path is named:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"github-actions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">"managerFilePatterns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"/^templates/.+\\.ya?ml$/"</span><span class="p">]</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">}</span>
+</code></pre></div>
+<p>This applies to <code>development</code> today, and to any repository that grows
+a second home for workflow files.</p>
 <h3 id="python-version-constraints">Python version constraints<a class="headerlink" href="#python-version-constraints" title="Permanent link">&para;</a></h3>
 <p>Projects supporting multiple Linux distributions set
 <code>constraints.python</code> to the oldest Python they support, so renovate
 stops proposing updates the oldest distribution cannot install:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span><span class="nt">"constraints"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"python"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&gt;=3.8"</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="nt">"constraints"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"python"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&gt;=3.8"</span><span class="p">}}</span>
 </code></pre></div>
 <p>Currently required for: agent-python, occystrap.</p>
 <p>The value matches <code>requires-python</code> in <code>pyproject.toml</code> -- both derive
@@ -13517,19 +13585,19 @@ than on a user's machine.</p>
 <h3 id="package-grouping-and-range-strategy">Package grouping and range strategy<a class="headerlink" href="#package-grouping-and-range-strategy" title="Permanent link">&para;</a></h3>
 <p>Tightly coupled dependencies (the grpc stack, for instance) are grouped
 so they bump together:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"packageRules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="p">{</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Group grpc packages together"</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">"matchPackagePatterns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">        </span><span class="s2">"^grpcio"</span><span class="p">,</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">        </span><span class="s2">"^googleapis-common-protos"</span><span class="p">,</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">        </span><span class="s2">"^protobuf"</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="p">],</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="nt">"groupName"</span><span class="p">:</span><span class="w"> </span><span class="s2">"grpc packages"</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">  </span><span class="p">]</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">"packageRules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">      </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Group grpc packages together"</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="nt">"matchPackagePatterns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">        </span><span class="s2">"^grpcio"</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="s2">"^googleapis-common-protos"</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">        </span><span class="s2">"^protobuf"</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">      </span><span class="p">],</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">      </span><span class="nt">"groupName"</span><span class="p">:</span><span class="w"> </span><span class="s2">"grpc packages"</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="p">]</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">}</span>
 </code></pre></div>
 <p>Server projects (shakenfist, kerbside) pin exactly (<code>==</code>) and use
 renovate's default range strategy, which bumps those pins on every

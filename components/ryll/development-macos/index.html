@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -9752,10 +9780,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openh264-build-issues" class="md-nav__link">
+  <a href="#openh264-and-mozjpeg-build-issues" class="md-nav__link">
     <span class="md-ellipsis">
       
-        openh264 build issues
+        openh264 and mozjpeg build issues
       
     </span>
   </a>
@@ -13744,10 +13772,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openh264-build-issues" class="md-nav__link">
+  <a href="#openh264-and-mozjpeg-build-issues" class="md-nav__link">
     <span class="md-ellipsis">
       
-        openh264 build issues
+        openh264 and mozjpeg build issues
       
     </span>
   </a>
@@ -13959,13 +13987,32 @@ building natively with <code>cargo</code> is the right approach.</p>
 correct:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>xcode-select<span class="w"> </span>-p
 </code></pre></div>
-<h3 id="openh264-build-issues">openh264 build issues<a class="headerlink" href="#openh264-build-issues" title="Permanent link">&para;</a></h3>
-<p>The <code>openh264</code> crate (used by the capture feature) downloads a
-pre-built library at build time. If this fails due to network issues,
-you can build without capture support:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>cargo<span class="w"> </span>build<span class="w"> </span>--no-default-features
+<h3 id="openh264-and-mozjpeg-build-issues">openh264 and mozjpeg build issues<a class="headerlink" href="#openh264-and-mozjpeg-build-issues" title="Permanent link">&para;</a></h3>
+<p><code>openh264-sys2</code> and <code>mozjpeg-sys</code> -- pulled in via
+<code>shakenfist-spice-compression</code> and <code>shakenfist-spice-renderer</code> (see
+<a href="/components/ryll/development/#key-dependencies">Key dependencies</a>) -- compile
+vendored C/C++ codec sources at build time using the <a href="https://docs.rs/cc"><code>cc</code>
+crate</a>; they do not download a prebuilt library,
+so a broken build here is never a network problem. The compiler
+they need is the same one the "Xcode Command Line Tools" step above
+installs, so on a correctly set-up machine this just works.</p>
+<p>Both dependencies are also unconditional: neither is behind a Cargo
+feature, so <code>cargo build --no-default-features</code> still compiles both
+of them. There is no flag that skips this step -- if the compiler is
+broken, the fix is the compiler, not the feature set.</p>
+<p>If the build fails inside either crate's compile step, check that
+the Xcode Command Line Tools are actually active:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>xcode-select<span class="w"> </span>-p<span class="w">              </span><span class="c1"># should print a valid path</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>sudo<span class="w"> </span>xcodebuild<span class="w"> </span>-license<span class="w"> </span>accept
 </code></pre></div>
-<p>This disables <code>--capture</code> mode but everything else works normally.</p>
+<p>An error here shows up as a C/C++ compiler failure (missing <code>cc</code>,
+license not accepted, or a stale/uninstalled toolchain), not the
+generic linker errors covered above.</p>
+<p>NASM is not required by either crate: both fall back to a slower,
+non-SIMD codec path if <code>nasm</code> isn't on <code>PATH</code>. On Apple Silicon this
+never matters (aarch64 doesn't use NASM's assembly path at all); on
+an Intel Mac, <code>brew install nasm</code> picks up the faster path if you
+want it.</p>
 <h3 id="rust-toolchain-updates">Rust toolchain updates<a class="headerlink" href="#rust-toolchain-updates" title="Permanent link">&para;</a></h3>
 <p>Keep your toolchain current to match CI:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>rustup<span class="w"> </span>update<span class="w"> </span>stable

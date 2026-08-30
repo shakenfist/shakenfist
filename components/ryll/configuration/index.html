@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -14105,22 +14133,22 @@ configuration section below.</p>
 <tr>
 <td><code>--auto-snapshot-interval &lt;SECONDS&gt;</code></td>
 <td>disabled</td>
-<td>Enable flight-data-recorder mode: fire a complete bug-report zip every N seconds into <code>&lt;bug-report-dir&gt;/auto-snapshots/</code>. Minimum recommended interval is 10 seconds</td>
+<td>Enable flight-data-recorder mode: fire a complete bug-report zip every N seconds into <code>&lt;bug-report-dir&gt;/auto-snapshots/</code>. Minimum recommended interval is 10 seconds; <code>0</code> is rejected at startup</td>
 </tr>
 <tr>
 <td><code>--auto-snapshot-cap &lt;N&gt;</code></td>
 <td>20</td>
-<td>Maximum number of auto-snapshot zips to keep on disk; oldest are pruned when capacity is exceeded</td>
+<td>Maximum number of auto-snapshot zips to keep on disk; oldest are pruned when capacity is exceeded. A 512 MiB budget for the same directory is enforced alongside it, so the cap you set is an upper bound rather than a promise — a busy session whose zips approach the 50 MiB traffic-ring budget will keep fewer than N</td>
 </tr>
 <tr>
 <td><code>--image-cache-cap-mib &lt;N&gt;</code></td>
 <td>256</td>
-<td>Cap the SPICE display image cache at N MiB. The cache holds decoded RGBA frames flagged with CACHE_ME by the server; an LRU evicts oldest entries when the cap is exceeded. Default is enough for typical desktop sessions, but increase it for heavy CACHE_ME workloads (sustained video) or lower it on small-RAM hosts</td>
+<td>Cap the SPICE display image cache at N MiB. The cache holds decoded RGBA frames flagged with CACHE_ME by the server; an LRU evicts oldest entries when the cap is exceeded. Default is enough for typical desktop sessions, but increase it for heavy CACHE_ME workloads (sustained video) or lower it on small-RAM hosts. Must be at least 1</td>
 </tr>
 <tr>
 <td><code>--glz-dictionary-cap-mib &lt;N&gt;</code></td>
 <td>256</td>
-<td>Cap the shared SPICE GLZ decompression dictionary at N MiB. The dictionary holds decoded RGBA entries that the server attached <code>IMAGE_FLAGS_CACHE_ME</code> to on Glz / ZlibGlz payloads so cross-frame back-references resolve; without a cap, full-frame ZlibGlzRgb workloads (observed in sessions 003a and 004d-g) grew the dictionary at roughly 30 MiB/s and drove a multi-GiB RSS runaway before the cap existed. An LRU evicts oldest entries when the cap is exceeded. Same trade-off shape as <code>--image-cache-cap-mib</code>: lower it on small-RAM hosts, raise it for sustained GLZ-heavy workloads to keep more cross-frame references hot</td>
+<td>Cap the shared SPICE GLZ decompression dictionary at N MiB. The dictionary holds decoded RGBA entries that the server attached <code>IMAGE_FLAGS_CACHE_ME</code> to on Glz / ZlibGlz payloads so cross-frame back-references resolve; without a cap, full-frame ZlibGlzRgb workloads (observed in sessions 003a and 004d-g) grew the dictionary at roughly 30 MiB/s and drove a multi-GiB RSS runaway before the cap existed. An LRU evicts oldest entries when the cap is exceeded. Same trade-off shape as <code>--image-cache-cap-mib</code>: lower it on small-RAM hosts, raise it for sustained GLZ-heavy workloads to keep more cross-frame references hot. Must be at least 1</td>
 </tr>
 <tr>
 <td><code>--pedantic</code></td>
@@ -14260,14 +14288,15 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 <a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--share-dir<span class="w"> </span>/tmp/test-share
 <a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>
 <a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="c1"># Enable auto-snapshot mode: fire a bug report every 30 seconds, keep last 20</span>
-<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span>
-<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>
-<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a><span class="c1"># Custom output directory and rolling cap</span>
-<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a><span class="w">     </span>--auto-snapshot-cap<span class="w"> </span><span class="m">10</span><span class="w"> </span>--bug-report-dir<span class="w"> </span>/tmp/session-debug
-<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>
-<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a><span class="c1"># Pedantic mode: report on protocol gaps</span>
-<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--pedantic
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a><span class="c1"># (or fewer, if 20 of them would exceed the 512 MiB directory budget)</span>
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span>
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a>
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a><span class="c1"># Custom output directory and rolling cap</span>
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a><span class="w">     </span>--auto-snapshot-cap<span class="w"> </span><span class="m">10</span><span class="w"> </span>--bug-report-dir<span class="w"> </span>/tmp/session-debug
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a>
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a><span class="c1"># Pedantic mode: report on protocol gaps</span>
+<a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--pedantic
 </code></pre></div>
 <h2 id="vv-file-format">.vv File Format<a class="headerlink" href="#vv-file-format" title="Permanent link">&para;</a></h2>
 <p>The .vv (virt-viewer) file is an INI-format configuration file. Ryll supports

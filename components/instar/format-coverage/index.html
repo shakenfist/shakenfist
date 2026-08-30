@@ -7172,6 +7172,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -15321,6 +15349,11 @@ owed.</p>
 <td>Multi-extent flat descriptors with multiple flat extent files; each extent is opened as a separate virtio-block device with reads dispatched by offset.</td>
 </tr>
 <tr>
+<td>vmdk (twoGbMaxExtentSparse)</td>
+<td>Not supported</td>
+<td>Multi-extent descriptors whose extents are themselves sparse VMDKs. Host-side descriptor resolution accepts FLAT extents only, so <code>instar info</code> fails with "only FLAT extents are supported". Unlike the flat case, each extent carries its own sparse header and grain directory, so extents cannot simply be mapped as raw byte ranges. Real-world fixture <code>osboxes-vmdk-split-sparse</code> (26 extents) is registered with baselines captured, and is marked <code>instar_unsupported</code> in <code>tests/manifest.json</code> so parity tests skip until support lands.</td>
+</tr>
+<tr>
 <td>vhd (fixed)</td>
 <td>Supported</td>
 <td>Raw sector reads with footer validation</td>
@@ -15824,7 +15857,7 @@ full reference.</p>
 <td>Multiple extents in descriptor</td>
 <td>N/A</td>
 <td>Supported for twoGbMaxExtentFlat; sparse multi-extent reports FLAG_NOT_SUPPORTED</td>
-<td>vmdk-multi-extent</td>
+<td>vmdk-multi-extent, osboxes-vmdk-split-sparse</td>
 </tr>
 <tr>
 <td>fragmentation</td>

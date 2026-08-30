@@ -6507,6 +6507,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13481,6 +13509,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#deferred-va-api-decode-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred VA-API decode path
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14017,6 +14056,55 @@ median 263 ms, p95 266 ms. Per-platform post-fix targets:</p>
 </tr>
 </tbody>
 </table>
+<h2 id="deferred-va-api-decode-path">Deferred VA-API decode path<a class="headerlink" href="#deferred-va-api-decode-path" title="Permanent link">&para;</a></h2>
+<p>Moved here from the <code>VaapiDecoder</code> docstring in
+<code>shakenfist-spice-compression/src/jpeg.rs</code>, which had grown a
+roadmap paragraph that was planning material rather than a
+description of what the code does. The code now carries a
+one-line pointer to this section instead.</p>
+<p><code>VaapiDecoder::try_new()</code> probes for VA-API and, on success,
+<code>best_for_platform()</code> selects it — but <code>decode()</code> delegates to an
+embedded <code>MozJpegDecoder</code>. Wiring up real VA-API decode needs:</p>
+<ul>
+<li><strong>A wider dlsym surface.</strong> The probe binds <code>vaGetDisplayDRM</code>,
+  <code>vaInitialize</code>, <code>vaTerminate</code>, <code>vaErrorStr</code>,
+  <code>vaMaxNumProfiles</code>, <code>vaQueryConfigProfiles</code>,
+  <code>vaMaxNumEntrypoints</code> and <code>vaQueryConfigEntrypoints</code>. Decode
+  additionally needs <code>vaCreateConfig</code>, <code>vaCreateContext</code>,
+  <code>vaCreateSurfaces</code>, <code>vaCreateBuffer</code>, <code>vaBeginPicture</code>,
+  <code>vaRenderPicture</code>, <code>vaEndPicture</code>, <code>vaSyncSurface</code>,
+  <code>vaDeriveImage</code>, <code>vaMapBuffer</code>, <code>vaUnmapBuffer</code>,
+  <code>vaDestroyImage</code>, <code>vaDestroyBuffer</code>, <code>vaDestroyContext</code>,
+  <code>vaDestroyConfig</code> and <code>vaDestroySurfaces</code>.</li>
+<li><strong>Our own JPEG header parse.</strong> VA-API is a command-buffer
+  interface and does not parse JPEG. The SOF/DHT/DQT segments
+  have to be read out to populate
+  <code>VAPictureParameterBufferJPEGBaseline</code>,
+  <code>VAIQMatrixBufferJPEGBaseline</code>,
+  <code>VAHuffmanTableBufferJPEGBaseline</code> and
+  <code>VASliceParameterBufferJPEGBaseline</code>.</li>
+<li><strong>Reference implementations.</strong> ffmpeg's
+  <code>libavcodec/vaapi_mjpeg.c</code> and chromium's
+  <code>media/gpu/vaapi/vaapi_jpeg_decoder.cc</code>.</li>
+</ul>
+<p>Two things in the current code exist to make this landing safe
+rather than silently unsound, and both must be revisited as part
+of the work:</p>
+<ul>
+<li><code>unsafe impl Send</code>/<code>Sync for VaapiDecoder</code> is sound only
+  because <code>decode(&amp;self, ..)</code> never touches libva. That is now
+  enforced by <code>vaapi::LibvaHandles</code>, whose fields are private to
+  the <code>vaapi</code> submodule and reachable only through <code>&amp;mut self</code>.
+  A real decode path has to widen those accessors, and the
+  correct answer at that point is an internal
+  <code>Mutex&lt;VADisplay&gt;</code> — libva thread-safety is driver-dependent
+  (Intel iHD, Mesa and friends each implement their own locking
+  policy), so we own the synchronisation rather than trusting
+  whichever driver is loaded.</li>
+<li><code>name()</code> reports <code>"VA-API (probed, mozjpeg fallback)"</code>. Drop
+  the parenthetical when the delegation goes away; the tests
+  assert only the <code>"VA-API"</code> prefix so they survive the change.</li>
+</ul>
 
 
 

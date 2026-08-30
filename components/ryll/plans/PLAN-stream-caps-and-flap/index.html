@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -11436,6 +11464,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#items-deferred-from-the-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Items deferred from the push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation-index-maintenance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13768,6 +13807,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#items-deferred-from-the-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Items deferred from the push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation-index-maintenance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14132,73 +14182,73 @@ session 002b showed that MJPEG decode in the pure-Rust
 <td>1. STREAM_REPORT</td>
 <td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/">completed/PLAN-stream-caps-and-flap-phase-01-stream-report.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>2. LZ4 compression</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/">PLAN-stream-caps-and-flap-phase-02-lz4.md</a></td>
 <td>Code landed; smoke test (2C) folded into phase 3 step 3H</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>3. Fast JPEG decode</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/">PLAN-stream-caps-and-flap-phase-03-jpeg-decoders.md</a></td>
 <td>Code landed (3A-3G). Session 006 follow-up revealed still-image JPEG path missed the wiring (was on pure-Rust at ~263 ms/frame); fix landed. 3H replaced with the 007 still-image JPEG smoke matrix (one shared guest, three client OSes) — pending operator runs.</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>4. Channel diagnostics audit + playback observability</td>
 <td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/">completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md</a></td>
 <td>Complete (4G verified in session 002g: <code>data_packets_received == data_packets_decoded</code>, no decode failures, underruns visible — instrumentation distinguishes the four failure modes as designed)</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>5. Auto-snapshot bug-report mode</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md</a></td>
 <td>Code landed (5A-5B); 5C operator smoke test pending</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>6. Multi-codec + H.264</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/">PLAN-stream-caps-and-flap-phase-06-h264.md</a></td>
 <td>Code landed (6A-6E); 6F operator smoke test pending (needs an H.264-capable spice-server build to actually exercise the new path)</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>7. Preference messages</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/">PLAN-stream-caps-and-flap-phase-07-pref-messages.md</a></td>
 <td>Code landed (7A-7C); session 006 measurement drove AUTO_LZ → AUTO_GLZ revert (server stopped using GLZ entirely under AUTO_LZ; +25% bytes_in). 7D smoke folded into the next 005-style run.</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>8. Live streaming indicator + flap notification</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/">PLAN-stream-caps-and-flap-phase-08-streaming-indicator.md</a></td>
 <td>Code landed.</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>9. Vdagent responsiveness probe</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md</a></td>
 <td>Code landed (9A-9D). 9E operator smoke (deliberately freeze the guest agent to verify the Warn notification fires) is pending.</td>
-<td>—</td>
+<td><code>cd4c7d9</code> (PR #105)</td>
 </tr>
 <tr>
 <td>10. Documentation</td>
 <td>(no separate plan — docs catch-all dispatched directly)</td>
-<td>Complete. ARCHITECTURE.md capability table + README CLI flag docs + troubleshooting JPEG-decoder subsection landed across three commits (faa8ebd9 / c4849822 / dfc59950). Phase-9D's vdagent docs already covered the agent-probe surface.</td>
-<td>—</td>
+<td>Complete. Capability table + CLI flag docs + troubleshooting JPEG-decoder subsection landed across three commits (faa8ebd9 / c4849822 / dfc59950). The first two landed in <code>ARCHITECTURE.md</code> and <code>README.md</code> and have since been relocated by the <code>readme-pitch</code> (PR #222) and <code>llm-doc-structure</code> (PR #277) work: the capability table is now in <code>docs/spice-protocol.md</code>, the CLI flags in <code>docs/features.md</code> and <code>docs/diagnostics.md</code>. Phase-9D's vdagent docs already covered the agent-probe surface.</td>
+<td><code>cd4c7d9</code> (PR #105)</td>
 </tr>
 <tr>
 <td>11. Remove spurious-PONG keepalive</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/">PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md</a></td>
 <td>11A landed (main channel); 11B doc cleanup landed (channel-diagnostics-audit + plan addendum); inputs-channel <code>send_idle_keepalive</code> kept (decision recorded in phase 11 plan — different mechanism + no visible side effects + cross-channel-idleness hypothesis); 11C long-idle soak pending.</td>
-<td>—</td>
+<td><code>f22416a</code> (11A, PR #102), <code>cd4c7d9</code> (11B, PR #105)</td>
 </tr>
 <tr>
 <td>12. Bounded image cache</td>
 <td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/">completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md</a></td>
 <td><strong>Complete.</strong> 12A-12C landed; 12D smoke FAILED (revealed GlzDictionary was a second unbounded cache the snapshot was summing in); 12E (bound GLZ), 12F (split snapshot fields), 12G (docs) all landed; 12H verified in session 005b — <code>glz_dictionary_bytes</code> held at 247 MiB / 256 cap across 67 snapshots over 670 s with eviction firing, <code>image_cache_bytes</code> stayed at 0, no RSS drift.</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>13. Investigate intermittent server-side streaming</td>
@@ -14210,13 +14260,13 @@ session 002b showed that MJPEG decode in the pure-Rust
 <td>14. Stop status-bar pointer events leaking into the guest</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/">PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak.md</a></td>
 <td>Code landed.</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>15. Track down <code>build_tcp_frame: payload too large</code> warns</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/">PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn.md</a></td>
 <td>15B (one-shot backtrace) landed; no fires across 006 bundles. Awaiting fresh reproduction.</td>
-<td>—</td>
+<td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
 <td>16. Evaluate guest driver options for video streaming</td>
@@ -14232,12 +14282,22 @@ session 002b showed that MJPEG decode in the pure-Rust
 </tr>
 <tr>
 <td>18. Push audit</td>
-<td>PLAN-stream-caps-and-flap-phase-18-push-audit.md</td>
-<td>Not started</td>
-<td>—</td>
+<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-18-push-audit/">PLAN-stream-caps-and-flap-phase-18-push-audit.md</a></td>
+<td><strong>Complete.</strong> 18a-18d audited <code>d416338..cd4c7d9</code> (64 files, 16 159 insertions) across a mechanical wave and six judgment agents; 18e triaged every finding against <code>develop</code>; 18f recorded the derivation; 18g fixed the ten items the PR review raised, four of which were defects this audit had missed. Follow-up recorded in 18g: no test guest promotes a video region, so the <code>STREAM_CREATE</code> reordering rests on unit tests rather than on a live server.</td>
+<td><code>00219c0</code> (PR #333)</td>
 </tr>
 </tbody>
 </table>
+<p>Every phase landed on the <code>feedback-002</code> branch
+across two pull requests, #102 (<code>f22416a</code>) and #105
+(<code>cd4c7d9</code>). Those two merges are adjacent on
+<code>develop</code>'s first-parent history, so
+<code>d416338...cd4c7d9</code> (where <code>d416338</code> is <code>f22416a^1</code>)
+is an exact audit range covering 64 files and
+16 159 insertions. Five commits inside that range
+belong to other work: <code>7115df8</code>, <code>d723074</code>,
+<code>6650b86</code>, <code>098bb0a</code>, and
+<code>.github/workflows/manual-build.yml</code>.</p>
 <h3 id="closeout-non-video-work-remaining">Closeout — non-video work remaining<a class="headerlink" href="#closeout-non-video-work-remaining" title="Permanent link">&para;</a></h3>
 <p>Per session 006 we are parking the video-bottleneck phases
 (13 / 16 / 17) and closing out the rest of the master plan
@@ -14873,9 +14933,18 @@ phases that are going to land have landed.</p>
   commits; record each phase's as it lands in the <code>Merged</code>
   column of the table above, and reconstruct the ones that
   landed before this convention. <em>Two ways this runbook is
-  invoked</em> in <code>PUSH-AUDIT.md</code> has the rest.
-  Recommended planning effort: <strong>low</strong> (the runbook does the
-  work; the phase plan is a wrapper).</p>
+  invoked</em> in <code>PUSH-AUDIT.md</code> has the rest. The
+  reconstruction turned out to be cheap: every phase landed
+  on the <code>feedback-002</code> branch in two pull requests, #102
+  (<code>f22416a</code>) and #105 (<code>cd4c7d9</code>), which are adjacent on
+  <code>develop</code>'s first-parent history, so <code>d416338...cd4c7d9</code>
+  is an exact range — 64 files, 16 159 insertions.
+  Recommended planning effort: <strong>medium</strong>. It was recorded
+  here as <strong>low</strong> on the assumption that the phase plan is a
+  wrapper around the runbook; the accumulated diff is about
+  ten times the size of the only previous closing audit in
+  this repository, and splitting it across judgment agents
+  is a design decision the wrapper does not make for you.</p>
 </li>
 </ul>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
@@ -15029,7 +15098,93 @@ all of the following are true:</p>
   surface path. Not on the roadmap.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>(Populated during execution.)</p>
+<p>Fixed while the phases ran, rather than as findings:</p>
+<ul>
+<li>The still-image JPEG path missed the per-platform decoder
+  wiring and was still on pure-Rust at ~263 ms/frame
+  (<code>eb730d8</code>, found in session 006).</li>
+<li><code>AUTO_LZ</code> made the server stop using GLZ entirely and cost
+  +25% <code>bytes_in</code>; reverted to <code>AUTO_GLZ</code> (<code>0a86a22</code>).</li>
+<li>The GLZ dictionary was a second unbounded cache the
+  bug-report snapshot was summing into the image-cache
+  figure; found by the 12D smoke test failing, fixed in
+  12E-12F.</li>
+<li>The auto-snapshot task leaked across reconnects; retired
+  and respawned instead (<code>cd44a0c</code>).</li>
+<li>A MiB cap conversion could overflow on 32-bit
+  (<code>3ddd0a1</code>).</li>
+<li>Status-bar pointer events leaked into the guest (phase
+  14, <code>671d166</code>).</li>
+</ul>
+<p>The push audit's own findings are separate; see below.</p>
+<h3 id="items-deferred-from-the-push-audit">Items deferred from the push audit<a class="headerlink" href="#items-deferred-from-the-push-audit" title="Permanent link">&para;</a></h3>
+<p>Phase 18 audited the accumulated diff
+(<code>d416338...cd4c7d9</code>, 64 files, 16 159 insertions) and
+produced 51 findings. The full triage table, with each
+finding verified against the patch and then classified
+against current <code>develop</code>, is in
+<a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-18-push-audit/">PLAN-stream-caps-and-flap-phase-18-push-audit.md</a>.</p>
+<p><strong>Nothing is deferred.</strong> The operator's decision on
+2026-08-29 was to fix every in-scope finding, including the
+advisory duplication items. The dispositions are therefore:</p>
+<ul>
+<li><strong>Fixed</strong> — every finding classified <code>still-present</code> or
+  <code>moved</code>, across all severities, in a separate PR against
+  <code>develop</code>.</li>
+<li><strong>Declined as out of scope</strong> — five findings, each because
+  it is not this plan's work rather than because it is not
+  worth fixing:</li>
+<li><code>S1-9</code> (lz4 <code>row_bytes</code> unchecked, uncapped allocation):
+    byte-identical at the audit base <code>d416338</code>, so it
+    predates the range. Worth fixing, but under its own
+    change rather than attributed here.</li>
+<li><code>Q2-7</code> (<code>capture.rs</code> odd-dimension TODO): also
+    pre-existing, and since removed by <code>b3bbf72</code>.</li>
+<li><code>W-1</code> (123-character line at <code>ryll/src/config.rs:19</code>):
+    belongs to <code>d723074</code>, a foreign commit that rode the
+    same branch.</li>
+<li><code>Q2-3</code> (<code>mjpeg_duration_stats</code> naming): refuted. The
+    comment justifies the reuse rather than conceding a
+    problem, and the function genuinely is codec-agnostic.</li>
+<li><code>D-5</code> (whether <code>shakenfist/kerbside</code> docs need review
+    for opcodes 102/103/105): a question for that
+    repository, raised there rather than resolved here.</li>
+<li><strong>No action needed</strong> — six findings already fixed on
+  <code>develop</code> by later work, each naming what fixed it:
+  <code>D-1</code> (<code>d1b2f60</code>, <code>7332cb7</code>, <code>f1b307c</code>), <code>D-3</code> and <code>D-4</code>
+  (relocated by PRs #222 and #277), <code>Q2-7</code> (<code>b3bbf72</code>), and
+  the two <code>Q2-8</code> instances partly cleaned by <code>f1b307c</code>.</li>
+</ul>
+<p>Three findings are worth naming individually because they
+outlive the fix:</p>
+<ol>
+<li><strong><code>S1-1</code>, the only HIGH.</strong> The macOS ImageIO backend
+   passed no container hint and no magic-byte check, so a
+   server could route crafted TIFF/HEIF bytes into ImageIO
+   sub-decoders. The Windows backend pins
+   <code>GUID_ContainerFormatJpeg</code>. Two backends written days
+   apart for the same job disagreed about whether to
+   constrain the container, and the permissive one was the
+   only backend macOS ever selected.</li>
+<li><strong><code>T-3</code> / <code>T-4</code>, which the audit got wrong and which
+   are recorded because of it.</strong> The audit reported that
+   <code>.github/workflows/ci.yml</code> never runs <code>cargo test</code> on
+   macOS or Windows, so the <code>cfg</code>-gated dimension guards had
+   no coverage anywhere. That is false: <code>ci.yml:532-533</code> runs
+   <code>cargo test --workspace</code> on every matrix entry and has
+   since <code>a488b39</code>. The finding came from reading the matrix
+   definition and inferring the steps. The true residual is
+   <code>T-2</code> — no test fed the guard an oversized image — and
+   the fact that those legs run in the merge tier rather
+   than per pull request.</li>
+<li><strong><code>D-2</code>, which inverted on inspection.</strong>
+   <code>docs/development-macos.md</code> claimed the openh264 crate
+   "downloads a pre-built library at build time". True of
+   older releases, false of the pinned <code>openh264-sys2</code>
+   0.9.8, which compiles vendored source — so the document
+   offered a remedy for a failure mode that no longer
+   exists and hid the one that does.</li>
+</ol>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When this master plan lands:</p>
 <ul>

@@ -6513,6 +6513,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 2: retire the comment addresser
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -15231,6 +15259,16 @@ seconds.</p>
 an LRU eviction policy: when the total cached bytes exceed the cap, the
 least-recently-used entries are evicted until the cap is satisfied. This
 is essential for long-running desktop sessions without risk of OOM.</p>
+<p>The cap counts pixel bytes only, so it is paired with an entry-count
+cap of <code>cap_bytes / 96</code> entries — 96 bytes being an estimate of the
+per-entry container overhead (LRU node, hash-map slot, allocator
+headers) that the byte counter cannot see. Without it a stream of
+tiny images — a 1x1 RGBA image accounts for 4 bytes and really costs
+around a hundred — would fit tens of millions of entries inside a
+256 MiB cap and take gigabytes of RSS. The same pairing applies to
+the GLZ dictionary, which shares the same LRU implementation.
+Entry-cap evictions are counted in <code>image_cache_evictions_total</code> /
+<code>glz_dictionary_evictions_total</code> like any other cap-driven eviction.</p>
 <h3 id="interpreting-cache-statistics-in-a-bug-report">Interpreting cache statistics in a bug report<a class="headerlink" href="#interpreting-cache-statistics-in-a-bug-report" title="Permanent link">&para;</a></h3>
 <p>When you file a Display bug report (F12), the <code>channel-state.json</code>
 includes three cache-related fields under the display channel entry:</p>
@@ -15308,7 +15346,10 @@ from the GLZ dictionary, not the image cache, but nothing in the
 snapshot distinguished the two.</p>
 <p>Current builds report the two separately: the <code>image_cache_*</code>
 fields reflect only the
-<code>BoundedImageCache</code> (CACHE_ME-flagged decoded RGBA frames). The GLZ
+<code>BoundedImageCache</code> (CACHE_ME-flagged decoded RGBA frames).
+<code>image_cache_ids</code> is also truncated to the 64 most recently used
+keys, MRU first, rather than being the full sorted key set;
+<code>image_cache_entries</code> carries the true total. The GLZ
 dictionary's state is reported separately under the new
 <code>glz_dictionary_*</code> fields described below. As a result,
 <code>image_cache_bytes</code> in a current bug report will be roughly an order
