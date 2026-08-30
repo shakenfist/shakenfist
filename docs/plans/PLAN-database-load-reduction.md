@@ -295,8 +295,8 @@ so the phase plans do not reopen them:
 | 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
 | 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
 | 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Complete |
-| 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | In progress |
-| 8. Push audit | [PLAN-database-load-reduction-phase-08-push-audit.md](PLAN-database-load-reduction-phase-08-push-audit.md) | In progress |
+| 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Complete |
+| 8. Push audit | [PLAN-database-load-reduction-phase-08-push-audit.md](PLAN-database-load-reduction-phase-08-push-audit.md) | Complete |
 
 Phase summaries:
 
@@ -465,6 +465,20 @@ accumulated diff of every phase in this plan against
 their own pull request, and the plan is not complete until
 each is resolved or declined in writing here. If the audit
 finds nothing, that is recorded in one sentence.
+*(Done, #3950. The audit did find things, and it graded and
+disposed of every one: the blocking findings were fixed on
+its own branch or routed to #3893, and the advisory
+remainder was filed as #3942, #3943 and #3944. No blocking
+finding is open. The automated review of the audit's own
+fixes then found two defects the audit had introduced -- an
+occupancy gauge that did not count the lazy-expiry read
+path, and a capacity trim whose expired sweep trimmed to
+`cap` rather than to target and so inverted its own
+amortisation -- the first of which the audit's own
+test-coverage finding had predicted and then not acted on.
+Both are fixed, with tests that fail against the pre-fix
+code. The disposition of every finding is in the phase 8
+plan.)*
 
 ## Agent guidance
 
@@ -674,6 +688,21 @@ the elected cluster daemon sleeps on its lock rather than in
 `idle()`, so it never calls `check_daemon_state()` and never
 notices an `sf-ctl stop`. Immaterial to load -- 0.5/s -- but
 a real shutdown-path gap.
+
+Phase 8's audit left three more open. **#3942**: `sf-queues`
+backs off only when its queue is empty, not when its worker
+pool is full. **#3944**: the phase 2 object cache extends
+the in-memory residency of `ssh_key` and `user_data`, which
+is a security property nobody chose when the cache was
+scoped. Both carry `automated-fix-attempted`, because each
+needs a design decision rather than a same-day patch.
+**#3953**: the cache's capacity trim sorts mixed TTL tiers
+by absolute expiry, so under sustained pressure it sheds the
+entire 30s mutable tier before touching a 300s immutable
+entry. The behaviour is documented in
+`docs/operator_guide/database.md`; changing the policy is
+the design decision the audit declined to make on its way
+out.
 
 ### Documentation index maintenance
 
