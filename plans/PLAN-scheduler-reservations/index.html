@@ -14043,19 +14043,37 @@ wrong gate, and phase 4c replaces it. The advisory release
 exists to collect calibration data, so what phase 5 waits on is
 that data existing, not time elapsing. Phase 5 does not start
 until phase 4c's observation record is written.</p>
-<p><em>Input from phase 00a's post-deploy observation (2026-08-27):</em>
-the load stage narrows to the lowest occupied bucket before
-headroom weighting, so it can discard nodes with far more room
-than the ones it keeps -- 8 of 60 observed decisions on sfcbr
-did exactly that, and 34 left a single survivor. The mechanism
-is that <code>cpu_load_1</code> measures activity rather than occupancy,
-so a node packed with idle CI runners ranks as the emptiest in
-the cluster. It is not concentrating placement today only
-because the capacity filters reject the over-committed node
-before ranking runs, which is a weaker guarantee than it looks.
-Phase 6 owns the ranking model and should decide this
-deliberately; the detail is in
+<p><em>Input from phase 00a's post-deploy observation (2026-08-27),
+corrected 2026-08-29:</em> this paragraph used to say the load stage
+"can discard nodes with far more room than the ones it keeps",
+citing 8 of 60 observed decisions and 34 leaving a single
+survivor. <strong>That is withdrawn.</strong> The load stage discards
+nothing: <code>find_candidates()</code> extends its result with every
+bucket's tier (<code>shakenfist/scheduler.py:741-756</code>), which is the
+merge-CI single-candidate lockout fix <code>108a0cdbd</code> from
+2026-08-15 -- twelve days before the observation. The counts came
+from the <code>schedule have lowest cpu load</code> audit event, which
+publishes the lowest bucket alone by construction; the full
+ranking is in <code>schedule final candidates</code>. The finding also
+quoted headroom weights for the nodes it called eliminated, and
+a node only has a weight if it is in the returned list, so its
+own evidence refutes it.</p>
+<p>What survives for phase 6 is real but weaker: <code>cpu_load_1</code>
+measures activity rather than occupancy, so a node packed with
+idle CI runners <em>ranks ahead of</em> a busier node with more room.
+That is a mis-ordering, not a mis-elimination -- the emptier node
+is still reachable, later in a list the caller walks only on
+refusal. Phase 6 owns the ranking model and should decide
+whether an activity metric belongs in it now that the capacity
+counters supply an occupancy one. Detail and the withdrawn text
+are in
 <a href="../PLAN-scheduler-reservations-phase-00a-load-aware-ordering/">PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md</a>.</p>
+<p><em>Not evidence for phase 6:</em> the recurring
+<code>507 ... sufficient_idle_cpu</code> refusals in merge CI (#3772) come
+from the admission stage, which runs before ranking and reads
+the capacity counters. When it refuses every candidate no
+ranking model would have helped, so that family belongs to
+<code>PLAN-ci-cloud-sizing</code> and phase 6 should not adopt it.</p>
 <p><strong>Phase 6 — affinity rework.</strong> Binary soft affinity plus
 hard require constraints, weighted-form deprecation mapping,
 ranking precedence above load ordering (D6). Also takes the

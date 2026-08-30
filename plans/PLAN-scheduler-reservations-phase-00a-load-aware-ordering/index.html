@@ -13856,20 +13856,73 @@ the typed columns phase 1 added, not the fallback --
 <code>cpu_schedulable_from_fallback</code> is <code>false</code> on every node in
 every decision observed.</p>
 <h3 id="one-finding-this-raises-for-phase-6">One finding this raises, for phase 6<a class="headerlink" href="#one-finding-this-raises-for-phase-6" title="Permanent link">&para;</a></h3>
-<p>The load stage narrows to the lowest occupied bucket <em>before</em>
+<p><strong>Withdrawn on 2026-08-29 — the discard half of it was wrong.</strong>
+The original text is kept below the correction, because a
+finding handed forward to another phase should show what it
+claimed as well as what it turned out to be.</p>
+<p>The load stage does <strong>not</strong> discard anything. <code>find_candidates()</code>
+builds its result with <code>for bucket in sorted(by_load)</code>, extending
+<code>ordered</code> with every bucket's tier in turn
+(<code>shakenfist/scheduler.py:741-756</code>), so every candidate that
+passed admission is returned, ranked. The comment directly above
+that loop says so explicitly and says why: a bucket "says a node
+looks busier right now, not that it cannot host the instance",
+and discarding the tail "turns one refusal into a failed create
+on a cluster with room". That is not a recent subtlety -- it is
+the fix for the merge-CI single-candidate lockout, <code>108a0cdbd</code>,
+landed 2026-08-15, <strong>twelve days before this observation was
+made</strong>.</p>
+<p>What was actually being read is the <code>schedule have lowest cpu
+load</code> audit event, whose <code>candidates</code> field is <code>by_load[
+lowest_load]</code> by construction (<code>:712-720</code>) -- the lowest bucket
+alone. The complete ranking is in the <code>schedule final
+candidates</code> event. Counting the first event's list and calling
+the remainder "eliminated" counts a log line, not a behaviour,
+which is why the "8 of 60" and "34 left a single survivor"
+numbers below should not be reused.</p>
+<p>The finding is refuted by its own evidence, which is the part
+worth noticing. It quotes headroom weights for the two nodes it
+says were eliminated -- sf-5 at 9.55 and sf-6 at 7.64. <code>weights</code>
+is populated only inside the loop that builds <code>ordered</code>, for
+every candidate in every bucket. A node with a weight was in the
+returned list. The numbers cited to show the discard are proof
+there was none.</p>
+<p><strong>What survives, and still belongs to phase 6.</strong> <code>cpu_load_1</code>
+measures activity, not occupancy, so a node packed with idle CI
+runners ranks ahead of a busier node with more room -- sf-1, at
+89% of its hard max by commitment, sat in bucket 0 with the
+lowest normalised load in the cluster. That is real, and it is a
+mis-<em>ordering</em> rather than a mis-elimination: the emptier node is
+still reachable, just later in a list the caller only walks on
+refusal. Phase 6 owns the ranking model and should decide
+deliberately whether an activity metric belongs in it at all,
+now that the capacity counters give it an occupancy one.</p>
+<p>Also for phase 6, and <em>not</em> an argument for reworking the
+ranking: the <code>507 ... sufficient_idle_cpu</code> refusals that recur in
+merge CI (#3772) come from the admission stage, which runs
+<em>before</em> ranking and reads the capacity counters. When it refuses
+every candidate, no ranking model would have helped. That family
+belongs to <code>PLAN-ci-cloud-sizing</code>, and phase 6 should not adopt
+it as evidence about ordering.</p>
+<details>
+<summary>The original finding, as written on 2026-08-27</summary>
+
+The load stage narrows to the lowest occupied bucket *before*
 headroom weighting, so it can discard nodes with far more room
 than the ones it keeps. In one observed decision the survivors
 were sf-1 (weight 3.67) and sf-4 (6.02), while sf-5 (9.55) and
 sf-6 (7.64) were eliminated for being in bucket 1 rather than
 bucket 0. Across 60 decisions on 30 live runners, 8 (13%)
 discarded a node whose headroom weight was higher than the best
-survivor's, and 34 left only a single survivor.</p>
-<p>The mechanism is that <code>cpu_load_1</code> measures activity, not
+survivor's, and 34 left only a single survivor.
+
+The mechanism is that `cpu_load_1` measures activity, not
 occupancy. A node packed with idle CI runners looks emptier than
 a busy one with room to spare -- and sf-1, at 89% of its hard
 max by commitment, sat in bucket 0 with the lowest normalised
-load in the cluster.</p>
-<p>This is not concentrating placement today, because the capacity
+load in the cluster.
+
+This is not concentrating placement today, because the capacity
 filters reject sf-1 for most runner sizes before ranking ever
 runs: it has six schedulable threads and, at the time of
 observation, two available vCPUs. So the risk is contained by
@@ -13878,7 +13931,10 @@ a weaker guarantee than it looks and worth knowing before the
 ranking is reworked. Recorded here rather than fixed: phase 6
 owns the ranking model, and D6's open question about whether a
 preference may bid against a hard ceiling is the same question
-in a different coat.</p>
+in a different coat.
+
+</details>
+
 <h3 id="method">Method<a class="headerlink" href="#method" title="Permanent link">&para;</a></h3>
 <p>An hour of sampling every two minutes, recording each instance
 uuid the first time it was seen along with the node it landed
