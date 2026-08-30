@@ -1812,6 +1812,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/diagram-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: diagram format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/expensive-lane-path-filter/" class="md-nav__link">
         
   
@@ -2128,6 +2156,34 @@
     
   
     Audit: Merge queue reasonability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../audits/mermaid-lint-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: mermaid diagrams linted in CI
   
 
     
@@ -6623,7 +6679,35 @@
   <span class="md-ellipsis">
     
   
-    Consistency Audit Deferred Work
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 1: shared blocks, vendor stamp and settings closeout
   
 
     
@@ -7352,6 +7436,34 @@
     
   
     Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 6: push audit
   
 
     
@@ -13563,17 +13675,21 @@ the <code>release.yml</code> workflow:</p>
 <li><strong>Creates a GitHub Release</strong> with the built artifacts and
    auto-generated release notes</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Maintainer pushes v0.6.0 tag
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>        |
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        v
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  Build package ──&gt; Upload artifacts
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        |
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        v
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  Wait for reviewer approval (GitHub environment)
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        |
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        v
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  Sign tag with Sigstore ──&gt; Publish to PyPI ──&gt; Create GitHub Release
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    tag["Maintainer pushes v0.6.0 tag"]
+    build["Build package"]
+    artifacts["Upload artifacts"]
+    approve["Wait for reviewer approval&lt;br/&gt;(GitHub environment)"]
+    sign["Sign tag with Sigstore"]
+    pypi["Publish to PyPI"]
+    release["Create GitHub Release"]
+
+    tag --&gt; build
+    build --&gt; artifacts
+    build --&gt; approve
+    approve --&gt; sign
+    sign --&gt; pypi
+    pypi --&gt; release</code></pre>
 <h2 id="security-properties">Security Properties<a class="headerlink" href="#security-properties" title="Permanent link">&para;</a></h2>
 <p>The release process is designed to eliminate long-lived secrets:</p>
 <ul>
@@ -13706,17 +13822,17 @@ the <code>release.yml</code> workflow:</p>
 </table>
 <h2 id="verifying-a-release">Verifying a Release<a class="headerlink" href="#verifying-a-release" title="Permanent link">&para;</a></h2>
 <h3 id="tag-signature">Tag Signature<a class="headerlink" href="#tag-signature" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gitsign<span class="w"> </span>verify<span class="w"> </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">'.*'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">'https://token.actions.githubusercontent.com'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>v0.6.0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gitsign<span class="w"> </span>verify<span class="w"> </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">'.*'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">'https://token.actions.githubusercontent.com'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>v0.6.0
 </code></pre></div>
 <h3 id="pypi-attestation">PyPI Attestation<a class="headerlink" href="#pypi-attestation" title="Permanent link">&para;</a></h3>
 <p>Check the <strong>Provenance</strong> section on the package's PyPI page.</p>
 <h3 id="artifact-attestation">Artifact Attestation<a class="headerlink" href="#artifact-attestation" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cosign<span class="w"> </span>verify-attestation<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">'.*'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">'https://token.actions.githubusercontent.com'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>package-0.6.0.tar.gz
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cosign<span class="w"> </span>verify-attestation<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--certificate-identity-regexp<span class="o">=</span><span class="s1">'.*'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>--certificate-oidc-issuer<span class="o">=</span><span class="s1">'https://token.actions.githubusercontent.com'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span>package-0.6.0.tar.gz
 </code></pre></div>
 
 

@@ -1597,6 +1597,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/diagram-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: diagram format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/expensive-lane-path-filter/" class="md-nav__link">
         
   
@@ -1913,6 +1941,34 @@
     
   
     Audit: Merge queue reasonability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/audits/mermaid-lint-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: mermaid diagrams linted in CI
   
 
     
@@ -6540,7 +6596,35 @@
   <span class="md-ellipsis">
     
   
-    Consistency Audit Deferred Work
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 1: shared blocks, vendor stamp and settings closeout
   
 
     
@@ -7269,6 +7353,34 @@
     
   
     Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 6: push audit
   
 
     
@@ -13421,9 +13533,14 @@ you do not build or install it separately. A release install —
 release it was built and tested against: the two packages release in
 lockstep from a single <code>v*</code> tag. A git or dev install of <code>kerbside</code>
 instead resolves whatever <code>kerbside-proxy</code> is newest on PyPI, which may
-be a rolling dev wheel rather than a tagged release. Prebuilt manylinux
-wheels are published for x86_64 and aarch64 (no source distribution —
-an unsupported platform gets a clean pip error).</p>
+be a rolling dev wheel rather than a tagged release. That wheel is
+published unattended from <code>develop</code>, so no per-commit human review
+stands behind it and nothing on the install path verifies its build
+provenance. Production deployments should install a tagged
+<code>kerbside==X.Y.Z</code>, which carries the exact <code>==</code> pin of the proxy it was
+built and tested against. Prebuilt manylinux wheels are published for
+x86_64 and aarch64 (no source distribution — an unsupported platform
+gets a clean pip error).</p>
 <p>For development you can instead point <code>KERBSIDE_PROXY_BIN</code> at a
 locally built binary, or let the daemon pick up the in-repo
 <code>cargo build</code> output.</p>

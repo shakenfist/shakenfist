@@ -1597,6 +1597,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/diagram-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: diagram format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/expensive-lane-path-filter/" class="md-nav__link">
         
   
@@ -1913,6 +1941,34 @@
     
   
     Audit: Merge queue reasonability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/audits/mermaid-lint-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: mermaid diagrams linted in CI
   
 
     
@@ -6668,7 +6724,35 @@
   <span class="md-ellipsis">
     
   
-    Consistency Audit Deferred Work
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 1: shared blocks, vendor stamp and settings closeout
   
 
     
@@ -7397,6 +7481,34 @@
     
   
     Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 6: push audit
   
 
     
@@ -13924,8 +14036,8 @@ Three things about it only matter while developing:</p>
   how <code>tools/build-proxy-wheel.sh</code> knows not to dev-stamp a
   release-stamped tree. A unit test pins the floor's dev-inclusive
   property. <code>find_proxy_bin()</code> still prefers <code>KERBSIDE_PROXY_BIN</code> and
-  the cargo build tree for local work, and the daemon verifies the
-  binary's gRPC contract hash at launch either way.</li>
+  the cargo build tree for local work, and the daemon compares the
+  binary's gRPC contract hash against its own at launch either way.</li>
 <li><strong><code>rust.yml</code> verifies wheel stamping on pull requests as a packaging
   guard</strong> (<code>tools/verify-wheel-stamping.sh</code>: an unstamped tree must
   produce a dev-versioned wheel, a release-stamped tree an

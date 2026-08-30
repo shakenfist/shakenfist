@@ -153,6 +153,10 @@
          <lastmod>2026-08-30</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/diagram-format/</loc>
+         <lastmod>2026-08-30</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/docs-external-links/</loc>
          <lastmod>2026-08-30</lastmod>
     </url>
@@ -190,6 +194,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/merge-queue-config/</loc>
+         <lastmod>2026-08-30</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/audits/mermaid-lint-ci/</loc>
          <lastmod>2026-08-30</lastmod>
     </url>
     <url>
@@ -1349,6 +1357,10 @@
          <lastmod>2026-08-30</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/</loc>
+         <lastmod>2026-08-30</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit/</loc>
          <lastmod>2026-08-30</lastmod>
     </url>
@@ -1430,6 +1442,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/</loc>
+         <lastmod>2026-08-30</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/</loc>
          <lastmod>2026-08-30</lastmod>
     </url>
     <url>

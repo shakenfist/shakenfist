@@ -1790,6 +1790,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/diagram-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: diagram format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/expensive-lane-path-filter/" class="md-nav__link">
         
   
@@ -2106,6 +2134,34 @@
     
   
     Audit: Merge queue reasonability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../audits/mermaid-lint-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: mermaid diagrams linted in CI
   
 
     
@@ -6601,7 +6657,35 @@
   <span class="md-ellipsis">
     
   
-    Consistency Audit Deferred Work
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 1: shared blocks, vendor stamp and settings closeout
   
 
     
@@ -7330,6 +7414,34 @@
     
   
     Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 6: push audit
   
 
     
@@ -13508,17 +13620,10 @@ the workflow templates and how to add them to a new project.</p>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p>The automation consists of several GitHub Actions workflows that
 respond to PR events and bot commands:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>PR opened/updated
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      |
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>      v
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>CI tests run (functional-tests.yml)
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>      |
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>      v
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>Tests pass ──&gt; Automated reviewer (Claude Code)
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                    |
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                    v
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>              Posts structured review comment
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TD
+    pr[PR opened or updated] --&gt; ci[CI tests run&lt;br/&gt;functional-tests.yml]
+    ci --&gt;|tests pass| review[Automated reviewer&lt;br/&gt;Claude Code]
+    review --&gt; comment[Posts structured review comment]</code></pre>
 <p>The review is where the automation stops. Its findings are worked
 through interactively; the workflow which acted on them automatically
 is retired, see below.</p>
@@ -13603,19 +13708,19 @@ templates which provide <code>pr-fix-tests.yml</code> and
 <code>test-drift-fix.yml</code>.</p>
 <h2 id="adding-ci-review-automation-to-a-project">Adding CI Review Automation to a Project<a class="headerlink" href="#adding-ci-review-automation-to-a-project" title="Permanent link">&para;</a></h2>
 <h3 id="step-1-copy-the-workflow-files">Step 1: Copy the Workflow Files<a class="headerlink" href="#step-1-copy-the-workflow-files" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># From the target project root:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>cp<span class="w"> </span>/path/to/development/templates/ci-review-automation/pr-re-review.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>.github/workflows/
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>cp<span class="w"> </span>/path/to/development/templates/ci-review-automation/pr-retest.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span>.github/workflows/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># From the target project root:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cp<span class="w"> </span>/path/to/development/templates/ci-review-automation/pr-re-review.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>.github/workflows/
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>cp<span class="w"> </span>/path/to/development/templates/ci-review-automation/pr-retest.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span>.github/workflows/
 </code></pre></div>
 <p>For projects with large test suites, also copy from
 <code>templates/test-drift-fix/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cp<span class="w"> </span>/path/to/development/templates/test-drift-fix/pr-fix-tests.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>.github/workflows/
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>cp<span class="w"> </span>/path/to/development/templates/test-drift-fix/test-drift-fix.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>.github/workflows/
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Then customise test-drift-fix.yml for your project</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cp<span class="w"> </span>/path/to/development/templates/test-drift-fix/pr-fix-tests.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>.github/workflows/
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>cp<span class="w"> </span>/path/to/development/templates/test-drift-fix/test-drift-fix.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span>.github/workflows/
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Then customise test-drift-fix.yml for your project</span>
 </code></pre></div>
 <h3 id="step-2-add-automated-reviewer-to-ci">Step 2: Add Automated Reviewer to CI<a class="headerlink" href="#step-2-add-automated-reviewer-to-ci" title="Permanent link">&para;</a></h3>
 <p>Modify your main CI workflow (e.g. <code>functional-tests.yml</code>) to add:</p>

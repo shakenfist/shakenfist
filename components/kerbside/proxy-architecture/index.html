@@ -1597,6 +1597,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/diagram-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: diagram format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/expensive-lane-path-filter/" class="md-nav__link">
         
   
@@ -1913,6 +1941,34 @@
     
   
     Audit: Merge queue reasonability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/audits/mermaid-lint-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: mermaid diagrams linted in CI
   
 
     
@@ -6785,7 +6841,35 @@
   <span class="md-ellipsis">
     
   
-    Consistency Audit Deferred Work
+    Consistency audit compliance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 1: shared blocks, vendor stamp and settings closeout
   
 
     
@@ -7514,6 +7598,34 @@
     
   
     Proxy dev releases phase 5: bounding the dev release set
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-proxy-dev-releases-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy dev releases phase 6: push audit
   
 
     
@@ -14204,6 +14316,16 @@ versions by hand):</p>
   and the mismatch is logged as a warning instead of refused. It exists
   for debugging only and is not a supported deployment posture.</li>
 </ul>
+<p>The handshake is a compatibility check, not an integrity control. It
+detects <em>accidental</em> build skew — a stale local <code>cargo build</code>, a wheel
+that did not upgrade with the package, a hand-mismatched pair — and it
+detects nothing at all about a substituted or tampered binary. An
+attacker who can replace the binary controls what it prints when asked
+for its hash, and more fundamentally the check has to <em>execute</em> the
+untrusted binary in order to decide whether to trust it, so anyone in a
+position to defeat it already has code execution. Nothing downstream of
+this may treat a passing handshake as evidence that the binary is the
+one this package shipped with.</p>
 <h3 id="session-termination-dropping-in-flight-connections">Session termination: dropping in-flight connections<a class="headerlink" href="#session-termination-dropping-in-flight-connections" title="Permanent link">&para;</a></h3>
 <p>Removing or expiring the DB token blocks a <strong>new</strong> connection attempt, but
 it does nothing to a client that is already connected: that client keeps
