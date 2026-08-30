@@ -213,6 +213,32 @@ like an idle cluster rather than a broken query.
 
 ## Coverage the functional suite does not have
 
+### Affinity test skips are topology dependent
+
+`cluster_ci_tests/test_scheduler.py`'s `test_affinity` skips rather
+than passes on two degeneracies, because in both the assertion could
+not have failed and a pass would be a false green. The two carry
+different messages, and which one is expected depends on the
+topology -- so a permanently skipping run cannot be read as a healthy
+one:
+
+- **`only N candidates`** -- the scorer considered fewer than two
+  nodes, so affinity was never consulted. Expected on any cluster
+  with fewer than three hypervisors, where the test's own
+  `len(nodes) < 3` guard usually fires first.
+- **`affine node not a candidate`** -- the node the test is affine to
+  was ejected by an admission filter (CPU, memory or disk) before
+  scoring. This is issue #3565's real mechanism and is not an
+  affinity defect. **Expected on `slim-tier` until
+  `PLAN-ci-cloud-sizing` lands**, since that topology runs the same
+  suite on roughly half the resources and the admission filters bind
+  there.
+
+Neither skip is expected on `slim-primary`. A `slim-primary` run
+reporting either one is a real signal: the cluster is smaller than it
+should be, or the scheduler is ejecting nodes it should not. Treat it
+as a failure to investigate rather than a pass.
+
 ### Upgrade data verification
 
 Every functional job deploys a fresh cluster, so nothing in the suite
