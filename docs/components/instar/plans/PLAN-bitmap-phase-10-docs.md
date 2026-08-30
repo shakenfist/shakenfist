@@ -54,7 +54,8 @@ Grounding (verified against the phase-10 research, HEAD `14be112`):
   left). The real add is a **`### bitmap`** subsection in the
   `## instar Operations` section, after `### dd` (ends `:1000`),
   matching the `### amend`/`### dd`/`### snapshot` shape (synopsis
-  block + one prose paragraph + "See [docs/bitmap.md](/components/instar/plans/bitmap/)").
+  block + one prose paragraph + a `See [docs/bitmap.md](/components/instar/plans/bitmap/)`
+  line).
 - **`README.md`**: add `docs/bitmap.md` to the per-subcommand-guide
   link list (`:33-37`), append `bitmap` to the operations sentence
   (`:30-31`), and add a `### ...bitmap...` usage section after the

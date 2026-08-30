@@ -166,7 +166,7 @@ Guest-side (mapped from the structured result code):
 In every case below instar is deliberately **more conservative** than
 `qemu-img` — it refuses an operation qemu accepts. Each is recorded in
 the `KNOWN_BITMAP_DIVERGENCES` registry in
-[`tests/test_bitmap.py`](../tests/test_bitmap.py) (and the differential
+[`tests/test_bitmap.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_bitmap.py) (and the differential
 allowlist `KNOWN_BITMAP_DIFFERENTIAL_DIVERGENCES` in
 `scripts/differential-fuzz.py`), so a cross-validation mismatch that is
 *not* registered there is treated as a real regression.
@@ -328,7 +328,7 @@ instar bitmap: mixing --merge with other actions in one invocation is not suppor
   `qemu-img info` is no longer required to inspect them.
 
 For the bitmap planner crate, see
-[`src/crates/bitmap/`](../src/crates/bitmap/). For the guest
-operation, see [`src/operations/bitmap/`](../src/operations/bitmap/).
+[`src/crates/bitmap/`](https://github.com/shakenfist/instar/tree/develop/src/crates/bitmap). For the guest
+operation, see [`src/operations/bitmap/`](https://github.com/shakenfist/instar/tree/develop/src/operations/bitmap).
 For the divergence whitelist, see `KNOWN_BITMAP_DIVERGENCES` at the top
-of [`tests/test_bitmap.py`](../tests/test_bitmap.py).
+of [`tests/test_bitmap.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_bitmap.py).

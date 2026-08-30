@@ -214,7 +214,7 @@ clear documentation of what information came from untrusted sources.
 ## Related Documents
 
 - [security.md](/components/instar/security/) - Comprehensive CVE analysis
-- [threat-model.md](/components/instar/threat-model/) - Overall security architecture (if exists)
+- [ARCHITECTURE.md](https://github.com/shakenfist/instar/blob/develop/ARCHITECTURE.md#security-model) - Overall security architecture
 - [qcow2/qcow2-format.md](/components/instar/qcow2/qcow2-format/) - QCOW2 format details
 - [vmdk/vmdk-format.md](/components/instar/vmdk/vmdk-format/) - VMDK format details
 

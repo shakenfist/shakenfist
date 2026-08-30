@@ -130,6 +130,22 @@ pre-commit run --all-files
 The hooks run rustfmt (formatting) and clippy (linting) on all Rust code via
 Docker, ensuring consistent tooling regardless of local Rust installation.
 
+Beyond the Rust hooks, `pre-commit run --all-files` also runs:
+
+- `skillsaw`, which lints the agent context — `AGENTS.md`, `CLAUDE.md`
+  and the skills and settings under `.claude/` — for malformed
+  frontmatter, instructions smuggled into a file an agent is handed,
+  embedded credentials, and dangerous hook or settings configuration.
+  The hook is pinned by `rev` in `.pre-commit-config.yaml` and fetches
+  its own environment on first run, so the first invocation after a
+  fresh checkout is slower than the rest. The same hook runs in CI as
+  the `Agent context` check.
+- `actionlint` over `.github/workflows/`, and `shellcheck` over
+  `scripts/` and `tools/`.
+- `binary-sizes`, which checks the built binaries against the guest
+  memory layout, and `nightly-pins`, which fails if the two
+  devcontainer Dockerfiles disagree about the Rust nightly.
+
 To auto-fix formatting issues:
 
 ```bash
@@ -376,13 +392,8 @@ Comment on a PR with these commands (requires write access):
 | Command | Description |
 |---------|-------------|
 | `@shakenfist-bot please re-review` | Request a fresh automated code review |
+| `@shakenfist-bot please retest` | Re-run functional tests without pushing a new commit |
 | `@shakenfist-bot please attempt to fix` | Attempt to fix failing tests |
-| `@shakenfist-bot please address comments` | Address automated review comments |
-
-The "address comments" command extracts the structured JSON review from the PR
-comment (embedded in a collapsed `<details>` section) and creates one commit per
-actionable item (those marked with `action: fix` or `action: document`). If Claude
-disagrees with a suggestion, it will explain its rationale instead of making changes.
 
 ### GitHub issues
 
@@ -395,7 +406,6 @@ automatically closed when the PR merges.
 - **Automated Review**: same-repository PRs automatically receive code review
   after CI passes, and GitHub issues are created for actionable items
 - **Test Fixing**: On-demand test failure resolution via PR comment
-- **Comment Addressing**: On-demand resolution of review feedback via PR comment
 
 Pull requests from forks are not reviewed automatically. The reviewer runs
 Claude Code with `--dangerously-skip-permissions` on a runner holding a token
@@ -723,21 +733,7 @@ a hard CI failure. Deliberate exclusions live in an allowlist in
 `tools/ci/check-test-partition.py` (currently just the malicious
 suite). See [docs/testing.md](/components/instar/testing/).
 
-## GitHub Automation
-
-The project includes Claude Code-powered GitHub automation for common PR tasks.
-
-## Available Bot Commands
-
-Comment on a PR with these commands (requires write access to the repository):
-
-- `@shakenfist-bot please re-review` - Request a fresh automated code review
-- `@shakenfist-bot please retest` - Re-run functional tests without pushing a new commit
-- `@shakenfist-bot please attempt to fix` - Have Claude attempt to fix failing tests
-- `@shakenfist-bot please address comments` - Have Claude address automated review
-  feedback, creating one commit per valid issue
-
-## How Automated Review Works
+## How automated review works
 
 The review job lives in the shared workflow
 `shakenfist/actions/.github/workflows/pr-auto-review.yml`, not in this
@@ -752,12 +748,11 @@ Code with `--dangerously-skip-permissions` while holding a token with
 input, so a fork PR is skipped rather than reviewed. Fork PRs get a skipped
 job, not a failing one.
 
-The automated reviewer outputs structured JSON that is:
-1. Validated against a JSON schema (`tools/review-schema.json`)
-2. GitHub issues are created for actionable items (action=fix or action=document)
-3. Rendered to human-readable markdown and posted as a PR comment
-4. The raw JSON is embedded in a collapsed `<details>` section at the end of
-   the comment, allowing the address-comments automation to extract it
+The automated reviewer outputs structured JSON. The shared workflow validates
+it, creates GitHub issues for actionable items (action=fix or action=document),
+and posts a human-readable rendering as a PR comment with the raw JSON embedded
+in a collapsed `<details>` section. The schema and the renderer live in
+`shakenfist/actions` alongside the reviewer.
 
 The review comment includes links to the created issues with "Closes #N" syntax,
 so issues are automatically closed when the PR merges.
@@ -768,60 +763,6 @@ Each review item has an `action` field:
 - `consider` - Optional improvement (reviewer suggestion)
 - `none` - Informational observation only
 
-## How Automated Comment Addressing Works
-
-When you trigger `@shakenfist-bot please address comments`:
-
-1. The bot extracts the `review.json` from the PR review comment (from the
-   embedded `<details>` section)
-2. It extracts items where `action` is `fix` or `document`
-3. For each actionable item, Claude Code:
-   - Analyzes whether the item should be addressed
-   - If valid: makes the fix and runs pre-commit, staging nothing
-   - If disagreeing: provides a rationale explaining why
-4. CI stages what the fix touched, via
-   `tools/ci/stage-autofix-changes.sh --tracked-only` and the new files
-   the item created.
-5. Each valid fix gets its own commit with attribution
-6. All commits are pushed and a summary is posted to the PR
-
-This allows reviewers to cherry-pick or drop individual fixes as needed.
-
-Claude Code edits the working tree and does not reliably stage, and the
-script judges an item by reading the index, so before step 4 existed an
-unstaged fix reached that test with an empty index and was recorded as
-"No changes needed" (#510). Past runs of this workflow are worth
-re-reading with that in mind before their skipped rows are believed.
-
-New files are staged here, unlike in the fuzz autofix, which refuses an
-attempt that created one: a review item can legitimately ask for a new
-file, and the result lands on a pull request a human reads before it goes
-anywhere. Only files the item itself created, though -- the untracked and
-ignored listings are snapshotted before Claude runs and compared
-afterwards, so a scratch file that was already in the tree is not swept
-into someone else's commit.
-
-Two kinds of file are named rather than staged, because neither can go in
-the commit:
-
-- Edits under `.github/workflows/`, because a commit touching one cannot
-  be pushed with the token the workflow holds -- and since the loop
-  commits per item and pushes once at the end, that failure would discard
-  every other item's commit with it. An item whose whole fix was a
-  workflow edit is reported as "Not pushable".
-- New files matching a `.gitignore` rule, which need `git add -f` and a
-  human deciding they belong in the tree. `**/*.bin` is in this repo's
-  `.gitignore`, which is what a fuzz regression fixture is called. These
-  are reported as "Not staged".
-
-Every path that abandons an item resets the work tree with
-`tools/ci/reset-autofix-worktree.sh`, so the next item's commit holds
-only its own work, and so does the path that succeeds -- the workflow
-edits the stager refused are still in the tree after the commit. Because
-that reset is unconditional and repo-wide, a local run refuses to start
-on a dirty tree unless `--ci` is passed, and refuses an `--output-dir`
-inside the work tree.
-
 ## Workflow Files
 
 - `.github/workflows/functional-tests.yml` - Main CI, and the caller for the
@@ -831,7 +772,6 @@ inside the work tree.
 - `.github/workflows/pr-re-review.yml` - Manual re-review trigger
 - `.github/workflows/pr-retest.yml` - Manual retest trigger via bot command
 - `.github/workflows/pr-fix-tests.yml` - Test failure fixing
-- `.github/workflows/pr-address-comments.yml` - Review comment addressing
 - `.github/workflows/test-drift-fix.yml` - Scheduled/on-demand test maintenance
 - `.github/workflows/differential-fuzz.yml` - On-demand differential fuzzing (instar vs qemu-img + libyal)
 - `.github/workflows/coverage-fuzz.yml` - Coverage-guided fuzzing of parser crates (nightly + PR)
@@ -839,6 +779,10 @@ inside the work tree.
 - `.github/workflows/rust-nightly-bump.yml` - Weekly devcontainer Rust nightly pin bump (see "Toolchain pinning" above)
 - `.github/workflows/codeql-analysis.yml` - CodeQL static analysis (push/PR to develop, plus weekly cron)
 - `.github/workflows/supply-chain.yml` - gitleaks secret scanning on debian-13 (PR/push, plus weekly cron)
+- `.github/workflows/agent-context.yml` - skillsaw lint of `AGENTS.md`, `CLAUDE.md` and `.claude/`, by running the pre-commit hook (PR and push to develop, both path-filtered)
+- `.github/workflows/lint.yml` - rustfmt and clippy in the containerised toolchain (PR, path-filtered to the Rust tree)
+- `.github/workflows/export-repo-config.yml` - nightly export of this repository's GitHub settings for the fleet configuration audit
+- `.github/workflows/renovate.yml` - self-hosted Renovate dependency updates (hourly)
 
 The self-hosted runners have no Docker preinstalled, so any job touching
 `docker` or a container-backed Makefile target needs an "Install Docker"
@@ -851,11 +795,6 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 
 ## Scripts
 
-- `tools/address-comments-with-claude.sh` - Addresses review comments (reads JSON); CI stages each fix for it via `tools/ci/stage-autofix-changes.sh --tracked-only` (see "How Automated Comment Addressing Works" above)
-- `tools/render-review.py` - Renders review JSON to markdown, and validates
-  it against `tools/review-schema.json` in `--validate` mode, which is how
-  `tools/address-comments-with-claude.sh` checks the review it was handed
-- `tools/review-schema.json` - JSON schema for review output validation
 - `scripts/differential-fuzz.py` - Differential fuzzing script (instar vs qemu-img + libyal)
 - `scripts/extract-fuzz-corpus.py` - Seeds + restores the coverage-fuzz corpus from instar-testdata
 - `tools/ci/install-gh-cli.sh` - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)
@@ -865,11 +804,8 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/ci/test-report-fuzz-crash.sh`, `tools/ci/test-pick-fuzz-artifact.sh` - Tests for those two; run them after any change (the `ci-tooling` CI job does)
 - `tools/ci/check-glibc-floor.sh` - Fails if the built `instar` binary needs a glibc above the published floor (`GLIBC_2.31`, Debian 11; see `docs/installation.md`). Runs immediately after `make instar` in both `build-and-test` and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and `src/.devcontainer/build/Dockerfile` must stay on `debian:bullseye`
 - `tools/ci/test-check-glibc-floor.sh` - Tests for that check; the `ci-tooling` CI job runs it
-- `tools/ci/stage-autofix-changes.sh` - Stages the tracked edits a Claude Code autofix run left in the working tree, before the steps that judge whether a fix exists read the index, and refuses the attempt (exit 3) if it created a file that cannot be staged safely. Called from `fuzz-autofix.yml`, and in `--tracked-only` mode from `tools/address-comments-with-claude.sh`; see "Automated bug fixes" in `docs/testing.md`
+- `tools/ci/stage-autofix-changes.sh` - Stages the tracked edits a Claude Code autofix run left in the working tree, before the steps that judge whether a fix exists read the index, and refuses the attempt (exit 3) if it created a file that cannot be staged safely. Called from `fuzz-autofix.yml`; see "Automated bug fixes" in `docs/testing.md`
 - `tools/ci/test-stage-autofix-changes.sh` - Tests for that stager; the `ci-tooling` CI job runs it
-- `tools/ci/reset-autofix-worktree.sh` - Discards staged edits, unstaged edits and new files, keeping ignored build output, and fails if the tree is still dirty afterwards; called on every path that finishes a review item, so the next item's commit holds only its own work
-- `tools/ci/autofix-artifact-patterns.sh` - Sourced, not executed: the editor leftovers and build output that are not part of a fix, shared by the stager and the review-comment addresser so the two cannot drift
-- `tools/ci/test-reset-autofix-worktree.sh` - Tests for that reset; the `ci-tooling` CI job runs it
-- `tools/ci/claude-result.sh` - Reads the JSONL stream a `claude -p --output-format stream-json --verbose` run leaves behind; `--text` reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), `--trailer` emits the `Assisted-By:`/`Co-Authored-By:` pair naming the model the run actually resolved to. Called from `fuzz-autofix.yml`, `test-drift-fix.yml` and `tools/address-comments-with-claude.sh`; see "Automated bug fixes" in `docs/testing.md`
+- `tools/ci/autofix-artifact-patterns.sh` - Sourced, not executed: the editor leftovers and build output that are not part of a fix
+- `tools/ci/claude-result.sh` - Reads the JSONL stream a `claude -p --output-format stream-json --verbose` run leaves behind; `--text` reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), `--trailer` emits the `Assisted-By:`/`Co-Authored-By:` pair naming the model the run actually resolved to. Called from `fuzz-autofix.yml` and `test-drift-fix.yml`; see "Automated bug fixes" in `docs/testing.md`
 - `tools/ci/test-claude-result.sh` - Tests for that helper; the `ci-tooling` CI job runs it
-- `tools/ci/test-address-comments-staging.sh` - Drives the `tools/address-comments-with-claude.sh` item loop against a scratch repo with `claude` and `gh` stubbed; the `ci-tooling` CI job runs it
