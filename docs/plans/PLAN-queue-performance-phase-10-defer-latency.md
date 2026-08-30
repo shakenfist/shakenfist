@@ -523,10 +523,7 @@ cross-check every fetch against `count_over_time`.
   sizing or fairness was made or is proposed here. What the data says
   about them goes in the issue with the evidence attached.
 
-  **The issue is drafted but not yet filed**, so this phase closes
-  with that one action outstanding. Anything citing "the successor
-  issue" above should be read as citing the draft until it has a
-  number.
+  **Filed as #3974.** Nothing from this phase is outstanding.
 
 * **Step 7's exclusion of `networknode`/`background` should not be
   cited as if it still held.** Step 7 excluded that lane on the

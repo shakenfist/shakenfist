@@ -625,7 +625,8 @@ sequencing argument decision 1 of the phase plan makes.
 * **No claim about dispatch, concurrency or pool sizing is made here,
   and none should be read into the numbers.** Decision 5 of the phase
   plan puts that out of scope deliberately; what the data says about
-  it belongs in a successor issue with this evidence attached.
+  it belongs in a successor issue with this evidence attached, and
+  that issue is #3974.
 * **Nothing about coalescing.** Step 9 measured it and those numbers
   stand untouched; the ten hour mislabel affects the `user_waiting`
   latency table only in as much as its window was wrong, and the
