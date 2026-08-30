@@ -8,6 +8,7 @@ from shakenfist.eventlog import add_event_multi
 from shakenfist.exceptions import CapacityAdmissionDenied
 from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.exceptions import AffinityConstraintUnsatisfiable
 from shakenfist.exceptions import LowResourceException
 from shakenfist.instance import Instance
 from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
@@ -152,6 +153,8 @@ class NodeInstNetdescOp(BaseClusterOperation):
 
         # Try to place on this node
         s = scheduler.Scheduler()
+        affinity_failure = False
+        affinity_message = ''
         try:
             s.find_candidates(inst, candidates=[config.NODE_UUID])
             return None
@@ -160,14 +163,31 @@ class NodeInstNetdescOp(BaseClusterOperation):
             inst.add_event(
                 EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
                 extra={'message': str(e)})
+            # Carried out of the except suite deliberately. Python
+            # deletes the "as" target when the suite exits (PEP 3110),
+            # and the two guards below are dedented back to the try
+            # level, so reading e there is a NameError -- which this
+            # path would only discover in the merge queue, since it
+            # runs under cluster CI and not on a pull request.
+            affinity_failure = isinstance(e, AffinityConstraintUnsatisfiable)
+            affinity_message = str(e)
 
         # Unsuccessful placement, check if reached placement attempt limit
         db_placement = inst.placement
         if db_placement['placement_attempts'] > 3:
+            if affinity_failure:
+                raise AbortInstanceStart(
+                    self, 'Too many start attempts, and no node satisfies '
+                    'the requested affinity constraints: %s'
+                    % affinity_message)
             raise AbortInstanceStart(self, 'Too many start attempts')
 
         # Or if the user asked for a specific node which is now at capacity
         if inst.requested_placement:
+            if affinity_failure:
+                raise AbortInstanceStart(
+                    self, 'Requested node does not satisfy the requested '
+                    'affinity constraints: %s' % affinity_message)
             raise AbortInstanceStart(self, 'Requested node lacks resources')
 
         # Try placing on another node
@@ -268,6 +288,18 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
         except LowResourceException as e:
+            # Unlike the two guards above, this raise is inside the
+            # except suite, so it can test the exception directly.
+            if isinstance(e, AffinityConstraintUnsatisfiable):
+                add_event_multi(
+                    EVENT_TYPE_AUDIT,
+                    [self, inst],
+                    'reschedule failed, affinity unsatisfiable',
+                    extra={'message': str(e)})
+                raise AbortInstanceStart(
+                    self, 'No node satisfies the requested affinity '
+                    'constraints: %s' % e)
+
             add_event_multi(
                 EVENT_TYPE_AUDIT,
                 [self, inst],

@@ -544,7 +544,8 @@ class InstancesEndpoint(api_base.Resource):
                 'configuration.', None),
             (404, 'Namespace, network, node, blob, snapshot, or label not found.', None),
             (406, 'Network not ready.', None),
-            (409, 'Network address in use.', None),
+            (409, 'Network address in use, or no node satisfies a hard '
+                'affinity constraint.', None),
             (507, 'Unable to allocate resources for the instance.', None)
          ]))
     @api_base.requires_namespace_exist_if_specified
@@ -868,6 +869,17 @@ class InstancesEndpoint(api_base.Resource):
             else:
                 candidates = SCHEDULER.find_candidates(
                     inst, candidates=[placed_on])
+
+        # This clause must stay *above* the LowResourceException one:
+        # AffinityConstraintUnsatisfiable is a subclass of it, and
+        # except clauses match in order, so reversing these two silently
+        # turns every 409 back into a 507.
+        except exceptions.AffinityConstraintUnsatisfiable as e:
+            inst.add_event(
+                EVENT_TYPE_AUDIT, 'schedule failed, affinity unsatisfiable',
+                extra={'message': str(e)})
+            inst.enqueue_delete_due_error('scheduling failed')
+            return sf_api.error(409, str(e), suppress_traceback=True)
 
         except exceptions.LowResourceException as e:
             inst.add_event(
@@ -1398,6 +1410,40 @@ def _validate_instance_metadata(key, value):
         if not isinstance(value, dict):
             return sf_api.error(
                 400, 'value for "affinity" key should be a valid JSON dictionary')
+
+        # The binary model is a second value shape under the same key,
+        # not a second key, so the two are told apart here by type. A
+        # dict whose keys are the four reserved names is the binary
+        # form; anything else is read as the weighted form and has to
+        # coerce to integers below. A spec mixing the two is refused
+        # rather than guessed at, because either guess silently
+        # discards half of what the caller asked for.
+        binary_keys = set(instance.Instance.AFFINITY_BINARY_KEYS)
+        present = set(value.keys())
+        if present & binary_keys:
+            unknown = present - binary_keys
+            if unknown:
+                return sf_api.error(
+                    400,
+                    'affinity keys %s are not valid alongside the binary '
+                    'affinity constraints; the weighted and binary forms '
+                    'cannot be mixed' % sorted(unknown))
+
+            for constraint, tags in value.items():
+                if not isinstance(tags, list):
+                    return sf_api.error(
+                        400,
+                        'value for affinity constraint "%s" should be a JSON '
+                        'list of tags' % constraint)
+                for tag in tags:
+                    # isinstance(True, str) is false, so booleans are
+                    # already excluded here, unlike in the weighted form.
+                    if not isinstance(tag, str) or not tag:
+                        return sf_api.error(
+                            400,
+                            'affinity constraint "%s" should contain only '
+                            'non-empty tag names' % constraint)
+            return
 
         for key_type, dv in value.items():
             # isinstance(True, int) is true in Python, so int(True) is 1 and a

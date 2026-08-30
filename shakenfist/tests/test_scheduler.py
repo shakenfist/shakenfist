@@ -1336,3 +1336,213 @@ class AffinityVersusLoadSheddingTestCase(SchedulerTestCase):
         nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual(
             self._node_uuids_set('node2', 'node4'), set(nodes))
+
+
+class BinaryAffinityTestCase(SchedulerTestCase):
+    """The four binary affinity constraints.
+
+    require_* are admission: a node which does not satisfy them cannot
+    host the instance, so they filter. prefer_* are ranking: they
+    contribute +/-1 per matching co-located instance into the score the
+    weighted form already produced.
+
+    Every tag here is an *instance* tag carried by an instance already
+    placed on a candidate node. Shaken Fist has no node capability tags,
+    so a constraint naming a property of the hardware would be naming
+    something that does not exist.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb.set_node_metrics_same()
+
+    def test_require_with_tag_narrows_to_matching_nodes(self):
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['database']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'require_with_tag': ['database']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node3'), set(nodes))
+
+    def test_require_without_tag_excludes_matching_nodes(self):
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['batch']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'require_without_tag': ['batch']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node4'), set(nodes))
+
+    def test_unsatisfiable_require_raises_the_affinity_subclass(self):
+        # No instance anywhere carries this tag, so every candidate is
+        # ejected. The exception must be the affinity subclass and not a
+        # bare LowResourceException, because the create path answers the
+        # two with different status codes -- 409 for a constraint nothing
+        # satisfies, 507 for a cluster that is genuinely full.
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'require_with_tag': ['nonexistent']}})
+
+        self.assertRaises(
+            exceptions.AffinityConstraintUnsatisfiable,
+            scheduler.Scheduler().find_candidates, inst)
+
+    def test_the_affinity_subclass_is_still_a_low_resource_exception(self):
+        # Preflight catches LowResourceException to redirect the instance
+        # to another node, which is the right behaviour for a constraint
+        # some other node may satisfy. A sibling exception would escape
+        # that handler as a traceback, so the subclassing is load bearing
+        # rather than tidiness.
+        self.assertTrue(issubclass(
+            exceptions.AffinityConstraintUnsatisfiable,
+            exceptions.LowResourceException))
+
+    def test_unsatisfiable_require_names_the_constraint(self):
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'require_with_tag': ['nonexistent']}})
+
+        try:
+            scheduler.Scheduler().find_candidates(inst)
+            self.fail('expected AffinityConstraintUnsatisfiable')
+        except exceptions.AffinityConstraintUnsatisfiable as e:
+            # The caller has to be able to tell which constraint refused
+            # them, and at which stage, or a 409 is no more actionable
+            # than the 507 it replaces.
+            self.assertIn('affinity_constraints', str(e))
+            self.assertIn('nonexistent', str(e))
+
+    def test_require_ignores_instances_in_another_namespace(self):
+        # The hard filter inherits the scorer's namespace scope. Crossing
+        # it would let a caller learn what another tenant is running by
+        # watching where their own instances refuse to land.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['database']}, namespace='other')
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'require_with_tag': ['database']}})
+
+        self.assertRaises(
+            exceptions.AffinityConstraintUnsatisfiable,
+            scheduler.Scheduler().find_candidates, inst)
+
+    def test_prefer_with_tag_ranks_matching_nodes_first(self):
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'prefer_with_tag': ['socialite']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node3'), set(nodes))
+
+    def test_prefer_without_tag_ranks_matching_nodes_last(self):
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['nerd']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'prefer_without_tag': ['nerd']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node4'), set(nodes))
+
+    def test_prefer_scoring_is_count_proportional(self):
+        # Two instances carrying the tag on node3, one on node2. A node
+        # carrying more of the group really is more "with the group", so
+        # node3 wins outright rather than tying at set membership.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+        self.mock_mariadb.create_instance(
+            'instance-2', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+        self.mock_mariadb.create_instance(
+            'instance-3', place_on_node='node2',
+            metadata={'tags': ['socialite']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-4',
+            metadata={'affinity': {'prefer_with_tag': ['socialite']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node3'), set(nodes))
+
+    def test_prefer_terms_sum_across_tags(self):
+        # node3 hosts two 'web' and one 'batch', scoring +2 -1 = +1.
+        # node2 hosts one 'web' and no 'batch', scoring +1. They tie, so
+        # a prefer_without_tag match really can be outvoted by neighbour
+        # count on the other axis. This is the intended consequence of
+        # count proportional scoring, and it is asserted rather than left
+        # for an operator to discover from a placement.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3', metadata={'tags': ['web']})
+        self.mock_mariadb.create_instance(
+            'instance-2', place_on_node='node3', metadata={'tags': ['web']})
+        self.mock_mariadb.create_instance(
+            'instance-3', place_on_node='node3', metadata={'tags': ['batch']})
+        self.mock_mariadb.create_instance(
+            'instance-4', place_on_node='node2', metadata={'tags': ['web']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-5',
+            metadata={'affinity': {'prefer_with_tag': ['web'],
+                                   'prefer_without_tag': ['batch']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3'), set(nodes))
+
+    def test_require_and_prefer_compose(self):
+        # node2 and node3 both satisfy the requirement; only node3 also
+        # attracts the preference.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node2',
+            metadata={'tags': ['database']})
+        self.mock_mariadb.create_instance(
+            'instance-2', place_on_node='node3',
+            metadata={'tags': ['database', 'socialite']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-3',
+            metadata={'affinity': {'require_with_tag': ['database'],
+                                   'prefer_with_tag': ['socialite']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node3'), set(nodes))
+
+    def test_weighted_form_is_untouched_by_the_binary_model(self):
+        # The two shapes share one metadata key, so the weighted path has
+        # to keep behaving exactly as it did.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['socialite']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'socialite': 100}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._node_uuids_set('node3'), set(nodes))
+
+    def test_empty_binary_spec_places_anywhere(self):
+        inst = self.mock_mariadb.create_instance(
+            'instance-1',
+            metadata={'affinity': {'require_with_tag': [],
+                                   'prefer_with_tag': []}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))

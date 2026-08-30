@@ -98,6 +98,23 @@ class LowResourceException(SchedulerException):
     ...
 
 
+class AffinityConstraintUnsatisfiable(LowResourceException):
+    """No candidate node satisfies a hard affinity constraint.
+
+    A subclass of LowResourceException rather than a sibling, because
+    preflight catches LowResourceException to redirect an instance to
+    another node, and that is exactly the right behaviour for a
+    constraint some other node may satisfy. A sibling would escape that
+    handler as a traceback.
+
+    The create path distinguishes them, because the two mean different
+    things to a caller: LowResourceException is 507, the cluster is
+    full, while this is 409, the request conflicts with the current
+    state of the cluster. Answering 507 here would tell an operator to
+    add capacity for a tag nothing carries.
+    """
+
+
 class CapacityAdmissionDenied(SchedulerException):
     """The atomic placement admission refused to place an instance.
 

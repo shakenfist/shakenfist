@@ -106,3 +106,71 @@ class ValidateInstanceMetadataTestCase(base.ShakenFistTestCase):
         resp = _validate_instance_metadata('', 'value')
         self.assertEqual(400, resp.status_code)
         self.assertIn('no key specified', resp.get_data(as_text=True))
+
+
+class ValidateBinaryAffinityTestCase(base.ShakenFistTestCase):
+    """The binary affinity value shape.
+
+    The binary model is a second value shape under the same ``affinity``
+    key rather than a key of its own, so that a caller cannot supply
+    both models at once and mean nothing coherent. The two are told
+    apart by type: a dict of integers is the weighted form, a dict of
+    the four reserved names mapping to lists is the binary one.
+    """
+
+    def _assert_refused(self, value, expected_fragment):
+        resp = _validate_instance_metadata(AFFINITY, value)
+        self.assertIsNotNone(
+            resp, 'value %r was accepted, expected a 400' % (value,))
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(expected_fragment, resp.get_data(as_text=True))
+
+    def test_all_four_constraints_are_accepted(self):
+        self.assertIsNone(_validate_instance_metadata(AFFINITY, {
+            'require_with_tag': ['web'],
+            'require_without_tag': ['batch'],
+            'prefer_with_tag': ['cache'],
+            'prefer_without_tag': ['noisy'],
+        }))
+
+    def test_a_subset_of_constraints_is_accepted(self):
+        self.assertIsNone(_validate_instance_metadata(
+            AFFINITY, {'require_with_tag': ['web']}))
+
+    def test_empty_tag_lists_are_accepted(self):
+        self.assertIsNone(_validate_instance_metadata(
+            AFFINITY, {'prefer_with_tag': []}))
+
+    def test_non_list_constraint_value_is_refused(self):
+        self._assert_refused(
+            {'require_with_tag': 'web'}, 'should be a JSON list of tags')
+        self._assert_refused(
+            {'require_with_tag': {'a': 1}}, 'should be a JSON list of tags')
+
+    def test_non_string_tag_is_refused(self):
+        self._assert_refused(
+            {'require_with_tag': [1]}, 'non-empty tag names')
+        self._assert_refused(
+            {'require_with_tag': [None]}, 'non-empty tag names')
+        self._assert_refused(
+            {'require_with_tag': ['']}, 'non-empty tag names')
+        # isinstance(True, str) is false, so a boolean is caught by the
+        # tag name check here rather than needing its own clause.
+        self._assert_refused(
+            {'require_with_tag': [True]}, 'non-empty tag names')
+
+    def test_mixing_the_two_forms_is_refused(self):
+        # Either way of resolving this silently discards half of what the
+        # caller asked for, so it is refused rather than guessed at.
+        self._assert_refused(
+            {'require_with_tag': ['web'], 'socialite': 100}, 'cannot be mixed')
+
+    def test_a_misspelled_constraint_alone_reads_as_the_weighted_form(self):
+        # 'require_with_tags' is not a reserved name, so this is not the
+        # binary shape at all and falls through to the weighted
+        # validation -- which refuses it, because a list is not an
+        # integer. The caller still gets a 400; this asserts which one,
+        # so that the shape discrimination is pinned rather than
+        # incidental.
+        self._assert_refused(
+            {'require_with_tags': ['web']}, 'should be integers')
