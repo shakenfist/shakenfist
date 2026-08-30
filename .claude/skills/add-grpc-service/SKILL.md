@@ -1,4 +1,9 @@
-# Skill: Add gRPC Service Methods
+---
+name: add-grpc-service
+description: Use this skill when adding new gRPC service methods to the Shaken Fist database microservice - defining proto messages, generating stubs, implementing handlers with Prometheus counters, and adding client functions in mariadb.py.
+---
+
+# Add gRPC Service Methods
 
 This skill guides adding new gRPC service methods to the Shaken Fist database
 microservice. The database service provides a centralized gRPC interface for
@@ -7,7 +12,7 @@ all database operations, with Prometheus metrics for observability.
 ## When to Use This Skill
 
 Use this skill when:
-- Adding new database operations (MariaDB or etcd)
+- Adding new database operations (MariaDB)
 - Exposing new query patterns to other daemons
 - Implementing data migrations that need service-level access
 - Adding CRUD operations for new data types
@@ -377,8 +382,3 @@ except Exception as e:
 - **Inconsistent UUID handling** - always convert at boundaries
 - **Missing error handling** - wrap all handlers in try/except
 - **Not using `_use_database_service()`** check in public functions
-
-## Related Skills
-
-- [migrate-etcd-to-mariadb](migrate-etcd-to-mariadb.md) - Uses gRPC for data
-  access

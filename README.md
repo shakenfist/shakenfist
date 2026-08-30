@@ -47,7 +47,8 @@ common development tasks:
   microservice, including proto definitions, handler implementation, and client
   functions.
 - **add-mypy-coverage**: Guides adding mypy type annotations to modules,
-  following the incremental rollout approach documented in PLAN-mypy-rollout.md.
+  following the incremental rollout approach documented in
+  [`docs/developer_guide/mypy.md`](https://github.com/shakenfist/shakenfist/blob/develop/docs/developer_guide/mypy.md).
 
 These skills are loaded automatically when using Claude Code within this
 repository.
