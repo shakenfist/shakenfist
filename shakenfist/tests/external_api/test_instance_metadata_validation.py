@@ -66,6 +66,12 @@ class ValidateInstanceMetadataTestCase(base.ShakenFistTestCase):
         # silently.
         self._assert_refused({'first-node': float('nan')}, 'should be integers')
 
+    def test_boolean_valued_entry_is_refused(self):
+        # A deliberate behaviour change: int(True) is 1, so this used to be
+        # accepted as a weight of one.
+        self._assert_refused({'first-node': True}, 'not booleans')
+        self._assert_refused({'first-node': False}, 'not booleans')
+
     def test_numeric_string_entry_is_still_accepted(self):
         # int('3') succeeds, so this is accepted today. Asserted so that a
         # later tightening of the check to a type test is a deliberate
