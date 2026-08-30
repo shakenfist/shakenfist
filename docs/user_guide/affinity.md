@@ -39,15 +39,31 @@ preference value are, although generally we recommend they range from -100 to 10
 where 100 means you'd really really love to be on the same hypervisor, and -100
 means you'd be very unhappy to be on the same hypervisor.
 
+!!! warning
+
+    This weighted form is **deprecated**, and the magnitude is already
+    ignored by the scheduler -- only the sign is read. It still works and
+    will for at least one more release, but new specifications should use
+    the constraint form described in
+    [Constraints, not just preferences](#constraints-not-just-preferences).
+    See [The weighted form is deprecated](#the-weighted-form-is-deprecated).
+
 ???+ info
 
-    Under the hood, Shaken Fist filters possible candidate hypervisors based on
-    the affinity coefficients specified. Only tags from within your namespace are
-    considered for this filtration. This decision is only made on the original
-    start up of an instance, and does not apply later. That is, if you change
-    the tags or affinity of an instance after instance creation it will not
-    affect that instance in any way, although it might affect scheduling decisions
-    for future instances.
+    Under the hood, weights **rank** the candidate hypervisors rather than
+    filtering them. Every hypervisor which can host your instance at all
+    remains a candidate whatever the weights say; the weights decide which
+    of them is preferred. That distinction is the whole of the next
+    section, and it is the difference between a preference and a promise.
+    The constraint form described below does filter, and is how you ask
+    for a hypervisor to be ruled out rather than merely disfavoured.
+
+    Only tags from within your namespace are considered, for both forms.
+    The decision is only made on the original start up of an instance, and
+    does not apply later. That is, if you change the tags or affinity of
+    an instance after instance creation it will not affect that instance
+    in any way, although it might affect scheduling decisions for future
+    instances.
 
 You can of course have more than one tag and affinity preference set at a time.
 So to extend our example, let's say that web servers do not prefer sharing with

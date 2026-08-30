@@ -1653,6 +1653,30 @@ class WeightedAffinityMappingTestCase(SchedulerTestCase):
         self.assertSetEqual(
             self._all_hypervisor_uuids(), set(extra['candidates']))
 
+    def test_a_weighted_spec_still_populates_affinity_detail(self):
+        # The other edge of the short-circuit, and the one that fails
+        # silently. The skip is keyed on the prefer_* lists, which are
+        # empty for a weighted specification until the mapping fills
+        # them -- so a short circuit shipped without the mapping stops
+        # scoring affinity for every existing caller, with no create
+        # failing and test_affinity merely skipping green. This is why
+        # the two belong in one commit.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['first-node']})
+        inst = self.mock_mariadb.create_instance(
+            'instance-2', metadata={'affinity': {'first-node': 100}})
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as events:
+            scheduler.Scheduler().find_candidates(inst)
+
+        published = [c for c in events.call_args_list
+                     if c[0][2] == 'schedule have highest affinity']
+        self.assertEqual(1, len(published), events.call_args_list)
+        extra = published[0][1]['extra']
+        self.assertNotEqual({}, extra['affinity_detail'])
+        self.assertEqual(1, extra['highest_affinity'])
+
     def test_no_affinity_still_places_anywhere(self):
         # The scorer is skipped entirely when there is nothing to score,
         # so this asserts the skip left the outcome unchanged: one tier,

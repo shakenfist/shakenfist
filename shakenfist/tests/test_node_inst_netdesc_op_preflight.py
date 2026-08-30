@@ -271,7 +271,7 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         mock_enqueue.assert_not_called()
         self.assertEqual([], inst.disk_fetch_calls)
 
-    def _redirect_raising(self, inst, exc, candidates=()):
+    def _redirect_raising(self, inst, exc, candidates=(), second=None):
         """As _redirect(), but choosing what the local placement raised.
 
         The three aborts below are reached after the ``except
@@ -286,7 +286,7 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         op = self._make_op()
         fake_scheduler = mock.MagicMock()
         fake_scheduler.find_candidates.side_effect = [
-            exc, list(candidates)]
+            exc, second if second is not None else list(candidates)]
         fake_scheduler.metrics = {c: {} for c in candidates}
 
         with mock.patch(
@@ -355,6 +355,36 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
 
         self.assertIsNotNone(raised)
         self.assertIn('Requested node lacks resources', str(raised))
+
+    def test_exhausted_redirect_abort_names_affinity(self):
+        # The third abort site, and the only one of the three inside an
+        # except suite -- so it tests the exception directly rather than
+        # a carried flag. It is reached when the redirect walks every
+        # other node and the last find_candidates() refuses them all,
+        # which for a require_with_tag naming a tag nothing in the
+        # namespace carries is every node, always.
+        inst = FakeInstance('created')
+
+        raised = self._redirect_raising(
+            inst,
+            exceptions.AffinityConstraintUnsatisfiable('first'),
+            second=exceptions.AffinityConstraintUnsatisfiable(
+                'no node carries require_with_tag=[\'database\']'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('affinity constraints', str(raised))
+        self.assertNotIn('Unable to find suitable node', str(raised))
+
+    def test_exhausted_redirect_still_says_suitable_node_for_capacity(self):
+        inst = FakeInstance('created')
+
+        raised = self._redirect_raising(
+            inst, exceptions.LowResourceException('full here'),
+            second=exceptions.LowResourceException('all full'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Unable to find suitable node', str(raised))
+        self.assertNotIn('affinity', str(raised))
 
     def test_the_redirect_itself_is_unchanged_by_the_subclass(self):
         # AffinityConstraintUnsatisfiable subclasses

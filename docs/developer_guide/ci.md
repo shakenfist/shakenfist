@@ -239,6 +239,14 @@ reporting either one is a real signal: the cluster is smaller than it
 should be, or the scheduler is ejecting nodes it should not. Treat it
 as a failure to investigate rather than a pass.
 
+`test_binary_affinity_prefers_the_tagged_node` shares both skips and
+reads the same way, since it asserts the binary model's soft half
+through the same helper.
+`test_unsatisfiable_require_with_tag_is_refused` shares neither: it
+asserts a refusal, needs no successful create and no candidate count,
+and so is expected to run on every topology including a single-node
+one. A skip there is a bug in the test.
+
 ### Upgrade data verification
 
 Every functional job deploys a fresh cluster, so nothing in the suite

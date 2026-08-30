@@ -3,6 +3,7 @@ import json
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestAffinity(base.BaseNamespacedTestCase):
@@ -262,3 +263,60 @@ class TestAffinity(base.BaseNamespacedTestCase):
                 'nodes, but that node is in the winning affinity tier %s '
                 '(scoring detail: %s)' % (
                     name, affine_node, len(detail), tier, detail))
+
+    def _disks(self):
+        return [{'size': 8, 'base': base.CLUSTER_CI_IMAGE, 'type': 'disk'}]
+
+    def _networks(self):
+        return [{'network_uuid': self.net['uuid']}]
+
+    def test_binary_affinity_prefers_the_tagged_node(self):
+        """prefer_with_tag ranks, exactly as a positive weight did.
+
+        The binary model's soft half, asserted the same way
+        test_affinity asserts the weighted one -- from the scorer's own
+        event, with the same two skips, because the same two
+        degeneracies make a run uninformative.
+        """
+        nodes = self.system_client.get_nodes()
+        if len(nodes) < 3:
+            self.skipTest('Insufficient nodes for test')
+
+        inst1 = self.test_client.create_instance(
+            'binst1', 1, 1024, self._networks(), self._disks(), None, None,
+            metadata={'tags': ['binary-tag']})
+        self._await_instance_create(inst1['uuid'])
+
+        inst2 = self.test_client.create_instance(
+            'binst2', 1, 1024, self._networks(), self._disks(), None, None,
+            metadata={'affinity': {'prefer_with_tag': ['binary-tag']}})
+        self._await_instance_create(inst2['uuid'])
+
+        inst1 = self.test_client.get_instance(inst1['uuid'])
+        inst2 = self.test_client.get_instance(inst2['uuid'])
+
+        events = self._scheduler_events(inst2['uuid'])
+        self._add_scheduler_detail('binst2', events)
+        self._assert_affinity_tier(
+            'binst2', events, inst1['node'], expected=True)
+
+    def test_unsatisfiable_require_with_tag_is_refused(self):
+        """require_with_tag names a tag nothing carries, so nothing fits.
+
+        This is the bootstrapping case documented in the user guide, and
+        it is the cheapest possible functional assertion of the hard
+        half: no instance has to be created successfully, and no
+        candidate count matters, because a constraint no instance in the
+        namespace can satisfy ejects every node on any cluster of any
+        size. The weighted form would have placed this anywhere.
+
+        409 rather than 507 is the whole point. A 507 would report the
+        cluster as full, which it is not.
+        """
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            self.test_client.create_instance,
+            'binst-refused', 1, 1024, self._networks(), self._disks(),
+            None, None,
+            metadata={'affinity': {
+                'require_with_tag': ['no-instance-carries-this-tag']}})
