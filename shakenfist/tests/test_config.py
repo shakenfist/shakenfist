@@ -55,6 +55,33 @@ class ConfigTestCase(base.ShakenFistTestCase):
         self.assertEqual('enforce', conf.API_VALIDATION_MODE)
 
 
+class AgentOperationAttemptCapTestCase(base.ShakenFistTestCase):
+    """AGENT_OPERATION_MAX_ATTEMPTS below 1 must refuse to load.
+
+    Zero makes "attempts >= cap" true on the very first check, which
+    disables retry entirely while reporting "after 1 attempts" as the
+    expiry reason -- indistinguishable in the logs from a working
+    configuration.
+    """
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_AGENT_OPERATION_MAX_ATTEMPTS': '0'})
+    def test_zero_attempts_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_AGENT_OPERATION_MAX_ATTEMPTS': '-1'})
+    def test_a_negative_cap_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_AGENT_OPERATION_MAX_ATTEMPTS': '1'})
+    def test_one_attempt_loads(self):
+        # One attempt and no retries is a legitimate choice, and is the
+        # smallest value which still dispatches the operation.
+        self.assertEqual(1, SFConfig().AGENT_OPERATION_MAX_ATTEMPTS)
+
+
 class SecretConfigFieldTestCase(base.ShakenFistTestCase):
     """The three configuration values which carry credentials.
 

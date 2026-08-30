@@ -332,10 +332,32 @@ retry policy is therefore "retry until the deadline expires or
 attempts are exhausted, whichever is first"; the attempt cap exists
 so no-deadline operations cannot retry forever.
 
+Retryability is a property of the whole command list, not of the
+command that happened to be in flight. Because a retry restarts at
+index 0, an operation containing any non-retryable command must not
+be retried at all -- an `[execute, get-file]` operation stalling in
+the `get-file` would otherwise re-run the `execute`, which is exactly
+what decision 6 forbids. No endpoint builds such a list today, so the
+two readings agree in practice; only the whole-list one stays correct
+when one does. Corrected during phase 5 planning, where this section
+implied the per-command reading.
+
 Partial results on retry need care: a retried `get-file` restarts the
 transfer from offset 0 and must not append to or duplicate the
 previous attempt's blob. The first attempt's incomplete blob (if any)
-must be cleaned up when the retry is scheduled.
+must be cleaned up when the retry is scheduled -- phase 4's
+`_abandon_get_file_transfer()` already does this.
+
+There is a second case this section originally missed, found during
+phase 5 planning. A `get-file` which *completed* registers a blob and
+records its uuid as the result for that command index; if a later
+command in the same operation then stalls, the retry mints a fresh
+blob uuid and overwrites that result, leaving the first blob recorded
+nowhere. The fix is to clear the abandoned attempt's results when the
+retry is scheduled, so no result from a superseded attempt is ever
+served to a caller. The orphaned blob itself needs no special
+handling: it carries no `object_references` row, so the cluster
+daemon's existing unreferenced-blob sweep collects it.
 
 ### Failure semantics between operations
 
@@ -503,7 +525,7 @@ three-repository audit of every consumer of agent operation state).
    system, and precisely the time a receipt-anchored deadline exists
    to count.
 5. **The reaper is an extension of `reap_instance_executors()`**
-   (`daemons/sidechannel/main.py:972`), which already runs at the top
+   (`daemons/sidechannel/main.py:1270`), which already runs at the top
    of every dispatcher pass serialised with dispatch. It must cover
    both a dead executor thread and the no-entry case after a daemon
    restart, with the database read gated on the instance actually
@@ -582,7 +604,7 @@ the slot at all.
 | 2 | [PLAN-agent-operation-deadlines-phase-02-schema.md](PLAN-agent-operation-deadlines-phase-02-schema.md) | Complete | Schema: `deadline`/`progress_timeout` columns, `last_progress`/`attempts` attributes, both table versions 2 -> 3, additive migrations, and a live-MariaDB test that they migrate. Survey corrections applied at source: NULL means "server default" rather than "no deadline", and there is deliberately no object version bump |
 | 3 | [PLAN-agent-operation-deadlines-phase-03-api.md](PLAN-agent-operation-deadlines-phase-03-api.md) | Complete | API: `deadline_seconds` on all three creating endpoints and `progress_timeout_seconds` on get/put only, their declarations and `STRUCTURED_PARAMETERS` entries, a 400 guard backing the published bound, and the two config defaults. Survey correction applied at source: `execute` does not publish a progress timeout it can never honour, and the API writes a computed deadline rather than NULL |
 | 4 | [PLAN-agent-operation-deadlines-phase-04-enforcement.md](PLAN-agent-operation-deadlines-phase-04-enforcement.md) | Complete | Enforcement: dequeue expiry, preflight expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check). Survey corrections applied at source: every address in decision 1 was refreshed after phase 1's refactor, the reaper is phase 5's rather than this phase's, and preflight is a fourth enforcement point the design sketch never listed. The phase plan also decides that an expiry records its reason as a state message and an audit event rather than as `.error`, which the `error` setter refuses from a non-`error` state |
-| 5 | | Not started | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep |
+| 5 | [PLAN-agent-operation-deadlines-phase-05-retry.md](PLAN-agent-operation-deadlines-phase-05-retry.md) | Complete | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; the node-local reaper, covering a dead executor thread, no executor at all after a daemon restart, and a live executor wedged in the pre-connection wait. Survey corrections applied at source: decision 5's address for `reap_instance_executors()`, that retryability is evaluated over the whole command list rather than the command in flight, and that partial-result cleanup has a registered-blob case the design sketch did not cover. The phase plan also decides that the terminal-only pop and the reaper must land in one commit, because the pop rule alone turns a daemon restart from a leak into a wedge |
 | 6 | | Not started | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast) |
 | 7 | | Not started | Docs (operator + developer guides, and the `v07-v08` release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on `!= 'complete'`, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note `docs/developer_guide/state_machine.md` is **not** this phase's: it is a rendering of `state_targets`, so phase 4 updated it when it added `expired` rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge |
 | 8 | | Not started | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |

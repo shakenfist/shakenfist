@@ -65,6 +65,7 @@ class AgentOperation(BaseOperation):
                                      dbo.STATE_DELETED, dbo.STATE_ERROR,
                                      STATE_EXPIRED),
         BaseOperation.STATE_EXECUTING: (BaseOperation.STATE_COMPLETE,
+                                        BaseOperation.STATE_QUEUED,
                                         dbo.STATE_DELETED, dbo.STATE_ERROR,
                                         STATE_EXPIRED),
         BaseOperation.STATE_COMPLETE: (dbo.STATE_DELETED,),
@@ -252,6 +253,17 @@ class AgentOperation(BaseOperation):
         replaces. See decision 3 in
         docs/plans/PLAN-agent-operation-deadlines-phase-04-enforcement.md.
 
+        Retry makes that cost larger, and it is worth being explicit
+        about how much. A retry is two more transitions
+        (executing -> queued -> executing), so a NULL-deadline
+        operation is handed a fresh AGENT_OPERATION_DEFAULT_DEADLINE
+        on every attempt, and its real ceiling is
+        AGENT_OPERATION_MAX_ATTEMPTS times that default rather than
+        the default -- 30 minutes rather than 10, at the shipped
+        values. It is still bounded, and it applies only to rows
+        written by an API server old enough to predate deadlines, so
+        it is a rolling-upgrade property rather than a permanent one.
+
         A caller which has already read this operation's State passes
         it as state, and the anchor is taken from that rather than
         read again. That matters on the dispatch poll: reading it
@@ -378,6 +390,23 @@ class AgentOperation(BaseOperation):
     def attempts(self):
         return self._attributes().attempts
 
+    def record_attempt(self):
+        """Persist that another dispatch attempt of this operation has started.
+
+        The persistence detail lives here rather than in the caller for
+        the same reason record_progress()'s does: this is the object
+        which knows how its attributes row is written.
+
+        The field mask is not optional. add_result() reads, merges and
+        writes the results column on this same row, and an unmasked
+        write here would push a stale snapshot of it over a concurrent
+        update.
+        """
+        attrs = self._attributes()
+        attrs.attempts += 1
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['attempts'])
+
     def add_result(self, index, value):
         if 'command' in value:
             del value['command']
@@ -395,6 +424,36 @@ class AgentOperation(BaseOperation):
 
         self.add_event(EVENT_TYPE_MUTATE, 'add result',
                        extra={'index': str(index)})
+
+    def clear_results(self):
+        """Discard this operation's results.
+
+        Used when a retry abandons an attempt: the next attempt
+        rewrites every index it reaches, so the results this clears
+        are only ever ones the retry is about to replace or was never
+        going to reach.
+
+        It takes the same results lock that add_result() takes, since
+        the two write the same column.
+
+        The field mask is not optional, for the reason record_progress()
+        spells out in its docstring.
+
+        The event matters more here than add_result()'s does. This is
+        the only place results are destroyed rather than overwritten,
+        so without it an operation's event stream shows results
+        appearing and then simply not being there, with nothing tying
+        the disappearance to the retry which caused it.
+        """
+        with self.get_lock_attr('results', op='clear results'):
+            _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
+            attrs = self._attributes()
+            cleared = len(attrs.results)
+            updated = AgentOperationAttributesData(uuid=_uuid, results={})
+            mariadb.update_agent_operation_attributes(updated, fields=['results'])
+
+        self.add_event(EVENT_TYPE_MUTATE, 'clear results',
+                       extra={'cleared': cleared})
 
     def record_progress(self, timestamp):
         """Persist the time the agent last made forward progress.

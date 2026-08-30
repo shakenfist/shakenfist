@@ -756,9 +756,10 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
     """Regression tests for the crash-safe agent operation dispatch queue.
 
     agent_operation_next() must never lose an operation: a queued head is
-    returned but left on the queue (the entry is only retired once the
-    operation has provably left the queued state), and finished or invalid
-    heads must not wedge the queue.
+    returned but left on the queue, an executing head is left on the
+    queue for the sidechannel daemon's reaper to resolve (the entry is
+    only retired once the operation reaches a terminal state), and
+    terminal or invalid heads must not wedge the queue.
     """
 
     def setUp(self):
@@ -819,8 +820,8 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
         op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
 
-        # Once the head has left the queued state it is lazily popped and
-        # the next operation dispatched.
+        # Once the head has reached a terminal state it is lazily popped
+        # and the next operation dispatched.
         op1.state = AgentOperation.STATE_EXECUTING
         op1.state = AgentOperation.STATE_COMPLETE
 
@@ -959,6 +960,49 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             str(op2.uuid), str(self.inst.agent_operation_next().uuid))
         self.assertEqual([str(op2.uuid)], self._queue())
+
+    def test_next_leaves_an_executing_head_alone(self):
+        # An executing head is being worked on, and its queue entry is
+        # what remains if the executor dies mid-flight. Popping it is
+        # what used to leak an operation orphaned in executing; the
+        # sidechannel daemon's reaper, not this method, is what resolves
+        # one.
+        op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+        op1.state = AgentOperation.STATE_EXECUTING
+
+        self.assertIsNone(self.inst.agent_operation_next())
+        self.assertEqual([str(op1.uuid), str(op2.uuid)], self._queue())
+
+        # Still there on the next pass: op2 must not be dispatched from
+        # behind it either, because order is preserved.
+        self.assertIsNone(self.inst.agent_operation_next())
+        self.assertEqual([str(op1.uuid), str(op2.uuid)], self._queue())
+        self.assertEqual(AgentOperation.STATE_EXECUTING, op1.state.value)
+
+    def test_next_retires_every_terminal_head(self):
+        # The other half of the terminal-only pop rule, and the half a
+        # regression would be silent about: an executing head surviving
+        # is worth nothing if a terminal head stops popping, because a
+        # queue whose head errored would block forever again.
+        for terminal in AgentOperation.TERMINAL_STATES:
+            op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+            op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
+
+            if terminal == AgentOperation.STATE_COMPLETE:
+                op1.state = AgentOperation.STATE_EXECUTING
+            op1.state = terminal
+
+            self.assertEqual(
+                str(op2.uuid), str(self.inst.agent_operation_next().uuid),
+                f'a {terminal} head was not retired')
+            self.assertEqual([str(op2.uuid)], self._queue())
+
+            # Drain op2 so the next iteration starts from an empty queue.
+            op2.state = AgentOperation.STATE_EXECUTING
+            op2.state = AgentOperation.STATE_COMPLETE
+            self.assertIsNone(self.inst.agent_operation_next())
+            self.assertEqual([], self._queue())
 
 
 class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):

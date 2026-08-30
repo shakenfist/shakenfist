@@ -3,8 +3,10 @@
 import os
 import shutil
 import tempfile
+import time
 from unittest import mock
 
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations.agentoperation import AgentOperation
@@ -34,13 +36,31 @@ class _FakeAgentOp:
     """
 
     TERMINAL_STATES = AgentOperation.TERMINAL_STATES
+    object_type = AgentOperation.object_type
 
-    def __init__(self, state_value):
+    def __init__(self, state_value, commands=None, attempts=0,
+                 deadline_passed=False):
         self.uuid = 'fake-agentop'
+        self.instance_uuid = 'fake-instance'
         self.state = state_value
-        self.commands = []
+
+        # Abandoning an operation is only terminal when it cannot be
+        # retried, so the default command list here is one which never
+        # is: execute repeats a side effect the agent cannot take
+        # back. Tests of the retry path pass a retryable list.
+        if commands is None:
+            commands = [{'command': 'execute'}]
+        self.commands = list(commands)
         self.failure_reason = None
         self.expired_reason = None
+
+        # Retry inputs. attempts is written on dispatch by the real
+        # dispatcher, so a fake in the middle of its first attempt
+        # carries 1, not 0.
+        self.attempts = attempts
+        self._deadline_passed = deadline_passed
+        self.results = {'0': {'content_blob': 'an-abandoned-blob'}}
+        self.results_cleared = False
 
     # The real state is a State object read as .value and assigned as a
     # bare string, so the fake accepts a string and reads back as an
@@ -67,6 +87,18 @@ class _FakeAgentOp:
         self.state = AgentOperation.STATE_EXPIRED
         self.expired_reason = reason
 
+    def deadline_passed(self, state=None):
+        # The real signature takes an already-read State to anchor a
+        # NULL deadline against, and the reaper passes one.
+        return self._deadline_passed
+
+    def clear_results(self):
+        self.results = {}
+        self.results_cleared = True
+
+    def record_attempt(self):
+        self.attempts += 1
+
 
 class _FakeInstance:
     def __init__(self):
@@ -92,6 +124,15 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
             sidechannel.SideChannelExecutorJob)
         job.agentop = _FakeAgentOp(state_value)
         job.log = mock.MagicMock()
+
+        # The finally block tears down any in-flight get-file whatever
+        # the operation's state, so these have to be set for the same
+        # reason __init__() sets them: without them the teardown raises
+        # AttributeError rather than being the no-op it is meant to be.
+        job._blob_uuid = None
+        job._stat_result = None
+        job._agent_path_for_get = None
+        job._blob_partial_file = None
         return job
 
     def test_marks_error_when_exit_while_executing(self):
@@ -101,7 +142,8 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
             job.execute()
         self.assertEqual(AgentOperation.STATE_ERROR, job.agentop.state.value)
         self.assertEqual(
-            'sidechannel executor exited before the operation completed',
+            'sidechannel executor exited before the operation completed, '
+            'and the operation cannot be safely retried',
             job.agentop.failure_reason)
 
     def test_marks_error_when_exception_while_executing(self):
@@ -135,6 +177,215 @@ class ExecutorOrphanTestCase(base.ShakenFistTestCase):
         # A completed op is not reassigned to error.
         self.assertEqual(AgentOperation.STATE_COMPLETE, job.agentop.state.value)
         self.assertIsNone(job.agentop.failure_reason)
+
+
+class SideChannelAbortPathTestCase(base.ShakenFistTestCase):
+    """A monitor and an executor for one instance need separate abort files.
+
+    The reaper stops a wedged executor by setting its abort path. When
+    the two jobs shared a file that also stopped the instance's agent
+    monitor, and the monitor's restart cleared the file again --
+    possibly before the wedged executor's one second poll had read it,
+    leaving it wedged with the executor slot still held, which is the
+    thing steps 5b and 5d exist to prevent.
+
+    These construct real jobs. A hand-built object would pass whatever
+    the derivation did, which is exactly how the two came to share a
+    file.
+    """
+
+    def _jobs(self):
+        inst = _FakeInstance()
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            monitor = sidechannel.SideChannelMonitorJob(inst)
+            executor = sidechannel.SideChannelExecutorJob(
+                inst, _FakeAgentOp(AgentOperation.STATE_QUEUED))
+        return monitor, executor
+
+    def test_the_two_job_types_do_not_share_an_abort_path(self):
+        monitor, executor = self._jobs()
+        self.assertNotEqual(monitor.abort_path, executor.abort_path)
+
+    def test_the_monitor_keeps_the_historical_path(self):
+        # Operators and the daemon's own shutdown path know the monitor
+        # by this name, so the executor is the one which moved.
+        monitor, _ = self._jobs()
+        self.assertEqual(
+            '/run/sf/sidechannel-fake-instance.abort', monitor.abort_path)
+
+    def test_the_executor_path_is_per_instance(self):
+        # Not per operation: the dispatcher runs one executor per
+        # instance, and a per-operation name would leave a file behind
+        # in /run/sf for every operation the reaper ever stopped.
+        _, executor = self._jobs()
+        self.assertEqual(
+            '/run/sf/sidechannel-executor-fake-instance.abort',
+            executor.abort_path)
+
+    def test_building_an_executor_does_not_clear_the_monitors_abort(self):
+        # The base constructor clears whatever path it derives. While
+        # the two were shared, constructing an executor during shutdown
+        # un-stopped the monitor.
+        inst = _FakeInstance()
+        with mock.patch.object(sidechannel.daemon,
+                               'clear_abort_path') as clear:
+            monitor = sidechannel.SideChannelMonitorJob(inst)
+            clear.reset_mock()
+            sidechannel.SideChannelExecutorJob(
+                inst, _FakeAgentOp(AgentOperation.STATE_QUEUED))
+
+        cleared = [c[0][0] for c in clear.call_args_list]
+        self.assertNotIn(monitor.abort_path, cleared)
+
+
+class RequestAllThreadsExitTestCase(base.ShakenFistTestCase):
+    """Every thread must be told to stop, whatever happens to the joins.
+
+    Until this phase a monitor and its instance's executor shared one
+    abort file, so the monitors loop stopped every executor as a side
+    effect. Separating the files (which the reaper needs, or its abort
+    for a wedged executor also stops the monitor) removed that
+    accident, and what it was masking is #3931: _request_thread_exit()
+    joins and deletes out of self.monitors whichever dictionary the
+    entry came from, so it raises KeyError once the monitors loop has
+    already removed an entry, with no try/except at the call site.
+    Signalling up front is what makes shutdown independent of that.
+    """
+
+    class _ShutdownMonitor:
+        _request_all_threads_exit = sidechannel.Monitor.\
+            _request_all_threads_exit
+        _request_thread_exit = sidechannel.Monitor._request_thread_exit
+
+        def __init__(self, instances):
+            self.monitors = {}
+            self.executors = {}
+            for uuid in instances:
+                # The monitor threads stop promptly, so the monitors
+                # loop deletes their entries. That is what arms
+                # #3931: the executors loop then reaches into
+                # self.monitors for an entry which is gone. Without
+                # it this fixture would never reproduce the bug,
+                # because a monitor which is still alive is not
+                # deleted and the KeyError never happens.
+                monitor_thread = mock.Mock()
+                monitor_thread.is_alive.return_value = False
+                self.monitors[uuid] = {
+                    'object': mock.Mock(
+                        abort_path=f'/run/sf/sidechannel-{uuid}.abort'),
+                    'thread': monitor_thread,
+                    'instance_uuid': uuid
+                }
+                self.executors[uuid] = {
+                    'object': mock.Mock(
+                        abort_path=(
+                            f'/run/sf/sidechannel-executor-{uuid}.abort')),
+                    'thread': mock.Mock(),
+                    'instance_uuid': uuid
+                }
+
+    def test_every_thread_is_signalled(self):
+        mon = self._ShutdownMonitor(['inst-a', 'inst-b'])
+
+        with mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel.daemon, 'clear_abort_path'), \
+                mock.patch.object(sidechannel.daemon,
+                                  'set_abort_path') as abort:
+            try:
+                mon._request_all_threads_exit()
+            except KeyError:
+                # #3931, which lives in _request_thread_exit() and is
+                # fixed separately. The point of this test is that the
+                # signalling above it has already happened.
+                pass
+
+        signalled = {c[0][0] for c in abort.call_args_list}
+        for uuid in ('inst-a', 'inst-b'):
+            self.assertIn(f'/run/sf/sidechannel-{uuid}.abort', signalled)
+            self.assertIn(
+                f'/run/sf/sidechannel-executor-{uuid}.abort', signalled)
+
+    def test_signalling_happens_before_any_join(self):
+        # Signalling inside the per-thread loop makes each thread's
+        # notice wait on the previous thread's half second join, so
+        # threads told to stop together would not stop together.
+        mon = self._ShutdownMonitor(['inst-a', 'inst-b'])
+        order = []
+
+        for entry in list(mon.monitors.values()) + list(
+                mon.executors.values()):
+            entry['thread'].join.side_effect = (
+                lambda *a, **kw: order.append('join'))
+
+        with mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel.daemon, 'clear_abort_path'), \
+                mock.patch.object(
+                    sidechannel.daemon, 'set_abort_path',
+                    side_effect=lambda *a: order.append('signal')):
+            try:
+                mon._request_all_threads_exit()
+            except KeyError:
+                pass
+
+        self.assertEqual(4, order[:4].count('signal'))
+
+
+class SideChannelPreConnectionWaitTestCase(base.ShakenFistTestCase):
+    """The pre-connection wait in SideChannelJob.execute() must be
+    abortable, or the reaper can resolve a wedged operation and still not
+    free the instance's executor slot (step 5d)."""
+
+    def _make_job(self, instance_path):
+        # The real constructor, so the abort path is the one production
+        # derives rather than one the test chose; only its directory is
+        # redirected away from /run/sf, which a test cannot write to.
+        # An earlier version of this built the object with __new__ and
+        # assigned abort_path by hand, which is why it could not have
+        # caught the monitor and the executor sharing a file.
+        inst = mock.MagicMock(
+            uuid='fake-instance', instance_path=instance_path)
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            job = sidechannel.SideChannelExecutorJob(
+                inst, _FakeAgentOp(AgentOperation.STATE_QUEUED))
+
+        self.assertEqual(
+            '/run/sf/sidechannel-executor-fake-instance.abort',
+            job.abort_path)
+        job.abort_path = os.path.join(
+            instance_path, os.path.basename(job.abort_path))
+        job.log = mock.MagicMock()
+        return job
+
+    def test_the_wait_exits_when_the_abort_path_is_set(self):
+        # Deliberately no patch of time.sleep. sidechannel.time is the
+        # global time module, so patching sleep there is process wide
+        # for the duration of the test, and this suite does not need
+        # it: an abort path which is already set is checked before the
+        # first sleep, so the loop exits without sleeping at all.
+        with tempfile.TemporaryDirectory() as tmp:
+            job = self._make_job(tmp)
+            sidechannel.daemon.set_abort_path(job.abort_path, 'test')
+
+            started = time.time()
+            job.execute()
+
+            self.assertLess(time.time() - started, 1)
+            job.instance.socket_on_vsock_channel.assert_not_called()
+
+    def test_the_wait_ends_when_the_console_log_appears(self):
+        # The other exit, so the test above cannot pass merely because
+        # the loop never runs: with no abort path set and the console
+        # log present, execute() falls through to the connection
+        # attempt on its first pass.
+        with tempfile.TemporaryDirectory() as tmp:
+            job = self._make_job(tmp)
+            open(os.path.join(tmp, 'console.log'), 'w').close()
+
+            with mock.patch.object(
+                    sidechannel.SideChannelExecutorJob, '_execute_inner'):
+                job.execute()
+
+            job.instance.socket_on_vsock_channel.assert_called_once()
 
 
 class ExecutorGetFileGuardTestCase(base.ShakenFistTestCase):
@@ -251,9 +502,15 @@ class ExecutorTerminalStateGuardTestCase(base.ShakenFistTestCase):
 class _BudgetAgentOp(_FakeAgentOp):
     """A fake operation whose two timing budgets are directly settable."""
 
-    def __init__(self, deadline_passed=False, progress_timeout=30.0):
-        super().__init__(AgentOperation.STATE_EXECUTING)
-        self._deadline_passed = deadline_passed
+    def __init__(self, deadline_passed=False, progress_timeout=30.0,
+                 commands=None, attempts=0):
+        # A stall only reaches a terminal state when a retry is
+        # impossible, so these fakes default to a command list which
+        # cannot be retried. The retry path itself is exercised in
+        # ExecutorRetryTestCase.
+        super().__init__(
+            AgentOperation.STATE_EXECUTING, commands=commands,
+            attempts=attempts, deadline_passed=deadline_passed)
         self._progress_timeout = progress_timeout
         self.deadline_checks = 0
 
@@ -333,6 +590,10 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
             agentop.expired_reason)
 
     def test_stalled_progress_expires_and_stops(self):
+        # The fake operation is an execute, which is never retried, so
+        # the stall is terminal here and the message names both what
+        # happened and why no retry followed. ExecutorRetryTestCase
+        # owns the case where it is retried instead.
         agentop = _BudgetAgentOp(progress_timeout=30.0)
         job = self._make_executor(
             agentop, handler=_ProgressHandler(), last_progress=0.0)
@@ -340,7 +601,8 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
             self.assertTrue(job.expire_if_out_of_budget())
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
-            'no progress from the agent for 30 seconds',
+            'no progress from the agent for 30 seconds, and the '
+            'operation cannot be safely retried',
             agentop.expired_reason)
 
     def test_progress_inside_the_window_continues(self):
@@ -577,7 +839,8 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
-            'no progress from the agent for 30 seconds',
+            'no progress from the agent for 30 seconds, and the '
+            'operation cannot be safely retried',
             agentop.expired_reason)
 
 
@@ -738,6 +1001,40 @@ class ExecutorPartialBlobTeardownTestCase(base.ShakenFistTestCase):
         job._abandon_get_file_transfer()
         self.assertIsNone(job._blob_partial_file)
 
+    def test_an_executor_exit_removes_it_too(self):
+        # execute()'s finally is the third way out, and until the review
+        # of this phase it was the one which did not clean up. It
+        # matters more now than it did: a retried operation runs
+        # GetFileCommand.dispatch() again and mints a fresh blob uuid,
+        # so a dropped connection mid-transfer would otherwise leave one
+        # orphaned .partial file per attempt.
+        agentop = _BudgetAgentOp()
+        job = self._make_executor(agentop)
+        self.assertTrue(os.path.exists(self.partial_path))
+
+        with mock.patch.object(sidechannel.SideChannelJob, 'execute',
+                               return_value=None), \
+                mock.patch.object(sidechannel, 'add_event_multi'):
+            job.execute()
+
+        self.assertFalse(os.path.exists(self.partial_path))
+        self.assertIsNone(job._blob_partial_file)
+
+    def test_an_executor_exit_with_no_transfer_is_a_noop(self):
+        # The teardown is outside the state guard in the finally, so it
+        # runs for a completed operation too. It must be a no-op there.
+        agentop = _BudgetAgentOp()
+        agentop.state = AgentOperation.STATE_COMPLETE
+        job = self._make_executor(agentop, in_flight=False)
+
+        with mock.patch.object(sidechannel.SideChannelJob, 'execute',
+                               return_value=None), \
+                mock.patch.object(sidechannel, 'add_event_multi'):
+            job.execute()
+
+        self.assertEqual(AgentOperation.STATE_COMPLETE, agentop.state.value)
+        self.assertIsNone(job._blob_partial_file)
+
     def test_a_failure_to_unlink_is_not_fatal(self):
         # This runs while an operation is already being abandoned, so
         # it must never be the thing that raises.
@@ -819,3 +1116,687 @@ class ExecutorDispatchTerminalGuardTestCase(base.ShakenFistTestCase):
         job._send_commands_single_envelope.assert_called_once()
         self.assertEqual(
             AgentOperation.STATE_EXECUTING, job.agentop.state.value)
+
+
+class OperationRetryabilityTestCase(base.ShakenFistTestCase):
+    """Retryability is a property of the whole command list.
+
+    A retry restarts the list at index 0, so a list containing any
+    command which cannot be repeated must not be retried at all --
+    even when the command which stalled could have been. No API
+    endpoint builds a mixed list today, which is exactly why this is
+    tested here rather than left to be discovered when one does.
+    """
+
+    def _op(self, *names):
+        return _FakeAgentOp(
+            AgentOperation.STATE_EXECUTING,
+            commands=[{'command': n} for n in names])
+
+    def test_a_retryable_list_is_retryable(self):
+        self.assertTrue(
+            sidechannel.operation_is_retryable(self._op('put-blob', 'chmod')))
+        self.assertTrue(
+            sidechannel.operation_is_retryable(self._op('get-file')))
+
+    def test_execute_is_not_retryable(self):
+        self.assertFalse(
+            sidechannel.operation_is_retryable(self._op('execute')))
+
+    def test_an_empty_list_is_not_retryable(self):
+        # all() over an empty list is True, which would make an
+        # operation with nothing to run retryable. A second attempt at
+        # nothing cannot make progress, so it would burn dispatches to
+        # the cap and then report a timing budget as the reason.
+        self.assertFalse(sidechannel.operation_is_retryable(self._op()))
+
+    def test_a_mixed_list_is_not_retryable_in_either_order(self):
+        # The decision this test exists for. Retrying the second list
+        # would re-run the execute, which is the side effect the agent
+        # cannot take back.
+        self.assertFalse(
+            sidechannel.operation_is_retryable(
+                self._op('execute', 'get-file')))
+        self.assertFalse(
+            sidechannel.operation_is_retryable(
+                self._op('get-file', 'execute')))
+
+    def test_an_unknown_command_is_not_retryable(self):
+        # We cannot know what running it a second time would do.
+        self.assertFalse(
+            sidechannel.operation_is_retryable(self._op('no-such-command')))
+
+
+class ExecutorRetryTestCase(base.ShakenFistTestCase):
+    """resolve_abandoned_operation() is the only place the retry decision
+    is made, for the executor and for the reaper alike.
+
+    Retry is for a stalled attempt and never for a failed one, so the
+    three refusals -- not retryable, deadline passed, attempts
+    exhausted -- each say so in the message the operator reads back
+    from object_states.
+    """
+
+    STALL = 'no progress from the agent for 30 seconds'
+    EXIT = 'sidechannel executor exited before the operation completed'
+
+    def _op(self, commands=None, attempts=1, deadline_passed=False):
+        return _FakeAgentOp(
+            AgentOperation.STATE_EXECUTING, commands=commands,
+            attempts=attempts, deadline_passed=deadline_passed)
+
+    def _resolve(self, agentop, reason, terminal):
+        with mock.patch.object(sidechannel, 'add_event_multi') as event:
+            retried = sidechannel.resolve_abandoned_operation(
+                agentop, reason, terminal=terminal)
+        return retried, event
+
+    def test_a_stall_under_the_cap_requeues_and_clears_results(self):
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=1)
+        retried, event = self._resolve(
+            agentop, self.STALL, agentop.expire)
+
+        self.assertTrue(retried)
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(agentop.expired_reason)
+
+        # The abandoned attempt registered a blob nothing else
+        # references. Leaving its result would hand the caller a
+        # content_blob from an attempt which never finished.
+        self.assertTrue(agentop.results_cleared)
+        self.assertEqual({}, agentop.results)
+
+        # One audit event, carrying why and which attempt.
+        event.assert_called_once()
+        extra = event.call_args[1]['extra']
+        self.assertEqual(self.STALL, extra['reason'])
+        self.assertEqual(1, extra['attempts'])
+
+    def test_the_cap_expires_with_a_message_naming_it(self):
+        # A stall which runs out of attempts expires rather than
+        # errors, because the progress timeout is a budget the caller
+        # set. The count is in the message so an operator can tell
+        # "stalled once and gave up" from "stalled three times".
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=3)
+        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+
+        self.assertFalse(retried)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(f'{self.STALL}, after 3 attempts',
+                         agentop.expired_reason)
+        self.assertFalse(agentop.results_cleared)
+
+    def test_a_passed_deadline_expires_even_with_attempts_left(self):
+        # Retrying would spend time nobody is waiting for: the
+        # caller's budget is the thing which just ran out.
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=1,
+                           deadline_passed=True)
+        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+
+        self.assertFalse(retried)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(
+            f'{self.STALL}, and the operation deadline has passed',
+            agentop.expired_reason)
+
+    def test_an_execute_operation_never_retries(self):
+        agentop = self._op(commands=[{'command': 'execute'}], attempts=1)
+        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+
+        self.assertFalse(retried)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(
+            f'{self.STALL}, and the operation cannot be safely retried',
+            agentop.expired_reason)
+
+    def test_a_stalled_transfer_is_requeued_by_the_budget_check(self):
+        # The same decision reached through the executor's progress
+        # stall branch, which must still stop the executor: a requeued
+        # operation is dispatched afresh by a new one.
+        agentop = _BudgetAgentOp(
+            progress_timeout=30.0, commands=[{'command': 'get-file'}],
+            attempts=1)
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.in_flight_handler = _ProgressHandler()
+        job.ready = False
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job.commands = []
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            with mock.patch('time.time', return_value=31.0):
+                self.assertTrue(job.expire_if_out_of_budget())
+
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(agentop.expired_reason)
+
+    def test_an_executor_exit_retries_to_the_cap_and_then_errors(self):
+        # The whole loop, one attempt at a time. attempts is written
+        # when the operation transitions into executing, which is what
+        # the assignment inside the loop below stands in for, so the
+        # first executor to exit sees 1.
+        agentop = self._op(commands=[{'command': 'get-file'}], attempts=0)
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.log = mock.MagicMock()
+        job._blob_uuid = None
+        job._stat_result = None
+        job._agent_path_for_get = None
+        job._blob_partial_file = None
+
+        cap = sidechannel.config.AGENT_OPERATION_MAX_ATTEMPTS
+        states = []
+        for _ in range(cap):
+            agentop.attempts += 1
+            agentop.state = AgentOperation.STATE_EXECUTING
+            with mock.patch.object(sidechannel, 'add_event_multi'):
+                with mock.patch.object(sidechannel.SideChannelJob, 'execute',
+                                       return_value=None):
+                    job.execute()
+            states.append(agentop.state.value)
+
+        self.assertEqual(
+            [AgentOperation.STATE_QUEUED] * (cap - 1)
+            + [AgentOperation.STATE_ERROR], states)
+        self.assertEqual(
+            f'{self.EXIT}, after {cap} attempts', agentop.failure_reason)
+
+
+class _DispatchMonitor:
+    """Stands in for self inside Monitor.start_instance_executor().
+
+    The method only touches these three dictionaries, and constructing
+    a real Monitor would start a daemon. Calling the unbound method
+    with this keeps the test to the one method under test, the same
+    way PreflightDeadlineTestCase._FakeClusterOp does in
+    test_node_aop_op.py.
+    """
+
+    def __init__(self):
+        self.executor_attempts = {}
+        self.monitors = {}
+        self.executors = {}
+
+
+class DispatchRegistrationOrderTestCase(base.ShakenFistTestCase):
+    """The executor must be registered before its thread starts.
+
+    self.executors is what the reaper reads to tell "nothing is working
+    on this operation" from "something is". Between start() and the
+    registration the operation can already be executing with no entry
+    there, and a reaper running in that window requeues an operation
+    which is actively running -- clearing its results underneath it.
+    Within one dispatcher thread the window is unobservable, but
+    supervise_dispatcher() deliberately leaves a replaced generation
+    alive, so an old thread can be here while the new generation reaps.
+    """
+
+    def test_the_entry_exists_before_the_thread_is_started(self):
+        mon = _DispatchMonitor()
+        mon.monitors['inst'] = {'object': mock.Mock()}
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+        registered_at_start = []
+
+        thread = mock.Mock()
+        thread.start.side_effect = lambda: registered_at_start.append(
+            'inst' in mon.executors)
+
+        with mock.patch.object(sidechannel.instance.Instance, 'from_db',
+                               return_value=mock.Mock()), \
+                mock.patch.object(sidechannel, 'SideChannelExecutorJob'), \
+                mock.patch.object(sidechannel.threading, 'Thread',
+                                  return_value=thread), \
+                mock.patch.object(sidechannel, 'add_event'):
+            sidechannel.Monitor.start_instance_executor(mon, 'inst', agentop)
+
+        self.assertEqual([True], registered_at_start)
+
+    def test_a_failed_start_does_not_leave_the_entry_behind(self):
+        # start() raises RuntimeError when the process cannot make
+        # another thread. The sweep skips an unstarted thread rather
+        # than joining it, so an entry left here would never be
+        # collected -- and while it sat there the instance would look
+        # to the reaper like it had a live executor, so an operation
+        # left executing on it would never be resolved again.
+        mon = _DispatchMonitor()
+        mon.monitors['inst'] = {'object': mock.Mock()}
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+
+        thread = mock.Mock()
+        thread.start.side_effect = RuntimeError('cannot start new thread')
+
+        with mock.patch.object(sidechannel.instance.Instance, 'from_db',
+                               return_value=mock.Mock()), \
+                mock.patch.object(sidechannel, 'SideChannelExecutorJob'), \
+                mock.patch.object(sidechannel.threading, 'Thread',
+                                  return_value=thread), \
+                mock.patch.object(sidechannel, 'add_event'):
+            self.assertRaises(
+                RuntimeError, sidechannel.Monitor.start_instance_executor,
+                mon, 'inst', agentop)
+
+        self.assertEqual({}, mon.executors)
+
+    def test_dispatch_alone_records_no_attempt(self):
+        # Attempts are counted on the transition into executing, not
+        # here. An executor which never reaches the agent leaves the
+        # operation queued for a later dispatch, and the dispatcher
+        # retries every five seconds, so counting here would burn the
+        # whole cap on an instance with a flaky agent channel without a
+        # single command having been sent.
+        mon = _DispatchMonitor()
+        mon.monitors['inst'] = {'object': mock.Mock()}
+        agentop = _FakeAgentOp(AgentOperation.STATE_QUEUED)
+
+        with mock.patch.object(sidechannel.instance.Instance, 'from_db',
+                               return_value=mock.Mock()), \
+                mock.patch.object(sidechannel, 'SideChannelExecutorJob'), \
+                mock.patch.object(sidechannel.threading, 'Thread'), \
+                mock.patch.object(sidechannel, 'add_event'):
+            sidechannel.Monitor.start_instance_executor(mon, 'inst', agentop)
+
+        self.assertEqual(0, agentop.attempts)
+
+
+class DispatchRecordsAnAttemptTestCase(base.ShakenFistTestCase):
+    """Reaching the agent is what counts an attempt.
+
+    Nothing else writes the attempts counter, so if this call is lost
+    the counter stays at zero, every comparison against
+    AGENT_OPERATION_MAX_ATTEMPTS is false, and a stalling operation
+    retries until its deadline -- or forever, for an operation with no
+    deadline at all.
+    """
+
+    def _make_executor(self, state_value, commands=2):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = _FakeAgentOp(state_value)
+        job.instance = _FakeInstance()
+        job.affected_objects = [job.instance, job.agentop]
+        job.commands = [{'command': 'execute', 'commandline': 'true'}
+                        for _ in range(commands)]
+        job.command_handlers = {'execute': _DispatchHandler()}
+        job.in_flight_handler = None
+        job.outstanding_message_count = 0
+        job.ready = True
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+        job._send_commands_single_envelope = mock.MagicMock()
+        return job
+
+    def _dispatch(self, job):
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            job._dispatch_next_command(mock.MagicMock())
+
+    def test_reaching_the_agent_records_an_attempt(self):
+        job = self._make_executor(AgentOperation.STATE_QUEUED)
+        self._dispatch(job)
+        self.assertEqual(
+            AgentOperation.STATE_EXECUTING, job.agentop.state.value)
+        self.assertEqual(1, job.agentop.attempts)
+
+    def test_a_second_command_is_the_same_attempt(self):
+        # The state assignment is a no-op the second time round, and
+        # those commands are the same attempt at the same operation.
+        # Counting per command would divide the cap by the length of
+        # the command list.
+        job = self._make_executor(AgentOperation.STATE_QUEUED)
+        self._dispatch(job)
+        self._dispatch(job)
+        self.assertEqual(1, job.agentop.attempts)
+
+    def test_a_retry_records_another_attempt(self):
+        # The requeue and re-dispatch that resolve_abandoned_operation()
+        # produces: back to queued, dispatched again, counted again.
+        job = self._make_executor(AgentOperation.STATE_QUEUED)
+        self._dispatch(job)
+        job.agentop.state = AgentOperation.STATE_QUEUED
+
+        job.commands = [{'command': 'execute', 'commandline': 'true'}]
+        self._dispatch(job)
+        self.assertEqual(2, job.agentop.attempts)
+
+    def test_a_terminal_operation_records_nothing(self):
+        # The guard above the counter. Nothing was sent, so nothing is
+        # counted against the operation's cap.
+        job = self._make_executor(AgentOperation.STATE_EXPIRED)
+        self._dispatch(job)
+        self.assertEqual(0, job.agentop.attempts)
+
+
+class _QueuedInstance:
+    """An instance whose agent operation queue can be peeked at.
+
+    The peek count is asserted on, because the peek being the *only*
+    database read the reaper performs for an idle instance is the
+    property which keeps it affordable at the top of every dispatcher
+    pass, for every instance on the node.
+    """
+
+    def __init__(self, queue=None):
+        self.uuid = 'fake-instance'
+        self._queue = list(queue or [])
+        self.peeks = 0
+
+    @property
+    def agent_operations(self):
+        self.peeks += 1
+        return {'queue': list(self._queue)}
+
+
+class _ReaperMonitor:
+    """Stands in for self inside Monitor.reap_instance_executors().
+
+    The method only touches these two dictionaries, and constructing a
+    real Monitor would start a daemon, so the unbound method is called
+    with this instead -- the same approach _DispatchMonitor takes above.
+    """
+
+    # The reaper calls exactly one method on itself, so the fake borrows
+    # the real one rather than standing in for it: the per-instance
+    # decisions are the behaviour under test.
+    _resolve_stuck_queue_head = sidechannel.Monitor._resolve_stuck_queue_head
+
+    def __init__(self):
+        self.monitors = {}
+        self.executors = {}
+        self.reaper_attempts = {}
+        self.monitor_attempts = {}
+
+
+class ExecutorReaperTestCase(base.ShakenFistTestCase):
+    """The reaper is what turns terminal-only pop back into a drain.
+
+    An operation's queue entry now survives until the operation is
+    terminal, so an operation left in executing with nothing working on
+    it blocks its instance's queue for as long as it stays there. This
+    node can see what the queue cannot: the instance is placed here, its
+    executor is a thread in this process, and the absence of that thread
+    is direct evidence rather than an inference.
+
+    Three cases and no more. Two are the absence of a thread; the third
+    is a wall-clock deadline, which is an absolute timestamp and so
+    cannot be wrong about a thread which is still making progress. A
+    live executor inside its budgets is left entirely alone.
+    """
+
+    INSTANCE = 'fake-instance'
+
+    # The path a real SideChannelExecutorJob for this instance derives,
+    # asserted against below rather than an arbitrary one, so the abort
+    # cannot silently be sent to the instance's monitor instead. That is
+    # not hypothetical: the two shared a file until the review of this
+    # phase. SideChannelAbortPathTestCase is what ties this constant to
+    # the real derivation.
+    EXECUTOR_ABORT = '/run/sf/sidechannel-executor-fake-instance.abort'
+
+    def _monitor(self, queue=(), executor_alive=None):
+        """A reaper self with one monitored instance, and maybe an executor.
+
+        executor_alive is None for no executor entry at all (the daemon
+        restart case), True for a live one, and False for a thread which
+        the sweep at the top of the reaper will remove first.
+        """
+        mon = _ReaperMonitor()
+        inst = _QueuedInstance(queue)
+        mon.monitors[self.INSTANCE] = {
+            'object': mock.Mock(instance=inst),
+            'thread': mock.Mock(),
+            'instance_uuid': self.INSTANCE
+        }
+
+        if executor_alive is not None:
+            # ident is set because the reaper skips a thread which has
+            # never been started; see
+            # test_an_unstarted_executor_is_not_joined.
+            thread = mock.Mock(ident=12345)
+            thread.is_alive.return_value = executor_alive
+            mon.executors[self.INSTANCE] = {
+                'object': mock.Mock(abort_path=self.EXECUTOR_ABORT),
+                'thread': thread,
+                'instance_uuid': self.INSTANCE
+            }
+
+        return mon, inst
+
+    def _reap(self, mon, agentop=None):
+        with mock.patch.object(sidechannel.AgentOperation, 'from_db',
+                               return_value=agentop) as from_db, \
+                mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel, 'add_event_multi'), \
+                mock.patch.object(sidechannel.daemon, 'clear_abort_path'), \
+                mock.patch.object(sidechannel.daemon,
+                                  'set_abort_path') as abort:
+            sidechannel.Monitor.reap_instance_executors(mon)
+        return from_db, abort
+
+    def test_a_daemon_restart_drains_the_queue(self):
+        # The case decision 1 names: the daemon died with an operation
+        # executing, so no finally block ever ran and there is no
+        # executor entry to find. One pass must leave the operation in a
+        # state Instance.agent_operation_next() will pop, or the
+        # instance's queue is wedged forever.
+        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
+        mon, _ = self._monitor(queue=['an-operation'])
+
+        self._reap(mon, agentop)
+
+        self.assertIn(agentop.state.value, AgentOperation.TERMINAL_STATES)
+
+        # error, not expired. Decision 3 splits the two on what went
+        # wrong rather than on who noticed, and this is an executor
+        # which went away -- the same failure the finally block
+        # handles, differing only in that the process died first. The
+        # difference is load bearing: expired is in
+        # FINAL_OBJECT_STATES and error is not, so expiring here would
+        # sweep the daemon-restart case for hard deletion while the
+        # finally case persisted.
+        self.assertEqual(AgentOperation.STATE_ERROR, agentop.state.value)
+        self.assertEqual(
+            'no sidechannel executor was running for this operation, and '
+            'the operation cannot be safely retried',
+            agentop.failure_reason)
+        self.assertIn(
+            AgentOperation.STATE_EXPIRED, constants.FINAL_OBJECT_STATES)
+        self.assertNotIn(
+            AgentOperation.STATE_ERROR, constants.FINAL_OBJECT_STATES)
+
+    def test_a_retryable_operation_is_requeued_instead(self):
+        # The same case for an operation which can be run again: it
+        # returns to the queue rather than to a terminal state, and the
+        # dispatcher picks it up on a later pass. The queue drains
+        # either way, which is the point.
+        agentop = _FakeAgentOp(
+            AgentOperation.STATE_EXECUTING, commands=[{'command': 'get-file'}],
+            attempts=1)
+        mon, _ = self._monitor(queue=['an-operation'])
+
+        self._reap(mon, agentop)
+
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        self.assertTrue(agentop.results_cleared)
+
+    def test_a_dead_thread_is_swept_and_resolved_in_one_pass(self):
+        # The sweep runs first deliberately: an executor whose thread
+        # ended without resolving its operation is handled in the same
+        # pass rather than the next one.
+        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
+        mon, _ = self._monitor(queue=['an-operation'], executor_alive=False)
+
+        self._reap(mon, agentop)
+
+        self.assertEqual({}, mon.executors)
+        self.assertEqual(AgentOperation.STATE_ERROR, agentop.state.value)
+
+    def test_an_unstarted_executor_is_not_joined(self):
+        # Registering before start() leaves a window in which the
+        # thread exists but has never run, and is_alive() is False for
+        # such a thread exactly as it is for a finished one. join()
+        # raises RuntimeError there, which without the ident guard
+        # would abort the whole reap pass -- and a replaced dispatcher
+        # generation reaping while the old one is mid-dispatch is
+        # precisely the case the registration order exists for.
+        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
+        mon, _ = self._monitor(queue=['an-operation'], executor_alive=False)
+        thread = mon.executors[self.INSTANCE]['thread']
+        thread.ident = None
+        thread.join.side_effect = RuntimeError(
+            'cannot join thread before it is started')
+
+        self._reap(mon, agentop)
+
+        # Not swept, not joined, and not mistaken for an absent
+        # executor: the operation is left alone for the thread to run.
+        self.assertIn(self.INSTANCE, mon.executors)
+        thread.join.assert_not_called()
+        self.assertEqual(
+            AgentOperation.STATE_EXECUTING, agentop.state.value)
+
+    def test_sweeping_a_dead_executor_clears_its_abort_path(self):
+        # The reaper is the only thing which sets this file and nothing
+        # else clears it, so without this /run/sf accumulates one file
+        # per reaped executor for the daemon's lifetime.
+        agentop = _FakeAgentOp(AgentOperation.STATE_EXECUTING)
+        mon, _ = self._monitor(queue=['an-operation'], executor_alive=False)
+
+        with mock.patch.object(sidechannel.AgentOperation, 'from_db',
+                               return_value=agentop), \
+                mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel, 'add_event_multi'), \
+                mock.patch.object(sidechannel.daemon, 'set_abort_path'), \
+                mock.patch.object(sidechannel.daemon,
+                                  'clear_abort_path') as clear:
+            sidechannel.Monitor.reap_instance_executors(mon)
+
+        clear.assert_called_once_with(self.EXECUTOR_ABORT)
+
+    def test_an_idle_instance_reads_no_operation(self):
+        # An instance with nothing queued costs one attributes peek and
+        # nothing else. Reading an operation here would put a database
+        # read on the idle path for every instance on the node, on every
+        # dispatcher pass.
+        mon, inst = self._monitor(queue=[])
+
+        from_db, abort = self._reap(mon)
+
+        from_db.assert_not_called()
+        abort.assert_not_called()
+        self.assertEqual(1, inst.peeks)
+
+    def test_a_wedged_live_executor_is_resolved_then_aborted(self):
+        # A live executor whose operation is out of wall-clock budget is
+        # wedged somewhere no budget is evaluated -- the pre-connection
+        # wait, which blocks before _execute_inner() is entered. The
+        # order matters: the executor's finally block only rewrites an
+        # operation which is still executing, so resolving first means
+        # the thread being stopped cannot overwrite this verdict.
+        agentop = _FakeAgentOp(
+            AgentOperation.STATE_EXECUTING, commands=[{'command': 'get-file'}],
+            attempts=1, deadline_passed=True)
+        mon, _ = self._monitor(queue=['an-operation'], executor_alive=True)
+
+        order = []
+        resolve = agentop.expire
+
+        def _expire(reason):
+            order.append('resolve')
+            resolve(reason)
+
+        agentop.expire = _expire
+
+        with mock.patch.object(sidechannel.AgentOperation, 'from_db',
+                               return_value=agentop), \
+                mock.patch.object(sidechannel, 'add_event'), \
+                mock.patch.object(sidechannel, 'add_event_multi'), \
+                mock.patch.object(
+                    sidechannel.daemon, 'set_abort_path',
+                    side_effect=lambda *a: order.append('abort')) as abort:
+            sidechannel.Monitor.reap_instance_executors(mon)
+
+        self.assertEqual(['resolve', 'abort'], order)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(
+            'the sidechannel executor was wedged and made no progress, and '
+            'the operation deadline has passed',
+            agentop.expired_reason)
+        self.assertEqual(self.EXECUTOR_ABORT, abort.call_args[0][0])
+
+    def test_a_live_executor_inside_its_budget_is_left_alone(self):
+        # The reaper acts on evidence, never on suspicion. A progress
+        # stall is the executor's own job: it holds state the reaper
+        # does not, and second-guessing it would race a thread which is
+        # making progress.
+        agentop = _FakeAgentOp(
+            AgentOperation.STATE_EXECUTING, commands=[{'command': 'get-file'}],
+            attempts=1, deadline_passed=False)
+        mon, _ = self._monitor(queue=['an-operation'], executor_alive=True)
+
+        _, abort = self._reap(mon, agentop)
+
+        self.assertEqual(AgentOperation.STATE_EXECUTING, agentop.state.value)
+        self.assertFalse(agentop.results_cleared)
+        abort.assert_not_called()
+        self.assertIn(self.INSTANCE, mon.executors)
+
+    def test_a_head_which_is_not_executing_is_left_alone(self):
+        # A queued head belongs to the dispatcher, and a preflight or
+        # initial one to the operation which is still creating it.
+        for state in (AgentOperation.STATE_QUEUED,
+                      AgentOperation.STATE_PREFLIGHT):
+            agentop = _FakeAgentOp(state)
+            mon, _ = self._monitor(queue=['an-operation'])
+
+            _, abort = self._reap(mon, agentop)
+
+            self.assertEqual(state, agentop.state.value)
+            abort.assert_not_called()
+
+    def test_the_peek_is_rate_limited(self):
+        # The reaper runs at the top of every dispatcher pass, so an
+        # unthrottled peek would be one uncached attributes read per
+        # instance per second -- the cost the dispatch check's own rate
+        # limit exists to avoid. A restarted daemon starts with an empty
+        # dictionary, so the first pass is never delayed.
+        mon, inst = self._monitor(queue=[])
+
+        self._reap(mon)
+        self._reap(mon)
+        self._reap(mon)
+        self.assertEqual(1, inst.peeks)
+
+        mon.reaper_attempts[self.INSTANCE] = (
+            time.time() - sidechannel.EXECUTOR_REAP_INTERVAL - 1)
+        self._reap(mon)
+        self.assertEqual(2, inst.peeks)
+
+    def test_reaping_a_monitor_drops_its_rate_limiter_entry(self):
+        # The reaper only ever examines instances which have a monitor,
+        # so its rate limiter has nothing to say about one which does
+        # not. Without this the dictionary grows for the daemon's
+        # lifetime on a node with instance churn.
+        mon, _ = self._monitor(queue=[])
+        mon.monitors[self.INSTANCE]['thread'].is_alive.return_value = False
+        mon.reaper_attempts[self.INSTANCE] = time.time()
+
+        sidechannel.Monitor.reap_instance_monitors(mon)
+
+        self.assertEqual({}, mon.monitors)
+        self.assertEqual({}, mon.reaper_attempts)
+
+    def test_an_invalid_queue_entry_is_left_for_the_dispatcher(self):
+        # Retiring it takes the instance's attribute lock, which the
+        # reaper deliberately does not; agent_operation_next() does it
+        # on the dispatch path instead.
+        mon, _ = self._monitor(queue=['no-such-operation'])
+
+        _, abort = self._reap(mon, None)
+
+        abort.assert_not_called()

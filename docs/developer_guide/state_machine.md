@@ -40,6 +40,11 @@ have not yet aged out.
   states are terminal in the same way, but only `expired` is currently
   swept for hard deletion.
 
+The `executing --> queued` edge is a retry of a stalled attempt, not a
+failure: it fires when the executor made no progress rather than when it
+reported an error, is bounded both by `AGENT_OPERATION_MAX_ATTEMPTS` and by
+the operation's own deadline, and is never taken by `execute` operations.
+
 The following transitions are possible:
 
 ``` mermaid
@@ -64,6 +69,7 @@ stateDiagram-v2
   queued --> expired
 
   executing --> complete
+  executing --> queued
   executing --> deleted
   executing --> error
   executing --> expired
