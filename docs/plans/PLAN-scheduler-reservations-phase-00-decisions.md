@@ -332,7 +332,7 @@ shows why: the node affinity wanted was removed by
 `sufficient_idle_cpu`, an **admission** filter at
 `scheduler.py:473-481`, thirty lines before affinity scoring
 begins at `scheduler.py:505`. *(Line references as of
-2026-08-16; the current locations are `:487-501` and
+2026-08-16; the current locations are `:489-502` and
 `:529-600`, and the hard ceiling cited below is now
 `:187-256`. Also, per a 2026-08-26 comment on 3565, the stage
 which binds has moved from `sufficient_idle_cpu` to
