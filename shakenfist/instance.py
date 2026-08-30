@@ -333,23 +333,33 @@ class Instance(dbowo):
     @staticmethod
     def _static_values_to_dict(data):
         """Convert InstanceData to the dict format used internally."""
+        # The three container fields are copied rather than referenced,
+        # for the reason set out under "A frozen model is not a deep
+        # frozen model" in docs/developer_guide/coding_rules.md: data is
+        # the model mariadb.get_instance() parks in the process wide
+        # object cache, and frozen=True on it stops attribute assignment
+        # rather than mutation of a list or dict field's contents.
+        # Nothing mutates these today, but sidechannel's
+        # instance_sidechannel_cache holds side_channels for the
+        # daemon's lifetime, which is the shared ownership that made the
+        # agentoperation case bite.
         return {
             'uuid': str(data.uuid),
             'cpus': data.cpus,
-            'disk_spec': data.disk_spec,
+            'disk_spec': list(data.disk_spec),
             'memory': data.memory,
             'name': data.name,
             'namespace': data.namespace,
             'requested_placement': data.requested_placement,
             'ssh_key': data.ssh_key,
             'user_data': data.user_data,
-            'video': data.video,
+            'video': dict(data.video),
             'uefi': data.uefi,
             'configdrive': data.configdrive,
             'nvram_template': data.nvram_template,
             'secure_boot': data.secure_boot,
             'machine_type': data.machine_type,
-            'side_channels': data.side_channels,
+            'side_channels': list(data.side_channels),
             'version': data.version,
         }
 

@@ -1118,12 +1118,16 @@ class ExecutorDispatchTerminalGuardTestCase(base.ShakenFistTestCase):
             AgentOperation.STATE_EXECUTING, job.agentop.state.value)
 
 
-class _GetFileDispatchHandler:
-    """A retryable handler whose dispatch() always produces one request."""
+class _GetFileDispatchHandler(sidechannel.AgentCommandHandler):
+    """A retryable handler whose dispatch() always produces one request.
+
+    Subclassed rather than duck typed so it inherits retryable,
+    register_as_outstanding and anything the base class grows later.
+    Only the two things this test needs to control are overridden.
+    """
 
     name = 'get-file'
     reports_progress = True
-    register_as_outstanding = False
 
     def dispatch(self, command_id, cmd):
         return ['a-request']
@@ -1152,7 +1156,7 @@ class ExecutorCommandListOwnershipTestCase(base.ShakenFistTestCase):
             commands=[{'command': 'get-file', 'path': '/tmp/x'}])
         with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
             job = sidechannel.SideChannelExecutorJob(_FakeInstance(), agentop)
-        job.command_handlers = {'get-file': _GetFileDispatchHandler()}
+        job.command_handlers = {'get-file': _GetFileDispatchHandler(job)}
         job._send_commands_single_envelope = mock.MagicMock()
         return job
 

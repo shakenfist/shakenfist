@@ -187,3 +187,29 @@ class AgentOperationCommandListTestCase(base.ShakenFistTestCase):
         expected = [{'command': 'get-file', 'path': '/tmp/x'}]
         self.assertEqual(expected, data.commands)
         self.assertEqual(expected, second['commands'])
+
+    def test_two_objects_from_one_cache_entry_do_not_share_a_list(self):
+        # The two above pin the mechanism at the dict _db_get() returns.
+        # This pins the behaviour readers actually depend on: every
+        # AgentOperation built while one cache entry is live owns its
+        # own command list. Without it a reader could be reverted onto
+        # shared static values as an allocation saving and the tests
+        # above would still pass.
+        data = self._data()
+        with mock.patch('shakenfist.operations.agentoperation.mariadb.'
+                        'get_agent_operation', return_value=data):
+            first = AgentOperation.from_db(str(data.uuid))
+            second = AgentOperation.from_db(str(data.uuid))
+
+        self.assertIsNot(first.commands, second.commands)
+        self.assertIsNot(data.commands, first.commands)
+
+        # The second consequence the fix comment names: a later reader
+        # on the node still sees the put-blob command it has to make
+        # local before dispatch. NodeAgentopOp._preflight iterates
+        # exactly this list.
+        first.commands.pop(0)
+        self.assertEqual(
+            [{'command': 'get-file', 'path': '/tmp/x'}], second.commands)
+        self.assertEqual(
+            [{'command': 'get-file', 'path': '/tmp/x'}], data.commands)
