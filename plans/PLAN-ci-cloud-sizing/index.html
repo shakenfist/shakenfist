@@ -13768,9 +13768,15 @@ this plan exists to fix. For now:</p>
   strips step timestamps.</li>
 <li>Ledger and refusal evidence: <code>ci-status shakenfist/shakenfist
   logs &lt;job id&gt;</code>, then grep for <code>cpu_schedulable</code>, <code>limit_cpus</code>
-  and <code>No nodes remaining at scheduling stage</code>. The scheduler's
-  per-candidate audit payload only reaches the log when a test
-  fails and attaches it, so a green run tells you nothing.</li>
+  and <code>No nodes remaining at scheduling stage</code>. Note that the
+  scheduler's per-candidate audit payload is written on <em>every</em>
+  schedule, not only failing ones: <code>_log_and_raise_on_error()</code>
+  (<code>shakenfist/scheduler.py:348-364</code>) emits <code>schedule at stage
+  {stage}</code> carrying <code>extra['dropped']</code> whenever candidates
+  survived, and <code>schedule has no candidates at stage {stage},
+  aborting</code> when none did. A green run therefore does record its
+  refusals -- the phase 1 survey corrected an earlier claim here
+  that it did not.</li>
 <li>Per-instance utilisation: the conductor database, copied as
   described in the private-ci access notes; join
   <code>workflow_cost_samples</code> to <code>workflow_costs</code> on <code>namespace</code> and
@@ -13984,7 +13990,7 @@ superseded.</p>
 </tr>
 <tr>
 <td>1. Headroom instrumentation: sample <code>/admin/resources</code> through every cluster job and publish the series</td>
-<td>PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</td>
+<td><a href="../PLAN-ci-cloud-sizing-phase-01-headroom-probe/">PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</a></td>
 <td>Not started</td>
 </tr>
 <tr>
@@ -14029,17 +14035,24 @@ signatures with a disposition each.</p>
 throughout the functional-test step, and emit a per-run summary:
 peak and p90 committed vCPU cluster-wide and per node, both as
 absolute numbers and as a fraction of ledger; the same for memory;
-and a count of <code>sufficient_idle_cpu</code> / <code>sufficient_idle_memory</code>
-refusals. Upload the raw series as a job artifact and print the
-summary in the log.</p>
-<p>No gating, no topology change. The endpoint already publishes both
-inputs to the admission decision (<code>cpu_measured</code> and
-<code>cpu_committed</code>, plus <code>cpu_hard_max</code>) precisely so "this node
+and a per-stage count of candidate refusals. Upload the raw series
+as a job artifact and print the summary in the log.</p>
+<p>There are four capacity stages, not three: <code>sufficient_idle_cpu</code>,
+<code>sufficient_idle_memory</code>, <code>sufficient_free_disk</code> (disk <em>space</em>)
+and <code>sufficient_idle_disk</code> (disk <em>bandwidth</em>, a rate predicate).
+Phase 1's survey found this plan and phase 0 naming only three,
+with the bandwidth stage standing in for disk capacity.</p>
+<p>No gating, no topology change. The endpoint publishes
+<code>cpu_measured</code>, <code>cpu_committed</code> and <code>cpu_hard_max</code>, so "this node
 measures idle but is refusing work" is answerable, which is what
-makes it the right probe.</p>
-<p>Lives in <code>shakenfist/actions</code> (the reusable <code>smoke-cluster</code>
-workflow and <code>build-smoke-cluster</code>), so it needs an operator push
-and a real CI run to prove.</p>
+makes it the right probe. It does <em>not</em> publish the capacity row's
+<code>limit_cpus</code>, which is what admission actually compares against
+and which D7 needs; phase 1 adds it.</p>
+<p>Most of the work lives in the main repository's <code>tools/</code>, following
+<code>ci_wait_schedulable.py</code>; the invocation lives in
+<code>shakenfist/actions</code> (the reusable <code>smoke-cluster</code> workflow and
+<code>build-smoke-cluster</code>), so it still needs an operator push and a
+real CI run to prove.</p>
 <h3 id="phase-2-baseline-measurement-window">Phase 2 -- Baseline measurement window<a class="headerlink" href="#phase-2-baseline-measurement-window" title="Permanent link">&para;</a></h3>
 <p>Leave phase 1 running for an agreed number of merge runs, then
 publish the distribution: what peak utilisation actually is per

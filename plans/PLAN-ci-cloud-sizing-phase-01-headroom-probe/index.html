@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-ci-cloud-sizing-phase-00-decisions/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 0: decisions, and an inventory of what scarcity catches - Shaken Fist</title>
+        <title>Phase 1: headroom instrumentation - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-0-decisions-and-an-inventory-of-what-scarcity-catches" class="md-skip">
+        <a href="#phase-1-headroom-instrumentation" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 0: decisions, and an inventory of what scarcity catches
+              Phase 1: headroom instrumentation
             
           </span>
         </div>
@@ -13183,10 +13183,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#d1-widen-the-nodes-keep-the-production-reservation-open-question-1" class="md-nav__link">
+  <a href="#d9-two-instruments-not-one" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D1 -- Widen the nodes; keep the production reservation (open question 1)
+        D9 -- Two instruments, not one
       
     </span>
   </a>
@@ -13194,10 +13194,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d2-slim-tier-is-database-tier-coverage-sized-for-parity-open-question-2" class="md-nav__link">
+  <a href="#d10-the-census-counts-every-stage-it-sees-and-the-plans-naming-is-fixed" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D2 -- slim-tier is database-tier coverage, sized for parity (open question 2)
+        D10 -- The census counts every stage it sees, and the plan's naming is fixed
       
     </span>
   </a>
@@ -13205,10 +13205,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d3-the-headroom-bands-form-now-its-numbers-in-phase-2-open-question-3" class="md-nav__link">
+  <a href="#d11-the-census-reads-loki-not-the-events-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D3 -- The headroom band's form now, its numbers in phase 2 (open question 3)
+        D11 -- The census reads Loki, not the events API
       
     </span>
   </a>
@@ -13216,10 +13216,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d4-node-lifecycle-keeps-five-hypervisors-the-ip-list-goes-anyway-open-question-4" class="md-nav__link">
+  <a href="#d12-publish-the-capacity-rows-limit-from-summarize_resources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D4 -- Node lifecycle keeps five hypervisors; the IP list goes anyway (open question 4)
+        D12 -- Publish the capacity row's limit from summarize_resources()
       
     </span>
   </a>
@@ -13227,10 +13227,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d5-memory-is-a-real-second-constraint-open-question-5-corrected" class="md-nav__link">
+  <a href="#d13-the-poller-runs-on-the-primary-and-is-self-limiting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D5 -- Memory is a real second constraint (open question 5, corrected)
+        D13 -- The poller runs on the primary, and is self-limiting
       
     </span>
   </a>
@@ -13238,10 +13238,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d6-the-sf-absent-phantom-stays-and-every-phase-says-so-open-question-6" class="md-nav__link">
+  <a href="#d14-both-halves-of-the-format-contract-live-in-the-main-repository" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D6 -- The sf-absent phantom stays, and every phase says so (open question 6)
+        D14 -- Both halves of the format contract live in the main repository
       
     </span>
   </a>
@@ -13249,21 +13249,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d7-the-12-versus-10-ledger-discrepancy-is-phase-2s-to-resolve-survey" class="md-nav__link">
+  <a href="#d15-nothing-in-this-phase-can-fail-a-build" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D7 -- The 12-versus-10 ledger discrepancy is phase 2's to resolve (survey)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#d8-3696-is-a-beneficiary-not-a-deliverable-survey" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        D8 -- #3696 is a beneficiary, not a deliverable (survey)
+        D15 -- Nothing in this phase can fail a build
       
     </span>
   </a>
@@ -13276,10 +13265,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-scarcity-inventory" class="md-nav__link">
+  <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The scarcity inventory
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-phase-2-inherits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What phase 2 inherits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
       
     </span>
   </a>
@@ -13307,292 +13340,259 @@
   
 
 
-<h1 id="phase-0-decisions-and-an-inventory-of-what-scarcity-catches">Phase 0: decisions, and an inventory of what scarcity catches<a class="headerlink" href="#phase-0-decisions-and-an-inventory-of-what-scarcity-catches" title="Permanent link">&para;</a></h1>
+<h1 id="phase-1-headroom-instrumentation">Phase 1: headroom instrumentation<a class="headerlink" href="#phase-1-headroom-instrumentation" title="Permanent link">&para;</a></h1>
 <p>Parent plan: <a href="../PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing.md</a>.</p>
-<p><strong>Planning effort:</strong> high. Nothing here is mechanical -- every item is
-a judgement about what CI is for and what a failure means, and the
-inventory determines what phase 3 has to build before any cloud is
-allowed to grow.</p>
+<p><strong>Planning effort:</strong> medium, as the master plan specifies. The
+arithmetic was settled in phase 0. What keeps this above mechanical
+is that the work is cross-repository -- part of it lands in
+<code>shakenfist/actions</code>, where a change cannot be exercised before it
+merges -- and that an instrument which measures the wrong thing is
+worse than no instrument, because phase 2 would then reshape the
+topologies against it.</p>
+<p>Decision numbering continues the plan-wide sequence: phase 0 used
+D1-D8, so this phase begins at D9. There is one namespace across
+the whole plan, because later phases cite these by number.</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>The master plan established that the nested CI clouds are sized on the
-wrong axis: what binds is the scheduler's admission ledger
-(<code>cpu_schedulable x CPU_OVERCOMMIT_RATIO</code>), not real CPU or memory,
-which sit at roughly 18% and 50% of allocation with zero swap-out
-anywhere. <code>slim-primary</code> has a 27 vCPU ledger and passes ~81% of merge
-runs; <code>slim-tier</code> has about 12 and passes 19%, its failures being the
-<code>507 sufficient_idle_cpu</code> family.</p>
-<p>Phase 0 does not change any topology. It exists because two of the
-plan's later phases are only safe if a set of questions are answered
-first, and because the coverage the undersized clouds give us today is
-about to be removed by making them bigger. This phase decides the
-questions and writes down what that coverage actually is.</p>
+<p>Phase 0 decided what to measure. D3 fixed the <em>form</em> of the headroom
+band, D5 made memory a genuine second dimension and required refusals
+to be counted per stage rather than in aggregate, and D7 made the
+unresolved 12-versus-10 ledger discrepancy something this phase's
+series has to make answerable by recording both figures rather than
+choosing one.</p>
+<p>This phase builds the instrument and nothing else. It changes no
+topology, gates no job and fails no build. Its output is a per-run
+artifact and a printed summary, so that phase 2 has a distribution
+to reason about instead of the three hand-collected data points the
+master plan was written from.</p>
 <h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <p><strong>In scope:</strong></p>
 <ul>
-<li>Answering the master plan's six open questions as numbered decisions
-  (D1-D6), plus two the survey added (D7-D8).</li>
-<li>A <em>scarcity inventory</em>: every distinct failure signature the current
-  clouds produce because they are small, each with a disposition of
-  <em>defect to fix</em>, <em>behaviour to assert</em>, or <em>test bug</em>.</li>
-<li>Correcting, at source, the master plan claims the survey found to be
-  wrong.</li>
-<li>Filing or annotating issues so that no signature in the inventory
-  depends on a small cloud to be remembered.</li>
+<li>A headroom series: <code>GET /admin/resources</code> sampled through the
+  functional-test step of every cluster job, written as JSONL.</li>
+<li>A refusal census: a count, per scheduler stage, of every candidate
+  node dropped during the run -- including on runs that pass.</li>
+<li>A per-run summary computing D3's band form, printed to the job log.</li>
+<li>Publishing the capacity row's <code>limit_cpus</code> from
+  <code>summarize_resources()</code>, which D7 requires and the endpoint does
+  not currently expose (D12).</li>
+<li>Documenting the artifact's format, so phase 2 parses a contract
+  rather than reverse-engineering a file.</li>
 </ul>
 <p><strong>Out of scope:</strong></p>
 <ul>
-<li>Any change to <code>ci-topology-*.yml</code>, to <code>smoke-cluster.yml</code>, or to the
-  test suites. Phase 1 instruments, phase 3 asserts, phase 4 reshapes.</li>
-<li>Fixing #3772, #3565 or #3496. This phase gives each a disposition and
-  makes sure a bigger cloud cannot silently close it. Fixing them is
-  scheduler work on its own axis.</li>
-<li>Anything about the under-cloud's own capacity. #3696 benefits from
-  this plan and is not a deliverable of it (D8).</li>
+<li>Any change to a topology file, node count, or node size. That is
+  phase 4, and it is gated on phase 3.</li>
+<li>Any gating, threshold enforcement or build failure. Phase 5 owns
+  the band as a guardrail; here it is only computed and printed
+  (D15).</li>
+<li>Fixing the scheduler defects the census will count. #3565, #3496
+  and #3772 stay where phase 0 put them.</li>
+<li><code>slim-primary</code> keeps its unreachable <code>sf-absent</code> hypervisor. This
+  phase does not touch topology files at all, but D6 requires every
+  phase plan to restate it: the phantom is the regression guard for
+  the 2026-07-20 absent-node deploy failure and must not be
+  "tidied". It never registers as a node, so it will never appear
+  in the series -- but it <em>is</em> in <code>ci-inventory.yaml</code> and
+  <code>ci-topology-facts.json</code>, so anything iterating those must
+  tolerate it.</li>
 </ul>
 <h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
-<p>The master plan was written yesterday, so most of it still holds. Three
-claims did not survive checking, and they are corrected here and at
-source.</p>
-<ol>
-<li>
-<p><strong><code>memory_available</code> is <code>MemAvailable</code>, not <code>MemFree</code>.</strong> Open
-   question 5 asked whether page cache inflates the denominator in
-   <code>Scheduler._has_sufficient_ram</code>. It does not: the resources daemon
-   publishes <code>psutil.virtual_memory().available</code>
-   (<code>shakenfist/daemons/resources/main.py:293</code>), which already excludes
-   reclaimable cache. A <code>sufficient_idle_memory</code> refusal therefore means
-   the node genuinely had little memory available, and the question
-   becomes a different one -- see D5.</p>
-</li>
-<li>
-<p><strong>CI cannot set a per-host reservation without a code change.</strong>
-   Open question 1 assumed <code>node_cpu_reservation_threads</code> could simply
-   be overridden from CI's inventory. <code>examples/_shared/site.yml:359</code>
-   does honour a pre-set value, but CI's inventory is <em>generated</em> by
-   <code>tools/ci-make-inventory.py</code> in <code>shakenfist/actions</code>, whose
-   <code>render_node_vars()</code> emits a fixed block (<code>node_name</code>,
-   <code>node_egress_ip</code>, <code>node_egress_nic</code>, <code>node_mesh_ip</code>,
-   <code>node_mesh_nic</code>) with no hook for arbitrary host vars. Lowering the
-   reservation in CI would therefore mean either extending that
-   generator or passing a cluster-wide <code>--extra-vars</code>, which is not the
-   same thing. This makes the option strictly more expensive than the
-   master plan assumed, and it feeds D1.</p>
-</li>
-<li>
-<p><strong>The tier's ledger is 12 by derivation and 10 by observation, and
-   nothing explains the gap.</strong> <code>_derive_cpu_memory_limits</code>
-   (<code>shakenfist/mariadb.py:23969</code>) computes
-   <code>limit_cpus = floor(cpu_schedulable x CPU_OVERCOMMIT_RATIO)</code>, which
-   mirrors <code>_has_sufficient_cpu</code> exactly, so <code>slim-tier</code>'s three
-   hypervisors should reconcile to 3 + 3 + 6 = 12. Issue #3907 records
-   the <code>cluster_capacity</code> singleton reporting <code>limit 10</code>. The obvious
-   candidate explanation -- that a node without a capacity row
-   contributes nothing to <code>total_cpus</code>, which the reconciler restricts
-   to <code>capacity_nodes</code> -- cannot produce 10 from 12, because dropping a
-   node subtracts 3 or 6. The discrepancy is real and unexplained; D7
-   assigns it to phase 2 rather than guessing now.</p>
-</li>
-</ol>
-<p><strong>These three corrections are applied to the master plan in this
-same commit</strong>, so no later step should redo them: open questions 1
-and 5 carry their corrected premise, the Situation section quotes
-the tier's ledger as "12 by derivation, 10 by observation", and
-every open question now points at the decision below that settled
-it.</p>
-<p>Everything else checked out: the <code>sf-absent</code> phantom is present and
-commented in <code>ci-topology-slim-primary.yml</code>; <code>functional-tests.yml</code>
-does hardcode <code>10.0.0.20</code>-<code>10.0.0.24</code> for its random upload target;
-<code>nodelifecycletests.sh</code> does require a script host, a network node and
-two further victims, all distinct; and <code>AdminResourcesEndpoint</code>
-(<code>shakenfist/external_api/admin.py:103</code>) is admin-only and returns
-<code>Scheduler.summarize_resources()</code>, which publishes <code>cpu_hard_max</code>,
-<code>cpu_measured</code>, <code>cpu_committed</code> and the memory equivalents per node --
-so phase 1's probe needs no new server code.</p>
+<p>Six findings. Three contradict claims this phase inherited, and they
+are corrected at source in the planning commit -- in the master
+plan's phase 1 section and in phase 0's D3 and D5 -- so the next
+reader does not trip over them. Re-check those rather than redoing
+them.</p>
+<p><strong>1. Refusals are recorded on every schedule, not only on failures.</strong>
+The master plan says the scheduler's per-candidate audit payload
+"only reaches the log when a test fails and attaches it, so a green
+run tells you nothing". That is wrong.
+<code>Scheduler._log_and_raise_on_error()</code> (<code>shakenfist/scheduler.py:348-364</code>)
+writes an audit event at <em>every</em> stage, whether or not candidates
+survived: <code>schedule at stage {stage}</code> when they did, <code>schedule has
+no candidates at stage {stage}, aborting</code> when they did not, both
+carrying <code>extra['dropped']</code> as a map of node UUID to a reason dict.
+A passing run therefore records its refusals in full. This is the
+single fact that keeps the whole phase client-side; without it, D3's
+"a refusal in an otherwise-green job is itself a warning" would have
+needed a new server-side counter.</p>
+<p><strong>2. There are four capacity stages, and phase 0 named the wrong
+one as disk.</strong> The stage strings are bare literals at their call
+sites, with no enumeration anywhere in the tree. In order:
+<code>pre_schedule</code> (<code>:431</code>), <code>is_hypervisor</code> (<code>:440</code>),
+<code>cpu_max_per_instance</code> (<code>:454</code>), <code>sufficient_idle_cpu</code> (<code>:469</code>),
+<code>sufficient_idle_memory</code> (<code>:480</code>), <code>sufficient_free_disk</code> (<code>:491</code>),
+<code>queue_state</code> (<code>:590</code>), <code>sufficient_idle_disk</code> (<code>:600</code>).</p>
+<p>D3 and D5 name the refusal set as <code>sufficient_idle_cpu</code>,
+<code>sufficient_idle_memory</code> and <code>sufficient_idle_disk</code>, treating the
+last as "disk". It is not. <code>sufficient_idle_disk</code> wraps
+<code>_has_idle_disk_bandwidth()</code> (<code>:329</code>), a <em>rate</em> predicate on
+disk-busy delta against an inline threshold of 1200 -- which phase 0
+had already established in its inventory row, and then contradicted
+in its own decisions. The stage that means "the cluster ran out of
+disk" is <code>sufficient_free_disk</code>, and it appears nowhere in the plan.
+D10 below settles how the census handles this.</p>
+<p><strong>3. <code>summarize_resources()</code> cannot answer D7.</strong> The CPU filter
+compares against the capacity row's <code>limit_cpus</code>
+(<code>_has_sufficient_cpu</code>, <code>:187-253</code>); the endpoint publishes only the
+live derivation <code>cpu_hard_max</code> (<code>:765</code>) and a
+<code>cpu_committed_row_present</code> boolean (<code>:760</code>). Those are precisely
+the two figures D7 asks phase 2 to reconcile, and only one is
+available. The refusal events <em>do</em> carry both in the same reason
+dict, so the reconciliation is possible whenever a refusal happens
+-- but not on a quiet run. D12 closes this.</p>
+<p><strong>4. Three admission inputs are not published at all.</strong> The disk
+bandwidth stage's metric and threshold are absent, so its headroom
+cannot be reconstructed from the endpoint even in principle. The
+queue-length stage is likewise invisible, and worse:
+<code>summarize_resources()</code> silently <em>omits</em> nodes over
+<code>UNREASONABLE_QUEUE_LENGTH</code> from <code>per_node</code> (<code>:736-738</code>), alongside
+non-hypervisors and nodes whose metrics are older than 120s. A node
+absent from a sample has four possible meanings and the sample does
+not say which. The series must therefore record cluster membership
+separately, from <code>GET /nodes</code>, exactly as
+<code>cluster_ci_tests/test_nodes.py:49-85</code> already does.</p>
+<p><strong>5. The existing Loki bundle dump cannot serve as the refusal
+source.</strong> <code>actions/ansible/ci-gather-logs-loki.yml:81-92</code> already
+dumps Loki into every bundle, which looked at first like the census
+being free. It is not: the query is an unfiltered
+<code>{job="shakenfist"}</code> with <code>limit: 5000</code> and <code>direction=forward</code>
+over a 21600-second window (<code>:40-41</code>), so it returns the first 5000
+lines of the <em>deploy</em> and stops long before the tests run. The
+census needs its own query, filtered to the scheduler events, where
+5000 lines is a generous budget rather than an immediate truncation.</p>
+<p><strong>6. Prior art exists for every piece, and the survey found no
+existing sampling to reconcile with.</strong> <code>tools/ci_wait_schedulable.py</code>
+is the working <code>get_cluster_resources()</code> client and establishes the
+credential and invocation pattern; <code>tools/queue-wait-report.py</code> is a
+log-stream summariser with a <code>percentile()</code> helper at <code>:289</code> and a
+docstring explaining that <code>eventlog.add_event_multi</code> echoes every
+event to the log stream (gated by <code>LOG_EVENTS_TO_LOKI</code>, default
+<code>True</code>); <code>tests/test_ci_claims_headroom.py</code> is the pattern for
+unit-testing CI tooling by loading it by path; and
+<code>cluster_ci_tests/test_scheduler.py:19-34</code> already reads scheduler
+stage events back and filters them by message prefix. Nothing in CI
+samples resources today -- this is greenfield.</p>
 <h2 id="decision-items">Decision items<a class="headerlink" href="#decision-items" title="Permanent link">&para;</a></h2>
-<h3 id="d1-widen-the-nodes-keep-the-production-reservation-open-question-1">D1 -- Widen the nodes; keep the production reservation (open question 1)<a class="headerlink" href="#d1-widen-the-nodes-keep-the-production-reservation-open-question-1" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> CI nodes gain vCPUs. <code>NODE_CPU_RESERVATION_THREADS</code> and
-the <code>examples/_shared/site.yml</code> derivation stay at their production
-defaults in CI.</p>
-<p><strong>Reasoning:</strong> the reservation arithmetic on small nodes is not
-incidental to our defects, it <em>is</em> one of them -- #3813 was
-unsatisfiable precisely at <code>cpu_schedulable &lt; 4</code>, which is the value
-every CI hypervisor publishes. A CI fleet that no longer produces small
-<code>cpu_schedulable</code> values would not have caught it. Survey finding 2
-also shows the override is not free. Widening costs under-cloud vCPU,
-which is the resource we have (88 of 234 free at measurement) rather
-than the one we do not (RAM).</p>
-<p><strong>The counter-argument, for the record:</strong> a reviewer could reasonably
-say that CI's job is to test the software, not the deployment sizing,
-and that buying ledger with a config override is cheaper than buying it
-with vCPUs. The answer is that the reservation <em>is</em> software here --
-it is an input to an admission decision that has already been wrong
-once -- and that keeping one fleet where <code>cpu_schedulable</code> is small is
-worth more than the vCPUs it costs.</p>
-<h3 id="d2-slim-tier-is-database-tier-coverage-sized-for-parity-open-question-2">D2 -- <code>slim-tier</code> is database-tier coverage, sized for parity (open question 2)<a class="headerlink" href="#d2-slim-tier-is-database-tier-coverage-sized-for-parity-open-question-2" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> <code>slim-tier</code> exists to exercise a multi-instance
-<code>sf-database</code> tier. It is sized for a ledger comparable to the other
-cluster topologies, and it stops being the fleet's scarcity topology.</p>
-<p><strong>Reasoning:</strong> at 19% it is not delivering the coverage it was built
-for. <code>test_database_tier</code> skips when it sees fewer than two database
-nodes, so the assertion it exists to make is only reached on a run that
-gets that far -- and four runs in five do not. A job that usually fails
-also stops being read, which is a slower and worse failure than a job
-that is honestly deleted.</p>
-<h3 id="d3-the-headroom-bands-form-now-its-numbers-in-phase-2-open-question-3">D3 -- The headroom band's <em>form</em> now, its numbers in phase 2 (open question 3)<a class="headerlink" href="#d3-the-headroom-bands-form-now-its-numbers-in-phase-2-open-question-3" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> the band is expressed over a whole job as:</p>
-<ul>
-<li><code>p90(committed vCPU cluster-wide) / ledger</code> -- warn above an upper
-  bound (oversubscribed, 507 risk) and below a lower bound (oversized).</li>
-<li>any capacity-stage refusal observed during a job that otherwise
-  passes is itself a warning, independent of the ratio. There are
-  four such stages, not three: <code>sufficient_idle_cpu</code>,
-  <code>sufficient_idle_memory</code>, <code>sufficient_free_disk</code> (disk <em>space</em>)
-  and <code>sufficient_idle_disk</code> (disk <em>bandwidth</em>). This clause
-  originally named three, using the bandwidth stage where it meant
-  disk capacity; the phase 1 survey corrected it.</li>
-</ul>
-<p>Provisional bounds are 0.70 and 0.35. Phase 2 replaces them with
-numbers derived from the measured distribution, or keeps them and says
-why.</p>
-<p><strong>Reasoning:</strong> committing to the <em>form</em> now is what lets phase 1 build
-the summary; committing to the <em>numbers</em> now would be inventing them.
-The second clause matters more than the first: a refusal is a
-point-in-time fact that a p90 can hide entirely.</p>
-<h3 id="d4-node-lifecycle-keeps-five-hypervisors-the-ip-list-goes-anyway-open-question-4">D4 -- Node lifecycle keeps five hypervisors; the IP list goes anyway (open question 4)<a class="headerlink" href="#d4-node-lifecycle-keeps-five-hypervisors-the-ip-list-goes-anyway-open-question-4" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> the <code>Node lifecycle</code> job keeps its current node count
-through this plan. Independently of that, the hardcoded
-<code>10.0.0.20</code>-<code>10.0.0.24</code> upload-target list in <code>functional-tests.yml</code> is
-replaced with a pick derived from the API, in phase 4.</p>
-<p><strong>Reasoning:</strong> the lifecycle test needs a script host, a network node
-and two distinct victims, and it kills two of them; it is the one job
-where node count is load-bearing for the test rather than for capacity.
-It is also the healthiest job in the fleet at 92%, so there is nothing
-to buy. The IP list is a separate matter: it is a coupling between a
-workflow file and a topology file that will break silently the moment
-any topology changes, which is exactly what phase 4 does.</p>
-<h3 id="d5-memory-is-a-real-second-constraint-open-question-5-corrected">D5 -- Memory is a real second constraint (open question 5, corrected)<a class="headerlink" href="#d5-memory-is-a-real-second-constraint-open-question-5-corrected" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> treat memory as a genuine binding dimension, not an
-artefact. No topology's per-node RAM is reduced below the measured p90
-plus a margin phase 2 sets, and phase 1's probe records memory headroom
-alongside CPU. Phase 2 must also measure capacity refusals per stage --
-cpu, memory, disk space and disk bandwidth counted separately, not as
-one combined number -- since a reshape that relaxes one stage can
-tighten another. The phase 1 survey corrected this item too: it
-originally said "cpu, memory and disk", which collapses the two
-distinct disk stages, only one of which is a capacity check at all.</p>
-<p><strong>Reasoning:</strong> survey finding 1 removes the reason to disbelieve the
-one observed <code>sufficient_idle_memory</code> refusal. The measured peak usage
-(4.9-7.6 GB of 12 GB on <code>slim-primary</code>, 7.5-10.2 GB on the tier) says
-there is <em>some</em> room, but it also says a three-hypervisor topology uses
-most of a 12 GB node -- so the RAM saving comes from having fewer nodes,
-not from making each node smaller.</p>
-<h3 id="d6-the-sf-absent-phantom-stays-and-every-phase-says-so-open-question-6">D6 -- The <code>sf-absent</code> phantom stays, and every phase says so (open question 6)<a class="headerlink" href="#d6-the-sf-absent-phantom-stays-and-every-phase-says-so-open-question-6" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> <code>slim-primary</code> keeps its unreachable <code>sf-absent</code>
-hypervisor. Every phase plan that touches a topology file restates this
-in its own scope section rather than relying on the comment in the
-topology file.</p>
-<p><strong>Reasoning:</strong> it is the regression guard for the 2026-07-20 deploy
-where one dead hypervisor aborted the deploy on every healthy node. A
-node that exists only to be absent is exactly the kind of thing a
-reshaping pass deletes as an oversight, and the comment in the file has
-already had to say "DO NOT FIX THIS" in capitals once.</p>
-<h3 id="d7-the-12-versus-10-ledger-discrepancy-is-phase-2s-to-resolve-survey">D7 -- The 12-versus-10 ledger discrepancy is phase 2's to resolve (survey)<a class="headerlink" href="#d7-the-12-versus-10-ledger-discrepancy-is-phase-2s-to-resolve-survey" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> phase 2 reconciles the live derivation in
-<code>Scheduler._has_sufficient_cpu</code> against the reconciled
-<code>cluster_capacity.total_cpus</code> for the same cluster, and reports which
-is right. Until it does, this plan quotes both and asserts neither.</p>
-<p><strong>Reasoning:</strong> a sizing decision made against the wrong ledger is wrong
-by construction, and the two figures disagree by an amount no candidate
-explanation produces. #3882 (the reconciler does not log the drift it
-corrects) is why this cannot be settled from logs after the fact, and
-is a reason to do it while a cluster is live.</p>
-<h3 id="d8-3696-is-a-beneficiary-not-a-deliverable-survey">D8 -- #3696 is a beneficiary, not a deliverable (survey)<a class="headerlink" href="#d8-3696-is-a-beneficiary-not-a-deliverable-survey" title="Permanent link">&para;</a></h3>
-<p><strong>Decision:</strong> the under-cloud saturation issue -- self-hosted runners
-losing communication mid-test when concurrent merge groups saturate the
-under-cloud -- is named in this plan as something the RAM reduction
-should help, and is not scoped as work here.</p>
-<p><strong>Reasoning:</strong> a merge run allocating ~95% of the under-cloud's
-physical memory is a plausible contributor, and a plan that quietly
-claimed to fix it would take credit for a correlation. Phase 2's
-measurement is the place to say whether the reduction moved it.</p>
-<h2 id="the-scarcity-inventory">The scarcity inventory<a class="headerlink" href="#the-scarcity-inventory" title="Permanent link">&para;</a></h2>
-<p>The deliverable phase 3 is built from. Each signature is what a small
-cloud produces today, and what happens to that coverage when the cloud
-grows.</p>
-<table>
-<thead>
-<tr>
-<th>Signature</th>
-<th>Issues</th>
-<th>Disposition</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Instance create refused <code>507 sufficient_idle_cpu</code> under suite concurrency</td>
-<td>#3772 (umbrella, open); #3498, #3602, #3670, #3728, #3749, #3767 (closed members)</td>
-<td><strong>Behaviour to assert.</strong> Phase 3 fills a cluster deliberately and asserts what the server does today. #3772 stays open: its own verdict is that a bare 507 is the wrong answer to a transient condition, and that is unchanged by a bigger cloud.</td>
-</tr>
-<tr>
-<td>Instance create refused <code>507 sufficient_idle_disk</code>, a rate predicate rather than a ledger</td>
-<td>#3772 (umbrella, open)</td>
-<td><strong>Behaviour to assert; sizing does not address it.</strong> <code>_has_idle_disk_bandwidth()</code> (<code>shakenfist/scheduler.py:329</code>) checks disk-busy rate against a metric unrelated to <code>cpu_schedulable</code> or memory. A 2026-08-21 comment on #3772 records an occurrence at exactly this stage on the single-node smoke topology, under a <code>pull_request</code> event, with the node hosting only two instances and every other capacity stage passing -- a cluster nowhere near full. Widening vCPUs does nothing for it. Phase 3's saturation test must cover this stage directly rather than assume the CPU-stage test also exercises it.</td>
-</tr>
-<tr>
-<td>Claim growth refused because the concurrent suite holds the cluster</td>
-<td>#3907 (closed)</td>
-<td><strong>Test bug, already fixed</strong>, by routing success-asserted claim requests through a transient-tolerant retry. Phase 3 keeps a test that exercises the refusal path directly, so the retry cannot mask a genuine regression in claim admission.</td>
-</tr>
-<tr>
-<td>Soft affinity loses to resource filters; instances that should share a node do not</td>
-<td>#3565 (open)</td>
-<td><strong>Defect to fix</strong>, not here. This is the most frequent <code>slim-primary</code> failure in the sampled window. A 2026-08-26 comment on the issue traces the most recent occurrence to <code>sufficient_idle_memory</code>, not <code>sufficient_idle_cpu</code> -- the candidate shapes consolidate onto fewer, larger hypervisors, which raises instances per node, so growing the cloud may relax the CPU filter while tightening the memory one instead of making the test uniformly greener. Fixing the scheduler is still not this plan's job. Phase 3 gives it a deterministic reproduction (fill the affinity target, then place) so it stops depending on ambient load.</td>
-</tr>
-<tr>
-<td>Targeted create silently lands on a different node</td>
-<td>#3496 (open)</td>
-<td><strong>Defect to fix</strong>, not here. Related but distinct: <code>force_placement</code> tests cannot fall back to a less loaded node, so they fail first under scarcity. Record the interaction; phase 3 asserts the documented behaviour of a targeted create against a full node. Deliberately <strong>not</strong> given a heads-up comment, unlike #3565 and #3772: this issue's recorded occurrence is a wrong-node placement with no refusal and no stage trace at all, and the one capacity mode it names it hands off to #3772, so a note predicting that it will reproduce less often would assert a connection its own evidence does not carry.</td>
-</tr>
-<tr>
-<td>Demand guard refuses every placement below four schedulable threads</td>
-<td>#3813 (closed)</td>
-<td><strong>Fixed, and the reason for D1.</strong> No further coverage needed beyond keeping a fleet where <code>cpu_schedulable</code> is small, which D1 does.</td>
-</tr>
-<tr>
-<td>Runners lose communication when concurrent merge groups saturate the under-cloud</td>
-<td>#3696, #3718 (open)</td>
-<td><strong>Out of scope</strong> per D8; the family has two observed shapes -- a runner dying mid-test, and a nested node never booting far enough to answer SSH. Named so that a later reduction in footprint can be checked against it. In the same window as the two dead runners, three other attempts by the same PR failed with <code>507 sufficient_idle_cpu</code> (citing #3498 and #3670), which suggests the under-cloud shortage and the inner-cloud 507s are the same shortage observed at two levels -- a reading the issue itself calls "well supported by the surrounding evidence" rather than proven.</td>
-</tr>
-</tbody>
-</table>
-<p>The sweep also turned up hits that are not scarcity signatures, and
-are deliberately not rows above. #3516 (sf-sidechannel orphans agent
-operations in <code>executing</code>) is a stuck-state defect with no capacity
-trigger. #3770 (the Guests suite stalling because
-<code>_await_agent_state</code>'s deadline is renewed by any event, not only the
-one it is actually waiting for) is a logic bug in the wait itself, not
-a resource refusal. #3720 (<code>ImageMissingFromCache</code> on a redirected
-start) is a cache-consistency defect independent of cluster size.</p>
-<h1 id="3652-and-3669-are-deterministic-ci-test-bugs-that-fail-regardless-of">3652 and #3669 are deterministic CI test bugs that fail regardless of<a class="headerlink" href="#3652-and-3669-are-deterministic-ci-test-bugs-that-fail-regardless-of" title="Permanent link">&para;</a></h1>
-<p>how much capacity is available. All five matched the search only
-because the searched words appear somewhere in their text, not because
-they describe scarcity.</p>
-<p>One further trap is worth recording here. #3602 (closed) and #3603
-(open) are the same test, <code>test_disappearing_source_instance</code>, with
-two entirely different causes: #3602 is the <code>507</code> scarcity failure
-already counted as a member of the #3772 umbrella above, while #3603
-is a genuine defect where an instance built from a cached image whose
-source URL has since gone missing enters an error state. #3603 is not
-a scarcity signature and does not belong in this table. Matching by
-test name rather than by cause would conflate the two.</p>
-<p>Two properties of this table are the point of it:</p>
-<ul>
-<li>Nothing in it is closed by growing a cloud. Two entries are defects
-  that a bigger cloud makes <em>less visible</em>, which is the failure mode
-  the user asked to avoid.</li>
-<li>Every entry that is "behaviour to assert" names a test phase 3 owes,
-  and phase 4 is gated on those tests existing.</li>
-</ul>
+<h3 id="d9-two-instruments-not-one">D9 -- Two instruments, not one<a class="headerlink" href="#d9-two-instruments-not-one" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> the headroom series and the refusal census are separate
+mechanisms with separate sources, built and reported separately.</p>
+<p><strong>Reasoning:</strong> they cannot substitute for each other and it is
+tempting to pretend otherwise. A 15-second poll cannot see a refusal,
+which is a point-in-time event that begins and ends between samples;
+this is exactly why D3 made "any refusal at all" a warning
+independent of the ratio. Conversely the census cannot see a cloud
+sitting half-empty for an hour, which is the oversizing case the
+whole plan exists to detect. Reporting one number derived from both
+would hide which of the two produced it.</p>
+<h3 id="d10-the-census-counts-every-stage-it-sees-and-the-plans-naming-is-fixed">D10 -- The census counts every stage it sees, and the plan's naming is fixed<a class="headerlink" href="#d10-the-census-counts-every-stage-it-sees-and-the-plans-naming-is-fixed" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> the census tallies whatever stage strings appear in the
+events, reporting all of them, with the four capacity stages
+(<code>sufficient_idle_cpu</code>, <code>sufficient_idle_memory</code>,
+<code>sufficient_free_disk</code>, <code>sufficient_idle_disk</code>) called out
+explicitly. D3 and D5 are corrected at source to name four stages
+rather than three. The memory stage's three distinct reasons are
+reported separately, not summed.</p>
+<p><strong>Reasoning:</strong> the stage names are bare literals with no
+enumeration, so any hardcoded list in a parser is a copy that will
+drift silently the moment a stage is added or renamed -- and survey
+finding 2 shows the plan had <em>already</em> drifted before a line of code
+was written. Tallying by observed string costs nothing and cannot
+fall out of date. Splitting the memory reasons matters because one
+of the three is <code>no memory_max in node metrics</code>
+(<code>scheduler.py:277-284</code>), which is missing data, not a shortage; a
+census that counted it as a memory refusal would read a stale
+metrics row as evidence that the cloud is too small, which is the
+precise error this plan exists to avoid making.</p>
+<h3 id="d11-the-census-reads-loki-not-the-events-api">D11 -- The census reads Loki, not the events API<a class="headerlink" href="#d11-the-census-reads-loki-not-the-events-api" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> refusals are captured by a dedicated, filtered LogQL
+query against the cluster's Loki at the end of the run, not by
+enumerating instances over REST.</p>
+<p><strong>Reasoning:</strong> the REST events routes are per-object, take only
+<code>limit</code> and <code>event_type</code>, and have no time filter, so a cluster-wide
+"what happened between T1 and T2" is not expressible. Worse, both
+507 paths call <code>enqueue_delete_due_error()</code>
+(<code>external_api/instance.py:876</code>, <code>:945</code>), so the instances whose
+events matter most are not in the live instance list, and
+<code>hard_delete()</code> drops their events an hour later
+(<code>baseobject.py:702-706</code>, <code>CLEANER_DELAY</code> 3600s). Loki is
+time-ranged, cluster-wide, and already deployed in CI. The cost is
+that the census depends on the log-shipping path being healthy,
+which is recorded as a risk below.</p>
+<h3 id="d12-publish-the-capacity-rows-limit-from-summarize_resources">D12 -- Publish the capacity row's limit from <code>summarize_resources()</code><a class="headerlink" href="#d12-publish-the-capacity-rows-limit-from-summarize_resources" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> add the capacity row's <code>limit_cpus</code> to the per-node
+payload, beside the existing <code>cpu_hard_max</code>, and extend the two
+tests that pin that payload.</p>
+<p><strong>Reasoning:</strong> D7 instructs this phase to record both ledgers so
+phase 2 can reconcile them, and survey finding 3 shows only one is
+available. Deriving the second in the probe is not an option: a
+second independently-derived ledger beside the real one is how the
+two came to disagree in the first place, and the endpoint's own
+source comment says as much (<code>scheduler.py:707-712</code>). Reading it
+from refusal events works only when something is refused, which on
+a healthy run is never.</p>
+<p><strong>The counter-argument, for the record:</strong> this is a server-side
+change made for CI's benefit, and this phase's scope says the work
+is client-side. The answer is that the row's limit is what admission
+actually compares against, so an operator reading <code>/admin/resources</code>
+to understand a 507 needs it for the same reason phase 2 does;
+publishing only the derived twin of the real ledger, while
+admission uses the real one, is the gap that let a 12-versus-10
+discrepancy sit unexplained. It is three lines with existing tests
+to extend, and it is inherited scope rather than new ambition.</p>
+<h3 id="d13-the-poller-runs-on-the-primary-and-is-self-limiting">D13 -- The poller runs on the primary, and is self-limiting<a class="headerlink" href="#d13-the-poller-runs-on-the-primary-and-is-self-limiting" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> the poller runs as a background process on the cluster
+primary, writing to <code>/srv/ci/traces/</code>, with its own maximum duration
+derived from the job's <code>test_timeout_minutes</code> input.</p>
+<p><strong>Reasoning:</strong> every API call in CI today goes to
+<code>http://localhost:13000</code> over ssh, and <code>/etc/sf/sfrc</code> is already
+made world-readable on the primary by
+<code>build-smoke-cluster/action.yml:217-218</code>, so this needs no new
+secret anywhere. <code>/srv/ci/traces</code> is already created and chowned
+(<code>smoke-cluster.yml:182-187</code>) and already collected into the bundle
+(<code>:471-474</code>), so the artifact path costs nothing.</p>
+<p>Self-limiting is not optional: <code>smoke-cluster.yml:135</code> sets
+<code>cancel-in-progress: true</code>, and a cancelled job runs no further
+steps, so the stop step is not guaranteed to execute. Nothing tears
+the cluster down either -- the under-cloud reaper collects it later
+-- so a poller without its own cap would spin on a leaked VM.</p>
+<p><strong>Rejected alternative:</strong> poll from the runner against
+<code>http://${primary}:13000</code>, which the API does listen on. It is
+mechanically simpler -- an ordinary background process, no
+backgrounding across ssh -- but it requires copying the cluster's
+system key onto the runner, where today only the <em>under-cloud</em>
+credential lives (<code>functional-tests.yml:583-586</code>), and it diverges
+from every other API call in CI. The simplicity is not worth the
+new credential path.</p>
+<h3 id="d14-both-halves-of-the-format-contract-live-in-the-main-repository">D14 -- Both halves of the format contract live in the main repository<a class="headerlink" href="#d14-both-halves-of-the-format-contract-live-in-the-main-repository" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> the poller and the analyser both live in the main
+repository's <code>tools/</code>. <code>shakenfist/actions</code> gets a thin launcher
+carrying no logic, plus the workflow steps.</p>
+<p><strong>Reasoning:</strong> the poller writes a format and the analyser reads it,
+and a format contract split across two repositories can only be
+changed by coordinated merges. That would be tolerable if both sides
+were equally testable, and they are not: a pull request against
+<code>actions</code> cannot exercise its own composite-action change, because
+every consumer pins <code>@main</code> and only the post-merge canary runs the
+workflow. Keeping both halves in the main repository means the
+contract is covered by unit tests that run on an ordinary pull
+request, and shrinks the untestable surface to a launcher with no
+decisions in it.</p>
+<p><strong>The cost, for the record:</strong> <code>actions/tools/</code> is already copied
+wholesale to the primary (<code>build-smoke-cluster/action.yml:91-104</code>),
+so putting the poller there would need no delivery step at all,
+where this decision needs one. That is a real convenience being
+traded away for testability, and a reviewer could reasonably prefer
+the other side of it.</p>
+<h3 id="d15-nothing-in-this-phase-can-fail-a-build">D15 -- Nothing in this phase can fail a build<a class="headerlink" href="#d15-nothing-in-this-phase-can-fail-a-build" title="Permanent link">&para;</a></h3>
+<p><strong>Decision:</strong> every step added to a workflow is <code>continue-on-error</code>,
+and the analyser exits zero whatever it finds. The band is computed
+and printed, never enforced.</p>
+<p><strong>Reasoning:</strong> the point of the phase is to observe CI's failure
+surface, and an instrument that can itself fail the job changes the
+thing being measured. It would also be measured <em>during</em> the
+baseline window, so phase 2's distribution would contain failures
+caused by the measurement. Phase 5 owns turning the band into a
+guardrail, once phase 2 has said what the numbers should be.</p>
 <h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -13606,25 +13606,46 @@ test name rather than by cause would conflate the two.</p>
 </thead>
 <tbody>
 <tr>
-<td>0a</td>
+<td>1a</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Sweep the issue tracker for capacity-shaped CI failures beyond the six already in the inventory table above: search closed and open issues for <code>sufficient_idle_cpu</code>, <code>507</code>, <code>InsufficientResources</code>, and for the phrase "suite concurrency". For each hit not already in the table, decide whether it is the same signature as an existing row (add the number to that row) or a new one (add a row, with a disposition drawn from the three permitted values). Do not open or modify any issue in this step -- report candidates instead. Edit only <code>docs/plans/PLAN-ci-cloud-sizing-phase-00-decisions.md</code>.</td>
+<td>Publish the capacity row's limit from <code>Scheduler.summarize_resources()</code> in <code>shakenfist/scheduler.py</code> (the per-node block begins at <code>:744</code>). The row is already in hand: <code>_capacity_by_node()</code> is read once at <code>:713</code> and <code>cpu_committed</code>/<code>cpu_committed_row_present</code> are set from it at <code>:760-767</code>. Add <code>cpu_limit</code> from the row's <code>limit_cpus</code>, and set it to <code>None</code> when no row exists -- do <strong>not</strong> fall back to <code>cpu_hard_max</code>, because the whole point is to let a reader see the two disagree. Extend <code>test_summarize_resources_publishes_the_counters</code> (<code>shakenfist/tests/test_scheduler.py:749</code>) and <code>test_summarize_resources_reports_a_node_with_no_row</code> (<code>:763</code>) to pin both the present and absent cases; <code>mock_mariadb.set_node_capacity(node_uuid, limit_cpus=...)</code> (<code>shakenfist/tests/mock_mariadb.py:2733</code>) seeds a row, and no node has one by default. Update the endpoint's swagger example in <code>shakenfist/external_api/admin.py</code> (<code>admin_resources_get_example</code>, above <code>:103</code>) to match, or the API spec test will disagree with what the server sends. Document the new field in <code>docs/developer_guide/api_reference/</code> if <code>/admin/resources</code> has a page there.</td>
 </tr>
 <tr>
-<td>0b</td>
+<td>1b</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Write <code>tools/ci_headroom_probe.py</code> in the main repository: a background poller that appends one JSON object per sample to a file given on the command line. Model it closely on <code>tools/ci_wait_schedulable.py</code> -- same credential handling (<code>SHAKENFIST_NAMESPACE</code>, <code>SHAKENFIST_KEY</code>, <code>SHAKENFIST_API_URL</code> from a sourced <code>/etc/sf/sfrc</code>), same <code>shakenfist_client.apiclient.Client</code>, same run-under-the-SF-venv assumption; copy its docstring style, which explains <em>why</em> the tool exists. Each sample records: a wall-clock timestamp, the whole <code>/admin/resources</code> payload verbatim, and the node roster from <code>GET /nodes</code> (<code>client.get_nodes()</code>) reduced to uuid, fqdn and the three role booleans. Recording the roster every sample rather than once is deliberate -- survey finding 4 -- because a node vanishing from <code>per_node</code> has four possible meanings and only the roster distinguishes "not a hypervisor" from "went stale". Take <code>--interval</code> (default 15) and <code>--max-seconds</code> (required, no default) arguments; exit cleanly when the cap is reached, because a cancelled job never runs the stop step (D13). Never raise: a failed sample writes a record with an <code>error</code> key and the loop continues, since the probe must not be the reason a run has no data. Flush after every line so a killed poller still leaves a readable file. Single quotes, 120 columns, <code># Copyright 2019 Michael Still and contributors</code> header.</td>
+</tr>
+<tr>
+<td>1c</td>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>Post a comment on #3565 and on the #3772 umbrella recording that a CI topology change is coming which will reduce how often the issue reproduces, linking this phase plan, and stating the deterministic reproduction phase 3 owes it. Do not change state or labels. #3496 is deliberately excluded -- see its inventory row for why -- so a draft written for it should be discarded rather than posted. Judgement is needed on the wording: these must read as "this will get quieter, and that is not a fix", not as a status update. <strong>The management session reviews the exact text before anything is posted</strong> -- this writes to a public tracker.</td>
+<td>Write <code>tools/ci_headroom_report.py</code> in the main repository and its unit tests. It takes the JSONL series from 1b and the Loki census JSON from 1d and prints a summary; it must run on the <em>runner</em> under stock <code>python3</code> with no third-party imports, so keep it to the standard library. Compute, per job: p90 and peak of committed vCPU cluster-wide and per node, both absolute and as a fraction of ledger, the same for memory, and the D3 band verdict against the provisional bounds 0.35 and 0.70 (phase 0 D3 -- state them as provisional in the output, because phase 2 replaces them). Reuse the <code>percentile()</code> implementation from <code>tools/queue-wait-report.py:289</code> rather than writing a second one. Three things need judgement and are the reason this step is opus. First, ledger: use the per-node <code>cpu_limit</code> added in 1a where present and <code>cpu_hard_max</code> where not, and report how many samples fell back, since a run that is entirely fallback tells phase 2 something about D7. Second, node absence: a node in the roster but missing from <code>per_node</code> must be classified using the roster (non-hypervisor) and, where it cannot be, reported as unexplained rather than silently dropped -- an all-false <code>cpu_committed_row_present</code> across every node means no capacity counter was visible at all, not that the cluster was idle. The swallow is a layer below <code>_capacity_by_node()</code>, in <code>mariadb.get_scheduler_node_capacity()</code>, which returns empty for a table that is unreadable <em>and</em> for one the reconciler has never populated -- the two are indistinguishable from <code>/admin/resources</code>, so report the observation rather than asserting a read failure. Third, the census: tally by observed stage string, never a hardcoded list (D10), report the four capacity stages explicitly, and split the memory stage's three reasons so that <code>no memory_max in node metrics</code> is never counted as a shortage. Exit zero always (D15). Unit tests follow <code>shakenfist/tests/test_ci_claims_headroom.py</code>: load the tool by path with <code>importlib.util.spec_from_file_location</code> and drive it with fixture series covering an empty file, a truncated final line, a sample carrying <code>error</code>, a node absent from <code>per_node</code>, and a census with an unknown stage string.</td>
 </tr>
 <tr>
-<td>0c</td>
+<td>1d</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Wire it up in <code>shakenfist/actions</code>. Add <code>tools/ci_headroom_launch.sh</code> and <code>tools/ci_headroom_collect.sh</code> carrying no analysis logic, and two steps to <code>.github/workflows/smoke-cluster.yml</code>: start the poller between <code>Authorise the primary to reach other nodes over the mesh</code> (<code>:195</code>) and <code>Run functional tests</code> (<code>:237</code>); after <code>List slowest tests</code> (<code>:316</code>) and before <code>Check sf-api drain</code> (<code>:391</code>), stop it, run the Loki census, and print the report. Every added step is <code>if: always()</code> on the stop side and <code>continue-on-error: true</code> throughout (D15). The launcher scp's <code>${GITHUB_WORKSPACE}/shakenfist/tools/ci_headroom_probe.py</code> to the primary and starts it under <code>nohup</code> with <strong>all three</strong> file descriptors redirected -- without that the starting ssh hangs waiting for EOF -- passing <code>--max-seconds</code> derived from the workflow's <code>test_timeout_minutes</code> input, not a constant, since callers pass 45 through 70 (<code>functional-tests.yml:438-472</code>). The census is a <code>query_range</code> call filtered to <code>{job="shakenfist"} |~ "schedule (at stage|has no candidates at stage)"</code>. There is <strong>no <code>|= "Added event"</code> line filter</strong>, and adding one makes the census match nothing at all: <code>eventlog.add_event_multi</code> logs under that message, but pylogrus' <code>JsonFormatter</code> merges the caller's fields over the record last and one of those fields is <code>message</code>, so the shipped JSON's <code>message</code> is the <em>event's</em> message and the string <code>Added event</code> never appears in the line. <code>tools/queue-wait-report.py</code>'s docstring says this outright -- "grepping a log stream for <code>Added event</code> finds nothing" -- and <code>tools/ci_headroom_report.py</code> repeats it where it defines the two prefixes it matches on. (This brief carried that filter through review and into the merged <code>shakenfist/actions</code> script, where it would have produced an empty census on every run while the report printed "No schedule stage events at all". It is corrected here and in actions.) The filter must also be a <strong>regex over both message forms</strong>, not a substring: survey finding 1 records that the scheduler emits <code>schedule at stage {stage}</code> when candidates survived and <code>schedule has no candidates at stage {stage}, aborting</code> when the stage exhausted them, and the second does not contain the substring <code>schedule at stage</code>. A plain <code>|=</code> on that phrase captures refusals on healthy runs and silently drops every event behind a 507 -- precisely backwards. (This brief specified the substring filter until step 1d caught it.) Do not reuse the existing bundle dump, which is unfiltered with <code>limit: 5000</code> and <code>direction=forward</code> and never reaches the test window (survey finding 5). Loki is installed only on the primary in every topology (<code>build-smoke-cluster/action.yml:134-146</code>), and the census runs there, so <code>http://localhost:3100</code> is correct throughout -- exactly as <code>ci-gather-logs-loki.yml:36-37</code> already does and says. (This brief originally told you to resolve the address dynamically, on the strength of a note that <code>smoke_ci_tests/test_loki.py</code> is smoke-only; that constraint is about nodes other than the primary reaching Loki over the mesh, and does not apply here.) Write both outputs into <code>/srv/ci/traces/</code> on the primary so the existing <code>Gather logs</code> step collects them (<code>:471-474</code>); no new <code>upload-artifact</code> step is needed. Observe the repository's conventions: at most about five lines of inline shell in a workflow step, <code>shellcheck --severity=error</code> with no new findings at any level, a minimal <code>permissions:</code> block, and <code>tests/test_workflow_references.py</code>, which requires that any <code>tools/</code> script a workflow names exists in the same commit. Be aware that this change cannot be exercised by its own pull request and lands untested; write it to be inert on failure.</td>
+</tr>
+<tr>
+<td>1e</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Document the artifact. Add a section to <code>docs/developer_guide/ci.md</code> describing what the headroom series and refusal census are, where they land in the bundle, the JSONL record format as a contract phase 2 will parse, and the four capacity stage names with the warning that <code>sufficient_idle_disk</code> is disk <em>bandwidth</em> and <code>sufficient_free_disk</code> is disk <em>space</em>. The file currently says nothing about CI topologies at all, so keep this to the probe and do not attempt to document the topologies -- that is phase 6. Do not touch <code>AGENTS.md</code> or <code>ARCHITECTURE.md</code>: no convention and no component boundary changes here.</td>
+</tr>
+<tr>
+<td>1f</td>
 <td>low</td>
 <td>haiku</td>
 <td>none</td>
-<td>Set the phase 0 row to <code>Complete</code> in the master plan's Execution table and update the <code>docs/plans/index.md</code> arithmetic to <code>1 of 7</code>, then run <code>python3 tools/check-plan-status.py</code>. Do this only after 0a and 0b are reviewed.</td>
+<td>Set the phase 1 row to <code>Complete</code> in the master plan's Execution table and the index arithmetic in <code>docs/plans/index.md</code> to <code>2 of 7</code>, then run <code>python3 tools/check-plan-status.py</code>. Do this only after 1a-1e are reviewed and the operator has confirmed a real CI run produced a non-empty series and census.</td>
 </tr>
 </tbody>
 </table>
@@ -13633,67 +13654,105 @@ were made in the planning commit, per the note under <em>What the
 survey found</em>.</p>
 <h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>The inventory is incomplete, and phase 4 removes coverage nobody
-  wrote down.</strong> Step 0a sweeps the tracker, but the tracker only holds
-  what someone bothered to file. <em>Mitigation:</em> phase 1 lands before
-  phase 4 and counts refusals per run, so a signature that only ever
-  showed up as an unfiled flake still shows up as a number. The
-  management session checks that phase 2's refusal counts have no
-  signature the inventory lacks.</li>
-<li><strong>D1 is the decision most likely to be argued with.</strong> Buying ledger
-  with vCPUs when a config override would do is a real cost.
-  <em>Mitigation:</em> the reasoning is written above rather than implied, and
-  the survey finding that the override needs a generator change is
-  recorded so the trade can be re-opened with the true price on it.</li>
-<li><strong>Deciding the band's numbers in phase 2 could slip into never.</strong>
-  <em>Mitigation:</em> D3 fixes provisional bounds now, so phase 5 has
-  something to enforce even if phase 2's analysis is thinner than
-  hoped.</li>
-<li><strong>Commenting on issues is outward-facing.</strong> Step 0b writes to a
-  public tracker. <em>Mitigation:</em> the management session reviews the exact
-  comment text before it is posted, and the step is explicitly barred
-  from changing state or labels.</li>
+<li><strong>The <code>actions</code> half lands untested.</strong> A pull request against
+  <code>actions</code> cannot run its own composite-action change; only the
+  post-merge canary does, and it uses the single-node <code>localhost</code>
+  topology at <code>tier: smoke</code>. <em>Mitigation:</em> D15 makes every added
+  step <code>continue-on-error</code>, so the worst failure is a missing
+  artifact rather than a broken CI lane; step 1d is briefed to be
+  inert on failure; and 1f does not close the phase until the
+  operator confirms a real run produced data.</li>
+<li><strong>The probe perturbs what it measures.</strong> Each poll constructs a
+  <code>Scheduler</code>, whose <code>__init__</code> refreshes metrics unconditionally
+  (<code>scheduler.py:86-95</code>), costing one database read per active node
+  plus an uncached <code>_capacity_by_node()</code> -- roughly seven reads per
+  poll on <code>slim-primary</code>. Worse, <code>get_active_node_metrics()</code> writes
+  an audit event per poll for any active node with stale metrics
+  (<code>:63-79</code>), and <code>degraded</code> is an active state, so the probe emits
+  the most event load exactly when the cluster is unhealthy, which
+  is when the failures it exists to observe are happening.
+  <em>Mitigation:</em> 15 seconds is a starting point and step 1c reports
+  sample count, so phase 2 can see the cost it paid; the interval is
+  a single argument to change. The management session checks the
+  first real run's database load against the in-flight
+  database-load-reduction work before the window opens.</li>
+<li><strong>The census depends on log shipping.</strong> D11 puts refusal counting
+  on Loki, so a run whose log shipping is broken produces a series
+  with no census beside it. <em>Mitigation:</em> the two are reported
+  separately (D9) and the report says explicitly when the census is
+  absent rather than printing zero refusals, which would be the
+  dangerous reading.</li>
+<li><strong>A poller leaks on a cancelled job.</strong> <code>cancel-in-progress</code> means
+  the stop step may never run. <em>Mitigation:</em> D13's self-limiting cap,
+  and the under-cloud reaper collects the instance regardless.</li>
+<li><strong>Phase 2 is tempted to start before the instrument is trustworthy.</strong>
+  <em>Mitigation:</em> the definition of done requires a real run's output
+  to be inspected, not merely produced.</li>
 </ul>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <p>Falsifiable, in order:</p>
 <ol>
-<li><code>docs/plans/PLAN-ci-cloud-sizing.md</code> contains no statement that
-   contradicts the three survey findings above. Specifically: no
-   sentence asks whether page cache inflates <code>memory_available</code>; open
-   question 1 names <code>ci-make-inventory.py</code>; and the tier's ledger is
-   never given as a single unqualified number. <em>(Done in the planning
-   commit; re-check rather than redo.)</em></li>
-<li>Every open question 1-6 in the master plan carries a pointer to
-   the decision D1-D6 that settled it. <em>(Done in the planning
-   commit.)</em></li>
-<li>The inventory table has a row for every issue returned by a tracker
-   search for <code>sufficient_idle_cpu</code>, and each row's disposition is one
-   of the three permitted values.</li>
-<li>
-<h1 id="3565-and-3772-each-carry-a-comment-linking-this-phase-plan-and">3565 and #3772 each carry a comment linking this phase plan and<a class="headerlink" href="#3565-and-3772-each-carry-a-comment-linking-this-phase-plan-and" title="Permanent link">&para;</a></h1>
-   stating that a topology change will change their reproduction rate
-   without fixing them, and neither had its state or labels changed.
-   #3496 carries no such comment, and the reason is recorded in its
-   inventory row rather than left as an omission.</li>
-<li>No file outside <code>docs/plans/</code> is modified by this phase.</li>
+<li><code>/admin/resources</code> publishes a per-node <code>cpu_limit</code> reflecting the
+   capacity row, <code>None</code> when no row exists, and
+   <code>test_summarize_resources_publishes_the_counters</code> and
+   <code>test_summarize_resources_reports_a_node_with_no_row</code> both pin it.</li>
+<li><code>tools/ci_headroom_probe.py</code> and <code>tools/ci_headroom_report.py</code>
+   exist in the main repository, and the report tool runs under
+   stock <code>python3</code> with no third-party import.</li>
+<li>A unit test drives the report tool over a fixture series
+   containing an empty file, a truncated final line, a sample with
+   an <code>error</code> key, a node absent from <code>per_node</code>, and a census with
+   a stage string the tool has never seen; none of these raises, and
+   the unknown stage appears in the output.</li>
+<li>The report never counts <code>no memory_max in node metrics</code> as a
+   memory shortage, asserted by a test.</li>
+<li>No list of stage names in either new tool can suppress a stage
+   from the census tally. The four capacity stages <em>are</em> named, for
+   annotation and for classifying the D3 warning -- D10 requires
+   that -- so a grep for them is not the check. The check is that a
+   stage string the tool has never seen is still counted and still
+   printed, pinned by a test, and that adding a
+   <code>if stage not in &lt;the map&gt;: continue</code> filter to the tally makes
+   that test fail. <em>(This item originally demanded no hardcoded
+   stage names at all, which contradicted D10 and would have failed
+   a correct implementation; step 1c caught it.)</em></li>
+<li>A real CI run on both <code>slim-primary</code> and <code>slim-tier</code> produces a
+   non-empty series and a non-empty census in its bundle, and the
+   job log carries the summary. The operator confirms this; it
+   cannot be checked from a worktree.</li>
+<li>No statement in the master plan or in phase 0 still says a green
+   run records no refusals, and no statement in either names three
+   capacity stages or calls <code>sufficient_idle_disk</code> a disk-capacity
+   check. <em>(Done in the planning commit; re-check rather than redo.)</em></li>
+<li>No workflow step added by this phase can fail a job: every one is
+   <code>continue-on-error</code>, verified by reading the diff.</li>
 <li><code>python3 tools/check-plan-status.py</code> passes, and
-   <code>pre-commit run --all-files</code> passes.</li>
+   <code>pre-commit run --all-files</code> passes in the main repository.</li>
 </ol>
-<h2 id="what-phase-1-inherits">What phase 1 inherits<a class="headerlink" href="#what-phase-1-inherits" title="Permanent link">&para;</a></h2>
+<h2 id="what-phase-2-inherits">What phase 2 inherits<a class="headerlink" href="#what-phase-2-inherits" title="Permanent link">&para;</a></h2>
 <ul>
-<li>D3's band form, which is what phase 1's summary must compute:
-  <code>p90(committed vCPU) / ledger</code> per job, plus a refusal count.</li>
-<li>The confirmation that <code>/admin/resources</code> already publishes every
-  input phase 1 needs, so phase 1 is a workflow change in
-  <code>shakenfist/actions</code> and needs no server-side work.</li>
-<li>D7, which makes "compare the live derivation against
-  <code>cluster_capacity</code>" an explicit thing phase 1's series must make
-  possible -- the probe should record both, not just the live figure.</li>
+<li>A documented JSONL contract rather than a file to reverse-engineer.</li>
+<li>Both ledger figures per node, so D7's 12-versus-10 reconciliation
+  is a question the data can answer, together with a count of how
+  often the fallback was used.</li>
+<li>A refusal census that is honest about the four capacity stages,
+  which changes what phase 2 must look for: phase 0's D5 asked for
+  cpu, memory and disk counted separately, and the correct
+  breakdown is cpu, memory, disk space and disk bandwidth -- the
+  last of which sizing cannot address at all.</li>
+<li>An explicit statement, per sample, of which nodes were absent and
+  why, so that "the cluster had three hypervisors" is never inferred
+  from a sample that merely could not see the other two.</li>
+<li>The knowledge that the provisional band bounds of 0.35 and 0.70
+  have never been checked against a distribution, and that phase 2's
+  job is to replace them or defend them.</li>
 </ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the operator on
-the understanding of it, and in particular on the wording intended
-for step 0b before any comment is posted to a public issue.</p>
+the understanding of it, and in particular on D12 -- the one change
+here that touches the server rather than CI -- and on the step 1d
+wiring, which lands in <code>shakenfist/actions</code> where it cannot be
+tested before it merges and where only the operator can push.</p>
 
 
 
@@ -13714,7 +13773,7 @@ for step 0b before any comment is posted to a public issue.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-ci-cloud-sizing-phase-00-decisions.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-ci-cloud-sizing-phase-00-decisions.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-ci-cloud-sizing-phase-00-decisions/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

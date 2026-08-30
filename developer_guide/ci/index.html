@@ -13160,6 +13160,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ci-headroom-instrumentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI headroom instrumentation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI headroom instrumentation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-instruments-not-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two instruments, not one
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-the-output-lands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the output lands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-series-record-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The series record format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#four-capacity-stages-and-a-naming-trap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Four capacity stages, and a naming trap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nothing-here-is-a-quality-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nothing here is a quality gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#coverage-the-functional-suite-does-not-have" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13502,6 +13574,121 @@ because it checked this repository's install path and took the conductor's
 from another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.</p>
+<h2 id="ci-headroom-instrumentation">CI headroom instrumentation<a class="headerlink" href="#ci-headroom-instrumentation" title="Permanent link">&para;</a></h2>
+<p>Phase 1 of <code>docs/plans/PLAN-ci-cloud-sizing.md</code> (see
+<code>docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</code> for the
+decisions behind it) added two data-gathering instruments to every
+functional cluster job, so that later phases can size CI's clouds from
+a distribution instead of the handful of hand-collected numbers the
+plan started from. Neither instrument gates anything -- see "Nothing
+here is a quality gate" below -- so a reader troubleshooting a CI
+failure can skip this section; it matters when reading a job's bundle
+afterwards, or when working on the sizing plan itself.</p>
+<h3 id="two-instruments-not-one">Two instruments, not one<a class="headerlink" href="#two-instruments-not-one" title="Permanent link">&para;</a></h3>
+<p><strong>The headroom series</strong> is a poll. <code>tools/ci_headroom_probe.py</code> (in
+this repository) runs in the background on the cluster primary for the
+whole functional test step, sampling <code>GET /admin/resources</code> and the
+node roster (<code>GET /nodes</code>) every 15 seconds and appending one JSON
+record per sample to a JSONL file.</p>
+<p><strong>The refusal census</strong> is a scrape. After the tests finish,
+<code>tools/ci_headroom_collect.sh</code> (in <code>shakenfist/actions</code>) runs a
+filtered Loki query for every scheduler admission event the run
+produced. <code>Scheduler._log_and_raise_on_error()</code> logs one at <em>every</em>
+stage, whether or not candidates survived, so a green run's refusals
+are on the record too, not only a failing one's.</p>
+<p>The two are not substitutes for each other. A fifteen-second poll
+cannot see a refusal, which begins and ends between samples; a census
+cannot see a cloud sitting half empty for an hour, which is the
+oversizing case the whole plan exists to catch. Reporting one number
+derived from both would hide which of the two produced it, so they
+are built, collected and reported separately.</p>
+<h3 id="where-the-output-lands">Where the output lands<a class="headerlink" href="#where-the-output-lands" title="Permanent link">&para;</a></h3>
+<p>Both instruments write into <code>/srv/ci/traces/</code> on the cluster primary:
+<code>headroom.jsonl</code> (the series) and <code>headroom-census.json</code> (the raw
+Loki <code>query_range</code> response the census reads). Neither gets its own
+<code>upload-artifact</code> step -- the existing <code>Gather logs</code> step already
+scp's the whole of <code>/srv/ci/traces/</code> into the job's 90-day artifact
+bundle, so a reader looking at a bundle finds both files sitting
+beside the other logs, with no separate download to go and find.</p>
+<p><code>tools/ci_headroom_report.py</code> (also in this repository) turns the two
+into a printed summary at the end of the job log: p90 and peak
+committed vCPU and memory, cluster-wide and per node, both absolute
+and as a fraction of the admission ledger, plus the refusal census
+broken out by stage.</p>
+<h3 id="the-series-record-format">The series record format<a class="headerlink" href="#the-series-record-format" title="Permanent link">&para;</a></h3>
+<p>Phase 2 parses <code>headroom.jsonl</code> as a contract, so treat the shape
+below as load-bearing rather than as prose to paraphrase; the tool's
+own docstring is the source of truth if the two ever disagree. Each
+line is one JSON object. A successful sample carries:</p>
+<ul>
+<li><code>sampled_at</code> -- float, unix epoch seconds, wall clock at sample
+  start.</li>
+<li><code>resources</code> -- the verbatim <code>/admin/resources</code> payload
+  (<code>client.get_cluster_resources()</code>).</li>
+<li><code>nodes</code> -- the node roster at the time of the sample, reduced to
+  <code>uuid</code>, <code>fqdn</code>, <code>is_hypervisor</code>, <code>is_network_node</code> and
+  <code>is_database_node</code> for each entry.</li>
+</ul>
+<p>A failed sample carries only <code>sampled_at</code> and <code>error</code> (the exception
+text) -- <code>resources</code> and <code>nodes</code> are absent, not null. The probe never
+raises: a failure just writes an error record and the polling loop
+continues, so one bad sample never costs the run the rest of the
+series.</p>
+<p>The roster is recorded on <em>every</em> sample, not once at the start of the
+run, and that is deliberate. <code>summarize_resources()</code> silently omits
+from <code>per_node</code> any node that is not a hypervisor, whose metrics are
+older than 120 seconds, or whose queue is unreasonably long, and does
+not say which of those applied. A node missing from a given sample's
+<code>per_node</code> therefore has several possible explanations, and only a
+roster captured in that same sample can tell "not a hypervisor" apart
+from "metrics gone stale" or "the node did not exist yet" -- a roster
+fetched once at the top of the run cannot, because cluster membership
+itself can change mid-run.</p>
+<h3 id="four-capacity-stages-and-a-naming-trap">Four capacity stages, and a naming trap<a class="headerlink" href="#four-capacity-stages-and-a-naming-trap" title="Permanent link">&para;</a></h3>
+<p>The scheduler's admission checks that can refuse a candidate node for
+being full are <code>sufficient_idle_cpu</code>, <code>sufficient_idle_memory</code>,
+<code>sufficient_free_disk</code> and <code>sufficient_idle_disk</code>. The last two are
+easy to swap: <code>sufficient_free_disk</code> is disk <em>space</em>, but
+<code>sufficient_idle_disk</code> is disk <em>bandwidth</em> -- a rate predicate on
+disk-busy delta, not a capacity check at all, and not something that
+more or bigger disks in the same shape would fix. The cloud-sizing
+plan itself named the wrong one as "disk" before this phase's survey
+caught the mistake, which is why it is worth calling out here: read a
+<code>sufficient_idle_disk</code> row in a census as a disk I/O problem, never as
+evidence the cloud needs more disk capacity.</p>
+<h3 id="nothing-here-is-a-quality-gate">Nothing here is a quality gate<a class="headerlink" href="#nothing-here-is-a-quality-gate" title="Permanent link">&para;</a></h3>
+<p>Every workflow step this phase added is <code>continue-on-error</code>, and
+<code>ci_headroom_report.py</code> always exits 0 whatever it finds -- even an
+internal error in the report is printed, not raised. The band verdict
+it prints (committed vCPU as a fraction of the admission ledger,
+against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
+phase 0 set those bounds with no distribution to check them against,
+phase 2 replaces or defends them, and any enforcement is phase 5's to
+add. Nothing in CI today can fail because of this instrumentation.</p>
+<p>An absent census is not zero refusals. When the Loki query failed or
+log shipping was unhealthy, the report says so explicitly rather than
+printing "0 refusals", which would look exactly like a run that
+refused nothing. Read a bundle's <code>headroom-census.json</code> the same way
+by hand: missing or empty means "unknown", never "clean".</p>
+<p>A <em>short</em> census is not zero refusals either. The query carries an
+entry limit -- 5000, which is both Loki's default
+<code>max_entries_limit_per_query</code> and what <code>ci_headroom_collect.sh</code> asks
+for -- and Loki gives no signal when it cuts a response off at that
+limit. A response holding exactly the limit is indistinguishable from
+a complete one, and the scheduler emits an event per stage per
+schedule, so a run creating a few hundred instances can reach it. The
+report is told the limit via <code>--census-limit</code> and prints <code>CENSUS MAY
+BE TRUNCATED</code> when the count reaches it; every figure below that line
+is a lower bound.</p>
+<p>One trap is worth stating because it has already been fallen into. Do
+not add a <code>|= "Added event"</code> line filter to the census query. That is
+the message <code>eventlog.add_event_multi</code> logs under, but pylogrus'
+<code>JsonFormatter</code> merges the caller's fields over the record last and
+one of those fields is <code>message</code> -- so the shipped JSON's <code>message</code> is
+the <em>event's</em> message, and <code>Added event</code> never appears in the line at
+all. Such a filter matches nothing, and the empty census that results
+is reported honestly as "no schedule stage events at all", which reads
+like an idle cluster rather than a broken query.</p>
 <h2 id="coverage-the-functional-suite-does-not-have">Coverage the functional suite does not have<a class="headerlink" href="#coverage-the-functional-suite-does-not-have" title="Permanent link">&para;</a></h2>
 <h3 id="upgrade-data-verification">Upgrade data verification<a class="headerlink" href="#upgrade-data-verification" title="Permanent link">&para;</a></h3>
 <p>Every functional job deploys a fresh cluster, so nothing in the suite

@@ -13980,7 +13980,11 @@ sourced from these same counters rather than a separate walk,
 alongside <code>cpu_committed_row_present</code>: a node the reconciler has not
 yet sized reports <code>cpu_committed</code> as zero <em>and</em>
 <code>cpu_committed_row_present</code> as false, which distinguishes a genuinely
-idle node from one that is admitting unguarded.</p>
+idle node from one that is admitting unguarded. It also publishes the
+capacity row's own <code>limit_cpus</code> as <code>cpu_limit</code>, so a reader can compare
+it against the live-derived <code>cpu_hard_max</code> and see the two ledgers
+disagree; a node with no capacity row reports <code>cpu_limit</code> as <code>None</code>
+rather than falling back to <code>cpu_hard_max</code>.</p>
 <h2 id="namespace-capacity-claims">Namespace capacity claims<a class="headerlink" href="#namespace-capacity-claims" title="Permanent link">&para;</a></h2>
 <p>A <strong>capacity claim</strong> is a namespace's reservation of aggregate cluster
 capacity: so many vCPUs, so much instance memory and so much instance
@@ -14367,8 +14371,8 @@ tells the whole story:</p>
 <code>cpu_schedulable</code>, <code>memory_reserved_mb</code>, <code>cpu_available</code> and RAM
 headroom using the same pre-filter arithmetic as the pipeline above.
 It also breaks the CPU decision out into <code>cpu_hard_max</code>,
-<code>cpu_measured</code> and <code>cpu_committed</code> -- see <a href="#admission-is-a-guarded-capacity-claim">Admission is a guarded
-capacity claim</a> for what
+<code>cpu_measured</code>, <code>cpu_committed</code> and <code>cpu_limit</code> -- see <a href="#admission-is-a-guarded-capacity-claim">Admission is a
+guarded capacity claim</a> for what
 <code>cpu_committed</code> and its <code>cpu_committed_row_present</code> companion actually
 mean.</p>
 <h2 id="mixed-version-clusters">Mixed-version clusters<a class="headerlink" href="#mixed-version-clusters" title="Permanent link">&para;</a></h2>
