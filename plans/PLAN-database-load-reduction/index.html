@@ -13822,12 +13822,12 @@ so the phase plans do not reopen them:</p>
 <tr>
 <td>7. Deployer-visible regression detection</td>
 <td><a href="../PLAN-database-load-reduction-phase-07-regression-detection/">PLAN-database-load-reduction-phase-07-regression-detection.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>8. Push audit</td>
 <td><a href="../PLAN-database-load-reduction-phase-08-push-audit/">PLAN-database-load-reduction-phase-08-push-audit.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -13986,7 +13986,21 @@ accumulated diff of every phase in this plan against
 <code>develop</code>, not the last phase's diff alone. Findings land as
 their own pull request, and the plan is not complete until
 each is resolved or declined in writing here. If the audit
-finds nothing, that is recorded in one sentence.</p>
+finds nothing, that is recorded in one sentence.
+<em>(Done, #3950. The audit did find things, and it graded and
+disposed of every one: the blocking findings were fixed on
+its own branch or routed to #3893, and the advisory
+remainder was filed as #3942, #3943 and #3944. No blocking
+finding is open. The automated review of the audit's own
+fixes then found two defects the audit had introduced -- an
+occupancy gauge that did not count the lazy-expiry read
+path, and a capacity trim whose expired sweep trimmed to
+<code>cap</code> rather than to target and so inverted its own
+amortisation -- the first of which the audit's own
+test-coverage finding had predicted and then not acted on.
+Both are fixed, with tests that fail against the pre-fix
+code. The disposition of every finding is in the phase 8
+plan.)</em></p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in the
@@ -14186,6 +14200,20 @@ the elected cluster daemon sleeps on its lock rather than in
 <code>idle()</code>, so it never calls <code>check_daemon_state()</code> and never
 notices an <code>sf-ctl stop</code>. Immaterial to load -- 0.5/s -- but
 a real shutdown-path gap.</p>
+<p>Phase 8's audit left three more open. <strong>#3942</strong>: <code>sf-queues</code>
+backs off only when its queue is empty, not when its worker
+pool is full. <strong>#3944</strong>: the phase 2 object cache extends
+the in-memory residency of <code>ssh_key</code> and <code>user_data</code>, which
+is a security property nobody chose when the cache was
+scoped. Both carry <code>automated-fix-attempted</code>, because each
+needs a design decision rather than a same-day patch.
+<strong>#3953</strong>: the cache's capacity trim sorts mixed TTL tiers
+by absolute expiry, so under sustained pressure it sheds the
+entire 30s mutable tier before touching a 300s immutable
+entry. The behaviour is documented in
+<code>docs/operator_guide/database.md</code>; changing the policy is
+the design decision the audit declined to make on its way
+out.</p>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>When this plan file lands, add it to <code>docs/plans/index.md</code>
 (<em>Master plans</em> table, one row for the whole plan) and
