@@ -136,4 +136,12 @@ class NodeBlobOp(BaseClusterOperation):
         try:
             b.ensure_local(wait_for_other_transfers=False)
         except BlobAlreadyBeingTransferred:
-            self.defer()
+            if not self.defer_with_backoff(reason='blob already being transferred'):
+                # Blob replication contention is benign, not an operation
+                # failure -- match the insufficient-space branch above and
+                # let this attempt lapse rather than erroring the op out.
+                b.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'cannot replicate blob, retry budget exhausted while blob '
+                    'already being transferred')
+                return

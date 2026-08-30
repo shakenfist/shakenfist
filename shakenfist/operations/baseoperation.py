@@ -571,7 +571,8 @@ class BaseClusterOperation(BaseOperation):
             EVENT_TYPE_STATUS, f'Execution deferred for {delay} seconds',
             extra={
                 'waiting_on': wo,
-                'defer_count': next_defer_count
+                'defer_count': next_defer_count,
+                'delay': delay
             })
         work_item = {
             'operation_type': self.object_type,

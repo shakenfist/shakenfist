@@ -138,6 +138,16 @@ class DeferWithBackoffTestCase(base.ShakenFistTestCase):
         self.assertTrue(op.defer_with_backoff(delays=(5, 10, 20, 40)))
         self.assertEqual(10, self.mock_enqueue.call_args.kwargs['delay'])
 
+    def test_defer_event_extra_carries_numeric_delay_matching_message(self):
+        op = self._make_op()
+        op.defer(delay=7.5)
+
+        args, kwargs = op.add_event.call_args
+        extra = kwargs['extra']
+        self.assertEqual(7.5, extra['delay'])
+        self.assertEqual(
+            f'Execution deferred for {extra["delay"]} seconds', args[1])
+
     def test_current_defer_count_starts_at_zero(self):
         # The dispatcher relies on this being a sensible default for
         # ops loaded outside the queue dispatch path.
