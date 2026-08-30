@@ -91,15 +91,23 @@ delay. That is the single most important correction this survey makes,
 and it inverts the phase: the title names a cause that no longer
 operates.
 
-### The one remaining 15.0 s defer has a known source
+### `defer()` still has a flat 15 s default, though nothing observed hit it
 
 `BaseClusterOperation.defer()` still declares `delay: float = 15.0`
 (`shakenfist/operations/baseoperation.py:552-555`). #3916 changed the
 call sites, not the default. Exactly one caller in the tree relies on
 that default: `shakenfist/operations/node_blob_op.py:139`, a bare
-`self.defer()` on the `BlobAlreadyBeingTransferred` path. That is
-consistent with one 15.0 s event in 42 hours on a blob-replication
-path, and it is the last flat-15 defer in the codebase.
+`self.defer()` on the `BlobAlreadyBeingTransferred` path. It is the
+last flat-15 defer in the codebase and step 10a removes it.
+
+**Corrected during step 10c.** This section originally attributed the
+window's single 15.0 s defer event to that call site. That was wrong.
+All 32 `Execution deferred for 15.0 seconds` events in the retained
+span come from `node_inst_netdesc_op` -- the ladder reaching its own
+`MAX_DEFER_DELAY` cap at `defer_count >= 8` -- and `node_blob_op` did
+not defer once in either measured window. The code finding stands and
+the fix is still right; the evidence for it does not, and no observed
+event came from that path.
 
 ### `wait_seconds` conflates three intervals and separates none of them
 
@@ -327,3 +335,212 @@ Two gates, both cheap to raise and expensive to unwind:
 * **After 10c, before 10d.** The finding decides whether this phase
   ends in an issue or in a "benign, and here is why". Agree which
   before the close-out is written.
+
+## Results
+
+Steps 10a to 10d are done. The phase is complete.
+
+It did not end where it started. The phase was re-scoped once at
+planning time -- off "the 15 second dependency wait", which #3916 had
+already fixed -- and then the measurement moved it again, because the
+question it re-scoped onto turned out to rest on a mislabelled window.
+Both moves are written up below rather than smoothed over.
+
+### What was built
+
+* **10a.** `BaseClusterOperation.defer()` now puts `delay` in the
+  defer event's `extra` alongside `waiting_on` and `defer_count`
+  (`shakenfist/operations/baseoperation.py`). The message string is
+  deliberately unchanged: 42 hours of retained history is matched by
+  that prose and this phase's whole method depends on it staying
+  matchable. A unit test asserts the field equals the number
+  interpolated into the message, so the two cannot drift.
+
+  The same step converted the tree's last bare `self.defer()` --
+  `shakenfist/operations/node_blob_op.py`, the
+  `BlobAlreadyBeingTransferred` path -- to
+  `defer_with_backoff(reason='blob already being transferred')`. That
+  was the only caller left relying on `defer()`'s `delay=15.0`
+  default. On budget exhaustion it emits an audit event and returns
+  rather than erroring the operation out, matching the
+  insufficient-space branch immediately above it in the same method:
+  blob replication contention is benign and the next scheduled
+  replication attempt will retry. Two tests cover the retry and the
+  exhaustion paths.
+
+* **10b.** `tools/operation-timeline.py` (1,371 lines), which
+  reconstructs a per-operation timeline from Loki and decomposes
+  `wait_seconds` into `(created -> first dequeue) + (summed defer
+  delay) + (residual)`. It joins the `Execution deferred` stream to
+  the `execution duration` stream on the operation uuid, which is not
+  a fixed field -- an event names its subject as a *top level key*
+  whose name is the operation type -- so the tool takes the single
+  top level key which is not one of the log record's own fields
+  rather than hardcoding a type and silently dropping the rest.
+
+  It reads the delay from `extra` where 10a's field is present and
+  falls back to parsing it out of the message where it is not, which
+  is not garnish: the entire retained history this phase measures
+  predates the field.
+
+  It pages `query_range` in chunks, subdivides and refetches any
+  chunk which comes back at exactly Loki's 5000 line ceiling, and
+  cross-checks every stream against `count_over_time` (a metric query,
+  not subject to the ceiling). It prints all of that, so an operator
+  does not have to remember to ask.
+
+  `shakenfist/tests/test_operation_timeline.py`, 26 tests, including
+  one that an empty window exits cleanly rather than raising.
+
+* **10c.** Both windows measured and written up as `## What step 10
+  measured` in `docs/plans/PLAN-queue-performance.md`.
+
+* Operator documentation for the new tool is in
+  `docs/operator_guide/networking/overview.md`, next to
+  `tools/queue-wait-report.py`, framed as what to reach for when the
+  "`wait_seconds` includes deliberate deferral" caveat stops being a
+  footnote and becomes the question.
+
+### What was measured
+
+Two `sfcbr` windows of 42 hours each -- step 9's own window, so the
+phase could confirm or refute step 9, and a trailing one in case the
+first aged out. They **overlap by 18 hours**, because 42 hours of new
+traffic did not exist yet, so they are a retention hedge and a
+consistency check and not two independent samples. The full numbers
+are in the master plan; the three findings are:
+
+* **The deep tail is queue sit on the background lanes, not
+  deferral.** Of the operations waiting 15 s or more, 92% in window A
+  and 91% in window B never deferred once. `node_blob_op` on
+  `background_high_io` is a saturated pool -- during the six worst
+  waits the same queue executed between 1.03x and 2.69x the wait's own
+  duration in its own work -- which is what step 7 concluded and this
+  window confirms directly.
+
+* **When an operation does defer, which interval holds the time
+  depends sharply on how far up the ladder it got.** At one deferral
+  the wait is 76% initial queue sit; from three deferrals up the
+  ladder itself is the majority and by seven it is 90%. Every deferred
+  operation over 15 s in either window is the same thing:
+  `node_inst_netdesc_op`, `user_waiting`, `waiting_on` an
+  `artifact_fetch_op`, at `defer_count` 7 or more. That is the
+  operation the ladder exists for and nothing there needs fixing.
+
+* **Redelivery is not exact in either direction, and it does not
+  matter.** 421 legs in window A came back *before* their requested
+  delay had elapsed, by up to 0.19 s, and the 1.6 s and 3.2 s rungs
+  are early at the median. That is why a residual can be negative --
+  122 operations in window A have one -- which is arithmetic, not a
+  join error. The residual is 20% of the deferred population's summed
+  wait in both windows with a p50 of 0.19 s, so nobody's latency is
+  explained by redelivery drift.
+
+### What was corrected
+
+Four things this phase found wrong, three of them its own.
+
+* **Step 9's unexplained 15-17 s population was pre-#3916 traffic,
+  and the claim is withdrawn.** Step 9 published its window as
+  2026-08-27T13:03Z to 2026-08-29T07:00Z. Sweeping the window
+  boundaries and re-running `tools/queue-wait-report.py` reproduces
+  every number it published at one and only one window, ten hours
+  earlier: the log records' `ts` is local time carrying a `Z` suffix,
+  and ten hours is this cluster's UTC offset. 10,108 of those 26,225
+  samples fall before the redeploy that brought #3916 in, and 493 of
+  the 823 first deferrals are pre-fix, where a first deferral lands in
+  the 15-17 s band by construction.
+
+  That reconstruction is confirmed independently by something which
+  does not depend on getting the boundaries right. The pre-#3916 code
+  passed no delay and took an `int` default, so it emitted `Execution
+  deferred for 15 seconds`; the ladder computes a float and emits
+  `15.0`. Counting the two forms separately over step 9's real window
+  gives 411 integer-form events against 1 float-form, and the integer
+  form falls to zero from 2026-08-28 onwards and stays there. 411
+  against step 9's "roughly 400".
+
+  The claim is corrected at source in the master plan's phase 10
+  narrative, not only recorded here.
+
+* **This plan's own survey attributed the window's single 15.0 s
+  defer to the wrong call site.** The survey said it came from
+  `node_blob_op.py`'s bare `self.defer()`. It did not. All 33
+  `Execution deferred for 15.0 seconds` events in the retained span
+  come from `node_inst_netdesc_op`, and are the back-off ladder
+  reaching its own `MAX_DEFER_DELAY` cap at `defer_count >= 8`;
+  `node_blob_op` did not defer once in either window. The code
+  finding stands and 10a's fix is still right -- a bare `defer()` is
+  a latent flat fifteen seconds whether or not anything took it --
+  but the evidence the survey offered for it was not evidence of it.
+  Corrected in place, in the survey section above and in the master
+  plan's method note.
+
+* **This plan's `created_at` formula was wrong.** The survey wrote
+  `created_at = execution event timestamp − wait_seconds`. The
+  execution event is emitted *after* `op.execute()` returns, so its
+  timestamp is the end of execution and not the start of it; the
+  formula is `event_ts - seconds - wait_seconds`. Dropping the
+  `seconds` term is a real error and not a rounding one -- on a
+  long-running operation it places creation *after* that operation's
+  own defer events and yields negative intervals. 10b found it while
+  building the tool, which is what the gate after 10b existed for.
+
+* **Step 10b's own preview looked like a flat contradiction of step
+  9 and was not one.** The preview found 97 of 105 operations waiting
+  >= 15 s had never deferred. Both accounts are true of disjoint
+  populations: step 9 was looking only at `user_waiting`, which is the
+  only lane on which anything defers at all -- 1,360 of 1,360 deferred
+  operations in window A are on it, because a dependency wait is what
+  defers -- and 10b was looking at the whole cluster, where the deep
+  tail is on the background lanes.
+
+Two method rules came out of this and are recorded in the master
+plan so the next measurement does not relearn them: take the window
+from Loki and never from the log records' own timestamps, and
+cross-check every fetch against `count_over_time`.
+
+### What is outstanding
+
+* **The `networknode`/`background` incident is undiagnosable with the
+  events we retain, and that is the phase's successor.** 12 `net_op`
+  operations created within one second at 2026-08-28T23:30:52Z,
+  executed 31 minutes later, serially, at intervals matching their own
+  execution times -- while the same `sf-net` dispatcher executed 85
+  other `networknode` operations during the span, 10 of them on the
+  `background` lane itself. So it is neither a saturated pool nor a
+  starved lane: the lane was served and these 12 items were not. Two
+  mechanisms fit and the retained events cannot tell them apart, so
+  the successor issue asks for the instruments rather than proposing a
+  fix -- `dequeued_at` on the execution event, which splits time in
+  the database queue from time inside the daemon after claiming, and
+  `deliveries`, which distinguishes a redelivery after a lost worker
+  from a first delivery. Both are cheap and neither should be added
+  before somebody wants to answer this question again, which is the
+  same sequencing argument decision 1 makes.
+
+  **Decision 5 held.** No change to dispatch, concurrency, pool
+  sizing or fairness was made or is proposed here. What the data says
+  about them goes in the issue with the evidence attached.
+
+  **The issue is drafted but not yet filed**, so this phase closes
+  with that one action outstanding. Anything citing "the successor
+  issue" above should be read as citing the draft until it has a
+  number.
+
+* **Step 7's exclusion of `networknode`/`background` should not be
+  cited as if it still held.** Step 7 excluded that lane on the
+  grounds that its waits were position in a burst rather than anything
+  structural. A 31 minute wait on a queue which was concurrently being
+  served is not that. The exclusion needs re-deriving before it is
+  leant on again; the numbers step 7 published are not withdrawn.
+
+* **A never-deferred wait still cannot be decomposed at all.** The
+  join's entire resolution comes from defer events, and 92% of the
+  deep tail emits none. The tail is therefore *classified* in this
+  phase, not measured. That is precisely the gap the two timestamps
+  above would close.
+
+Nothing else is outstanding. Every definition-of-done item is met and
+the phase is `Complete` in both the master plan and `index.md`; phase
+11 (#3884, the multi-column coalescing key) remains.
