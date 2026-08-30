@@ -13441,8 +13441,8 @@ monitor drives a purpose-built bare-metal guest, and the parsers run
 inside that guest where a malicious image cannot reach the host.</p>
 <p>This page covers the approaches considered, the design that was chosen,
 the guest's structure, its call table, and its memory map. See
-<a href="/components/instar/../ARCHITECTURE/">Architecture</a> for how it fits the rest of the tool,
-and <a href="../prototypes/">prototypes/</a> for the experiments that led here.</p>
+<a href="https://github.com/shakenfist/instar/blob/develop/ARCHITECTURE.md">Architecture</a> for how it fits the rest of the tool,
+and <a href="https://github.com/shakenfist/instar/tree/develop/prototypes">prototypes/</a> for the experiments that led here.</p>
 <h2 id="prototype-approaches">Prototype Approaches<a class="headerlink" href="#prototype-approaches" title="Permanent link">&para;</a></h2>
 <h2 id="approach-a-minimal-linux-guest">Approach A: Minimal Linux Guest<a class="headerlink" href="#approach-a-minimal-linux-guest" title="Permanent link">&para;</a></h2>
 <p>Use a tiny Linux distribution (like Alpine or a custom initramfs) running
@@ -13480,17 +13480,17 @@ Just enough code to handle virtio communication and format conversion.</p>
 - Must implement everything from scratch
 - No existing tooling</p>
 <p><strong>Progress:</strong>
-- <a href="../prototypes/helloworld/">helloworld</a> - Minimal KVM VMM with serial output
-- <a href="../prototypes/helloworld2/">helloworld2</a> - Uses vm-memory crate for safer memory
-- <a href="../prototypes/virtio-block/">virtio-block</a> - Virtio-block device emulation with file copy
-- <a href="../prototypes/virtio-block2/">virtio-block2</a> - Adds guest-protocol (protobuf) integration
-- <a href="../prototypes/virtio-block3/">virtio-block3</a> - Adds configurable sector sizes
-- <a href="../prototypes/virtio-block4/">virtio-block4</a> - Adds performance statistics tracking
-- <a href="../prototypes/virtio-block5/">virtio-block5</a> - Adds ioeventfd optimization
-- <a href="../prototypes/virtio-block6/">virtio-block6</a> - Adds sparse/dynamic output file support
-- <a href="../prototypes/pluggable/">pluggable</a> - Modular operations architecture
-- <a href="../prototypes/pluggable2/">pluggable2</a> - Separate binary loading for operations
-- <a href="../prototypes/info/">info</a> - Image format detection (qemu-img info equivalent)</p>
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/helloworld">helloworld</a> - Minimal KVM VMM with serial output
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/helloworld2">helloworld2</a> - Uses vm-memory crate for safer memory
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block">virtio-block</a> - Virtio-block device emulation with file copy
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block2">virtio-block2</a> - Adds guest-protocol (protobuf) integration
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block3">virtio-block3</a> - Adds configurable sector sizes
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block4">virtio-block4</a> - Adds performance statistics tracking
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block5">virtio-block5</a> - Adds ioeventfd optimization
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block6">virtio-block6</a> - Adds sparse/dynamic output file support
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/pluggable">pluggable</a> - Modular operations architecture
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/pluggable2">pluggable2</a> - Separate binary loading for operations
+- <a href="https://github.com/shakenfist/instar/tree/develop/prototypes/info">info</a> - Image format detection (qemu-img info equivalent)</p>
 <p><strong>Current Implementation:</strong>
 The <code>info</code> prototype has been promoted to the main implementation in <code>src/</code>. This
 provides a modular architecture with:

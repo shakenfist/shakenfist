@@ -13499,12 +13499,15 @@ YAML.</p>
   measured it: <code>claude -p --output-format json</code> reports <code>.modelUsage</code>
   keyed by the resolved model with its <code>contextWindow</code>, so the trailer
   can be derived per run and cannot go stale again. The same defect
-  exists in <code>.github/workflows/test-drift-fix.yml</code> and
-  <code>tools/address-comments-with-claude.sh</code>, which carry a <em>different</em>
-  stale name; phase 1 fixes all three behind one tested helper.</li>
-<li><code>tools/address-comments-with-claude.sh</code> had the same defect this
-  plan diagnosed, in the review-comment loop rather than the fuzz loop
-  (issue #510): it instructed Claude to stage, then reported an
+  existed in <code>.github/workflows/test-drift-fix.yml</code> and
+  <code>tools/address-comments-with-claude.sh</code>, which carried a <em>different</em>
+  stale name; phase 1 fixed all three behind one tested helper. The
+  addresser has since been retired outright — the workflow, the driver
+  script and its helpers were deleted — so everything this plan says
+  about it is history, and only the two workflows survive.</li>
+<li><code>tools/address-comments-with-claude.sh</code> (since retired) had the same
+  defect this plan diagnosed, in the review-comment loop rather than
+  the fuzz loop (issue #510): it instructed Claude to stage, then reported an
   unstaged fix as a skipped review item. <strong>Done</strong> — PR #511 merged as
   <code>7b1afe4</code>, reusing the stager in <code>--tracked-only</code> mode. It was not
   the one-line change it looked like: the loop's Claude-failed and
@@ -13523,6 +13526,7 @@ audit that ends every master plan.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -13530,14 +13534,21 @@ audit that ends every master plan.</p>
 <td>1. Derived trailers and an end-to-end proof</td>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">PLAN-fuzz-autofix-phase-01-closeout.md</a></td>
 <td>In progress</td>
+<td></td>
 </tr>
 <tr>
 <td>2. Push audit</td>
-<td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">PLAN-fuzz-autofix-phase-02-push-audit.md</a></td>
+<td><code>PLAN-fuzz-autofix-phase-02-push-audit.md</code> (not yet written)</td>
 <td>Not started</td>
+<td></td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column is the one <code>PLAN-TEMPLATE.md</code> requires of a plan
+carrying a push audit phase: phase 2 runs the audit over the union of
+the earlier phases' merge ranges, because <code>git diff develop...HEAD</code> is
+empty once they have landed. Both cells are empty because neither phase
+has merged.</p>
 <h3 id="2-push-audit">2. Push audit<a class="headerlink" href="#2-push-audit" title="Permanent link">&para;</a></h3>
 <p>This phase runs <code>PUSH-AUDIT.md</code> over this plan's accumulated
 diff against <code>develop</code> — every phase's work together, not phase 1's
@@ -13675,7 +13686,13 @@ A concurrency group ensures only one instance runs at a time.</p>
 <li><strong>Build:</strong> Run <code>make instar</code> to verify the fix compiles.</li>
 <li><strong>Run reproducer:</strong> Execute the fuzz target with the crash
    input. If the target no longer crashes (exit code 0), the
-   fix is verified.</li>
+   fix is verified. <strong>Not implemented</strong> -- the workflow reads
+   <code>.reproducer</code> into the prompt and into the pull request body
+   but never executes it, so verification is the build and the
+   core tests only. Tracked as issue #529, which records why it
+   is more than a missing line: the crash input is not in the
+   issue body, only in the <code>coverage-fuzz-logs</code> artifact of the
+   run named by <code>.ci_run</code>, and those expire after 90 days.</li>
 <li><strong>Run existing tests:</strong> Run <code>make test-container-core</code> to
    ensure the fix doesn't break existing functionality.</li>
 </ol>
@@ -13720,8 +13737,8 @@ attempts and their failure modes. Stop processing this issue.</p>
 <a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="s">## Verification</span>
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="s">- Reproducer no longer crashes after fix</span>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="s">- Existing tests pass (make test-container-core)</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="s">- Build succeeded (make instar)</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="s">- Core tests passed (make test-container-core)</span>
 <a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
 <a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="s">## Reproduction</span>
 <a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>

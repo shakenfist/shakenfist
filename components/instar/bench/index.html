@@ -14297,7 +14297,7 @@ perf-tracking job never has to reproduce the division and risk
 rounding drift against the value instar itself reports.</p>
 <h2 id="known-divergences-from-qemu-img-bench">Known divergences from <code>qemu-img bench</code><a class="headerlink" href="#known-divergences-from-qemu-img-bench" title="Permanent link">&para;</a></h2>
 <p>Each entry below is recorded in the <code>KNOWN_BENCH_DIVERGENCES</code>
-registry in <a href="../tests/test_bench.py"><code>tests/test_bench.py</code></a>, named
+registry in <a href="https://github.com/shakenfist/instar/blob/develop/tests/test_bench.py"><code>tests/test_bench.py</code></a>, named
 by its registry key, so a cross-validation mismatch that is <em>not</em>
 registered there is treated as a real regression.</p>
 <ul>
@@ -14440,15 +14440,15 @@ still prints before the guest-side gate fires):</p>
   invocation.</li>
 </ul>
 <p>For the request-schedule crate, see
-<a href="../src/crates/bench/"><code>src/crates/bench/</code></a>; the refcount-growth
+<a href="https://github.com/shakenfist/instar/tree/develop/src/crates/bench"><code>src/crates/bench/</code></a>; the refcount-growth
 planner now lives in the <code>growth</code> module of
-<a href="../src/crates/qcow2-write/"><code>src/crates/qcow2-write/</code></a>, which also
+<a href="https://github.com/shakenfist/instar/tree/develop/src/crates/qcow2-write"><code>src/crates/qcow2-write/</code></a>, which also
 provides the qcow2 <code>-w</code> allocate-on-write planner (executed through
-<a href="../src/crates/qcow2-write-exec/"><code>src/crates/qcow2-write-exec/</code></a>).
+<a href="https://github.com/shakenfist/instar/tree/develop/src/crates/qcow2-write-exec"><code>src/crates/qcow2-write-exec/</code></a>).
 For the guest operation, see
-<a href="../src/operations/bench/"><code>src/operations/bench/</code></a>. For the
+<a href="https://github.com/shakenfist/instar/tree/develop/src/operations/bench"><code>src/operations/bench/</code></a>. For the
 divergence registry, see <code>KNOWN_BENCH_DIVERGENCES</code> at the top of
-<a href="../tests/test_bench.py"><code>tests/test_bench.py</code></a>. See also
+<a href="https://github.com/shakenfist/instar/blob/develop/tests/test_bench.py"><code>tests/test_bench.py</code></a>. See also
 <a href="/components/instar/usage/">usage.md</a>. For the qcow2-write migration quirks, see
 <a href="/components/instar/quirks/">quirks.md</a>.</p>
 

@@ -10444,6 +10444,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#browser-shell-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Browser shell assets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Browser shell assets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-vendored-sfui-copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The vendored sfui copy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-page-overrides-sfui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the page overrides sfui
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ci-and-packaging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14003,6 +14042,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#browser-shell-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Browser shell assets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Browser shell assets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-vendored-sfui-copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The vendored sfui copy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-page-overrides-sfui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the page overrides sfui
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ci-and-packaging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14562,6 +14640,62 @@ IIFE. On ICE-failed or connection-state-failed events,
 button is revealed when all attempts are exhausted. Each attempt
 constructs a brand-new <code>RTCPeerConnection</code>; the backoff counter
 resets on a successful <code>Connected</code> transition.</p>
+<h2 id="browser-shell-assets">Browser shell assets<a class="headerlink" href="#browser-shell-assets" title="Permanent link">&para;</a></h2>
+<p><code>ryll/src/web/assets/</code> holds the shell that the browser
+fetches. Every file is <code>include_str!</code>-embedded by
+<code>assets.rs</code> and served by its own route in <code>server.rs</code>, behind
+the token middleware — there is no static directory on disk and
+no build step. <code>index.html</code> is the only one templated: the
+<code>{{TOKEN}}</code> placeholders are substituted per request so each
+subresource URL carries the launch token, and a subresource that
+did not go through the template would be fetched without one and
+answered with a 401.</p>
+<h3 id="the-vendored-sfui-copy">The vendored sfui copy<a class="headerlink" href="#the-vendored-sfui-copy" title="Permanent link">&para;</a></h3>
+<p><code>assets/sfui/</code> is a verbatim copy of
+<a href="https://github.com/shakenfist/sfui">sfui</a>, the Shaken Fist web
+UI design system, placed there by that repository's
+<code>tools/vendor.sh</code>. <strong>Never edit it in place.</strong> Change sfui,
+merge, and re-vendor; an in-place edit is silently discarded by
+the next sync. The <code>.sfui-commit</code> stamp <code>vendor.sh</code> leaves
+behind enrols this repository in the daily fleet-wide
+<code>sfui-vendor</code> audit, which fails if the copy is not verbatim at
+canonical HEAD.</p>
+<p><code>vendor.sh</code> copies a fixed file list and <code>--check</code> diffs all of
+it, so the whole distributable is in the tree — but only
+<code>tokens.css</code> and <code>sf.css</code> are embedded and routed. The Lit
+runtime, morphdom, the three components (a data table, a tab
+strip, a theme toggle) and the logo have nothing to render on a
+page that is one full-viewport <code>&lt;video&gt;</code> with four controls over
+it, and embedding them would put roughly 100KB into every ryll
+binary to serve nothing. Adding one back is an <code>include_str!</code>
+and a route.</p>
+<p><code>sf-theme.js</code> is vendored and deliberately not served. It exists
+to resolve an "auto" light/dark preference before first paint and
+to back a toggle component; this page pins <code>data-theme="dark"</code> in
+the markup instead, which costs no cookie, no toggle and no
+render-blocking script in front of the stream.</p>
+<h3 id="how-the-page-overrides-sfui">How the page overrides sfui<a class="headerlink" href="#how-the-page-overrides-sfui" title="Permanent link">&para;</a></h3>
+<p>All of sf.css lives in the <code>sfui</code> cascade layer, and unlayered
+rules beat layered ones whatever their specificity, so every rule
+in <code>style.css</code> wins over its sfui counterpart with no
+<code>!important</code> and no specificity contest. That is sfui's
+documented adoption mechanism, and <code>style.css</code> uses it for the
+two things a dashboard design system does not anticipate:</p>
+<ul>
+<li><strong>A page that bleeds to the edges.</strong> <code>.sf-page</code> pads itself by
+  <code>2rem</code>; <code>style.css</code> sets the documented <code>--sf-page-pad</code> knob to
+  <code>0</code> rather than overriding the padding directly.</li>
+<li><strong>Controls over arbitrary video.</strong> sfui primitives assume an
+  opaque page behind them. <code>.sf-btn</code> is transparent-filled and
+  <code>.sf-banner--error</code> tints at 15%, both of which vanish over a
+  guest desktop, so the buttons and the no-video panel restate a
+  backdrop mixed from the tokens.</li>
+</ul>
+<p>The trap in that mechanism is stranding a related property: the
+page fills <code>.sf-btn</code>, and <code>.sf-btn--primary:hover</code> is <em>also</em> a
+fill, so the reconnect button needs its own unlayered hover rule
+to get sfui's behaviour back. Check the primitive for related
+declarations before overriding one of them.</p>
 <h2 id="ci-and-packaging">CI and packaging<a class="headerlink" href="#ci-and-packaging" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>shakenfist-spice-renderer</code> and <code>shakenfist-spice-webrtc</code>

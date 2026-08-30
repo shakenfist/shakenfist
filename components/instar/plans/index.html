@@ -13409,7 +13409,7 @@ at the repo root).</p>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix/">Fuzz autofix workflow</a></td>
 <td>Workflow that triages fuzzer-discovered crashes and proposes minimal fixes; the staging fix that made it able to open a pull request is on <code>develop</code>, but no eligible issue has existed since, so the loop has still never run end to end</td>
 <td>In progress</td>
-<td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">1: trailer and end-to-end proof</a>, <a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">2: push audit</a></td>
+<td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">1: trailer and end-to-end proof</a>, 2: push audit (plan not yet written)</td>
 </tr>
 <tr>
 <td>2026-05-10</td>
@@ -13491,7 +13491,7 @@ at the repo root).</p>
 <tr>
 <td>2026-06-15</td>
 <td><a href="/components/instar/plans/PLAN-amend/"><code>instar amend</code> subcommand</a></td>
-<td>Implement the <code>amend</code> subcommand (qcow2-only, mirroring <code>qemu-img amend -o</code>). v1 scope is the two header-only options that change no cluster/refcount data: <code>compat=0.10\|1.1</code> (qcow2 v2⇔v3 version transition, with v3-only-feature downgrade blockers, refcount-width constraints, and header-extension relocation) and <code>lazy_refcounts=on\|off</code> (the v3 compatible-feature bit). Reuses the resize/rebase in-place-mutation idiom; new <code>src/crates/amend/</code> planner crate and <code>src/operations/amend/</code> guest op. Cross-version info-equivalence baselines, integration tests with post-op <code>info</code>/<code>check</code>/<code>compare</code>, coverage and differential fuzzing. <code>refcount_bits</code>, external data file, encryption, and backing-file amend deferred. Picks up the <code>qemu-img amend</code> sibling deferred from convert-followups.</td>
+<td>Implement the <code>amend</code> subcommand (qcow2-only, mirroring <code>qemu-img amend -o</code>). v1 scope is the two header-only options that change no cluster/refcount data: <code>compat=0.10</code> and <code>compat=1.1</code> (qcow2 v2⇔v3 version transition, with v3-only-feature downgrade blockers, refcount-width constraints, and header-extension relocation) and <code>lazy_refcounts=on</code> and <code>lazy_refcounts=off</code> (the v3 compatible-feature bit). Reuses the resize/rebase in-place-mutation idiom; new <code>src/crates/amend/</code> planner crate and <code>src/operations/amend/</code> guest op. Cross-version info-equivalence baselines, integration tests with post-op <code>info</code>/<code>check</code>/<code>compare</code>, coverage and differential fuzzing. <code>refcount_bits</code>, external data file, encryption, and backing-file amend deferred. Picks up the <code>qemu-img amend</code> sibling deferred from convert-followups.</td>
 <td>Complete</td>
 <td>1: ABI, 2: qcow2 planner, 3: guest, 4: host CLI, 5: rust tests, 6: integration tests, 7: baselines, 8: fuzz, 9: docs</td>
 </tr>

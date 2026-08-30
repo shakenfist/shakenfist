@@ -13500,7 +13500,9 @@ bitten this plan twice.</p>
 <li>Switching all three Claude automations to JSON output and the
   helper: <code>.github/workflows/fuzz-autofix.yml</code>,
   <code>.github/workflows/test-drift-fix.yml</code>, and
-  <code>tools/address-comments-with-claude.sh</code>.</li>
+  <code>tools/address-comments-with-claude.sh</code>. All three were converted;
+  the third has since been deleted along with the rest of the retired
+  comment addresser, so only the two workflows remain to check.</li>
 <li>Documentation for the helper in <code>docs/development.md</code>'s script
   index, and for the derived trailer in <code>docs/testing.md</code>.</li>
 <li>Dispatching <code>fuzz-autofix.yml</code> against issue #485 once the above is
@@ -13524,8 +13526,9 @@ bitten this plan twice.</p>
   reached that code, which this phase's step 7 will be the first to
   produce.</li>
 <li><code>Signed-off-by: Michael Still</code> hardcoded in
-  <code>tools/address-comments-with-claude.sh:818</code>. That one is correct —
-  the human owning the automation is the sign-off — and is not stale.</li>
+  <code>tools/address-comments-with-claude.sh:818</code>. That one was correct —
+  the human owning the automation is the sign-off — and was not stale.
+  Moot now that the file is gone.</li>
 </ul>
 <h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
 <p>Checked against the tree at <code>7b1afe4</code>.</p>
@@ -13876,10 +13879,10 @@ else in the master plan was found to be wrong.</p>
 </tr>
 <tr>
 <td>5</td>
-<td>high</td>
-<td>opus</td>
-<td>none</td>
-<td>Same change to <code>tools/address-comments-with-claude.sh</code>. Its invocation is at <code>:603</code>-<code>:609</code> and differs from the workflows: it uses <code>&gt; "${claude_output_file}" 2&gt;&amp;1</code> inside an <code>if !</code> so the exit status drives <code>item_error "Claude execution failed"</code>, and it runs once per review item with an <code>-${i}</code> suffix. Preserve the exit-status check exactly — a Claude that fails must still be an item-level error — and add per-item <code>claude-stream-${i}.jsonl</code> and <code>claude-stderr-${i}.txt</code>. This one is <em>not</em> piped through <code>tee</code> today and must not become so: the <code>if !</code> depends on <code>claude</code>'s own exit status, which a pipe would replace with <code>tee</code>'s. Redirect stdout straight to the stream file. The trailer is at <code>:819</code>-<code>:820</code>, inside a <code>printf</code> block that also emits <code>Signed-off-by: Michael Still</code>; keep the sign-off, replace only the two Claude lines. The helper lives in <code>${tools_dir}</code>, which is the trusted copy checked out from the base branch — resolve it as <code>${tools_dir}/ci/claude-result.sh</code> alongside the existing <code>stager</code>/<code>resetter</code>/<code>patterns</code> assignments at <code>:283</code>-<code>:285</code>, not relative to the work tree. Commit subject: <code>Name the model in the review-comment fixes.</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><strong>Done, and since obsoleted.</strong> It landed as <code>757b0bd</code> (<em>Name the model in the review-comment fixes.</em>), and the file it changed has since been deleted: the <code>@shakenfist-bot please address comments</code> automation was retired in the consistency-audit pull request, so nothing below is executable any more. Kept for the record. ~~Same change to <code>tools/address-comments-with-claude.sh</code>. Its invocation is at <code>:603</code>-<code>:609</code> and differs from the workflows: it uses <code>&gt; "${claude_output_file}" 2&gt;&amp;1</code> inside an <code>if !</code> so the exit status drives <code>item_error "Claude execution failed"</code>, and it runs once per review item with an <code>-${i}</code> suffix. Preserve the exit-status check exactly — a Claude that fails must still be an item-level error — and add per-item <code>claude-stream-${i}.jsonl</code> and <code>claude-stderr-${i}.txt</code>. This one is <em>not</em> piped through <code>tee</code> today and must not become so: the <code>if !</code> depends on <code>claude</code>'s own exit status, which a pipe would replace with <code>tee</code>'s. Redirect stdout straight to the stream file. The trailer is at <code>:819</code>-<code>:820</code>, inside a <code>printf</code> block that also emits <code>Signed-off-by: Michael Still</code>; keep the sign-off, replace only the two Claude lines. The helper lives in <code>${tools_dir}</code>, which is the trusted copy checked out from the base branch — resolve it as <code>${tools_dir}/ci/claude-result.sh</code> alongside the existing <code>stager</code>/<code>resetter</code>/<code>patterns</code> assignments at <code>:283</code>-<code>:285</code>, not relative to the work tree. Commit subject: <code>Name the model in the review-comment fixes.</code>~~</td>
 </tr>
 <tr>
 <td>6</td>
@@ -13944,9 +13947,11 @@ else in the master plan was found to be wrong.</p>
    <code>grep -c 'test-claude-result.sh' .github/workflows/functional-tests.yml</code>
    is at least 1.</li>
 <li><code>grep -c 'output-format text' .github/workflows/fuzz-autofix.yml
-   .github/workflows/test-drift-fix.yml
-   tools/address-comments-with-claude.sh</code> is 0 for all three, and each
-   of the three passes <code>--output-format stream-json --verbose</code>.</li>
+   .github/workflows/test-drift-fix.yml</code> is 0 for both, and both pass
+   <code>--output-format stream-json --verbose</code>. This read
+   <code>tools/address-comments-with-claude.sh</code> as a third site; it was
+   converted in <code>757b0bd</code> and the file has since been deleted with the
+   retired comment addresser.</li>
 <li><code>tools/ci/claude-result.sh --trailer</code> on a fixture result line
    whose <code>modelUsage</code> value has <code>canonicalModel</code> <code>claude-opus-5</code> and
    <code>contextWindow</code> 1000000 prints exactly

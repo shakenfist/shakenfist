@@ -13850,7 +13850,7 @@ in transcripts. Messages below are verbatim.</p>
 <p>In every case below instar is deliberately <strong>more conservative</strong> than
 <code>qemu-img</code> — it refuses an operation qemu accepts. Each is recorded in
 the <code>KNOWN_BITMAP_DIVERGENCES</code> registry in
-<a href="../tests/test_bitmap.py"><code>tests/test_bitmap.py</code></a> (and the differential
+<a href="https://github.com/shakenfist/instar/blob/develop/tests/test_bitmap.py"><code>tests/test_bitmap.py</code></a> (and the differential
 allowlist <code>KNOWN_BITMAP_DIFFERENTIAL_DIVERGENCES</code> in
 <code>scripts/differential-fuzz.py</code>), so a cross-validation mismatch that is
 <em>not</em> registered there is treated as a real regression.</p>
@@ -13970,10 +13970,10 @@ refusal message is:</p>
   <code>qemu-img info</code> is no longer required to inspect them.</li>
 </ul>
 <p>For the bitmap planner crate, see
-<a href="../src/crates/bitmap/"><code>src/crates/bitmap/</code></a>. For the guest
-operation, see <a href="../src/operations/bitmap/"><code>src/operations/bitmap/</code></a>.
+<a href="https://github.com/shakenfist/instar/tree/develop/src/crates/bitmap"><code>src/crates/bitmap/</code></a>. For the guest
+operation, see <a href="https://github.com/shakenfist/instar/tree/develop/src/operations/bitmap"><code>src/operations/bitmap/</code></a>.
 For the divergence whitelist, see <code>KNOWN_BITMAP_DIVERGENCES</code> at the top
-of <a href="../tests/test_bitmap.py"><code>tests/test_bitmap.py</code></a>.</p>
+of <a href="https://github.com/shakenfist/instar/blob/develop/tests/test_bitmap.py"><code>tests/test_bitmap.py</code></a>.</p>
 
 
 

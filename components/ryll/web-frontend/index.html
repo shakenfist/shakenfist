@@ -10016,6 +10016,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#appearance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appearance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reconnect-behaviour" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13747,6 +13758,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#appearance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appearance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reconnect-behaviour" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14222,6 +14244,21 @@ exchanges SDP via <code>POST /offer</code>, and starts streaming.</p>
   guest booted at, which looks soft.</li>
 <li>Ctrl-C cleanly stops the binary.</li>
 </ul>
+<h2 id="appearance">Appearance<a class="headerlink" href="#appearance" title="Permanent link">&para;</a></h2>
+<p>The browser shell is styled with
+<a href="https://github.com/shakenfist/sfui">sfui</a>, the Shaken Fist web
+UI design system, so its controls match the other Shaken Fist
+web interfaces. There is nothing to install or configure: the
+stylesheets are compiled into the <code>ryll</code> binary and served from
+the same token-gated endpoint as the rest of the shell.</p>
+<p>The page is always dark. sfui ships a light palette and a
+theme toggle, and this page deliberately uses neither — the
+area around a letterboxed guest is page background, and a
+light chrome around a video reads as a bug rather than as a
+preference. That background is sfui's near-black
+<code>--sf-bg</code> (<code>#0f1117</code>) rather than pure black; if you are
+comparing screenshots against an older build, that is the
+difference you are seeing.</p>
 <h2 id="reconnect-behaviour">Reconnect behaviour<a class="headerlink" href="#reconnect-behaviour" title="Permanent link">&para;</a></h2>
 <p><code>--web</code> mode is resilient to browser disconnects.</p>
 <h3 id="browser-tab-close-reopen">Browser tab close → reopen<a class="headerlink" href="#browser-tab-close-reopen" title="Permanent link">&para;</a></h3>
