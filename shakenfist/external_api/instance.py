@@ -1400,9 +1400,15 @@ def _validate_instance_metadata(key, value):
                 400, 'value for "affinity" key should be a valid JSON dictionary')
 
         for key_type, dv in value.items():
+            # int() raises TypeError -- not ValueError -- for a list, a dict or
+            # None, and OverflowError for infinity. json.loads() accepts the
+            # bare Infinity and NaN literals by default, so flask hands them
+            # straight through and a bare ValueError handler returns a 500 to
+            # the caller. NaN is already covered: int(float('nan')) is a
+            # ValueError.
             try:
                 int(dv)
-            except ValueError:
+            except (TypeError, ValueError, OverflowError):
                 return sf_api.error(400, 'affinity dictionary values should be integers')
 
 
