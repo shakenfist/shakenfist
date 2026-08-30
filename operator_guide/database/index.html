@@ -14925,8 +14925,10 @@ in memory, so repeatedly loading the same node, blob or instance does not hit
 <code>sf-database</code> every time. Mutable data (object state, metadata, attributes,
 IPAM, daemon states) is never cached. The cache invalidates itself when this
 process updates or deletes an object; a change made by another process is
-picked up when the entry's TTL expires.</p>
-<p>Two settings control it, both in seconds:</p>
+picked up when the entry's TTL expires. On a multi-gateway tier that means a
+delete routed to one gateway leaves the others serving the row to their own
+clients until the TTL runs out.</p>
+<p>Three settings control it:</p>
 <table>
 <thead>
 <tr>
@@ -14939,22 +14941,62 @@ picked up when the entry's TTL expires.</p>
 <tr>
 <td><code>OBJECT_CACHE_TTL_IMMUTABLE</code></td>
 <td>300</td>
-<td>instance, network, networkinterface, agentoperation (no post-creation writer)</td>
+<td>instance, network, networkinterface, agentoperation, ipam (static row changes only on create, delete or a version upgrade)</td>
 </tr>
 <tr>
 <td><code>OBJECT_CACHE_TTL_MUTABLE</code></td>
 <td>30</td>
 <td>node, blob, artifact, upload, dnsmasq, namespace (rewritten only by an online version upgrade)</td>
 </tr>
+<tr>
+<td><code>OBJECT_CACHE_MAX_ENTRIES</code></td>
+<td>20000</td>
+<td>how many entries a process retains, across both tiers</td>
+</tr>
 </tbody>
 </table>
-<p>Setting a value to <code>0</code> disables caching for that tier — a fast rollback to
+<p>The first two are in seconds. The third is a count, and it exists because a
+TTL bounds how <em>stale</em> an entry may be, not how many entries are kept: expiry
+only happens when that same object is looked up again, so an object read once
+and never read again would otherwise sit in memory for the life of the
+process. If you see <code>database_object_cache_capacity_evictions_total</code> climbing
+steadily, the working set no longer fits and the hit rate is suffering;
+<code>database_object_cache_entries</code> reports current occupancy.</p>
+<p>When the cap is reached the cache drops expired entries first and then, if
+that is not enough, live entries nearest to their expiry. Be aware of what
+that means with two TTL tiers in one pool: a 30 second mutable entry is
+always nearer its expiry than a 300 second immutable one inserted up to 270
+seconds earlier, so sustained capacity pressure sheds essentially the whole
+mutable tier — blob, node, artifact, namespace, upload, dnsmasq — before it
+touches a single instance, network or ipam entry. If blob caching in
+particular matters to your workload, raise the cap rather than relying on
+the tiers competing for the space.</p>
+<p>Setting a TTL to <code>0</code> disables caching for that tier — a fast rollback to
 pure read-through that needs only a config change and a restart, no code
 change. The <code>database_object_cache_hits_total</code>,
 <code>database_object_cache_misses_total</code> and <code>database_object_cache_evictions_total</code>
 Prometheus counters (labelled by <code>object_type</code>) report cache behaviour, and a
 working cache shows up as reduced <code>database_get_&lt;type&gt;_total</code> rates on the
 <code>sf-database</code> tier.</p>
+<p>These counters only reach Prometheus from the daemons which serve a metrics
+endpoint — <code>sf-cluster</code>, <code>sf-resources</code> and <code>sf-database</code>. Every process that
+talks to the database has its own cache, so the numbers you can scrape are a
+sample of the cluster's caching rather than a total; <code>sf-api</code> in particular
+is invisible here.</p>
+<p>Expect that rollback to set off database load alerts while it is in effect,
+and plan for it rather than being surprised by it. The load budget was
+derived with the cache on, so the pairs the cache suppresses now sit under
+the budget's inclusion cut and are policed by the unbudgeted-polling ceiling
+of 0.05/s per node instead of by an entry of their own. <code>GetIPAM</code> from
+<code>sf-cluster</code> read 5.5/s before the cache and 0.02/s after it, and turning the
+cache off puts it — and a good many pairs like it — two orders of magnitude
+over that ceiling, firing <code>ShakenFistUnbudgetedDatabasePolling</code> for each.
+The alert is not wrong: pure read-through really does cost that much, which
+is the reason the cache exists. Silence the alert for the duration of the
+rollback. Do not raise the budget to accommodate it, because the same file
+also feeds <code>sf-ctl database-load</code> and the nightly report, and a level edited
+to quiet an alert stops being a description of a healthy cluster. The alert
+waits an hour before firing, so a short restart-and-observe will not trip it.</p>
 <h3 id="attributing-database-load-to-callers">Attributing database load to callers<a class="headerlink" href="#attributing-database-load-to-callers" title="Permanent link">&para;</a></h3>
 <p>Alongside the per-operation <code>database_&lt;op&gt;_total</code> counters, sf-database
 publishes <code>database_requests_total{operation, caller_daemon}</code> — the same
