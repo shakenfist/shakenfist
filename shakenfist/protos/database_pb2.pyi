@@ -5709,6 +5709,71 @@ class GetNetworkAttributesReply(_message.Message):
 Global___GetNetworkAttributesReply: _TypeAlias = GetNetworkAttributesReply  # noqa: Y015
 
 @_typing.final
+class GetNetworkFloatingGatewaysRequest(_message.Message):
+    """One bulk read of every assigned floating gateway, so that
+    fixed-cadence sweeps do not issue one GetNetworkAttributes per
+    network per pass (issue 3976). The reply is bounded by the number of
+    networks with a gateway assigned, at two short strings per row.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNetworkFloatingGatewaysRequest: _TypeAlias = GetNetworkFloatingGatewaysRequest  # noqa: Y015
+
+@_typing.final
+class NetworkFloatingGateway(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    FLOATING_GATEWAY_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """References networks.uuid"""
+    floating_gateway: _builtins.str
+    """The assigned gateway address"""
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        floating_gateway: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["floating_gateway", b"floating_gateway", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NetworkFloatingGateway: _TypeAlias = NetworkFloatingGateway  # noqa: Y015
+
+@_typing.final
+class GetNetworkFloatingGatewaysReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    GATEWAYS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def gateways(self) -> _containers.RepeatedCompositeFieldContainer[Global___NetworkFloatingGateway]: ...
+    def __init__(
+        self,
+        *,
+        gateways: _abc.Iterable[Global___NetworkFloatingGateway] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["gateways", b"gateways"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNetworkFloatingGatewaysReply: _TypeAlias = GetNetworkFloatingGatewaysReply  # noqa: Y015
+
+@_typing.final
 class UpdateNetworkAttributesRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 

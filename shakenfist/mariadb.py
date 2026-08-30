@@ -18014,6 +18014,27 @@ def _direct_get_network_attributes(
         return None
 
 
+def _direct_get_network_floating_gateways() -> dict[str, str]:
+    """Every assigned floating gateway from MariaDB, keyed by uuid.
+
+    The IS NOT NULL filter is pushed down to SQL so the reply carries
+    one small row per network with a gateway assigned rather than the
+    whole attributes table. Errors are deliberately not swallowed: the
+    floating IP reaper treats a reserved address absent from this
+    mapping as a leak candidate, so an error presenting as an empty
+    result would eventually release live gateways.
+    """
+    engine = _get_engine()
+    table = _get_network_attributes_table()
+
+    with engine.connect() as conn:
+        stmt = sa.select(
+            table.c.uuid, table.c.floating_gateway).where(
+            table.c.floating_gateway.isnot(None))
+        return {str(row.uuid): row.floating_gateway
+                for row in conn.execute(stmt)}
+
+
 def _network_attributes_column_values(
         data: NetworkAttributesData,
         fields: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -18307,6 +18328,18 @@ def _grpc_get_network_attributes(
         return None
 
 
+def _grpc_get_network_floating_gateways() -> dict[str, str]:
+    """Every assigned floating gateway, via the database microservice.
+
+    As with the direct form, errors are deliberately not swallowed --
+    see ``_direct_get_network_floating_gateways``.
+    """
+    stub = _get_database_stub()
+    request = database_pb2.GetNetworkFloatingGatewaysRequest()
+    reply = _grpc_call(stub.GetNetworkFloatingGateways, request)
+    return {g.uuid: g.floating_gateway for g in reply.gateways}
+
+
 def _grpc_update_network_attributes(
         data: NetworkAttributesData,
         fields: Optional[List[str]] = None) -> bool:
@@ -18498,6 +18531,26 @@ def get_network_attributes(
     if _use_database_service():
         return _grpc_get_network_attributes(net_uuid)
     return _direct_get_network_attributes(net_uuid)
+
+
+def get_network_floating_gateways() -> dict[str, str]:
+    """Every assigned floating gateway, keyed by dashed network uuid.
+
+    One bulk read serving fixed-cadence sweeps which would otherwise
+    issue one get_network_attributes() call per network per pass --
+    the per-object access shape issue 3655 removed for reservations,
+    surviving on the attributes row (issue 3976). Attribute rows are
+    deliberately uncacheable, so per-network reads all reach MariaDB.
+
+    Returns:
+        A mapping of network uuid (dashed string form) to its assigned
+        floating gateway address, for every network_attributes row with
+        a gateway. Errors propagate rather than presenting as an empty
+        result -- see ``_direct_get_network_floating_gateways``.
+    """
+    if _use_database_service():
+        return _grpc_get_network_floating_gateways()
+    return _direct_get_network_floating_gateways()
 
 
 def update_network_attributes(

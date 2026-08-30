@@ -3588,6 +3588,29 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.GetNetworkAttributesReply(
                 found=False)
 
+    def GetNetworkFloatingGateways(
+        self,
+        request: database_pb2.GetNetworkFloatingGatewaysRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNetworkFloatingGatewaysReply:
+        """Get every assigned floating gateway from MariaDB."""
+        try:
+            self.monitor.counters[
+                'get_network_floating_gateways'].inc()
+            gateways = mariadb._direct_get_network_floating_gateways()
+            return database_pb2.GetNetworkFloatingGatewaysReply(
+                gateways=[
+                    database_pb2.NetworkFloatingGateway(
+                        uuid=net_uuid, floating_gateway=addr)
+                    for net_uuid, addr in sorted(gateways.items())
+                ])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNetworkFloatingGateways failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNetworkFloatingGatewaysReply()
+
     def UpdateNetworkAttributes(
         self,
         request: database_pb2.UpdateNetworkAttributesRequest,
@@ -6330,6 +6353,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB network attributes operations
             'create_network_attributes',
             'get_network_attributes',
+            'get_network_floating_gateways',
             'update_network_attributes',
             'delete_network_attributes',
             # MariaDB artifact operations
