@@ -183,8 +183,21 @@ class BridgedVXLanNetwork:
         The single-threaded net-worker dispatcher is the only caller of
         this method and provides natural serialisation; no explicit lock
         is required.
+
+        Declines quietly on a deleted network, mirroring the guard in
+        ``_apply_create_on_network_node``: the maintain loop enqueues this
+        task at ``background`` priority behind a create, and the network
+        (and its netns) can be torn down before the batch is dequeued
+        (issue 3962).
         """
         self._require_network_node('_apply_add_floating_ip')
+
+        if self.network.state.value == dbo.STATE_DELETED:
+            self.network.add_event(
+                EVENT_TYPE_AUDIT,
+                'refusing to add floating ip to deleted network',
+                extra={'floating': floating_address})
+            return
 
         util_concurrency.add_floating_ip(
             str(self.network.uuid), floating_address, inner_address,
@@ -218,8 +231,20 @@ class BridgedVXLanNetwork:
         The single-threaded net-worker dispatcher is the only caller of
         this method and provides natural serialisation; no explicit lock
         is required.
+
+        Declines quietly on a deleted network for the same reason as
+        ``_apply_add_floating_ip``: the maintain loop's reconciliation
+        batch can be dequeued long after the network (and its
+        ``vx_bridge``) has been torn down (issue 3962).
         """
         self._require_network_node('_apply_route_address')
+
+        if self.network.state.value == dbo.STATE_DELETED:
+            self.network.add_event(
+                EVENT_TYPE_AUDIT,
+                'refusing to route address on deleted network',
+                extra={'floating': ip})
+            return
 
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'routing floating ip to network',

@@ -296,6 +296,23 @@ class BridgedVXLanNetworkApplyFloatingIPTestCase(base.ShakenFistTestCase):
         # The apply layer does NOT emit events; that is the dispatcher's job.
         network.add_event.assert_not_called()
 
+    def test_apply_add_floating_ip_declines_deleted_network(self):
+        """A deleted network declines quietly instead of asking privexec to
+        move a veth into a netns that no longer exists (issue 3962)."""
+        network = _make_network_mock(
+            uuid='dddddddd-dddd-4ddd-8ddd-dddddddddddd', vxid=43)
+        network.state = mock.Mock()
+        network.state.value = 'deleted'
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_add_floating_ip('203.0.113.7', '10.0.0.7')
+
+        self.mock_add_floating_ip.assert_not_called()
+        network.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'refusing to add floating ip to deleted network',
+            extra={'floating': '203.0.113.7'})
+
     def test_apply_remove_floating_ip_invokes_privexec(self):
         network = _make_network_mock(
             uuid='cccccccc-cccc-4ccc-8ccc-cccccccccccc')
@@ -343,6 +360,22 @@ class BridgedVXLanNetworkApplyRouteAddressTestCase(base.ShakenFistTestCase):
         network.add_event.assert_called_once_with(
             EVENT_TYPE_AUDIT, 'routing floating ip to network',
             extra={'floating': '203.0.113.10'})
+
+    def test_apply_route_address_declines_deleted_network(self):
+        """A deleted network declines quietly instead of adding a route to a
+        vx_bridge that no longer exists (issue 3962)."""
+        network = self._make_network_with_subst(vxid=0xbcd)
+        network.state = mock.Mock()
+        network.state.value = 'deleted'
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_route_address('203.0.113.12')
+
+        self.mock_execute.assert_not_called()
+        network.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'refusing to route address on deleted network',
+            extra={'floating': '203.0.113.12'})
 
     def test_apply_unroute_address_runs_ip_route_del(self):
         network = self._make_network_with_subst(vxid=0xdef)
