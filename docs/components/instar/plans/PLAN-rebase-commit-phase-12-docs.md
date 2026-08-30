@@ -4,7 +4,7 @@
 
 Before responding to questions or discussion points in this
 document, explore the codebase thoroughly. Read
-[docs/resize.md](/components/instar/plans/resize/) and [docs/create.md](/components/instar/plans/create/)
+[docs/resize.md](/components/instar/resize/) and [docs/create.md](/components/instar/create/)
 end-to-end — they're the structural twins for the new
 per-subcommand user guides. Read the existing
 `CHANGELOG.md`'s `[Unreleased]` section (the resize entry

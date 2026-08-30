@@ -284,10 +284,10 @@ behaviour.
 ## Future work
 
 For the per-format commit planners, see
-[`src/crates/commit/src/lib.rs`](../src/crates/commit/src/lib.rs)
+[`src/crates/commit/src/lib.rs`](https://github.com/shakenfist/instar/blob/develop/src/crates/commit/src/lib.rs)
 (`plan_commit_qcow2`, `plan_commit_vmdk`). For the divergence
 whitelist applied during cross-version baseline comparison, see
-[`tests/helpers/info_json.py`](../tests/helpers/info_json.py).
+[`tests/helpers/info_json.py`](https://github.com/shakenfist/instar/blob/develop/tests/helpers/info_json.py).
 
 Tracked under the [PLAN-rebase-commit
 master plan](/components/instar/plans/PLAN-rebase-commit/):

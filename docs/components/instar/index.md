@@ -171,10 +171,10 @@ Experimental implementations exploring secure isolated execution.
 | [Virtio-Block3](/components/instar/prototypes/virtio-block3/) | Virtio-block with configurable sector sizes |
 | [Virtio-Block4](/components/instar/prototypes/virtio-block4/) | Virtio-block with performance statistics |
 | [Virtio-Block5](/components/instar/prototypes/virtio-block5/) | Virtio-block with ioeventfd/irqfd optimizations |
-| [Virtio-Block6](/components/instar/../prototypes/virtio-block6/README/) | Sparse/dynamic output file support |
-| [Pluggable](/components/instar/../prototypes/pluggable/README/) | Modular operation architecture with shared infrastructure |
-| [Pluggable2](/components/instar/../prototypes/pluggable2/README/) | Separate binary loading for operations (minimal attack surface) |
-| [Info](/components/instar/../prototypes/info/README/) | Image format detection (`qemu-img info` equivalent) |
+| [Virtio-Block6](https://github.com/shakenfist/instar/blob/develop/prototypes/virtio-block6/README.md) | Sparse/dynamic output file support |
+| [Pluggable](https://github.com/shakenfist/instar/blob/develop/prototypes/pluggable/README.md) | Modular operation architecture with shared infrastructure |
+| [Pluggable2](https://github.com/shakenfist/instar/blob/develop/prototypes/pluggable2/README.md) | Separate binary loading for operations (minimal attack surface) |
+| [Info](https://github.com/shakenfist/instar/blob/develop/prototypes/info/README.md) | Image format detection (`qemu-img info` equivalent) |
 
 ## KVM Virtualization Research
 

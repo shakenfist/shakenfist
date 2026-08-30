@@ -394,7 +394,7 @@ rounding drift against the value instar itself reports.
 ## Known divergences from `qemu-img bench`
 
 Each entry below is recorded in the `KNOWN_BENCH_DIVERGENCES`
-registry in [`tests/test_bench.py`](../tests/test_bench.py), named
+registry in [`tests/test_bench.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_bench.py), named
 by its registry key, so a cross-validation mismatch that is *not*
 registered there is treated as a real regression.
 
@@ -562,14 +562,14 @@ Error: "bench: write tests are not supported for this image (extended L2)"
   invocation.
 
 For the request-schedule crate, see
-[`src/crates/bench/`](../src/crates/bench/); the refcount-growth
+[`src/crates/bench/`](https://github.com/shakenfist/instar/tree/develop/src/crates/bench); the refcount-growth
 planner now lives in the `growth` module of
-[`src/crates/qcow2-write/`](../src/crates/qcow2-write/), which also
+[`src/crates/qcow2-write/`](https://github.com/shakenfist/instar/tree/develop/src/crates/qcow2-write), which also
 provides the qcow2 `-w` allocate-on-write planner (executed through
-[`src/crates/qcow2-write-exec/`](../src/crates/qcow2-write-exec/)).
+[`src/crates/qcow2-write-exec/`](https://github.com/shakenfist/instar/tree/develop/src/crates/qcow2-write-exec)).
 For the guest operation, see
-[`src/operations/bench/`](../src/operations/bench/). For the
+[`src/operations/bench/`](https://github.com/shakenfist/instar/tree/develop/src/operations/bench). For the
 divergence registry, see `KNOWN_BENCH_DIVERGENCES` at the top of
-[`tests/test_bench.py`](../tests/test_bench.py). See also
+[`tests/test_bench.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_bench.py). See also
 [usage.md](/components/instar/usage/). For the qcow2-write migration quirks, see
 [quirks.md](/components/instar/quirks/).

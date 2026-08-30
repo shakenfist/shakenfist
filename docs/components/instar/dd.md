@@ -314,9 +314,9 @@ instar dd if=disk.raw of=empty.raw bs=512 count=0
   concrete downstream need appears.
 
 For the window math crate, see
-[`src/crates/dd/src/lib.rs`](../src/crates/dd/src/lib.rs).
+[`src/crates/dd/src/lib.rs`](https://github.com/shakenfist/instar/blob/develop/src/crates/dd/src/lib.rs).
 For the VHD CHS rounding function, see
-[`src/crates/vhd/src/lib.rs`](../src/crates/vhd/src/lib.rs)
+[`src/crates/vhd/src/lib.rs`](https://github.com/shakenfist/instar/blob/develop/src/crates/vhd/src/lib.rs)
 (`chs_rounded_size`).
 For the divergence allowlist, see `KNOWN_DD_DIVERGENCES` at the top of
-[`tests/test_dd_baselines.py`](../tests/test_dd_baselines.py).
+[`tests/test_dd_baselines.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_dd_baselines.py).

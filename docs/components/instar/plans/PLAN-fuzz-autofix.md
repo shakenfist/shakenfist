@@ -106,12 +106,15 @@ YAML.
   measured it: `claude -p --output-format json` reports `.modelUsage`
   keyed by the resolved model with its `contextWindow`, so the trailer
   can be derived per run and cannot go stale again. The same defect
-  exists in `.github/workflows/test-drift-fix.yml` and
-  `tools/address-comments-with-claude.sh`, which carry a *different*
-  stale name; phase 1 fixes all three behind one tested helper.
-* `tools/address-comments-with-claude.sh` had the same defect this
-  plan diagnosed, in the review-comment loop rather than the fuzz loop
-  (issue #510): it instructed Claude to stage, then reported an
+  existed in `.github/workflows/test-drift-fix.yml` and
+  `tools/address-comments-with-claude.sh`, which carried a *different*
+  stale name; phase 1 fixed all three behind one tested helper. The
+  addresser has since been retired outright — the workflow, the driver
+  script and its helpers were deleted — so everything this plan says
+  about it is history, and only the two workflows survive.
+* `tools/address-comments-with-claude.sh` (since retired) had the same
+  defect this plan diagnosed, in the review-comment loop rather than
+  the fuzz loop (issue #510): it instructed Claude to stage, then reported an
   unstaged fix as a skipped review item. **Done** — PR #511 merged as
   `7b1afe4`, reusing the stager in `--tracked-only` mode. It was not
   the one-line change it looked like: the loop's Claude-failed and
@@ -126,10 +129,16 @@ request, predate this table and were tracked inline in the sections
 above. Phase 1 is the remaining close-out; phase 2 is the push
 audit that ends every master plan.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | In progress |
-| 2. Push audit | [PLAN-fuzz-autofix-phase-02-push-audit.md](/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/) | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | In progress | |
+| 2. Push audit | `PLAN-fuzz-autofix-phase-02-push-audit.md` (not yet written) | Not started | |
+
+The `Merged` column is the one `PLAN-TEMPLATE.md` requires of a plan
+carrying a push audit phase: phase 2 runs the audit over the union of
+the earlier phases' merge ranges, because `git diff develop...HEAD` is
+empty once they have landed. Both cells are empty because neither phase
+has merged.
 
 ### 2. Push audit
 
@@ -301,7 +310,13 @@ After Claude finishes:
 2. **Build:** Run `make instar` to verify the fix compiles.
 3. **Run reproducer:** Execute the fuzz target with the crash
    input. If the target no longer crashes (exit code 0), the
-   fix is verified.
+   fix is verified. **Not implemented** -- the workflow reads
+   `.reproducer` into the prompt and into the pull request body
+   but never executes it, so verification is the build and the
+   core tests only. Tracked as issue #529, which records why it
+   is more than a missing line: the crash input is not in the
+   issue body, only in the `coverage-fuzz-logs` artifact of the
+   run named by `.ci_run`, and those expire after 90 days.
 4. **Run existing tests:** Run `make test-container-core` to
    ensure the fix doesn't break existing functionality.
 
@@ -352,8 +367,8 @@ ${COMMIT_BODY}
 
 ## Verification
 
-- Reproducer no longer crashes after fix
-- Existing tests pass (make test-container-core)
+- Build succeeded (make instar)
+- Core tests passed (make test-container-core)
 
 ## Reproduction
 

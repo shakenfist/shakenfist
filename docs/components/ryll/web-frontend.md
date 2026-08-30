@@ -61,6 +61,24 @@ exchanges SDP via `POST /offer`, and starts streaming.
   guest booted at, which looks soft.
 - Ctrl-C cleanly stops the binary.
 
+## Appearance
+
+The browser shell is styled with
+[sfui](https://github.com/shakenfist/sfui), the Shaken Fist web
+UI design system, so its controls match the other Shaken Fist
+web interfaces. There is nothing to install or configure: the
+stylesheets are compiled into the `ryll` binary and served from
+the same token-gated endpoint as the rest of the shell.
+
+The page is always dark. sfui ships a light palette and a
+theme toggle, and this page deliberately uses neither — the
+area around a letterboxed guest is page background, and a
+light chrome around a video reads as a bug rather than as a
+preference. That background is sfui's near-black
+`--sf-bg` (`#0f1117`) rather than pure black; if you are
+comparing screenshots against an older build, that is the
+difference you are seeing.
+
 ## Reconnect behaviour
 
 `--web` mode is resilient to browser disconnects.

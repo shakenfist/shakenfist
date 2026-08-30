@@ -6,8 +6,8 @@ inside that guest where a malicious image cannot reach the host.
 
 This page covers the approaches considered, the design that was chosen,
 the guest's structure, its call table, and its memory map. See
-[Architecture](/components/instar/../ARCHITECTURE/) for how it fits the rest of the tool,
-and [prototypes/](../prototypes/) for the experiments that led here.
+[Architecture](https://github.com/shakenfist/instar/blob/develop/ARCHITECTURE.md) for how it fits the rest of the tool,
+and [prototypes/](https://github.com/shakenfist/instar/tree/develop/prototypes) for the experiments that led here.
 
 ## Prototype Approaches
 
@@ -60,17 +60,17 @@ Cons:
 - No existing tooling
 
 **Progress:**
-- [helloworld](../prototypes/helloworld/) - Minimal KVM VMM with serial output
-- [helloworld2](../prototypes/helloworld2/) - Uses vm-memory crate for safer memory
-- [virtio-block](../prototypes/virtio-block/) - Virtio-block device emulation with file copy
-- [virtio-block2](../prototypes/virtio-block2/) - Adds guest-protocol (protobuf) integration
-- [virtio-block3](../prototypes/virtio-block3/) - Adds configurable sector sizes
-- [virtio-block4](../prototypes/virtio-block4/) - Adds performance statistics tracking
-- [virtio-block5](../prototypes/virtio-block5/) - Adds ioeventfd optimization
-- [virtio-block6](../prototypes/virtio-block6/) - Adds sparse/dynamic output file support
-- [pluggable](../prototypes/pluggable/) - Modular operations architecture
-- [pluggable2](../prototypes/pluggable2/) - Separate binary loading for operations
-- [info](../prototypes/info/) - Image format detection (qemu-img info equivalent)
+- [helloworld](https://github.com/shakenfist/instar/tree/develop/prototypes/helloworld) - Minimal KVM VMM with serial output
+- [helloworld2](https://github.com/shakenfist/instar/tree/develop/prototypes/helloworld2) - Uses vm-memory crate for safer memory
+- [virtio-block](https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block) - Virtio-block device emulation with file copy
+- [virtio-block2](https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block2) - Adds guest-protocol (protobuf) integration
+- [virtio-block3](https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block3) - Adds configurable sector sizes
+- [virtio-block4](https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block4) - Adds performance statistics tracking
+- [virtio-block5](https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block5) - Adds ioeventfd optimization
+- [virtio-block6](https://github.com/shakenfist/instar/tree/develop/prototypes/virtio-block6) - Adds sparse/dynamic output file support
+- [pluggable](https://github.com/shakenfist/instar/tree/develop/prototypes/pluggable) - Modular operations architecture
+- [pluggable2](https://github.com/shakenfist/instar/tree/develop/prototypes/pluggable2) - Separate binary loading for operations
+- [info](https://github.com/shakenfist/instar/tree/develop/prototypes/info) - Image format detection (qemu-img info equivalent)
 
 **Current Implementation:**
 The `info` prototype has been promoted to the main implementation in `src/`. This

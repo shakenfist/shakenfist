@@ -589,6 +589,70 @@ button is revealed when all attempts are exhausted. Each attempt
 constructs a brand-new `RTCPeerConnection`; the backoff counter
 resets on a successful `Connected` transition.
 
+## Browser shell assets
+
+`ryll/src/web/assets/` holds the shell that the browser
+fetches. Every file is `include_str!`-embedded by
+`assets.rs` and served by its own route in `server.rs`, behind
+the token middleware — there is no static directory on disk and
+no build step. `index.html` is the only one templated: the
+`{{TOKEN}}` placeholders are substituted per request so each
+subresource URL carries the launch token, and a subresource that
+did not go through the template would be fetched without one and
+answered with a 401.
+
+### The vendored sfui copy
+
+`assets/sfui/` is a verbatim copy of
+[sfui](https://github.com/shakenfist/sfui), the Shaken Fist web
+UI design system, placed there by that repository's
+`tools/vendor.sh`. **Never edit it in place.** Change sfui,
+merge, and re-vendor; an in-place edit is silently discarded by
+the next sync. The `.sfui-commit` stamp `vendor.sh` leaves
+behind enrols this repository in the daily fleet-wide
+`sfui-vendor` audit, which fails if the copy is not verbatim at
+canonical HEAD.
+
+`vendor.sh` copies a fixed file list and `--check` diffs all of
+it, so the whole distributable is in the tree — but only
+`tokens.css` and `sf.css` are embedded and routed. The Lit
+runtime, morphdom, the three components (a data table, a tab
+strip, a theme toggle) and the logo have nothing to render on a
+page that is one full-viewport `<video>` with four controls over
+it, and embedding them would put roughly 100KB into every ryll
+binary to serve nothing. Adding one back is an `include_str!`
+and a route.
+
+`sf-theme.js` is vendored and deliberately not served. It exists
+to resolve an "auto" light/dark preference before first paint and
+to back a toggle component; this page pins `data-theme="dark"` in
+the markup instead, which costs no cookie, no toggle and no
+render-blocking script in front of the stream.
+
+### How the page overrides sfui
+
+All of sf.css lives in the `sfui` cascade layer, and unlayered
+rules beat layered ones whatever their specificity, so every rule
+in `style.css` wins over its sfui counterpart with no
+`!important` and no specificity contest. That is sfui's
+documented adoption mechanism, and `style.css` uses it for the
+two things a dashboard design system does not anticipate:
+
+* **A page that bleeds to the edges.** `.sf-page` pads itself by
+  `2rem`; `style.css` sets the documented `--sf-page-pad` knob to
+  `0` rather than overriding the padding directly.
+* **Controls over arbitrary video.** sfui primitives assume an
+  opaque page behind them. `.sf-btn` is transparent-filled and
+  `.sf-banner--error` tints at 15%, both of which vanish over a
+  guest desktop, so the buttons and the no-video panel restate a
+  backdrop mixed from the tokens.
+
+The trap in that mechanism is stranding a related property: the
+page fills `.sf-btn`, and `.sf-btn--primary:hover` is *also* a
+fill, so the reconnect button needs its own unlayered hover rule
+to get sfui's behaviour back. Check the primitive for related
+declarations before overriding one of them.
+
 ## CI and packaging
 
 - `shakenfist-spice-renderer` and `shakenfist-spice-webrtc`

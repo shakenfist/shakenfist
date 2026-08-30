@@ -148,4 +148,4 @@ fixed-size stack allocations.
 |-----------|-----------|-------|
 | [virtio-block2](/components/instar/prototypes/virtio-block2/) | Guest → VMM | Status, progress, errors |
 | [virtio-block3](/components/instar/prototypes/virtio-block3/) | Bidirectional | Status + configuration |
-| [info](../../prototypes/info/) | Bidirectional | Config + InfoResultMessage |
+| [info](https://github.com/shakenfist/instar/tree/develop/prototypes/info) | Bidirectional | Config + InfoResultMessage |

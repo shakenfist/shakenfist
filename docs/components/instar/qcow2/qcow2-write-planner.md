@@ -441,5 +441,5 @@ per-phase companions (the crate, the commit/rebase/bench
 migrations, copy-on-write, refcount growth and fuzzing), plus
 [PLAN-bench-refcount-growth.md](/components/instar/plans/PLAN-bench-refcount-growth/)
 for the growth algorithm. Source:
-[`src/crates/qcow2-write/`](../../src/crates/qcow2-write/) and
-[`src/crates/qcow2-write-exec/`](../../src/crates/qcow2-write-exec/).
+[`src/crates/qcow2-write/`](https://github.com/shakenfist/instar/tree/develop/src/crates/qcow2-write) and
+[`src/crates/qcow2-write-exec/`](https://github.com/shakenfist/instar/tree/develop/src/crates/qcow2-write-exec).

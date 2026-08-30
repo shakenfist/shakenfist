@@ -292,7 +292,7 @@ instar amend -q -o compat=1.1 disk.qcow2
   of scope for v1.
 
 For the amend planner, see
-[`src/crates/amend/src/qcow2.rs`](../src/crates/amend/src/qcow2.rs).
+[`src/crates/amend/src/qcow2.rs`](https://github.com/shakenfist/instar/blob/develop/src/crates/amend/src/qcow2.rs).
 For the divergence whitelist, see `KNOWN_AMEND_DIVERGENCES` at
 the top of
-[`tests/test_amend.py`](../tests/test_amend.py).
+[`tests/test_amend.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_amend.py).
