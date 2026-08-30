@@ -149,9 +149,13 @@ that is honestly deleted.
 
 * `p90(committed vCPU cluster-wide) / ledger` -- warn above an upper
   bound (oversubscribed, 507 risk) and below a lower bound (oversized).
-* any `sufficient_idle_cpu`, `sufficient_idle_memory` or
-  `sufficient_idle_disk` refusal observed during a job that otherwise
-  passes is itself a warning, independent of the ratio.
+* any capacity-stage refusal observed during a job that otherwise
+  passes is itself a warning, independent of the ratio. There are
+  four such stages, not three: `sufficient_idle_cpu`,
+  `sufficient_idle_memory`, `sufficient_free_disk` (disk *space*)
+  and `sufficient_idle_disk` (disk *bandwidth*). This clause
+  originally named three, using the bandwidth stage where it meant
+  disk capacity; the phase 1 survey corrected it.
 
 Provisional bounds are 0.70 and 0.35. Phase 2 replaces them with
 numbers derived from the measured distribution, or keeps them and says
@@ -183,8 +187,11 @@ any topology changes, which is exactly what phase 4 does.
 artefact. No topology's per-node RAM is reduced below the measured p90
 plus a margin phase 2 sets, and phase 1's probe records memory headroom
 alongside CPU. Phase 2 must also measure capacity refusals per stage --
-cpu, memory and disk counted separately, not as one combined number --
-since a reshape that relaxes one stage can tighten another.
+cpu, memory, disk space and disk bandwidth counted separately, not as
+one combined number -- since a reshape that relaxes one stage can
+tighten another. The phase 1 survey corrected this item too: it
+originally said "cpu, memory and disk", which collapses the two
+distinct disk stages, only one of which is a capacity check at all.
 
 **Reasoning:** survey finding 1 removes the reason to disbelieve the
 one observed `sufficient_idle_memory` refusal. The measured peak usage

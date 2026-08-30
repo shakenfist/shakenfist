@@ -823,6 +823,11 @@ class Scheduler:
             committed_cpus = row['used_cpus'] if row else 0
             resources['per_node'][n]['cpu_committed_row_present'] = \
                 row is not None
+            # No fallback to cpu_hard_max here: the whole point of this
+            # field is to let a reader see the two ledgers disagree, and
+            # a fallback would hide exactly that disagreement.
+            resources['per_node'][n]['cpu_limit'] = \
+                row['limit_cpus'] if row else None
             # Both inputs to the admission decision are published, because
             # "this node measures as idle but is refusing work" is only
             # diagnosable if you can see which of the two is binding.
