@@ -117,12 +117,18 @@ def execution_line(timestamp, uuid=OP_UUID,
     return json.dumps(record)
 
 
-def entries(*lines):
-    """Wrap log lines as (loki nanosecond timestamp, line) pairs."""
+def entries(*lines, skew=0.0):
+    """Wrap log lines as (loki nanosecond timestamp, line) pairs.
+
+    ``skew`` is how far the record's own clock runs ahead of Loki's
+    ingestion clock. sfcbr stamps local time with a ``Z`` suffix, so it
+    runs a constant ten hours ahead; anything comparing a derived time
+    against the requested window has to undo that first.
+    """
     out = []
     for line in lines:
         stamp = timeline.parse_timestamp(json.loads(line)['ts'])
-        out.append((int(stamp * 1e9), line))
+        out.append((int((stamp - skew) * 1e9), line))
     return out
 
 
@@ -444,6 +450,68 @@ class TimelineMainTestCase(base.ShakenFistTestCase):
         self.assertIn('Defer redelivery fidelity', output)
         self.assertIn('Tail by what it was waiting on', output)
         self.assertNotIn('not self consistent', output)
+
+    def test_every_operation_incomplete_exits_cleanly(self):
+        # One execution event recording two defers, with only one defer
+        # event in the data: nothing joins, so every table below is empty
+        # and the tail share has no denominator. It used to divide by it.
+        lines = entries(
+            defer_line('2026-08-29T00:00:01.000Z', delay=0.1, defer_count=2),
+            execution_line('2026-08-29T00:00:03.500Z', wait=3.0, seconds=0.5,
+                           defer_count=2))
+        code, output = self._run(
+            StubLoki(lines),
+            ['--start', '2026-08-29T00:00:00Z',
+             '--end', '2026-08-29T00:30:00Z'])
+        self.assertEqual(0, code)
+        self.assertIn('No operation in this window has a decomposable '
+                      'timeline', output)
+        self.assertIn('--lookback-minutes', output)
+
+    def test_clipped_count_is_measured_on_the_ingestion_clock(self):
+        # The operation is created well before the defer lookback window,
+        # so its early defer events cannot be in the data and it belongs
+        # under 'clipped' rather than under 'unexplained'. With the log
+        # clock ten hours ahead of Loki's, comparing created_at straight
+        # against the window boundary never fires -- which is the exact
+        # class of clock confusion this phase was written to correct.
+        # Ingested at 00:20Z, inside the window, but the record stamps
+        # itself 10:20 because its clock is ten hours ahead.
+        skew = 10 * 60 * 60
+        lines = entries(
+            execution_line('2026-08-29T10:20:00.000Z', wait=7200.0,
+                           seconds=0.5, defer_count=3),
+            skew=skew)
+        code, output = self._run(
+            StubLoki(lines),
+            ['--start', '2026-08-29T00:00:00Z',
+             '--end', '2026-08-29T00:30:00Z',
+             '--lookback-minutes', '60'])
+        self.assertEqual(0, code)
+        self.assertIn('1 were created before', output)
+        self.assertIn('0 are unexplained', output)
+
+    def test_each_delivery_joins_only_the_defers_that_preceded_it(self):
+        # An operation which defers itself from inside execute() produces
+        # one execution event per delivery. Handing each of them the
+        # uuid's whole defer list makes every delivery but the last fail
+        # the integrity check and be reported as events lost in shipping.
+        lines = entries(
+            execution_line('2026-08-29T00:00:01.000Z', wait=1.0, seconds=0.5,
+                           defer_count=0),
+            defer_line('2026-08-29T00:00:01.100Z', delay=15, defer_count=1),
+            execution_line('2026-08-29T00:00:17.000Z', wait=17.0, seconds=0.5,
+                           defer_count=1))
+        join = timeline.join_streams(
+            [e for e in lines if 'deferred' in e[1]],
+            [e for e in lines if 'execution duration' in e[1]])
+
+        self.assertEqual(2, len(join.operations))
+        self.assertEqual(1, join.multi_execution_uuids)
+        # Both deliveries join: the first against no defers, the second
+        # against the one which preceded it.
+        self.assertEqual([True, True], [o.joined for o in join.operations])
+        self.assertEqual([0, 1], [len(o.defers) for o in join.operations])
 
     def test_writes_a_csv_when_asked(self):
         lines = entries(

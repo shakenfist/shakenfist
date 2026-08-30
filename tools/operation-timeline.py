@@ -555,10 +555,29 @@ class Operation:
         self.defer_count = defer_count
         self.defers = []
 
+        # How far this record's own clock runs ahead of Loki's ingestion
+        # clock, filled in by join_streams. Every interval below is a
+        # difference of two log-clock stamps, so the offset cancels and
+        # none of them need it. Comparing a derived time against the
+        # *window* does need it, because the window is in Loki's clock:
+        # on this cluster the two are ten hours apart, which silently
+        # makes every such comparison false. See created_at_ingested.
+        self.clock_skew = 0.0
+
         # The event is emitted after execute() returns, so the event's
         # timestamp is the end of the operation and not the start of it.
         self.started_at = executed_at - (execution or 0.0)
         self.created_at = self.started_at - wait
+
+    @property
+    def created_at_ingested(self):
+        """created_at moved onto Loki's clock, for comparison with the window.
+
+        Only use this against a window boundary or another Loki-clock
+        time. Every interval between two events stays in the log clock,
+        where the offset cancels out.
+        """
+        return self.created_at - self.clock_skew
 
     @property
     def joined(self):
@@ -725,14 +744,26 @@ def join_streams(defer_lines, execution_lines, program=None):
             continue
         if program and operation.program != program:
             continue
-        join.skews.append(operation.executed_at - stamp / 1e9)
+        operation.clock_skew = operation.executed_at - stamp / 1e9
+        join.skews.append(operation.clock_skew)
         if operation.uuid in claimed:
-            # The same operation uuid executing twice inside one window
-            # cannot be split across its defer events, since the events do
-            # not say which run they belong to. Counted, not guessed at.
+            # An operation which defers itself from *inside* execute()
+            # (artifact_fetch_op, net_op, node_blob_op) is dispatched
+            # again afterwards, and the dispatcher emits one execution
+            # event per delivery. So a uuid appearing more than once is
+            # expected rather than anomalous, and each appearance is a
+            # separate delivery to decompose.
             join.multi_execution_uuids += 1
         claimed.add(operation.uuid)
-        operation.defers = list(by_uuid.get(operation.uuid, []))
+
+        # Only the defers which had already happened when this delivery
+        # began belong to it. The event carries the defer_count it was
+        # *delivered* with, so handing every delivery the uuid's whole
+        # defer list makes all but the last one fail the join-integrity
+        # check and be reported as events lost in shipping.
+        operation.defers = [
+            d for d in by_uuid.get(operation.uuid, [])
+            if d.timestamp <= operation.started_at]
         join.operations.append(operation)
 
     for uuid, defers in by_uuid.items():
@@ -1035,9 +1066,11 @@ def print_join_integrity(join, complete, incomplete, clipped, defer_window_start
               f'({join.defers_without_execution} defer events) have no '
               'execution event in the window -- they ran after it, or not yet')
     if join.multi_execution_uuids:
-        print(f'  {join.multi_execution_uuids} operation uuids executed more '
-              'than once in the window; their defer events cannot be '
-              'attributed to one run')
+        print(f'  {join.multi_execution_uuids} executions were a repeat '
+              'delivery of a uuid already seen in the window (an operation '
+              'which defers itself from')
+        print('  inside execute); each delivery is decomposed separately, '
+              'against the defer events which preceded it')
     if join.delays_from_message:
         print(f'  {join.delays_from_message} defer delays were read from the '
               'message prose rather than extra["delay"] (a build predating '
@@ -1060,7 +1093,9 @@ def print_join_integrity(join, complete, incomplete, clipped, defer_window_start
     # reader.
     explained = [o for o in negative_residual
                  if o.early_redelivery >= -o.residual - 0.01]
-    unexplained = [o for o in negative_residual if o not in explained]
+    explained_ids = {id(o) for o in explained}
+    unexplained = [o for o in negative_residual
+                   if id(o) not in explained_ids]
     no_execution_time = [o for o in complete if o.execution is None]
 
     print()
@@ -1221,7 +1256,9 @@ def build_argument_parser():
         '--top', type=int, default=15,
         help='Show at most this many rows per breakdown table (0 for all).')
     parser.add_argument(
-        '--csv', help='Also write the per operation timeline to this path.')
+        '--csv',
+        help=('Also write the per operation timeline to this path, for the '
+              'operations whose join is complete (see Join integrity).'))
     return parser
 
 
@@ -1286,8 +1323,23 @@ def main(argv=None, client=None):
 
     complete = [o for o in join.operations if o.joined]
     incomplete = [o for o in join.operations if not o.joined]
-    clipped = len([o for o in incomplete if o.created_at < defer_start])
+    clipped = len([o for o in incomplete
+                   if o.created_at_ingested < defer_start])
     print_join_integrity(join, complete, incomplete, clipped, defer_start)
+
+    if not complete:
+        print()
+        print('No operation in this window has a decomposable timeline.')
+        print()
+        print('Every execution event found was excluded by the join '
+              'integrity check above: the defer')
+        print('events which would account for its defer_count are not in '
+              'the fetched data. Raise')
+        print('--lookback-minutes so operations created before the window '
+              'still have their early defer')
+        print('events, or widen the window so operations are not clipped '
+              'at its leading edge.')
+        return 0
 
     deferred = [o for o in complete if o.defers]
     undeferred = [o for o in complete if not o.defers]

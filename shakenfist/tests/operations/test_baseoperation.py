@@ -145,6 +145,11 @@ class DeferWithBackoffTestCase(base.ShakenFistTestCase):
         args, kwargs = op.add_event.call_args
         extra = kwargs['extra']
         self.assertEqual(7.5, extra['delay'])
+        # Pinned against the literal as well as against the field, so the
+        # message format is anchored independently of the thing it is
+        # meant to cross-check. Retained Loki history is matched on this
+        # exact prose (tools/operation-timeline.py's fallback parser).
+        self.assertEqual('Execution deferred for 7.5 seconds', args[1])
         self.assertEqual(
             f'Execution deferred for {extra["delay"]} seconds', args[1])
 

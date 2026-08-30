@@ -116,6 +116,7 @@ class NodeBlobOpAlreadyBeingTransferredTestCase(base.ShakenFistTestCase):
         op._ensure_local(b)
 
         op.defer_with_backoff.assert_called_once_with(
+            delays=NodeBlobOp._TRANSFER_CONTENTION_DELAYS,
             reason='blob already being transferred')
         b.add_event.assert_not_called()
 
@@ -143,8 +144,67 @@ class NodeBlobOpAlreadyBeingTransferredTestCase(base.ShakenFistTestCase):
         op._ensure_local(b)
 
         op.defer_with_backoff.assert_called_once_with(
+            delays=NodeBlobOp._TRANSFER_CONTENTION_DELAYS,
             reason='blob already being transferred')
         b.add_event.assert_called_once()
         args, _ = b.add_event.call_args
         self.assertEqual(EVENT_TYPE_AUDIT, args[0])
         mock_state_update.assert_not_called()
+
+    @mock.patch('shakenfist.operations.baseoperation.mariadb.enqueue_work_item')
+    @mock.patch('shakenfist.operations.node_blob_op.mariadb.get_node_metrics')
+    @mock.patch('shakenfist.operations.node_blob_op.config')
+    def test_real_backoff_requeues_and_leaves_the_op_queued(
+            self, mock_config, mock_get_metrics, mock_enqueue):
+        """The two tests above stub defer_with_backoff, so they cannot see this.
+
+        What the change actually depends on is not the branch but its
+        effect: a scheduled retry must leave the operation in
+        STATE_QUEUED, because that is what makes
+        BaseClusterOperation.execute() stop dispatching further tasks
+        instead of falling through to STATE_COMPLETE. Let the real
+        defer_with_backoff run so a change to that contract fails here.
+        """
+        mock_config.NODE_NAME = 'node2'
+        mock_config.NODE_UUID = 'uuid-node2'
+        mock_config.NODE_DISK_RESERVATION_GB = 20.0
+        mock_get_metrics.return_value = {
+            'metrics': {'disk_free_blobs': 35 * GiB}}
+
+        b = self._blob(10 * GiB)
+        op = self._op()
+        op.queue_name = 'node2-background_high_io'
+        op.current_defer_count = 0
+        op.add_event = mock.MagicMock()
+
+        uuid_patcher = mock.patch.object(
+            NodeBlobOp, 'uuid', new_callable=mock.PropertyMock,
+            return_value='uuid-op')
+        uuid_patcher.start()
+        self.addCleanup(uuid_patcher.stop)
+
+        recorded = []
+        state_patcher = mock.patch.object(
+            NodeBlobOp, 'state',
+            new_callable=mock.PropertyMock,
+            side_effect=lambda *a: recorded.append(a))
+        state_patcher.start()
+        self.addCleanup(state_patcher.stop)
+
+        op._ensure_local(b)
+
+        # Re-enqueued on the first rung of this path's own ladder, which
+        # is longer than defer_with_backoff's default so a healthy peer
+        # transfer is outlasted.
+        mock_enqueue.assert_called_once()
+        enqueue_args, enqueue_kwargs = mock_enqueue.call_args
+        self.assertEqual(
+            NodeBlobOp._TRANSFER_CONTENTION_DELAYS[0], enqueue_kwargs['delay'])
+        self.assertEqual(1, enqueue_args[1]['defer_count'])
+
+        # And left queued, so execute() stops rather than completing.
+        self.assertEqual(
+            [(NodeBlobOp.STATE_QUEUED,)], recorded)
+
+        # Contention is not an audit-worthy failure while retries remain.
+        b.add_event.assert_not_called()

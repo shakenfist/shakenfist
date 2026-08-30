@@ -541,3 +541,58 @@ cross-check every fetch against `count_over_time`.
 Nothing else is outstanding. Every definition-of-done item is met and
 the phase is `Complete` in both the master plan and `index.md`; phase
 11 (#3884, the multi-column coalescing key) remains.
+
+### What the review changed
+
+The automated review raised ten items on the pull request. Eight were
+taken; two were informational and one of those was declined on its own
+advice. Three are worth recording here because they change what the
+tool reports rather than only how it is written.
+
+* **The window-edge check mixed the two clocks.** `clipped` compared
+  a `created_at` derived from the log record's own stamp against the
+  requested window, which is in Loki's ingestion clock. On this
+  cluster those are ten hours apart, so the comparison was never true
+  and every clipped operation was reported as *unexplained -- events
+  lost in shipping* instead. This is the same class of error the
+  phase was written to correct, one layer down, and it was in the
+  code the whole time the measurement ran. It does not move any
+  published number: nothing in the results rests on the clipped
+  count, and every interval in every table is a difference of two
+  log-clock stamps, where the offset cancels. Each operation now
+  carries its own skew and `created_at_ingested` does the comparison.
+
+* **Each delivery now joins only the defers which preceded it.** An
+  operation which defers itself from *inside* `execute()` gets one
+  execution event per delivery, and the join handed each of them the
+  uuid's whole defer list. Every delivery but the last then failed
+  the integrity check and was reported as lost events. Tables were
+  unaffected, since unjoined operations are excluded from all of
+  them -- but the integrity narrative was wrong, and step 10a made
+  `node_blob_op` a third operation type with this shape.
+
+* **The blob contention ladder was too short.** Converting the bare
+  `defer()` to `defer_with_backoff()` took the retry budget from
+  unbounded to the default three rungs, 105 s. `ensure_local()`
+  discards a partial file which has gone five minutes without
+  progress and restarts it, so a budget under that gives up while
+  the transfer it is waiting for is still healthy. The path now
+  names its own ten-rung ladder, sized to outlast a full
+  stall-and-restart cycle.
+
+The remaining fixes were a `ZeroDivisionError` when no operation in a
+window joins, a `--csv` help string which did not say it exports only
+the joined subset, a quadratic membership test, a cross-reference to
+the tool from the work-queues documentation, and two test hardenings:
+the defer-event message is now pinned against its literal as well as
+against the field it cross-checks, and one `node_blob_op` test now
+runs the real `defer_with_backoff` and asserts the operation is left
+`STATE_QUEUED`, which is the property the change actually depends on
+and which no mocked test could see.
+
+The one declined item is the `count_over_time` cross-check's
+one-sample boundary discrepancy, which explains the `differed by 2 of
+23,179` reported for window B. The review recommended against
+changing it and that recommendation is right: the check is a tripwire
+for large losses, and describing a delta of two as a match would
+suppress a real small loss to remove a cosmetic one.
