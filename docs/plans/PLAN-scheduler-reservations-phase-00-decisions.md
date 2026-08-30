@@ -337,7 +337,17 @@ begins at `scheduler.py:505`. *(Line references as of
 and PR 3722's ranking precedence, cited above as `:611-631`,
 is now the `narrowed` block at `:637-658` -- that one moved
 *and* is a different block from the affinity scoring at
-`:529-600`, so do not read the two as interchangeable. Also,
+`:529-600`, so do not read the two as interchangeable.
+Every one of those is named by symbol as well as by number,
+because a set of line numbers is what went stale here in the
+first place and a second set carries the same decay: `:489-502`
+is the `sufficient_idle_cpu` stage inside `find_candidates()`,
+`:529-600` is the block under the comment "Filter by affinity,
+if any has been specified", `:187-256` is
+`_has_sufficient_cpu()` where `hard_max_cpus` is applied, and
+`:637-658` is the block whose comment begins "The two filters
+above are load shedding, not admission". Re-derive from the
+names when the numbers next move. Also,
 per a 2026-08-26 comment on 3565, the stage
 which binds has moved from `sufficient_idle_cpu` to
 `sufficient_idle_memory` -- the mechanism is unchanged, an
