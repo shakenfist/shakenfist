@@ -333,8 +333,12 @@ shows why: the node affinity wanted was removed by
 `scheduler.py:473-481`, thirty lines before affinity scoring
 begins at `scheduler.py:505`. *(Line references as of
 2026-08-16; the current locations are `:489-502` and
-`:529-600`, and the hard ceiling cited below is now
-`:187-256`. Also, per a 2026-08-26 comment on 3565, the stage
+`:529-600`, the hard ceiling cited below is now `:187-256`,
+and PR 3722's ranking precedence, cited above as `:611-631`,
+is now the `narrowed` block at `:637-658` -- that one moved
+*and* is a different block from the affinity scoring at
+`:529-600`, so do not read the two as interchangeable. Also,
+per a 2026-08-26 comment on 3565, the stage
 which binds has moved from `sufficient_idle_cpu` to
 `sufficient_idle_memory` -- the mechanism is unchanged, an
 admission filter emptying the set before ranking, but a fix
