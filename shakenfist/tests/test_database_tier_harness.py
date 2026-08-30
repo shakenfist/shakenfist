@@ -257,6 +257,93 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             'GetObjectEvents/api in HARNESS_DRIVEN_PAIRS -- drop the '
             'exemption and let the idle load check see the pair again.')
 
+    def test_the_headroom_probe_pairs_are_exempt(self):
+        # The other half of the contract that
+        # test_the_suite_still_probes_cluster_headroom holds up. That one
+        # fails if the probe goes while these stay; this one fails if these
+        # go while the probe stays, which is how issue 3975 read in merge CI
+        # -- all three at N/15 per second, over the unbudgeted ceiling, on
+        # every cluster job big enough to reach it.
+        for operation in ('GetAllNodeDaemonStates', 'GetNodeAttributes',
+                          'GetNodeMetrics'):
+            self.assertTrue(
+                harness.harness_driven((operation, 'api')),
+                '%s/api is not exempt, so the node roster sampling done by '
+                'tools/ci_headroom_probe.py will fail '
+                'test_no_unbudgeted_fixed_rate_database_polling again on any '
+                'merge queue cluster of six nodes or more (issue 3975).'
+                % operation)
+
+        # Scoped to the caller which actually makes them. The same operations
+        # from a daemon are ordinary server side traffic and stay budgeted.
+        for operation in ('GetAllNodeDaemonStates', 'GetNodeAttributes',
+                          'GetNodeMetrics'):
+            self.assertFalse(
+                harness.harness_driven((operation, 'queues')),
+                '%s/queues is exempt, but no part of the CI harness makes '
+                'that call -- sf-queues does, and the budget is its home.'
+                % operation)
+
+    def test_the_suite_still_probes_cluster_headroom(self):
+        # The argument for exempting the three node-state pairs is that
+        # tools/ci_headroom_probe.py reads the node roster and the cluster
+        # resources on a timer for the whole functional test step. That probe
+        # is phase 1 instrumentation and is meant to come out once the sizing
+        # question it answers is closed, so derive the justification from the
+        # file rather than trusting the comment beside the exemption: when the
+        # probe goes, or stops reading those two endpoints, the exemption
+        # stops being an explanation and becomes a hole.
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(os.path.dirname(here))
+        path = os.path.join(root, 'tools', 'ci_headroom_probe.py')
+
+        self.assertTrue(
+            os.path.exists(path),
+            'tools/ci_headroom_probe.py is gone, so nothing polls the node '
+            'roster on a timer during a CI run any more. That is the entire '
+            'justification for exempting GetNodeAttributes/api, '
+            'GetAllNodeDaemonStates/api and GetNodeMetrics/api in '
+            'HARNESS_DRIVEN_PAIRS -- drop those three and let the idle load '
+            'check see the pairs again.')
+
+        with open(path, encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+
+        # Two findings rather than one loop carrying both, unlike the events
+        # check above: the probe's sleeping loop and the calls it samples with
+        # live in different functions, because the loop body is take_sample().
+        sleeping_loops = []
+        for loop in ast.walk(tree):
+            if not isinstance(loop, (ast.While, ast.For)):
+                continue
+            for node in ast.walk(loop):
+                if (isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                        and node.func.attr == 'sleep'):
+                    sleeping_loops.append(loop.lineno)
+                    break
+
+        sampled = set()
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr in ('get_nodes',
+                                           'get_cluster_resources')):
+                sampled.add(node.func.attr)
+
+        self.assertNotEqual(
+            [], sleeping_loops,
+            'No loop in tools/ci_headroom_probe.py sleeps, so it no longer '
+            'samples on a timer and its traffic is not the fixed-rate poll '
+            'the api entries in HARNESS_DRIVEN_PAIRS are exempted as.')
+
+        self.assertEqual(
+            {'get_cluster_resources', 'get_nodes'}, sampled,
+            'tools/ci_headroom_probe.py no longer reads both the node roster '
+            'and the cluster resources, so the set of pairs its sampling '
+            'explains has changed. Re-derive the api entries in '
+            'HARNESS_DRIVEN_PAIRS from what it actually calls.')
+
     def test_harness_reads_the_shipped_budget_not_a_copy(self):
         # If the harness ever grows its own copy of the numbers this stops
         # being true, which is the failure decision 2 of the phase plan is

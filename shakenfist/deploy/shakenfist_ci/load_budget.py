@@ -199,12 +199,49 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # file and not from here, so the same pair is still watched at the same
 # ceiling on every real cluster.
 #
-# Anything added here needs the same two things: a named loop in this
-# suite which produces it, and a reason the budget is the wrong home for
-# it. test_harness_driven_pairs_are_not_budgeted and
-# test_the_suite_still_polls_an_events_endpoint hold both ends of that up.
+# The CI headroom probe is the same shape of thing, one layer further out.
+# tools/ci_headroom_probe.py samples GET /nodes and GET /admin/resources on
+# an --interval timer for the whole of the functional test step, started by
+# ci_headroom_launch.sh in shakenfist/actions rather than by this suite (see
+# docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md). Reading the
+# roster runs Node.external_view() per node, which is one GetNodeAttributes
+# and one GetAllNodeDaemonStates each, and /admin/resources refreshes node
+# metrics, which is one GetNodeMetrics each. On a cluster of N nodes at a
+# 15s interval that is N/15 per second for all three, and on the six node
+# merge queue cluster which found this all three read 0.3997/s against the
+# same 0.30/s ceiling -- flat across windows and indifferent to what the
+# suite was doing, because a poller started by the workflow and paced by a
+# constant is precisely what the check is built to notice (issue 3975).
+#
+# The budget is the wrong home for these for the reason above and one more:
+# no deployed cluster runs the headroom probe at all, so an entry would
+# model load which exists nowhere outside a CI job. It would also have to be
+# a per_node term, since the traffic scales with node count, and that raises
+# every real cluster's ceiling in proportion to its size.
+#
+# What it costs, again said plainly: this check can no longer see a new
+# fixed-rate poll of node state made through sf-api, whatever its rate. That
+# is a wider blind spot than the events one. It is still CI's alone -- none
+# of these three pairs is budgeted for the api caller, so
+# ShakenFistUnbudgetedDatabasePolling goes on watching all three at the
+# unbudgeted ceiling on every real cluster. The exemption is also load
+# bearing only while the probe is: phase 1 instrumentation comes out once
+# the sizing question it answers is closed, and
+# test_the_suite_still_probes_cluster_headroom fails when it does, so this
+# gets revisited rather than quietly outliving its reason.
+#
+# Anything added here needs the same two things: a named loop which produces
+# it, and a reason the budget is the wrong home for it.
+# test_harness_driven_pairs_are_not_budgeted,
+# test_the_suite_still_polls_an_events_endpoint and
+# test_the_suite_still_probes_cluster_headroom hold both ends of that up.
 HARNESS_DRIVEN_PAIRS = frozenset([
+    # shakenfist_ci/base.py's await helpers, on a time.sleep(5) timer.
     ('GetObjectEvents', 'api'),
+    # tools/ci_headroom_probe.py, on its --interval timer.
+    ('GetAllNodeDaemonStates', 'api'),
+    ('GetNodeAttributes', 'api'),
+    ('GetNodeMetrics', 'api'),
 ])
 
 
