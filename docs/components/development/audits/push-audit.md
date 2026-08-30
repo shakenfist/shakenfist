@@ -8,11 +8,11 @@ Repositories that carry a pre-push audit runbook must:
   flagged as legacy, because the file is a runbook the operator follows
   before pushing rather than a template that gets copied, and
   `-TEMPLATE` is reserved for true templates like `PLAN-TEMPLATE.md`;
-* embed the current **`readme-discipline`**, **`llm-doc-discipline`**
-  and **`plan-phase-references`** shared blocks in its
-  documentation-review section (see the `readme-structure`,
-  `llm-doc-structure` and `plan-phase-references` audits for the
-  policies they enforce);
+* embed the current **`readme-discipline`**, **`llm-doc-discipline`**,
+  **`diagram-discipline`** and **`plan-phase-references`** shared
+  blocks in its documentation-review section (see the
+  `readme-structure`, `llm-doc-structure`, `diagram-format` and
+  `plan-phase-references` audits for the policies they enforce);
 * embed the current **`comment-proportion`** shared block in its
   code-quality review section;
 * embed the current **`path-traversal-review`**,

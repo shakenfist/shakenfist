@@ -360,8 +360,8 @@ Three things about it only matter while developing:
   how `tools/build-proxy-wheel.sh` knows not to dev-stamp a
   release-stamped tree. A unit test pins the floor's dev-inclusive
   property. `find_proxy_bin()` still prefers `KERBSIDE_PROXY_BIN` and
-  the cargo build tree for local work, and the daemon verifies the
-  binary's gRPC contract hash at launch either way.
+  the cargo build tree for local work, and the daemon compares the
+  binary's gRPC contract hash against its own at launch either way.
 - **`rust.yml` verifies wheel stamping on pull requests as a packaging
   guard** (`tools/verify-wheel-stamping.sh`: an unstamped tree must
   produce a dev-versioned wheel, a release-stamped tree an

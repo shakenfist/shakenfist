@@ -265,9 +265,9 @@ All resolved by the operator on 2026-08-14:
 | 1. Dev wheel publish workflow | [PLAN-proxy-dev-releases-phase-01-publish-workflow.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/) | Complete (merged in PR #314, 2026-08-16) |
 | 2. Committed dev specifier and release stamping | [PLAN-proxy-dev-releases-phase-02-dev-specifier.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/) | Complete (merged in PR #314, 2026-08-16) |
 | 3. Contract handshake | [PLAN-proxy-dev-releases-phase-03-contract-handshake.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/) | Complete (merged in PR #314, 2026-08-16) |
-| 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Docs (4a) complete in PR #314. 4b (patch175 simplification) withdrawn 2026-08-18 — decision 1 is reversed in the phase plan and the Kolla patch keeps its PyPI fallback. 4c (Gerrit recheck) outstanding, operator-driven |
+| 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Complete (4a docs in PR #314; 4b withdrawn 2026-08-18 after measurement, not delivered; 4c Gerrit recheck green 2026-08-29) |
 | 5. Automated dev release pruning | [PLAN-proxy-dev-releases-phase-05-pypi-prune.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/) | Complete (merged in PR #328, 2026-08-18) — storage monitor, lockfile-only merges no longer publish, pruning runbook |
-| 6. Push audit | PLAN-proxy-dev-releases-phase-06-push-audit.md | Not started |
+| 6. Push audit | [PLAN-proxy-dev-releases-phase-06-push-audit.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/) | Complete |
 
 Phase sketches (to be expanded into per-phase plans):
 
@@ -437,20 +437,231 @@ it, so a rebase or a later amendment cannot silently
 narrow the audit. Substitute this range wherever
 `PUSH-AUDIT.md` says `git diff develop...HEAD`, in all
 five judgment briefs. Wave 1's lint and test gates run
-against the worktree and are unaffected, but its style
-checks are diff-based against a hard-coded `DIFF_BASE`
-(`tools/audit/wave1.sh:37`) and will see nothing; run
-those greps over the range above by hand, or edit
-`DIFF_BASE` locally without committing it.
+against the worktree and are unaffected, but every style
+and report grep in *both* audit scripts is diff-based
+against a hard-coded `DIFF_BASE=develop` --
+`tools/audit/wave1.sh:37` and, as the phase 6 survey
+found, `tools/audit/wave2-mechanical.sh:18` as well, where
+all eight reports are built from it. Run unmodified on a
+phase 6 branch, wave 2's script prints "(none)" eight
+times and exits 0, which reads as a clean bill of health
+and is an empty diff. This sketch previously named only
+`wave1.sh` and suggested editing `DIFF_BASE` locally
+without committing it; the phase plan rejects that (it
+cannot express the path scoping) and teaches both scripts
+to read an `AUDIT_RANGE` / `AUDIT_PATHS` pair from the
+environment instead, derived by a new
+`tools/audit/plan-range.sh`.
 
-Scope note: 4b is withdrawn and 4c is still outstanding
-and operator-driven, so the audit covers phases 1 to 3,
-4a and 5.
+The Rust half of the range is not mechanically checked at
+all: both audit scripts are Python-only, and the range
+touches `rust/kerbside-proxy/build.rs` and
+`src/main.rs`. The phase runs
+`make -C rust/kerbside-proxy lint test` alongside wave 1.
+
+Scope note: 4b is withdrawn and 4c ships no diff in this
+repository, so the audit covers phases 1 to 3, 4a and 5.
+(4c completed on 2026-08-29, after the audit ran; it
+changed nothing here.)
 
 Findings land as their own pull request; this plan is not
 complete until each one is fixed or declined in writing
 here, with the reason. If the audit finds nothing, record
 that in a sentence — it is a result worth having.
+
+**Phase 6 result.** The audit ran on 2026-08-29 over
+`14b54f3^1..2e1fd43`, scoped to the 40 paths phases 1 to
+3, 4a and 5 touched: wave 1 mechanical and style, the Rust
+lint and test gates, wave 2 mechanical, and the four
+judgment agents (2a code quality, 2b tests, 2c
+documentation, 2d security). It found **nothing critical,
+high or blocking.** Everything it did find was a cheap
+correctness or honesty improvement; all of it is fixed in
+this phase's pull request, and everything not fixed is
+declined below with its reason.
+
+Fixed, each in its own commit:
+* `get_binary_contract_hash()` decoded the binary's stdout
+  with the strict UTF-8 handler while catching only
+  `TimeoutExpired` and `OSError`, so a binary printing
+  non-UTF-8 raised `UnicodeDecodeError` out of a function
+  documented to return a failure reason for *every*
+  failure — the operator would have seen a traceback at
+  daemon startup instead of the actionable `RuntimeError`
+  `check_contract()` builds. Now decoded with
+  `errors='replace'`, so the mangled text falls into the
+  digest check that already exists, with a regression test
+  that runs a real executable printing real undecodable
+  bytes. *Survive a proxy binary that prints non-UTF-8.*
+* Three scripts decide whether the crate's
+  `pyproject.toml` is still unstamped by testing the same
+  literal `dynamic = ["version"]` line in the same file,
+  and `tools/build-proxy-wheel.sh` tested it with no end
+  anchor while both stampers anchored it at both ends. A
+  trailing comment on that line would have made the three
+  disagree about the state of the tree. End-anchored, with
+  a comment saying the anchoring is deliberate and naming
+  its two siblings. *Make the three stamped-tree checks
+  agree.*
+* `tools/file-pypi-storage-issue.sh` interpolated the
+  issue title into the jq program that dedupes on it. Both
+  call sites pass literals so nothing was exploitable, but
+  it is a trap for the next caller with a computed title;
+  the comparison is now made in bash and jq only names
+  fields. *Pass the issue title to jq as data.*
+* `docs/development.md` said the daemon "verifies" the
+  binary's contract hash — the only security-flavoured
+  word about the handshake anywhere in the shipped
+  documentation. It now compares, and
+  `docs/proxy-architecture.md` says explicitly that the
+  handshake detects accidental build skew and detects
+  nothing whatever about a substituted or tampered binary.
+  *Say what the contract handshake does not do.*
+* `docs/installation.md` never said that the dev wheel a
+  git install resolves is published unattended with no
+  per-commit human review behind it, nor that production
+  should install a tagged `kerbside==X.Y.Z` and get the
+  exact pin; `RELEASE-SETUP.md` described build provenance
+  attestations as something consumers of dev wheels rely
+  on when in fact no install path in this repository, in
+  `docs/installation.md` or in the Kolla patch verifies
+  them. Both now say so, and `RELEASE-SETUP.md` also
+  records that the response to a suspected compromise is
+  the same manual PyPI yank as pruning, since there is no
+  delete or yank API. The same commit rewords that file's
+  "the phase 5 decisions in ..." pointer, which read as
+  though the runbook itself were phased. *Be plain about
+  what installs an unreviewed wheel.*
+
+Declined, with the reason:
+* A non-docstring string using double quotes at
+  `kerbside/proxy_supervisor.py:212`. It contains `'1',
+  'true', 'yes', 'on'`, so double-quoting avoids escaping
+  four apostrophes. Defensible as written.
+* `kerbside/tests/unit/test_proxy_floor.py` subclasses
+  `unittest.TestCase` where its three sibling new modules
+  use `testtools.TestCase`. Cosmetic: it runs correctly
+  under stestr, and two pre-existing test modules do the
+  same.
+* `KERBSIDE_SKIP_CONTRACT_CHECK` is read through
+  `os.environ` rather than `kerbside/config.py`. It
+  exactly mirrors the same file's existing precedent,
+  `KERBSIDE_PROXY_BIN` at `proxy_supervisor.py:61`: both
+  are supervisor bootstrap escape hatches, not runtime
+  application settings, and neither belongs in the
+  deployment's configuration surface.
+* Four advisory test gaps from the 2b review — no
+  coverage of `tools/file-pypi-storage-issue.sh`, no
+  end-to-end test that the real built binary's
+  `--contract-hash` stdout is what the supervisor parses,
+  no direct test of `format_bytes`, and no test pinning
+  the hash regex against a valid hash followed by trailing
+  output. None describes a defect that exists today; all
+  four are recorded as future work.
+* The duplicated `setuptools_scm` version derivation
+  between the two stamp scripts, and the wider
+  shared-helper extraction across the four version
+  scripts. The duplication is real, but extracting it is a
+  refactor of the very code under audit and a larger
+  change than an audit should land. Recorded as future
+  work; the minimal correctness half of it is the
+  end-anchor fix above.
+* L1, third-party actions pinned to mutable refs
+  (`dtolnay/rust-toolchain@stable`,
+  `pypa/gh-action-pypi-publish@release/v1`). This matches
+  the repository-wide pre-existing pattern in
+  `release.yml` and `rust.yml`; fixing it properly means
+  digest-pinning every third-party action across the
+  repository with Renovate keeping the digests current,
+  which is a repository-wide change rather than a finding
+  against this range.
+* L3, escaping the markdown fence in the issue body built
+  by `tools/file-pypi-storage-issue.sh`. The shell quoting
+  is correct and PyPI normalises version strings to PEP
+  440, so a backtick cannot reach the fenced block; the
+  payoff would be a malformed GitHub issue.
+* M1, the unpinned pre-release floor. This is the single
+  deliberate hole in an otherwise exactly pinned tree, and
+  no fix preserves the feature: a floor cannot be
+  hash-pinned, which is the whole point of having one. The
+  risk was analysed and accepted in writing when phase 2
+  committed it. The documentation half of the finding is
+  closed by the `docs/installation.md` and
+  `RELEASE-SETUP.md` edits above.
+* M2, the unattended OIDC publish job sharing a persistent
+  self-hosted runner pool with jobs that execute
+  pull-request code. Filed as kerbside#374 rather than
+  fixed. It is pre-existing — `release.yml` already
+  publishes with `id-token: write` on the same pool — but
+  the dev lane widens the exposure window substantially,
+  because it fires unattended on every qualifying merge
+  instead of a handful of human-initiated tags a year. The
+  fix is ephemeral runners for every job holding
+  `id-token: write`, which is runner-fleet infrastructure
+  and not a change to this repository.
+
+Verified rather than found:
+* M3, the `dev-release` environment's deployment-branch
+  policy, could not be checked from inside the repository.
+  The management session checked it with `gh api`: the
+  environment carries a custom branch policy containing
+  exactly `develop`. The control is in place.
+* The contract handshake cannot go stale on either side.
+  `kerbside/tests/unit/test_contract.py:19-29` re-reads
+  `kerbside.proto`, recomputes its sha256 and compares it
+  to the committed constant, and it runs under
+  `tox -epy3`, a required check;
+  `rust/kerbside-proxy/build.rs:53-60` re-derives the same
+  hash from the proto at build time, so the Rust side
+  cannot drift either. The handshake's one plausible
+  failure mode is closed.
+* The 2c plan-accuracy pass found no drift between the
+  planning record and the code: the publish path filter,
+  the version floor and the monitor's three thresholds all
+  agree across the workflow, `pyproject.toml`,
+  `tools/check-pypi-storage.py`, `RELEASE-SETUP.md`,
+  `docs/proxy-architecture.md` and the phase plans.
+* The contract-check escape hatch fails closed on every
+  path, including unrecognised values, and logs loudly
+  when it is set.
+* No PyPI credential exists anywhere in the repository;
+  `issues: write` is scoped to only the jobs that file
+  issues; and both new workflows set `permissions: {}` at
+  the top level, with neither carrying a `pull_request`
+  trigger.
+
+`PUSH-AUDIT.md`'s management session checklist, worked
+through: wave 1 passed, including the Rust lint and test
+gates step 6b ran alongside it; wave 2's findings are
+reviewed and dispositioned above; there were no blocking
+2a, 2b or 2c findings needing a re-verified fix; 2d raised
+nothing critical or high; the branch carries one planning
+commit, two audit-tooling commits and six audit-outcome
+commits, with no fixups to squash, no stray files and no
+build artefacts; and it is level with `develop` at
+`fe4bebe`, so no rebase is needed before it is pushed.
+
+One correction the audit made to its own planning: the
+phase 6 plan's brief for step 6g asserted that phases 3
+and 4 describe the contract hash both ways, as a security
+control and as a compatibility check, and told the
+security reviewer to treat that inconsistency as a
+finding. The review checked and could not substantiate it
+— both phase plans, this plan and the shipped
+documentation are consistently about skew, and the only
+security-flavoured word anywhere was the single "verifies"
+that the documentation fix above removes. The claim was
+overstated, and the phase plan now says so.
+
+**This plan is complete.** Phase 4c — the upstream Gerrit
+recheck of the kolla-ansible kerbside scenario jobs — was
+the last thing outstanding, and the operator confirmed on
+2026-08-29 that every Gerrit review is passing Zuul CI.
+That was the plan's whole point: the scenario jobs that
+were red because an unreleased kerbside install could not
+resolve a proxy binary are now green, with no change
+required in upstream kolla. With the push audit and its
+fixes also done, nothing remains.
 
 ## Agent guidance
 
@@ -618,6 +829,41 @@ implemented because the following statements will be true:
   account password and TOTP seed. If #12810 lands, the
   monitor phase 5 builds becomes the trigger for a real
   pruning job.
+* Extract the shared version derivation the four version
+  scripts duplicate — `tools/stamp-proxy-version.sh`,
+  `tools/stamp-dev-proxy-version.sh`,
+  `tools/verify-wheel-stamping.sh` and
+  `tools/build-proxy-wheel.sh` — into one helper they all
+  call, in particular the `setuptools_scm` derivation the
+  two stampers each carry and the "is this tree stamped"
+  test three of them make separately. Raised by the phase
+  6 audit, which landed only the minimal correctness half
+  (end-anchoring the third test so all three agree)
+  because a refactor of the code under audit is not an
+  audit's job.
+* Four advisory test gaps the phase 6 audit recorded: no
+  coverage of `tools/file-pypi-storage-issue.sh` at all,
+  no end-to-end test that the real built binary's
+  `--contract-hash` stdout is what
+  `get_binary_contract_hash()` parses, no direct test of
+  `format_bytes` in `tools/check-pypi-storage.py`, and no
+  test pinning the contract-hash regex against a valid
+  hash followed by trailing output. None of the four
+  describes a defect that exists today.
+* Run every job holding `id-token: write` on an ephemeral
+  runner rather than the shared persistent self-hosted
+  pool, so a publish never shares a machine with
+  previously executed pull-request code. Tracked as
+  kerbside#374; raised by the phase 6 audit, which found
+  it pre-existing (`release.yml` publishes the same way)
+  but substantially widened by a dev lane that fires
+  unattended on every qualifying merge.
+* Digest-pin the third-party actions this repository uses
+  from mutable refs (`dtolnay/rust-toolchain@stable`,
+  `pypa/gh-action-pypi-publish@release/v1`), with Renovate
+  keeping the digests current. Raised by the phase 6
+  audit and declined there as a repository-wide change
+  rather than a finding against one range.
 * Upstream kolla: consider eventually switching
   `kerbside-base` from git-develop to released tarballs,
   which would make image builds reproducible and reduce
