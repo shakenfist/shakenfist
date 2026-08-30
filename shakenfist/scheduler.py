@@ -83,19 +83,24 @@ def get_active_node_metrics():
 
 
 def _binary_affinity_spec(requested_affinity):
-    """The binary constraints in a spec, or None if it is the weighted form.
+    """Any affinity specification, as the binary form.
 
     The two shapes live under one metadata key and are told apart by
-    their keys. Anything the validator would have refused is treated
-    here as "not the binary form" rather than raising: the scheduler
-    reads specs which were validated when they were accepted, and a
-    spec which predates a validation rule should degrade to the old
-    behaviour rather than making an instance unschedulable.
+    their keys. A weighted specification is mapped here, at the point
+    the scheduler reads it, so that there is exactly one scoring path
+    rather than two which can drift apart.
+
+    Anything the validator would have refused is dropped rather than
+    raising: the scheduler reads specifications which were validated
+    when they were accepted, and one which predates a validation rule
+    should place somewhere rather than making an instance
+    unschedulable.
     """
-    if not isinstance(requested_affinity, dict):
-        return None
+    if not isinstance(requested_affinity, dict) or not requested_affinity:
+        return instance.map_weighted_affinity({})
+
     if not set(requested_affinity) & set(instance.Instance.AFFINITY_BINARY_KEYS):
-        return None
+        return instance.map_weighted_affinity(requested_affinity)
 
     spec = {}
     for k in instance.Instance.AFFINITY_BINARY_KEYS:
@@ -109,8 +114,6 @@ def _binary_affinity_spec(requested_affinity):
 def _hard_affinity_constraints(requested_affinity):
     """The (require_with, require_without) tag lists for a spec."""
     spec = _binary_affinity_spec(requested_affinity)
-    if spec is None:
-        return [], []
     return (spec[instance.Instance.AFFINITY_REQUIRE_WITH],
             spec[instance.Instance.AFFINITY_REQUIRE_WITHOUT])
 
@@ -674,8 +677,22 @@ class Scheduler:
             by_affinity = defaultdict(list)
             affinity_detail = {}
             binary_spec = _binary_affinity_spec(requested_affinity)
+            scoring_tags = (
+                binary_spec[instance.Instance.AFFINITY_PREFER_WITH]
+                + binary_spec[instance.Instance.AFFINITY_PREFER_WITHOUT])
 
-            for c in list(candidates):
+            # A scorer with no tags to score cannot change the ordering,
+            # but the walk below reads every candidate's placements --
+            # one Node.from_db() plus one Instance.from_db() per placed
+            # instance -- so running it for the great majority of creates
+            # which request no affinity at all was pure cost. Skipping it
+            # reduces the measured database load rather than holding it
+            # flat. Everything downstream sees what it saw before: one
+            # tier, containing every candidate, scoring zero.
+            if not scoring_tags:
+                by_affinity[0] = list(candidates)
+
+            for c in (list(candidates) if scoring_tags else []):
                 node_instances = self._placed_instances(c, placements)
                 affinity = 0
                 considered = []
@@ -714,32 +731,29 @@ class Scheduler:
                         })
                         continue
 
+                    # Count proportional, not set membership: a node
+                    # carrying five instances of a group really is more
+                    # "with the group" than one carrying a single
+                    # instance, and the same in reverse for the avoid
+                    # direction. Note the score is a sum across
+                    # neighbours *and* across tags, so a
+                    # prefer_without_tag match can be outweighed by
+                    # neighbour count on the other axis.
+                    #
+                    # Weighted specifications reach here already mapped,
+                    # so there is one scoring path and not two.
                     matched = {}
                     contribution = 0
-                    if binary_spec is not None:
-                        # Count proportional, not set membership: a node
-                        # carrying five instances of a group really is
-                        # more "with the group" than one carrying a
-                        # single instance, and the same in reverse for
-                        # the avoid direction. Note the score is a sum
-                        # across neighbours *and* across tags, so a
-                        # prefer_without_tag match can be outweighed by
-                        # neighbour count on the other axis.
-                        for tag in binary_spec[
-                                instance.Instance.AFFINITY_PREFER_WITH]:
-                            if tag in i.tags:
-                                matched[tag] = matched.get(tag, 0) + 1
-                                contribution += 1
-                        for tag in binary_spec[
-                                instance.Instance.AFFINITY_PREFER_WITHOUT]:
-                            if tag in i.tags:
-                                matched[tag] = matched.get(tag, 0) - 1
-                                contribution -= 1
-                    else:
-                        for tag, val in requested_affinity.items():
-                            if tag in i.tags:
-                                matched[tag] = int(val)
-                                contribution += int(val)
+                    for tag in binary_spec[
+                            instance.Instance.AFFINITY_PREFER_WITH]:
+                        if tag in i.tags:
+                            matched[tag] = matched.get(tag, 0) + 1
+                            contribution += 1
+                    for tag in binary_spec[
+                            instance.Instance.AFFINITY_PREFER_WITHOUT]:
+                        if tag in i.tags:
+                            matched[tag] = matched.get(tag, 0) - 1
+                            contribution -= 1
                     considered.append({
                         'instance_uuid': instance_uuid,
                         'tags': list(i.tags),

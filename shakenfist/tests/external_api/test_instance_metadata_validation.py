@@ -14,7 +14,12 @@ the top of the function -- and stating that here is the point: the
 hole was one level down from where it looked.
 """
 
+from unittest import mock
+
+from shakenfist.external_api.instance import AFFINITY_DEPRECATION_MESSAGE
+from shakenfist.external_api.instance import _affinity_spec_is_weighted
 from shakenfist.external_api.instance import _validate_instance_metadata
+from shakenfist.external_api.instance import _warn_if_weighted_affinity
 from shakenfist.instance import Instance
 from shakenfist.tests import base
 
@@ -174,3 +179,56 @@ class ValidateBinaryAffinityTestCase(base.ShakenFistTestCase):
         # incidental.
         self._assert_refused(
             {'require_with_tags': ['web']}, 'should be integers')
+
+
+class WeightedAffinityDeprecationTestCase(base.ShakenFistTestCase):
+    """The deprecation warning for the weighted affinity form.
+
+    Emitted where a specification is accepted rather than where it is
+    consumed, so it reaches the caller at the moment they submit the
+    deprecated form rather than at some later reschedule.
+
+    The site matters and is easy to get wrong. It cannot live in
+    _validate_instance_metadata: that is module level with a
+    (key, value) signature and, on the create path, runs before
+    Instance.new(), so there would be no object to hang an event on and
+    the create path -- the one a weighted caller is most likely using --
+    would emit nothing at all.
+    """
+
+    def _emitted(self, key, value):
+        inst = mock.MagicMock()
+        _warn_if_weighted_affinity(inst, key, value)
+        return [c for c in inst.add_event.call_args_list
+                if c[0][1] == AFFINITY_DEPRECATION_MESSAGE]
+
+    def test_weighted_spec_warns(self):
+        emitted = self._emitted(AFFINITY, {'first-node': 100})
+        self.assertEqual(1, len(emitted))
+        # The warning has to say what the spec was mapped to, or an
+        # operator cannot act on it without rederiving the mapping.
+        extra = emitted[0][1]['extra']
+        self.assertEqual({'first-node': 100}, extra['affinity'])
+        self.assertEqual(['first-node'], extra['mapped_to']['prefer_with_tag'])
+
+    def test_binary_spec_does_not_warn(self):
+        self.assertEqual(
+            [], self._emitted(AFFINITY, {'prefer_with_tag': ['first-node']}))
+
+    def test_another_metadata_key_does_not_warn(self):
+        # 'tags' values are lists, and a list is not a weighted affinity
+        # spec, but the key check should stop it before the shape check
+        # ever runs.
+        self.assertEqual([], self._emitted(TAGS, ['first-node']))
+
+    def test_empty_affinity_does_not_warn(self):
+        self.assertEqual([], self._emitted(AFFINITY, {}))
+        self.assertEqual([], self._emitted(AFFINITY, None))
+
+    def test_the_predicate_matches_the_validator(self):
+        # The shape test is shared so that the validator and the warning
+        # cannot disagree about which form a caller sent.
+        self.assertTrue(_affinity_spec_is_weighted({'a': 1}))
+        self.assertFalse(_affinity_spec_is_weighted({'prefer_with_tag': ['a']}))
+        self.assertFalse(_affinity_spec_is_weighted({}))
+        self.assertFalse(_affinity_spec_is_weighted(['a']))

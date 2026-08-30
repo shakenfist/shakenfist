@@ -3,6 +3,7 @@ import time
 from unittest import mock
 
 from shakenfist import exceptions
+from shakenfist import instance
 from shakenfist import scheduler
 from shakenfist.config import SFConfig
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
@@ -1544,5 +1545,97 @@ class BinaryAffinityTestCase(SchedulerTestCase):
             metadata={'affinity': {'require_with_tag': [],
                                    'prefer_with_tag': []}})
 
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
+
+
+class WeightedAffinityMappingTestCase(SchedulerTestCase):
+    """The weighted form, mapped onto the binary one.
+
+    The weighted form stays working for one more release by being
+    mapped mechanically at the point the scheduler reads it, so there is
+    one scoring path rather than two which can drift apart.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb.set_node_metrics_same()
+
+    def test_positive_maps_to_prefer_with(self):
+        self.assertEqual(
+            {'require_with_tag': [], 'require_without_tag': [],
+             'prefer_with_tag': ['a'], 'prefer_without_tag': []},
+            instance.map_weighted_affinity({'a': 100}))
+
+    def test_negative_maps_to_prefer_without(self):
+        self.assertEqual(
+            {'require_with_tag': [], 'require_without_tag': [],
+             'prefer_with_tag': [], 'prefer_without_tag': ['a']},
+            instance.map_weighted_affinity({'a': -100}))
+
+    def test_zero_maps_to_nothing(self):
+        # Zero already meant nothing: a zero contribution never changed
+        # a score, so mapping it to a preference would invent a request
+        # the caller did not make.
+        self.assertEqual(
+            {'require_with_tag': [], 'require_without_tag': [],
+             'prefer_with_tag': [], 'prefer_without_tag': []},
+            instance.map_weighted_affinity({'a': 0}))
+
+    def test_mixed_signs_map_to_both_lists(self):
+        mapped = instance.map_weighted_affinity({'a': 5, 'b': -5, 'c': 0})
+        self.assertEqual(['a'], mapped['prefer_with_tag'])
+        self.assertEqual(['b'], mapped['prefer_without_tag'])
+
+    def test_uniform_magnitude_preserves_ordering(self):
+        # With uniform magnitude M the weighted score is exactly M times
+        # the binary score for every candidate, so the ordering cannot
+        # differ. This is the real condition, and it is about magnitude
+        # rather than tag count -- every single-tag spec satisfies it,
+        # but so does any spec whose weights all share a magnitude.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3', metadata={'tags': ['a']})
+        self.mock_mariadb.create_instance(
+            'instance-2', place_on_node='node2', metadata={'tags': ['b']})
+
+        weighted = self.mock_mariadb.create_instance(
+            'instance-3', metadata={'affinity': {'a': 50, 'b': -50}})
+        binary = self.mock_mariadb.create_instance(
+            'instance-4',
+            metadata={'affinity': {'prefer_with_tag': ['a'],
+                                   'prefer_without_tag': ['b']}})
+
+        self.assertEqual(
+            scheduler.Scheduler().find_candidates(weighted),
+            scheduler.Scheduler().find_candidates(binary))
+
+    def test_mixed_magnitudes_diverge_and_that_is_intended(self):
+        # {'a': 100, 'b': 1} maps to prefer_with_tag ['a', 'b'], so a
+        # node carrying only b ties with a node carrying only a, where
+        # the weighted form ranked them 1 against 100. F4 discards the
+        # magnitude deliberately, so this divergence is asserted rather
+        # than left as an unstated exception -- a test demanding
+        # identical ordering in every case would be a gate the mapping
+        # could only pass by not existing.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3', metadata={'tags': ['a']})
+        self.mock_mariadb.create_instance(
+            'instance-2', place_on_node='node2', metadata={'tags': ['b']})
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-3', metadata={'affinity': {'a': 100, 'b': 1}})
+
+        # Both nodes now score +1, so both are in the winning tier --
+        # where the unmapped weighted form would have preferred node3
+        # outright.
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3'), set(nodes))
+
+    def test_no_affinity_still_places_anywhere(self):
+        # The scorer is skipped entirely when there is nothing to score,
+        # so this asserts the skip left the outcome unchanged: one tier,
+        # every candidate, rather than an empty tier and an IndexError.
+        inst = self.mock_mariadb.create_instance('instance-1')
         nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
