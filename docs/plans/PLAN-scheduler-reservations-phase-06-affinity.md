@@ -458,10 +458,26 @@ merge throughput. So: accept the loss, and make it visible
 rather than silent -- which is what step 6's requirement to
 record the expected skip per topology is for.
 
-So the test also skips when inst1's node is absent from the
-unforced pass's `affinity_detail` keys, with a message that tells
-the two skips apart in CI output -- `affine node not a candidate`
-against `only N candidates`. Expect this one to fire on
+**And "the unforced pass" is two passes, not one.** inst2 and
+inst3 are separate creates, scheduled by separate
+`find_candidates()` calls at different moments against candidate
+sets that need not match -- and the traced #3565 run is precisely
+a case where one had collapsed and the other had not. So both
+skip conditions are evaluated **per instance**, against inst2's
+unforced pass for the inst2 assertion and inst3's for the inst3
+assertion, and the test skips if *either* pass is degenerate. The
+singular reading is the dangerous one: guards computed from
+inst2's events alone leave the inst3 assertion running against a
+pass that may have had one candidate, or may have had inst1's
+node already ejected, and it then fails for exactly the mechanism
+F2 holds is not a scheduler defect. That is the same failure this
+whole finding exists to prevent, reached through the one door
+left open by reading a singular noun.
+
+So the test also skips when inst1's node is absent from that
+instance's unforced pass's `affinity_detail` keys, with a message
+that tells the two skips apart in CI output -- `affine node not a
+candidate` against `only N candidates`. Expect this one to fire on
 `slim-tier` until `PLAN-ci-cloud-sizing` lands, and not to fire
 on `slim-primary`; a test that skips permanently on one topology
 reads as green, so step 6 records which skip is expected where.
@@ -617,7 +633,12 @@ step 4 and say which, rather than discovering it while writing
 the response body.
 
 So the stage raises `AffinityConstraintUnsatisfiable`, **a
-subclass of `LowResourceException`**, and the create path gains
+subclass of `LowResourceException` defined beside it in
+`shakenfist/exceptions.py`** -- named because every other new
+symbol in this plan is pinned to a file, and because
+`node_inst_netdesc_op.py` has to import it, so defining it in
+`scheduler.py` would make an operation module import the
+scheduler for an exception type. The create path gains
 an `except` clause for it placed *before* the existing one.
 Python matches `except` clauses in order, so that ordering is the
 entire mechanism and is the easy thing to get wrong. It answers
@@ -658,6 +679,16 @@ unbound there. Checked at the interpreter: reading it raises
 `NameError: cannot access local variable 'e' where it is not
 associated with a value`. Only `:276` is genuinely inside an
 `except` suite and can test the exception directly.
+
+**Which is an instruction, not just an observation.** An
+earlier draft said `:276` "is a different matter" and left it
+there, so the site with the *easiest* fix was the one
+with no fix specified. Inside that suite, branch on
+`isinstance(e, AffinityConstraintUnsatisfiable)` and raise
+`AbortInstanceStart(self, 'No node satisfies the requested
+affinity constraints: %s' % e)` in place of `'Unable to find
+suitable node'`, with a matching audit event. All three
+sites, not two and an aside.
 
 So the mechanism is a **carried flag**, not a rebound exception:
 inside the suite at `:159`, set
@@ -788,15 +819,514 @@ operator to reach for it will read it as isolation.
 
 ## Execution
 
+Five of the seven briefs live in `### Step N brief` sections below
+this table rather than inside their cells, which is a deliberate
+deviation from `PLAN-TEMPLATE.md` and is recorded here so it is not
+read as an oversight. The template puts the brief in the cell, and
+that works at the ~300 character briefs the sibling phase plans in
+this series carry. Steps 1 and 4 here reached 8,700 and 11,100
+characters, twenty times the house norm, at which point the row is a
+single unwrapped line in the source and one unreadable cell in
+mkdocs -- so the container was defeating the content it exists to
+carry. The cells keep a real one-or-two-sentence brief and a link;
+nothing was shortened in the move, and the sections carry the text
+verbatim. The `### Step N` heading level is already used by sibling
+plans for their post-execution implementation notes, so this reuses
+a shape a reader of these plans knows rather than inventing one.
+
 | Step | Effort | Model | Isolation | Brief for sub-agent | Status |
 |------|--------|-------|-----------|---------------------|--------|
-| 1 | high | opus | worktree | (shakenfist) Rewrite `test_affinity` onto the audit events, per F2 and F3. In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_scheduler.py`, keep the three-instance setup unchanged and replace the two placement assertions (`:124-131`, whose `['node']` arguments are on `:125` and `:129`) with assertions read from the scheduler's own events. The events are already fetched by `_add_scheduler_detail()` (`:19-35`), which filters `get_instance_events()` to messages starting with `schedule` -- factor its fetch out into a helper returning the events so both the detail-attachment and the assertions use one read, rather than fetching twice. Assert, for inst2: that `schedule have highest affinity` scored inst1's node in the winning tier. For inst3: that inst1's node was **not** in the winning tier. Then **skip, do not pass**, when the scorer had fewer than two candidates to choose among, with the count in the skip message (F3). Take that count from `len(affinity_detail)` in the `schedule have highest affinity` event **of the unforced scheduling pass**, located by finding the `schedule inputs` event whose `forced_candidates` is false (`scheduler.py:438`) and taking the affinity event carrying the **same `request_id`**. Pair on `request_id`, not on adjacency: it is a field of `EventReadRow` (`schema/event.py:84`), populated from `FLASK_REQUEST_ID` (`eventlog.py:82-86`) and returned to clients by `row.model_dump()` (`external_api/base.py:1479-1484`); the create path takes exactly one of its two `find_candidates()` branches per request (`external_api/instance.py:866-870`), so the id identifies the unforced pass outright, while the preflight call runs in the queue daemon with no flask request and no `request_id` at all. **Guard the join against a null key on both sides.** `eventlog.py:84` reads the environ with a bare `.get()`, so an absent key yields `request_id = None` -- and if the create-path events carried `None` too, an equality match would return the preflight events as well, and taking the first or last could select the forced pass, whose `affinity_detail` has exactly one entry: a silent permanent skip, the failure F3 exists to prevent, reached by a fourth route. In practice the key is always set on the create path -- `RequestID(app)` (`external_api/app.py:63`) is WSGI middleware that does `environ["FLASK_REQUEST_ID"] = req_id` on every request, generating a uuid4 when the client sends no `X-Request-ID` header -- which is *why* the pairing is sound, and is worth stating because this plan had been asserting the pairing without saying what guarantees it. (The `.get(..., 'none')` defaults elsewhere -- `external_api/base.py:1274`, `app.py:227,262,614` -- are defensive logging, not evidence of absence.) Use the pairing only when the unforced `schedule inputs` event's `request_id` is truthy; if it is falsy, fall back to adjacency, and `self.fail()` rather than skip when adjacency cannot identify a pass either. Adjacency is the fallback only when `request_id` is absent, and it is fragile because the rows are ordered by float timestamps that can tie. **Three** wrong sources are ruled out in F3 and must not be reintroduced: `schedule final candidates` (post-narrowing, holds one node whenever affinity works for inst2); any `schedule have highest affinity` matched by message alone (`find_candidates()` runs several times per create, and the forced calls each publish one with a single entry); and -- inside the correct event -- `extra['candidates']`, which is `preferred`, the post-scoring winning tier (`scheduler.py:604,609`), and not the input set. That third one is the nearest to hand and the easiest to reach for, because `candidates` means an actual candidate list in the two sibling events. The count is `len(affinity_detail)`, full stop. **The same key is the right source for the other question**, and is named here so that being told three times not to touch it does not send you rebuilding the tier by hand: the two tier assertions ask whether inst1's node is *in* the winning tier, and `extra['candidates']` *is* the winning tier. Tier membership from `extra['candidates']`, count from `affinity_detail`. Rebuilding the tier from `by_affinity` or from the `affinity_detail` scores is more code and can disagree with the scheduler's own `sorted(by_affinity, reverse=True)[0]` choice. The lookup itself needs no translation: `inst1['node']` and the keys of `affinity_detail` are both node UUIDs drawn from the same `get_active_node_metrics()` keyspace -- confirmed at planning time, and worth stating because if it were false the test would skip permanently and silently. **The fetch must also be widened.** `_add_scheduler_detail()` calls `get_instance_events()` with no limit, and that endpoint defaults to `limit=100` (`external_api/instance.py:1203`) over rows ordered by timestamp descending (`mariadb.py:6139-6146`) -- so it returns the *newest* hundred, while the create-path scheduling events are the *oldest* an instance has, behind all its networking, image, boot and agent events. Pass `event_type='audit', limit=1000` explicitly, and put that pair in the helper's *body* rather than in its signature -- it takes the instance uuid and nothing else. The truncation this instruction removes was reintroducible precisely because the widening lived at the call site; a helper that hardcodes both gives every reader the widened fetch by construction. Both, not one: 1000 is the endpoint's hard cap (`:1193-1195`, `{'minimum': 1, 'maximum': 1000}`), so the audit filter is what keeps a busy create inside that ceiling rather than an optional tidiness -- and since the brief also requires `self.fail()` when the unforced pair is missing, a create that emits more than 1000 events would otherwise become a test failure blamed on affinity. Two call sites in the suite already use this idiom: `get_instance_events(inst['uuid'], event_type='mutate', limit=1000)` (`cluster_ci_tests/test_events.py:136-137`), and `cluster_ci_tests/test_namespace_claims.py:415-421`, whose docstring makes exactly this argument about a default read pushing an old event off the end. If the unforced pair is not found, `self.fail()` with that reason rather than skipping: a missing event means the read was wrong, not that the run was degenerate, and a skip would hide it. `affinity_detail` has two shapes -- the normal `{'score', 'instance_count', 'considered'}` (`:596-600`) and `{'score': 0, 'reason': 'node row not found'}` (`:548-551`) for a candidate whose node row could not be read -- so count its entries but do not index inside them unconditionally, or a transient node-row failure becomes a `KeyError` and an unreadable test error instead of a diagnosable skip -- a single-candidate run carries no information and a green result there is the false pass finding 3 describes. **Skip on a second condition too, per F3**: when inst1's node is not among the unforced pass's `affinity_detail` keys, the affinity target was ejected by an admission filter before scoring, so the run says nothing about affinity in either direction -- and without this guard step 1's inst2 assertion fails on precisely the mechanism F2 holds is not a scheduler defect and F7 declines to soften. Give the two skips different messages (`affine node not a candidate` against `only N candidates`) so CI output separates them; a single message would merge the degenerate case this phase accepts with the one it declines to fix. Read the 2026-08-26 comment on issue #3565 first: it contains the exact event payloads from a failing run, including an `affinity_detail` that scored a node `-100` and placed there anyway, and it is the specification for what these assertions must distinguish. Do not assert final co-location anywhere -- that is the guarantee F2 establishes the product does not make. This runs only on `merge_group` (`docs/developer_guide/coding_rules.md:341-352`), so exercise it against sfcbr before proposing the commit. Commit subject: `tests: assert what soft affinity actually promises.` | Not started |
+| 1 | high | opus | worktree | Rewrite `test_affinity` onto the scheduler's audit events per F2 and F3, asserting affinity tier membership rather than final co-location, and skipping (not passing) on a degenerate run. **Full brief: [Step 1](#step-1-brief-rewrite-test_affinity-onto-the-events).** | Not started |
 | 2 | low | sonnet | none | (GitHub) The #3565 disposition, once step 1 has merged. Comment on #3565 recording F2: the traced 2026-08-26 run shows a single-candidate set, so affinity was never consulted, and both halves of the assertion had the same cause; the issue is closed by candidate fix 2 rather than by a scheduler change; D6's three positions are disposed of by F2 and F7. Close it. Then deal with the retry behaviour from finding 6, and **pin it to a call site before filing** (F8). Re-read that comment's event payloads against the three sites finding 6 names: the create path's demand-waiving second walk (`external_api/instance.py:924-940`), the preflight redirect that rebuilds the candidate list excluding the current node (`operations/node_inst_netdesc_op.py:172-180`), and preflight's opening forced call against `config.NODE_UUID` (`:156`), which runs on the node the create path has just chosen. File the issue against whichever the trace matches, quoting the payloads and naming the file and line. If none of them matches, file it as an observation that says so in as many words rather than asserting a mechanism -- a wrong issue is worse than none. Cross-reference it from #3565's closing comment. Do **not** file the validator defect here: step 3 files and closes its own issue, deliberately, so that a live public-API 500 does not wait on this step, which waits on step 1 (F1). If step 3 has already landed, reference its issue from #3565's closure alongside the retry one. Also comment on `PLAN-ci-cloud-sizing`'s tracking of #3565 that its "needs a disposition in phase 0 before phase 4" is now satisfied. Include *(Triage assisted by Claude Code)*. | Not started |
-| 3 | low | sonnet | worktree | (shakenfist) The validator 500, on its own. Widen `_validate_instance_metadata`'s `except ValueError` to `except (TypeError, ValueError, OverflowError)` (`external_api/instance.py:1403-1406`). `int()` raises `TypeError`, not `ValueError`, for a list, a dict or `None`, so an affinity dictionary *value* of that shape escapes the handler and returns **500** today from instance create (`:797`) and from both metadata endpoints (`:1375`, `:1425`). **`OverflowError` is a fourth case and is not theoretical**: `int(float('inf'))` raises it, and flask hands a bare `Infinity` literal straight through because `req.get_json(force=True, silent=True)` (`external_api/base.py:129`) uses `json.loads` defaults, which accept `Infinity` and `NaN` as JSON. So `{'affinity': {'a': Infinity}}` 500s exactly like the other three, and a two-exception fix leaves that hole open behind a ticked box. This trap is already known in this codebase and handled one file over -- `external_api/base.py:308-320` refuses non-finite durations with a comment saying in as many words that json.loads hands the bare literals through. (`NaN` needs nothing: `int(float('nan'))` raises `ValueError`, which is already caught.) **Refuse booleans as well**, mirroring `external_api/base.py:299-301`: `isinstance(True, int)` is true in Python so `int(True)` is 1, and `{'affinity': {'a': true}}` is accepted today as weight 1 -- which under F4's mapping would silently become `prefer_with_tag: ['a']`. Record that half honestly in the issue, the commit message **and the release notes**, because it is the one part of this step that **changes a request that succeeds today into a 400**, and the validator is shared, so the break has three entry points -- instance create and both metadata endpoints; it is worth doing here rather than later precisely because F4 is about to give `true` a meaning nobody asked for. Do *not* replace the coercion with a shape test (`isinstance(dv, int) and not isinstance(dv, bool)`), tempting as it looks: `int('3')` succeeds today, so a shape test would also refuse string-encoded integers, and this step is a bugfix for a 500, not a tightening of what the API accepts. Get the level right too: a malformed *outer* `affinity` value is already refused correctly -- a list by `isinstance(value, dict)` (`:1398-1400`) and `None` by `if not value` (`:1387-1388`) -- and only the inner per-tag coercion leaks. Unit tests in `shakenfist/tests/` for the list-valued, dict-valued, `None`-valued and `Infinity`-valued inner cases, which are the four that 500 now, plus the boolean case which is the one that changes answer. This step is deliberately separate from the binary model below and depends on none of this phase's decisions: it is a live 500 on a public API, the fix is one `except` clause, and it should not wait behind an API surface, a new scheduler stage and a back-brief gate. **File its own issue and close it with the fix** (`Fixes #NNNN`), rather than waiting for step 2's triage pass -- step 2 waits on step 1, which is a cluster-CI rewrite that has to be driven against sfcbr by hand, and a live 500 on a public API should not sit behind that. Be precise about the level in the issue as well as in the code: a malformed *outer* `affinity` value is already refused correctly, and only the inner per-tag coercion leaks. This step waits for nothing and can go first. Commit subject: `Refuse malformed affinity values with a 400.` | Not started |
-| 4 | high | opus | worktree | (shakenfist) The binary model. Per F4 and the Design section: accept the new value shape under the `affinity` metadata key, validate it at `external_api/instance.py:1395-1406` alongside the weighted form (four reserved keys, list-of-string values, 400 on anything else), and consume it in `scheduler.py`. Step 3 has already widened the `except` clause in that same function; build the new-shape validation beside it rather than repeating it, and **place it above the per-value coercion loop, not below**. The binary form's values are *lists*, which is exactly the shape step 3 has just taught that loop to refuse with a 400, so a branch added underneath it ships a validator that rejects the whole new API surface -- a step breaking the feature the next step adds, which no test written inside either step would catch. Discriminate on the keys: a dictionary any of whose keys are one of the four reserved names is the binary form, so validate that branch and `return`, and let only the weighted branch reach `int()`. A dictionary mixing the two shapes is refused rather than guessed at, because either way of resolving it silently discards half of what the caller asked for. `require_with_tag` / `require_without_tag` become a filter stage placed **with** the admission filters and before affinity scoring, publishing a dropped map through `_log_and_raise_on_error()` like every other filter, with its own stage name so a refusal says which constraint ejected the node. **That helper cannot raise the subclass as it stands**: it raises `exceptions.LowResourceException` unconditionally at `scheduler.py:391` with a message it builds itself, so give it an optional `exception_class=exceptions.LowResourceException` argument, defaulted so no existing call site changes, and pass `AffinityConstraintUnsatisfiable` from the require stage. The message is built in the helper too, so decide *in this step* how the constraint detail reaches the 409 body -- a second optional argument, or the stage raising directly and using the helper only for the event -- and record which. Do not leave it to be discovered while writing the response body. **Hoist the `placements` memo before writing that stage.** Matching co-located instance tags means calling `_placed_instances()` (`scheduler.py:169-185`), one `Node.from_db()` plus one `Instance.from_db()` per placed instance per candidate node; today that is paid exactly once because the memo is a local created inside the affinity block (`:541`). A separate earlier stage cannot see it, so the obvious implementation pays it twice -- and the earlier payment lands on the *full* candidate set, before the CPU, RAM and disk filters have pruned it, which makes it strictly more expensive than the pass that already exists. Lift `placements` to the top of the candidate walk so the filter and the scorer share one read, and confirm the result against `shakenfist/data/database_load_budget.yaml` before proposing the commit -- the same requirement step 5 carries for a far smaller addition, on the same instance-create hot path. **Hoisting removes the doubling but not the pre-prune increase**, so it is not sufficient on its own: the same "lands on the full candidate set" argument that condemns the naive implementation applies to the hoist, just once instead of twice. So the require stage must **return immediately when the instance requests neither `require_with_tag` nor `require_without_tag`**, leaving the memo unpopulated until the scorer's existing post-prune fill. Otherwise every create on a large cluster pays the larger walk, including the overwhelming majority that request no affinity at all. While you are there, take the free win the same reading exposes: the affinity loop calls `_placed_instances()` unconditionally today (`scheduler.py:542-543`) with no short-circuit on an empty `inst.affinity`, so every create already pays a full `Node.from_db()` plus one `Instance.from_db()` per placed instance per candidate for a scorer that has nothing to score. Skipping the walk when there is nothing to score *reduces* the measured load rather than holding it flat, which is a better outcome for the budget check than a wash. **But the skip has to establish what the code after the walk expects, or it breaks every create that requests no affinity -- which is most of them.** The walk is what populates `by_affinity`, and the next statement is `highest_affinity = sorted(by_affinity, reverse=True)[0]` (`scheduler.py:602`) over a `defaultdict(list)`: empty if the loop body never ran, so `sorted(...)[0]` raises `IndexError` and `preferred` never reaches the unconditional load-shed block at `:637-658`. Seed `by_affinity[0] = list(candidates)` on the skipped path, so everything downstream sees what it saw before -- one tier, every candidate, score zero. Skip on whether there are any tags to *score* (the `prefer_*` lists, after mapping) rather than on `inst.affinity` being empty, or a specification of nothing but `require_*` constraints walks anyway. **Say what the event carries there too.** `schedule have highest affinity` is still published on the skipped path, because F3 makes it the record step 1 reads and step 6 makes it the recipe an operator reads; its `candidates`, `highest_affinity` and `by_affinity` are all populated, and its `affinity_detail` is `{}` with no `instance_count` anywhere. That shape is the walk correctly declining to run, not events going missing, and step 6's recipe has to cover it -- a no-affinity create is exactly the create an operator diagnosing an unexpected placement will look at first. **Per F9 the status code is 409, not 507.** `_log_and_raise_on_error()` raises `LowResourceException` (`scheduler.py:386-392`) and the create path answers that with 507 'insufficient resources' plus a delete (`external_api/instance.py:872-877`, the `LowResourceException` handler) -- which would tell the caller the cluster is full when it is not. So raise `AffinityConstraintUnsatisfiable`, a **subclass** of `LowResourceException`, and add an `except` clause for it to the create path *before* the existing one; `except` clauses match in order, so that ordering is the whole mechanism. Answer 409 naming the constraint and the stage, and add the 409 to that endpoint's `swagger_helper` response list. Keep the delete. Leave preflight's *redirect* untouched: it catches `LowResourceException` and tries the other nodes (`node_inst_netdesc_op.py:159-180`), which is the right behaviour for a constraint another node may satisfy, and the subclass keeps that working unchanged. **Its abort message is a different matter.** When no node can satisfy the constraint -- a `require_with_tag` naming a tag nothing in the namespace carries -- the redirect exhausts its candidates and raises `AbortInstanceStart(self, 'Unable to find suitable node')` (`:276`), and repeated preflight cycles then hit `AbortInstanceStart(self, 'Too many start attempts')` (`:166-167`) after burning three placement attempts. There is a **third** between them: `AbortInstanceStart(self, 'Requested node lacks resources')` (`:169-171`), taken when `inst.requested_placement` is set and the forced call at `:156` raised -- so an operator who pinned a node is told it lacks resources when it lacks a matching tag. All three messages are capacity-shaped, which is the same "tells the caller the cluster is full when it is not" fault F9 exists to prevent, one path over; the create path escapes it only because the instance is deleted before preflight runs, so this is the restart and reschedule path. **They are not the same fix, and the difference is a trap.** The `except LowResourceException as e:` suite is `:159-162` only; `:164` onwards is dedented back to the `try` level, so `:166-167` and `:169-171` sit outside it and `e` has been deleted by then (PEP 3110) -- reading it there raises `NameError: cannot access local variable 'e' where it is not associated with a value`, confirmed at the interpreter. Only `:276` is inside an `except` suite and can test the exception directly. For the other two, capture a local inside the suite at `:159` -- `affinity_failure = isinstance(e, AffinityConstraintUnsatisfiable)` -- and test that flag at `:166` and `:170`. Initialise it to `False` immediately before the `try` rather than only inside the suite: today `:157` returns on success so the assignment always runs, but that is a property of the current control flow and not of the guards, and the next edit which adds a non-returning path through the `try` puts the unbound local back on the one path a pull request does not exercise. Get this wrong and the `NameError` lands in the merge queue rather than failing the PR, because the reschedule path runs only under cluster CI (`docs/developer_guide/coding_rules.md:341-352`). Do not change the redirect behaviour itself. The filter matches co-located **instance** tags, within the requesting namespace only, exactly as the scorer already does (`scheduler.py:574-580`) -- see the Design section for why the namespace scope is inherited rather than crossed, and note that this makes `require_without_tag` a within-namespace constraint and not an isolation primitive. `prefer_with_tag` / `prefer_without_tag` contribute +1 / -1 per matching co-located instance into the existing scoring loop (`:529-600`), which already has the per-candidate `affinity_detail` shape the events publish -- extend it rather than replacing it, because step 1's assertions read it. Unit tests in `shakenfist/tests/test_scheduler.py` beside the existing ordering cases, **plus two things that suite cannot assert**. First, an API-level test that the create path answers **409 and not 507**: the `except` ordering is the entire mechanism per F9, and a scheduler test asserting the exception type passes whichever clause catches it, so the one mistake the ordering exists to prevent is invisible to it. Second, a unit test over the preflight abort path exercising `affinity_failure` at both `:166` and `:170` -- that path runs only in the queue daemon under cluster CI, so an error there passes the pull request and lands in the merge queue. Also assert that a create requesting no affinity at all still schedules, which is the cheapest possible guard on the short-circuit above. Commit subject: `Add binary affinity constraints to the scheduler.` | Not started |
-| 5 | medium | sonnet | worktree | (shakenfist) The transition mapping, per F4. Map weighted specs mechanically at the point the scheduler reads them: positive value to `prefer_with_tag`, negative to `prefer_without_tag`, zero to nothing. Emit a deprecation event (not a log line -- this needs to reach an operator) **where the spec is accepted, not where it is consumed**, once per acceptance. Accept-time needs no durable marker at all, which is the point: the alternatives are an attribute write on the scheduling hot path or a read of the instance's own event history on that same path, and both are the kind of addition the budget check below exists to catch. It also puts the warning where the caller can act on it, at the moment they submit the deprecated form, rather than at some later reschedule. Do not make it per-process (it would reset on every daemon restart) or per-schedule (the scheduler runs this path on every create *and* every reschedule). **The emission site is not `_validate_instance_metadata` itself, and an earlier draft of this plan said it was.** That function is module level with the signature `(key, value)` (`external_api/instance.py:1384`), so it has no object to call `add_event()` on; and on the create path it runs at `:792-799`, under the comment 'Validate metadata before instance creation', which is before `Instance.new()` at `:810`. Emitting there would have produced no event at all on the create path -- the path `test_affinity` exercises and the path an operator using the weighted form almost certainly takes -- leaving a deprecation warning that silently reaches nobody, which defeats the one requirement it exists to meet. Split a predicate out of the validator instead, `_affinity_spec_is_weighted(value)` beside it so the shape test lives in one place, and emit at the three sites where an instance object is in scope: on the create path in the metadata-initialisation loop that already holds `inst` (`:835-838`), and in both metadata endpoints via `instance_from_db.add_event()` beside the existing 'set metadata key request from REST API' events (`:1378-1380` and `:1428-1430`). Record the limit this choice accepts, in the step's commit message and in step 6's documentation: accept-time covers **new acceptances only**, so every instance already carrying a weighted spec when this lands warns nobody, ever. That is tolerable because the event is not the migration mechanism -- but F4 commits to removing the weighted form in a later release, and an operator will need to find those instances then, so step 6 owes them a way to. Confirm the change against `shakenfist/data/database_load_budget.yaml` before proposing the commit: an unbounded per-schedule event on a still-supported path is exactly the kind of addition that moves a measurement CI enforces, and the weighted form is expected to survive at least one more release. Decide and record whether `test_affinity` moves to the binary form or stays weighted: there is a real argument for staying, since finding 7 makes it the only automated proof the mapping works, and a separate binary case can be added beside it. Do not remove the weighted form; that is a later release, and the removal needs its own deprecation window. Unit tests for the mapping including the zero and mixed-sign cases. Commit subject: `Map weighted affinity onto the binary form.` | Not started |
-| 6 | medium | sonnet | worktree | (shakenfist) Documentation. In `docs/`, state what soft affinity promises and -- more importantly -- what it does not: a preference is consulted when there is a choice, and a single-candidate placement is not a preference being honoured or violated. Document the four binary constraints **in one table**, with the hard/soft distinction and the namespace scope in that same view rather than as prose paragraphs elsewhere on the page. The four names share a `_with_tag` / `_without_tag` suffix family and carry two separate counterintuitive readings -- `prefer_without_tag` is a term in a sum and not a soft veto, and `require_without_tag` is scoped to the requesting namespace and is therefore not an isolation primitive -- so an operator who reads about one name must see both caveats without hunting. Document the weighted form's deprecation and its mapping, and the fact that `require_*` can make a create fail with no candidates where the weighted form would silently place anywhere. **Document the bootstrapping dead end explicitly**, because it is the first thing an operator hits and it reads as a bug: the constraints match tags on instances *already placed* on a candidate node, so the first instance of a group requesting `require_with_tag: ['web']` ejects every candidate and gets a 409, and stays that way for as long as nothing in the namespace carries the tag -- including any instance created under the same constraint. State the workaround in the same breath: create the seed instance carrying the tag and *without* the `require_*` constraint, or use `prefer_with_tag`, which degrades to a ranking that nothing to rank leaves alone. Document that `prefer_*` terms **sum**, across neighbours and across tags, with the worked two-tag example from F4: with `prefer_with_tag: ['a']` and `prefer_without_tag: ['b']` both requested, a node hosting three `a` instances and one `b` scores +2 and beats a node hosting one `a` and no `b` at +1. `prefer_without_tag` reads as a soft veto and is not one; it is a term in a sum, and an operator who learns that from a placement rather than from the documentation will read it as a bug. Include the diagnostic recipe, which is the durable output of this whole investigation: read `schedule have highest affinity` and `schedule final candidates` from the instance's events to tell "scored wrong" from "had no choice". **Cover both shapes of that event**, per step 4: a create which requested affinity carries a populated `affinity_detail` with a per-candidate `score`, `instance_count` and `considered` breakdown, while a create which requested none carries `affinity_detail: {}` with `candidates`, `highest_affinity: 0` and `by_affinity` still populated. The second is the scorer correctly declining to run and not a diagnostic gap, and it is the shape an operator meets most often, so a recipe written only against the first sends them looking for events that were never going to exist. Include a **discovery recipe** for existing weighted specs -- a metadata query or `sf-ctl` invocation listing instances whose `affinity` value is the weighted shape -- because step 5's deprecation event covers new acceptances only, and the removal release will need that list. **Run the recipe once against a real cluster** and record what it returned. It is the only thing standing between the removal release and a silent breakage, and a recipe that has never been executed is not a mitigation -- everything else this plan commits to is falsifiable, and this should be too. Record which of `test_affinity`'s two skips is expected on which CI topology (F3): `affine node not a candidate` is expected on `slim-tier` until `PLAN-ci-cloud-sizing` lands, and neither skip is expected on `slim-primary`, so a permanently-skipping test cannot pass for green. `AGENTS.md` and `ARCHITECTURE.md` are unlikely to need touching; check rather than assume. Commit subject: `docs: say what soft affinity promises.` | Not started |
+| 3 | low | sonnet | worktree | The validator 500, on its own branch and its own issue: widen the `int()` coercion handler to `(TypeError, ValueError, OverflowError)` and refuse booleans. Depends on nothing else here. **Full brief: [Step 3](#step-3-brief-the-validator-500).** | Not started |
+| 4 | high | opus | worktree | Build the binary affinity model: the four reserved keys, the hard `require_*` filter stage, the 409, and the three preflight abort messages. **Full brief: [Step 4](#step-4-brief-the-binary-model).** | Not started |
+| 5 | medium | sonnet | worktree | Map weighted specifications onto the binary form where the scheduler reads them, and emit a deprecation event where a specification is accepted. **Full brief: [Step 5](#step-5-brief-the-transition-mapping).** | Not started |
+| 6 | medium | sonnet | worktree | Documentation: rewrite `docs/user_guide/affinity.md`, put the diagnostic and discovery recipes in `docs/operator_guide/scheduler.md`, and record which skip is expected on which CI topology. **Full brief: [Step 6](#step-6-brief-documentation).** | Not started |
 | 7 | low | sonnet | worktree | (shakenfist) Close-out. Set phase 6 to `Complete` in the master plan Execution table, confirm `docs/plans/index.md`'s arithmetic, and record in the phase status notes that #3565 closed on a test change rather than a scheduler change, with F2's one-line reason so a later reader does not reopen it looking for the missing fix. Commit subject: `scheduler: close out phase 6.` | Not started |
+
+### Step 1 brief: rewrite `test_affinity` onto the events
+
+(shakenfist) Rewrite `test_affinity` onto the audit events, per F2 and F3.
+In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_scheduler.py`,
+keep the three-instance setup unchanged and replace the two placement
+assertions (`:124-131`, whose `['node']` arguments are on `:125` and
+`:129`) with assertions read from the scheduler's own events. The events
+are already fetched by `_add_scheduler_detail()` (`:19-35`), which filters
+`get_instance_events()` to messages starting with `schedule` -- factor its
+fetch out into a helper returning the events so both the detail-attachment
+and the assertions use one read, rather than fetching twice. Assert, for
+inst2: that `schedule have highest affinity` scored inst1's node in the
+winning tier. For inst3: that inst1's node was **not** in the winning tier.
+Then **skip, do not pass**, when the scorer had fewer than two candidates
+to choose among, with the count in the skip message (F3). Take that count
+from `len(affinity_detail)` in the `schedule have highest affinity` event
+**of the unforced scheduling pass**, located by finding the `schedule
+inputs` event whose `forced_candidates` is false (`scheduler.py:438`) and
+taking the affinity event carrying the **same `request_id`**. Pair on
+`request_id`, not on adjacency: it is a field of `EventReadRow`
+(`schema/event.py:84`), populated from `FLASK_REQUEST_ID`
+(`eventlog.py:82-86`) and returned to clients by `row.model_dump()`
+(`external_api/base.py:1479-1484`); the create path takes exactly one of
+its two `find_candidates()` branches per request
+(`external_api/instance.py:866-870`), so the id identifies the unforced
+pass outright, while the preflight call runs in the queue daemon with no
+flask request and no `request_id` at all. **Guard the join against a null
+key on both sides.** `eventlog.py:84` reads the environ with a bare
+`.get()`, so an absent key yields `request_id = None` -- and if the
+create-path events carried `None` too, an equality match would return the
+preflight events as well, and taking the first or last could select the
+forced pass, whose `affinity_detail` has exactly one entry: a silent
+permanent skip, the failure F3 exists to prevent, reached by a fourth
+route. In practice the key is always set on the create path --
+`RequestID(app)` (`external_api/app.py:63`) is WSGI middleware that does
+`environ["FLASK_REQUEST_ID"] = req_id` on every request, generating a uuid4
+when the client sends no `X-Request-ID` header -- which is *why* the
+pairing is sound, and is worth stating because this plan had been asserting
+the pairing without saying what guarantees it. (The `.get(..., 'none')`
+defaults elsewhere -- `external_api/base.py:1274`, `app.py:227,262,614` --
+are defensive logging, not evidence of absence.) Use the pairing only when
+the unforced `schedule inputs` event's `request_id` is truthy; if it is
+falsy, fall back to adjacency, and `self.fail()` rather than skip when
+adjacency cannot identify a pass either. **Define adjacency exactly, rather
+than leaving the word to be interpreted**: sort the instance's events
+ascending by `timestamp`, find the chosen `schedule inputs` event in that
+order, and take the first `schedule have highest affinity` strictly after
+it; `self.fail()` if there is none. It is fragile precisely because those
+timestamps are floats that can tie, which is why it is the fallback and not
+the mechanism. **It is not dead code, though it is close to it.**
+`RequestID(app)` sets the id on every request, so a current cluster always
+pairs -- but `request_id` is a recent addition to `EventReadRow`, and this
+test runs against whatever sf-api the CI cluster is running, so an older
+API that does not publish the field is the reachable path. Left undefined
+it would be a latent flake with no test behind it; defined, it is a
+documented degradation. **Three** wrong sources are ruled out in F3 and
+must not be reintroduced: `schedule final candidates` (post-narrowing,
+holds one node whenever affinity works for inst2); any `schedule have
+highest affinity` matched by message alone (`find_candidates()` runs
+several times per create, and the forced calls each publish one with a
+single entry); and -- inside the correct event -- `extra['candidates']`,
+which is `preferred`, the post-scoring winning tier
+(`scheduler.py:604,609`), and not the input set. That third one is the
+nearest to hand and the easiest to reach for, because `candidates` means an
+actual candidate list in the two sibling events. The count is
+`len(affinity_detail)`, full stop. **The same key is the right source for
+the other question**, and is named here so that being told three times not
+to touch it does not send you rebuilding the tier by hand: the two tier
+assertions ask whether inst1's node is *in* the winning tier, and
+`extra['candidates']` *is* the winning tier. Tier membership from
+`extra['candidates']`, count from `affinity_detail`. Rebuilding the tier
+from `by_affinity` or from the `affinity_detail` scores is more code and
+can disagree with the scheduler's own `sorted(by_affinity,
+reverse=True)[0]` choice. The lookup itself needs no translation:
+`inst1['node']` and the keys of `affinity_detail` are both node UUIDs drawn
+from the same `get_active_node_metrics()` keyspace -- confirmed at planning
+time, and worth stating because if it were false the test would skip
+permanently and silently. **The fetch must also be widened.**
+`_add_scheduler_detail()` calls `get_instance_events()` with no limit, and
+that endpoint defaults to `limit=100` (`external_api/instance.py:1203`)
+over rows ordered by timestamp descending (`mariadb.py:6139-6146`) -- so it
+returns the *newest* hundred, while the create-path scheduling events are
+the *oldest* an instance has, behind all its networking, image, boot and
+agent events. Pass `event_type='audit', limit=1000` explicitly, and put
+that pair in the helper's *body* rather than in its signature -- it takes
+the instance uuid and nothing else. The truncation this instruction removes
+was reintroducible precisely because the widening lived at the call site; a
+helper that hardcodes both gives every reader the widened fetch by
+construction. Both, not one: 1000 is the endpoint's hard cap (`:1193-1195`,
+`{'minimum': 1, 'maximum': 1000}`), so the audit filter is what keeps a
+busy create inside that ceiling rather than an optional tidiness -- and
+since the brief also requires `self.fail()` when the unforced pair is
+missing, a create that emits more than 1000 events would otherwise become a
+test failure blamed on affinity. Two call sites in the suite already use
+this idiom: `get_instance_events(inst['uuid'], event_type='mutate',
+limit=1000)` (`cluster_ci_tests/test_events.py:136-137`), and
+`cluster_ci_tests/test_namespace_claims.py:415-421`, whose docstring makes
+exactly this argument about a default read pushing an old event off the
+end. If the unforced pair is not found, `self.fail()` with that reason
+rather than skipping: a missing event means the read was wrong, not that
+the run was degenerate, and a skip would hide it. `affinity_detail` has two
+shapes -- the normal `{'score', 'instance_count', 'considered'}`
+(`:596-600`) and `{'score': 0, 'reason': 'node row not found'}`
+(`:548-551`) for a candidate whose node row could not be read -- so count
+its entries but do not index inside them unconditionally, or a transient
+node-row failure becomes a `KeyError` and an unreadable test error instead
+of a diagnosable skip -- a single-candidate run carries no information and
+a green result there is the false pass finding 3 describes. **Skip on a
+second condition too, per F3**: when inst1's node is not among the unforced
+pass's `affinity_detail` keys, the affinity target was ejected by an
+admission filter before scoring, so the run says nothing about affinity in
+either direction -- and without this guard step 1's inst2 assertion fails
+on precisely the mechanism F2 holds is not a scheduler defect and F7
+declines to soften. Give the two skips different messages (`affine node not
+a candidate` against `only N candidates`) so CI output separates them; a
+single message would merge the degenerate case this phase accepts with the
+one it declines to fix. Read the 2026-08-26 comment on issue #3565 first:
+it contains the exact event payloads from a failing run, including an
+`affinity_detail` that scored a node `-100` and placed there anyway, and it
+is the specification for what these assertions must distinguish. Do not
+assert final co-location anywhere -- that is the guarantee F2 establishes
+the product does not make. This runs only on `merge_group`
+(`docs/developer_guide/coding_rules.md:341-352`), so exercise it against
+sfcbr before proposing the commit. Commit subject: `tests: assert what soft
+affinity actually promises.`
+
+### Step 3 brief: the validator 500
+
+(shakenfist) The validator 500, on its own. Widen
+`_validate_instance_metadata`'s `except ValueError` to `except (TypeError,
+ValueError, OverflowError)` (`external_api/instance.py:1403-1406`). `int()`
+raises `TypeError`, not `ValueError`, for a list, a dict or `None`, so an
+affinity dictionary *value* of that shape escapes the handler and returns
+**500** today from instance create (`:797`) and from both metadata
+endpoints (`:1375`, `:1425`). **`OverflowError` is a fourth case and is not
+theoretical**: `int(float('inf'))` raises it, and flask hands a bare
+`Infinity` literal straight through because `req.get_json(force=True,
+silent=True)` (`external_api/base.py:129`) uses `json.loads` defaults,
+which accept `Infinity` and `NaN` as JSON. So `{'affinity': {'a':
+Infinity}}` 500s exactly like the other three, and a two-exception fix
+leaves that hole open behind a ticked box. This trap is already known in
+this codebase and handled one file over -- `external_api/base.py:308-320`
+refuses non-finite durations with a comment saying in as many words that
+json.loads hands the bare literals through. (`NaN` needs nothing:
+`int(float('nan'))` raises `ValueError`, which is already caught.) **Refuse
+booleans as well**, mirroring `external_api/base.py:299-301`:
+`isinstance(True, int)` is true in Python so `int(True)` is 1, and
+`{'affinity': {'a': true}}` is accepted today as weight 1 -- which under
+F4's mapping would silently become `prefer_with_tag: ['a']`. Record that
+half honestly in the issue, the commit message **and the release notes**,
+because it is the one part of this step that **changes a request that
+succeeds today into a 400**, and the validator is shared, so the break has
+three entry points -- instance create and both metadata endpoints; it is
+worth doing here rather than later precisely because F4 is about to give
+`true` a meaning nobody asked for. Do *not* replace the coercion with a
+shape test (`isinstance(dv, int) and not isinstance(dv, bool)`), tempting
+as it looks: `int('3')` succeeds today, so a shape test would also refuse
+string-encoded integers, and this step is a bugfix for a 500, not a
+tightening of what the API accepts. Get the level right too: a malformed
+*outer* `affinity` value is already refused correctly -- a list by
+`isinstance(value, dict)` (`:1398-1400`) and `None` by `if not value`
+(`:1387-1388`) -- and only the inner per-tag coercion leaks. Unit tests in
+`shakenfist/tests/` for the list-valued, dict-valued, `None`-valued and
+`Infinity`-valued inner cases, which are the four that 500 now, plus the
+boolean case which is the one that changes answer. This step is
+deliberately separate from the binary model below and depends on none of
+this phase's decisions: it is a live 500 on a public API, the fix is one
+`except` clause, and it should not wait behind an API surface, a new
+scheduler stage and a back-brief gate. **File its own issue and close it
+with the fix** (`Fixes #NNNN`), rather than waiting for step 2's triage
+pass -- step 2 waits on step 1, which is a cluster-CI rewrite that has to
+be driven against sfcbr by hand, and a live 500 on a public API should not
+sit behind that. Be precise about the level in the issue as well as in the
+code: a malformed *outer* `affinity` value is already refused correctly,
+and only the inner per-tag coercion leaks. This step waits for nothing and
+can go first. Commit subject: `Refuse malformed affinity values with a
+400.`
+
+### Step 4 brief: the binary model
+
+(shakenfist) The binary model. Per F4 and the Design section: accept the
+new value shape under the `affinity` metadata key, validate it at
+`external_api/instance.py:1395-1406` alongside the weighted form (four
+reserved keys, list-of-string values, 400 on anything else), and consume it
+in `scheduler.py`. Step 3 has already widened the `except` clause in that
+same function; build the new-shape validation beside it rather than
+repeating it, and **place it above the per-value coercion loop, not
+below**. The binary form's values are *lists*, which is exactly the shape
+step 3 has just taught that loop to refuse with a 400, so a branch added
+underneath it ships a validator that rejects the whole new API surface -- a
+step breaking the feature the next step adds, which no test written inside
+either step would catch. Discriminate on the keys: a dictionary any of
+whose keys are one of the four reserved names is the binary form, so
+validate that branch and `return`, and let only the weighted branch reach
+`int()`. A dictionary mixing the two shapes is refused rather than guessed
+at, because either way of resolving it silently discards half of what the
+caller asked for. `require_with_tag` / `require_without_tag` become a
+filter stage placed as the **last** of the admission filters -- after
+`sufficient_free_disk` and immediately before the affinity block at
+`scheduler.py:529` -- and so before affinity scoring, publishing a dropped
+map through `_log_and_raise_on_error()` like every other filter, with its
+own stage name so a refusal says which constraint ejected the node. **That
+helper cannot raise the subclass as it stands**: it raises
+`exceptions.LowResourceException` unconditionally at `scheduler.py:391`
+with a message it builds itself, so give it an optional
+`exception_class=exceptions.LowResourceException` argument, defaulted so no
+existing call site changes, and pass `AffinityConstraintUnsatisfiable` from
+the require stage. The message is built in the helper too, so decide *in
+this step* how the constraint detail reaches the 409 body -- a second
+optional argument, or the stage raising directly and using the helper only
+for the event -- and record which. Do not leave it to be discovered while
+writing the response body. **The position is what keeps the `placements`
+memo cheap, and it is the reason to choose it.** Matching co-located
+instance tags means calling `_placed_instances()` (`scheduler.py:169-185`),
+one `Node.from_db()` plus one `Instance.from_db()` per placed instance per
+candidate node; today that is paid exactly once because the memo is a local
+created inside the affinity block (`:541`). A separate stage cannot see
+that local, so the memo has to move above it -- but a hard filter is
+order-independent for correctness, only the stage name in the refusal event
+changes, so there is a free choice about *how far* above. Putting the stage
+among the earlier admission filters would drag the memo in front of the
+CPU, RAM and disk pruning, where it reads placements for the full candidate
+set: strictly more expensive than the pass that exists today, and paid on a
+hot path to save nothing. Putting it last instead moves the memo by two
+statements over an already-pruned set, and the filter and the scorer share
+one read. Take the second. Keep one guard even so: the stage must **return
+immediately when the instance requests neither `require_with_tag` nor
+`require_without_tag`**, because it still runs ahead of the load-shedding
+filters, and without it every create walks candidates it has no constraint
+to test them against. Confirm the result against
+`shakenfist/data/database_load_budget.yaml` before proposing the commit --
+the same requirement step 5 carries for a far smaller addition, on the same
+instance-create hot path. While you are there, take the free win the same
+reading exposes: the affinity loop calls `_placed_instances()`
+unconditionally today (`scheduler.py:544`) with no short-circuit on an
+empty `inst.affinity`, so every create already pays a full `Node.from_db()`
+plus one `Instance.from_db()` per placed instance per candidate for a
+scorer that has nothing to score. Skipping the walk when there is nothing
+to score *reduces* the measured load rather than holding it flat, which is
+a better outcome for the budget check than a wash. **But the skip has to
+establish what the code after the walk expects, or it breaks every create
+that requests no affinity -- which is most of them.** The walk is what
+populates `by_affinity`, and the next statement is `highest_affinity =
+sorted(by_affinity, reverse=True)[0]` (`scheduler.py:603`) over a
+`defaultdict(list)`: empty if the loop body never ran, so `sorted(...)[0]`
+raises `IndexError` and `preferred` never reaches the unconditional
+load-shed block at `:637-658`. Seed `by_affinity[0] = list(candidates)` on
+the skipped path, so everything downstream sees what it saw before -- one
+tier, every candidate, score zero. Skip on whether there are any tags to
+*score* (the `prefer_*` lists, after mapping) rather than on
+`inst.affinity` being empty, or a specification of nothing but `require_*`
+constraints walks anyway. **Which makes step 5 a hard prerequisite of the
+short-circuit, and the two must not be separated.** The `prefer_*` lists of
+a weighted specification are empty until step 5's mapping populates them,
+so a short-circuit landing in step 4 alone would skip the walk for *every
+existing caller* -- silently, since no create fails and `test_affinity`
+would merely skip green in cluster CI. Land the short-circuit in step 5
+beside the mapping, not here; step 4 leaves the walk unconditional. If for
+some reason they must be separated, the predicate has to be "no `prefer_*`
+tags **and** not a weighted specification" instead, which is worse code
+written to survive an ordering nothing needs. **Say what the event carries
+there too.** `schedule have highest affinity` is still published on the
+skipped path, because F3 makes it the record step 1 reads and step 6 makes
+it the recipe an operator reads; its `candidates`, `highest_affinity` and
+`by_affinity` are all populated, and its `affinity_detail` is `{}` with no
+`instance_count` anywhere. That shape is the walk correctly declining to
+run, not events going missing, and step 6's recipe has to cover it -- a
+no-affinity create is exactly the create an operator diagnosing an
+unexpected placement will look at first. **Per F9 the status code is 409,
+not 507.** `_log_and_raise_on_error()` raises `LowResourceException`
+(`scheduler.py:386-392`) and the create path answers that with 507
+'insufficient resources' plus a delete (`external_api/instance.py:872-877`,
+the `LowResourceException` handler) -- which would tell the caller the
+cluster is full when it is not. So raise `AffinityConstraintUnsatisfiable`,
+a **subclass** of `LowResourceException`, and add an `except` clause for it
+to the create path *before* the existing one; `except` clauses match in
+order, so that ordering is the whole mechanism. Answer 409 naming the
+constraint and the stage, and add the 409 to that endpoint's
+`swagger_helper` response list. Keep the delete. Leave preflight's
+*redirect* untouched: it catches `LowResourceException` and tries the other
+nodes (`node_inst_netdesc_op.py:159-180`), which is the right behaviour for
+a constraint another node may satisfy, and the subclass keeps that working
+unchanged. **Its abort message is a different matter.** When no node can
+satisfy the constraint -- a `require_with_tag` naming a tag nothing in the
+namespace carries -- the redirect exhausts its candidates and raises
+`AbortInstanceStart(self, 'Unable to find suitable node')` (`:276`), and
+repeated preflight cycles then hit `AbortInstanceStart(self, 'Too many
+start attempts')` (`:166-167`) after burning three placement attempts.
+There is a **third** between them: `AbortInstanceStart(self, 'Requested
+node lacks resources')` (`:169-171`), taken when `inst.requested_placement`
+is set and the forced call at `:156` raised -- so an operator who pinned a
+node is told it lacks resources when it lacks a matching tag. All three
+messages are capacity-shaped, which is the same "tells the caller the
+cluster is full when it is not" fault F9 exists to prevent, one path over;
+the create path escapes it only because the instance is deleted before
+preflight runs, so this is the restart and reschedule path. **They are not
+the same fix, and the difference is a trap.** The `except
+LowResourceException as e:` suite is `:159-162` only; `:164` onwards is
+dedented back to the `try` level, so `:166-167` and `:169-171` sit outside
+it and `e` has been deleted by then (PEP 3110) -- reading it there raises
+`NameError: cannot access local variable 'e' where it is not associated
+with a value`, confirmed at the interpreter. Only `:276` is inside an
+`except` suite and can test the exception directly. For the other two,
+capture a local inside the suite at `:159` -- `affinity_failure =
+isinstance(e, AffinityConstraintUnsatisfiable)` -- and test that flag at
+`:166` and `:170`. Initialise it to `False` immediately before the `try`
+rather than only inside the suite: today `:157` returns on success so the
+assignment always runs, but that is a property of the current control flow
+and not of the guards, and the next edit which adds a non-returning path
+through the `try` puts the unbound local back on the one path a pull
+request does not exercise. Get this wrong and the `NameError` lands in the
+merge queue rather than failing the PR, because the reschedule path runs
+only under cluster CI (`docs/developer_guide/coding_rules.md:341-352`). Do
+not change the redirect behaviour itself. The filter matches co-located
+**instance** tags, within the requesting namespace only, exactly as the
+scorer already does (`scheduler.py:574-580`) -- see the Design section for
+why the namespace scope is inherited rather than crossed, and note that
+this makes `require_without_tag` a within-namespace constraint and not an
+isolation primitive. `prefer_with_tag` / `prefer_without_tag` contribute +1
+/ -1 per matching co-located instance into the existing scoring loop
+(`:529-600`), which already has the per-candidate `affinity_detail` shape
+the events publish -- extend it rather than replacing it, because step 1's
+assertions read it. Unit tests in `shakenfist/tests/test_scheduler.py`
+beside the existing ordering cases, **plus two things that suite cannot
+assert**. First, an API-level test that the create path answers **409 and
+not 507**: the `except` ordering is the entire mechanism per F9, and a
+scheduler test asserting the exception type passes whichever clause catches
+it, so the one mistake the ordering exists to prevent is invisible to it.
+Second, a unit test over the preflight abort path exercising
+`affinity_failure` at both `:166` and `:170` -- that path runs only in the
+queue daemon under cluster CI, so an error there passes the pull request
+and lands in the merge queue. Also assert that a create requesting no
+affinity at all still schedules, which is the cheapest possible guard on
+the short-circuit above. Commit subject: `Add binary affinity constraints
+to the scheduler.`
+
+### Step 5 brief: the transition mapping
+
+(shakenfist) The transition mapping, per F4. Map weighted specs
+mechanically at the point the scheduler reads them: positive value to
+`prefer_with_tag`, negative to `prefer_without_tag`, zero to nothing. Emit
+a deprecation event (not a log line -- this needs to reach an operator)
+**where the spec is accepted, not where it is consumed**, once per
+acceptance. Accept-time needs no durable marker at all, which is the point:
+the alternatives are an attribute write on the scheduling hot path or a
+read of the instance's own event history on that same path, and both are
+the kind of addition the budget check below exists to catch. It also puts
+the warning where the caller can act on it, at the moment they submit the
+deprecated form, rather than at some later reschedule. Do not make it
+per-process (it would reset on every daemon restart) or per-schedule (the
+scheduler runs this path on every create *and* every reschedule). **The
+emission site is not `_validate_instance_metadata` itself, and an earlier
+draft of this plan said it was.** That function is module level with the
+signature `(key, value)` (`external_api/instance.py:1384`), so it has no
+object to call `add_event()` on; and on the create path it runs at
+`:792-799`, under the comment 'Validate metadata before instance creation',
+which is before `Instance.new()` at `:810`. Emitting there would have
+produced no event at all on the create path -- the path `test_affinity`
+exercises and the path an operator using the weighted form almost certainly
+takes -- leaving a deprecation warning that silently reaches nobody, which
+defeats the one requirement it exists to meet. Split a predicate out of the
+validator instead, `_affinity_spec_is_weighted(value)` beside it so the
+shape test lives in one place, and emit at the three sites where an
+instance object is in scope: on the create path in the
+metadata-initialisation loop that already holds `inst` (`:835-838`), and in
+both metadata endpoints via `instance_from_db.add_event()` beside the
+existing 'set metadata key request from REST API' events (`:1378-1380` and
+`:1428-1430`). Record the limit this choice accepts, in the step's commit
+message and in step 6's documentation: accept-time covers **new acceptances
+only**, so every instance already carrying a weighted spec when this lands
+warns nobody, ever. That is tolerable because the event is not the
+migration mechanism -- but F4 commits to removing the weighted form in a
+later release, and an operator will need to find those instances then, so
+step 6 owes them a way to. Confirm the change against
+`shakenfist/data/database_load_budget.yaml` before proposing the commit: an
+unbounded per-schedule event on a still-supported path is exactly the kind
+of addition that moves a measurement CI enforces, and the weighted form is
+expected to survive at least one more release. Decide and record whether
+`test_affinity` moves to the binary form or stays weighted: there is a real
+argument for staying, since finding 7 makes it the only automated proof the
+mapping works, and a separate binary case can be added beside it. **Add
+that separate case rather than leaving it optional.** As the rest of this
+plan stands, all four constraints could ship with unit coverage only,
+against a project standard that prefers functional tests to unit tests
+where only one is possible (`CLAUDE.md`). Add a cluster-CI method in
+`cluster_ci_tests/test_scheduler.py` reusing step 1's event helper: a
+`prefer_with_tag` create asserted through the same tier check, and a
+`require_with_tag` create naming a tag nothing carries, asserted to fail
+with a 409. The second needs no successful create at all and is therefore
+cheap -- and it is the one case a unit test with mocked placements
+exercises least convincingly, since the bootstrapping dead end and the
+namespace scope are both properties of a real cluster's instance
+population. Drive it against sfcbr before proposing the commit, per the
+merge-queue-only rule. Do not remove the weighted form; that is a later
+release, and the removal needs its own deprecation window. Unit tests for
+the mapping including the zero and mixed-sign cases. Commit subject: `Map
+weighted affinity onto the binary form.`
+
+### Step 6 brief: documentation
+
+(shakenfist) Documentation. **The page to rewrite is
+`docs/user_guide/affinity.md`** (registered in the nav at
+`mkdocs.yml:454`), and the diagnostic material goes in
+`docs/operator_guide/scheduler.md`. Naming them matters because affinity.md
+as it stands **contradicts F2 in an admonition**: it says Shaken Fist
+"filters possible candidate hypervisors based on the affinity coefficients
+specified", which is the exact over-strong reading F2 identifies as the
+root of #3565, and it teaches the weighted form as the only form with a
+-100..100 recommendation. A step told only "in `docs/`" can satisfy itself
+by adding a new page and leave that one teaching the deprecated form and
+the wrong guarantee, which is worse than before: two pages disagreeing.
+Rewrite it. Note the claim is not simply false any more -- `require_*`
+really does filter -- so the fix is to say which half filters and which
+half ranks, not to delete the sentence. In it, state what soft affinity
+promises and -- more importantly -- what it does not: a preference is
+consulted when there is a choice, and a single-candidate placement is not a
+preference being honoured or violated. Document the four binary constraints
+**in one table**, with the hard/soft distinction and the namespace scope in
+that same view rather than as prose paragraphs elsewhere on the page. The
+four names share a `_with_tag` / `_without_tag` suffix family and carry two
+separate counterintuitive readings -- `prefer_without_tag` is a term in a
+sum and not a soft veto, and `require_without_tag` is scoped to the
+requesting namespace and is therefore not an isolation primitive -- so an
+operator who reads about one name must see both caveats without hunting.
+Document the weighted form's deprecation and its mapping, and the fact that
+`require_*` can make a create fail with no candidates where the weighted
+form would silently place anywhere. **Document the bootstrapping dead end
+explicitly**, because it is the first thing an operator hits and it reads
+as a bug: the constraints match tags on instances *already placed* on a
+candidate node, so the first instance of a group requesting
+`require_with_tag: ['web']` ejects every candidate and gets a 409, and
+stays that way for as long as nothing in the namespace carries the tag --
+including any instance created under the same constraint. State the
+workaround in the same breath: create the seed instance carrying the tag
+and *without* the `require_*` constraint, or use `prefer_with_tag`, which
+degrades to a ranking that nothing to rank leaves alone. Document that
+`prefer_*` terms **sum**, across neighbours and across tags, with the
+worked two-tag example from F4: with `prefer_with_tag: ['a']` and
+`prefer_without_tag: ['b']` both requested, a node hosting three `a`
+instances and one `b` scores +2 and beats a node hosting one `a` and no `b`
+at +1. `prefer_without_tag` reads as a soft veto and is not one; it is a
+term in a sum, and an operator who learns that from a placement rather than
+from the documentation will read it as a bug. Include the diagnostic
+recipe, which is the durable output of this whole investigation: read
+`schedule have highest affinity` and `schedule final candidates` from the
+instance's events to tell "scored wrong" from "had no choice". **Cover both
+shapes of that event**, per step 4: a create which requested affinity
+carries a populated `affinity_detail` with a per-candidate `score`,
+`instance_count` and `considered` breakdown, while a create which requested
+none carries `affinity_detail: {}` with `candidates`, `highest_affinity: 0`
+and `by_affinity` still populated. The second is the scorer correctly
+declining to run and not a diagnostic gap, and it is the shape an operator
+meets most often, so a recipe written only against the first sends them
+looking for events that were never going to exist. Include a **discovery
+recipe** for existing weighted specs. Specify it as a **client-side loop
+over `instance list` calling `instance show` per instance**, and accept
+that cost: there is no bulk or filtered metadata read behind it.
+`mariadb.get_object_metadata()` is per-object, and no `sf-ctl` subcommand
+exposes a query. So the honest options are an N+1 loop now or a new
+server-side capability, and a new capability is not something a
+medium-effort documentation step should be discovering halfway through --
+it would be its own step, and this phase does not need it. The loop is a
+one-off run before an upgrade, not a monitoring query, so N+1 is the right
+trade here; say so in the documentation rather than leaving a reader to
+wonder why it is shaped that way. Two traps to write into the recipe:
+`instance show` renders metadata as **Python literals** and not JSON
+(`{'static-runner': -10}`, single quotes), so it parses with
+`ast.literal_eval` and a `json.loads` version silently reports a clean
+cluster; and the weighted/binary test is the same one the server uses, a
+dictionary using none of the four reserved names. The recipe lists
+instances whose `affinity` value is the weighted shape, because step 5's
+deprecation event covers new acceptances only, and the removal release will
+need that list. **Run the recipe once against a real cluster** and record
+what it returned. It is the only thing standing between the removal release
+and a silent breakage, and a recipe that has never been executed is not a
+mitigation -- everything else this plan commits to is falsifiable, and this
+should be too. Record which of `test_affinity`'s two skips is expected on
+which CI topology (F3): `affine node not a candidate` is expected on
+`slim-tier` until `PLAN-ci-cloud-sizing` lands, and neither skip is
+expected on `slim-primary`, so a permanently-skipping test cannot pass for
+green. `AGENTS.md` and `ARCHITECTURE.md` are unlikely to need touching;
+check rather than assume. Commit subject: `docs: say what soft affinity
+promises.`
 
 ## Risks and mitigations
 
@@ -1056,6 +1586,47 @@ step 4.
       the constraint that defines the group, which is the model
       working and reads as a bug; an operator who meets it
       undocumented files one.
+- [ ] A **weighted** affinity specification still produces a
+      populated `affinity_detail`, asserted by a unit test. This is
+      the guard on the short-circuit's other edge: the `prefer_*`
+      lists of a weighted spec are empty until step 5's mapping fills
+      them, so a short-circuit landing without the mapping stops
+      scoring affinity for every existing caller -- silently, since
+      nothing fails, and `test_affinity` would skip green. The
+      no-affinity bullet above does not catch it, and neither does
+      the weighted-vs-binary ordering test, which belongs to the same
+      step as the mapping.
+- [ ] Both of `test_affinity`'s skip conditions are evaluated
+      **per instance**, against inst2's unforced pass and inst3's,
+      and the test skips if either is degenerate. Falsifiable by
+      reading the two assertion call sites: each passes that
+      instance's own events. Guards computed once from inst2 leave
+      the inst3 assertion running against a pass that may have had
+      no choice.
+- [ ] `docs/user_guide/affinity.md` no longer says that affinity
+      **filters** candidate hypervisors on the strength of the
+      weights. It says so today, in an admonition, and that is the
+      exact over-strong reading F2 identifies as the root of #3565 --
+      so shipping this phase without touching it leaves the plan's
+      central finding contradicted on the project's own user-facing
+      page, next to the new section saying the opposite. Note the
+      word is not simply wrong now: `require_*` does filter. The
+      criterion is that the page says which half filters and which
+      half ranks.
+- [ ] **All three** preflight abort messages name affinity when the
+      constraint is what failed, `:276` included. Falsifiable by
+      grepping the three `AbortInstanceStart` sites for a branch on
+      `AffinityConstraintUnsatisfiable`. `:276` is the one inside an
+      `except` suite, so it is the easiest of the three -- which is
+      how an earlier draft came to describe it without instructing
+      it.
+- [ ] The binary model has **cluster-CI** coverage, not unit
+      coverage alone: a `prefer_with_tag` tier assertion and a
+      `require_with_tag` refusal asserted as a 409. The project
+      prefers functional tests where only one is possible, and the
+      two behaviours least convincing under mocked placements -- the
+      bootstrapping dead end and the namespace scope -- are
+      properties of a real cluster's instance population.
 - [ ] `pre-commit run --all-files` passes.
 
 ## Future work
