@@ -47,10 +47,10 @@ configuration section below.
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--bug-report-dir <DIR>` | none | Output directory for manual and auto-snapshot bug reports (falls back to `<capture>/bug-reports/` if `--capture` is set, then current directory) |
-| `--auto-snapshot-interval <SECONDS>` | disabled | Enable flight-data-recorder mode: fire a complete bug-report zip every N seconds into `<bug-report-dir>/auto-snapshots/`. Minimum recommended interval is 10 seconds |
-| `--auto-snapshot-cap <N>` | 20 | Maximum number of auto-snapshot zips to keep on disk; oldest are pruned when capacity is exceeded |
-| `--image-cache-cap-mib <N>` | 256 | Cap the SPICE display image cache at N MiB. The cache holds decoded RGBA frames flagged with CACHE_ME by the server; an LRU evicts oldest entries when the cap is exceeded. Default is enough for typical desktop sessions, but increase it for heavy CACHE_ME workloads (sustained video) or lower it on small-RAM hosts |
-| `--glz-dictionary-cap-mib <N>` | 256 | Cap the shared SPICE GLZ decompression dictionary at N MiB. The dictionary holds decoded RGBA entries that the server attached `IMAGE_FLAGS_CACHE_ME` to on Glz / ZlibGlz payloads so cross-frame back-references resolve; without a cap, full-frame ZlibGlzRgb workloads (observed in sessions 003a and 004d-g) grew the dictionary at roughly 30 MiB/s and drove a multi-GiB RSS runaway before the cap existed. An LRU evicts oldest entries when the cap is exceeded. Same trade-off shape as `--image-cache-cap-mib`: lower it on small-RAM hosts, raise it for sustained GLZ-heavy workloads to keep more cross-frame references hot |
+| `--auto-snapshot-interval <SECONDS>` | disabled | Enable flight-data-recorder mode: fire a complete bug-report zip every N seconds into `<bug-report-dir>/auto-snapshots/`. Minimum recommended interval is 10 seconds; `0` is rejected at startup |
+| `--auto-snapshot-cap <N>` | 20 | Maximum number of auto-snapshot zips to keep on disk; oldest are pruned when capacity is exceeded. A 512 MiB budget for the same directory is enforced alongside it, so the cap you set is an upper bound rather than a promise — a busy session whose zips approach the 50 MiB traffic-ring budget will keep fewer than N |
+| `--image-cache-cap-mib <N>` | 256 | Cap the SPICE display image cache at N MiB. The cache holds decoded RGBA frames flagged with CACHE_ME by the server; an LRU evicts oldest entries when the cap is exceeded. Default is enough for typical desktop sessions, but increase it for heavy CACHE_ME workloads (sustained video) or lower it on small-RAM hosts. Must be at least 1 |
+| `--glz-dictionary-cap-mib <N>` | 256 | Cap the shared SPICE GLZ decompression dictionary at N MiB. The dictionary holds decoded RGBA entries that the server attached `IMAGE_FLAGS_CACHE_ME` to on Glz / ZlibGlz payloads so cross-frame back-references resolve; without a cap, full-frame ZlibGlzRgb workloads (observed in sessions 003a and 004d-g) grew the dictionary at roughly 30 MiB/s and drove a multi-GiB RSS runaway before the cap existed. An LRU evicts oldest entries when the cap is exceeded. Same trade-off shape as `--image-cache-cap-mib`: lower it on small-RAM hosts, raise it for sustained GLZ-heavy workloads to keep more cross-frame references hot. Must be at least 1 |
 | `--pedantic` | false | Write a bug-report zip to `./ryll-pedantic-reports/` (or `--pedantic-dir`) the first time each distinct protocol gap is detected |
 | `--pedantic-dir <DIR>` | none | Output directory for pedantic bug reports |
 
@@ -125,6 +125,7 @@ ryll --file test.vv --share-dir /home/user/documents --share-dir-ro
 ryll --file test.vv --headless --share-dir /tmp/test-share
 
 # Enable auto-snapshot mode: fire a bug report every 30 seconds, keep last 20
+# (or fewer, if 20 of them would exceed the 512 MiB directory budget)
 ryll --file test.vv --auto-snapshot-interval 30
 
 # Custom output directory and rolling cap

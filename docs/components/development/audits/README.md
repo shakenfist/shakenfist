@@ -153,7 +153,7 @@ attached rather than quietly disappearing from the table.
 | [merge-queue-config.md](/components/development/audits/merge-queue-config/) | Merge queues process entries serially, without speculative stacking or merge batching |
 | [merge-group-cancellation.md](/components/development/audits/merge-group-cancellation/) | Superseded merge group runs are cancelled, not left building clouds |
 | [security-sanitization.md](/components/development/audits/security-sanitization/) | HTTP header and file path sanitization |
-| [workflow-standards.md](/components/development/audits/workflow-standards/) | Permissions, naming, self-hosted runners, static runner tags, devpi cache fallback, devpi cache address, linting, PIPESTATUS, flake8wrap |
+| [workflow-standards.md](/components/development/audits/workflow-standards/) | Permissions, naming, self-hosted runners, static runner tags, vm runner size, devpi cache fallback, devpi cache address, linting, PIPESTATUS, flake8wrap |
 | [expensive-lane-path-filter.md](/components/development/audits/expensive-lane-path-filter/) | Expensive PR lanes skip docs-only and review-marks-only changes |
 | [console-logging.md](/components/development/audits/console-logging/) | Console script logging setup |
 | [python-version.md](/components/development/audits/python-version/) | Python version targeting and type hints |

@@ -211,17 +211,39 @@ correct:
 xcode-select -p
 ```
 
-### openh264 build issues
+### openh264 and mozjpeg build issues
 
-The `openh264` crate (used by the capture feature) downloads a
-pre-built library at build time. If this fails due to network issues,
-you can build without capture support:
+`openh264-sys2` and `mozjpeg-sys` -- pulled in via
+`shakenfist-spice-compression` and `shakenfist-spice-renderer` (see
+[Key dependencies](/components/ryll/development/#key-dependencies)) -- compile
+vendored C/C++ codec sources at build time using the [`cc`
+crate](https://docs.rs/cc); they do not download a prebuilt library,
+so a broken build here is never a network problem. The compiler
+they need is the same one the "Xcode Command Line Tools" step above
+installs, so on a correctly set-up machine this just works.
+
+Both dependencies are also unconditional: neither is behind a Cargo
+feature, so `cargo build --no-default-features` still compiles both
+of them. There is no flag that skips this step -- if the compiler is
+broken, the fix is the compiler, not the feature set.
+
+If the build fails inside either crate's compile step, check that
+the Xcode Command Line Tools are actually active:
 
 ```bash
-cargo build --no-default-features
+xcode-select -p              # should print a valid path
+sudo xcodebuild -license accept
 ```
 
-This disables `--capture` mode but everything else works normally.
+An error here shows up as a C/C++ compiler failure (missing `cc`,
+license not accepted, or a stale/uninstalled toolchain), not the
+generic linker errors covered above.
+
+NASM is not required by either crate: both fall back to a slower,
+non-SIMD codec path if `nasm` isn't on `PATH`. On Apple Silicon this
+never matters (aarch64 doesn't use NASM's assembly path at all); on
+an Intel Mac, `brew install nasm` picks up the faster path if you
+want it.
 
 ### Rust toolchain updates
 

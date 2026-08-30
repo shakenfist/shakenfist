@@ -267,7 +267,7 @@ All resolved by the operator on 2026-08-14:
 | 3. Contract handshake | [PLAN-proxy-dev-releases-phase-03-contract-handshake.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/) | Complete (merged in PR #314, 2026-08-16) |
 | 4. Docs, downstream cleanup and verification | [PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/) | Complete (4a docs in PR #314; 4b withdrawn 2026-08-18 after measurement, not delivered; 4c Gerrit recheck green 2026-08-29) |
 | 5. Automated dev release pruning | [PLAN-proxy-dev-releases-phase-05-pypi-prune.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/) | Complete (merged in PR #328, 2026-08-18) — storage monitor, lockfile-only merges no longer publish, pruning runbook |
-| 6. Push audit | [PLAN-proxy-dev-releases-phase-06-push-audit.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/) | Complete |
+| 6. Push audit | [PLAN-proxy-dev-releases-phase-06-push-audit.md](/components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/) | Complete (merged in PR #375, 2026-08-29) — no critical, high or blocking findings; five fixes, and the audit tooling itself repaired |
 
 Phase sketches (to be expanded into per-phase plans):
 
@@ -477,7 +477,7 @@ judgment agents (2a code quality, 2b tests, 2c
 documentation, 2d security). It found **nothing critical,
 high or blocking.** Everything it did find was a cheap
 correctness or honesty improvement; all of it is fixed in
-this phase's pull request, and everything not fixed is
+this phase's pull request (#375), and everything not fixed is
 declined below with its reason.
 
 Fixed, each in its own commit:

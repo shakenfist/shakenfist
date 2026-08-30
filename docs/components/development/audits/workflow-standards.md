@@ -52,6 +52,52 @@ kebab case. Job **ids** may be machine-friendly.
   not exist, and the job waits forever. The check flags any `runs-on:`
   combining `static` with additional labels.
 
+### VM runners must name a size
+
+This is the exact complement of the rule above, and the two are easy to
+confuse: a `static` job must name **no** size because the static pool
+advertises none, and a `vm` job must name **one** because the conductor
+otherwise picks for it.
+
+* Sizes are `xs`, `s`, `m`, `l`, `xl`, and the `m-bigdisk` /
+  `xl-bigdisk` variants. Every `vm` `runs-on` must name one.
+* The conductor matches the size out of the labels, and falls back to
+  the first entry in its `CI_SIZES` table when it finds none -- `xs`,
+  one vCPU and 2048 MB. An omitted size is therefore a silent downgrade
+  to the smallest runner, not a job left free to take any runner.
+* `xs` counts as naming a size. The rule is that the size is a
+  decision, not that it is a large one, so a job which genuinely wants
+  the smallest runner says so and passes.
+* The check reads the labels which are statically known, so a
+  `runs-on:` pairing a matrix expression with a literal size passes.
+  A job whose size could only arrive through an expression is a
+  finding: the fleet writes the size literally even when the operating
+  system comes from the matrix.
+* A job which genuinely cannot name a size marks the line
+  `audit-ok: vm-runner-size`, on the `runs-on:` itself or the line
+  above it, with the reason. This is the fleet's usual escape hatch
+  and it is here for consistency with the other runner checks, not
+  because a case is known: writing `xs` costs one word and states the
+  same decision honestly, so a marker whose reason amounts to "we did
+  not choose" is the wrong answer.
+* Only the inline-list (`[self-hosted, vm, l]`) and scalar forms of
+  `runs-on:` are examined. A block sequence spread over the following
+  lines is not matched, so a job written that way is neither passed
+  nor flagged -- it is simply not seen. No repository in scope writes
+  one today, and the sibling runner checks share the blind spot; this
+  is recorded so the coverage claim is honest rather than assumed.
+
+The two failures look nothing alike, which is why this needs its own
+check. An over-labelled `static` job is never scheduled and someone
+notices within one run. An under-labelled `vm` job runs perfectly well
+on a machine nobody chose -- until it does not.
+[shakenfist/shakenfist#3696](https://github.com/shakenfist/shakenfist/issues/3696)
+is the case that prompted this: seven CI jobs building wheels and
+driving ansible deploys, all on a 2048 MB runner with roughly 110 MB
+free and no swap device, for months. The conductor's own sizing
+recommender could not see it either, because both its upsize triggers
+are swap-based and the image has no swap.
+
 ### Job timeouts
 
 Every job must set `timeout-minutes`. GitHub's default is 360 minutes,

@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-29T12:30:13.234079+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-08-30T11:31:10.482825+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -37,7 +37,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | cloudgood | non-compliant | shakenfist/cloudgood#1 |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#515 |
+| instar | compliant | - |
 | kerbside | non-compliant | shakenfist/kerbside#360 |
 | kerbside-patches | compliant | - |
 | library-utilities | non-compliant | shakenfist/library-utilities#32 |
@@ -52,7 +52,6 @@ Details for non-compliant projects:
 - **agent-python** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
-- **instar** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **kerbside** (Status): the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **library-utilities** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **occystrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
@@ -161,6 +160,38 @@ Criterion: [dependency-name-normalization.md](/components/development/audits/dep
 | sfui | N/A | - |
 | shakenfist | compliant | - |
 
+## diagram-format
+
+Criterion: [diagram-format.md](/components/development/audits/diagram-format/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | compliant | - |
+| agent-python | compliant | - |
+| client-python | compliant | - |
+| client-python-k3s | compliant | - |
+| clingwrap | non-compliant | shakenfist/clingwrap#126 |
+| cloudgood | non-compliant | shakenfist/cloudgood#9 |
+| development | compliant | - |
+| divergulent | compliant | - |
+| instar | non-compliant | shakenfist/instar#536 |
+| kerbside | compliant | - |
+| kerbside-patches | compliant | - |
+| library-utilities | compliant | - |
+| occystrap | non-compliant | shakenfist/occystrap#127 |
+| private-ci | N/A | - |
+| ryll | compliant | - |
+| sfui | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#3978 |
+
+Details for non-compliant projects:
+
+- **clingwrap** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:21
+- **cloudgood** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/memory-mapped-devices.md:729
+- **instar** (Status): 13 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:21, docs/format-detection-safety.md:48, docs/technology-primer.md:988, docs/prototypes/kvm-hello-world.md:18, docs/prototypes/kvm-hello-world2.md:22, docs/prototypes/virtio-block.md:49, docs/prototypes/virtio-block.md:96, docs/prototypes/virtio-block2.md:25, docs/prototypes/virtio-block3.md:26, docs/prototypes/virtio-block5.md:65 (+3 more)
+- **occystrap** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/internals.md:30
+- **shakenfist** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:124
+
 ## docs-external-links
 
 Criterion: [docs-external-links.md](/components/development/audits/docs-external-links/)
@@ -175,7 +206,7 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 | cloudgood | non-compliant | shakenfist/cloudgood#7 |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#502 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
@@ -188,7 +219,6 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 Details for non-compliant projects:
 
 - **cloudgood** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/index.md -> more-fundamentals.md, docs/virtualization-history.md -> more-fundamentals.md
-- **instar** (Status): 46 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/amend.md -> ../src/crates/amend/src/qcow2.rs, docs/amend.md -> ../tests/test_amend.py, docs/bench.md -> ../src/crates/bench/, docs/bench.md -> ../src/crates/qcow2-write-exec/, docs/bench.md -> ../src/crates/qcow2-write/, docs/bench.md -> ../src/operations/bench/, docs/bench.md -> ../tests/test_bench.py, docs/bitmap.md -> ../src/crates/bitmap/, docs/bitmap.md -> ../src/operations/bitmap/, docs/bitmap.md -> ../tests/test_bitmap.py (+36 more)
 
 ## expensive-lane-path-filter
 
@@ -295,7 +325,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | cloudgood | non-compliant | shakenfist/cloudgood#8 |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#514 |
+| instar | compliant | - |
 | kerbside | non-compliant | shakenfist/kerbside#359 |
 | kerbside-patches | compliant | - |
 | library-utilities | N/A | - |
@@ -310,7 +340,6 @@ Details for non-compliant projects:
 - **agent-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **clingwrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **instar** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **kerbside** (Status): skillsaw does not run from a CI workflow
 - **occystrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **sfui** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
@@ -330,7 +359,7 @@ Criterion: [llm-context-lint.md](/components/development/audits/llm-context-lint
 | cloudgood | compliant | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#513 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | N/A | - |
@@ -338,13 +367,11 @@ Criterion: [llm-context-lint.md](/components/development/audits/llm-context-lint
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3831 |
+| shakenfist | compliant | - |
 
 Details for non-compliant projects:
 
-- **instar** (Status): Markdown that will never load as a skill: .claude/skills/build-and-test.md, .claude/skills/correct-fixes.md, .claude/skills/documentation-updates.md, .claude/skills/error-handling.md, .claude/skills/instar-add-test-image.md, .claude/skills/instar-calltable.md, .claude/skills/instar-debug.md, .claude/skills/instar-format.md, .claude/skills/instar-new-op.md, .claude/skills/pr-preparation.md, .claude/skills/testing-discipline.md, .claude/skills/verbose-print.md
 - **occystrap** (Status): Markdown that will never load as a skill: .claude/skills/documentation-updates.md, .claude/skills/pr-preparation.md, .claude/skills/testing-discipline.md
-- **shakenfist** (Status): Markdown that will never load as a skill: .claude/skills/add-grpc-service.md, .claude/skills/add-mypy-coverage.md
 
 ## llm-doc-structure
 
@@ -446,6 +473,36 @@ Criterion: [merge-queue-config.md](/components/development/audits/merge-queue-co
 | sfui | N/A | - |
 | shakenfist | compliant | - |
 
+## mermaid-lint-ci
+
+Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | compliant | - |
+| divergulent | N/A | - |
+| instar | N/A | - |
+| kerbside | non-compliant | shakenfist/kerbside#381 |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | N/A | - |
+| private-ci | N/A | - |
+| ryll | non-compliant | shakenfist/ryll#337 |
+| sfui | N/A | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#3979 |
+
+Details for non-compliant projects:
+
+- **kerbside** (Status): mermaid diagrams are not linted: missing tools/mermaid-lint.sh and a CI workflow that runs it (copy templates/mermaid-lint/ from the development repository)
+- **ryll** (Status): mermaid diagrams are not linted: missing tools/mermaid-lint.sh and a CI workflow that runs it (copy templates/mermaid-lint/ from the development repository)
+- **shakenfist** (Status): mermaid diagrams are not linted: missing tools/mermaid-lint.sh and a CI workflow that runs it (copy templates/mermaid-lint/ from the development repository)
+
 ## pin-indirect-dependencies
 
 Criterion: [pin-indirect-dependencies.md](/components/development/audits/pin-indirect-dependencies/)
@@ -484,7 +541,7 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#506 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | non-compliant | shakenfist/library-utilities#42 |
@@ -496,7 +553,6 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 
 Details for non-compliant projects:
 
-- **instar** (Status): 1 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): instar amend subcommand ("1.1 (qcow2 v2⇔v3 version transition, ...")
 - **library-utilities** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
 - **occystrap** (Status): index has no plan table (it must list plans in a table led by Date and Plan columns, not as prose or a bullet list); 4 master plan(s) not listed in the index: PLAN-make-the-speed.md, PLAN-post-write-verification.md, PLAN-registry-proxy.md, PLAN-structured-logging.md
 - **sfui** (Status): docs/plans/index.md is missing, so none of the 3 plan(s) in docs/plans/ are registered
@@ -527,7 +583,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 
 Details for non-compliant projects:
 
-- **shakenfist** (Status): 18 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/ci.md:70, docs/developer_guide/database_internals.md:315, docs/developer_guide/database_internals.md:319, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:158, docs/developer_guide/subsystem_internals.md:160, docs/developer_guide/subsystem_internals.md:179, docs/developer_guide/subsystem_internals.md:233, docs/developer_guide/subsystem_internals.md:250 (+8 more)
+- **shakenfist** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:132, docs/developer_guide/ci.md:183, docs/developer_guide/ci.md:184, docs/developer_guide/database_internals.md:335, docs/developer_guide/database_internals.md:339, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)
 
 ## plan-source-references
 
@@ -543,7 +599,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#516 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
@@ -555,8 +611,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 Details for non-compliant projects:
 
-- **actions** (Status): 3 of 3 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): .github/workflows/smoke-cluster.yml:244 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:14 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_launch.sh:13 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md
-- **instar** (Status): 2 of 197 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): src/crates/qcow2-write-exec/src/growth.rs:13 -> docs/plans/PLAN-qcow2-write-infrastructure-phase-07-write.md, tests/test_adversarial.py:8 -> PLAN-adversarial-images.md
+- **actions** (Status): 3 of 3 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): .github/workflows/smoke-cluster.yml:268 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:14 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_launch.sh:13 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md
 
 ## plan-template
 
@@ -572,8 +627,8 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | cloudgood | N/A | - |
 | development | N/A | - |
 | divergulent | non-compliant | shakenfist/divergulent#79 |
-| instar | non-compliant | shakenfist/instar#523 |
-| kerbside | non-compliant | shakenfist/kerbside#368 |
+| instar | compliant | - |
+| kerbside | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | non-compliant | shakenfist/occystrap#117 |
@@ -585,8 +640,6 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 Details for non-compliant projects:
 
 - **divergulent** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **instar** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
-- **kerbside** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **occystrap** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **shakenfist** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 
@@ -599,7 +652,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | compliant | - |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#46 |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -616,13 +669,14 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 
 Details for non-compliant projects:
 
-- **divergulent** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
-- **instar** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
-- **kerbside** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
-- **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
-- **ryll** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
-- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
-- **shakenfist** (Status): missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
+- **divergulent** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **instar** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
+- **kerbside** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
+- **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **ryll** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
+- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **shakenfist** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 
 ## pyproject-usage
 
@@ -809,9 +863,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 41 of 112 in-scope files reviewed at HEAD; 71 need review (threshold 5)
-- **kerbside** (Status): 124 of 194 in-scope files reviewed at HEAD; 70 need review (threshold 5)
-- **ryll** (Status): 96 of 183 in-scope files reviewed at HEAD; 87 need review (threshold 5)
+- **development** (Status): 46 of 121 in-scope files reviewed at HEAD; 75 need review (threshold 5)
+- **kerbside** (Status): 121 of 196 in-scope files reviewed at HEAD; 75 need review (threshold 5)
+- **ryll** (Status): 89 of 191 in-scope files reviewed at HEAD; 102 need review (threshold 5)
 
 ## rust-unwrap-lint
 
@@ -912,18 +966,17 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | development | N/A | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#373 |
+| kerbside | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | non-compliant | shakenfist/private-ci#17 |
-| ryll | N/A | - |
+| ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 - **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## version-file-gitignore
@@ -959,32 +1012,38 @@ Details for non-compliant projects:
 
 Criterion: [workflow-standards.md](/components/development/audits/workflow-standards/)
 
-| Project | Permissions | Linting | Review marks | flake8wrap | Runners | Static tags | devpi fallback | devpi IP | Issue |
-|---------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
-| actions | compliant | compliant | compliant | N/A | compliant | compliant | N/A | compliant | - |
-| agent-python | compliant | compliant | N/A | non-compliant | non-compliant | compliant | N/A | compliant | shakenfist/agent-python#105, shakenfist/agent-python#82 |
-| client-python | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| client-python-k3s | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| clingwrap | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| cloudgood | N/A | compliant | N/A | N/A | N/A | N/A | N/A | N/A | - |
-| development | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| divergulent | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| instar | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| kerbside | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | - |
-| kerbside-patches | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| library-utilities | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| occystrap | compliant | compliant | N/A | non-compliant | compliant | compliant | N/A | compliant | shakenfist/occystrap#67 |
-| private-ci | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
-| ryll | compliant | compliant | N/A | N/A | compliant | compliant | N/A | compliant | - |
-| sfui | compliant | compliant | N/A | N/A | compliant | compliant | compliant | compliant | - |
-| shakenfist | compliant | compliant | N/A | non-compliant | compliant | compliant | non-compliant | compliant | shakenfist/shakenfist#3057, shakenfist/shakenfist#3418 |
+| Project | Permissions | Linting | Review marks | flake8wrap | Runners | Static tags | VM size | devpi fallback | devpi IP | Issue |
+|---------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
+| actions | compliant | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
+| agent-python | compliant | compliant | N/A | non-compliant | non-compliant | compliant | non-compliant | N/A | compliant | shakenfist/agent-python#105, shakenfist/agent-python#130, shakenfist/agent-python#82 |
+| client-python | compliant | compliant | N/A | compliant | compliant | compliant | non-compliant | N/A | compliant | shakenfist/client-python#378 |
+| client-python-k3s | compliant | compliant | N/A | compliant | compliant | compliant | compliant | N/A | compliant | - |
+| clingwrap | compliant | compliant | N/A | compliant | compliant | compliant | non-compliant | N/A | compliant | shakenfist/clingwrap#125 |
+| cloudgood | N/A | compliant | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
+| development | compliant | compliant | N/A | N/A | compliant | compliant | compliant | N/A | compliant | - |
+| divergulent | compliant | compliant | N/A | compliant | compliant | compliant | compliant | N/A | compliant | - |
+| instar | compliant | compliant | N/A | N/A | compliant | compliant | compliant | N/A | compliant | - |
+| kerbside | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | - |
+| kerbside-patches | compliant | compliant | N/A | N/A | compliant | compliant | non-compliant | N/A | compliant | shakenfist/kerbside-patches#1637 |
+| library-utilities | compliant | compliant | N/A | compliant | compliant | compliant | compliant | N/A | compliant | - |
+| occystrap | compliant | compliant | N/A | non-compliant | compliant | compliant | non-compliant | N/A | compliant | shakenfist/occystrap#126, shakenfist/occystrap#67 |
+| private-ci | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
+| ryll | compliant | compliant | N/A | N/A | compliant | compliant | compliant | N/A | compliant | - |
+| sfui | compliant | compliant | N/A | N/A | compliant | compliant | compliant | compliant | compliant | - |
+| shakenfist | compliant | compliant | N/A | non-compliant | compliant | compliant | non-compliant | non-compliant | compliant | shakenfist/shakenfist#3057, shakenfist/shakenfist#3418, shakenfist/shakenfist#3977 |
 
 Details for non-compliant projects:
 
 - **agent-python** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **agent-python** (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
+- **agent-python** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:25 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
+- **client-python** (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:23 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
+- **clingwrap** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
+- **kerbside-patches** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:514 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **occystrap** (flake8wrap): Missing shellcheck disable=SC2086 directive
+- **occystrap** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:17 (self-hosted, vm, debian-12), python-unit-tests.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **shakenfist** (flake8wrap): Missing shellcheck disable=SC2086 directive
+- **shakenfist** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:718 (self-hosted, vm, debian-12), pin-indirect-dependencies.yml:50 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **shakenfist** (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:133, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: https://pypi.org/simple/" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"
 
 ## Criteria with no automated check

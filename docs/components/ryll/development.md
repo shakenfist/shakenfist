@@ -63,13 +63,33 @@ cargo build --release
 
 ```bash
 apt-get install -y \
+    build-essential \
     libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev \
     libx11-dev libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev \
     libwayland-dev libssl-dev pkg-config
 ```
 
+`build-essential` provides the C/C++ compiler that two vendored
+codec crates need at build time: `openh264-sys2` (H.264, see
+[Key dependencies](#key-dependencies) below) compiles Cisco's
+openh264 C++ sources, and `mozjpeg-sys` compiles vendored
+libjpeg-turbo (see
+[spice-protocol.md](/components/ryll/spice-protocol/#image-types-and-compression)
+for why that buys a no-runtime-dependency JPEG fallback). Neither
+crate downloads a prebuilt binary, and neither is optional --
+they're unconditional dependencies of `shakenfist-spice-compression`
+and `shakenfist-spice-renderer`, so every `ryll` build compiles them
+regardless of which Cargo features are enabled. A missing compiler
+fails the build during their `cc`-crate compile step, not at link
+time, so the error surfaces early with a clear "no C compiler
+found"-style message. NASM (`nasm`) is not required for either
+crate -- both fall back to a slower, non-SIMD codec path if it is
+missing, so it's an optional install for anyone chasing codec
+throughput, not a build prerequisite.
+
 **macOS** (Apple Silicon): No additional system libraries are needed --
-just Xcode Command Line Tools and Rust. See
+just Xcode Command Line Tools and Rust, which is also what provides
+the C/C++ compiler for the same two crates. See
 [development-macos.md](/components/ryll/development-macos/) for full setup
 instructions.
 
