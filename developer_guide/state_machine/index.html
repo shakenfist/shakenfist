@@ -13513,6 +13513,10 @@ have not yet aged out.</p>
   states are terminal in the same way, but only <code>expired</code> is currently
   swept for hard deletion.</li>
 </ul>
+<p>The <code>executing --&gt; queued</code> edge is a retry of a stalled attempt, not a
+failure: it fires when the executor made no progress rather than when it
+reported an error, is bounded both by <code>AGENT_OPERATION_MAX_ATTEMPTS</code> and by
+the operation's own deadline, and is never taken by <code>execute</code> operations.</p>
 <p>The following transitions are possible:</p>
 <pre class="mermaid"><code>stateDiagram-v2
   [*] --&gt; initial
@@ -13535,6 +13539,7 @@ have not yet aged out.</p>
   queued --&gt; expired
 
   executing --&gt; complete
+  executing --&gt; queued
   executing --&gt; deleted
   executing --&gt; error
   executing --&gt; expired

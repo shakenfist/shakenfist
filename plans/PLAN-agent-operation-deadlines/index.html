@@ -13667,10 +13667,30 @@ terminal failure state and the lazy pop removes it as today. The
 retry policy is therefore "retry until the deadline expires or
 attempts are exhausted, whichever is first"; the attempt cap exists
 so no-deadline operations cannot retry forever.</p>
+<p>Retryability is a property of the whole command list, not of the
+command that happened to be in flight. Because a retry restarts at
+index 0, an operation containing any non-retryable command must not
+be retried at all -- an <code>[execute, get-file]</code> operation stalling in
+the <code>get-file</code> would otherwise re-run the <code>execute</code>, which is exactly
+what decision 6 forbids. No endpoint builds such a list today, so the
+two readings agree in practice; only the whole-list one stays correct
+when one does. Corrected during phase 5 planning, where this section
+implied the per-command reading.</p>
 <p>Partial results on retry need care: a retried <code>get-file</code> restarts the
 transfer from offset 0 and must not append to or duplicate the
 previous attempt's blob. The first attempt's incomplete blob (if any)
-must be cleaned up when the retry is scheduled.</p>
+must be cleaned up when the retry is scheduled -- phase 4's
+<code>_abandon_get_file_transfer()</code> already does this.</p>
+<p>There is a second case this section originally missed, found during
+phase 5 planning. A <code>get-file</code> which <em>completed</em> registers a blob and
+records its uuid as the result for that command index; if a later
+command in the same operation then stalls, the retry mints a fresh
+blob uuid and overwrites that result, leaving the first blob recorded
+nowhere. The fix is to clear the abandoned attempt's results when the
+retry is scheduled, so no result from a superseded attempt is ever
+served to a caller. The orphaned blob itself needs no special
+handling: it carries no <code>object_references</code> row, so the cluster
+daemon's existing unreferenced-blob sweep collects it.</p>
 <h3 id="failure-semantics-between-operations">Failure semantics between operations<a class="headerlink" href="#failure-semantics-between-operations" title="Permanent link">&para;</a></h3>
 <p>Linear execution raises the question: when an operation fails
 terminally (error or expiry), should the operations queued behind it
@@ -13826,7 +13846,7 @@ three-repository audit of every consumer of agent operation state).</p>
    system, and precisely the time a receipt-anchored deadline exists
    to count.</li>
 <li><strong>The reaper is an extension of <code>reap_instance_executors()</code></strong>
-   (<code>daemons/sidechannel/main.py:972</code>), which already runs at the top
+   (<code>daemons/sidechannel/main.py:1270</code>), which already runs at the top
    of every dispatcher pass serialised with dispatch. It must cover
    both a dead executor thread and the no-entry case after a daemon
    restart, with the database read gated on the instance actually
@@ -13936,9 +13956,9 @@ the slot at all.</p>
 </tr>
 <tr>
 <td>5</td>
-<td></td>
-<td>Not started</td>
-<td>Retry: <code>EXECUTING -&gt; QUEUED</code> edge, terminal-only lazy pop, attempt bound, partial-result cleanup; node-local reaper sweep</td>
+<td><a href="../PLAN-agent-operation-deadlines-phase-05-retry/">PLAN-agent-operation-deadlines-phase-05-retry.md</a></td>
+<td>Complete</td>
+<td>Retry: <code>EXECUTING -&gt; QUEUED</code> edge, terminal-only lazy pop, attempt bound, partial-result cleanup; the node-local reaper, covering a dead executor thread, no executor at all after a daemon restart, and a live executor wedged in the pre-connection wait. Survey corrections applied at source: decision 5's address for <code>reap_instance_executors()</code>, that retryability is evaluated over the whole command list rather than the command in flight, and that partial-result cleanup has a registered-blob case the design sketch did not cover. The phase plan also decides that the terminal-only pop and the reaper must land in one commit, because the pop rule alone turns a daemon restart from a leak into a wedge</td>
 </tr>
 <tr>
 <td>6</td>
