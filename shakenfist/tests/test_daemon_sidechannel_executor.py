@@ -1118,6 +1118,72 @@ class ExecutorDispatchTerminalGuardTestCase(base.ShakenFistTestCase):
             AgentOperation.STATE_EXECUTING, job.agentop.state.value)
 
 
+class _GetFileDispatchHandler:
+    """A retryable handler whose dispatch() always produces one request."""
+
+    name = 'get-file'
+    reports_progress = True
+    register_as_outstanding = False
+
+    def dispatch(self, command_id, cmd):
+        return ['a-request']
+
+
+class ExecutorCommandListOwnershipTestCase(base.ShakenFistTestCase):
+    """The executor's work queue must be its own list, not the operation's.
+
+    AgentOperation.commands returns the operation's list by reference,
+    and that list is the one the process wide object cache holds, so an
+    executor which aliased it drained the operation as it dispatched.
+    The visible consequence was in the retry decision:
+    operation_is_retryable() refuses an empty command list, so a single
+    command get-file called itself unretryable the moment its only
+    command went out -- the exact operation shape issue #3516 is about,
+    and the opposite of what the retry path was built to do.
+
+    These build a real executor through its real constructor. The
+    dispatch tests above hand-set job.commands, which is precisely why
+    they could not see this: the alias was made in __init__.
+    """
+
+    def _executor(self):
+        agentop = _FakeAgentOp(
+            AgentOperation.STATE_QUEUED,
+            commands=[{'command': 'get-file', 'path': '/tmp/x'}])
+        with mock.patch.object(sidechannel.daemon, 'clear_abort_path'):
+            job = sidechannel.SideChannelExecutorJob(_FakeInstance(), agentop)
+        job.command_handlers = {'get-file': _GetFileDispatchHandler()}
+        job._send_commands_single_envelope = mock.MagicMock()
+        return job
+
+    def test_the_executor_does_not_share_the_operations_list(self):
+        job = self._executor()
+        self.assertEqual(job.commands, job.agentop.commands)
+        self.assertIsNot(job.commands, job.agentop.commands)
+
+    def test_dispatch_does_not_drain_the_operation(self):
+        job = self._executor()
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            job._dispatch_next_command(mock.MagicMock())
+
+        # The executor consumed its own queue, which is what makes the
+        # socket loop exit once the replies are in...
+        self.assertEqual([], job.commands)
+        # ...while the operation still knows what it was asked to do.
+        self.assertEqual(
+            [{'command': 'get-file', 'path': '/tmp/x'}], job.agentop.commands)
+
+    def test_a_dispatched_get_file_is_still_retryable(self):
+        # The consequence, asserted where it was actually observed. A
+        # stall is only reachable after dispatch, so this is the state
+        # every caller of operation_is_retryable() sees.
+        job = self._executor()
+        with mock.patch.object(sidechannel, 'add_event_multi'):
+            job._dispatch_next_command(mock.MagicMock())
+
+        self.assertTrue(sidechannel.operation_is_retryable(job.agentop))
+
+
 class OperationRetryabilityTestCase(base.ShakenFistTestCase):
     """Retryability is a property of the whole command list.
 

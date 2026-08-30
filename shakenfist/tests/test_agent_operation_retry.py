@@ -7,6 +7,7 @@ from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.operations.agentoperation import AgentOperation
+from shakenfist.schema.agentoperation_data import AgentOperationData
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -142,3 +143,47 @@ class AgentOperationRetryTestCase(base.ShakenFistTestCase):
         mock_event.assert_called_once()
         self.assertEqual('clear results', mock_event.call_args.args[1])
         self.assertEqual(2, mock_event.call_args.kwargs['extra']['cleared'])
+
+
+class AgentOperationCommandListTestCase(base.ShakenFistTestCase):
+    """_db_get() must not hand out the cached model's own command list.
+
+    mariadb.get_agent_operation() caches the AgentOperationData model
+    for OBJECT_CACHE_TTL_IMMUTABLE seconds, and pydantic's frozen=True
+    stops attribute assignment rather than mutation of a list field's
+    contents. While _db_get() referenced data.commands, every
+    AgentOperation built from a cache hit shared one list with the
+    cache and with every other such object, so a single mutation
+    anywhere on the node was visible everywhere until the entry aged
+    out.
+    """
+
+    def _data(self):
+        return AgentOperationData(
+            uuid=uuid.uuid4(), namespace='ns', instance_uuid=uuid.uuid4(),
+            commands=[{'command': 'get-file', 'path': '/tmp/x'}],
+            deadline=None, progress_timeout=None,
+            version=AgentOperation.current_version)
+
+    def test_the_static_values_do_not_alias_the_cached_model(self):
+        data = self._data()
+        with mock.patch('shakenfist.operations.agentoperation.mariadb.'
+                        'get_agent_operation', return_value=data):
+            first = AgentOperation._db_get(str(data.uuid))
+            second = AgentOperation._db_get(str(data.uuid))
+
+        self.assertIsNot(data.commands, first['commands'])
+        self.assertIsNot(first['commands'], second['commands'])
+
+    def test_mutating_one_reader_leaves_the_others_alone(self):
+        data = self._data()
+        with mock.patch('shakenfist.operations.agentoperation.mariadb.'
+                        'get_agent_operation', return_value=data):
+            first = AgentOperation._db_get(str(data.uuid))
+            second = AgentOperation._db_get(str(data.uuid))
+
+        first['commands'].pop(0)
+
+        expected = [{'command': 'get-file', 'path': '/tmp/x'}]
+        self.assertEqual(expected, data.commands)
+        self.assertEqual(expected, second['commands'])

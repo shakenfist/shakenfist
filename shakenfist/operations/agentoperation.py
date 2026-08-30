@@ -132,7 +132,13 @@ class AgentOperation(BaseOperation):
                 'uuid': str(data.uuid),
                 'namespace': data.namespace,
                 'instance_uuid': str(data.instance_uuid),
-                'commands': data.commands,
+                # Copied rather than referenced: data is the shared
+                # model the object cache holds, and its frozen=True
+                # prevents attribute assignment, not mutation of a list
+                # field's contents. Handing the same list to every
+                # AgentOperation built from a cache hit would make one
+                # object's mutation everybody's.
+                'commands': list(data.commands),
                 'deadline': data.deadline,
                 'progress_timeout': data.progress_timeout,
                 'version': data.version
