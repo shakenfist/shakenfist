@@ -56,9 +56,14 @@ you do not build or install it separately. A release install —
 release it was built and tested against: the two packages release in
 lockstep from a single `v*` tag. A git or dev install of `kerbside`
 instead resolves whatever `kerbside-proxy` is newest on PyPI, which may
-be a rolling dev wheel rather than a tagged release. Prebuilt manylinux
-wheels are published for x86_64 and aarch64 (no source distribution —
-an unsupported platform gets a clean pip error).
+be a rolling dev wheel rather than a tagged release. That wheel is
+published unattended from `develop`, so no per-commit human review
+stands behind it and nothing on the install path verifies its build
+provenance. Production deployments should install a tagged
+`kerbside==X.Y.Z`, which carries the exact `==` pin of the proxy it was
+built and tested against. Prebuilt manylinux wheels are published for
+x86_64 and aarch64 (no source distribution — an unsupported platform
+gets a clean pip error).
 
 For development you can instead point `KERBSIDE_PROXY_BIN` at a
 locally built binary, or let the daemon pick up the in-repo

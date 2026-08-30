@@ -19,17 +19,22 @@ the `release.yml` workflow:
 6. **Creates a GitHub Release** with the built artifacts and
    auto-generated release notes
 
-```
-Maintainer pushes v0.6.0 tag
-        |
-        v
-  Build package ──> Upload artifacts
-        |
-        v
-  Wait for reviewer approval (GitHub environment)
-        |
-        v
-  Sign tag with Sigstore ──> Publish to PyPI ──> Create GitHub Release
+```mermaid
+flowchart TB
+    tag["Maintainer pushes v0.6.0 tag"]
+    build["Build package"]
+    artifacts["Upload artifacts"]
+    approve["Wait for reviewer approval<br/>(GitHub environment)"]
+    sign["Sign tag with Sigstore"]
+    pypi["Publish to PyPI"]
+    release["Create GitHub Release"]
+
+    tag --> build
+    build --> artifacts
+    build --> approve
+    approve --> sign
+    sign --> pypi
+    pypi --> release
 ```
 
 ## Security Properties

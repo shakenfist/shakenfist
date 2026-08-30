@@ -9,17 +9,11 @@ the workflow templates and how to add them to a new project.
 The automation consists of several GitHub Actions workflows that
 respond to PR events and bot commands:
 
-```
-PR opened/updated
-      |
-      v
-CI tests run (functional-tests.yml)
-      |
-      v
-Tests pass ──> Automated reviewer (Claude Code)
-                    |
-                    v
-              Posts structured review comment
+```mermaid
+flowchart TD
+    pr[PR opened or updated] --> ci[CI tests run<br/>functional-tests.yml]
+    ci -->|tests pass| review[Automated reviewer<br/>Claude Code]
+    review --> comment[Posts structured review comment]
 ```
 
 The review is where the automation stops. Its findings are worked

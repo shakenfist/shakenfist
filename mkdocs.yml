@@ -110,6 +110,7 @@ nav:
                 - "Audit: Default branch naming": components/development/audits/default-branch-naming.md
                 - "Audit: Delete branch on merge": components/development/audits/delete-branch-on-merge.md
                 - "Audit: Dependency name normalization": components/development/audits/dependency-name-normalization.md
+                - "Audit: diagram format": components/development/audits/diagram-format.md
                 - "Audit: Expensive lane path filtering": components/development/audits/expensive-lane-path-filter.md
                 - "Audit: Exporting repo configuration changes": components/development/audits/export-repo-config.md
                 - "Audit: Generated version file": components/development/audits/version-file-gitignore.md
@@ -122,6 +123,7 @@ nav:
                 - "Audit: LLM tooling": components/development/audits/llm-tooling.md
                 - "Audit: Merge group run cancellation": components/development/audits/merge-group-cancellation.md
                 - "Audit: Merge queue reasonability": components/development/audits/merge-queue-config.md
+                - "Audit: mermaid diagrams linted in CI": components/development/audits/mermaid-lint-ci.md
                 - "Audit: Pinning indirect dependencies": components/development/audits/pin-indirect-dependencies.md
                 - "Audit: Plan index": components/development/audits/plan-index.md
                 - "Audit: Plan phase references": components/development/audits/plan-phase-references.md
@@ -270,7 +272,8 @@ nav:
                 - "A working installation path: the compose demo": components/kerbside/plans/PLAN-demo-install.md
                 - "Automated SPICE test harness": components/kerbside/plans/PLAN-test-harness.md
                 - "Backend host_subject enforcement": components/kerbside/plans/PLAN-host-subject.md
-                - "Consistency Audit Deferred Work": components/kerbside/plans/PLAN-consistency-audit.md
+                - "Consistency audit compliance": components/kerbside/plans/PLAN-consistency-audit.md
+                - "Consistency audit phase 1: shared blocks, vendor stamp and settings closeout": components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp.md
                 - "Convert the kerbside admin UI to sfui": components/kerbside/plans/PLAN-sfui-conversion.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
@@ -297,6 +300,7 @@ nav:
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md
                 - "Proxy dev releases phase 4: docs, downstream cleanup, verification": components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md
                 - "Proxy dev releases phase 5: bounding the dev release set": components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune.md
+                - "Proxy dev releases phase 6: push audit": components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit.md
                 - "Rolling kerbside-proxy dev releases": components/kerbside/plans/PLAN-proxy-dev-releases.md
                 - "Rust proxy phase 1: server-side SPICE primitives": components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives.md
                 - "Rust proxy phase 2: gRPC contract and Python UDS server": components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract.md

@@ -17,24 +17,23 @@ addresser](#the-comment-addresser-retired) below.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Pull Request Created                           │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        Sanity Checks Workflow                           │
-│  ┌─────────────┐    ┌─────────────────┐    ┌─────────────────────────┐ │
-│  │ Build/Test  │───▶│ Integration     │───▶│ Automated Reviewer      │ │
-│  │             │    │ Tests           │    │ (Claude Code)           │ │
-│  └─────────────┘    └─────────────────┘    └───────────┬─────────────┘ │
-│                                                         │               │
-│                                                         ▼               │
-│                                              Post PR comment with       │
-│                                              markdown + embedded JSON   │
-│                                              (in <details> section)     │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    pr["Pull request created"]
+
+    subgraph sanity["Sanity checks workflow"]
+        direction TB
+        build["Build / test"]
+        integration["Integration tests"]
+        reviewer["Automated reviewer<br/>(Claude Code)"]
+        comment["Post PR comment:<br/>markdown plus embedded JSON<br/>in a details section"]
+
+        build --> integration
+        integration --> reviewer
+        reviewer --> comment
+    end
+
+    pr --> sanity
 ```
 
 ## JSON-Based Review Format

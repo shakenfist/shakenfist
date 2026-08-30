@@ -390,6 +390,17 @@ versions by hand):
   and the mismatch is logged as a warning instead of refused. It exists
   for debugging only and is not a supported deployment posture.
 
+The handshake is a compatibility check, not an integrity control. It
+detects *accidental* build skew — a stale local `cargo build`, a wheel
+that did not upgrade with the package, a hand-mismatched pair — and it
+detects nothing at all about a substituted or tampered binary. An
+attacker who can replace the binary controls what it prints when asked
+for its hash, and more fundamentally the check has to *execute* the
+untrusted binary in order to decide whether to trust it, so anyone in a
+position to defeat it already has code execution. Nothing downstream of
+this may treat a passing handshake as evidence that the binary is the
+one this package shipped with.
+
 ### Session termination: dropping in-flight connections
 
 Removing or expiring the DB token blocks a **new** connection attempt, but
