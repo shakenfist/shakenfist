@@ -525,7 +525,12 @@ jobs:
       (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
       && needs.check_paths.outputs.code_changed != 'false'
     needs: [check_paths]
-    runs-on: [self-hosted, vm, debian-12]
+    # Carries a size element for the same reason smoke-cluster.yml does:
+    # without one the conductor falls back to xs (1 vCPU / 2048 MB), and
+    # this job drives a full ansible deploy from the runner. Measured
+    # demand is ~2.5-2.7 GB against 1927 MB usable and no swap. See
+    # shakenfist/shakenfist#3696.
+    runs-on: [self-hosted, vm, debian-12, s]
     # The deploy and test steps below are capped at 90 and 60 minutes;
     # this is the backstop for the setup and teardown around them, and
     # is still far short of GitHub's six hour default.
