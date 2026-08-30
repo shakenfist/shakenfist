@@ -54,7 +54,7 @@ footgun and is consistent with the rest of the file.
 | `last_ping_recv_ts_secs` | Timestamp of the most recent PING received; None if no PING received yet |
 | `writer_dropped_count` | Number of outbound writes dropped because the write queue was full |
 
-### Per-opcode baseline (all channels except display)
+### Per-opcode baseline (all channels)
 
 | Field | Description |
 |---|---|
@@ -62,6 +62,24 @@ footgun and is consistent with the rest of the file.
 | `messages_send_by_opcode` | Map of client-opcode → send count since session start |
 | `last_unknown_opcode` | The most recent opcode the channel received but did not recognise; surfaces protocol-coverage gaps that `warn_once` would otherwise swallow silently |
 | `unknown_opcode_count` | Total number of unrecognised opcodes received since session start |
+
+All four are produced by the shared `OpcodeCounters` type in
+`shakenfist-spice-renderer/src/opcode_counters.rs`, which every
+channel owns one of. Two properties of that type matter when reading
+a report:
+
+- **Only named opcodes get a map entry.** The receive opcode is a
+  server-chosen `u16`, so an unbounded map is a denial-of-service
+  primitive: ~65 000 header-only messages (about 400 KB, sent once)
+  would leave every later snapshot publish cloning a 65 000-node map
+  under the snapshot mutex. An opcode the protocol crate's
+  `message_names` table has no name for therefore folds into
+  `last_unknown_opcode` / `unknown_opcode_count` instead of growing
+  `messages_recv_by_opcode`.
+- **`unknown_opcode_count` covers two cases.** An opcode with no
+  protocol name at all, and a named opcode that reached the
+  handler's catch-all arm (a real coverage gap). Each message is
+  counted once, never both.
 
 A `recent_action_ring` field (a bounded ring of structured
 "interesting event" rows) was discussed as a fifth baseline addition
@@ -88,10 +106,29 @@ key on it), recent decode-duration rings, STREAM_REPORT fields, and a
 `streams_recently_destroyed` ring that feeds the stream-flap
 notifications.
 
-Display is the one channel without the four per-opcode baseline
-fields: its per-stream counters already answer the "what did the
-server send?" question in more useful terms than a flat opcode map
-would. Revisit if an unknown-opcode question ever arises on display.
+Display carries the four per-opcode baseline fields like every other
+channel. It also carries two stream-safety counters:
+
+- `streams_rejected_total` — `STREAM_CREATE` messages refused
+  because the concurrent-stream cap (`MAX_CONCURRENT_STREAMS`, 16)
+  was already reached. `stream_id` is a server-chosen `u32` and each
+  open stream owns a video decoder — an H.264 decoder costs
+  megabytes — so an uncapped map is a memory-exhaustion primitive. A
+  non-zero value means the server asked for more concurrent streams
+  than the client will carry decoders for.
+- A re-`STREAM_CREATE` on a stream id that is still open retires the
+  previous stream through the normal teardown path, so it appears in
+  `streams_recently_destroyed` and is counted in
+  `streams_destroyed_total`. It is exempt from the cap, since
+  replacing an entry cannot grow the map, and the replacement
+  decoder is built *before* the teardown: a re-create naming a codec
+  this build cannot decode is ignored outright rather than
+  destroying the working stream and failing to replace it.
+
+`image_cache_ids` is the 64 most recently used cache keys, MRU
+first — not the full key set. The cache can hold millions of entries
+and the snapshot is republished on every send; `image_cache_entries`
+carries the true total.
 
 ### main
 
@@ -198,7 +235,10 @@ instrumentation distinguishes the failure modes as designed.
   each entry carries the USB vendor ID, product ID, device class,
   the time the redirect was established (`attached_at_secs`), and
   bytes transferred in each direction (`bytes_to_guest` /
-  `bytes_from_guest`)
+  `bytes_from_guest`). The byte counters cover usbredir-protocol
+  bytes — framed usbredir messages outbound, decompressed SPICEVMC
+  payload inbound — and reset on each attachment, so they are not
+  comparable with the channel-wide `bytes_in` / `bytes_out`
 - `device_connect_total` / `device_disconnect_total` — cumulative
   device connect/disconnect events since channel open
 - `last_device_event_ts_secs` — timestamp of the most recent device
@@ -236,12 +276,14 @@ point following the baseline template in this document.
    `messages_send_by_opcode`, `last_unknown_opcode`,
    `unknown_opcode_count`). Add channel-specific fields below a
    separating comment.
-2. **Wire opcode counting** in the channel's message-dispatch `match`
-   arm: increment `messages_recv_by_opcode[opcode]` on every receive
-   and `messages_send_by_opcode[opcode]` on every send. Treat
-   unrecognised opcodes as `unknown_opcode_count += 1` /
-   `last_unknown_opcode = Some(opcode)` rather than silently ignoring
-   them.
+2. **Wire opcode counting** by giving the channel an
+   `OpcodeCounters` field, constructed with that channel's
+   `message_names` server and client functions. Call `record_recv`
+   before dispatch, `record_send` from the single send path,
+   `note_unknown` from the catch-all `match` arm, and
+   `publish_into(&mut *snap)` from `update_snapshot`. Do not
+   hand-roll the four fields: the counters must stay bounded, and
+   `OpcodeCounters` is where that bound lives.
 3. **Extend `ChannelSnapshots`** in
    `shakenfist-spice-renderer/src/snapshots.rs`: add a field for the
    new snapshot type, initialise it in `new()`, and add arms in

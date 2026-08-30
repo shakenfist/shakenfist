@@ -481,3 +481,54 @@ median 263 ms, p95 266 ms. Per-platform post-fix targets:
 | 007b | mozjpeg  | ≤40 ms | ≤80 ms |
 | 007b | VA-API   | ≤20 ms | ≤40 ms |
 | 007c | WIC      | platform-dep — Surface Go is slow hardware, "better than pure-Rust" is the bar |
+
+## Deferred VA-API decode path
+
+Moved here from the `VaapiDecoder` docstring in
+`shakenfist-spice-compression/src/jpeg.rs`, which had grown a
+roadmap paragraph that was planning material rather than a
+description of what the code does. The code now carries a
+one-line pointer to this section instead.
+
+`VaapiDecoder::try_new()` probes for VA-API and, on success,
+`best_for_platform()` selects it — but `decode()` delegates to an
+embedded `MozJpegDecoder`. Wiring up real VA-API decode needs:
+
+- **A wider dlsym surface.** The probe binds `vaGetDisplayDRM`,
+  `vaInitialize`, `vaTerminate`, `vaErrorStr`,
+  `vaMaxNumProfiles`, `vaQueryConfigProfiles`,
+  `vaMaxNumEntrypoints` and `vaQueryConfigEntrypoints`. Decode
+  additionally needs `vaCreateConfig`, `vaCreateContext`,
+  `vaCreateSurfaces`, `vaCreateBuffer`, `vaBeginPicture`,
+  `vaRenderPicture`, `vaEndPicture`, `vaSyncSurface`,
+  `vaDeriveImage`, `vaMapBuffer`, `vaUnmapBuffer`,
+  `vaDestroyImage`, `vaDestroyBuffer`, `vaDestroyContext`,
+  `vaDestroyConfig` and `vaDestroySurfaces`.
+- **Our own JPEG header parse.** VA-API is a command-buffer
+  interface and does not parse JPEG. The SOF/DHT/DQT segments
+  have to be read out to populate
+  `VAPictureParameterBufferJPEGBaseline`,
+  `VAIQMatrixBufferJPEGBaseline`,
+  `VAHuffmanTableBufferJPEGBaseline` and
+  `VASliceParameterBufferJPEGBaseline`.
+- **Reference implementations.** ffmpeg's
+  `libavcodec/vaapi_mjpeg.c` and chromium's
+  `media/gpu/vaapi/vaapi_jpeg_decoder.cc`.
+
+Two things in the current code exist to make this landing safe
+rather than silently unsound, and both must be revisited as part
+of the work:
+
+- `unsafe impl Send`/`Sync for VaapiDecoder` is sound only
+  because `decode(&self, ..)` never touches libva. That is now
+  enforced by `vaapi::LibvaHandles`, whose fields are private to
+  the `vaapi` submodule and reachable only through `&mut self`.
+  A real decode path has to widen those accessors, and the
+  correct answer at that point is an internal
+  `Mutex<VADisplay>` — libva thread-safety is driver-dependent
+  (Intel iHD, Mesa and friends each implement their own locking
+  policy), so we own the synchronisation rather than trusting
+  whichever driver is loaded.
+- `name()` reports `"VA-API (probed, mozjpeg fallback)"`. Drop
+  the parenthetical when the delegation goes away; the tests
+  assert only the `"VA-API"` prefix so they survive the change.

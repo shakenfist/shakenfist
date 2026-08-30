@@ -759,6 +759,17 @@ an LRU eviction policy: when the total cached bytes exceed the cap, the
 least-recently-used entries are evicted until the cap is satisfied. This
 is essential for long-running desktop sessions without risk of OOM.
 
+The cap counts pixel bytes only, so it is paired with an entry-count
+cap of `cap_bytes / 96` entries — 96 bytes being an estimate of the
+per-entry container overhead (LRU node, hash-map slot, allocator
+headers) that the byte counter cannot see. Without it a stream of
+tiny images — a 1x1 RGBA image accounts for 4 bytes and really costs
+around a hundred — would fit tens of millions of entries inside a
+256 MiB cap and take gigabytes of RSS. The same pairing applies to
+the GLZ dictionary, which shares the same LRU implementation.
+Entry-cap evictions are counted in `image_cache_evictions_total` /
+`glz_dictionary_evictions_total` like any other cap-driven eviction.
+
 ### Interpreting cache statistics in a bug report
 
 When you file a Display bug report (F12), the `channel-state.json`
@@ -842,7 +853,10 @@ snapshot distinguished the two.
 
 Current builds report the two separately: the `image_cache_*`
 fields reflect only the
-`BoundedImageCache` (CACHE_ME-flagged decoded RGBA frames). The GLZ
+`BoundedImageCache` (CACHE_ME-flagged decoded RGBA frames).
+`image_cache_ids` is also truncated to the 64 most recently used
+keys, MRU first, rather than being the full sorted key set;
+`image_cache_entries` carries the true total. The GLZ
 dictionary's state is reported separately under the new
 `glz_dictionary_*` fields described below. As a result,
 `image_cache_bytes` in a current bug report will be roughly an order

@@ -34,6 +34,30 @@ with no `.pre-commit-config.yaml`, or one whose hooks are all
 `repo: local`, passes without the manager. `sfui`'s
 `"pre-commit": {"enabled": true}` is the form the template carries.
 
+### Repositories that ship workflow templates
+
+Renovate's `github-actions` manager only reads
+`.github/workflows`, `.github/actions` and `workflow-templates`. A
+repository that keeps workflows anywhere else -- `development` ships
+the fleet's templates from `templates/` -- gets its own workflows
+bumped while the copies it hands out stay behind, so every repository
+onboarded after a bump starts life a version stale.
+
+Extending the manager's file patterns brings them into view. The
+patterns extend the defaults rather than replacing them, so only the
+extra path is named:
+
+```json
+{
+  "github-actions": {
+    "managerFilePatterns": ["/^templates/.+\\.ya?ml$/"]
+  }
+}
+```
+
+This applies to `development` today, and to any repository that grows
+a second home for workflow files.
+
 ### Python version constraints
 
 Projects supporting multiple Linux distributions set

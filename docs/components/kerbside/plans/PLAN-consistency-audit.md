@@ -162,11 +162,19 @@ the phases:
   `kerbside/tests/unit/test_render_review.py`, which
   imports `tools/render-review.py` by path and would fail
   at collection the moment the script goes; a row in
-  `.claude/CLAUDE.md` (line 139) listing the workflow; a
-  cross-reference in `.github/workflows/pr-re-review.yml`
-  (line 10); and four review marks plus their weaudit
-  entries. Deleting only the four named files leaves a
-  repository whose unit tests do not run.
+  `.claude/CLAUDE.md` (line 139) listing the workflow;
+  three cross-references in
+  `.github/workflows/pr-re-review.yml` (lines 10, 34 and
+  106); one in `tools/shellcheck-wrap.sh` (line 7); and
+  four review marks plus their weaudit entries. Deleting
+  only the four named files leaves a repository whose unit
+  tests do not run.
+
+  *Corrected during phase 2 planning:* this bullet
+  originally named one `pr-re-review.yml` reference and no
+  `shellcheck-wrap.sh` reference. The line 34 one is the
+  awkward case -- it is the stated reason for a live
+  `if:` guard that must outlive the workflow it cites.
 
 The two surviving GitHub-settings checkboxes were also
 re-checked against the API rather than the web interface:
@@ -227,7 +235,7 @@ to forcing it.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Shared blocks, vendor stamp and settings closeout | [PLAN-consistency-audit-phase-01-blocks-and-stamp.md](/components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/) | In progress | |
-| 2. Retire the comment addresser | PLAN-consistency-audit-phase-02-retire-addresser.md | Not started | |
+| 2. Retire the comment addresser | [PLAN-consistency-audit-phase-02-retire-addresser.md](/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/) | In progress | |
 | 3. Skillsaw CI detection, upstream | PLAN-consistency-audit-phase-03-skillsaw-detection.md | Not started | |
 | 4. Review coverage backlog | PLAN-consistency-audit-phase-04-review-coverage.md | Not started | |
 | 5. Push audit | PLAN-consistency-audit-phase-05-push-audit.md | Not started | |
@@ -253,8 +261,10 @@ Delete `.github/workflows/pr-address-comments.yml`,
 `tools/render-review.py` and `tools/review-schema.json` in
 one commit, as the audit requires, along with
 `kerbside/tests/unit/test_render_review.py` which cannot
-survive them. Remove the `.claude/CLAUDE.md` row and fix the
-`pr-re-review.yml` cross-reference. Prune the four review
+survive them. Remove the `.claude/CLAUDE.md` row and repair
+the three `pr-re-review.yml` cross-references and the one in
+`tools/shellcheck-wrap.sh`, keeping the bot-comment guard
+whose justification one of them is. Prune the four review
 marks. The security argument is the point of the phase and
 belongs in the commit message: the workflow holds
 `contents: write` on the pull request branch, for automation

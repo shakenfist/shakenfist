@@ -235,6 +235,17 @@ through kerbside.
 LZ4-compressed with a big-endian size prefix. The `spice_format`
 byte indicates the pixel format (4=BGRX, 6=BGRA, 3=BGR).
 
+Decoding is all-or-nothing: a payload that ends mid-image — a
+truncated row header, a row length running past the buffer, or a
+row LZ4 chunk that fails to decompress — is rejected outright and
+the frame is dropped. It is not painted. An earlier implementation
+returned the rows it had managed to decode with the remainder left
+as zeros, which rendered as a partial image above a black band and
+gave the caller no way to tell a short frame from a genuinely dark
+one. Since a client cannot distinguish a server bug from a hostile
+server truncating deliberately, the safe reading of a partial
+image is that it is not an image.
+
 **QUIC** -- SPICE's proprietary image codec based on the SFALIC
 algorithm (Simple Fast Adaptive Lossless Image Compression). Not
 to be confused with the IETF QUIC network protocol. Each colour

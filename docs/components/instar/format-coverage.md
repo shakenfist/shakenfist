@@ -296,6 +296,7 @@ The `instar convert` operation supports writing output in the following formats:
 | vmdk (streamOptimized) | Supported | DEFLATE decompression, footer-based GD offset resolution |
 | vmdk (monolithicFlat) | Supported | Two-file descriptor + raw flat extent; descriptor is parsed host-side for extent discovery and allowlist validation, flat extent is opened as a second virtio-block device and reads are redirected via `ChainConfig.data_device_idx`. Descriptors with `parentFileNameHint` are followed as a backing chain. |
 | vmdk (twoGbMaxExtentFlat) | Supported | Multi-extent flat descriptors with multiple flat extent files; each extent is opened as a separate virtio-block device with reads dispatched by offset. |
+| vmdk (twoGbMaxExtentSparse) | Not supported | Multi-extent descriptors whose extents are themselves sparse VMDKs. Host-side descriptor resolution accepts FLAT extents only, so `instar info` fails with "only FLAT extents are supported". Unlike the flat case, each extent carries its own sparse header and grain directory, so extents cannot simply be mapped as raw byte ranges. Real-world fixture `osboxes-vmdk-split-sparse` (26 extents) is registered with baselines captured, and is marked `instar_unsupported` in `tests/manifest.json` so parity tests skip until support lands. |
 | vhd (fixed) | Supported | Raw sector reads with footer validation |
 | vhd (dynamic) | Supported | BAT-based block lookup, sector-cached reads |
 | vhdx (dynamic) | Supported | 64-bit BAT with interleaved SB entries, GUID-based metadata, CRC-32C validation |
@@ -495,7 +496,7 @@ full reference.
 | grain overlap | Two grains at same offset | N/A | 1-bit-per-grain bitmap | plaso-vmdk, vmdk-multi-partition |
 | compressed grain markers | Validate LBA, size, bounds | N/A | Marker structure validated per compressed GTE | vmdk-streamoptimized |
 | redundant GD (RGD) | Cross-check against primary GD | N/A | Entry-by-entry comparison when FLAG_USE_RGD set | qemu-img-created VMDKs |
-| multi-extent detection | Multiple extents in descriptor | N/A | Supported for twoGbMaxExtentFlat; sparse multi-extent reports FLAG_NOT_SUPPORTED | vmdk-multi-extent |
+| multi-extent detection | Multiple extents in descriptor | N/A | Supported for twoGbMaxExtentFlat; sparse multi-extent reports FLAG_NOT_SUPPORTED | vmdk-multi-extent, osboxes-vmdk-split-sparse |
 | fragmentation | Non-sequential grain layout | N/A | Reports fragmentation count | plaso-vmdk, vmdk-multi-partition |
 
 ### RAW/Partition Table Safety Checks
