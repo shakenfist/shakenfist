@@ -730,7 +730,14 @@ tells the whole story:
   `affinity_detail`. The two are easy to confuse and answer
   different questions. `schedule keeping affinity despite
   transient load` follows it when load shedding was ignored to
-  honour that group.
+  honour that group. **The event has a second shape**: an instance
+  which requested no soft affinity at all -- which is most of them
+  -- gets `affinity_detail: {}` and `highest_affinity: 0`, with
+  `candidates` and `by_affinity` still holding every candidate.
+  The scorer is skipped outright when there is nothing to score,
+  because walking every candidate's placed instances is not free,
+  so an empty breakdown there means "nothing was asked for" and
+  not "the events went missing".
 - `schedule have lowest cpu load` includes per-node `load_detail`:
   raw `cpu_load_1`, the denominator used, the normalised load, the
   committed-RAM fraction and the bucket.
@@ -784,6 +791,12 @@ that was given no choice.
 
 Then, in that pass's `schedule have highest affinity`:
 
+- **Is `affinity_detail` empty?** Then this instance requested no
+  soft affinity, the scorer was skipped, and there is nothing here
+  to diagnose. Check the instance's `affinity` metadata before
+  reading any further: a specification of nothing but `require_*`
+  constraints also lands here, and its story is in the `schedule at
+  stage affinity_constraints` event instead.
 - **How many entries does `affinity_detail` have?** That is how many
   nodes the scorer actually considered. If it is 1, affinity was
   never consulted: the placement is neither honoured nor violated,

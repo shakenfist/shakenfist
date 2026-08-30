@@ -109,15 +109,26 @@ Or on the command line:
 
 Each name takes a JSON list of tags, and you may use any subset of the four.
 
-`require_with_tag` and `require_without_tag` are **hard**. A hypervisor
-which does not satisfy them cannot host the instance at all, so they are
-applied alongside the CPU, memory and disk filters rather than as a
-ranking. If no hypervisor satisfies them, the create fails with a **409
-Conflict** naming the constraint -- where the weighted form would have
-silently placed the instance anywhere.
+All four match the tags of instances **already placed on a candidate
+hypervisor**, and only instances in **your own namespace**:
 
-`prefer_with_tag` and `prefer_without_tag` are **soft**, and behave exactly
-as weights did: they rank the hypervisors that survived the hard filters.
+| Name | Strength | Effect on a hypervisor hosting a matching instance |
+|------|----------|---------------------------------------------------|
+| `require_with_tag` | hard | Hypervisors hosting *no* matching instance cannot host yours at all |
+| `require_without_tag` | hard | Hypervisors hosting a matching instance cannot host yours at all |
+| `prefer_with_tag` | soft | +1 to the hypervisor's score, per matching instance |
+| `prefer_without_tag` | soft | -1 from the hypervisor's score, per matching instance |
+
+The hard pair is applied alongside the CPU, memory and disk filters rather
+than as a ranking. If no hypervisor satisfies them, the create fails with a
+**409 Conflict** naming the constraint -- where the weighted form would have
+silently placed the instance anywhere. The soft pair behaves exactly as
+weights did: it ranks the hypervisors that survived the hard filters.
+
+Two things about that table are easy to read past, and both are covered in
+detail below. The soft forms are terms in a **sum** and not soft vetoes, so
+`prefer_without_tag` can be outvoted. And the namespace scope applies to the
+hard forms too, so `require_without_tag` is **not** an isolation primitive.
 
 ???+ warning "`prefer_*` terms are a sum, not a veto"
 
@@ -141,6 +152,22 @@ as weights did: they rank the hypervisors that survived the hard filters.
     instance away from another tenant's workload, because it cannot see
     it. It is a placement constraint within your namespace, not a security
     or isolation boundary.
+
+???+ warning "The first member of a `require_with_tag` group"
+
+    The constraints match instances *already placed*, so the first
+    instance of a group cannot be created under the constraint that
+    defines the group. Ask for `require_with_tag: ["web"]` on a cluster
+    where nothing in your namespace carries the `web` tag and every
+    hypervisor is ejected, so you get a 409 -- including when the
+    instance you are trying to create is the one that would carry the
+    tag. This is the constraint working, not a bug, but it has no way
+    out on its own.
+
+    Seed the group first: create one instance carrying the tag and
+    *without* the `require_with_tag` constraint, then create the rest
+    with it. Or use `prefer_with_tag`, where having nothing to rank is
+    harmless.
 
 The two value shapes cannot be mixed in one specification. A dictionary of
 tag weights is the weighted form; a dictionary using the four reserved

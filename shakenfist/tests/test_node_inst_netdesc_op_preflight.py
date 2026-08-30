@@ -271,6 +271,106 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         mock_enqueue.assert_not_called()
         self.assertEqual([], inst.disk_fetch_calls)
 
+    def _redirect_raising(self, inst, exc, candidates=()):
+        """As _redirect(), but choosing what the local placement raised.
+
+        The three aborts below are reached after the ``except
+        LowResourceException as e:`` suite has exited, so they cannot
+        read ``e`` -- Python deletes the ``as`` target when the suite
+        ends (PEP 3110), and reading it there is a NameError. They test
+        an ``affinity_failure`` flag captured inside the suite instead.
+        That flag is only exercised in the queue daemon, which runs
+        under cluster CI and not on a pull request, so these tests are
+        the only thing between a mistake in it and the merge queue.
+        """
+        op = self._make_op()
+        fake_scheduler = mock.MagicMock()
+        fake_scheduler.find_candidates.side_effect = [
+            exc, list(candidates)]
+        fake_scheduler.metrics = {c: {} for c in candidates}
+
+        with mock.patch(
+                'shakenfist.operations.node_inst_netdesc_op.scheduler.'
+                'Scheduler', return_value=fake_scheduler):
+            with mock.patch(
+                    'shakenfist.operations.node_inst_netdesc_op.schema.'
+                    'create_and_enqueue'):
+                with mock.patch(
+                        'shakenfist.operations.node_inst_netdesc_op.'
+                        'add_event_multi'):
+                    try:
+                        op._instance_preflight(inst)
+                        return None
+                    except AbortInstanceStart as e:
+                        return e
+
+    def test_attempt_limit_abort_names_affinity(self):
+        # The ":166" guard. Without the flag this abort says "Too many
+        # start attempts", which reads as a busy cluster to an operator
+        # whose constraint simply cannot be met anywhere.
+        inst = FakeInstance('created')
+        inst.placement = {'placement_attempts': 4}
+
+        raised = self._redirect_raising(
+            inst,
+            exceptions.AffinityConstraintUnsatisfiable(
+                'no node carries require_with_tag=[\'database\']'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('affinity constraints', str(raised))
+        self.assertIn('require_with_tag', str(raised))
+
+    def test_attempt_limit_abort_still_says_attempts_for_capacity(self):
+        inst = FakeInstance('created')
+        inst.placement = {'placement_attempts': 4}
+
+        raised = self._redirect_raising(
+            inst, exceptions.LowResourceException('full here'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Too many start attempts', str(raised))
+        self.assertNotIn('affinity', str(raised))
+
+    def test_requested_placement_abort_names_affinity(self):
+        # The ":170" guard. An operator who pinned a node is otherwise
+        # told it lacks resources when what it lacks is a matching tag.
+        inst = FakeInstance('created')
+        inst.requested_placement = str(uuid4())
+
+        raised = self._redirect_raising(
+            inst,
+            exceptions.AffinityConstraintUnsatisfiable(
+                'node carries require_without_tag=[\'batch\']'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('affinity constraints', str(raised))
+        self.assertNotIn('lacks resources', str(raised))
+
+    def test_requested_placement_abort_still_says_resources_for_capacity(self):
+        inst = FakeInstance('created')
+        inst.requested_placement = str(uuid4())
+
+        raised = self._redirect_raising(
+            inst, exceptions.LowResourceException('full here'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Requested node lacks resources', str(raised))
+
+    def test_the_redirect_itself_is_unchanged_by_the_subclass(self):
+        # AffinityConstraintUnsatisfiable subclasses
+        # LowResourceException precisely so this keeps working: another
+        # node may satisfy a constraint this one does not, so preflight
+        # must still redirect rather than escaping as a traceback.
+        inst = FakeInstance('created')
+        target_node = str(uuid4())
+
+        raised = self._redirect_raising(
+            inst, exceptions.AffinityConstraintUnsatisfiable('not here'),
+            candidates=[target_node])
+
+        self.assertIsNone(raised)
+        self.assertEqual([target_node], inst.placed_on)
+
     def _dispatch_failing_preflight(self, op):
         inst = FakeInstance('created')
         with mock.patch(

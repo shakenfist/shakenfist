@@ -1632,6 +1632,27 @@ class WeightedAffinityMappingTestCase(SchedulerTestCase):
         self.assertSetEqual(
             self._node_uuids_set('node2', 'node3'), set(nodes))
 
+    def test_the_affinity_event_is_still_published_when_skipped(self):
+        # The skip must not take the event with it. It is what step 1's
+        # cluster test reads and what the operator guide's diagnostic
+        # recipe reads, and a create requesting no affinity is the one
+        # an operator diagnosing an unexpected placement looks at
+        # first. So: published, with candidates and a zero tier, and an
+        # empty affinity_detail because there was nothing to score.
+        inst = self.mock_mariadb.create_instance('instance-1')
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as events:
+            scheduler.Scheduler().find_candidates(inst)
+
+        published = [c for c in events.call_args_list
+                     if c[0][2] == 'schedule have highest affinity']
+        self.assertEqual(1, len(published), events.call_args_list)
+        extra = published[0][1]['extra']
+        self.assertEqual({}, extra['affinity_detail'])
+        self.assertEqual(0, extra['highest_affinity'])
+        self.assertSetEqual(
+            self._all_hypervisor_uuids(), set(extra['candidates']))
+
     def test_no_affinity_still_places_anywhere(self):
         # The scorer is skipped entirely when there is nothing to score,
         # so this asserts the skip left the outcome unchanged: one tier,
