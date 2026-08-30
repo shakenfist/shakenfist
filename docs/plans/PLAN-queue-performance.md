@@ -71,7 +71,7 @@ Two things this plan changed are deliberately still unproven:
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
 | 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
 | 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | Complete |
-| 10. The 15 second dependency wait | (not yet planned, and see below -- #3863 was fixed by #3916) | Not started |
+| 10. Where the pre-execution time goes | [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md) | Not started |
 | 11. Multi-column coalescing key | (not yet planned) | Not started |
 
 ## Problem
@@ -192,30 +192,33 @@ for someone to notice it.
    load bearing rather than assumed to be. See
    [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md).
 
-10. **The 15 second dependency wait.** Step 7 measured a p50 of
-    15.78 s on the `user_waiting` queue and traced all of it to
-    deferral: a dependency wait re-enqueues a flat 15 seconds into
-    the future on the queues `sf-queues` drains, where `sf-net`
-    instead backs off from 0.1 s to a 15 s cap. Restricted to
-    operations which never deferred, the same p50 is 0.77 s. This
-    is the largest user-visible latency in the whole sample and it
-    has nothing to do with queue order, which is why step 7 excluded
-    it from the fairness question and filed it as #3863 instead.
+10. **Where the pre-execution time goes.** This phase began as
+    "the 15 second dependency wait" (#3863): a dependency wait
+    re-enqueued a flat 15 seconds into the future on the queues
+    `sf-queues` drains, where `sf-net` instead backed off from
+    0.1 s to a 15 s cap. Step 7 measured that as a 15.78 s p50 on
+    the `user_waiting` lane against 0.77 s restricted to
+    operations which never deferred.
 
-    **The subject moved.** #3916 landed a fix on 2026-08-27 --
-    `dependency_defer_delay()` in
-    `shakenfist/daemons/queues/workitem.py` gives `sf-queues` the
-    same 0.1 s doubling to a 15 s cap that `sf-net` already had,
-    derived statelessly from the persisted `defer_count` -- and
-    #3863 was closed as completed. Phase 9's window is the first
-    data carrying it. That window says the back-off is live and also
-    says the story is not finished: the lane's p99 is still 17.18 s,
-    1,568 operations deferred at least once, and about 400 first
-    deferrals still sit at 15-17 s for reasons #3916 does not
-    explain. See "What this window says about phase 10" below, which
-    also explains why the headline p50 improvement is not a
-    controlled comparison. Re-scope this phase against that data
-    before planning it.
+    **That fix landed and the subject moved.** #3916
+    (`dependency_defer_delay()` in
+    `shakenfist/daemons/queues/workitem.py`) gave `sf-queues` the
+    same ladder, derived statelessly from the persisted
+    `defer_count`, and #3863 was closed. Counting the defer events
+    over phase 9's window confirms the ladder fires exactly as
+    designed -- 1,391 defers at 0.1 s decaying to 11 at 12.8 s --
+    and that **a flat 15 second dependency defer now happens once
+    in 42 hours**, from the one caller still taking `defer()`'s
+    `delay=15.0` default.
+
+    So the flat wait is measurably gone, and the open question is
+    a different one. Phase 9 recorded that the lane's p99 is still
+    17.18 s and that roughly 400 of 823 first deferrals sit at
+    15-17 s -- which, now that a first deferral costs 0.1 s,
+    cannot be the defer delay. `wait_seconds` is
+    `start_time - created_at` and conflates queue-sit time with
+    deferral without separating them. Phase 10 decomposes it. See
+    [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md).
 
 11. **Multi-column coalescing key.** The fold keys on a single
     target column, which for `net_op` means "the same network". A
@@ -441,8 +444,14 @@ What the window does establish is narrower and still worth having:
 
 So phase 10 is not "already fixed by #3916". Its subject moved, and
 the remaining question -- what the 15-17 s population is waiting on --
-is a different question from the one #3863 asked. Re-scope it against
-this data before planning it.
+is a different question from the one #3863 asked.
+
+That re-scope has since been done. Counting the defer events directly
+shows the ladder firing as designed and only one flat 15 s defer in
+the whole window, so the 15-17 s population cannot be waiting on the
+defer delay at all. Phase 10 is now scoped to decompose `wait_seconds`
+into the intervals it conflates; see
+[PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md).
 
 ### Method note
 
