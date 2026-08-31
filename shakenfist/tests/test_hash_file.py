@@ -50,6 +50,45 @@ class PrivExecHashFileTestCase(base.ShakenFistTestCase):
                          reply.hash_file_reply.error)
         self.assertIn('Input/output error',
                       reply.hash_file_reply.error_text)
+        # The return code is the one fact that distinguishes "the hasher
+        # failed" from every other failure, so it must survive into the
+        # reply even when stderr is empty (issue 3983).
+        self.assertIn('exited 1', reply.hash_file_reply.error_text)
+
+    @mock.patch('shakenfist.daemons.privexec.util.locate_command',
+                side_effect=lambda c: c)
+    @mock.patch('shakenfist.daemons.privexec.main.os.path.exists',
+                return_value=True)
+    def test_hasher_failure_with_empty_stderr_still_diagnosable(
+            self, mock_exists, mock_locate):
+        # The issue 3983 failure mode: non-zero exit with empty stderr
+        # used to produce 'ALGORITHM_FAILED: ' with nothing after the
+        # colon at all.
+        with mock.patch(
+                'shakenfist.daemons.privexec.util.command_helper',
+                return_value=('', '', 137)):
+            reply = self.job._hash_file(self._request('/some/blob'))
+        self.assertEqual(privexec_pb2.HashFileReply.ALGORITHM_FAILED,
+                         reply.hash_file_reply.error)
+        self.assertIn('exited 137', reply.hash_file_reply.error_text)
+        self.assertIn('sha512sum', reply.hash_file_reply.error_text)
+
+    @mock.patch('shakenfist.daemons.privexec.util.locate_command',
+                side_effect=lambda c: c)
+    @mock.patch('shakenfist.daemons.privexec.main.os.path.exists',
+                return_value=True)
+    def test_hasher_no_output_is_distinct_error(
+            self, mock_exists, mock_locate):
+        # A clean exit with no output is a different fault from a
+        # failing hasher, and must not be conflated with it.
+        with mock.patch(
+                'shakenfist.daemons.privexec.util.command_helper',
+                return_value=('', '', 0)):
+            reply = self.job._hash_file(self._request('/some/blob'))
+        self.assertEqual(privexec_pb2.HashFileReply.HASHER_NO_OUTPUT,
+                         reply.hash_file_reply.error)
+        self.assertIn('produced no output',
+                      reply.hash_file_reply.error_text)
 
 
 class ConcurrencyHashFileTestCase(base.ShakenFistTestCase):
@@ -76,6 +115,23 @@ class ConcurrencyHashFileTestCase(base.ShakenFistTestCase):
         self.assertIn('ALGORITHM_FAILED', str(exc))
         self.assertIn('Input/output error', str(exc))
         self.assertIn('/some/blob', str(exc))
+
+    def test_hash_file_raises_no_output_with_name(self):
+        reply = privexec_pb2.PrivExecReply(
+            hash_file_reply=privexec_pb2.HashFileReply(
+                path='/some/blob',
+                algorithm=privexec_pb2.HashAlgorithm.SHA512,
+                error=privexec_pb2.HashFileReply.HASHER_NO_OUTPUT,
+                error_text='hasher /usr/bin/sha512sum exited 0 but produced no output; stderr: '))
+        with mock.patch(
+                'shakenfist.util.concurrency._marshal_privexec_request',
+                return_value=reply):
+            exc = self.assertRaises(
+                exceptions.HashFailed,
+                util_concurrency.hash_file, '/some/blob', 'sha512')
+
+        self.assertEqual('HASHER_NO_OUTPUT', exc.error)
+        self.assertIn('produced no output', str(exc))
 
     def test_hash_file_returns_hash_on_ok(self):
         reply = privexec_pb2.PrivExecReply(

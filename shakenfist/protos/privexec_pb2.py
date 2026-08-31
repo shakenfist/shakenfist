@@ -25,59 +25,59 @@ _sym_db = _symbol_database.Default()
 from shakenfist.protos import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprivexec.proto\x12\x11shakenfist.protos\x1a\x0c\x63ommon.proto\"T\n\x0fHashFileRequest\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\"\x98\x02\n\rHashFileReply\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\x12\x0c\n\x04hash\x18\x03 \x01(\t\x12\x36\n\x05\x65rror\x18\x14 \x01(\x0e\x32\'.shakenfist.protos.HashFileReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"j\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x12\n\x0e\x46ILE_NOT_FOUND\x10\x01\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x02\x12\x17\n\x13\x41LGORITHM_NOT_FOUND\x10\x03\x12\x14\n\x10\x41LGORITHM_FAILED\x10\x04\"e\n\x10\x45nableNATRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\"\xf2\x01\n\x0e\x45nableNATReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\x12\x37\n\x05\x65rror\x18\x14 \x01(\x0e\x32(.shakenfist.protos.EnableNATReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"@\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x13\n\x0fIPTABLES_FAILED\x10\x01\x12\x19\n\x15RULES_ALREADY_PRESENT\x10\x02\"N\n\x16\x45nsureVXLANMeshRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x0c\n\x04vxid\x18\x02 \x01(\x03\x12\x10\n\x08node_ips\x18\x03 \x03(\t\"\xe0\x01\n\x14\x45nsureVXLANMeshReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x0c\n\x04vxid\x18\x02 \x01(\x03\x12\x17\n\x0f\x61\x64\x64\x65\x64_addresses\x18\x03 \x03(\t\x12\x19\n\x11removed_addresses\x18\x04 \x03(\t\x12=\n\x05\x65rror\x18\x14 \x01(\x0e\x32..shakenfist.protos.EnsureVXLANMeshReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1d\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x0b\n\x07\x46\x41ILURE\x10\x01\"k\n\x14\x41\x64\x64\x46loatingIPRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\x12\x15\n\rinner_address\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\"\x88\x02\n\x12\x41\x64\x64\x46loatingIPReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\x12\x15\n\rinner_address\x18\x03 \x01(\t\x12;\n\x05\x65rror\x18\x14 \x01(\x0e\x32,.shakenfist.protos.AddFloatingIPReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"Z\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x1b\n\x17\x43REATE_INTERFACE_FAILED\x10\x01\x12\x16\n\x12\x41\x44\x44_ADDRESS_FAILED\x10\x02\x12\x13\n\x0fIPTABLES_FAILED\x10\x03\"I\n\x17RemoveFloatingIPRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\"\xb9\x01\n\x15RemoveFloatingIPReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\x12>\n\x05\x65rror\x18\x14 \x01(\x0e\x32/.shakenfist.protos.RemoveFloatingIPReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1c\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\"D\n\x1b\x43reateVXLANInterfaceRequest\x12\r\n\x05vx_id\x18\x01 \x01(\x03\x12\x16\n\x0emesh_interface\x18\x02 \x01(\t\"\xb8\x01\n\x19\x43reateVXLANInterfaceReply\x12\r\n\x05vx_id\x18\x01 \x01(\x03\x12\x16\n\x0emesh_interface\x18\x02 \x01(\t\x12\x42\n\x05\x65rror\x18\x14 \x01(\x0e\x32\x33.shakenfist.protos.CreateVXLANInterfaceReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1c\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\"2\n\x1d\x43reateNetworkNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\"\xa8\x01\n\x1b\x43reateNetworkNamespaceReply\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x44\n\x05\x65rror\x18\x14 \x01(\x0e\x32\x35.shakenfist.protos.CreateNetworkNamespaceReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1c\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\"\x84\x05\n\x0fPrivExecRequest\x12<\n\x0f\x65xecute_request\x18\x01 \x01(\x0b\x32!.shakenfist.protos.ExecuteRequestH\x00\x12?\n\x11hash_file_request\x18\n \x01(\x0b\x32\".shakenfist.protos.HashFileRequestH\x00\x12\x41\n\x12\x65nable_nat_request\x18\x0b \x01(\x0b\x32#.shakenfist.protos.EnableNATRequestH\x00\x12N\n\x19\x65nsure_vxlan_mesh_request\x18\x0c \x01(\x0b\x32).shakenfist.protos.EnsureVXLANMeshRequestH\x00\x12J\n\x17\x61\x64\x64_floating_ip_request\x18\r \x01(\x0b\x32\'.shakenfist.protos.AddFloatingIPRequestH\x00\x12P\n\x1aremove_floating_ip_request\x18\x0e \x01(\x0b\x32*.shakenfist.protos.RemoveFloatingIPRequestH\x00\x12X\n\x1e\x63reate_vxlan_interface_request\x18\x0f \x01(\x0b\x32..shakenfist.protos.CreateVXLANInterfaceRequestH\x00\x12\\\n create_network_namespace_request\x18\x10 \x01(\x0b\x32\x30.shakenfist.protos.CreateNetworkNamespaceRequestH\x00\x42\t\n\x07request\"\xe0\x04\n\rPrivExecReply\x12\x38\n\rexecute_reply\x18\x01 \x01(\x0b\x32\x1f.shakenfist.protos.ExecuteReplyH\x00\x12;\n\x0fhash_file_reply\x18\n \x01(\x0b\x32 .shakenfist.protos.HashFileReplyH\x00\x12=\n\x10\x65nable_nat_reply\x18\x0b \x01(\x0b\x32!.shakenfist.protos.EnableNATReplyH\x00\x12J\n\x17\x65nsure_vxlan_mesh_reply\x18\x0c \x01(\x0b\x32\'.shakenfist.protos.EnsureVXLANMeshReplyH\x00\x12\x46\n\x15\x61\x64\x64_floating_ip_reply\x18\r \x01(\x0b\x32%.shakenfist.protos.AddFloatingIPReplyH\x00\x12L\n\x18remove_floating_ip_reply\x18\x0e \x01(\x0b\x32(.shakenfist.protos.RemoveFloatingIPReplyH\x00\x12T\n\x1c\x63reate_vxlan_interface_reply\x18\x0f \x01(\x0b\x32,.shakenfist.protos.CreateVXLANInterfaceReplyH\x00\x12X\n\x1e\x63reate_network_namespace_reply\x18\x10 \x01(\x0b\x32..shakenfist.protos.CreateNetworkNamespaceReplyH\x00\x42\x07\n\x05reply*=\n\rHashAlgorithm\x12\x08\n\x04SHA1\x10\x00\x12\n\n\x06SHA256\x10\x01\x12\n\n\x06SHA512\x10\x02\x12\n\n\x06XXH128\x10\x03\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprivexec.proto\x12\x11shakenfist.protos\x1a\x0c\x63ommon.proto\"T\n\x0fHashFileRequest\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\"\xaf\x02\n\rHashFileReply\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\talgorithm\x18\x02 \x01(\x0e\x32 .shakenfist.protos.HashAlgorithm\x12\x0c\n\x04hash\x18\x03 \x01(\t\x12\x36\n\x05\x65rror\x18\x14 \x01(\x0e\x32\'.shakenfist.protos.HashFileReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x80\x01\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x12\n\x0e\x46ILE_NOT_FOUND\x10\x01\x12\x15\n\x11UNKNOWN_ALGORITHM\x10\x02\x12\x17\n\x13\x41LGORITHM_NOT_FOUND\x10\x03\x12\x14\n\x10\x41LGORITHM_FAILED\x10\x04\x12\x14\n\x10HASHER_NO_OUTPUT\x10\x05\"e\n\x10\x45nableNATRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\"\xf2\x01\n\x0e\x45nableNATReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x17\n\x0fnetwork_address\x18\x02 \x01(\t\x12\x14\n\x0cnetwork_mask\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\x12\x37\n\x05\x65rror\x18\x14 \x01(\x0e\x32(.shakenfist.protos.EnableNATReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"@\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x13\n\x0fIPTABLES_FAILED\x10\x01\x12\x19\n\x15RULES_ALREADY_PRESENT\x10\x02\"N\n\x16\x45nsureVXLANMeshRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x0c\n\x04vxid\x18\x02 \x01(\x03\x12\x10\n\x08node_ips\x18\x03 \x03(\t\"\xe0\x01\n\x14\x45nsureVXLANMeshReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x0c\n\x04vxid\x18\x02 \x01(\x03\x12\x17\n\x0f\x61\x64\x64\x65\x64_addresses\x18\x03 \x03(\t\x12\x19\n\x11removed_addresses\x18\x04 \x03(\t\x12=\n\x05\x65rror\x18\x14 \x01(\x0e\x32..shakenfist.protos.EnsureVXLANMeshReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1d\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x0b\n\x07\x46\x41ILURE\x10\x01\"k\n\x14\x41\x64\x64\x46loatingIPRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\x12\x15\n\rinner_address\x18\x03 \x01(\t\x12\x0c\n\x04vxid\x18\x04 \x01(\x03\"\x88\x02\n\x12\x41\x64\x64\x46loatingIPReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\x12\x15\n\rinner_address\x18\x03 \x01(\t\x12;\n\x05\x65rror\x18\x14 \x01(\x0e\x32,.shakenfist.protos.AddFloatingIPReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"Z\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\x1b\n\x17\x43REATE_INTERFACE_FAILED\x10\x01\x12\x16\n\x12\x41\x44\x44_ADDRESS_FAILED\x10\x02\x12\x13\n\x0fIPTABLES_FAILED\x10\x03\"I\n\x17RemoveFloatingIPRequest\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\"\xb9\x01\n\x15RemoveFloatingIPReply\x12\x14\n\x0cnetwork_uuid\x18\x01 \x01(\t\x12\x18\n\x10\x66loating_address\x18\x02 \x01(\t\x12>\n\x05\x65rror\x18\x14 \x01(\x0e\x32/.shakenfist.protos.RemoveFloatingIPReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1c\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\"D\n\x1b\x43reateVXLANInterfaceRequest\x12\r\n\x05vx_id\x18\x01 \x01(\x03\x12\x16\n\x0emesh_interface\x18\x02 \x01(\t\"\xb8\x01\n\x19\x43reateVXLANInterfaceReply\x12\r\n\x05vx_id\x18\x01 \x01(\x03\x12\x16\n\x0emesh_interface\x18\x02 \x01(\t\x12\x42\n\x05\x65rror\x18\x14 \x01(\x0e\x32\x33.shakenfist.protos.CreateVXLANInterfaceReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1c\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\"2\n\x1d\x43reateNetworkNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\"\xa8\x01\n\x1b\x43reateNetworkNamespaceReply\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x44\n\x05\x65rror\x18\x14 \x01(\x0e\x32\x35.shakenfist.protos.CreateNetworkNamespaceReply.Errors\x12\x12\n\nerror_text\x18\x15 \x01(\t\"\x1c\n\x06\x45rrors\x12\x06\n\x02OK\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\"\x84\x05\n\x0fPrivExecRequest\x12<\n\x0f\x65xecute_request\x18\x01 \x01(\x0b\x32!.shakenfist.protos.ExecuteRequestH\x00\x12?\n\x11hash_file_request\x18\n \x01(\x0b\x32\".shakenfist.protos.HashFileRequestH\x00\x12\x41\n\x12\x65nable_nat_request\x18\x0b \x01(\x0b\x32#.shakenfist.protos.EnableNATRequestH\x00\x12N\n\x19\x65nsure_vxlan_mesh_request\x18\x0c \x01(\x0b\x32).shakenfist.protos.EnsureVXLANMeshRequestH\x00\x12J\n\x17\x61\x64\x64_floating_ip_request\x18\r \x01(\x0b\x32\'.shakenfist.protos.AddFloatingIPRequestH\x00\x12P\n\x1aremove_floating_ip_request\x18\x0e \x01(\x0b\x32*.shakenfist.protos.RemoveFloatingIPRequestH\x00\x12X\n\x1e\x63reate_vxlan_interface_request\x18\x0f \x01(\x0b\x32..shakenfist.protos.CreateVXLANInterfaceRequestH\x00\x12\\\n create_network_namespace_request\x18\x10 \x01(\x0b\x32\x30.shakenfist.protos.CreateNetworkNamespaceRequestH\x00\x42\t\n\x07request\"\xe0\x04\n\rPrivExecReply\x12\x38\n\rexecute_reply\x18\x01 \x01(\x0b\x32\x1f.shakenfist.protos.ExecuteReplyH\x00\x12;\n\x0fhash_file_reply\x18\n \x01(\x0b\x32 .shakenfist.protos.HashFileReplyH\x00\x12=\n\x10\x65nable_nat_reply\x18\x0b \x01(\x0b\x32!.shakenfist.protos.EnableNATReplyH\x00\x12J\n\x17\x65nsure_vxlan_mesh_reply\x18\x0c \x01(\x0b\x32\'.shakenfist.protos.EnsureVXLANMeshReplyH\x00\x12\x46\n\x15\x61\x64\x64_floating_ip_reply\x18\r \x01(\x0b\x32%.shakenfist.protos.AddFloatingIPReplyH\x00\x12L\n\x18remove_floating_ip_reply\x18\x0e \x01(\x0b\x32(.shakenfist.protos.RemoveFloatingIPReplyH\x00\x12T\n\x1c\x63reate_vxlan_interface_reply\x18\x0f \x01(\x0b\x32,.shakenfist.protos.CreateVXLANInterfaceReplyH\x00\x12X\n\x1e\x63reate_network_namespace_reply\x18\x10 \x01(\x0b\x32..shakenfist.protos.CreateNetworkNamespaceReplyH\x00\x42\x07\n\x05reply*=\n\rHashAlgorithm\x12\x08\n\x04SHA1\x10\x00\x12\n\n\x06SHA256\x10\x01\x12\n\n\x06SHA512\x10\x02\x12\n\n\x06XXH128\x10\x03\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'privexec_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_HASHALGORITHM']._serialized_start=3452
-  _globals['_HASHALGORITHM']._serialized_end=3513
+  _globals['_HASHALGORITHM']._serialized_start=3475
+  _globals['_HASHALGORITHM']._serialized_end=3536
   _globals['_HASHFILEREQUEST']._serialized_start=51
   _globals['_HASHFILEREQUEST']._serialized_end=135
   _globals['_HASHFILEREPLY']._serialized_start=138
-  _globals['_HASHFILEREPLY']._serialized_end=418
-  _globals['_HASHFILEREPLY_ERRORS']._serialized_start=312
-  _globals['_HASHFILEREPLY_ERRORS']._serialized_end=418
-  _globals['_ENABLENATREQUEST']._serialized_start=420
-  _globals['_ENABLENATREQUEST']._serialized_end=521
-  _globals['_ENABLENATREPLY']._serialized_start=524
-  _globals['_ENABLENATREPLY']._serialized_end=766
-  _globals['_ENABLENATREPLY_ERRORS']._serialized_start=702
-  _globals['_ENABLENATREPLY_ERRORS']._serialized_end=766
-  _globals['_ENSUREVXLANMESHREQUEST']._serialized_start=768
-  _globals['_ENSUREVXLANMESHREQUEST']._serialized_end=846
-  _globals['_ENSUREVXLANMESHREPLY']._serialized_start=849
-  _globals['_ENSUREVXLANMESHREPLY']._serialized_end=1073
-  _globals['_ENSUREVXLANMESHREPLY_ERRORS']._serialized_start=1044
-  _globals['_ENSUREVXLANMESHREPLY_ERRORS']._serialized_end=1073
-  _globals['_ADDFLOATINGIPREQUEST']._serialized_start=1075
-  _globals['_ADDFLOATINGIPREQUEST']._serialized_end=1182
-  _globals['_ADDFLOATINGIPREPLY']._serialized_start=1185
-  _globals['_ADDFLOATINGIPREPLY']._serialized_end=1449
-  _globals['_ADDFLOATINGIPREPLY_ERRORS']._serialized_start=1359
-  _globals['_ADDFLOATINGIPREPLY_ERRORS']._serialized_end=1449
-  _globals['_REMOVEFLOATINGIPREQUEST']._serialized_start=1451
-  _globals['_REMOVEFLOATINGIPREQUEST']._serialized_end=1524
-  _globals['_REMOVEFLOATINGIPREPLY']._serialized_start=1527
-  _globals['_REMOVEFLOATINGIPREPLY']._serialized_end=1712
-  _globals['_REMOVEFLOATINGIPREPLY_ERRORS']._serialized_start=1684
-  _globals['_REMOVEFLOATINGIPREPLY_ERRORS']._serialized_end=1712
-  _globals['_CREATEVXLANINTERFACEREQUEST']._serialized_start=1714
-  _globals['_CREATEVXLANINTERFACEREQUEST']._serialized_end=1782
-  _globals['_CREATEVXLANINTERFACEREPLY']._serialized_start=1785
-  _globals['_CREATEVXLANINTERFACEREPLY']._serialized_end=1969
-  _globals['_CREATEVXLANINTERFACEREPLY_ERRORS']._serialized_start=1684
-  _globals['_CREATEVXLANINTERFACEREPLY_ERRORS']._serialized_end=1712
-  _globals['_CREATENETWORKNAMESPACEREQUEST']._serialized_start=1971
-  _globals['_CREATENETWORKNAMESPACEREQUEST']._serialized_end=2021
-  _globals['_CREATENETWORKNAMESPACEREPLY']._serialized_start=2024
-  _globals['_CREATENETWORKNAMESPACEREPLY']._serialized_end=2192
-  _globals['_CREATENETWORKNAMESPACEREPLY_ERRORS']._serialized_start=1684
-  _globals['_CREATENETWORKNAMESPACEREPLY_ERRORS']._serialized_end=1712
-  _globals['_PRIVEXECREQUEST']._serialized_start=2195
-  _globals['_PRIVEXECREQUEST']._serialized_end=2839
-  _globals['_PRIVEXECREPLY']._serialized_start=2842
-  _globals['_PRIVEXECREPLY']._serialized_end=3450
+  _globals['_HASHFILEREPLY']._serialized_end=441
+  _globals['_HASHFILEREPLY_ERRORS']._serialized_start=313
+  _globals['_HASHFILEREPLY_ERRORS']._serialized_end=441
+  _globals['_ENABLENATREQUEST']._serialized_start=443
+  _globals['_ENABLENATREQUEST']._serialized_end=544
+  _globals['_ENABLENATREPLY']._serialized_start=547
+  _globals['_ENABLENATREPLY']._serialized_end=789
+  _globals['_ENABLENATREPLY_ERRORS']._serialized_start=725
+  _globals['_ENABLENATREPLY_ERRORS']._serialized_end=789
+  _globals['_ENSUREVXLANMESHREQUEST']._serialized_start=791
+  _globals['_ENSUREVXLANMESHREQUEST']._serialized_end=869
+  _globals['_ENSUREVXLANMESHREPLY']._serialized_start=872
+  _globals['_ENSUREVXLANMESHREPLY']._serialized_end=1096
+  _globals['_ENSUREVXLANMESHREPLY_ERRORS']._serialized_start=1067
+  _globals['_ENSUREVXLANMESHREPLY_ERRORS']._serialized_end=1096
+  _globals['_ADDFLOATINGIPREQUEST']._serialized_start=1098
+  _globals['_ADDFLOATINGIPREQUEST']._serialized_end=1205
+  _globals['_ADDFLOATINGIPREPLY']._serialized_start=1208
+  _globals['_ADDFLOATINGIPREPLY']._serialized_end=1472
+  _globals['_ADDFLOATINGIPREPLY_ERRORS']._serialized_start=1382
+  _globals['_ADDFLOATINGIPREPLY_ERRORS']._serialized_end=1472
+  _globals['_REMOVEFLOATINGIPREQUEST']._serialized_start=1474
+  _globals['_REMOVEFLOATINGIPREQUEST']._serialized_end=1547
+  _globals['_REMOVEFLOATINGIPREPLY']._serialized_start=1550
+  _globals['_REMOVEFLOATINGIPREPLY']._serialized_end=1735
+  _globals['_REMOVEFLOATINGIPREPLY_ERRORS']._serialized_start=1707
+  _globals['_REMOVEFLOATINGIPREPLY_ERRORS']._serialized_end=1735
+  _globals['_CREATEVXLANINTERFACEREQUEST']._serialized_start=1737
+  _globals['_CREATEVXLANINTERFACEREQUEST']._serialized_end=1805
+  _globals['_CREATEVXLANINTERFACEREPLY']._serialized_start=1808
+  _globals['_CREATEVXLANINTERFACEREPLY']._serialized_end=1992
+  _globals['_CREATEVXLANINTERFACEREPLY_ERRORS']._serialized_start=1707
+  _globals['_CREATEVXLANINTERFACEREPLY_ERRORS']._serialized_end=1735
+  _globals['_CREATENETWORKNAMESPACEREQUEST']._serialized_start=1994
+  _globals['_CREATENETWORKNAMESPACEREQUEST']._serialized_end=2044
+  _globals['_CREATENETWORKNAMESPACEREPLY']._serialized_start=2047
+  _globals['_CREATENETWORKNAMESPACEREPLY']._serialized_end=2215
+  _globals['_CREATENETWORKNAMESPACEREPLY_ERRORS']._serialized_start=1707
+  _globals['_CREATENETWORKNAMESPACEREPLY_ERRORS']._serialized_end=1735
+  _globals['_PRIVEXECREQUEST']._serialized_start=2218
+  _globals['_PRIVEXECREQUEST']._serialized_end=2862
+  _globals['_PRIVEXECREPLY']._serialized_start=2865
+  _globals['_PRIVEXECREPLY']._serialized_end=3473
 # @@protoc_insertion_point(module_scope)
