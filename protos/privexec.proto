@@ -22,6 +22,7 @@ message HashFileReply {
         UNKNOWN_ALGORITHM = 2;
         ALGORITHM_NOT_FOUND = 3;
         ALGORITHM_FAILED = 4;
+        HASHER_NO_OUTPUT = 5;
     }
 
     string path = 1;

@@ -172,16 +172,32 @@ class PrivExecJob:
             privexec_util.locate_command('ionice'), '-c', '2', '-n', '7',
             hasher, req.path
         )
-        if returncode != 0 or len(stdout) == 0:
-            log.error(
-                'Failed to hash file, bad exit code or no output from hasher')
+        if returncode != 0:
+            log.with_fields({
+                'returncode': returncode,
+                'stderr': stderr
+            }).error('Failed to hash file, hasher exited non-zero')
             return privexec_pb2.PrivExecReply(
                 hash_file_reply=privexec_pb2.HashFileReply(
                     path=req.path,
                     algorithm=req.algorithm,
                     hash=stdout,
                     error=privexec_pb2.HashFileReply.ALGORITHM_FAILED,
-                    error_text=stderr
+                    error_text=f'hasher {hasher} exited {returncode}: {stderr}'
+                )
+            )
+
+        if len(stdout) == 0:
+            log.with_fields({
+                'returncode': returncode,
+                'stderr': stderr
+            }).error('Failed to hash file, hasher exited zero but produced no output')
+            return privexec_pb2.PrivExecReply(
+                hash_file_reply=privexec_pb2.HashFileReply(
+                    path=req.path,
+                    algorithm=req.algorithm,
+                    error=privexec_pb2.HashFileReply.HASHER_NO_OUTPUT,
+                    error_text=f'hasher {hasher} exited 0 but produced no output; stderr: {stderr}'
                 )
             )
 

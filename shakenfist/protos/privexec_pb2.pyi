@@ -76,6 +76,7 @@ class HashFileReply(_message.Message):
         UNKNOWN_ALGORITHM: HashFileReply._Errors.ValueType  # 2
         ALGORITHM_NOT_FOUND: HashFileReply._Errors.ValueType  # 3
         ALGORITHM_FAILED: HashFileReply._Errors.ValueType  # 4
+        HASHER_NO_OUTPUT: HashFileReply._Errors.ValueType  # 5
 
     class Errors(_Errors, metaclass=_ErrorsEnumTypeWrapper): ...
     OK: HashFileReply.Errors.ValueType  # 0
@@ -83,6 +84,7 @@ class HashFileReply(_message.Message):
     UNKNOWN_ALGORITHM: HashFileReply.Errors.ValueType  # 2
     ALGORITHM_NOT_FOUND: HashFileReply.Errors.ValueType  # 3
     ALGORITHM_FAILED: HashFileReply.Errors.ValueType  # 4
+    HASHER_NO_OUTPUT: HashFileReply.Errors.ValueType  # 5
 
     PATH_FIELD_NUMBER: _builtins.int
     ALGORITHM_FIELD_NUMBER: _builtins.int
