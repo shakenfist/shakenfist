@@ -5634,10 +5634,24 @@ _PRUNE_BATCH_SIZE = 10000
 def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
     """Prune event_objects rows for one event_type older than max_age.
 
-    Stage A of the daily events prune sweep. Joins event_objects to
-    events on event_uuid, filters by event_type and the age cutoff,
-    and deletes the join row in batches of ``_PRUNE_BATCH_SIZE``. Each
-    batch is its own transaction so a long prune does not hold a
+    Stage A of the daily events prune sweep. Each batch first finds up
+    to ``_PRUNE_BATCH_SIZE`` candidate event uuids with a non-locking
+    SELECT driving off the events (event_type, timestamp) index, then
+    deletes their event_objects rows via the event_uuid secondary
+    index. All three stages used to be a single
+    ``DELETE ... JOIN ... LIMIT`` statement, but a LIMIT there bounds
+    the rows deleted, not the rows the join examines -- and a DELETE
+    takes an InnoDB next-key lock on every row it examines. Issue 3982
+    measured single stage C batches holding 15.8M row locks for two
+    minutes, stalling every node's event writes; the SELECT-then-
+    delete-by-key shape keeps each batch's lock footprint proportional
+    to the batch size. The SELECT resumes from a timestamp cursor so a
+    sweep makes one pass over the index; ``>=`` on the cursor is
+    deliberate because events may share a timestamp, and revisiting
+    the boundary is harmless (already-pruned events have no
+    event_objects rows left, so the join skips them).
+
+    Each batch is its own transaction so a long prune does not hold a
     single transaction open. Returns the total number of event_objects
     rows deleted across all batches. On OperationalError the partial
     count accumulated so far is returned.
@@ -5654,29 +5668,40 @@ def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
     engine = _get_engine()
     cutoff = time.time() - max_age
     total = 0
+    cursor = 0.0
 
-    stmt = sa.text('''
-        DELETE eo FROM event_objects eo
-        JOIN events e ON eo.event_uuid = e.event_uuid
-        WHERE e.event_type = :event_type AND e.timestamp < :cutoff
+    select_stmt = sa.text('''
+        SELECT e.event_uuid, e.timestamp FROM events e
+        JOIN event_objects eo ON eo.event_uuid = e.event_uuid
+        WHERE e.event_type = :event_type
+          AND e.timestamp >= :cursor AND e.timestamp < :cutoff
+        ORDER BY e.timestamp
         LIMIT :batch
     ''')
+    delete_stmt = sa.text('''
+        DELETE FROM event_objects WHERE event_uuid IN :event_uuids
+    ''').bindparams(sa.bindparam('event_uuids', expanding=True))
 
     try:
         while True:
             with engine.connect() as conn:
-                result = conn.execute(stmt, {
+                rows = conn.execute(select_stmt, {
                     'event_type': event_type,
+                    'cursor': cursor,
                     'cutoff': cutoff,
                     'batch': _PRUNE_BATCH_SIZE,
+                }).fetchall()
+                if not rows:
+                    break
+                cursor = rows[-1].timestamp
+                result = conn.execute(delete_stmt, {
+                    'event_uuids': list({row.event_uuid for row in rows}),
                 })
                 conn.commit()
             rowcount = result.rowcount or 0
             if rowcount > 0:
                 EVENTS_PRUNED.labels(event_type=event_type).inc(rowcount)
                 total += rowcount
-            if rowcount < _PRUNE_BATCH_SIZE:
-                break
         return total
     except OperationalError as e:
         LOG.warning(
@@ -5695,8 +5720,11 @@ def _direct_prune_api_request_events(max_age: float) -> int:
     last event_objects row is gone. Counter increments use the
     synthetic label ``event_type='api-request'`` so operators can
     distinguish object-type-override prunes from regular per-type
-    prunes in the same metric. Batched and OperationalError-tolerant
-    like stage A.
+    prunes in the same metric. Uses stage A's SELECT-then-delete-by-key
+    batch shape (see there for the lock-footprint rationale), but needs
+    no cursor: it deletes from the same table its SELECT scans, so
+    processed rows never reappear. Batched and OperationalError-
+    tolerant like stage A.
 
     Args:
         max_age: Maximum age in seconds. Rows whose referenced event
@@ -5709,27 +5737,34 @@ def _direct_prune_api_request_events(max_age: float) -> int:
     cutoff = time.time() - max_age
     total = 0
 
-    stmt = sa.text('''
-        DELETE eo FROM event_objects eo
+    select_stmt = sa.text('''
+        SELECT eo.event_uuid FROM event_objects eo
         JOIN events e ON eo.event_uuid = e.event_uuid
         WHERE eo.object_type = 'api-request' AND e.timestamp < :cutoff
         LIMIT :batch
     ''')
+    delete_stmt = sa.text('''
+        DELETE FROM event_objects
+        WHERE object_type = 'api-request' AND event_uuid IN :event_uuids
+    ''').bindparams(sa.bindparam('event_uuids', expanding=True))
 
     try:
         while True:
             with engine.connect() as conn:
-                result = conn.execute(stmt, {
+                rows = conn.execute(select_stmt, {
                     'cutoff': cutoff,
                     'batch': _PRUNE_BATCH_SIZE,
+                }).fetchall()
+                if not rows:
+                    break
+                result = conn.execute(delete_stmt, {
+                    'event_uuids': list({row.event_uuid for row in rows}),
                 })
                 conn.commit()
             rowcount = result.rowcount or 0
             if rowcount > 0:
                 EVENTS_PRUNED.labels(event_type='api-request').inc(rowcount)
                 total += rowcount
-            if rowcount < _PRUNE_BATCH_SIZE:
-                break
         return total
     except OperationalError as e:
         LOG.warning(f'MariaDB prune_api_request_events failed: {e}')
@@ -5742,8 +5777,16 @@ def _direct_prune_orphan_events() -> int:
     Stage C of the daily events prune sweep. After stages A and B
     have removed event_objects rows, any events row whose event_uuid
     no longer appears in event_objects is now an orphan and may be
-    deleted. Uses a LEFT JOIN anti-join via the events PK and the
-    event_objects ``event_uuid`` secondary index. Batched and
+    deleted. Each batch finds orphans with a non-locking LEFT JOIN
+    anti-join SELECT walking the events PK from a uuid cursor, then
+    deletes them by primary key (see stage A for why the old
+    ``DELETE ... LEFT JOIN ... LIMIT`` shape had to go: its anti-join
+    next-key-locked every events row it examined, up to 15.8M rows
+    per batch on issue 3982's measurements). The SELECT sees events
+    and event_objects at one snapshot, and the insert path commits an
+    event and its references in a single transaction, so a
+    concurrently written event can never be caught between the two
+    tables and misread as an orphan. Batched and
     OperationalError-tolerant like the other stages.
 
     Returns:
@@ -5751,25 +5794,37 @@ def _direct_prune_orphan_events() -> int:
     """
     engine = _get_engine()
     total = 0
+    cursor = ''
 
-    stmt = sa.text('''
-        DELETE e FROM events e
+    select_stmt = sa.text('''
+        SELECT e.event_uuid FROM events e
         LEFT JOIN event_objects eo ON e.event_uuid = eo.event_uuid
-        WHERE eo.event_uuid IS NULL
+        WHERE e.event_uuid > :cursor AND eo.event_uuid IS NULL
+        ORDER BY e.event_uuid
         LIMIT :batch
     ''')
+    delete_stmt = sa.text('''
+        DELETE FROM events WHERE event_uuid IN :event_uuids
+    ''').bindparams(sa.bindparam('event_uuids', expanding=True))
 
     try:
         while True:
             with engine.connect() as conn:
-                result = conn.execute(stmt, {'batch': _PRUNE_BATCH_SIZE})
+                rows = conn.execute(select_stmt, {
+                    'cursor': cursor,
+                    'batch': _PRUNE_BATCH_SIZE,
+                }).fetchall()
+                if not rows:
+                    break
+                cursor = rows[-1].event_uuid
+                result = conn.execute(delete_stmt, {
+                    'event_uuids': [row.event_uuid for row in rows],
+                })
                 conn.commit()
             rowcount = result.rowcount or 0
             if rowcount > 0:
                 ORPHAN_EVENTS_PRUNED.inc(rowcount)
                 total += rowcount
-            if rowcount < _PRUNE_BATCH_SIZE:
-                break
         return total
     except OperationalError as e:
         LOG.warning(f'MariaDB prune_orphan_events failed: {e}')
