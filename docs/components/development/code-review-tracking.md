@@ -11,18 +11,18 @@ The full design rationale is in
 
 The automation lives in this repository:
 `scripts/review-tracking.py` (subcommands `stamp`, `prune`, `regen`,
-`next`, and `status`), with tests in
+`next`, `status`, and `scope-orphans`), with tests in
 `scripts/test_review_tracking.py`. In a developer's clone it is run
 by hand -- deliberately not from git hooks. An earlier iteration
 wired `stamp` and `prune` into the pre-commit, post-merge,
 post-checkout, and post-rewrite hooks, but review state silently
 changing in the middle of unrelated git operations proved more
 confusing than helpful. That objection does not apply to CI running
-against a repository's own main branch, so in steady state two
+against a repository's own main branch, so in steady state three
 subcommands also run automatically: `prune` from an adopting repo's
-`prune-reviews` workflow on every push to main, and `status` from
-the consistency audit's `review-coverage` check (see "Steady state"
-below). Target repositories carry a thin wrapper (for example
+`prune-reviews` workflow on every push to main, and `status` and
+`scope-orphans` from the consistency audit's `review-coverage` and
+`review-scope-completeness` checks (see "Steady state" below). Target repositories carry a thin wrapper (for example
 ryll's `tools/review-tracking.sh`) that locates a local clone of
 this repository and passes through to the script.
 
@@ -179,6 +179,17 @@ this repository and passes through to the script.
    keep generated code (`*_pb2.py` and friends), vendored trees
    (`vendor/*`, minified third-party JavaScript), and ephemeral
    archives out of the queue.
+
+   Whichever you choose, every tracked file has to end up either in
+   scope or named by an `exclude` entry: the
+   `review-scope-completeness` audit fails on a file that is out of
+   scope only because `include` does not name it. Enumerating
+   extensions and leaving `include` empty are both compliant, and
+   they differ in which way a new file type fails. With an empty
+   `include` it silently joins the review queue and somebody excludes
+   it if that was wrong; with a list it fails the audit and somebody
+   decides. Run `review-tracking.py scope-orphans` after writing the
+   config to see which files it leaves out.
 
    Prefix an `exclude` entry with `!` to re-include something the
    pattern above it takes away:
@@ -536,6 +547,30 @@ backlog back under the threshold. Expect the issue to open and
 close routinely: a single feature PR can touch five in-scope
 files, and the issue is a standing nudge rather than an alarm.
 
-`status` is also useful interactively: run
+**Scope alerting.** The same audit runs a
+`review-scope-completeness` check
+(`docs/audits/review-scope-completeness.md`), which measures the
+scope config rather than the backlog. It fails when a tracked file
+is out of scope only because no `include` pattern names it, as
+opposed to because an `exclude` entry says it should not be
+reviewed. The two checks fail in opposite directions and the gap
+between them matters: narrowing `include` is the cheapest way to
+make a `review-coverage` issue close, and without this check
+nothing notices a repository that reaches full coverage by
+shrinking what counts. It runs `review-tracking.py scope-orphans`,
+and the issue it files lists the unnamed files.
+
+The case it was written for was not adversarial.
+`templates/renovate/renovate.json` in this repository is a template
+copied across the fleet -- by this repository's own scope config the
+most consequential kind of file in it -- and it sat outside review
+for as long as the `include` list had no JSON pattern, because JSON
+had simply never come up. No issue could have been filed about it:
+from `review-coverage`'s perspective the repository was fully
+measured.
+
+`status` and `scope-orphans` are also useful interactively: run
 `./tools/review-tracking.sh status` in any clone to see effective
-coverage at that clone's HEAD without touching any state.
+coverage at that clone's HEAD, or
+`./tools/review-tracking.sh scope-orphans` to see what the scope
+config is silently leaving out. Neither touches any state.

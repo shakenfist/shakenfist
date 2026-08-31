@@ -218,6 +218,30 @@ and the overlay becomes standalone.
  classification inconsistencies. The sparse-table refusal
  fires before any mutation and is byte-idempotent;
  qemu-img rebases the same shape check-clean.
+- **Overlays whose backing-path slot is not where the
+ format says it should be are refused.** The header's
+ `backing_file_offset` and `backing_file_size` describe
+ where the existing backing name is stored, and rewriting
+ the backing name in place writes to that slot. The slot
+ must lie wholly within the overlay's first cluster and
+ must start after the fixed header; a slot that runs past
+ the end of the first cluster or of the file, that
+ overlaps the header instar rewrites itself, or whose end
+ overflows 64 bits is refused with
+ `ERROR_HEADER_MISMATCH` (issue #485) instead of becoming
+ a write at an offset the header picked. This is the same
+ rule qemu-img applies when opening an image, so no image
+ qemu-img will open is refused for this reason. A detach
+ is exempt, because it zeroes the header pointer without
+ writing to the slot at all.
+- **vmdk overlays whose descriptor slot lies outside the
+ file are refused.** The vmdk binary header's
+ `desc_offset_sectors` / `desc_size_sectors` say where
+ the descriptor text lives, and a rebase rewrites it in
+ place. A slot that ends past the overlay's end-of-file,
+ or whose end overflows 64 bits, is refused with
+ `ERROR_HEADER_MISMATCH` — the vmdk counterpart of the
+ qcow2 rule above.
 - **Deep-allocation safe rebases refuse on refcount
  exhaustion.** v1 never appends refblocks, so a safe
  rebase that needs more cluster allocations than the

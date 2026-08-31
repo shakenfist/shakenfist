@@ -143,11 +143,11 @@ ones.
 
 1. **`scripts/audit-check.py`** -- add a `check_*()` function returning
    a dict with `id`, `status` (`pass` / `fail` / `not_applicable`) and
-   `details`. Register it in `check_calls()` and `CHECK_NAMES`. The id
-   written in `check_calls()` must be the id the function returns, and
-   a test asserts it: the calls are deferred so that a scoped
-   repository can skip a check without running it, which means the
-   table is what schedules the check, not the function.
+   `details`. Register it in `check_calls()`. The id written in
+   `check_calls()` must be the id the function returns, and a test
+   asserts it: the calls are deferred so that a scoped repository can
+   skip a check without running it, which means the table is what
+   schedules the check, not the function.
 2. **`scripts/audit_common.py`** -- add the id to `AUDIT_METADATA`
    (spec file, optional template) and `ISSUE_TITLES`. Both
    `audit-manage-issues.py` and `audit-update-docs.py` read this

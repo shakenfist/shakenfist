@@ -129,8 +129,8 @@ bug tracker".
 `check_plan_template` mirrors `check_push_audit`: repositories with
 no `PLAN-TEMPLATE.md` are `not_applicable`; those that have one must
 carry all nine blocks, current and verbatim. Registered in
-`CHECK_NAMES`, in the check list, and in `audit_common.py`
-(`AUDIT_METADATA` and its names table).
+`check_calls()` and in `audit_common.py` (`AUDIT_METADATA` and
+`ISSUE_TITLES`).
 
 Whether every repository should have a plan template is deliberately
 left as a separate decision. Eight of the sixteen audited
