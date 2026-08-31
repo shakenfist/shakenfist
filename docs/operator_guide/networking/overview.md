@@ -683,3 +683,22 @@ numbers: that a p90 at or below two seconds is the dispatcher's idle
 poll interval rather than queueing, and that `wait_seconds` includes
 deliberate deferral, which is why every percentile is also reported
 over just the operations which never deferred.
+
+When that second caveat is the question rather than a footnote --
+when a tail is deep and it matters whether the time went on deferral
+or on sitting in a queue -- `tools/operation-timeline.py` splits
+`wait_seconds` apart. It queries Loki itself rather than reading
+standard input, joining the `Execution deferred` events to the
+`execution duration` events on the operation uuid, and reports each
+operation's wait as three intervals: how long it sat before a
+dispatcher first picked it up, how much of the wait was deferral the
+dispatcher asked for, and how long it then sat after each redelivery.
+It also checks whether each rung of the back-off ladder was actually
+honoured, and reports whether any part of the window it read hit
+Loki's 5000 line query ceiling, since a truncated window otherwise
+looks exactly like a complete one:
+
+```
+tools/operation-timeline.py --tenant sfcbr \
+    --start 2026-08-29T00:00:00Z --end 2026-08-30T00:00:00Z
+```

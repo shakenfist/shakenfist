@@ -373,6 +373,16 @@ follow-up step. Worker crash recovery is unchanged: any claimed-
 but-not-yet-executed rows that the worker doesn't run are picked up
 by the stuck-row reaper described above.
 
+To see what that costs an operation in practice, `tools/queue-wait-report.py`
+reports the queue-wait distribution by queue class, priority lane and
+operation type, and `tools/operation-timeline.py` splits one operation's
+wait into the initial queue sit, the deferral the dispatcher asked for
+and the sit after each redelivery -- which is what distinguishes a lane
+that is genuinely backed up from one whose operations are waiting on a
+dependency. Both are documented, with their caveats, under
+[networking observability](../operator_guide/networking/overview.md),
+where they sit next to the other queue tooling.
+
 ## Coalescible Operations
 
 Some operation tasks are idempotent reconciliation work whose effect

@@ -71,7 +71,7 @@ Two things this plan changed are deliberately still unproven:
 | 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
 | 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
 | 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | Complete |
-| 10. The 15 second dependency wait | (not yet planned, and see below -- #3863 was fixed by #3916) | Not started |
+| 10. Where the pre-execution time goes | [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md) | Complete |
 | 11. Multi-column coalescing key | (not yet planned) | Not started |
 
 ## Problem
@@ -192,30 +192,51 @@ for someone to notice it.
    load bearing rather than assumed to be. See
    [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md).
 
-10. **The 15 second dependency wait.** Step 7 measured a p50 of
-    15.78 s on the `user_waiting` queue and traced all of it to
-    deferral: a dependency wait re-enqueues a flat 15 seconds into
-    the future on the queues `sf-queues` drains, where `sf-net`
-    instead backs off from 0.1 s to a 15 s cap. Restricted to
-    operations which never deferred, the same p50 is 0.77 s. This
-    is the largest user-visible latency in the whole sample and it
-    has nothing to do with queue order, which is why step 7 excluded
-    it from the fairness question and filed it as #3863 instead.
+10. **Where the pre-execution time goes.** This phase began as
+    "the 15 second dependency wait" (#3863): a dependency wait
+    re-enqueued a flat 15 seconds into the future on the queues
+    `sf-queues` drains, where `sf-net` instead backed off from
+    0.1 s to a 15 s cap. Step 7 measured that as a 15.78 s p50 on
+    the `user_waiting` lane against 0.77 s restricted to
+    operations which never deferred.
 
-    **The subject moved.** #3916 landed a fix on 2026-08-27 --
-    `dependency_defer_delay()` in
-    `shakenfist/daemons/queues/workitem.py` gives `sf-queues` the
-    same 0.1 s doubling to a 15 s cap that `sf-net` already had,
-    derived statelessly from the persisted `defer_count` -- and
-    #3863 was closed as completed. Phase 9's window is the first
-    data carrying it. That window says the back-off is live and also
-    says the story is not finished: the lane's p99 is still 17.18 s,
-    1,568 operations deferred at least once, and about 400 first
-    deferrals still sit at 15-17 s for reasons #3916 does not
-    explain. See "What this window says about phase 10" below, which
-    also explains why the headline p50 improvement is not a
-    controlled comparison. Re-scope this phase against that data
-    before planning it.
+    **That fix landed, and phase 9's residual turned out to be the
+    old behaviour rather than a new mystery.** #3916
+    (`dependency_defer_delay()` in
+    `shakenfist/daemons/queues/workitem.py`) gave `sf-queues` the
+    same ladder, derived statelessly from the persisted
+    `defer_count`, and #3863 was closed. Over a wholly post-fix
+    window the ladder fires exactly as designed -- 1,391 defers at
+    0.1 s decaying to 11 at 12.8 s, summing to the unfiltered total
+    exactly -- and a flat 15 second dependency defer happens once
+    in 42 hours. That one event is the ladder reaching its own
+    `MAX_DEFER_DELAY` cap at `defer_count >= 8`, not a caller
+    taking `defer()`'s `delay=15.0` default; all 32 such events in
+    the retained span come from `node_inst_netdesc_op`, and
+    `node_blob_op` did not defer once.
+
+    Phase 9's window was not wholly post-fix, which is what its
+    unexplained population was. The pre-#3916 code emitted its flat
+    wait as `Execution deferred for 15 seconds` -- the integer form,
+    because the call site passed no delay and took an `int` default
+    -- while the ladder emits floats. Counting the two forms
+    separately over phase 9's window gives **411 integer-form
+    events**, against 1 float-form; and the integer form falls to
+    **zero from 2026-08-28 onwards** and stays there. So the
+    "roughly 400 of 823 first deferrals at 15-17 s" phase 9 could
+    not explain were #3863 itself, still in the sample. See
+    "What step 10 measured" below, which reconstructs the window
+    and withdraws the claim.
+
+    That resolves the question this phase inherited, and leaves a
+    different one standing. `wait_seconds` is
+    `start_time - created_at` and conflates queue-sit time with
+    deferral without separating them, and once the pre-fix
+    population is excluded the deep tail is not deferral at all --
+    over 90% of the operations waiting 15 s or more never deferred
+    once. Phase 10 decomposes the wait and characterises that tail.
+    See
+    [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md).
 
 11. **Multi-column coalescing key.** The fold keys on a single
     target column, which for `net_op` means "the same network". A
@@ -307,6 +328,336 @@ events' object references with it, so the numbers had to come from the
 log echo instead. That gap is filed as #3864 and the operator
 documentation, which claimed 30 day retention, is corrected.
 
+## What step 10 measured
+
+Step 9 reported a `user_waiting` p99 of 17.18 s and roughly 400 first
+deferrals sitting at 15-17 s which it could not explain. Step 10 built
+`tools/operation-timeline.py`, which joins the `Execution deferred`
+events to the `execution duration` events on the operation uuid and
+splits `wait_seconds` into the three intervals it conflates:
+
+```
+(created -> first dequeue) + (summed defer delay) + (residual)
+```
+
+Two windows on `sfcbr`, both through that tool:
+
+* **Window A**, 2026-08-27T13:15Z to 2026-08-29T07:15Z, 42h00m,
+  23,362 operations and 3,585 defer events (the defer fetch runs
+  from 60 minutes before the window, so that an operation created
+  before it still has its early legs). This is step 9's own window,
+  so it is the one that can confirm or refute step 9.
+* **Window B**, 2026-08-28T13:15Z to 2026-08-30T07:15Z, 42h00m,
+  23,177 operations and 3,588 defer events. A trailing window ending
+  at the measurement, retained independently in case A ages out.
+
+The two **overlap by 18 hours** -- 42 hours of new traffic did not
+exist yet -- so they are a retention hedge and a consistency check,
+not two independent samples. Read them that way.
+
+No chunk of either fetch came back at Loki's 5000 line ceiling, and
+every stream was cross-checked against `count_over_time`: A matched
+exactly on both selectors, B matched on defers and differed by 2 of
+23,179 on executions, which is the window edge.
+
+### Step 9's 15-17 s population was pre-#3916 traffic
+
+**The claim is withdrawn, and it is corrected at source above.** After
+#3916 there is no 15-17 s population on the `user_waiting` lane at all:
+
+| | window A | window B |
+|---|---|---|
+| `user_waiting` operations | 3,821 | 3,815 |
+| of those, deferred at least once | 1,360 | 1,347 |
+| of those, `defer_count == 1` | 473 | 438 |
+| `defer_count == 1` in the 15-17 s band | **0** | **0** |
+| longest `defer_count == 1` wait | 3.79 s | 2.32 s |
+
+Step 9's dataset was reconstructed rather than guessed at. Sweeping
+the window boundaries over the retained stream and re-running
+`tools/queue-wait-report.py` reproduces every number it published, at
+one and only one window -- 2026-08-27T03:03Z to 2026-08-28T21:00Z,
+exactly ten hours earlier than its label:
+
+| | published by step 9 | reconstruction |
+|---|---|---|
+| operations in window | 26,229 | 26,225 |
+| deferred at least once | 1,568 | 1,568 |
+| `defer_count == 1` | 823 | 823 |
+| `defer_count == 1` at 15-17 s | "roughly 400" | 359 (419 at >= 15 s) |
+| `user_waiting` p50 / p90 / p99 / max | 1.20 / 7.28 / 17.18 / 42.83 | 1.20 / 7.30 / 17.19 / 42.83 |
+| never deferred p50 / p90 / p99 / max | 0.86 / 1.82 / 2.30 / 9.08 | 0.86 / 1.82 / 2.30 / 9.08 |
+
+Ten hours is this cluster's UTC offset. The log records carry a `ts`
+which is local time with a `Z` suffix, so a window read off the
+records reads ten hours later than the window Loki was actually asked
+for. 10,108 of those 26,225 samples fall before the 13:13Z redeploy
+that brought #3916 in, and 493 of the 823 first deferrals are pre-fix.
+Under the flat fifteen second defer a first deferral lands in the
+15-17 s band by construction, and 754 of the 956 pre-fix first
+deferrals do. So the population step 9 could not explain was #3863
+itself, sampled after its fix had shipped.
+
+That reconstruction is confirmed independently by the message text
+itself, which does not depend on getting the window boundaries right.
+The pre-#3916 code passed no delay and took an `int` default, so it
+emitted `Execution deferred for 15 seconds`; the ladder computes a
+float and emits `15.0`. The two forms are separable in the log:
+
+| | integer form (pre-fix) | float form (ladder cap) |
+|---|---|---|
+| in step 9's reconstructed window | **411** | 1 |
+| 2026-08-26 | 772 | -- |
+| 2026-08-27 | 632 | -- |
+| 2026-08-28 onwards | **0** | -- |
+
+411 integer-form events against step 9's "roughly 400" unexplained
+first deferrals, falling to zero the day after the redeploy and
+staying there. A search for the float form alone -- which is what the
+phase 10 survey ran -- sees one event and concludes the flat wait is
+gone, which is true of a post-fix window and false of step 9's.
+
+### The two accounts of the deep tail were about different populations
+
+Step 10b's own preview found 97 of 105 operations waiting >= 15 s had
+never deferred at all, which reads as a flat contradiction of step 9.
+It is not one. Both are real and they are disjoint populations, and
+the split holds in both windows:
+
+| operations waiting >= 15 s | window A | window B |
+|---|---|---|
+| total | 153 of 23,362 (0.7%) | 191 of 23,177 (0.8%) |
+| never deferred | 141 (92%) | 173 (91%) |
+| deferred | 12 | 18 |
+| in the 15-17 s band | 11, **all** never deferred | 8, **all** never deferred |
+
+Step 9 was looking only at `user_waiting`, which is the only lane on
+which anything defers at all -- 1,360 of 1,360 deferred operations in
+window A and 1,347 of 1,347 in window B are on it, because a
+dependency wait is what defers and dependency-bearing work is enqueued
+`user_waiting`. Step 10b was looking at the whole cluster, where the
+deep tail is on the background lanes and never deferred once. Step 9's
+error was the ten hour label, not the lane.
+
+### Where the time goes when an operation does defer
+
+Deferred operations only, since an operation which never deferred has
+no intermediate event and therefore no decomposition:
+
+| window A (n=1,360) | p50 | p90 | p99 | max | share of summed wait |
+|---|-----|-----|-----|-----|---|
+| total wait | 1.60 s | 3.17 s | 13.66 s | 42.83 s | 100.0% |
+| created -> first dequeue | 0.43 s | 1.61 s | 2.03 s | 3.52 s | 30.2% |
+| summed defer delay | 0.30 s | 1.50 s | 12.70 s | 40.50 s | 49.1% |
+| residual | 0.19 s | 1.12 s | 3.79 s | 6.78 s | 20.7% |
+
+| window B (n=1,347) | p50 | p90 | p99 | max | share of summed wait |
+|---|-----|-----|-----|-----|---|
+| total wait | 1.66 s | 3.23 s | 26.12 s | 293.80 s | 100.0% |
+| created -> first dequeue | 0.44 s | 1.61 s | 1.99 s | 3.81 s | 24.7% |
+| summed defer delay | 0.30 s | 1.50 s | 25.50 s | 280.50 s | 55.3% |
+| residual | 0.24 s | 1.14 s | 5.16 s | 16.55 s | 20.0% |
+
+The interval which holds the time depends entirely on how far up the
+ladder the operation got, and the crossover is sharp (window A):
+
+| `defer_count` | n | wait p50 | dequeue share | delay share | residual share |
+|---|---|---|---|---|---|
+| 1 | 473 | 1.06 s | 76.4% | 8.8% | 14.8% |
+| 2 | 297 | 1.34 s | 59.1% | 21.1% | 19.8% |
+| 3 | 205 | 1.51 s | 28.2% | 41.5% | 30.3% |
+| 4 | 259 | 2.80 s | 11.9% | 57.7% | 30.5% |
+| 5 | 82 | 3.42 s | 12.6% | 67.4% | 20.1% |
+| 6 | 23 | 6.96 s | 8.9% | 75.3% | 15.7% |
+| 7 | 10 | 13.45 s | 3.6% | 90.4% | 6.0% |
+| 8 | 10 | 30.45 s | 2.9% | 84.1% | 12.9% |
+| 9 | 1 | 42.83 s | 3.6% | 94.6% | 1.8% |
+
+At one or two deferrals the wait is dominated by the initial queue sit
+before anybody looked, which at a p50 of 0.43 s and a p90 of 1.61 s is
+the dispatcher's idle poll interval (`IDLE_POLL_MAX_SECONDS = 2.0`)
+and not contention. From three deferrals up the ladder itself is the
+wait, which is the ladder working: an operation that has waited eight
+times is waiting on something slow, and backing further off is the
+intended response.
+
+Every deferred operation over 15 s in either window is the same thing:
+12 in A and 18 in B, all `node_inst_netdesc_op`, all `user_waiting`,
+all `waiting_on` an `artifact_fetch_op`, all at `defer_count` 7 or
+more. In window A they account for 308.2 s of ladder delay against
+11.7 s of initial queue sit and 46.0 s of residual. An instance
+waiting on an image fetch is the operation the ladder exists for, and
+nothing here needs fixing.
+
+### The ladder's rungs are served a little early, and it does not matter
+
+The residual is redelivery slack: for each leg, how much longer it
+actually took than the delay that was asked for.
+
+| requested delay | legs | served p50 | slack p50 | served early |
+|---|---|---|---|---|
+| 0.1 s | 1,360 | 0.24 s | +0.14 s | 2 |
+| 0.2 s | 887 | 0.24 s | +0.04 s | 3 |
+| 0.4 s | 590 | 0.63 s | +0.23 s | 175 |
+| 0.8 s | 385 | 1.43 s | +0.63 s | 142 |
+| 1.6 s | 126 | 1.50 s | -0.10 s | 71 |
+| 3.2 s | 44 | 3.17 s | -0.03 s | 25 |
+| 6.4 s | 21 | 7.06 s | +0.66 s | 0 |
+| 12.8 s | 11 | 13.87 s | +1.07 s | 3 |
+| 15.0 s | 1 | 15.22 s | +0.22 s | 0 |
+
+Redelivery is not exact in either direction. 421 legs in window A came
+back **before** their delay had elapsed, by up to 0.19 s, and the
+1.6 s and 3.2 s rungs are early at the median. That is a real fidelity
+finding and it is the reason a residual can be negative -- 122
+operations in window A and 81 in window B have one, which is
+arithmetically correct rather than a join error.
+
+It is not material to the question. The residual is 20% of the
+deferred population's summed wait in both windows, its p50 is 0.19 s
+and 0.24 s, and its p99 is 3.79 s and 5.16 s. Every rung is served
+within a poll interval of what was asked for. Nobody's latency is
+explained by redelivery drift.
+
+### The deep tail is queue sit on the background lanes
+
+That is the answer to the question phase 10 was re-scoped around: the
+time is queue sit, not deferral, and it is not on `user_waiting`.
+Ninety-two per cent of the >= 15 s population never deferred, and
+splits into two families which are not the same phenomenon:
+
+| never-deferred, wait >= 15 s | window A | window B |
+|---|---|---|
+| `node_blob_op`, `per-node`/`background_high_io` | 97 | 115 |
+| `net_op`, `networknode`/`background` | 25 | 38 |
+| `net_op`, `per-node (network)`/`background` | 6 | 13 |
+| `net_macaddr_ip_op` / `net_op` / `net_iface_ip_op`, user-facing | 13 | 7 |
+| summed wait | 45,697 s | 68,577 s |
+
+**`node_blob_op` is a saturated pool**, which is what step 7 already
+concluded and this window confirms directly. For the six worst waits
+in window A, the same queue executed as much of its own work during
+the wait as the wait itself lasted -- ratios of 1.03, 1.18, 1.33,
+2.36, 2.68 and 2.69 of queue-seconds to wait-seconds, several workers
+running concurrently. The queue was full of blob transfers, and
+`background_high_io` is where blob transfers are meant to go.
+
+**`net_op` on `networknode`/`background` is not.** The whole 1,800+ s
+end of both windows is a single incident, visible in both because it
+falls in the 18 hour overlap: 12 operations created within one second
+at 2026-08-28T23:30:52Z, executed 31 minutes later between
+2026-08-29T00:01:42Z and 00:02:01Z, serially, at intervals matching
+their own 2.3-2.5 s execution times.
+
+Nothing was stalled while they waited. The same `sf-net` dispatcher
+executed 85 other `networknode` operations during the span -- 75 on
+the higher priority lanes and **10 on the `background` lane itself**
+-- for 52.3 s of work. So this is neither a saturated pool nor a
+starved lane: the lane was served, and these 12 items were not.
+
+Which leaves two mechanisms, and the retained events cannot tell them
+apart. Either the rows were never claimed (`networknode`/`background`
+is ninth of the ten queues in that dispatcher's `FIELD()` priority
+order, so a batch which fills from higher queues never reaches it),
+or they were claimed promptly and then held in `sf-net`'s in-memory
+worker pool, which partitions by a stable hash of the target so one
+slow operation holds every later operation for that target behind it.
+The serial drain at execution-time intervals is what the second looks
+like; it is not proof. See the next subsection for the timestamp that
+would decide it.
+
+This is 12 operations in 42 hours on a background lane, so the
+user-visible cost is nil. But step 7 excluded `networknode`/
+`background` on the grounds that its waits were burst position rather
+than anything structural, and a 31 minute wait on a queue which was
+concurrently being served is not that. The exclusion should not be
+cited as if it still held without re-deriving it.
+
+### What the join cannot say, and what would let it
+
+**It cannot decompose a never-deferred wait at all** -- which is 92%
+of the deep tail, so the paragraph above is a classification of the
+tail rather than a measurement of it. The join's resolution comes
+entirely from defer events, and an operation which never deferred
+emits none. Between `created_at` and `start_time` there is no event,
+so the whole wait is one bracket and both readings of it fit:
+
+* the work item sat in `work_queue` because no dispatcher asked for
+  its queue, or asked and had no free slot; or
+* a dispatcher claimed it promptly and it then sat in an in-memory
+  worker queue -- `sf-net` routes claimed items to a partitioned pool
+  by a stable hash of the target, so a slow operation on one partition
+  holds every later operation for that target behind it, and
+  `wait_seconds` counts that as queue wait.
+
+The 31 minute incident is exactly the case which needs telling apart,
+and nothing in the retained events can. Two timestamps on the
+`execution duration` event would settle it, and neither exists today:
+
+* **`dequeued_at`** -- when the dispatcher's `dequeue_work_items` call
+  returned the row. `dequeued_at - created_at` is time in the
+  database queue; `start_time - dequeued_at` is time inside the
+  daemon after it was claimed. This is the one that matters, and it
+  separates "nobody asked for this queue" from "we had it and sat on
+  it".
+* **`deliveries`** -- how many times the work item has been handed out.
+  `defer_count` counts deliberate deferrals only, so a redelivery
+  after a crashed or lost worker is currently indistinguishable from
+  a first delivery.
+
+Both are cheap: the dispatcher has the first at claim time and the
+work item row can carry the second. Neither should be added before
+somebody wants to answer this question again, which is the same
+sequencing argument decision 1 of the phase plan makes.
+
+### What this does not establish
+
+* **One cluster, and two windows which overlap by 18 hours.** The
+  `net_op` incident above appears in both windows because it is the
+  same incident. Nothing here is a second independent sample.
+* **No before-and-after.** There is no post-#3916 measurement of a
+  workload matched to a pre-#3916 one; what step 10 has is a mislabel
+  corrected, not an A/B.
+* **The tail's causes are classified, not measured.** Saturation for
+  `node_blob_op` is inferred from queue-seconds against wait-seconds,
+  which is the same argument step 7 made and has the same limits. The
+  `networknode`/`background` reading rests on one incident.
+* **No claim about dispatch, concurrency or pool sizing is made here,
+  and none should be read into the numbers.** Decision 5 of the phase
+  plan puts that out of scope deliberately; what the data says about
+  it belongs in a successor issue with this evidence attached, and
+  that issue is #3974.
+* **Nothing about coalescing.** Step 9 measured it and those numbers
+  stand untouched; the ten hour mislabel affects the `user_waiting`
+  latency table only in as much as its window was wrong, and the
+  coalescing counts were cross-checked against Prometheus.
+
+### Method note
+
+* **Take the window from Loki, never from the log records.** The
+  records' `ts` is local time with a `Z` suffix, so on `sfcbr` it runs
+  ten hours ahead of ingestion. That is the whole of step 9's error and
+  it is invisible in the output unless you look for it.
+  `tools/operation-timeline.py` measures the offset and prints it
+  (35999.999 s to 36000.000 s across 26,947 events in window A); a
+  *constant* offset cancels out of every interval, a varying one would
+  not, which is why it is printed rather than silently corrected.
+* `created_at` is `event_ts - seconds - wait_seconds`. Dropping the
+  `seconds` term places creation after the operation's own defer
+  events and yields negative intervals on long-running operations.
+* Cross-check every fetch against `count_over_time`, which is a metric
+  query and is not subject to the 5000 line ceiling. Both windows
+  above were checked chunk by chunk as well.
+* The phase plan's survey attributed window A's single 15.0 s defer
+  event to `node_blob_op.py`'s bare `self.defer()`. That was wrong:
+  all 33 `Execution deferred for 15.0 seconds` events between
+  2026-08-27 and 2026-08-30 come from `node_inst_netdesc_op`, and are
+  the back-off ladder reaching its own `MAX_DEFER_DELAY` cap after
+  eight or more deferrals. `node_blob_op` did not defer once in either
+  window. Step 10a's change to that call site is still right -- a bare
+  `defer()` is a latent flat fifteen seconds -- but no observed event
+  came from it.
+
 ## What step 9 measured
 
 Step 7's numbers were captured while coalescing was inert. Step 9
@@ -316,11 +667,17 @@ describe a cluster on which the fold actually matches rows.
 
 One window, through the same `tools/queue-wait-report.py`:
 
-* **`sfcbr`**, 41h56m, 26,229 operations
-  (2026-08-27T13:03Z to 2026-08-29T07:00Z). Production steady state.
-  147 of those operations predate the instrumented build and are
-  excluded from the coalescing tables by the tool, which is the
-  deploy boundary showing up in the data.
+* **`sfcbr`**, 41h57m, 26,229 operations, published as
+  2026-08-27T13:03Z to 2026-08-29T07:00Z. **That label is ten hours
+  out**: step 10 reconstructed the dataset and it actually spans
+  2026-08-27T03:03Z to 2026-08-28T21:00Z, because the log records'
+  `ts` is local time carrying a `Z` suffix. Production steady state
+  either way, and the coalescing counts below are unaffected -- the
+  coalescing instrumentation was already deployed across the whole of
+  the real span, and 147 of these operations predate it and are
+  excluded from the coalescing tables by the tool. The latency
+  numbers *are* affected, because #3916 deployed inside the real span
+  but not inside the published one; see the phase 10 subsection below.
 
 ### The fold is cheap -- the ~200 ms estimate was wrong by 50x
 
@@ -410,39 +767,69 @@ work on the key.
 ### What this window says about phase 10, which is less than it looks
 
 #3916 merged on 2026-08-27 at 10:11 and `sfcbr` was redeployed at
-13:13, so this is the first window carrying the dependency-wait
-back-off. The `user_waiting` lane reads:
+13:13, so this was meant to be the first window carrying the
+dependency-wait back-off. **The data it was read from was not that
+window.** Step 10 reconstructed the dataset exactly and found it runs
+from 2026-08-27T03:03Z to 2026-08-28T21:00Z -- ten hours earlier than
+the label above says, because the log records carry a local-time `ts`
+stamped with a `Z` suffix and ten hours is this cluster's UTC offset.
+10,108 of its 26,225 samples therefore predate the 13:13Z redeploy and
+were captured under the flat fifteen second defer #3916 removed. What
+follows is corrected in place; the reconstruction is in
+[What step 10 measured](#what-step-10-measured).
+
+The `user_waiting` lane as published, with the same tool's row over
+the window the label actually names beneath it:
 
 | | p50 | p90 | p99 | max |
 |---|-----|-----|-----|-----|
-| all | 1.20 s | 7.28 s | 17.18 s | 42.83 s |
-| never deferred | 0.86 s | 1.82 s | 2.30 s | 9.08 s |
+| as published (straddles the redeploy) | 1.20 s | 7.28 s | 17.18 s | 42.83 s |
+| 13:03Z to 07:00Z, all | 1.14 s | 2.35 s | 7.36 s | 42.83 s |
+| 13:03Z to 07:00Z, never deferred | 0.86 s | 1.84 s | 2.29 s | 4.59 s |
 
-against step 7's 15.78 s p50 for the same lane. **Do not read that as
-a controlled before-and-after.** Two things get in the way. The
-windows are different workloads a week apart, with no attempt to hold
-load constant. And `wait_seconds` is `start_time - created_at`
+against step 7's 15.78 s p50 for the same lane. **Do not read either
+row as a controlled before-and-after.** Three things get in the way.
+Two fifths of the published row is a pre-fix workload. The step 7 window is a
+different workload a week earlier, with no attempt to hold load
+constant. And `wait_seconds` is `start_time - created_at`
 (`baseoperation.py:162`) -- time since the operation was *created*,
 not since its last deferral -- so it is not a direct reading of the
 defer delay at all.
 
-What the window does establish is narrower and still worth having:
+What survives the correction:
 
-* Sub-second waits now appear on operations with `defer_count == 1`,
+* Sub-second waits appear on operations with `defer_count == 1`,
   which a flat fifteen second delay could not produce. The back-off
-  is live.
-* 1,568 operations in the window still deferred at least once, and
-  the lane's p99 is 17.18 s. Deferral has not stopped mattering.
-* Roughly 400 of the 823 first deferrals sit at 15-17 s. That is
-  **not** the transient-failure retry path -- `defer_with_backoff`
-  uses a `(15, 30, 60)` schedule and emits `scheduling retry after
-  transient failure`, which occurs **zero** times in this window. What
-  those operations were waiting for has not been established.
+  is live. Step 10 sharpens this: after the redeploy the entire
+  `defer_count == 1` population tops out at 3.79 s.
+* Operations still defer. 1,568 did so in the published dataset and
+  1,360 in the window the label names.
 
-So phase 10 is not "already fixed by #3916". Its subject moved, and
-the remaining question -- what the 15-17 s population is waiting on --
-is a different question from the one #3863 asked. Re-scope it against
-this data before planning it.
+What does not survive:
+
+* ~~Roughly 400 of the 823 first deferrals sit at 15-17 s ... what
+  those operations were waiting for has not been established.~~
+  **Withdrawn.** Those 823 first deferrals include 493 from before
+  the redeploy, and under the flat fifteen second defer a first
+  deferral lands in the 15-17 s band by construction -- 754 of the
+  956 pre-fix first deferrals do. After the redeploy there is not one
+  `user_waiting` operation in that band in either of step 10's 42
+  hour windows. The population was #3863, measured after the fix had
+  shipped but with pre-fix samples still in the dataset. Nothing was
+  waiting on anything unexplained.
+
+The rest of the paragraph stands: `defer_with_backoff`'s `(15, 30,
+60)` transient-failure retry emits `scheduling retry after transient
+failure` **zero** times in either dataset, so it was never the
+explanation either.
+
+So phase 10's subject did move, but not for the reason given here.
+The flat 15 s defer is gone and the `user_waiting` lane's residual is
+the back-off ladder doing what it was designed to do. The question
+step 10 inherited turned out to be a different one -- where the deep
+tail lives, which is not this lane at all. See
+[PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md)
+and the step 10 section above.
 
 ### Method note
 

@@ -42,6 +42,18 @@ class NodeBlobOp(BaseClusterOperation):
     initial_version = schema.initial_version
     current_version = schema.current_version
 
+    # Defer schedule for a replication which found another transfer of the
+    # same blob to this node already in flight. Roughly nine minutes, which
+    # is chosen against ensure_local()'s own stale-partial rule rather than
+    # against a blob size: a partial file which goes five minutes without
+    # progress is discarded and the transfer restarted, so a ladder shorter
+    # than that would give up while the peer transfer was still healthy,
+    # and this one outlasts a full stall-and-restart cycle. Bounded rather
+    # than the unbounded 15s retry this replaced, because the cluster
+    # maintainer re-requests under replicated blobs every five minutes, so
+    # spinning here forever buys nothing a sweep would not.
+    _TRANSFER_CONTENTION_DELAYS = (15, 30, 60, 60, 60, 60, 60, 60, 60, 60)
+
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values, schema)
@@ -136,4 +148,14 @@ class NodeBlobOp(BaseClusterOperation):
         try:
             b.ensure_local(wait_for_other_transfers=False)
         except BlobAlreadyBeingTransferred:
-            self.defer()
+            if not self.defer_with_backoff(
+                    delays=self._TRANSFER_CONTENTION_DELAYS,
+                    reason='blob already being transferred'):
+                # Blob replication contention is benign, not an operation
+                # failure -- match the insufficient-space branch above and
+                # let this attempt lapse rather than erroring the op out.
+                b.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'cannot replicate blob, retry budget exhausted while blob '
+                    'already being transferred')
+                return
