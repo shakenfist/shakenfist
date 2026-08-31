@@ -13444,6 +13444,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-frozen-model-is-not-a-deep-frozen-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A frozen model is not a deep frozen model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-per-item-convenience-wrapper-does-not-belong-in-a-loop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13893,6 +13904,50 @@ that proves it matches something. Asserting the statement's <em>shape</em>
 against a mocked engine cannot do that, and neither can a test that
 rewrites the query to suit sqlite -- register the missing SQL functions
 instead, so the statement under test is the statement that ships.</p>
+<h2 id="a-frozen-model-is-not-a-deep-frozen-model">A frozen model is not a deep frozen model<a class="headerlink" href="#a-frozen-model-is-not-a-deep-frozen-model" title="Permanent link">&para;</a></h2>
+<p><code>mariadb.get_&lt;type&gt;()</code> returns a Pydantic model with
+<code>model_config = ConfigDict(frozen=True)</code>, and that model is the one
+entry the process-wide static object value cache holds for its whole
+TTL. Every reader in the process gets the same object. <code>frozen=True</code>
+stops attribute <em>assignment</em> on it; it does not stop mutation of the
+<em>contents</em> of a list or dict field. So <code>data.commands.pop(0)</code> succeeds,
+and it edits what every other reader on the node is about to see.</p>
+<p>Two obligations follow, and they are two different obligations:</p>
+<ul>
+<li><strong>Copy the container you hand out.</strong> A <code>_db_get()</code> or
+  <code>_static_values_to_dict()</code> copying <code>list(data.commands)</code> is the
+  containment boundary. Without it, every object built from one cache
+  hit shares one list, so a mutation anywhere is a mutation everywhere
+  until the entry ages out.</li>
+<li><strong>Do not mutate an element of a container you were handed.</strong> The copy
+  above is shallow, which is deliberate -- a deep copy would defend
+  against a mutation no code performs and would cost an allocation per
+  element per read -- so the dicts inside a copied list are still the
+  cache's. Consume a command list by copying it and popping the copy,
+  the way <code>SideChannelExecutorJob.__init__</code> does; build the dict you
+  intend to edit locally, the way <code>add_result()</code>'s callers do.</li>
+</ul>
+<p><code>SideChannelExecutorJob</code> did the popping (issue #3516, PR #3970). It
+aliased <code>agentop.commands</code> as its work queue and popped each command as
+it dispatched, which drained the operation and, through it, the cache.
+The visible damage was an inverted decision: <code>operation_is_retryable()</code>
+opens by refusing an empty command list, so a single-command <code>get-file</code>
+declared itself unretryable the instant its only command went out --
+precisely the operation shape the retry path exists for. The second
+consequence was quieter: <code>NodeAgentopOp._preflight()</code> iterates the same
+list looking for <code>put-blob</code> commands whose blobs it must make local, and
+against a drained cache entry it would find none and skip the
+preparation with nothing logged.</p>
+<p>Note what did <em>not</em> catch this. The class is covered by unit tests which
+build the executor and drive a dispatch, but they hand-set
+<code>job.commands</code> rather than going through the constructor, so the alias
+was created in a line no test executed. A regression test for this class
+of bug has to build the object the way production does and then assert
+on what a <em>second</em> reader sees.</p>
+<p>The static-values models with container fields today are
+<code>AgentOperationData.commands</code> and <code>InstanceData</code>'s <code>disk_spec</code>, <code>video</code>
+and <code>side_channels</code>; all four are copied at their boundary. A new
+container field on a cached model joins that list.</p>
 <h2 id="a-per-item-convenience-wrapper-does-not-belong-in-a-loop">A per-item convenience wrapper does not belong in a loop<a class="headerlink" href="#a-per-item-convenience-wrapper-does-not-belong-in-a-loop" title="Permanent link">&para;</a></h2>
 <p><code>instance_usage_for_blob_uuid()</code> answers "which instances use this
 blob?". It does so by calling <code>instance_blob_usage()</code>, which walks

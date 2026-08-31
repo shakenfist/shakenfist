@@ -13491,12 +13491,17 @@ readers and are never cached). The cache sits above the direct/gRPC branch, so
 it serves both compute nodes (avoiding a gRPC round trip) and the <code>sf-database</code>
 daemon's own worker threads (avoiding a SQL query); it is a single
 process-global dict keyed <code>(object_type, uuid)</code> under a lock.</p>
-<p>Correctness rests on three rules: only present rows are cached (never a miss,
+<p>Correctness rests on four rules: only present rows are cached (never a miss,
 so a create-after-lookup or delete-then-lookup is never masked); every public
 <code>update_&lt;type&gt;</code>/<code>delete_&lt;type&gt;</code> evicts, and because the lazy online-upgrade
 persist routes through the public <code>update_&lt;type&gt;</code>, the cache self-heals after
-an upgrade; and every entry is TTL-bounded, which is the only bound on
-staleness from a write made by another process. Two tiers set the TTL —
+an upgrade; every entry is TTL-bounded, which is the only bound on
+staleness from a write made by another process; and a <code>_db_get()</code> copies any
+list or dict field it hands out, because <code>frozen=True</code> on the cached model
+stops attribute <em>assignment</em> rather than mutation of a container field's
+<em>contents</em>, so one reader mutating an uncopied list would be mutating every
+reader's — see "A frozen model is not a deep frozen model" in
+<a href="../coding_rules/">coding_rules.md</a>. Two tiers set the TTL —
 <code>OBJECT_CACHE_TTL_IMMUTABLE</code> (default 300 s) for types whose static row
 changes only on create, delete, or a version-upgrade persist (instance,
 network, networkinterface, agentoperation, ipam) and
