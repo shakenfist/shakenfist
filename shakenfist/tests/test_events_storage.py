@@ -735,12 +735,17 @@ class EventsInsertedCounterTestCase(base.ShakenFistTestCase):
 # _direct_prune_events_by_type tests  (Stage A)
 # ---------------------------------------------------------------------------
 
+def _select_result(*rows):
+    """A _MockResult whose fetchall() yields the given _MockRow objects."""
+    return _MockResult(rows=list(rows))
+
+
 class DirectPruneEventsByTypeTestCase(base.ShakenFistTestCase):
     """Tests for _direct_prune_events_by_type() using mock engine/connection.
 
-    The function executes a DELETE in a loop until rowcount < _PRUNE_BATCH_SIZE
-    (10000). We drive the loop by controlling the rowcount returned from each
-    conn.execute() call via mock.Mock(side_effect=[...]).
+    Each batch is a candidate SELECT followed by a delete-by-key; the loop
+    exits when the SELECT returns no rows. We drive the loop by supplying
+    alternating select/delete results via mock.Mock(side_effect=[...]).
     """
 
     def _events_pruned_value(self, event_type: str) -> float:
@@ -750,42 +755,68 @@ class DirectPruneEventsByTypeTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_deletes_only_matching_event_type_rows_returns_count(
             self, mock_get_engine):
-        """First batch returns rowcount=5 (< 10000), loop exits; total == 5."""
+        """One batch of 5 candidates, then an empty select ends the loop."""
         conn = _MockConnection()
-        result_small = _MockResult(rowcount=5)
-        conn.execute = mock.Mock(side_effect=[result_small])
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(
+                _MockRow(event_uuid=EVENT_UUID_1, timestamp=100.0),
+                _MockRow(event_uuid=EVENT_UUID_2, timestamp=101.0)),
+            _MockResult(rowcount=5),
+            _select_result(),
+        ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         total = mariadb._direct_prune_events_by_type('audit', 3600.0)
 
         self.assertEqual(5, total)
-        self.assertEqual(1, conn.execute.call_count)
-        # The SQL text should be passed as the first argument.
-        called_stmt = conn.execute.call_args[0][0]
-        stmt_text = str(called_stmt)
-        self.assertIn('event_type', stmt_text)
+        self.assertEqual(3, conn.execute.call_count)
+        select_text = str(conn.execute.call_args_list[0][0][0])
+        self.assertIn('SELECT', select_text)
+        self.assertIn('event_type', select_text)
+        # The delete is by key only: no join to walk (and lock), and no
+        # LIMIT, which bounds rows deleted rather than rows examined
+        # (issue 3982).
+        delete_text = str(conn.execute.call_args_list[1][0][0])
+        self.assertIn('DELETE FROM event_objects', delete_text)
+        self.assertNotIn('JOIN', delete_text)
+        self.assertNotIn('LIMIT', delete_text)
+        self.assertEqual(
+            {EVENT_UUID_1, EVENT_UUID_2},
+            set(conn.execute.call_args_list[1][0][1]['event_uuids']))
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_loops_until_batch_undershoots(self, mock_get_engine):
-        """Two full batches (10000) then a partial (4321) = 24321 total, 3 calls."""
+    def test_loops_until_select_empty_and_advances_cursor(
+            self, mock_get_engine):
+        """Two batches then an empty select: totals sum, cursor advances."""
         conn = _MockConnection()
         conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1, timestamp=50.0)),
             _MockResult(rowcount=10000),
-            _MockResult(rowcount=10000),
+            _select_result(_MockRow(event_uuid=EVENT_UUID_2, timestamp=60.0)),
             _MockResult(rowcount=4321),
+            _select_result(),
         ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         total = mariadb._direct_prune_events_by_type('mutate', 3600.0)
 
-        self.assertEqual(24321, total)
-        self.assertEqual(3, conn.execute.call_count)
+        self.assertEqual(14321, total)
+        self.assertEqual(5, conn.execute.call_count)
+        # The first select starts from the epoch; later selects resume from
+        # the previous batch's last timestamp so the sweep is one index pass.
+        self.assertEqual(0.0, conn.execute.call_args_list[0][0][1]['cursor'])
+        self.assertEqual(50.0, conn.execute.call_args_list[2][0][1]['cursor'])
+        self.assertEqual(60.0, conn.execute.call_args_list[4][0][1]['cursor'])
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_increments_labeled_counter_by_rowcount(self, mock_get_engine):
         """Counter EVENTS_PRUNED for the given label grows by exactly rowcount."""
         conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=42)])
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1, timestamp=1.0)),
+            _MockResult(rowcount=42),
+            _select_result(),
+        ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         before = self._events_pruned_value('prune_counter_test')
@@ -796,29 +827,19 @@ class DirectPruneEventsByTypeTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_operational_error_returns_partial_count(self, mock_get_engine):
-        """First batch returns rowcount=100; second raises OperationalError.
-        Function returns 100 (partial) without re-raising.
+        """First batch deletes 10000; the next select raises OperationalError.
+        Function returns 10000 (partial) without re-raising.
         """
         conn = _MockConnection()
         conn.execute = mock.Mock(side_effect=[
-            _MockResult(rowcount=100),
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1, timestamp=1.0)),
+            _MockResult(rowcount=10000),
             OperationalError('stmt', {}, Exception('db error')),
         ])
         mock_get_engine.return_value = _MockEngine(conn)
 
-        # rowcount=100 is less than _PRUNE_BATCH_SIZE (10000), so the loop
-        # terminates after the first call without ever reaching the OperationalError.
-        # To exercise the error path we need a full-batch first result.
-        conn2 = _MockConnection()
-        conn2.execute = mock.Mock(side_effect=[
-            _MockResult(rowcount=10000),
-            OperationalError('stmt', {}, Exception('db error')),
-        ])
-        mock_get_engine.return_value = _MockEngine(conn2)
-
         total = mariadb._direct_prune_events_by_type('status', 3600.0)
 
-        # First batch contributed 10000; second raised, so partial is 10000.
         self.assertEqual(10000, total)
 
 
@@ -834,23 +855,40 @@ class DirectPruneApiRequestEventsTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_deletes_api_request_object_type_rows(self, mock_get_engine):
-        """SQL statement contains the 'api-request' literal object_type filter."""
+        """Both statements carry the 'api-request' literal object_type filter."""
         conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=7)])
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=7),
+            _select_result(),
+        ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         total = mariadb._direct_prune_api_request_events(86400.0)
 
         self.assertEqual(7, total)
-        self.assertEqual(1, conn.execute.call_count)
-        stmt_text = str(conn.execute.call_args[0][0])
-        self.assertIn('api-request', stmt_text)
+        self.assertEqual(3, conn.execute.call_count)
+        select_text = str(conn.execute.call_args_list[0][0][0])
+        self.assertIn('SELECT', select_text)
+        self.assertIn('api-request', select_text)
+        # Delete-by-key only: no join, no LIMIT (issue 3982).
+        delete_text = str(conn.execute.call_args_list[1][0][0])
+        self.assertIn('api-request', delete_text)
+        self.assertNotIn('JOIN', delete_text)
+        self.assertNotIn('LIMIT', delete_text)
+        self.assertEqual(
+            [EVENT_UUID_1],
+            conn.execute.call_args_list[1][0][1]['event_uuids'])
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_counter_label_is_api_request_synthetic(self, mock_get_engine):
         """EVENTS_PRUNED{event_type='api-request'} increments by rowcount."""
         conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=33)])
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=33),
+            _select_result(),
+        ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         before = self._api_request_counter_value()
@@ -874,7 +912,11 @@ class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
     def test_increments_orphan_counter(self, mock_get_engine):
         """ORPHAN_EVENTS_PRUNED increments by the rowcount of each batch."""
         conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=15)])
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=15),
+            _select_result(),
+        ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         before = self._orphan_counter_value()
@@ -884,34 +926,61 @@ class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
         self.assertAlmostEqual(15.0, after - before, places=9)
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_loops_until_undershoot(self, mock_get_engine):
-        """Two full batches then a partial: loop exits, total is sum of all batches."""
+    def test_loops_until_select_empty_and_advances_cursor(
+            self, mock_get_engine):
+        """Two batches then an empty select: totals sum, uuid cursor advances."""
         conn = _MockConnection()
         conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
             _MockResult(rowcount=10000),
-            _MockResult(rowcount=10000),
+            _select_result(_MockRow(event_uuid=EVENT_UUID_2)),
             _MockResult(rowcount=999),
+            _select_result(),
         ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         total = mariadb._direct_prune_orphan_events()
 
-        self.assertEqual(20999, total)
-        self.assertEqual(3, conn.execute.call_count)
+        self.assertEqual(10999, total)
+        self.assertEqual(5, conn.execute.call_count)
+        # The select walks the events PK from a uuid cursor so the sweep is
+        # a single pass rather than a rescan from the table start per batch.
+        self.assertEqual('', conn.execute.call_args_list[0][0][1]['cursor'])
+        self.assertEqual(
+            EVENT_UUID_1, conn.execute.call_args_list[2][0][1]['cursor'])
+        self.assertEqual(
+            EVENT_UUID_2, conn.execute.call_args_list[4][0][1]['cursor'])
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_orphan_sql_uses_left_join_antijoin_shape(self, mock_get_engine):
-        """The DELETE statement uses a LEFT JOIN ... WHERE ... IS NULL anti-join."""
+    def test_orphan_antijoin_is_select_only_delete_is_by_pk(
+            self, mock_get_engine):
+        """The anti-join lives in the non-locking SELECT; the DELETE is by PK.
+
+        Issue 3982: a DELETE ... LEFT JOIN ... LIMIT next-key-locks every
+        row the anti-join examines (measured at 15.8M rows per batch), so
+        the DELETE must not contain the join or a LIMIT.
+        """
         conn = _MockConnection()
-        conn.execute = mock.Mock(side_effect=[_MockResult(rowcount=0)])
+        conn.execute = mock.Mock(side_effect=[
+            _select_result(_MockRow(event_uuid=EVENT_UUID_1)),
+            _MockResult(rowcount=1),
+            _select_result(),
+        ])
         mock_get_engine.return_value = _MockEngine(conn)
 
         mariadb._direct_prune_orphan_events()
 
-        stmt_text = str(conn.execute.call_args[0][0])
-        # Verify the anti-join shape: LEFT JOIN and IS NULL guard.
-        self.assertIn('LEFT JOIN', stmt_text)
-        self.assertIn('IS NULL', stmt_text)
+        select_text = str(conn.execute.call_args_list[0][0][0])
+        self.assertIn('SELECT', select_text)
+        self.assertIn('LEFT JOIN', select_text)
+        self.assertIn('IS NULL', select_text)
+        delete_text = str(conn.execute.call_args_list[1][0][0])
+        self.assertIn('DELETE FROM events', delete_text)
+        self.assertNotIn('JOIN', delete_text)
+        self.assertNotIn('LIMIT', delete_text)
+        self.assertEqual(
+            [EVENT_UUID_1],
+            conn.execute.call_args_list[1][0][1]['event_uuids'])
 
 
 # ---------------------------------------------------------------------------
