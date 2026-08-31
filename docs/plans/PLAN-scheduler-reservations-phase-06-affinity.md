@@ -725,6 +725,56 @@ is called the entire mechanism above, and a scheduler-level test
 asserting the exception *type* cannot observe which clause
 caught it.
 
+**F10. `require_*` is enforced on every reschedule, not only at
+create -- deliberately, and the user guide currently says the
+opposite.** `find_candidates()` is not a create-time function.
+Preflight calls it on every restart and reschedule
+(`node_inst_netdesc_op.py:156` and `:180`), so a stage placed
+inside it runs then too. The consequence is a lifecycle change
+this plan had not stated: an instance placed under
+`require_with_tag: ['database']` whose tagged neighbour is later
+deleted can be refused when it next restarts, and that refusal
+ends in `AbortInstanceStart`.
+
+**Enforce it.** A constraint which applies at create and then
+stops is not a constraint, it is a create-time hint with a
+misleading name -- and the placement it would then permit is the
+one the binary model exists to prevent, arriving later and more
+quietly. `require_without_tag` is the clearer case: an instance
+which must not share a hypervisor with `batch` work has not
+stopped needing that on its second boot. Suppressing the stage
+for forced and preflight calls would also make the constraint
+depend on *how* an instance came to be scheduled, which is not
+something a user can reason about or observe.
+
+Three things make this survivable, and each is already in the
+plan for another reason. Preflight catches
+`LowResourceException` and redirects, and
+`AffinityConstraintUnsatisfiable` is a subclass, so a reschedule
+refused on the current node tries every other node before
+aborting -- an abort means no node in the cluster satisfies the
+constraint, not that one node did not. F9's three abort messages
+then say so in as many words rather than reporting a full
+cluster. And `require_*` is opt-in: no weighted specification
+maps onto it, so nothing existing acquires this behaviour.
+
+**The user guide contradicts this, and was already wrong before
+this phase.** `docs/user_guide/affinity.md` says, in the same
+admonition step 6 is told to fix, that "this decision is only
+made on the original start up of an instance, and does not apply
+later. That is, if you change the tags or affinity of an
+instance after instance creation it will not affect that
+instance in any way". Neither half holds. `Instance.affinity`
+reads `self.metadata` live (`instance.py:792-793`), and metadata
+is read from MariaDB on each access rather than snapshotted at
+create (`baseobject.py:660-666`), so a changed specification has
+always applied to the next reschedule of that same instance.
+What this phase changes is the *consequence*: a re-read could
+previously only re-rank, and now it can refuse. The sentence
+moves from misleading to dangerous, so step 6 fixes both halves
+of that admonition and not only the "filters candidate
+hypervisors" half.
+
 ## Design: where the binary form lives
 
 Affinity is not a first-class instance field. It is instance
@@ -842,7 +892,7 @@ a shape a reader of these plans knows rather than inventing one.
 | 4 | high | opus | worktree | Build the binary affinity model: the four reserved keys, the hard `require_*` filter stage, the 409, and the three preflight abort messages. **Full brief: [Step 4](#step-4-brief-the-binary-model).** | Not started |
 | 5 | medium | sonnet | worktree | Map weighted specifications onto the binary form where the scheduler reads them, and emit a deprecation event where a specification is accepted. **Full brief: [Step 5](#step-5-brief-the-transition-mapping).** | Not started |
 | 6 | medium | sonnet | worktree | Documentation: rewrite `docs/user_guide/affinity.md`, put the diagnostic and discovery recipes in `docs/operator_guide/scheduler.md`, and record which skip is expected on which CI topology. **Full brief: [Step 6](#step-6-brief-documentation).** | Not started |
-| 7 | low | sonnet | worktree | (shakenfist) Close-out. Set phase 6 to `Complete` in the master plan Execution table, confirm `docs/plans/index.md`'s arithmetic, and record in the phase status notes that #3565 closed on a test change rather than a scheduler change, with F2's one-line reason so a later reader does not reopen it looking for the missing fix. Commit subject: `scheduler: close out phase 6.` | Not started |
+| 7 | low | sonnet | worktree | (shakenfist) Close-out. Set phase 6 to `Complete` in the master plan Execution table, confirm `docs/plans/index.md`'s arithmetic, and record in the phase status notes that #3565 closed on a test change rather than a scheduler change, with F2's one-line reason so a later reader does not reopen it looking for the missing fix. Also settle `GOALS.md:38`, "I am not confident that the affinity rules for instances work as expected" -- the project-level form of the uncertainty this phase exists to resolve, and the one artifact that should not still say it afterwards. Rewrite it to what is now known (affinity ranks, it does not admit; a single-candidate placement is neither honoured nor violated; hard constraints are the way to ask for admission) or delete it, but do not leave it standing. Commit subject: `scheduler: close out phase 6.` | Not started |
 
 ### Step 1 brief: rewrite `test_affinity` onto the events
 
@@ -993,34 +1043,36 @@ booleans as well**, mirroring `external_api/base.py:299-301`:
 `isinstance(True, int)` is true in Python so `int(True)` is 1, and
 `{'affinity': {'a': true}}` is accepted today as weight 1 -- which under
 F4's mapping would silently become `prefer_with_tag: ['a']`. Record that
-half honestly in the issue, the commit message **and the release notes**,
-because it is the one part of this step that **changes a request that
-succeeds today into a 400**, and the validator is shared, so the break has
-three entry points -- instance create and both metadata endpoints; it is
-worth doing here rather than later precisely because F4 is about to give
-`true` a meaning nobody asked for. Do *not* replace the coercion with a
-shape test (`isinstance(dv, int) and not isinstance(dv, bool)`), tempting
-as it looks: `int('3')` succeeds today, so a shape test would also refuse
-string-encoded integers, and this step is a bugfix for a 500, not a
-tightening of what the API accepts. Get the level right too: a malformed
-*outer* `affinity` value is already refused correctly -- a list by
-`isinstance(value, dict)` (`:1398-1400`) and `None` by `if not value`
-(`:1387-1388`) -- and only the inner per-tag coercion leaks. Unit tests in
-`shakenfist/tests/` for the list-valued, dict-valued, `None`-valued and
-`Infinity`-valued inner cases, which are the four that 500 now, plus the
-boolean case which is the one that changes answer. This step is
-deliberately separate from the binary model below and depends on none of
-this phase's decisions: it is a live 500 on a public API, the fix is one
-`except` clause, and it should not wait behind an API surface, a new
-scheduler stage and a back-brief gate. **File its own issue and close it
-with the fix** (`Fixes #NNNN`), rather than waiting for step 2's triage
-pass -- step 2 waits on step 1, which is a cluster-CI rewrite that has to
-be driven against sfcbr by hand, and a live 500 on a public API should not
-sit behind that. Be precise about the level in the issue as well as in the
-code: a malformed *outer* `affinity` value is already refused correctly,
-and only the inner per-tag coercion leaks. This step waits for nothing and
-can go first. Commit subject: `Refuse malformed affinity values with a
-400.`
+half honestly in the issue, the commit message **and the release notes** --
+which today means `docs/release_notes/v07-v08.md`, the only file in that
+directory; name whichever is current when this is written rather than
+leaving "the release notes" to be located -- because it is the one part of
+this step that **changes a request that succeeds today into a 400**, and
+the validator is shared, so the break has three entry points -- instance
+create and both metadata endpoints; it is worth doing here rather than
+later precisely because F4 is about to give `true` a meaning nobody asked
+for. Do *not* replace the coercion with a shape test (`isinstance(dv, int)
+and not isinstance(dv, bool)`), tempting as it looks: `int('3')` succeeds
+today, so a shape test would also refuse string-encoded integers, and this
+step is a bugfix for a 500, not a tightening of what the API accepts. Get
+the level right too: a malformed *outer* `affinity` value is already
+refused correctly -- a list by `isinstance(value, dict)` (`:1398-1400`) and
+`None` by `if not value` (`:1387-1388`) -- and only the inner per-tag
+coercion leaks. Unit tests in `shakenfist/tests/` for the list-valued,
+dict-valued, `None`-valued and `Infinity`-valued inner cases, which are the
+four that 500 now, plus the boolean case which is the one that changes
+answer. This step is deliberately separate from the binary model below and
+depends on none of this phase's decisions: it is a live 500 on a public
+API, the fix is one `except` clause, and it should not wait behind an API
+surface, a new scheduler stage and a back-brief gate. **File its own issue
+and close it with the fix** (`Fixes #NNNN`), rather than waiting for step
+2's triage pass -- step 2 waits on step 1, which is a cluster-CI rewrite
+that has to be driven against sfcbr by hand, and a live 500 on a public API
+should not sit behind that. Be precise about the level in the issue as well
+as in the code: a malformed *outer* `affinity` value is already refused
+correctly, and only the inner per-tag coercion leaks. This step waits for
+nothing and can go first. Commit subject: `Refuse malformed affinity values
+with a 400.`
 
 ### Step 4 brief: the binary model
 
@@ -1166,19 +1218,34 @@ isolation primitive. `prefer_with_tag` / `prefer_without_tag` contribute +1
 / -1 per matching co-located instance into the existing scoring loop
 (`:529-600`), which already has the per-candidate `affinity_detail` shape
 the events publish -- extend it rather than replacing it, because step 1's
-assertions read it. Unit tests in `shakenfist/tests/test_scheduler.py`
-beside the existing ordering cases, **plus two things that suite cannot
-assert**. First, an API-level test that the create path answers **409 and
-not 507**: the `except` ordering is the entire mechanism per F9, and a
-scheduler test asserting the exception type passes whichever clause catches
-it, so the one mistake the ordering exists to prevent is invisible to it.
-Second, a unit test over the preflight abort path exercising
-`affinity_failure` at both `:166` and `:170` -- that path runs only in the
-queue daemon under cluster CI, so an error there passes the pull request
-and lands in the merge queue. Also assert that a create requesting no
-affinity at all still schedules, which is the cheapest possible guard on
-the short-circuit above. Commit subject: `Add binary affinity constraints
-to the scheduler.`
+assertions read it. **Nothing may reach an `int()` on a value whose shape
+has not been checked.** That loop coerces every tag's value today
+(`scheduler.py:583-587`), and this step teaches the same metadata key to
+hold lists, so a binary specification arriving at the weighted coercion
+raises `TypeError` inside `find_candidates()` -- which the create path does
+not catch (`external_api/instance.py:872-878` handles only
+`LowResourceException` and `CandidateNodeNotFoundException`), making it a
+**500 on instance create**: exactly the failure class step 3 exists to
+remove, one layer down and reintroduced by the step which fixes it. Two
+rules, and both are needed. Dispatch on shape *before* any coercion, so a
+binary specification never enters the weighted path at all. And make the
+weighted path itself skip a value it cannot coerce rather than raise,
+because the scheduler reads specifications validated when they were
+accepted -- which for anything stored before step 3 landed means not
+validated at all -- and an instance whose stored metadata predates a
+validation rule should place somewhere rather than become permanently
+unschedulable. Unit tests in `shakenfist/tests/test_scheduler.py` beside
+the existing ordering cases, **plus two things that suite cannot assert**.
+First, an API-level test that the create path answers **409 and not 507**:
+the `except` ordering is the entire mechanism per F9, and a scheduler test
+asserting the exception type passes whichever clause catches it, so the one
+mistake the ordering exists to prevent is invisible to it. Second, a unit
+test over the preflight abort path exercising `affinity_failure` at both
+`:166` and `:170` -- that path runs only in the queue daemon under cluster
+CI, so an error there passes the pull request and lands in the merge queue.
+Also assert that a create requesting no affinity at all still schedules,
+which is the cheapest possible guard on the short-circuit above. Commit
+subject: `Add binary affinity constraints to the scheduler.`
 
 ### Step 5 brief: the transition mapping
 
@@ -1257,36 +1324,46 @@ by adding a new page and leave that one teaching the deprecated form and
 the wrong guarantee, which is worse than before: two pages disagreeing.
 Rewrite it. Note the claim is not simply false any more -- `require_*`
 really does filter -- so the fix is to say which half filters and which
-half ranks, not to delete the sentence. In it, state what soft affinity
-promises and -- more importantly -- what it does not: a preference is
-consulted when there is a choice, and a single-candidate placement is not a
-preference being honoured or violated. Document the four binary constraints
-**in one table**, with the hard/soft distinction and the namespace scope in
-that same view rather than as prose paragraphs elsewhere on the page. The
-four names share a `_with_tag` / `_without_tag` suffix family and carry two
-separate counterintuitive readings -- `prefer_without_tag` is a term in a
-sum and not a soft veto, and `require_without_tag` is scoped to the
-requesting namespace and is therefore not an isolation primitive -- so an
-operator who reads about one name must see both caveats without hunting.
-Document the weighted form's deprecation and its mapping, and the fact that
-`require_*` can make a create fail with no candidates where the weighted
-form would silently place anywhere. **Document the bootstrapping dead end
-explicitly**, because it is the first thing an operator hits and it reads
-as a bug: the constraints match tags on instances *already placed* on a
-candidate node, so the first instance of a group requesting
-`require_with_tag: ['web']` ejects every candidate and gets a 409, and
-stays that way for as long as nothing in the namespace carries the tag --
-including any instance created under the same constraint. State the
-workaround in the same breath: create the seed instance carrying the tag
-and *without* the `require_*` constraint, or use `prefer_with_tag`, which
-degrades to a ranking that nothing to rank leaves alone. Document that
-`prefer_*` terms **sum**, across neighbours and across tags, with the
-worked two-tag example from F4: with `prefer_with_tag: ['a']` and
-`prefer_without_tag: ['b']` both requested, a node hosting three `a`
-instances and one `b` scores +2 and beats a node hosting one `a` and no `b`
-at +1. `prefer_without_tag` reads as a soft veto and is not one; it is a
-term in a sum, and an operator who learns that from a placement rather than
-from the documentation will read it as a bug. Include the diagnostic
+half ranks, not to delete the sentence. **The second half of that same
+admonition is wrong too, and per F10 it is the more dangerous half**: "this
+decision is only made on the original start up of an instance, and does not
+apply later", and that changing an instance's tags or affinity "will not
+affect that instance in any way". `find_candidates()` runs on every
+reschedule and `Instance.affinity` reads metadata live, so neither has ever
+been true -- and now that `require_*` can refuse rather than merely
+re-rank, a reader who believes it can lose a restart they were told was
+safe. Say what actually happens: the specification is re-read on every
+restart and reschedule, a changed one applies from then on, and a hard
+constraint no node can satisfy refuses the restart after trying every node.
+In it, state what soft affinity promises and -- more importantly -- what it
+does not: a preference is consulted when there is a choice, and a
+single-candidate placement is not a preference being honoured or violated.
+Document the four binary constraints **in one table**, with the hard/soft
+distinction and the namespace scope in that same view rather than as prose
+paragraphs elsewhere on the page. The four names share a `_with_tag` /
+`_without_tag` suffix family and carry two separate counterintuitive
+readings -- `prefer_without_tag` is a term in a sum and not a soft veto,
+and `require_without_tag` is scoped to the requesting namespace and is
+therefore not an isolation primitive -- so an operator who reads about one
+name must see both caveats without hunting. Document the weighted form's
+deprecation and its mapping, and the fact that `require_*` can make a
+create fail with no candidates where the weighted form would silently place
+anywhere. **Document the bootstrapping dead end explicitly**, because it is
+the first thing an operator hits and it reads as a bug: the constraints
+match tags on instances *already placed* on a candidate node, so the first
+instance of a group requesting `require_with_tag: ['web']` ejects every
+candidate and gets a 409, and stays that way for as long as nothing in the
+namespace carries the tag -- including any instance created under the same
+constraint. State the workaround in the same breath: create the seed
+instance carrying the tag and *without* the `require_*` constraint, or use
+`prefer_with_tag`, which degrades to a ranking that nothing to rank leaves
+alone. Document that `prefer_*` terms **sum**, across neighbours and across
+tags, with the worked two-tag example from F4: with `prefer_with_tag:
+['a']` and `prefer_without_tag: ['b']` both requested, a node hosting three
+`a` instances and one `b` scores +2 and beats a node hosting one `a` and no
+`b` at +1. `prefer_without_tag` reads as a soft veto and is not one; it is
+a term in a sum, and an operator who learns that from a placement rather
+than from the documentation will read it as a bug. Include the diagnostic
 recipe, which is the durable output of this whole investigation: read
 `schedule have highest affinity` and `schedule final candidates` from the
 instance's events to tell "scored wrong" from "had no choice". **Cover both
@@ -1320,13 +1397,32 @@ need that list. **Run the recipe once against a real cluster** and record
 what it returned. It is the only thing standing between the removal release
 and a silent breakage, and a recipe that has never been executed is not a
 mitigation -- everything else this plan commits to is falsifiable, and this
-should be too. Record which of `test_affinity`'s two skips is expected on
-which CI topology (F3): `affine node not a candidate` is expected on
-`slim-tier` until `PLAN-ci-cloud-sizing` lands, and neither skip is
-expected on `slim-primary`, so a permanently-skipping test cannot pass for
-green. `AGENTS.md` and `ARCHITECTURE.md` are unlikely to need touching;
-check rather than assume. Commit subject: `docs: say what soft affinity
-promises.`
+should be too. **Say explicitly that the skip expectation is documentation,
+not enforcement.** A skip is green, so nothing fails if `slim-primary`
+starts skipping too, and the "does not skip on a healthy three-node run"
+criterion is checked once by hand rather than continuously -- which is a
+standing gap in the middle of a phase whose stated fear is that a silent
+skip reads as a pass. It is a deliberate trade and not an oversight: the
+obvious automation, failing rather than skipping when `get_nodes()` returns
+three or more, would fail every `slim-tier` run, and `slim-tier` is
+expected to skip until `PLAN-ci-cloud-sizing` lands. Record the trade where
+a reader meets the expectation, and record what would let it be enforced:
+once that plan lands and `slim-tier` is expected not to skip either, the
+guard becomes a fail rather than a skip on any topology with three or more
+nodes. Record which of `test_affinity`'s two skips is expected on which CI
+topology (F3): `affine node not a candidate` is expected on `slim-tier`
+until `PLAN-ci-cloud-sizing` lands, and neither skip is expected on
+`slim-primary`, so a permanently-skipping test cannot pass for green. **Two
+existing pipeline descriptions go stale the moment step 4 lands, and both
+must be updated here.** `docs/operator_guide/scheduler.md` narrates the
+filter and scoring order around `:40-76`, and `ARCHITECTURE.md:170` carries
+the same order in one sentence; inserting a hard `require_*` stage between
+`sufficient_free_disk` and the affinity block makes both incomplete. This
+plan pins every other artifact to a path, so guessing that
+`ARCHITECTURE.md` is "unlikely to need touching" was a gap in its own
+standard rather than a judgement. `AGENTS.md` genuinely is unlikely to need
+touching -- no convention changes here -- but check rather than assume.
+Commit subject: `docs: say what soft affinity promises.`
 
 ## Risks and mitigations
 
@@ -1627,6 +1723,32 @@ step 4.
       two behaviours least convincing under mocked placements -- the
       bootstrapping dead end and the namespace scope -- are
       properties of a real cluster's instance population.
+- [ ] A well-formed **binary** specification schedules without
+      raising, asserted by a unit test that drives
+      `find_candidates()` with the binary shape -- and so does a
+      stored specification the validator would refuse today, such
+      as a weighted entry whose value is a list. The first is the
+      new API surface meeting the old coercion; the second is
+      every instance whose metadata was written before step 3
+      landed. Either one raising inside `find_candidates()` is a
+      500 on instance create, because that path catches only
+      `LowResourceException` and `CandidateNodeNotFoundException`.
+      The weighted-spec bullet above guards the opposite
+      direction and does not cover this.
+- [ ] `docs/user_guide/affinity.md` says that a hard constraint is
+      re-evaluated on **every restart and reschedule**, not only at
+      create, and that a changed specification applies from then
+      on. Both halves of the admonition it replaces are wrong
+      today, and F10 explains why the second half is the more
+      dangerous one now that a re-read can refuse rather than
+      merely re-rank.
+- [ ] The stage-ordering narrative in
+      `docs/operator_guide/scheduler.md` and the one-line pipeline
+      summary in `ARCHITECTURE.md:170` both name the hard affinity
+      stage in its place between disk capacity and affinity
+      scoring. Falsifiable by grep. Step 4 inserts a pipeline
+      stage, and a pipeline described in two places is wrong in
+      two places.
 - [ ] `pre-commit run --all-files` passes.
 
 ## Future work
