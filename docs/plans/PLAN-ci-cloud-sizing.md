@@ -806,6 +806,22 @@ sure none of them is closed by accident:
   cloud may quieten it, may not, and either way decides nothing
   about whether the scheduler was right. It needs a disposition in
   phase 0 before phase 4.
+- **#3975** (closed) -- the phase 1 headroom probe failed a merge
+  queue build. Its per-sample `GET /nodes` and `GET
+  /admin/resources` read node state once per node, so at the default
+  15s interval it produces N/15 per second of `GetNodeAttributes`,
+  `GetAllNodeDaemonStates` and `GetNodeMetrics` from the `api`
+  caller, which clears the idle-load check's unbudgeted ceiling from
+  four nodes upwards. D15 said nothing in this phase can fail a
+  build; that was true of the phase's own verdicts and false of its
+  traffic. Fixed by exempting the three pairs in
+  `HARNESS_DRIVEN_PAIRS`, not by lengthening the interval or
+  widening the budget. **This carries an obligation into whichever
+  phase retires the probe: trim those three pairs from
+  `shakenfist/deploy/shakenfist_ci/load_budget.py` at the same
+  time.** Nothing enforces it, because the launcher and the workflow
+  steps are in `shakenfist/actions` and a decommission done there
+  leaves this repository untouched.
 - **#3882** (open) -- reconciler drift is not provable from logs.
   Phase 2 wants to compare the live ledger derivation against the
   reconciled `cluster_capacity` figure; if they disagree, this is
