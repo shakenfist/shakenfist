@@ -6659,6 +6659,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 3: skillsaw CI detection, upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13535,18 +13563,15 @@ cannot be tested there, and the bugs in this area all hid in inline
 YAML.</p>
 <h3 id="remaining-work">Remaining work<a class="headerlink" href="#remaining-work" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Re-run against the two open <code>autofix-failed</code> issues (#485, #492) and
-  confirm at least one reaches a PR — this is the plan's own
-  outstanding success criterion, and the only thing that exercises the
-  workflow end to end. It needs the fix on <code>develop</code> first, because
-  the workflow checks out <code>develop</code>. That fix is on <code>develop</code> as of
-  2026-08-20, and six scheduled runs have since completed with every
-  step after <code>Find eligible issue</code> skipped: both issues are blocked by
-  their own <code>autofix-failed</code> label, and the third open
-  <code>security-audit</code> issue (#483) is hand-written prose that the JSON
-  gate correctly rejects. Nothing is broken; there is no input. A
-  <code>workflow_dispatch</code> with an explicit <code>issue_number</code> bypasses the
-  label check, which is how phase 1 proves the loop.</li>
+<li><strong>Done.</strong> Phase 1's step 7 dispatched <code>workflow_dispatch</code> against
+  #485 twice. The first run, 33219527764 on 2026-08-28, exposed a
+  workflow defect instead of proving the loop: the workflow never
+  checked out <code>instar-testdata</code>, so <code>make test-container-core</code> could
+  never pass and no run could ever have reached <code>Commit, push, and
+  create PR</code>; fixed in PR #530. The second, run 33297854229 on
+  2026-08-30 after PR #530 merged, proved the loop end to end -- it
+  reached <code>Commit, push, and create PR</code> and opened PR #533 against
+  #485. See phase 1's <em>Result</em> section for the full account.</li>
 <li>Refresh the hardcoded <code>Co-Authored-By: Claude Opus 4.6 (1M context)</code>
   trailer in the Create PR step, which no longer names the model that
   runs. This was previously recorded here as a call for a human on the
@@ -13560,7 +13585,11 @@ YAML.</p>
   stale name; phase 1 fixed all three behind one tested helper. The
   addresser has since been retired outright — the workflow, the driver
   script and its helpers were deleted — so everything this plan says
-  about it is history, and only the two workflows survive.</li>
+  about it is history, and only the two workflows survive. <strong>Done</strong>,
+  and confirmed live: run 33297854229's pushed commit for PR #533
+  carries <code>Co-Authored-By: Claude claude-opus-5 (1M context)
+  &lt;noreply@anthropic.com&gt;</code>, the derived form, not the old hardcoded
+  string.</li>
 <li><code>tools/address-comments-with-claude.sh</code> (since retired) had the same
   defect this plan diagnosed, in the review-comment loop rather than
   the fuzz loop (issue #510): it instructed Claude to stage, then reported an
@@ -13589,8 +13618,8 @@ audit that ends every master plan.</p>
 <tr>
 <td>1. Derived trailers and an end-to-end proof</td>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">PLAN-fuzz-autofix-phase-01-closeout.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>b6b67a8</code> (#520), <code>931b5a9</code> (#530)</td>
 </tr>
 <tr>
 <td>2. Push audit</td>
@@ -13603,8 +13632,12 @@ audit that ends every master plan.</p>
 <p>The <code>Merged</code> column is the one <code>PLAN-TEMPLATE.md</code> requires of a plan
 carrying a push audit phase: phase 2 runs the audit over the union of
 the earlier phases' merge ranges, because <code>git diff develop...HEAD</code> is
-empty once they have landed. Both cells are empty because neither phase
-has merged.</p>
+empty once they have landed. Phase 1 landed across three pull requests
+rather than one -- #520 built the helper and switched the automations
+to it, #530 gave the workflow its test data and corrected this plan's
+account of verification, and the close-out pull request that records
+the result adds its own merge commit to that cell when it lands.
+Phase 2's cell is empty because it has not started.</p>
 <h3 id="2-push-audit">2. Push audit<a class="headerlink" href="#2-push-audit" title="Permanent link">&para;</a></h3>
 <p>This phase runs <code>PUSH-AUDIT.md</code> over this plan's accumulated
 diff against <code>develop</code> — every phase's work together, not phase 1's
@@ -13870,7 +13903,12 @@ finish rather than interrupting mid-fix.</p>
 <ul>
 <li>It can discover eligible <code>security-audit</code> issues.</li>
 <li>It successfully fixes at least one fuzzer-found crash
-  end-to-end (issue to merged PR).</li>
+  end-to-end (issue to merged PR). <strong>Met as far as an unattended
+  run can take it.</strong> Run 33297854229 on 2026-08-30 took issue #485
+  to PR #533 without human intervention, which is the whole of what
+  the workflow does; the final merge is a human review decision
+  this criterion cannot require of the automation, and it is
+  tracked on #533 itself.</li>
 <li>Failed attempts are properly labelled and commented.</li>
 <li>Complexity guardrails prevent runaway fixes.</li>
 <li>The workflow integrates cleanly with existing CI (same
@@ -13890,6 +13928,19 @@ finish rather than interrupting mid-fix.</p>
 <li><strong>Cross-reference with differential fuzzing:</strong> If a
   coverage fuzzer crash also manifests as a differential
   fuzzing divergence, link the issues.</li>
+<li><strong>Run the crash reproducer during verification (#529):</strong> the
+  workflow reads <code>.reproducer</code> into the prompt and into the pull
+  request body but never executes it, so verification is the build
+  and core tests only. Needs the crash input available past the
+  fuzz run's 90-day artifact expiry, and a make target that replays
+  a single input.</li>
+<li><strong>Give the model enough turns to emit its own summary (#534):</strong>
+  every autofix run so far -- at 30 turns, then 40 -- has exhausted
+  its turn budget before reaching the
+  <code>COMMIT_SUMMARY_START</code>/<code>END</code> block <code>tools/autofix-prompt-base.txt</code>
+  asks for at the end of the work, so every PR opened so far,
+  including #533, has used the fallback title and commit body
+  instead of Claude's own summary.</li>
 </ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, please back brief the

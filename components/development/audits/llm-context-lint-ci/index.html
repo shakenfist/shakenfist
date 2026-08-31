@@ -6653,6 +6653,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 3: skillsaw CI detection, upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13471,6 +13499,18 @@ Requiring the linter to be named in a workflow as well would report a
 repository non-compliant for a wiring that does run it. The pre-commit
 half is still checked independently, so a workflow running pre-commit
 against a config with no skillsaw hook does not pass.</p>
+<p>A workflow that installs skillsaw from PyPI and then invokes the
+<code>skillsaw</code> command satisfies the second half as well, without naming
+the upstream repository anywhere. Where the command sits is not
+pinned: on its own line inside a <code>run: |</code> block, inline in a
+single-command <code>run:</code> step, after a shell operator, or reached through
+<code>uvx</code>, <code>uv run</code>, <code>python -m</code>, or a path into a virtualenv.</p>
+<p>What does not count is naming the package without running it. An
+install line -- <code>pip install skillsaw==0.18.0</code>, including the wrapped
+form that leaves the pin on a line of its own -- a job or key called
+<code>skillsaw:</code>, and a <code>skillsaw --version</code> probe asserting the install
+worked are all mentions rather than runs. Installing a linter is not
+running it, and neither is asking it what version it is.</p>
 <p>As with the secret scanner check, <em>how</em> skillsaw is invoked is
 deliberately not pinned: naming it in a pre-commit config and in a
 workflow is the step change, and requiring a particular rev or argument

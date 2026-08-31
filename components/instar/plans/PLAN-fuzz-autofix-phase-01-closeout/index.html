@@ -6563,6 +6563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 3: skillsaw CI detection, upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13472,6 +13500,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#risks-and-mitigations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13963,6 +14002,88 @@ else in the master plan was found to be wrong.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="result">Result<a class="headerlink" href="#result" title="Permanent link">&para;</a></h2>
+<p>Step 7 needed two dispatches, because the first exposed a workflow
+defect the plan had not anticipated.</p>
+<p>The first dispatch, run 33219527764 on 2026-08-28, <code>-f
+issue_number=485</code>, was the first run of this workflow ever to get past
+<code>Find eligible issue</code>. Both attempts failed verification identically,
+on <code>make test-container-core</code>: <code>Error: Test data not found at
+.../instar/../instar-testdata</code>. The workflow had never checked out
+<code>instar-testdata</code>, so that make target could never pass and no run
+could ever have reached <code>Commit, push, and create PR</code>. This is a
+fourth failure mode; the plan explicitly listed three at step 7 --
+the staging bug returning, the model failing on a hard bug, and a
+JSON capture regression -- and it was none of them. Not the staging
+bug: <code>stager-rc-1.txt</code> and <code>stager-rc-2.txt</code> were both <code>0</code>, the diff
+staged cleanly, and the stager correctly ignored 22
+<code>prototypes/*/target/</code> build artifacts. Not a capture regression: the
+capture worked, as done-criterion 5 confirms below. And not the
+model: both attempts produced a plausible single-file root-cause fix
+with regression tests. It was fixed in PR #530 (merged 2026-08-30 as
+<code>931b5a9</code>), which added the <code>Prepare instar-testdata</code> and <code>Resparsify
+test images</code> steps that every other test-running workflow already
+had, placed before <code>Construct prompt</code> so Claude has the fixtures
+during its own attempt too.</p>
+<p>Done-criterion 5 was confirmed on this live run, not only on step 2's
+fixtures. Both attempts of the first dispatch hit <code>max_turns</code> at 31
+turns of 30, and <code>claude-output-1.txt</code> carried the reconstructed
+assistant text <em>plus</em> the diagnostic block naming <code>terminal_reason:
+max_turns</code>, <code>subtype: error_max_turns</code> and <code>num_turns: 31</code> -- exactly
+the turn-exhaustion case the step 1 contract measurement caught, and
+the case plain <code>--output-format json</code> would have written an empty
+file for. Steps 2-5 are validated by a real unattended run.</p>
+<p>The second dispatch, run 33297854229 on 2026-08-30, <code>-f
+issue_number=485 -f max_turns=40</code>, ran after PR #530 merged, and is
+the proof. Attempt 1 passed verification; <code>Prepare retry</code> was
+skipped; <code>Commit, push, and create PR</code> completed; <code>Report failure</code>
+was skipped. It opened <strong>PR #533</strong> from branch <code>autofix/issue-485</code>,
+commit <code>2d40cb0</code>.</p>
+<p>The decisive check was the trailer on that pushed commit, which
+reads <code>Co-Authored-By: Claude claude-opus-5 (1M context)
+&lt;noreply@anthropic.com&gt;</code>. That is Decision 2's canonical-id form, not
+the old hardcoded <code>Claude Opus 4.6 (1M context)</code>, and it could only
+have been produced by the merged helper -- so it also proves
+Decision 8's ordering constraint held.</p>
+<p>The fix in PR #533 is itself good, and was reviewed. It bounds the
+untrusted <code>backing_file_offset</code> and <code>backing_file_size</code> in
+<code>src/crates/rebase/src/qcow2.rs</code>, using version-aware header bounds
+from the real <code>QCOW2_HEADER_LENGTH_V3</code> and
+<code>V2_HEADER_EXTENSION_OFFSET</code> constants, handles u64 overflow, adds a
+short-overlay check returning <code>OverlayCorrupt</code>, adds four regression
+tests, and updates <code>CHANGELOG.md</code> and <code>docs/rebase.md</code>. The bound is
+sound because <code>path_len &lt;= backing_file_size</code> is enforced before
+<code>slot_end = offset + backing_file_size &lt;= overlay_file_size</code> is
+checked. Landing it remains a separate decision, per Decision 7,
+which keeps that judgement apart from whether the machinery worked.</p>
+<p>One operational note for whoever picks #533 up. Its CI had not run at
+the time of writing, and the reason is not that the workflow failed to
+trigger: all five workflow runs exist against the branch on a
+<code>pull_request</code> event and every one is <code>action_required</code>, which is
+GitHub waiting for a maintainer to approve workflow runs on a pull
+request authored by <code>app/github-actions</code>. The pull request reports
+<code>mergeStateStatus: BLOCKED</code> until someone does. That is a repository
+setting rather than a defect, but it does bound what this loop can
+ever do unattended: the master plan's success criterion says "issue to
+merged PR", and the merge half necessarily waits for a human here.</p>
+<p>Two defects were found along the way and deferred, both filed as
+issues rather than fixed in this phase. #529 records that the
+workflow never runs the crash reproducer, which the master plan's
+step 5 lists as verification check 3 -- not a missing line, but a
+structural gap: the crash input is not in the issue body, only in the
+<code>coverage-fuzz-logs</code> artifact of the run named by <code>.ci_run</code>, those
+artifacts expire after 90 days, and there is no make target that
+replays a single input. The master plan's step 5 and its step 7 pull
+request body template were corrected to match the implementation, in
+the same PR #530. #534 records that every attempt so far has
+exhausted its turn budget -- 31/30, 31/30, then 41/40 -- and because
+<code>tools/autofix-prompt-base.txt</code> asks for the
+<code>COMMIT_SUMMARY_START</code>/<code>END</code> block at the end of the work, a
+turn-exhausted attempt never emits it. <code>summary_found</code> was false for
+PR #533, so its commit body is the fallback "Automated fix for
+security-audit issue." and its title the fallback "Fix fuzzer crash:
+${ISSUE_TITLE}". Raising the budget from 30 to 40 did not help; the
+model did more work and still ran out.</p>
 <h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -13998,38 +14119,44 @@ else in the master plan was found to be wrong.</p>
 <p>Falsifiable, in order:</p>
 <ol>
 <li><code>grep -rn 'Co-Authored-By: Claude Opus' .github/ tools/</code> returns
-   nothing.</li>
+   nothing. <strong>Met</strong>, by the steps 1-6 pull request.</li>
 <li><code>tools/ci/test-claude-result.sh</code> exits 0, and
    <code>grep -c 'test-claude-result.sh' .github/workflows/functional-tests.yml</code>
-   is at least 1.</li>
+   is at least 1. <strong>Met</strong>, by the same pull request.</li>
 <li><code>grep -c 'output-format text' .github/workflows/fuzz-autofix.yml
    .github/workflows/test-drift-fix.yml</code> is 0 for both, and both pass
    <code>--output-format stream-json --verbose</code>. This read
    <code>tools/address-comments-with-claude.sh</code> as a third site; it was
    converted in <code>757b0bd</code> and the file has since been deleted with the
-   retired comment addresser.</li>
+   retired comment addresser. <strong>Met</strong>.</li>
 <li><code>tools/ci/claude-result.sh --trailer</code> on a fixture result line
    whose <code>modelUsage</code> value has <code>canonicalModel</code> <code>claude-opus-5</code> and
    <code>contextWindow</code> 1000000 prints exactly
    <code>Co-Authored-By: Claude claude-opus-5 (1M context) &lt;noreply@anthropic.com&gt;</code>
    as its second line; on an empty file it prints
-   <code>Co-Authored-By: Claude &lt;noreply@anthropic.com&gt;</code>.</li>
+   <code>Co-Authored-By: Claude &lt;noreply@anthropic.com&gt;</code>. <strong>Met</strong>.</li>
 <li><code>tools/ci/claude-result.sh --text</code> on a turn-exhausted fixture — a
    stream with assistant text and a result line carrying
    <code>"subtype":"error_max_turns"</code> and no <code>.result</code> — prints the
    assistant text <em>and</em> a block naming <code>max_turns</code>. This is the
    regression the contract measurement caught; it is checked
-   separately because it is the case the original plan got wrong.</li>
+   separately because it is the case the original plan got wrong.
+   <strong>Met</strong> on the fixture, and confirmed again on a live run in step
+   7 -- see the <em>Result</em> section above.</li>
 <li><code>pre-commit run --all-files</code> passes, including actionlint over the
-   two workflows and shellcheck over the two new scripts.</li>
+   two workflows and shellcheck over the two new scripts. <strong>Met</strong>.</li>
 <li>A <code>fuzz-autofix.yml</code> run exists whose <code>Commit, push, and create PR</code>
    step completed, and whose pushed commit's <code>Co-Authored-By</code> line
-   names a model from the current roster.</li>
+   names a model from the current roster. <strong>Met</strong>: run 33297854229 on
+   2026-08-30 opened PR #533 with <code>Co-Authored-By: Claude
+   claude-opus-5 (1M context) &lt;noreply@anthropic.com&gt;</code>.</li>
 <li>No fact about the trailer is stated differently in
    <code>docs/development.md</code>, <code>docs/testing.md</code>, and
-   <code>PLAN-fuzz-autofix.md</code>.</li>
+   <code>PLAN-fuzz-autofix.md</code>. <strong>Met</strong>, by the corrections made in PR #520
+   and PR #530.</li>
 <li>The master plan contains no claim that the workflow cannot
-   introspect its model, and no description of PR #511 as pending.</li>
+   introspect its model, and no description of PR #511 as pending.
+   <strong>Met</strong>, by the same corrections.</li>
 </ol>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the operator on

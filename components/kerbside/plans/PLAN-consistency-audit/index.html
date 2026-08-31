@@ -6692,6 +6692,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-consistency-audit-phase-03-skillsaw-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 3: skillsaw CI detection, upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-sfui-conversion/" class="md-nav__link">
         
   
@@ -13783,19 +13811,19 @@ to forcing it.</p>
 <tr>
 <td>1. Shared blocks, vendor stamp and settings closeout</td>
 <td><a href="/components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/">PLAN-consistency-audit-phase-01-blocks-and-stamp.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>cbca9b1</td>
 </tr>
 <tr>
 <td>2. Retire the comment addresser</td>
 <td><a href="/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/">PLAN-consistency-audit-phase-02-retire-addresser.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>5f3c80c</td>
 </tr>
 <tr>
 <td>3. Skillsaw CI detection, upstream</td>
-<td>PLAN-consistency-audit-phase-03-skillsaw-detection.md</td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/">PLAN-consistency-audit-phase-03-skillsaw-detection.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -13805,8 +13833,14 @@ to forcing it.</p>
 <td></td>
 </tr>
 <tr>
-<td>5. Push audit</td>
-<td>PLAN-consistency-audit-phase-05-push-audit.md</td>
+<td>5. Diagram discipline and mermaid linting</td>
+<td>PLAN-consistency-audit-phase-05-diagram-discipline.md</td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>6. Push audit</td>
+<td>PLAN-consistency-audit-phase-06-push-audit.md</td>
 <td>Not started</td>
 <td></td>
 </tr>
@@ -13866,7 +13900,21 @@ remaining bulk is protocol documentation under <code>docs/spice/</code>
 that has never been read end to end. Every mark is a signed
 commit; the signing configuration in <code>AGENTS.md</code> is a
 prerequisite the phase must check before starting.</p>
-<p><strong>Phase 5 -- push audit.</strong> Work through <code>PUSH-AUDIT.md</code> over
+<p><strong>Phase 5 -- diagram discipline and mermaid linting.</strong>
+Resolves #370 and #381, both of which arrived on 2026-08-29
+while phase 2 was in flight, when <code>shakenfist/development</code>
+added a <code>diagram-discipline</code> shared block and an accompanying
+<code>mermaid-lint-ci</code> audit. Copy the <code>diagram-discipline</code> block
+verbatim into <code>PUSH-AUDIT.md</code>, and copy
+<code>templates/mermaid-lint/</code> to give the repository a
+<code>tools/mermaid-lint.sh</code> and a workflow that runs it. Note that</p>
+<h1 id="370s-issue-body-is-stale-it-still-lists-the-three-shared">370's issue body is stale: it still lists the three shared<a class="headerlink" href="#370s-issue-body-is-stale-it-still-lists-the-three-shared" title="Permanent link">&para;</a></h1>
+<p>blocks phase 1 added, all of which are present on develop, and
+the audit does not refresh an open issue's body. Its only live
+finding is the missing <code>diagram-discipline</code> block. These two
+issues are one upstream change and are deliberately kept in one
+phase rather than split to clear a failure count sooner.</p>
+<p><strong>Phase 6 -- push audit.</strong> Work through <code>PUSH-AUDIT.md</code> over
 the accumulated diff of phases 1, 2 and 4 against <code>develop</code>
 -- phase 3 lands in another repository and is audited there,
 as part of the pull request that lands it. Name the commit
