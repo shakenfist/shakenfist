@@ -242,6 +242,7 @@ class DatabaseServiceStub:
     These store mutable Network attributes (floating gateway, NI list, DNS).
     """
     GetNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkAttributesRequest, _database_pb2.GetNetworkAttributesReply]
+    GetNetworkFloatingGateways: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNetworkFloatingGatewaysRequest, _database_pb2.GetNetworkFloatingGatewaysReply]
     UpdateNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkAttributesRequest, _database_pb2.StatusReply]
     DeleteNetworkAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkAttributesRequest, _database_pb2.StatusReply]
     CreateNamespaceKey: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceKeyRequest, _database_pb2.StatusReply]
@@ -647,6 +648,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     These store mutable Network attributes (floating gateway, NI list, DNS).
     """
     GetNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkAttributesRequest, _database_pb2.GetNetworkAttributesReply]  # type: ignore[assignment]
+    GetNetworkFloatingGateways: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNetworkFloatingGatewaysRequest, _database_pb2.GetNetworkFloatingGatewaysReply]  # type: ignore[assignment]
     UpdateNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteNetworkAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNetworkAttributesRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     CreateNamespaceKey: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceKeyRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
@@ -1907,6 +1909,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.GetNetworkAttributesRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.GetNetworkAttributesReply, _abc.Awaitable[_database_pb2.GetNetworkAttributesReply]]: ...
+
+    @_abc_1.abstractmethod
+    def GetNetworkFloatingGateways(
+        self,
+        request: _database_pb2.GetNetworkFloatingGatewaysRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNetworkFloatingGatewaysReply, _abc.Awaitable[_database_pb2.GetNetworkFloatingGatewaysReply]]: ...
 
     @_abc_1.abstractmethod
     def UpdateNetworkAttributes(

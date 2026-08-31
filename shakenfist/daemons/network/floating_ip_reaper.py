@@ -1,11 +1,13 @@
 import time
 import itertools
 
+import grpc
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
+from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.network import interface
 from shakenfist.schema.ipam_reservation import ReservationType
@@ -28,6 +30,43 @@ LEAK_CONFIRMATION_SECONDS = 300
 # first saw them look that way. Rebuilt on every sweep, so an address
 # which stops looking leaked forgets its history.
 _leak_candidates: dict[str, float] = {}
+
+# Whether the bulk floating gateway read has been failing, so the
+# fallback is logged on the transition into failure rather than on
+# every 30 second sweep for the length of a mixed version window.
+_bulk_gateway_read_failing = False
+
+
+def _network_floating_gateways():
+    """Every assigned floating gateway, keyed by network uuid -- or None.
+
+    One read for the whole sweep, instead of one GetNetworkAttributes
+    per active network below. The attributes row is deliberately
+    uncacheable and this sweep runs on every sf-net node every 30
+    seconds, so the per-network read made this pair's database rate
+    scale with node count times network count (issue 3976) -- the same
+    per-object access shape issue 3655 removed for reservations.
+
+    Returns None when the RPC failed: an sf-database from before this
+    RPC answers UNIMPLEMENTED for the length of a mixed version window,
+    which is not retryable. The caller then falls back to per-network
+    attribute reads -- the old shape at the old cost, not a wrong
+    answer. An unreachable database tier is different and propagates
+    as DatabaseUnavailable, aborting the sweep, because every read
+    after this one would fail the same way.
+    """
+    global _bulk_gateway_read_failing
+    try:
+        gateways = mariadb.get_network_floating_gateways()
+    except grpc.RpcError as e:
+        if not _bulk_gateway_read_failing:
+            _bulk_gateway_read_failing = True
+            LOG.warning(
+                'Bulk floating gateway read failed, falling back to '
+                'per-network attribute reads: %s' % e)
+        return None
+    _bulk_gateway_read_failing = False
+    return gateways
 
 
 def reap_floating_ips():
@@ -68,10 +107,18 @@ def reap_floating_ips():
     LOG.debug('Floating network registrations: %s' % in_use)
 
     # Collect floating gateways and floating IPs, while ensuring that
-    # they are correctly reserved on the floating network as well.
+    # they are correctly reserved on the floating network as well. The
+    # gateways come from one bulk read (see _network_floating_gateways
+    # for why); reading n.floating_gateway per network is the fallback
+    # for the mixed version window only.
+    gateways = _network_floating_gateways()
+
     floating_gateways = []
     for n in network.Networks([], prefilter='active'):
-        fg = n.floating_gateway
+        if gateways is None:
+            fg = n.floating_gateway
+        else:
+            fg = gateways.get(str(n.uuid))
         if fg:
             floating_gateways.append(fg)
             if fg not in in_use:

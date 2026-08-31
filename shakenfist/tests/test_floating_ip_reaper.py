@@ -15,7 +15,10 @@
 import time
 from unittest import mock
 
+import grpc
+
 from shakenfist.daemons.network import floating_ip_reaper
+from shakenfist import exceptions
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -93,17 +96,32 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         # The candidate leak history is module level state which
-        # persists between sweeps, so each test starts from empty.
+        # persists between sweeps, so each test starts from empty. The
+        # bulk read failure flag persists the same way.
         floating_ip_reaper._leak_candidates.clear()
         self.addCleanup(floating_ip_reaper._leak_candidates.clear)
+        floating_ip_reaper._bulk_gateway_read_failing = False
 
-    def _sweep(self, ipam, networks=None, interfaces=None):
+    def _sweep(self, ipam, networks=None, interfaces=None, gateways=None):
         fake_floating_network = mock.MagicMock()
         fake_floating_network.ipam = ipam
+
+        # The sweep reads gateways from the bulk accessor rather than
+        # from each network's floating_gateway property, so derive the
+        # map the accessor would return from the fakes unless the test
+        # supplies its own.
+        if gateways is None:
+            gateways = {}
+            for n in networks or []:
+                if n.floating_gateway:
+                    gateways[str(n.uuid)] = n.floating_gateway
 
         with mock.patch.object(
                 floating_ip_reaper.network, 'floating_network',
                 return_value=fake_floating_network), \
+            mock.patch.object(
+                floating_ip_reaper.mariadb, 'get_network_floating_gateways',
+                return_value=gateways), \
             mock.patch.object(
                 floating_ip_reaper.network, 'Networks',
                 return_value=networks or []), \
@@ -238,6 +256,83 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(['192.168.10.154'], ipam.released)
 
+    def test_bulk_gateway_read_failure_falls_back_to_per_network(self):
+        # An sf-database from before GetNetworkFloatingGateways answers
+        # UNIMPLEMENTED for the length of a mixed version window. The
+        # sweep must fall back to per-network attribute reads rather
+        # than dying (which would crash-restart the job every few
+        # seconds) or treating every gateway as a leak candidate.
+        fake_network = mock.MagicMock()
+        fake_network.floating_gateway = '192.168.10.11'
+        fake_network.unique_label.return_value = (
+            ObjectType.NETWORK, 'network-uuid')
+
+        ipam = FakeIPAM(in_use={'192.168.10.11'})
+        fake_floating_network = mock.MagicMock()
+        fake_floating_network.ipam = ipam
+
+        with mock.patch.object(
+                floating_ip_reaper.network, 'floating_network',
+                return_value=fake_floating_network), \
+            mock.patch.object(
+                floating_ip_reaper.mariadb, 'get_network_floating_gateways',
+                side_effect=grpc.RpcError()), \
+            mock.patch.object(
+                floating_ip_reaper.network, 'Networks',
+                return_value=[fake_network]), \
+            mock.patch.object(
+                floating_ip_reaper.interface, 'NetworkInterfaces',
+                return_value=[]):
+            self.assertTrue(floating_ip_reaper.reap_floating_ips())
+
+        # The gateway was found via the fallback property read, so it
+        # is not on the leak path.
+        self.assertEqual([], ipam.released)
+        self.assertEqual({}, floating_ip_reaper._leak_candidates)
+        self.assertTrue(floating_ip_reaper._bulk_gateway_read_failing)
+
+    def test_unreachable_database_aborts_the_sweep(self):
+        # DatabaseUnavailable means retries are already exhausted, and
+        # every read after this one would fail the same way. It must
+        # propagate rather than being mistaken for the mixed version
+        # window: the fallback would issue one more doomed RPC per
+        # network, and a sweep built on failed reads feeds the leak
+        # release path.
+        fake_floating_network = mock.MagicMock()
+        fake_floating_network.ipam = FakeIPAM()
+
+        with mock.patch.object(
+                floating_ip_reaper.network, 'floating_network',
+                return_value=fake_floating_network), \
+            mock.patch.object(
+                floating_ip_reaper.mariadb, 'get_network_floating_gateways',
+                side_effect=exceptions.DatabaseUnavailable('gone')):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                floating_ip_reaper.reap_floating_ips)
+
+
+class CountingNetwork:
+    """A fake network which counts floating_gateway property reads.
+
+    On the real object every read is one uncacheable
+    GetNetworkAttributes RPC, which is the per-network cost issue 3976
+    exists to remove from this sweep.
+    """
+
+    def __init__(self, net_uuid, gateway):
+        self.uuid = net_uuid
+        self._gateway = gateway
+        self.attribute_reads = 0
+
+    @property
+    def floating_gateway(self):
+        self.attribute_reads += 1
+        return self._gateway
+
+    def unique_label(self):
+        return (ObjectType.NETWORK, self.uuid)
+
 
 class FloatingIPReaperReadShapeTestCase(base.ShakenFistTestCase):
     """The sweep's cost must not grow with the number of addresses.
@@ -270,6 +365,9 @@ class FloatingIPReaperReadShapeTestCase(base.ShakenFistTestCase):
                 floating_ip_reaper.network, 'floating_network',
                 return_value=fake_floating_network), \
             mock.patch.object(
+                floating_ip_reaper.mariadb, 'get_network_floating_gateways',
+                return_value={}), \
+            mock.patch.object(
                 floating_ip_reaper.network, 'Networks', return_value=[]), \
             mock.patch.object(
                 floating_ip_reaper.interface, 'NetworkInterfaces',
@@ -287,3 +385,42 @@ class FloatingIPReaperReadShapeTestCase(base.ShakenFistTestCase):
             few, many,
             'the sweep issued %d whole-table reads for 40 addresses against '
             '%d for 2, so its database cost grows per address' % (many, few))
+
+    def test_the_sweep_does_not_read_attributes_per_network(self):
+        # The per-network floating_gateway property read is one
+        # uncacheable GetNetworkAttributes RPC, issued by every sf-net
+        # node every 30 seconds, so the sweep's database rate scaled
+        # with node count times network count (issue 3976). The
+        # gateways must come from the one bulk read instead.
+        networks = [
+            CountingNetwork('network-%d' % i, '192.168.10.%d' % (30 + i))
+            for i in range(5)]
+        gateways = {n.uuid: '192.168.10.%d' % (30 + i)
+                    for i, n in enumerate(networks)}
+        ipam = FakeIPAM(in_use=set(gateways.values()))
+
+        fake_floating_network = mock.MagicMock()
+        fake_floating_network.ipam = ipam
+        with mock.patch.object(
+                floating_ip_reaper.network, 'floating_network',
+                return_value=fake_floating_network), \
+            mock.patch.object(
+                floating_ip_reaper.mariadb, 'get_network_floating_gateways',
+                return_value=gateways), \
+            mock.patch.object(
+                floating_ip_reaper.network, 'Networks',
+                return_value=networks), \
+            mock.patch.object(
+                floating_ip_reaper.interface, 'NetworkInterfaces',
+                return_value=[]):
+            self.assertTrue(floating_ip_reaper.reap_floating_ips())
+
+        self.assertEqual(
+            [0, 0, 0, 0, 0],
+            [n.attribute_reads for n in networks],
+            'the sweep read floating_gateway per network rather than '
+            'using the bulk read')
+        # And the bulk answer was actually used: every gateway is
+        # accounted for, so none was recorded as a leak candidate.
+        self.assertEqual([], ipam.released)
+        self.assertEqual({}, floating_ip_reaper._leak_candidates)

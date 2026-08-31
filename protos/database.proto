@@ -225,6 +225,7 @@ service DatabaseService {
   // These store mutable Network attributes (floating gateway, NI list, DNS).
   rpc CreateNetworkAttributes (CreateNetworkAttributesRequest) returns (StatusReply) {}
   rpc GetNetworkAttributes (GetNetworkAttributesRequest) returns (GetNetworkAttributesReply) {}
+  rpc GetNetworkFloatingGateways (GetNetworkFloatingGatewaysRequest) returns (GetNetworkFloatingGatewaysReply) {}
   rpc UpdateNetworkAttributes (UpdateNetworkAttributesRequest) returns (StatusReply) {}
   rpc DeleteNetworkAttributes (DeleteNetworkAttributesRequest) returns (StatusReply) {}
 
@@ -1795,6 +1796,23 @@ message GetNetworkAttributesRequest {
 message GetNetworkAttributesReply {
   bool found = 1;
   NetworkAttributesProto data = 2;
+}
+
+// One bulk read of every assigned floating gateway, so that
+// fixed-cadence sweeps do not issue one GetNetworkAttributes per
+// network per pass (issue 3976). The reply is bounded by the number of
+// networks with a gateway assigned, at two short strings per row.
+
+message GetNetworkFloatingGatewaysRequest {
+}
+
+message NetworkFloatingGateway {
+  string uuid = 1;              // References networks.uuid
+  string floating_gateway = 2;  // The assigned gateway address
+}
+
+message GetNetworkFloatingGatewaysReply {
+  repeated NetworkFloatingGateway gateways = 1;
 }
 
 message UpdateNetworkAttributesRequest {
