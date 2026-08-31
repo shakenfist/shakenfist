@@ -13755,11 +13755,37 @@ begins at <code>scheduler.py:505</code>. Ranking cannot rank a candidate
 that is no longer in the candidate list. "Hard filters →
 affinity score → load" is already the ordering; the
 hard-filter step is what eats the node.</p>
+<p><em>Line references in the paragraph above are as of 2026-08-16.
+The current locations are <code>:489-502</code> and <code>:529-600</code>; the hard
+ceiling cited below is now <code>:187-256</code>; and PR 3722's ranking
+precedence, cited above as <code>:611-631</code>, is now the <code>narrowed</code>
+block at <code>:637-658</code> -- that one moved</em> and <em>is a different
+block from the affinity scoring at <code>:529-600</code>, so do not read
+the two as interchangeable. Each is named by symbol as well as
+by number, because a set of line numbers is what went stale
+here in the first place and a second set carries the same
+decay: <code>:489-502</code> is the <code>sufficient_idle_cpu</code> stage inside
+<code>find_candidates()</code>, <code>:529-600</code> is the block under the comment
+"Filter by affinity, if any has been specified", <code>:187-256</code> is
+<code>_has_sufficient_cpu()</code> where <code>hard_max_cpus</code> is applied, and
+<code>:637-658</code> is the block whose comment begins "The two filters
+above are load shedding, not admission". Re-derive from the
+names when the numbers next move. Also, per a 2026-08-26
+comment on 3565, the stage which binds has moved from
+<code>sufficient_idle_cpu</code> to <code>sufficient_idle_memory</code> -- the
+mechanism is unchanged, an admission filter emptying the set
+before ranking, but a fix aimed only at CPU admission would
+now miss.</em></p>
 <p>Closing 3565 therefore needs a decision this document has not
 taken: <strong>may a soft affinity preference bid against a hard
 admission ceiling?</strong> Today <code>hard_max_cpus</code> is absolute
-(<code>scheduler.py:260</code>). Three positions, for phase 6 to choose
-between:</p>
+(<code>scheduler.py:260</code>).</p>
+<p><em>All three positions below were disposed of on 2026-08-29 by
+the phase 6 plan's F2 and F7, which found the traced mechanism
+to be a candidate set of one, and none of the three to address
+it. They are kept as written, because a decision record should
+show what was on offer.</em></p>
+<p>Three positions, for phase 6 to choose between:</p>
 <ol>
 <li><strong>Hard require only.</strong> <code>require_with_tag</code> turns silent
    mis-placement into an explicit no-candidate refusal.
