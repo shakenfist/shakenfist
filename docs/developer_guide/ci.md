@@ -182,7 +182,52 @@ it prints (committed vCPU as a fraction of the admission ledger,
 against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
 phase 0 set those bounds with no distribution to check them against,
 phase 2 replaces or defends them, and any enforcement is phase 5's to
-add. Nothing in CI today can fail because of this instrumentation.
+add. No verdict this instrumentation *prints* can fail a build.
+
+That is not the same as the instrumentation being invisible, and
+issue #3975 is the difference. The probe is a poll against the API,
+and the API reads the database, so the probe adds database load like
+anything else does -- and the idle-load check in
+`cluster_ci_tests/test_database_tier.py` is built to notice exactly
+that shape of traffic. It duly noticed the probe and failed every
+merge-queue cluster job until the allowance below was added. An
+instrument that perturbs what another check measures is a real cost of
+having it, so weigh it before adding the next one.
+
+### The probe's own load, and the allowance for it
+
+Each sample makes two API calls, and both fan out per node:
+`GET /nodes` reads every node's attributes row and daemon-state rows,
+and `GET /admin/resources` reads every node's metrics. So on an
+N-node cluster the probe produces `GetNodeAttributes`,
+`GetAllNodeDaemonStates` and `GetNodeMetrics` from `api` at N/15 per
+second each -- 0.4/s on a six-node merge-queue cluster, against the
+0.30/s ceiling the idle-load check applies to traffic that has no
+budget entry. PR CI never sees it, because its single-node cluster
+runs the same probe at 1/15 = 0.067/s.
+
+Those three pairs are therefore exempted, in
+`HEADROOM_PROBE_PAIRS` in `shakenfist_ci/load_budget.py` -- but as an
+*allowance* rather than a blanket skip. The check subtracts what the
+probe is known to produce and reports the residual, so a pair running
+above the probe's own rate still fails the build. That distinction is
+the point: `GetNodeMetrics` from `api` is not only the probe, since
+instance creation constructs a Scheduler and reads node metrics too,
+and skipping the pair outright would have hidden a genuine regression
+in order to silence a synthetic one. The blind spot that remains is
+bounded, CI-only, and named in the comment on those constants; the
+same pairs are watched at the same ceiling on every real cluster,
+because `ShakenFistUnbudgetedDatabasePolling` takes its exclusions
+from `shakenfist/data/database_load_budget.yaml` and not from the CI
+suite.
+
+The allowance divides by the probe's sampling interval, which is a
+constant in the CI suite copied from the probe's own `--interval`
+default. `test_database_tier_harness.py` reads that default back out
+of `tools/ci_headroom_probe.py` and fails if the two drift, and
+asserts the probe still samples both endpoints on a timer -- because
+the day it stops, the allowance stops being an explanation and
+becomes a hole.
 
 An absent census is not zero refusals. When the Loki query failed or
 log shipping was unhealthy, the report says so explicitly rather than

@@ -14,6 +14,7 @@ the server -- and keeping it that way matters, because it runs wherever the
 harness puts it. What must not be duplicated is the data.
 """
 
+import math
 import os
 import re
 
@@ -207,6 +208,93 @@ HARNESS_DRIVEN_PAIRS = frozenset([
     ('GetObjectEvents', 'api'),
 ])
 
+# The CI headroom probe, tools/ci_headroom_probe.py, is the second thing
+# this suite runs which the checks below cannot tell from a server side
+# poll -- and unlike the await helpers, its rate is predictable, so it is
+# exempted as an allowance rather than as a blanket skip.
+#
+# shakenfist/actions starts one probe per cluster deploy and it samples on
+# a timer until the run ends. Each sample makes exactly two API calls:
+# GET /admin/resources (client.get_cluster_resources()) and GET /nodes
+# (client.get_nodes()). Both fan out per node -- Node.external_view()
+# reads its own attributes row and its own daemon state rows for each
+# node in the roster, and summarize_resources() reads each node's metrics
+# -- so on a cluster of N nodes each of the three pairs below runs at
+# N/interval per second, set by configuration and not by what the suite
+# is doing. That is the exact signature of fixed_rate() and
+# independent_of_activity(), which is why #3975 failed every merge queue
+# cluster job once #3940 landed: 6 nodes over a 15s interval is 0.4/s
+# against a 0.30/s ceiling. PR CI never saw it because its single node
+# cluster runs the same probe at 1/15 = 0.067/s.
+#
+# Why not simply list these in HARNESS_DRIVEN_PAIRS. A blanket skip drops
+# the pair whatever its rate, and node state read from sf-api is exactly
+# the class of regression this check exists to find: an endpoint which
+# starts reading every node's attributes on a timer would be invisible
+# forever after. GetNodeMetrics/api is the clearest case, because it is
+# not only the probe -- instance creation constructs a Scheduler, so real
+# API traffic reads node metrics too, and in the merge group for #3970
+# that pair did not even reach the unbudgeted branch because the suite's
+# own activity moved it. Exempting it outright would hide a real signal
+# to silence a synthetic one.
+#
+# So the exemption is bounded: subtract what the probe is known to
+# produce and report the residual. A pair which runs at the probe's rate
+# passes; the same pair at twice the probe's rate still fails, and says
+# by how much it exceeded what the harness explains.
+#
+# Why not in shakenfist/data/database_load_budget.yaml, on the same
+# argument as GetObjectEvents above: no deployed cluster runs a headroom
+# probe, and writing CI's measuring instrument into the model would raise
+# a real cluster's ceiling for load only CI produces. Every consumer of
+# that file -- sf-ctl database-load, the generated Prometheus rules, the
+# nightly report -- would inherit the fiction.
+#
+# What it still costs, said plainly: a genuine new poll of node state
+# from sf-api is invisible while it stays under the probe's own rate.
+# That floor is a fraction of a request per second per node and it is
+# CI's alone; ShakenFistUnbudgetedDatabasePolling takes its exclusions
+# from the budget file and not from here, so the same pairs are watched
+# at the same ceiling on every real cluster.
+HEADROOM_PROBE_PAIRS = frozenset([
+    ('GetNodeAttributes', 'api'),
+    ('GetAllNodeDaemonStates', 'api'),
+    ('GetNodeMetrics', 'api'),
+])
+
+# The probe's sampling interval, in seconds. Duplicated from the
+# --interval default in tools/ci_headroom_probe.py, because this suite is
+# standalone and imports nothing from the server checkout at runtime;
+# test_headroom_probe_interval_matches_the_probe reads that default back
+# out of the source and fails if the two drift, on the same argument as
+# DAEMON_STATE_POLL_INTERVAL above.
+#
+# The workflow which starts the probe passes --interval explicitly, and
+# it lives in another repository (shakenfist/actions), so this constant
+# can be wrong in a way no test here can see. It fails safe: a workflow
+# sampling *faster* than this leaves a residual above the allowance and
+# the pair is reported, which is a visible failure naming the measured
+# rate rather than a silent hole.
+HEADROOM_PROBE_INTERVAL_SECONDS = 15.0
+
+# How far above the probe's arithmetic rate a pair may still read as just
+# the probe. The allowance is derived from a node count and an interval,
+# and the measurement it is compared against is a counter difference over
+# a wall clock window, so the two agree to about a part in a thousand and
+# not exactly -- the run in #3975 measured 0.39981792260485516/s against
+# an arithmetic 0.4/s, which is 0.9995 of it. A window which starts or
+# ends mid-sample can land one extra sample in a window, which on a four
+# minute measurement is a few percent.
+#
+# Set well above both, because the cost of the two errors is not
+# symmetric. Too tight and the merge queue fails on a rounding difference
+# in the measuring instrument, which is the failure this whole change is
+# undoing. Too loose and the blind spot grows by the same factor -- but
+# it is a blind spot in CI only, on a pair whose real ceiling on a
+# deployed cluster is unaffected. This is the same reasoning, and the
+# same value, as POLL_OVERCOUNT_TOLERANCE above.
+HEADROOM_PROBE_TOLERANCE = 1.60
+
 
 def load_budget():
     """The shipped database load budget, as plain dicts.
@@ -290,8 +378,41 @@ def harness_driven(key):
     high is worth failing on, this asks whether an unbudgeted pair is the
     measuring instrument rather than the thing measured. See
     HARNESS_DRIVEN_PAIRS for why the answer is not simply a budget entry.
+
+    Says only whether the harness produces the pair at all. How much of
+    the pair's measured rate that explains is harness_allowance(), and
+    the caller wants that one: a pair this suite drives can still be
+    running well above anything this suite can account for.
     """
-    return tuple(key) in HARNESS_DRIVEN_PAIRS
+    return (tuple(key) in HARNESS_DRIVEN_PAIRS
+            or tuple(key) in HEADROOM_PROBE_PAIRS)
+
+
+def harness_allowance(key, node_count):
+    """How much of a pair's rate this suite's own traffic explains.
+
+    Returns None for a pair the harness does not produce, which is the
+    ordinary case and means the measured rate is entirely the cluster's.
+    Returns math.inf for a pair the harness produces at a rate it cannot
+    predict, which is a blanket exemption. Otherwise returns the rate in
+    requests per second, above which the pair is reporting more traffic
+    than the harness can account for and is worth failing on.
+
+    Only the headroom probe gets a number, because it is the only one of
+    the two whose rate is arithmetic rather than emergent: it samples on
+    a fixed interval and fans out over a known roster, so N/interval is
+    the whole of its contribution. The await helpers behind
+    GetObjectEvents run once per worker currently waiting on an object,
+    which is a property of which tests happen to be in flight, so there
+    is no number to subtract and the exemption stays blanket.
+    """
+    key = tuple(key)
+    if key in HEADROOM_PROBE_PAIRS:
+        return (node_count / HEADROOM_PROBE_INTERVAL_SECONDS
+                * HEADROOM_PROBE_TOLERANCE)
+    if key in HARNESS_DRIVEN_PAIRS:
+        return math.inf
+    return None
 
 
 def enforced(entry):

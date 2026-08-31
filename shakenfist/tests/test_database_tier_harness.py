@@ -17,6 +17,7 @@ for every entry in the shipped budget, at four cluster shapes.
 import ast
 import importlib.util
 import json
+import math
 import os
 import textwrap
 import tomllib
@@ -131,6 +132,19 @@ class FakeResponse:
         pass
 
 
+# The headroom probe is phase 1 instrumentation of
+# docs/plans/PLAN-ci-cloud-sizing.md and is meant to come out once the
+# sizing question it answers is closed. Both guards below read it by
+# path, so say what its absence means rather than letting them die on a
+# FileNotFoundError which names no consequence.
+_PROBE_IS_GONE = (
+    'tools/ci_headroom_probe.py is gone, so nothing samples the node '
+    'roster on a timer during a CI run any more. That is the entire '
+    'justification for the HEADROOM_PROBE_PAIRS allowance in '
+    'load_budget.py -- drop those three pairs and let the idle load check '
+    'see them at the ordinary unbudgeted ceiling again.')
+
+
 class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
     def test_scrape_request_pairs_reads_both_label_orders(self):
         # Prometheus does not promise a label order, and the sample which
@@ -196,9 +210,9 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # HARNESS_DRIVEN_PAIRS exists to avoid rather than cause.
         budgeted = {e['operation'] + '/' + e['caller_daemon']
                     for e in harness.load_budget()['entries']}
+        exempted = harness.HARNESS_DRIVEN_PAIRS | harness.HEADROOM_PROBE_PAIRS
         overlap = sorted(
-            {'%s/%s' % pair for pair in harness.HARNESS_DRIVEN_PAIRS}
-            & budgeted)
+            {'%s/%s' % pair for pair in exempted} & budgeted)
         self.assertEqual(
             [], overlap,
             'These pairs are exempted as harness traffic and are also in '
@@ -212,6 +226,146 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         self.assertTrue(harness.harness_driven(['GetObjectEvents', 'api']))
         self.assertFalse(harness.harness_driven(('GetObjectEvents', 'net')))
         self.assertFalse(harness.harness_driven(('GetNodeDaemonState', 'net')))
+        # The probe pairs are harness driven too, and are the reason
+        # harness_driven() is no longer the question the caller wants.
+        self.assertTrue(harness.harness_driven(('GetNodeMetrics', 'api')))
+        self.assertFalse(harness.harness_driven(('GetNodeMetrics', 'queues')))
+
+    def test_allowance_is_none_for_a_pair_the_harness_does_not_produce(self):
+        # None rather than zero, because the two say different things: a
+        # zero allowance would read as "the harness produces this and
+        # explains none of it", which would make every ordinary cluster
+        # pair look like a harness pair running over.
+        self.assertIsNone(
+            harness.harness_allowance(('GetNodeMetrics', 'queues'), 6))
+        self.assertIsNone(
+            harness.harness_allowance(('GetInstance', 'api'), 6))
+
+    def test_allowance_is_unbounded_for_the_events_poll(self):
+        # GetObjectEvents has no arithmetic rate to subtract -- it is set
+        # by how many workers happen to be waiting -- so it stays a
+        # blanket exemption, expressed as an infinite allowance so the
+        # caller needs only one comparison.
+        self.assertEqual(
+            math.inf,
+            harness.harness_allowance(('GetObjectEvents', 'api'), 6))
+
+    def test_allowance_covers_the_rate_the_probe_actually_produced(self):
+        # The numbers from the two runs in #3975. Both are a shade under
+        # the arithmetic N/interval, because the measurement is a counter
+        # difference over a wall clock window and the allowance is
+        # division; the allowance has to cover them or the merge queue
+        # fails on the measuring instrument, which is the bug being
+        # fixed here.
+        for measured in (0.39981792260485516, 0.39972509425618863):
+            for pair in sorted(harness.HEADROOM_PROBE_PAIRS):
+                self.assertLessEqual(
+                    measured, harness.harness_allowance(pair, 6),
+                    '%s/%s at %r on the six node cluster' % (pair + (measured,)))
+
+    def test_allowance_scales_with_the_cluster_and_still_bounds_the_pair(self):
+        # The point of an allowance rather than a blanket skip: it grows
+        # with the roster the probe walks, and a pair running clear of it
+        # is still reported. Were this a plain membership test, the 4.0/s
+        # case below would pass silently and a genuine new poll of node
+        # state from sf-api would never be seen again.
+        pair = ('GetNodeAttributes', 'api')
+        one_node = harness.harness_allowance(pair, 1)
+        six_nodes = harness.harness_allowance(pair, 6)
+        self.assertLess(one_node, six_nodes)
+        self.assertAlmostEqual(6.0, six_nodes / one_node)
+        self.assertGreater(4.0, six_nodes)
+
+    def test_headroom_probe_interval_matches_the_probe(self):
+        # HEADROOM_PROBE_INTERVAL_SECONDS is the divisor in every
+        # allowance above, and it is a copy of a default which lives in
+        # another file. Read that default back out rather than trusting
+        # the comment beside the copy, on the same argument as
+        # test_daemon_state_poll_interval_matches_the_daemon: a comment
+        # cannot notice that it went stale, and this one going stale
+        # silently widens the blind spot the allowance exists to keep
+        # narrow.
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(os.path.dirname(here))
+        path = os.path.join(root, 'tools', 'ci_headroom_probe.py')
+        self.assertTrue(os.path.exists(path), _PROBE_IS_GONE)
+        with open(path, encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+
+        defaults = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not (isinstance(func, ast.Attribute)
+                    and func.attr == 'add_argument'):
+                continue
+            if not any(isinstance(a, ast.Constant) and a.value == '--interval'
+                       for a in node.args):
+                continue
+            for keyword in node.keywords:
+                if (keyword.arg == 'default'
+                        and isinstance(keyword.value, ast.Constant)):
+                    defaults.append(keyword.value.value)
+
+        self.assertEqual(
+            [harness.HEADROOM_PROBE_INTERVAL_SECONDS],
+            [float(d) for d in defaults],
+            'The --interval default in tools/ci_headroom_probe.py no '
+            'longer matches HEADROOM_PROBE_INTERVAL_SECONDS in '
+            'load_budget.py. Every headroom allowance divides by that '
+            'constant, so while they disagree the allowance is wrong by '
+            'the ratio between them.')
+
+    def test_the_headroom_probe_still_samples_node_state_on_a_timer(self):
+        # The whole argument for allowing these three pairs is that the
+        # probe walks the node roster on a fixed interval. If it stops --
+        # because it samples something cheaper, or caches the roster, or
+        # goes away with the sizing plan that asked for it -- the
+        # allowance stops being an explanation and becomes a hole, and
+        # the pairs should go back to failing the build. Derived from the
+        # probe rather than asserted about it, exactly as
+        # test_the_suite_still_polls_an_events_endpoint is.
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(os.path.dirname(here))
+        path = os.path.join(root, 'tools', 'ci_headroom_probe.py')
+        self.assertTrue(os.path.exists(path), _PROBE_IS_GONE)
+        with open(path, encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+
+        # The sleep and the sampling calls are in different functions --
+        # main() paces the loop, take_sample() makes the calls -- so this
+        # asks the module rather than a single loop body.
+        sleeps_in_a_loop = False
+        for loop in ast.walk(tree):
+            if not isinstance(loop, (ast.While, ast.For)):
+                continue
+            for node in ast.walk(loop):
+                if (isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                        and node.func.attr == 'sleep'):
+                    sleeps_in_a_loop = True
+
+        sampled = set()
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr in ('get_nodes',
+                                           'get_cluster_resources')):
+                sampled.add(node.func.attr)
+
+        self.assertTrue(
+            sleeps_in_a_loop,
+            'tools/ci_headroom_probe.py no longer sleeps inside a loop, so '
+            'it is not a fixed rate sampler any more. The headroom '
+            'allowances in load_budget.py assume it is.')
+        self.assertEqual(
+            {'get_nodes', 'get_cluster_resources'}, sampled,
+            'tools/ci_headroom_probe.py no longer calls both get_nodes() '
+            'and get_cluster_resources(), which are what produce the '
+            'GetNodeAttributes, GetAllNodeDaemonStates and GetNodeMetrics '
+            'traffic HEADROOM_PROBE_PAIRS exempts. Drop the pairs it no '
+            'longer produces and let the idle load check see them again.')
 
     def test_the_suite_still_polls_an_events_endpoint(self):
         # The whole argument for exempting GetObjectEvents/api is that this

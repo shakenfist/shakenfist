@@ -17,6 +17,7 @@ slim-tier topology has, so it stays in the cluster suite.
 """
 
 import json
+import math
 import time
 
 import requests
@@ -87,6 +88,21 @@ def scrape_database_counters(mesh_ip):
         except ValueError:
             continue
     return counters
+
+
+def _allowance_json(allowance):
+    """Render a harness allowance for the run summary.
+
+    math.inf is what lb.harness_allowance() returns for a pair the
+    harness drives at a rate it cannot predict. json.dumps() will write
+    that as a bare Infinity, which no strict JSON reader accepts, and
+    this summary is meant to be read by tools as well as by people. None
+    means the same thing here as it does in the allowance itself -- no
+    number to compare against -- and survives a round trip.
+    """
+    if allowance is None or allowance == math.inf:
+        return None
+    return round(allowance, 3)
 
 
 def scrape_operation_requests(mesh_ip, operation, caller_daemon):
@@ -642,13 +658,23 @@ class DatabaseTierTestsMixin:
                 # Traffic this suite polls for itself looks exactly like a
                 # server side poll to everything above, because it is one
                 # -- it is just on the wrong side of the API. Listed and
-                # argued in lb.HARNESS_DRIVEN_PAIRS, and reported below
-                # rather than dropped, because an exemption nobody can see
-                # in the run detail is an exemption nobody will revisit.
-                if lb.harness_driven(key):
-                    harness.append((key, measured))
+                # argued in lb.HARNESS_DRIVEN_PAIRS and
+                # lb.HEADROOM_PROBE_PAIRS, and reported below rather than
+                # dropped, because an exemption nobody can see in the run
+                # detail is an exemption nobody will revisit.
+                #
+                # Bounded by what the harness can actually account for,
+                # not by the name of the pair. The headroom probe's rate
+                # is arithmetic, so a pair running above it is carrying
+                # traffic the probe does not explain and still fails --
+                # otherwise exempting a pair like GetNodeMetrics/api,
+                # which real API work also produces, would hide the
+                # regression this check exists to find.
+                allowance = lb.harness_allowance(key, node_count)
+                if allowance is not None and measured <= allowance:
+                    harness.append((key, measured, allowance))
                 else:
-                    unbudgeted.append((key, measured))
+                    unbudgeted.append((key, measured, allowance))
                 continue
             modelled = lb.expected_qps(entry, node_count, standing_instances)
             ceiling = (modelled * defaults['tolerance_multiplier']
@@ -679,11 +705,13 @@ class DatabaseTierTestsMixin:
                 {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
                  'modelled': mod, 'ceiling': c} for k, m, mod, c in over],
             'unbudgeted': [
-                {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
-                for k, m in unbudgeted],
+                {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
+                 'harness_allowance': _allowance_json(a)}
+                for k, m, a in unbudgeted],
             'harness_driven': [
-                {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
-                for k, m in harness],
+                {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
+                 'allowance': _allowance_json(a)}
+                for k, m, a in harness],
             'over_budget_but_not_enforced': [
                 {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
                  'modelled': mod} for k, m, mod, _ in reported],
@@ -728,7 +756,10 @@ class DatabaseTierTestsMixin:
             'note naming the loop which produces it -- or, if this suite '
             'is what produces it rather than the cluster, to '
             'HARNESS_DRIVEN_PAIRS in load_budget.py, which says what such '
-            'an entry has to argue. summary=%s'
+            'an entry has to argue. A pair carrying a harness_allowance '
+            'here is one this suite does drive, running above everything '
+            'that traffic accounts for, so the excess is the cluster\'s '
+            'and the allowance is not the thing to raise. summary=%s'
             % (unbudgeted_ceiling, json.dumps(summary, sort_keys=True)))
 
         self.assertEqual(
