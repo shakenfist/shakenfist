@@ -1400,9 +1400,23 @@ def _validate_instance_metadata(key, value):
                 400, 'value for "affinity" key should be a valid JSON dictionary')
 
         for key_type, dv in value.items():
+            # isinstance(True, int) is true in Python, so int(True) is 1 and a
+            # JSON true would be accepted as a weight of one. Nobody writing
+            # true means "weight 1", and the binary affinity model gives it a
+            # meaning nobody asked for, so refuse it explicitly.
+            if isinstance(dv, bool):
+                return sf_api.error(
+                    400, 'affinity dictionary values should be integers, not booleans')
+
+            # int() raises TypeError -- not ValueError -- for a list, a dict or
+            # None, and OverflowError for infinity. json.loads() accepts the
+            # bare Infinity and NaN literals by default, so flask hands them
+            # straight through and a bare ValueError handler returns a 500 to
+            # the caller. NaN is already covered: int(float('nan')) is a
+            # ValueError.
             try:
                 int(dv)
-            except ValueError:
+            except (TypeError, ValueError, OverflowError):
                 return sf_api.error(400, 'affinity dictionary values should be integers')
 
 
