@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-30T11:31:10.482825+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-08-31T13:02:39.008665+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -38,7 +38,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | development | compliant | - |
 | divergulent | compliant | - |
 | instar | compliant | - |
-| kerbside | non-compliant | shakenfist/kerbside#360 |
+| kerbside | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | non-compliant | shakenfist/library-utilities#32 |
 | occystrap | non-compliant | shakenfist/occystrap#120 |
@@ -52,7 +52,6 @@ Details for non-compliant projects:
 - **agent-python** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
-- **kerbside** (Status): the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **library-utilities** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **occystrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **ryll** (Status): the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
@@ -326,7 +325,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | development | compliant | - |
 | divergulent | compliant | - |
 | instar | compliant | - |
-| kerbside | non-compliant | shakenfist/kerbside#359 |
+| kerbside | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | N/A | - |
 | occystrap | non-compliant | shakenfist/occystrap#119 |
@@ -340,7 +339,6 @@ Details for non-compliant projects:
 - **agent-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **clingwrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **kerbside** (Status): skillsaw does not run from a CI workflow
 - **occystrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **sfui** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **shakenfist** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
@@ -863,9 +861,39 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 46 of 121 in-scope files reviewed at HEAD; 75 need review (threshold 5)
-- **kerbside** (Status): 121 of 196 in-scope files reviewed at HEAD; 75 need review (threshold 5)
+- **development** (Status): 65 of 126 in-scope files reviewed at HEAD; 61 need review (threshold 5)
+- **kerbside** (Status): 115 of 192 in-scope files reviewed at HEAD; 77 need review (threshold 5)
 - **ryll** (Status): 89 of 191 in-scope files reviewed at HEAD; 102 need review (threshold 5)
+
+## review-scope-completeness
+
+Criterion: [review-scope-completeness.md](/components/development/audits/review-scope-completeness/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | non-compliant | shakenfist/actions#48 |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | compliant | - |
+| divergulent | N/A | - |
+| instar | N/A | - |
+| kerbside | non-compliant | shakenfist/kerbside#385 |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | N/A | - |
+| private-ci | N/A | - |
+| ryll | non-compliant | shakenfist/ryll#340 |
+| sfui | N/A | - |
+| shakenfist | N/A | - |
+
+Details for non-compliant projects:
+
+- **actions** (Status): 4 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
+- **kerbside** (Status): 44 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
+- **ryll** (Status): 37 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
 
 ## rust-unwrap-lint
 
