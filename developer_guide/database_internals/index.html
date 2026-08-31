@@ -13740,6 +13740,15 @@ yield fewer rows than <code>limit</code>, so sustained heavy load on
 follow-up step. Worker crash recovery is unchanged: any claimed-
 but-not-yet-executed rows that the worker doesn't run are picked up
 by the stuck-row reaper described above.</p>
+<p>To see what that costs an operation in practice, <code>tools/queue-wait-report.py</code>
+reports the queue-wait distribution by queue class, priority lane and
+operation type, and <code>tools/operation-timeline.py</code> splits one operation's
+wait into the initial queue sit, the deferral the dispatcher asked for
+and the sit after each redelivery -- which is what distinguishes a lane
+that is genuinely backed up from one whose operations are waiting on a
+dependency. Both are documented, with their caveats, under
+<a href="../../operator_guide/networking/overview/">networking observability</a>,
+where they sit next to the other queue tooling.</p>
 <h2 id="coalescible-operations">Coalescible Operations<a class="headerlink" href="#coalescible-operations" title="Permanent link">&para;</a></h2>
 <p>Some operation tasks are idempotent reconciliation work whose effect
 depends only on current DB state, not on the count of pending ops
