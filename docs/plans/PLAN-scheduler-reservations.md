@@ -358,7 +358,7 @@ table entirely (decision D8).
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
-| 6. Affinity model rework | PLAN-scheduler-reservations-phase-06-affinity.md | Not started |
+| 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Not started |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
@@ -681,6 +681,23 @@ already landed as PR 3722 — see the D6 correction of
 2026-08-16 in the phase 0 decisions document for the audit
 trail and the three positions on offer. Phase 6 closes 3565
 only if it picks one of them.
+
+*Correction (2026-08-29), from the phase 6 survey: the
+instruction below is discharged, and the mechanism is neither
+of the two candidates it weighs.* A fully traced occurrence of
+3565 was posted to the issue on 2026-08-26 -- after phase 4a
+fixed #3813 on 2026-08-24, so from a cluster where the
+spreader works. In it the candidate set had already collapsed
+to **one node** before affinity was scored. The anti-affinity
+instance scored that node -100, correctly, and placed there
+anyway, because a scorer given one candidate has nothing to
+do; and the half of the assertion that *passed* was the same
+forced choice. So affinity was never consulted, in either
+direction. It is not lost spreading and it is not affinity
+losing a tiebreak. The phase 6 plan takes this as its finding
+3 and closes 3565 on it. The superseded reasoning is kept
+below because it is a fair account of what was known at the
+time.
 
 *Correction (2026-08-19, restated 2026-08-22):* there is now
 a competing explanation for 3565, and phase 6 must rule it

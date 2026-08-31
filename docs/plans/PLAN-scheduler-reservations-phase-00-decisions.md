@@ -336,11 +336,40 @@ that is no longer in the candidate list. "Hard filters →
 affinity score → load" is already the ordering; the
 hard-filter step is what eats the node.
 
+*Line references in the paragraph above are as of 2026-08-16.
+The current locations are `:489-502` and `:529-600`; the hard
+ceiling cited below is now `:187-256`; and PR 3722's ranking
+precedence, cited above as `:611-631`, is now the `narrowed`
+block at `:637-658` -- that one moved* and *is a different
+block from the affinity scoring at `:529-600`, so do not read
+the two as interchangeable. Each is named by symbol as well as
+by number, because a set of line numbers is what went stale
+here in the first place and a second set carries the same
+decay: `:489-502` is the `sufficient_idle_cpu` stage inside
+`find_candidates()`, `:529-600` is the block under the comment
+"Filter by affinity, if any has been specified", `:187-256` is
+`_has_sufficient_cpu()` where `hard_max_cpus` is applied, and
+`:637-658` is the block whose comment begins "The two filters
+above are load shedding, not admission". Re-derive from the
+names when the numbers next move. Also, per a 2026-08-26
+comment on 3565, the stage which binds has moved from
+`sufficient_idle_cpu` to `sufficient_idle_memory` -- the
+mechanism is unchanged, an admission filter emptying the set
+before ranking, but a fix aimed only at CPU admission would
+now miss.*
+
 Closing 3565 therefore needs a decision this document has not
 taken: **may a soft affinity preference bid against a hard
 admission ceiling?** Today `hard_max_cpus` is absolute
-(`scheduler.py:260`). Three positions, for phase 6 to choose
-between:
+(`scheduler.py:260`).
+
+*All three positions below were disposed of on 2026-08-29 by
+the phase 6 plan's F2 and F7, which found the traced mechanism
+to be a candidate set of one, and none of the three to address
+it. They are kept as written, because a decision record should
+show what was on offer.*
+
+Three positions, for phase 6 to choose between:
 
 1. **Hard require only.** `require_with_tag` turns silent
    mis-placement into an explicit no-candidate refusal.
