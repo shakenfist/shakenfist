@@ -14070,6 +14070,17 @@
   instruction to base64 encode on the caller's behalf — check that a
   regenerated client does not double encode content you already encode
   yourself, as the API has always required.</li>
+<li>Malformed values inside the reserved <code>affinity</code> instance metadata key
+  are now refused with a 400 instead of returning a 500. A list, a
+  dictionary, <code>null</code> or <code>Infinity</code> used as the <em>value</em> of an affinity
+  entry -- that is, <code>{"affinity": {"first-node": ["a"]}}</code> -- previously
+  escaped the validator and produced a server error on instance create
+  and on both instance metadata endpoints.</li>
+<li><strong>Behaviour change:</strong> a boolean affinity value is now refused with a</li>
+<li><code>{"affinity": {"first-node": true}}</code> was previously accepted as a
+  weight of one, because Python's <code>int(True)</code> is 1. If you relied on
+  that, send <code>1</code> instead. Numeric strings such as <code>"3"</code> are still
+  accepted, unchanged.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>
