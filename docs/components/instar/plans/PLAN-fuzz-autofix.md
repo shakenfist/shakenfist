@@ -86,18 +86,15 @@ YAML.
 
 ### Remaining work
 
-* Re-run against the two open `autofix-failed` issues (#485, #492) and
-  confirm at least one reaches a PR — this is the plan's own
-  outstanding success criterion, and the only thing that exercises the
-  workflow end to end. It needs the fix on `develop` first, because
-  the workflow checks out `develop`. That fix is on `develop` as of
-  2026-08-20, and six scheduled runs have since completed with every
-  step after `Find eligible issue` skipped: both issues are blocked by
-  their own `autofix-failed` label, and the third open
-  `security-audit` issue (#483) is hand-written prose that the JSON
-  gate correctly rejects. Nothing is broken; there is no input. A
-  `workflow_dispatch` with an explicit `issue_number` bypasses the
-  label check, which is how phase 1 proves the loop.
+* **Done.** Phase 1's step 7 dispatched `workflow_dispatch` against
+  #485 twice. The first run, 33219527764 on 2026-08-28, exposed a
+  workflow defect instead of proving the loop: the workflow never
+  checked out `instar-testdata`, so `make test-container-core` could
+  never pass and no run could ever have reached `Commit, push, and
+  create PR`; fixed in PR #530. The second, run 33297854229 on
+  2026-08-30 after PR #530 merged, proved the loop end to end -- it
+  reached `Commit, push, and create PR` and opened PR #533 against
+  #485. See phase 1's *Result* section for the full account.
 * Refresh the hardcoded `Co-Authored-By: Claude Opus 4.6 (1M context)`
   trailer in the Create PR step, which no longer names the model that
   runs. This was previously recorded here as a call for a human on the
@@ -111,7 +108,11 @@ YAML.
   stale name; phase 1 fixed all three behind one tested helper. The
   addresser has since been retired outright — the workflow, the driver
   script and its helpers were deleted — so everything this plan says
-  about it is history, and only the two workflows survive.
+  about it is history, and only the two workflows survive. **Done**,
+  and confirmed live: run 33297854229's pushed commit for PR #533
+  carries `Co-Authored-By: Claude claude-opus-5 (1M context)
+  <noreply@anthropic.com>`, the derived form, not the old hardcoded
+  string.
 * `tools/address-comments-with-claude.sh` (since retired) had the same
   defect this plan diagnosed, in the review-comment loop rather than
   the fuzz loop (issue #510): it instructed Claude to stage, then reported an
@@ -131,14 +132,18 @@ audit that ends every master plan.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | In progress | |
+| 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | Complete | `b6b67a8` (#520), `931b5a9` (#530) |
 | 2. Push audit | `PLAN-fuzz-autofix-phase-02-push-audit.md` (not yet written) | Not started | |
 
 The `Merged` column is the one `PLAN-TEMPLATE.md` requires of a plan
 carrying a push audit phase: phase 2 runs the audit over the union of
 the earlier phases' merge ranges, because `git diff develop...HEAD` is
-empty once they have landed. Both cells are empty because neither phase
-has merged.
+empty once they have landed. Phase 1 landed across three pull requests
+rather than one -- #520 built the helper and switched the automations
+to it, #530 gave the workflow its test data and corrected this plan's
+account of verification, and the close-out pull request that records
+the result adds its own merge commit to that cell when it lands.
+Phase 2's cell is empty because it has not started.
 
 ### 2. Push audit
 
@@ -465,7 +470,12 @@ The workflow is complete when:
 
 * It can discover eligible `security-audit` issues.
 * It successfully fixes at least one fuzzer-found crash
-  end-to-end (issue to merged PR).
+  end-to-end (issue to merged PR). **Met as far as an unattended
+  run can take it.** Run 33297854229 on 2026-08-30 took issue #485
+  to PR #533 without human intervention, which is the whole of what
+  the workflow does; the final merge is a human review decision
+  this criterion cannot require of the automation, and it is
+  tracked on #533 itself.
 * Failed attempts are properly labelled and commented.
 * Complexity guardrails prevent runaway fixes.
 * The workflow integrates cleanly with existing CI (same
@@ -485,6 +495,19 @@ The workflow is complete when:
 * **Cross-reference with differential fuzzing:** If a
   coverage fuzzer crash also manifests as a differential
   fuzzing divergence, link the issues.
+* **Run the crash reproducer during verification (#529):** the
+  workflow reads `.reproducer` into the prompt and into the pull
+  request body but never executes it, so verification is the build
+  and core tests only. Needs the crash input available past the
+  fuzz run's 90-day artifact expiry, and a make target that replays
+  a single input.
+* **Give the model enough turns to emit its own summary (#534):**
+  every autofix run so far -- at 30 turns, then 40 -- has exhausted
+  its turn budget before reaching the
+  `COMMIT_SUMMARY_START`/`END` block `tools/autofix-prompt-base.txt`
+  asks for at the end of the work, so every PR opened so far,
+  including #533, has used the fallback title and commit body
+  instead of Claude's own summary.
 
 ## Back brief
 

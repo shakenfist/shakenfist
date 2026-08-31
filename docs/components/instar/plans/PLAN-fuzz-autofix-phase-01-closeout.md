@@ -319,6 +319,97 @@ Steps 1–6 are one pull request. Step 7 runs only once that PR is on
 | 7 | high | — | — | **Management session, after the PR above merges.** Dispatch `gh workflow run fuzz-autofix.yml -f issue_number=485` and watch it. Confirm each of: `Find eligible issue` reports found=true; `Run Claude Code (attempt 1)` writes a parseable `claude-result-1.json`; the stager stages tracked edits and the complexity gate sees a non-empty index; the run reaches `Commit, push, and create PR`; the pushed commit's `Co-Authored-By` names the model, not `Opus 4.6`. Then triage: if a PR opened, review it as a normal change against #483's diagnosis and either land it or close it with a reason. If the run fails, the failure mode is the finding — classify it, and say whether it is the staging bug returning (it should not be), the model failing on a genuinely hard bug (expected and acceptable), or a new defect in the JSON capture (a regression from steps 3–5). Commit subject: none; the outcome is recorded in step 8. |
 | 8 | medium | sonnet | none | Close out. Record the step 7 outcome in this phase plan under a *Result* heading and in the master plan, set the master plan's Execution row and the `docs/plans/index.md` row to `Complete` if the run reached a PR — and to a stated status with a reason if it did not. Update the master plan's Success criteria section to mark the end-to-end criterion met, and move anything still outstanding into its Future work section rather than leaving the plan In progress for it. Commit subject: `Close out the fuzz autofix plan.` |
 
+## Result
+
+Step 7 needed two dispatches, because the first exposed a workflow
+defect the plan had not anticipated.
+
+The first dispatch, run 33219527764 on 2026-08-28, `-f
+issue_number=485`, was the first run of this workflow ever to get past
+`Find eligible issue`. Both attempts failed verification identically,
+on `make test-container-core`: `Error: Test data not found at
+.../instar/../instar-testdata`. The workflow had never checked out
+`instar-testdata`, so that make target could never pass and no run
+could ever have reached `Commit, push, and create PR`. This is a
+fourth failure mode; the plan explicitly listed three at step 7 --
+the staging bug returning, the model failing on a hard bug, and a
+JSON capture regression -- and it was none of them. Not the staging
+bug: `stager-rc-1.txt` and `stager-rc-2.txt` were both `0`, the diff
+staged cleanly, and the stager correctly ignored 22
+`prototypes/*/target/` build artifacts. Not a capture regression: the
+capture worked, as done-criterion 5 confirms below. And not the
+model: both attempts produced a plausible single-file root-cause fix
+with regression tests. It was fixed in PR #530 (merged 2026-08-30 as
+`931b5a9`), which added the `Prepare instar-testdata` and `Resparsify
+test images` steps that every other test-running workflow already
+had, placed before `Construct prompt` so Claude has the fixtures
+during its own attempt too.
+
+Done-criterion 5 was confirmed on this live run, not only on step 2's
+fixtures. Both attempts of the first dispatch hit `max_turns` at 31
+turns of 30, and `claude-output-1.txt` carried the reconstructed
+assistant text *plus* the diagnostic block naming `terminal_reason:
+max_turns`, `subtype: error_max_turns` and `num_turns: 31` -- exactly
+the turn-exhaustion case the step 1 contract measurement caught, and
+the case plain `--output-format json` would have written an empty
+file for. Steps 2-5 are validated by a real unattended run.
+
+The second dispatch, run 33297854229 on 2026-08-30, `-f
+issue_number=485 -f max_turns=40`, ran after PR #530 merged, and is
+the proof. Attempt 1 passed verification; `Prepare retry` was
+skipped; `Commit, push, and create PR` completed; `Report failure`
+was skipped. It opened **PR #533** from branch `autofix/issue-485`,
+commit `2d40cb0`.
+
+The decisive check was the trailer on that pushed commit, which
+reads `Co-Authored-By: Claude claude-opus-5 (1M context)
+<noreply@anthropic.com>`. That is Decision 2's canonical-id form, not
+the old hardcoded `Claude Opus 4.6 (1M context)`, and it could only
+have been produced by the merged helper -- so it also proves
+Decision 8's ordering constraint held.
+
+The fix in PR #533 is itself good, and was reviewed. It bounds the
+untrusted `backing_file_offset` and `backing_file_size` in
+`src/crates/rebase/src/qcow2.rs`, using version-aware header bounds
+from the real `QCOW2_HEADER_LENGTH_V3` and
+`V2_HEADER_EXTENSION_OFFSET` constants, handles u64 overflow, adds a
+short-overlay check returning `OverlayCorrupt`, adds four regression
+tests, and updates `CHANGELOG.md` and `docs/rebase.md`. The bound is
+sound because `path_len <= backing_file_size` is enforced before
+`slot_end = offset + backing_file_size <= overlay_file_size` is
+checked. Landing it remains a separate decision, per Decision 7,
+which keeps that judgement apart from whether the machinery worked.
+
+One operational note for whoever picks #533 up. Its CI had not run at
+the time of writing, and the reason is not that the workflow failed to
+trigger: all five workflow runs exist against the branch on a
+`pull_request` event and every one is `action_required`, which is
+GitHub waiting for a maintainer to approve workflow runs on a pull
+request authored by `app/github-actions`. The pull request reports
+`mergeStateStatus: BLOCKED` until someone does. That is a repository
+setting rather than a defect, but it does bound what this loop can
+ever do unattended: the master plan's success criterion says "issue to
+merged PR", and the merge half necessarily waits for a human here.
+
+Two defects were found along the way and deferred, both filed as
+issues rather than fixed in this phase. #529 records that the
+workflow never runs the crash reproducer, which the master plan's
+step 5 lists as verification check 3 -- not a missing line, but a
+structural gap: the crash input is not in the issue body, only in the
+`coverage-fuzz-logs` artifact of the run named by `.ci_run`, those
+artifacts expire after 90 days, and there is no make target that
+replays a single input. The master plan's step 5 and its step 7 pull
+request body template were corrected to match the implementation, in
+the same PR #530. #534 records that every attempt so far has
+exhausted its turn budget -- 31/30, 31/30, then 41/40 -- and because
+`tools/autofix-prompt-base.txt` asks for the
+`COMMIT_SUMMARY_START`/`END` block at the end of the work, a
+turn-exhausted attempt never emits it. `summary_found` was false for
+PR #533, so its commit body is the fallback "Automated fix for
+security-audit issue." and its title the fallback "Fix fuzzer crash:
+${ISSUE_TITLE}". Raising the budget from 30 to 40 did not help; the
+model did more work and still ran out.
+
 ## Risks and mitigations
 
 | Risk | Mitigation |
@@ -334,38 +425,44 @@ Steps 1–6 are one pull request. Step 7 runs only once that PR is on
 Falsifiable, in order:
 
 1. `grep -rn 'Co-Authored-By: Claude Opus' .github/ tools/` returns
-   nothing.
+   nothing. **Met**, by the steps 1-6 pull request.
 2. `tools/ci/test-claude-result.sh` exits 0, and
    `grep -c 'test-claude-result.sh' .github/workflows/functional-tests.yml`
-   is at least 1.
+   is at least 1. **Met**, by the same pull request.
 3. `grep -c 'output-format text' .github/workflows/fuzz-autofix.yml
    .github/workflows/test-drift-fix.yml` is 0 for both, and both pass
    `--output-format stream-json --verbose`. This read
    `tools/address-comments-with-claude.sh` as a third site; it was
    converted in `757b0bd` and the file has since been deleted with the
-   retired comment addresser.
+   retired comment addresser. **Met**.
 4. `tools/ci/claude-result.sh --trailer` on a fixture result line
    whose `modelUsage` value has `canonicalModel` `claude-opus-5` and
    `contextWindow` 1000000 prints exactly
    `Co-Authored-By: Claude claude-opus-5 (1M context) <noreply@anthropic.com>`
    as its second line; on an empty file it prints
-   `Co-Authored-By: Claude <noreply@anthropic.com>`.
+   `Co-Authored-By: Claude <noreply@anthropic.com>`. **Met**.
 5. `tools/ci/claude-result.sh --text` on a turn-exhausted fixture — a
    stream with assistant text and a result line carrying
    `"subtype":"error_max_turns"` and no `.result` — prints the
    assistant text *and* a block naming `max_turns`. This is the
    regression the contract measurement caught; it is checked
    separately because it is the case the original plan got wrong.
+   **Met** on the fixture, and confirmed again on a live run in step
+   7 -- see the *Result* section above.
 6. `pre-commit run --all-files` passes, including actionlint over the
-   two workflows and shellcheck over the two new scripts.
+   two workflows and shellcheck over the two new scripts. **Met**.
 7. A `fuzz-autofix.yml` run exists whose `Commit, push, and create PR`
    step completed, and whose pushed commit's `Co-Authored-By` line
-   names a model from the current roster.
+   names a model from the current roster. **Met**: run 33297854229 on
+   2026-08-30 opened PR #533 with `Co-Authored-By: Claude
+   claude-opus-5 (1M context) <noreply@anthropic.com>`.
 8. No fact about the trailer is stated differently in
    `docs/development.md`, `docs/testing.md`, and
-   `PLAN-fuzz-autofix.md`.
+   `PLAN-fuzz-autofix.md`. **Met**, by the corrections made in PR #520
+   and PR #530.
 9. The master plan contains no claim that the workflow cannot
    introspect its model, and no description of PR #511 as pending.
+   **Met**, by the same corrections.
 
 ## Back brief
 

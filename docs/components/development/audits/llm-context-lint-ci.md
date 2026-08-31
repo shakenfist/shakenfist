@@ -25,6 +25,20 @@ repository non-compliant for a wiring that does run it. The pre-commit
 half is still checked independently, so a workflow running pre-commit
 against a config with no skillsaw hook does not pass.
 
+A workflow that installs skillsaw from PyPI and then invokes the
+`skillsaw` command satisfies the second half as well, without naming
+the upstream repository anywhere. Where the command sits is not
+pinned: on its own line inside a `run: |` block, inline in a
+single-command `run:` step, after a shell operator, or reached through
+`uvx`, `uv run`, `python -m`, or a path into a virtualenv.
+
+What does not count is naming the package without running it. An
+install line -- `pip install skillsaw==0.18.0`, including the wrapped
+form that leaves the pin on a line of its own -- a job or key called
+`skillsaw:`, and a `skillsaw --version` probe asserting the install
+worked are all mentions rather than runs. Installing a linter is not
+running it, and neither is asking it what version it is.
+
 As with the secret scanner check, *how* skillsaw is invoked is
 deliberately not pinned: naming it in a pre-commit config and in a
 workflow is the step change, and requiring a particular rev or argument

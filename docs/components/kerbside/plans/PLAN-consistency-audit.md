@@ -234,11 +234,12 @@ to forcing it.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Shared blocks, vendor stamp and settings closeout | [PLAN-consistency-audit-phase-01-blocks-and-stamp.md](/components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/) | In progress | |
-| 2. Retire the comment addresser | [PLAN-consistency-audit-phase-02-retire-addresser.md](/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/) | In progress | |
-| 3. Skillsaw CI detection, upstream | PLAN-consistency-audit-phase-03-skillsaw-detection.md | Not started | |
+| 1. Shared blocks, vendor stamp and settings closeout | [PLAN-consistency-audit-phase-01-blocks-and-stamp.md](/components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/) | Complete | cbca9b1 |
+| 2. Retire the comment addresser | [PLAN-consistency-audit-phase-02-retire-addresser.md](/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/) | Complete | 5f3c80c |
+| 3. Skillsaw CI detection, upstream | [PLAN-consistency-audit-phase-03-skillsaw-detection.md](/components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/) | In progress | |
 | 4. Review coverage backlog | PLAN-consistency-audit-phase-04-review-coverage.md | Not started | |
-| 5. Push audit | PLAN-consistency-audit-phase-05-push-audit.md | Not started | |
+| 5. Diagram discipline and mermaid linting | PLAN-consistency-audit-phase-05-diagram-discipline.md | Not started | |
+| 6. Push audit | PLAN-consistency-audit-phase-06-push-audit.md | Not started | |
 
 Phase sketches (to be expanded into per-phase plans):
 
@@ -299,7 +300,22 @@ that has never been read end to end. Every mark is a signed
 commit; the signing configuration in `AGENTS.md` is a
 prerequisite the phase must check before starting.
 
-**Phase 5 -- push audit.** Work through `PUSH-AUDIT.md` over
+**Phase 5 -- diagram discipline and mermaid linting.**
+Resolves #370 and #381, both of which arrived on 2026-08-29
+while phase 2 was in flight, when `shakenfist/development`
+added a `diagram-discipline` shared block and an accompanying
+`mermaid-lint-ci` audit. Copy the `diagram-discipline` block
+verbatim into `PUSH-AUDIT.md`, and copy
+`templates/mermaid-lint/` to give the repository a
+`tools/mermaid-lint.sh` and a workflow that runs it. Note that
+#370's issue body is stale: it still lists the three shared
+blocks phase 1 added, all of which are present on develop, and
+the audit does not refresh an open issue's body. Its only live
+finding is the missing `diagram-discipline` block. These two
+issues are one upstream change and are deliberately kept in one
+phase rather than split to clear a failure count sooner.
+
+**Phase 6 -- push audit.** Work through `PUSH-AUDIT.md` over
 the accumulated diff of phases 1, 2 and 4 against `develop`
 -- phase 3 lands in another repository and is audited there,
 as part of the pull request that lands it. Name the commit
