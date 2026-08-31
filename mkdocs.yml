@@ -117,6 +117,7 @@ nav:
                 - "Audit: GitHub security settings and CodeQL": components/development/audits/github-security.md
                 - "Audit: HTTP header and file path sanitization": components/development/audits/security-sanitization.md
                 - "Audit: Human review coverage": components/development/audits/review-coverage.md
+                - "Audit: Human review scope completeness": components/development/audits/review-scope-completeness.md
                 - "Audit: Links out of docs/ are absolute": components/development/audits/docs-external-links.md
                 - "Audit: LLM context linting": components/development/audits/llm-context-lint.md
                 - "Audit: LLM context linting in pre-commit and CI": components/development/audits/llm-context-lint-ci.md
