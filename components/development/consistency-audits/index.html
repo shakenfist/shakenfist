@@ -1919,6 +1919,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/review-scope-completeness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Human review scope completeness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/docs-external-links/" class="md-nav__link">
         
   
@@ -13639,11 +13667,11 @@ ones.</p>
 <ol>
 <li><strong><code>scripts/audit-check.py</code></strong> -- add a <code>check_*()</code> function returning
    a dict with <code>id</code>, <code>status</code> (<code>pass</code> / <code>fail</code> / <code>not_applicable</code>) and
-   <code>details</code>. Register it in <code>check_calls()</code> and <code>CHECK_NAMES</code>. The id
-   written in <code>check_calls()</code> must be the id the function returns, and
-   a test asserts it: the calls are deferred so that a scoped
-   repository can skip a check without running it, which means the
-   table is what schedules the check, not the function.</li>
+   <code>details</code>. Register it in <code>check_calls()</code>. The id written in
+   <code>check_calls()</code> must be the id the function returns, and a test
+   asserts it: the calls are deferred so that a scoped repository can
+   skip a check without running it, which means the table is what
+   schedules the check, not the function.</li>
 <li><strong><code>scripts/audit_common.py</code></strong> -- add the id to <code>AUDIT_METADATA</code>
    (spec file, optional template) and <code>ISSUE_TITLES</code>. Both
    <code>audit-manage-issues.py</code> and <code>audit-update-docs.py</code> read this

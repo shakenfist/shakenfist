@@ -1986,6 +1986,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/review-scope-completeness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Human review scope completeness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/docs-external-links/" class="md-nav__link">
         
   
@@ -13695,10 +13723,28 @@ elevated permissions. Security is enforced through multiple layers:</p>
    not the PR, preventing execution of malicious PR code</li>
 <li><strong>No credential persistence</strong> -- <code>persist-credentials: false</code>
    prevents tokens from being stored in the checkout</li>
-<li><strong>Git hooks disabled</strong> -- <code>core.hooksPath=/dev/null</code> prevents
-   malicious git hooks from the PR</li>
+<li><strong>Git hooks disabled</strong> -- the workflows that put a pull request's
+   code on the runner (<code>pr-re-review.yml</code>, and <code>test-drift-fix.yml</code>
+   behind <code>pr-fix-tests.yml</code>) set <code>core.hooksPath=/dev/null</code> on the
+   checkout before running anything over it. <code>pr-retest.yml</code> never
+   checks out pull request code at all. The setting is repository
+   local rather than <code>--global</code>, so it cannot affect any other
+   repository's jobs on the same runner -- these jobs run on the
+   shared, long-lived <code>claude-code</code> pool, not on a throwaway VM.
+   This is a rollout in progress: the setting is in the templates and
+   in this repository, but the repositories that copied
+   <code>pr-re-review.yml</code> before it existed do not have it, and
+   <code>check_ci_review_automation</code> does not yet look for it, so the
+   daily audit will not tell you which ones</li>
 <li><strong>No pre-commit</strong> -- pre-commit hooks execute repository code and
-   are skipped in privileged workflows</li>
+   are skipped in privileged workflows. <code>test-drift-fix.yml</code> is the
+   deliberate exception: fixing test drift means running the pull
+   request's own tests, and its prompt asks Claude to run <code>pre-commit
+   run --all-files</code> too, so the pull request's hooks do execute in a
+   privileged job. <code>core.hooksPath</code> does not cover that -- it stops
+   git-invoked hooks, not an explicit <code>pre-commit run</code>. That workflow
+   rests instead on maintainer-only triggering and runner isolation,
+   as its own file header states</li>
 <li><strong>Just-in-time auth</strong> -- <code>gh auth setup-git</code> is used only when
    pushing, not during the entire workflow</li>
 </ol>

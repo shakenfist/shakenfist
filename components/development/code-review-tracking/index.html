@@ -1936,6 +1936,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/review-scope-completeness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Human review scope completeness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/docs-external-links/" class="md-nav__link">
         
   
@@ -13552,18 +13580,18 @@ The full design rationale is in
 <code>docs/plans/PLAN-code-review-tracking.md</code>.</p>
 <p>The automation lives in this repository:
 <code>scripts/review-tracking.py</code> (subcommands <code>stamp</code>, <code>prune</code>, <code>regen</code>,
-<code>next</code>, and <code>status</code>), with tests in
+<code>next</code>, <code>status</code>, and <code>scope-orphans</code>), with tests in
 <code>scripts/test_review_tracking.py</code>. In a developer's clone it is run
 by hand -- deliberately not from git hooks. An earlier iteration
 wired <code>stamp</code> and <code>prune</code> into the pre-commit, post-merge,
 post-checkout, and post-rewrite hooks, but review state silently
 changing in the middle of unrelated git operations proved more
 confusing than helpful. That objection does not apply to CI running
-against a repository's own main branch, so in steady state two
+against a repository's own main branch, so in steady state three
 subcommands also run automatically: <code>prune</code> from an adopting repo's
-<code>prune-reviews</code> workflow on every push to main, and <code>status</code> from
-the consistency audit's <code>review-coverage</code> check (see "Steady state"
-below). Target repositories carry a thin wrapper (for example
+<code>prune-reviews</code> workflow on every push to main, and <code>status</code> and
+<code>scope-orphans</code> from the consistency audit's <code>review-coverage</code> and
+<code>review-scope-completeness</code> checks (see "Steady state" below). Target repositories carry a thin wrapper (for example
 ryll's <code>tools/review-tracking.sh</code>) that locates a local clone of
 this repository and passes through to the script.</p>
 <h2 id="the-pieces">The pieces<a class="headerlink" href="#the-pieces" title="Permanent link">&para;</a></h2>
@@ -13707,6 +13735,16 @@ this repository and passes through to the script.</p>
    keep generated code (<code>*_pb2.py</code> and friends), vendored trees
    (<code>vendor/*</code>, minified third-party JavaScript), and ephemeral
    archives out of the queue.</p>
+<p>Whichever you choose, every tracked file has to end up either in
+   scope or named by an <code>exclude</code> entry: the
+   <code>review-scope-completeness</code> audit fails on a file that is out of
+   scope only because <code>include</code> does not name it. Enumerating
+   extensions and leaving <code>include</code> empty are both compliant, and
+   they differ in which way a new file type fails. With an empty
+   <code>include</code> it silently joins the review queue and somebody excludes
+   it if that was wrong; with a list it fails the audit and somebody
+   decides. Run <code>review-tracking.py scope-orphans</code> after writing the
+   config to see which files it leaves out.</p>
 <p>Prefix an <code>exclude</code> entry with <code>!</code> to re-include something the
    pattern above it takes away:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
@@ -14029,9 +14067,31 @@ session work queue -- and closes it once a session brings the
 backlog back under the threshold. Expect the issue to open and
 close routinely: a single feature PR can touch five in-scope
 files, and the issue is a standing nudge rather than an alarm.</p>
-<p><code>status</code> is also useful interactively: run
+<p><strong>Scope alerting.</strong> The same audit runs a
+<code>review-scope-completeness</code> check
+(<code>docs/audits/review-scope-completeness.md</code>), which measures the
+scope config rather than the backlog. It fails when a tracked file
+is out of scope only because no <code>include</code> pattern names it, as
+opposed to because an <code>exclude</code> entry says it should not be
+reviewed. The two checks fail in opposite directions and the gap
+between them matters: narrowing <code>include</code> is the cheapest way to
+make a <code>review-coverage</code> issue close, and without this check
+nothing notices a repository that reaches full coverage by
+shrinking what counts. It runs <code>review-tracking.py scope-orphans</code>,
+and the issue it files lists the unnamed files.</p>
+<p>The case it was written for was not adversarial.
+<code>templates/renovate/renovate.json</code> in this repository is a template
+copied across the fleet -- by this repository's own scope config the
+most consequential kind of file in it -- and it sat outside review
+for as long as the <code>include</code> list had no JSON pattern, because JSON
+had simply never come up. No issue could have been filed about it:
+from <code>review-coverage</code>'s perspective the repository was fully
+measured.</p>
+<p><code>status</code> and <code>scope-orphans</code> are also useful interactively: run
 <code>./tools/review-tracking.sh status</code> in any clone to see effective
-coverage at that clone's HEAD without touching any state.</p>
+coverage at that clone's HEAD, or
+<code>./tools/review-tracking.sh scope-orphans</code> to see what the scope
+config is silently leaving out. Neither touches any state.</p>
 
 
 

@@ -1795,6 +1795,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../audits/review-scope-completeness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Human review scope completeness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../audits/docs-external-links/" class="md-nav__link">
         
   
@@ -13738,8 +13766,8 @@ bug tracker".</p>
 <p><code>check_plan_template</code> mirrors <code>check_push_audit</code>: repositories with
 no <code>PLAN-TEMPLATE.md</code> are <code>not_applicable</code>; those that have one must
 carry all nine blocks, current and verbatim. Registered in
-<code>CHECK_NAMES</code>, in the check list, and in <code>audit_common.py</code>
-(<code>AUDIT_METADATA</code> and its names table).</p>
+<code>check_calls()</code> and in <code>audit_common.py</code> (<code>AUDIT_METADATA</code> and
+<code>ISSUE_TITLES</code>).</p>
 <p>Whether every repository should have a plan template is deliberately
 left as a separate decision. Eight of the sixteen audited
 repositories have none, and a template's project-specific half has
