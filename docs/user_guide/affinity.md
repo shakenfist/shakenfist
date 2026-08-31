@@ -59,11 +59,16 @@ means you'd be very unhappy to be on the same hypervisor.
     for a hypervisor to be ruled out rather than merely disfavoured.
 
     Only tags from within your namespace are considered, for both forms.
-    The decision is only made on the original start up of an instance, and
-    does not apply later. That is, if you change the tags or affinity of
-    an instance after instance creation it will not affect that instance
-    in any way, although it might affect scheduling decisions for future
-    instances.
+
+    The specification is re-read **every time the instance is scheduled**,
+    which includes every restart and reschedule and not only the original
+    create. So a specification you change later applies from the next
+    restart onwards, and a hard constraint no hypervisor can satisfy by
+    then will refuse that restart -- after trying every hypervisor in the
+    cluster, not only the one it was on. If you have an instance which
+    must always be able to start, prefer `prefer_*` over `require_*`: a
+    ranking with nothing to rank is harmless, and a constraint with
+    nothing to satisfy it is not.
 
 You can of course have more than one tag and affinity preference set at a time.
 So to extend our example, let's say that web servers do not prefer sharing with
@@ -140,6 +145,23 @@ than as a ranking. If no hypervisor satisfies them, the create fails with a
 **409 Conflict** naming the constraint -- where the weighted form would have
 silently placed the instance anywhere. The soft pair behaves exactly as
 weights did: it ranks the hypervisors that survived the hard filters.
+
+???+ warning "Hard constraints are re-checked on every restart"
+
+    A `require_*` constraint is not a create-time decision. The scheduler
+    runs the same filter whenever the instance is scheduled, restarts and
+    reschedules included, so an instance placed under
+    `require_with_tag: ["database"]` can be refused later if the tagged
+    neighbour it was placed beside has since been deleted. The refusal
+    happens only after every hypervisor in the cluster has been tried, and
+    the error names the constraint rather than reporting a full cluster.
+
+    This is deliberate: a constraint which applied once and then stopped
+    would be a create-time hint with a misleading name, and
+    `require_without_tag` in particular is not something an instance stops
+    needing on its second boot. But it does mean `require_*` trades some
+    of an instance's ability to restart for the guarantee, where
+    `prefer_*` does not.
 
 Two things about that table are easy to read past, and both are covered in
 detail below. The soft forms are terms in a **sum** and not soft vetoes, so

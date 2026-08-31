@@ -239,6 +239,16 @@ reporting either one is a real signal: the cluster is smaller than it
 should be, or the scheduler is ejecting nodes it should not. Treat it
 as a failure to investigate rather than a pass.
 
+This expectation is **documentation, not enforcement**, and that is a
+deliberate trade rather than an oversight. A skip is green, so nothing
+in CI fails if `slim-primary` starts skipping too -- the "does not skip
+on a healthy three-node run" check was made once by hand. The obvious
+automation, failing rather than skipping when `get_nodes()` returns
+three or more, would fail every `slim-tier` run, and `slim-tier` is
+expected to skip until `PLAN-ci-cloud-sizing` lands. Once it does, and
+neither topology is expected to skip, that guard becomes worth adding:
+fail rather than skip on any cluster with three or more hypervisors.
+
 `test_binary_affinity_prefers_the_tagged_node` shares both skips and
 reads the same way, since it asserts the binary model's soft half
 through the same helper.

@@ -1653,6 +1653,43 @@ class WeightedAffinityMappingTestCase(SchedulerTestCase):
         self.assertSetEqual(
             self._all_hypervisor_uuids(), set(extra['candidates']))
 
+    def test_a_binary_spec_does_not_reach_the_weighted_coercion(self):
+        # The scorer coerces weighted values with int(). This phase
+        # teaches the same metadata key to hold lists, so a binary
+        # specification reaching that coercion is a TypeError raised
+        # inside find_candidates() -- which the create path does not
+        # catch, making it a 500 on instance create: the failure class
+        # the validator fix exists to remove, one layer down.
+        inst = self.mock_mariadb.create_instance(
+            'instance-1',
+            metadata={'affinity': {'prefer_with_tag': ['a'],
+                                   'require_without_tag': ['b']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
+
+    def test_a_stored_spec_the_validator_would_refuse_still_places(self):
+        # Every instance whose affinity metadata was written before the
+        # validator fix landed was never validated at all, so the
+        # scheduler has to survive shapes the API now refuses. Skipping
+        # the value rather than raising is what keeps such an instance
+        # schedulable instead of permanently stuck -- a 500 here would
+        # be on both create and every later reschedule.
+        inst = self.mock_mariadb.create_instance(
+            'instance-1',
+            metadata={'affinity': {'a': ['not-an-int'], 'b': None,
+                                   'c': float('inf'), 'd': 5}})
+
+        with mock.patch('shakenfist.scheduler.add_event_multi') as events:
+            nodes = scheduler.Scheduler().find_candidates(inst)
+
+        self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
+        # 'd' is the only coercible entry, so it is the only one which
+        # survives the mapping -- the rest are dropped, not guessed at.
+        published = [c for c in events.call_args_list
+                     if c[0][2] == 'schedule have highest affinity']
+        self.assertEqual(1, len(published), events.call_args_list)
+
     def test_a_weighted_spec_still_populates_affinity_detail(self):
         # The other edge of the short-circuit, and the one that fails
         # silently. The skip is keyed on the prefer_* lists, which are
