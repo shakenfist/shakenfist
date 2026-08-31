@@ -1437,6 +1437,36 @@ class BinaryAffinityTestCase(SchedulerTestCase):
             exceptions.AffinityConstraintUnsatisfiable,
             scheduler.Scheduler().find_candidates, inst)
 
+    def test_require_without_ignores_the_rescheduling_instance_itself(self):
+        # find_candidates() is not create-only: preflight calls it on
+        # every restart, by which time the instance is placed and is one
+        # of its own node's neighbours. Counting itself would make an
+        # instance carrying an excluded tag refuse the node it is
+        # already running on, and every other node too once it moved.
+        inst = self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['batch'],
+                      'affinity': {'require_without_tag': ['batch']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertIn(self._node_uuid('node3'), nodes)
+
+    def test_require_without_ignores_instances_in_another_namespace(self):
+        # The other direction of the same trust boundary, and the one
+        # which leaks if it is ever crossed: a caller who could trip
+        # require_without_tag on another tenant's instances would learn
+        # their tags by watching which nodes refuse to take theirs.
+        self.mock_mariadb.create_instance(
+            'instance-1', place_on_node='node3',
+            metadata={'tags': ['batch']}, namespace='other')
+
+        inst = self.mock_mariadb.create_instance(
+            'instance-2',
+            metadata={'affinity': {'require_without_tag': ['batch']}})
+
+        nodes = scheduler.Scheduler().find_candidates(inst)
+        self.assertIn(self._node_uuid('node3'), nodes)
+
     def test_prefer_with_tag_ranks_matching_nodes_first(self):
         self.mock_mariadb.create_instance(
             'instance-1', place_on_node='node3',

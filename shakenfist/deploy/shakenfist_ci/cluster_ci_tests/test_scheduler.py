@@ -67,10 +67,19 @@ class TestAffinity(base.BaseNamespacedTestCase):
         flask request at all -- which is what makes it a discriminator
         rather than merely an identifier.
         """
-        inputs = [
-            e for e in events
-            if str(e.get('message', '')) == 'schedule inputs'
-            and not (e.get('extra') or {}).get('forced_candidates')]
+        # Oldest first, because there can be more than one unforced
+        # pass. forced_candidates is bool(candidates) and not "was an
+        # argument supplied", so the preflight redirect -- which builds
+        # its list by excluding the current node -- publishes a second
+        # unforced event whenever that exclusion empties the list, as it
+        # does on a single node cluster. The create path's pass is
+        # always the oldest of them. _scheduler_events() returns the
+        # API's newest-first order, so sort rather than index into it.
+        inputs = sorted(
+            [e for e in events
+             if str(e.get('message', '')) == 'schedule inputs'
+             and not (e.get('extra') or {}).get('forced_candidates')],
+            key=lambda e: e.get('timestamp') or 0)
         affinity = [
             e for e in events
             if str(e.get('message', '')) == 'schedule have highest affinity']

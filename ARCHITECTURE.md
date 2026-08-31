@@ -166,14 +166,18 @@ HTTP push; otherwise it logs to the local systemd journal. See
 
 The scheduler (`shakenfist/scheduler.py`) is in-process in each `sf-api`
 worker; there is no scheduler daemon. It filters candidate hypervisors
-against the `node_metrics` table (hard pre-filters: hypervisor role, queue
-health, CPU/RAM/disk headroom, disk bandwidth, and hard affinity
-constraints), scores soft affinity, then
-ranks by **load per schedulable thread** in coarse buckets with
+against the `node_metrics` table (hard pre-filters: hypervisor role,
+CPU/RAM/disk headroom, and hard affinity constraints), scores soft
+affinity, sheds load (queue health, disk bandwidth), then ranks by
+**load per schedulable thread** in coarse buckets with
 headroom-weighted selection so differently sized machines share work
-proportionally. These pre-filters order and prune the candidate list from
-a metrics snapshot up to a minute stale; they are not themselves the
-admission decision.
+proportionally. Affinity sits between the pre-filters and load
+shedding deliberately: a node that cannot fit the instance is never
+scored, while a busy node is still one the user asked for, so load
+shedding may narrow the winning affinity group but never moves
+placement out of it. These stages order and prune the candidate list
+from a metrics snapshot up to a minute stale; they are not themselves
+the admission decision.
 
 Admission is a separate, atomic step. Once the pipeline has picked a
 candidate, `Instance.place_instance()` makes one guarded capacity claim

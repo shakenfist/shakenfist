@@ -118,6 +118,45 @@ def _hard_affinity_constraints(requested_affinity):
             spec[instance.Instance.AFFINITY_REQUIRE_WITHOUT])
 
 
+def _affinity_neighbour_skip(inst, instance_uuid, i):
+    """Should this co-located instance be ignored when matching tags?
+
+    Returns the audit record describing why it was skipped, or None if
+    it is a neighbour whose tags count. Both the hard require_* filter
+    and the soft scoring loop call this rather than restating the four
+    conditions, because a filter and a scorer which disagreed about
+    what counts as a neighbour would place an instance somewhere its
+    own audit trail says it should not be (coding_rules.md, "Never
+    restate a visibility predicate").
+
+    The namespace skip is the trust boundary: crossing it would let a
+    caller learn what another tenant is running by watching where
+    their own instances refuse to land.
+    """
+    if not i:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'instance row not found',
+        }
+    if i.uuid == inst.uuid:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'self',
+        }
+    if not i.tags:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'no tags',
+        }
+    if i.namespace != inst.namespace:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'different namespace',
+            'namespace': i.namespace,
+        }
+    return None
+
+
 def _hard_affinity_description(require_with, require_without):
     """Human readable text naming the constraints, for the 409 body."""
     parts = []
@@ -217,26 +256,26 @@ class Scheduler:
         """Does this node satisfy the instance's hard affinity constraints?
 
         Constraints match the tags of *instances already placed on the
-        node*, within the requesting namespace only, exactly as the
-        scorer does. Shaken Fist has no node capability tags, so there
-        is nothing else they could match. The namespace scope is
-        inherited rather than chosen: crossing it would let a caller
-        learn what another tenant is running by watching where their
-        own instances refuse to land, which is why require_without_tag
-        is a within-namespace constraint and not an isolation
-        primitive.
+        node*, exactly as the scorer does -- which here means calling
+        the same _affinity_neighbour_skip() rather than restating its
+        four conditions, so a filter and a scorer cannot disagree about
+        what counts as a neighbour. Shaken Fist has no node capability
+        tags, so there is nothing else they could match. The namespace
+        scope is inherited rather than chosen: crossing it would let a
+        caller learn what another tenant is running by watching where
+        their own instances refuse to land, which is why
+        require_without_tag is a within-namespace constraint and not an
+        isolation primitive.
         """
         node_instances = self._placed_instances(node, memo)
         if node_instances is None:
             return False, {'reason': 'node row not found'}
 
         present = set()
-        for _, i in node_instances:
-            if i is None or i.uuid == inst.uuid:
+        for instance_uuid, i in node_instances:
+            if _affinity_neighbour_skip(inst, instance_uuid, i):
                 continue
-            if i.namespace != inst.namespace:
-                continue
-            for tag in (i.tags or []):
+            for tag in i.tags:
                 present.add(tag)
 
         missing = [t for t in require_with if t not in present]
@@ -705,30 +744,9 @@ class Scheduler:
                     continue
 
                 for instance_uuid, i in node_instances:
-                    if not i:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'instance row not found',
-                        })
-                        continue
-                    if i.uuid == inst.uuid:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'self',
-                        })
-                        continue
-                    if not i.tags:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'no tags',
-                        })
-                        continue
-                    if i.namespace != inst.namespace:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'different namespace',
-                            'namespace': i.namespace,
-                        })
+                    skipped = _affinity_neighbour_skip(inst, instance_uuid, i)
+                    if skipped:
+                        considered.append(skipped)
                         continue
 
                     # Count proportional, not set membership: a node
