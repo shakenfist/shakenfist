@@ -603,7 +603,22 @@ class SideChannelExecutorJob(SideChannelJob):
         self.affected_objects = [self.instance, self.agentop]
         self.thread_name = f'{self.instance.uuid}-{self.agentop.uuid}'
 
-        self.commands = agentop.commands
+        # The executor's own working copy, deliberately not the
+        # operation's list. AgentOperation.commands returns the
+        # underlying list by reference, and that list is the one the
+        # process wide object cache holds: get_agent_operation() caches
+        # the AgentOperationData model, and frozen=True on that model
+        # stops attribute assignment rather than mutation of a list
+        # field's contents. Popping through an alias of it therefore
+        # drained the operation itself, and two things broke.
+        # operation_is_retryable() opens by refusing an empty command
+        # list, so a single command get-file -- the case issue #3516 is
+        # about -- called itself unretryable the moment its only
+        # command went out, inverting the decision this exists to make.
+        # And every later reader on the node saw the drained list for
+        # as long as the cache entry lived, the reaper's own
+        # AgentOperation.from_db() included.
+        self.commands = list(agentop.commands)
         self.command_count = 0
         self.num_results = 0
         self.command_cache = {}

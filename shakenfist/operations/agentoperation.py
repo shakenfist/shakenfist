@@ -132,7 +132,13 @@ class AgentOperation(BaseOperation):
                 'uuid': str(data.uuid),
                 'namespace': data.namespace,
                 'instance_uuid': str(data.instance_uuid),
-                'commands': data.commands,
+                # Copied rather than referenced: data is the shared
+                # model the object cache holds, and its frozen=True
+                # prevents attribute assignment, not mutation of a list
+                # field's contents. Handing the same list to every
+                # AgentOperation built from a cache hit would make one
+                # object's mutation everybody's.
+                'commands': list(data.commands),
                 'deadline': data.deadline,
                 'progress_timeout': data.progress_timeout,
                 'version': data.version
@@ -218,6 +224,15 @@ class AgentOperation(BaseOperation):
 
     @property
     def commands(self):
+        # Returned by reference, like every other static value property
+        # in the tree. Static values are immutable after construction,
+        # so the contract for a caller which needs to consume this list
+        # is to take its own copy -- see SideChannelExecutorJob's, and
+        # "A frozen model is not a deep frozen model" in
+        # docs/developer_guide/coding_rules.md. _db_get() copies at the
+        # cache boundary so a caller who breaks that rule corrupts only
+        # its own object rather than every reader in the process, but
+        # the boundary is containment, not permission.
         return self.__commands
 
     @property

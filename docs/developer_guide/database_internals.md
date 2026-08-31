@@ -95,12 +95,17 @@ it serves both compute nodes (avoiding a gRPC round trip) and the `sf-database`
 daemon's own worker threads (avoiding a SQL query); it is a single
 process-global dict keyed `(object_type, uuid)` under a lock.
 
-Correctness rests on three rules: only present rows are cached (never a miss,
+Correctness rests on four rules: only present rows are cached (never a miss,
 so a create-after-lookup or delete-then-lookup is never masked); every public
 `update_<type>`/`delete_<type>` evicts, and because the lazy online-upgrade
 persist routes through the public `update_<type>`, the cache self-heals after
-an upgrade; and every entry is TTL-bounded, which is the only bound on
-staleness from a write made by another process. Two tiers set the TTL —
+an upgrade; every entry is TTL-bounded, which is the only bound on
+staleness from a write made by another process; and a `_db_get()` copies any
+list or dict field it hands out, because `frozen=True` on the cached model
+stops attribute *assignment* rather than mutation of a container field's
+*contents*, so one reader mutating an uncopied list would be mutating every
+reader's — see "A frozen model is not a deep frozen model" in
+[coding_rules.md](coding_rules.md). Two tiers set the TTL —
 `OBJECT_CACHE_TTL_IMMUTABLE` (default 300 s) for types whose static row
 changes only on create, delete, or a version-upgrade persist (instance,
 network, networkinterface, agentoperation, ipam) and

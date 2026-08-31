@@ -478,6 +478,55 @@ against a mocked engine cannot do that, and neither can a test that
 rewrites the query to suit sqlite -- register the missing SQL functions
 instead, so the statement under test is the statement that ships.
 
+## A frozen model is not a deep frozen model
+
+`mariadb.get_<type>()` returns a Pydantic model with
+`model_config = ConfigDict(frozen=True)`, and that model is the one
+entry the process-wide static object value cache holds for its whole
+TTL. Every reader in the process gets the same object. `frozen=True`
+stops attribute *assignment* on it; it does not stop mutation of the
+*contents* of a list or dict field. So `data.commands.pop(0)` succeeds,
+and it edits what every other reader on the node is about to see.
+
+Two obligations follow, and they are two different obligations:
+
+* **Copy the container you hand out.** A `_db_get()` or
+  `_static_values_to_dict()` copying `list(data.commands)` is the
+  containment boundary. Without it, every object built from one cache
+  hit shares one list, so a mutation anywhere is a mutation everywhere
+  until the entry ages out.
+* **Do not mutate an element of a container you were handed.** The copy
+  above is shallow, which is deliberate -- a deep copy would defend
+  against a mutation no code performs and would cost an allocation per
+  element per read -- so the dicts inside a copied list are still the
+  cache's. Consume a command list by copying it and popping the copy,
+  the way `SideChannelExecutorJob.__init__` does; build the dict you
+  intend to edit locally, the way `add_result()`'s callers do.
+
+`SideChannelExecutorJob` did the popping (issue #3516, PR #3970). It
+aliased `agentop.commands` as its work queue and popped each command as
+it dispatched, which drained the operation and, through it, the cache.
+The visible damage was an inverted decision: `operation_is_retryable()`
+opens by refusing an empty command list, so a single-command `get-file`
+declared itself unretryable the instant its only command went out --
+precisely the operation shape the retry path exists for. The second
+consequence was quieter: `NodeAgentopOp._preflight()` iterates the same
+list looking for `put-blob` commands whose blobs it must make local, and
+against a drained cache entry it would find none and skip the
+preparation with nothing logged.
+
+Note what did *not* catch this. The class is covered by unit tests which
+build the executor and drive a dispatch, but they hand-set
+`job.commands` rather than going through the constructor, so the alias
+was created in a line no test executed. A regression test for this class
+of bug has to build the object the way production does and then assert
+on what a *second* reader sees.
+
+The static-values models with container fields today are
+`AgentOperationData.commands` and `InstanceData`'s `disk_spec`, `video`
+and `side_channels`; all four are copied at their boundary. A new
+container field on a cached model joins that list.
+
 ## A per-item convenience wrapper does not belong in a loop
 
 `instance_usage_for_blob_uuid()` answers "which instances use this
