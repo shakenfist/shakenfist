@@ -358,7 +358,7 @@ table entirely (decision D8).
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Not started |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
-| 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Not started |
+| 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
@@ -424,6 +424,48 @@ is here.
   of its own measurements, which reclassifies the fix from a deferred
   tuning question to a correction; see the phase plan's *What the
   survey found*.
+
+- **Phase 6** was executed out of order, ahead of phases 4c and 5,
+  and completed on 2026-09-01. It merged as #3972 (the validator
+  400s), #3971 (the binary model, the transition mapping and the
+  documentation) and #3957 (this plan file).
+
+  **#3565 closed on a test change, not a scheduler change.** The
+  traced occurrence of 2026-08-26 had the candidate set collapsing
+  to a single node before affinity was scored, so the anti-affinity
+  instance placed on the node it had correctly scored `-100` simply
+  because a scorer given one candidate has nothing to do -- and the
+  half of the assertion that *passed* was the same forced choice.
+  Affinity was never consulted in either direction. The test now
+  asserts that the scheduler *scored* the affine node highest among
+  the candidates it had, and skips when it had none to choose
+  between. A later reader looking for the missing scheduler fix
+  should stop here: there is not one, and D6's three positions are
+  disposed of under F2 and F7 in the phase plan. The filter that
+  did the damage was `sufficient_idle_memory`, not the
+  `sufficient_idle_cpu` the issue title named for a year.
+
+  Two things the phase found and did not fix, both recorded rather
+  than dropped: **#3967** (closed) -- affinity metadata values
+  returned 500 rather than 400 for lists, dicts, `null` and
+  `Infinity` -- was fixed by step 3 on its own branch so a live
+  public-API 500 did not wait on the model work. **#4001** (open)
+  -- the preflight redirect reverting to the whole cluster when its
+  exclusion set comes out empty -- is filed on a reading of the
+  code and explicitly *not* on the trace that prompted the search
+  for it; see the phase plan's Future work for why the trace turned
+  out to show designed behaviour.
+
+  One caveat on its exit: the merge-queue run for #3971 shows
+  `failure` overall, because `Ubuntu 24.04 cluster` failed. All
+  three affinity cluster tests passed on `Debian 12 cluster` and
+  the tier platform passed too, so the affinity evidence is sound,
+  but as with #3930 the gate was bypassed rather than met.
+
+  Its step 7 close-out ran a day after the code merged, and #3565
+  was closed in the interval with no comment on it. The phase plan
+  records both, because a phase whose bookkeeping trails its code
+  by a day is a phase whose status columns lie for a day.
 
 ### Phase scope stubs
 
