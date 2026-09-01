@@ -3804,25 +3804,49 @@ class MockMariaDB():
             f'{"removed" if removed else "not found"}')
         return removed
 
+    @staticmethod
+    def _coalescible_keys_valid(keys):
+        """Mirror ``mariadb._coalescible_preflight``'s key validation.
+
+        An empty key list or a column outside the whitelist means the
+        real code skips the query entirely, so the mock must too.
+        """
+        if not keys:
+            return False
+        for column, value in keys:
+            if column not in {'network_uuid', 'instance_uuid', 'node_uuid'}:
+                return False
+            if value is None or value == '':
+                return False
+        return True
+
+    @staticmethod
+    def _coalescible_row_matches(op_row, keys):
+        """True when a stored op row matches every pair of the key."""
+        for column, value in keys:
+            if str(op_row.get(column) or '') != str(value):
+                return False
+        return True
+
     def _mariadb_find_existing_coalescible_op(
-            self, operation_type, target_column, target_uuid, task_name):
+            self, operation_type, keys, task_name):
         """Mock implementation of mariadb.find_existing_coalescible_op().
 
         Mirrors the SQL guards in
         ``mariadb._direct_find_existing_coalescible_op``: returns
-        the uuid of the oldest single-task pending op on the same
-        target whose task equals ``task_name``, or ``None``. The
-        oldest-first order matches the SQL
-        ``ORDER BY created_at ASC LIMIT 1``.
+        the uuid of the oldest single-task pending op matching every
+        ``(column, uuid)`` pair of ``keys`` whose task equals
+        ``task_name``, or ``None``. The oldest-first order matches the
+        SQL ``ORDER BY created_at ASC LIMIT 1``.
         """
-        if target_column not in {
-                'network_uuid', 'instance_uuid', 'node_uuid'}:
+        if not self._coalescible_keys_valid(keys):
             return None
+        key_description = ','.join(f'{c}={v}' for c, v in keys)
         candidates: list[tuple[float, str]] = []
         for op_uuid, op_row in self.cluster_operations_store.items():
             if op_row.get('operation_type') != operation_type:
                 continue
-            if str(op_row.get(target_column) or '') != str(target_uuid):
+            if not self._coalescible_row_matches(op_row, keys):
                 continue
             # The mock stores metadata fields flat on the row (see
             # ``_mariadb_create_and_enqueue_cluster_operation``),
@@ -3843,40 +3867,39 @@ class MockMariaDB():
         if not candidates:
             self._trace(
                 f'MockMariaDB.find_existing_coalescible_op('
-                f'{operation_type}, {target_column}={target_uuid}, '
+                f'{operation_type}, {key_description}, '
                 f'{task_name}): no match')
             return None
         candidates.sort()
         chosen_uuid = candidates[0][1]
         self._trace(
             f'MockMariaDB.find_existing_coalescible_op('
-            f'{operation_type}, {target_column}={target_uuid}, '
+            f'{operation_type}, {key_description}, '
             f'{task_name}): reusing {chosen_uuid}')
         return chosen_uuid
 
     def _mariadb_claim_coalescible_siblings(
-            self, operation_type, target_column, target_uuid,
-            task_names, exclude_op_uuid):
+            self, operation_type, keys, task_names, exclude_op_uuid):
         """Mock implementation of mariadb.claim_coalescible_siblings().
 
         Mirrors the SQL safety guards in
         ``mariadb._direct_claim_coalescible_siblings``: only single-
         task ops in state ``queued`` matching one of ``task_names``
-        on the same target are folded; the excluded op is never
-        affected. Transitions the matched ops to ``complete`` in
-        ``mariadb_states`` and returns their uuids.
+        and every ``(column, uuid)`` pair of ``keys`` are folded; the
+        excluded op is never affected. Transitions the matched ops to
+        ``complete`` in ``mariadb_states`` and returns their uuids.
         """
-        if not task_names or target_column not in {
-                'network_uuid', 'instance_uuid', 'node_uuid'}:
+        if not task_names or not self._coalescible_keys_valid(keys):
             return []
 
+        key_description = ','.join(f'{c}={v}' for c, v in keys)
         folded: list[str] = []
         for op_uuid, op_row in list(self.cluster_operations_store.items()):
             if op_uuid == exclude_op_uuid:
                 continue
             if op_row.get('operation_type') != operation_type:
                 continue
-            if str(op_row.get(target_column) or '') != str(target_uuid):
+            if not self._coalescible_row_matches(op_row, keys):
                 continue
             # See ``_mariadb_find_existing_coalescible_op`` for the
             # rationale behind the metadata_json-vs-flat fallback.
@@ -3894,7 +3917,7 @@ class MockMariaDB():
             folded.append(op_uuid)
         self._trace(
             f'MockMariaDB.claim_coalescible_siblings('
-            f'{operation_type}, {target_column}={target_uuid}): '
+            f'{operation_type}, {key_description}): '
             f'folded {len(folded)} ops')
         return folded
 

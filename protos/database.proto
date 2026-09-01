@@ -16,6 +16,16 @@ service DatabaseService {
   rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
   rpc ClaimCoalescibleSiblings (ClaimCoalescibleSiblingsRequest) returns (ClaimCoalescibleSiblingsReply) {}
   rpc FindExistingCoalescibleOp (FindExistingCoalescibleOpRequest) returns (FindExistingCoalescibleOpReply) {}
+  // V2 of the two coalescing RPCs, taking a multi-column key. The V1
+  // pair above is retained unmodified for one release so a rolling
+  // upgrade can still serve old clients. A new client never falls back
+  // to V1: an old server would ignore the extra key columns and fold on
+  // the first column alone, which is exactly the cross-node corruption
+  // the new names exist to prevent. See
+  // docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+  // decision 1.
+  rpc ClaimCoalescibleSiblingsV2 (ClaimCoalescibleSiblingsV2Request) returns (ClaimCoalescibleSiblingsReply) {}
+  rpc FindExistingCoalescibleOpV2 (FindExistingCoalescibleOpV2Request) returns (FindExistingCoalescibleOpReply) {}
 
   // Lock Operations
   rpc AcquireLock (ClusterLockRequest) returns (ClusterLockReply) {}
@@ -539,6 +549,35 @@ message FindExistingCoalescibleOpReply {
   // Empty string when no match was found (proto3 has no string
   // null).
   string op_uuid = 1;
+}
+
+message CoalescibleKeyPair {
+  // One (column, uuid) pair of the coalescing key. ``column`` names an
+  // indexed column on the cluster_operations table and is validated
+  // server side against a whitelist; ``uuid`` is the value that column
+  // must equal for an op to be considered a sibling.
+  string column = 1;
+  string uuid = 2;
+}
+
+message ClaimCoalescibleSiblingsV2Request {
+  // As ClaimCoalescibleSiblingsRequest, but the single
+  // target_column/target_uuid pair is replaced by a list of them. Every
+  // pair must match for an op to be folded, so a key of
+  // (network_uuid, node_uuid) can distinguish two hypervisors' work on
+  // the same network where the V1 key could not.
+  string operation_type = 1;
+  repeated CoalescibleKeyPair keys = 2;
+  repeated string task_names = 3;
+  string exclude_op_uuid = 4;
+}
+
+message FindExistingCoalescibleOpV2Request {
+  // As FindExistingCoalescibleOpRequest, but with the multi-column key
+  // described on ClaimCoalescibleSiblingsV2Request.
+  string operation_type = 1;
+  repeated CoalescibleKeyPair keys = 2;
+  string task_name = 3;
 }
 
 // Lock Operations

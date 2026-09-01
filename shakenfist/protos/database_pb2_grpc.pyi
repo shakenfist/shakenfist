@@ -42,6 +42,17 @@ class DatabaseServiceStub:
     DeleteWorkQueueRow: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]
     ClaimCoalescibleSiblings: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]
     FindExistingCoalescibleOp: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]
+    ClaimCoalescibleSiblingsV2: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]
+    """V2 of the two coalescing RPCs, taking a multi-column key. The V1
+    pair above is retained unmodified for one release so a rolling
+    upgrade can still serve old clients. A new client never falls back
+    to V1: an old server would ignore the extra key columns and fold on
+    the first column alone, which is exactly the cross-node corruption
+    the new names exist to prevent. See
+    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+    decision 1.
+    """
+    FindExistingCoalescibleOpV2: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]
     AcquireLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]
     """Lock Operations"""
     ReleaseLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterReleaseLockRequest, _database_pb2.StatusReply]
@@ -448,6 +459,17 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     DeleteWorkQueueRow: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     ClaimCoalescibleSiblings: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
     FindExistingCoalescibleOp: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
+    ClaimCoalescibleSiblingsV2: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
+    """V2 of the two coalescing RPCs, taking a multi-column key. The V1
+    pair above is retained unmodified for one release so a rolling
+    upgrade can still serve old clients. A new client never falls back
+    to V1: an old server would ignore the extra key columns and fold on
+    the first column alone, which is exactly the cross-node corruption
+    the new names exist to prevent. See
+    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+    decision 1.
+    """
+    FindExistingCoalescibleOpV2: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
     AcquireLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]  # type: ignore[assignment]
     """Lock Operations"""
     ReleaseLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterReleaseLockRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
@@ -909,6 +931,29 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     def FindExistingCoalescibleOp(
         self,
         request: _database_pb2.FindExistingCoalescibleOpRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.FindExistingCoalescibleOpReply, _abc.Awaitable[_database_pb2.FindExistingCoalescibleOpReply]]: ...
+
+    @_abc_1.abstractmethod
+    def ClaimCoalescibleSiblingsV2(
+        self,
+        request: _database_pb2.ClaimCoalescibleSiblingsV2Request,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.ClaimCoalescibleSiblingsReply, _abc.Awaitable[_database_pb2.ClaimCoalescibleSiblingsReply]]:
+        """V2 of the two coalescing RPCs, taking a multi-column key. The V1
+        pair above is retained unmodified for one release so a rolling
+        upgrade can still serve old clients. A new client never falls back
+        to V1: an old server would ignore the extra key columns and fold on
+        the first column alone, which is exactly the cross-node corruption
+        the new names exist to prevent. See
+        docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+        decision 1.
+        """
+
+    @_abc_1.abstractmethod
+    def FindExistingCoalescibleOpV2(
+        self,
+        request: _database_pb2.FindExistingCoalescibleOpV2Request,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.FindExistingCoalescibleOpReply, _abc.Awaitable[_database_pb2.FindExistingCoalescibleOpReply]]: ...
 

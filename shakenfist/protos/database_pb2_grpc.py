@@ -5,7 +5,7 @@ import warnings
 
 from shakenfist.protos import database_pb2 as database__pb2
 
-GRPC_GENERATED_VERSION = '1.83.0'
+GRPC_GENERATED_VERSION = '1.83.1'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -82,6 +82,16 @@ class DatabaseServiceStub:
         self.FindExistingCoalescibleOp = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOp',
                 request_serializer=database__pb2.FindExistingCoalescibleOpRequest.SerializeToString,
+                response_deserializer=database__pb2.FindExistingCoalescibleOpReply.FromString,
+                _registered_method=True)
+        self.ClaimCoalescibleSiblingsV2 = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ClaimCoalescibleSiblingsV2',
+                request_serializer=database__pb2.ClaimCoalescibleSiblingsV2Request.SerializeToString,
+                response_deserializer=database__pb2.ClaimCoalescibleSiblingsReply.FromString,
+                _registered_method=True)
+        self.FindExistingCoalescibleOpV2 = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOpV2',
+                request_serializer=database__pb2.FindExistingCoalescibleOpV2Request.SerializeToString,
                 response_deserializer=database__pb2.FindExistingCoalescibleOpReply.FromString,
                 _registered_method=True)
         self.AcquireLock = channel.unary_unary(
@@ -1255,6 +1265,26 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def FindExistingCoalescibleOp(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ClaimCoalescibleSiblingsV2(self, request, context):
+        """V2 of the two coalescing RPCs, taking a multi-column key. The V1
+        pair above is retained unmodified for one release so a rolling
+        upgrade can still serve old clients. A new client never falls back
+        to V1: an old server would ignore the extra key columns and fold on
+        the first column alone, which is exactly the cross-node corruption
+        the new names exist to prevent. See
+        docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+        decision 1.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FindExistingCoalescibleOpV2(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2779,6 +2809,16 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.FindExistingCoalescibleOpRequest.FromString,
                     response_serializer=database__pb2.FindExistingCoalescibleOpReply.SerializeToString,
             ),
+            'ClaimCoalescibleSiblingsV2': grpc.unary_unary_rpc_method_handler(
+                    servicer.ClaimCoalescibleSiblingsV2,
+                    request_deserializer=database__pb2.ClaimCoalescibleSiblingsV2Request.FromString,
+                    response_serializer=database__pb2.ClaimCoalescibleSiblingsReply.SerializeToString,
+            ),
+            'FindExistingCoalescibleOpV2': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindExistingCoalescibleOpV2,
+                    request_deserializer=database__pb2.FindExistingCoalescibleOpV2Request.FromString,
+                    response_serializer=database__pb2.FindExistingCoalescibleOpReply.SerializeToString,
+            ),
             'AcquireLock': grpc.unary_unary_rpc_method_handler(
                     servicer.AcquireLock,
                     request_deserializer=database__pb2.ClusterLockRequest.FromString,
@@ -4159,6 +4199,60 @@ class DatabaseService:
             target,
             '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOp',
             database__pb2.FindExistingCoalescibleOpRequest.SerializeToString,
+            database__pb2.FindExistingCoalescibleOpReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ClaimCoalescibleSiblingsV2(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ClaimCoalescibleSiblingsV2',
+            database__pb2.ClaimCoalescibleSiblingsV2Request.SerializeToString,
+            database__pb2.ClaimCoalescibleSiblingsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FindExistingCoalescibleOpV2(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/FindExistingCoalescibleOpV2',
+            database__pb2.FindExistingCoalescibleOpV2Request.SerializeToString,
             database__pb2.FindExistingCoalescibleOpReply.FromString,
             options,
             channel_credentials,

@@ -573,8 +573,7 @@ class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
                 'shakenfist.mariadb._get_engine') as mock_get_engine:
             result = mariadb._direct_find_existing_coalescible_op(
                 'net_op',
-                'arbitrary_user_supplied_column',
-                'some-uuid',
+                [('arbitrary_user_supplied_column', 'some-uuid')],
                 'some_task')
             self.assertIsNone(result)
             mock_get_engine.assert_not_called()
@@ -587,7 +586,7 @@ class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
                 'shakenfist.mariadb._get_engine') as mock_get_engine:
             self.assertIsNone(
                 mariadb._direct_find_existing_coalescible_op(
-                    'net_op', 'network_uuid', 'not-a-uuid',
+                    'net_op', [('network_uuid', 'not-a-uuid')],
                     'network_apply_update_dnsmasq'))
             mock_get_engine.assert_not_called()
 
@@ -598,8 +597,8 @@ class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         result = mariadb._direct_find_existing_coalescible_op(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             'network_apply_update_dnsmasq')
 
         self.assertIsNone(result)
@@ -615,8 +614,8 @@ class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         result = mariadb._direct_find_existing_coalescible_op(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             'network_apply_update_dnsmasq')
 
         self.assertEqual(
@@ -633,8 +632,8 @@ class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         mariadb._direct_find_existing_coalescible_op(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             'network_apply_update_dnsmasq')
 
         select_stmt = mock_conn.execute.call_args[0][0]
@@ -659,8 +658,8 @@ class FindExistingCoalescibleOpTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         result = mariadb._direct_find_existing_coalescible_op(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             'network_apply_update_dnsmasq')
 
         self.assertIsNone(result)
@@ -689,8 +688,8 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
                 'shakenfist.mariadb._get_engine') as mock_get_engine:
             self.assertEqual(
                 [], mariadb._direct_claim_coalescible_siblings(
-                    'net_op', 'network_uuid',
-                    'some-uuid', [], 'exclude-uuid'))
+                    'net_op', [('network_uuid', 'some-uuid')],
+                    [], 'exclude-uuid'))
             mock_get_engine.assert_not_called()
 
     def test_invalid_target_column_returns_empty_without_query(self):
@@ -698,8 +697,8 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
                 'shakenfist.mariadb._get_engine') as mock_get_engine:
             self.assertEqual(
                 [], mariadb._direct_claim_coalescible_siblings(
-                    'net_op', 'malicious_column',
-                    'some-uuid', ['task'], 'exclude-uuid'))
+                    'net_op', [('malicious_column', 'some-uuid')],
+                    ['task'], 'exclude-uuid'))
             mock_get_engine.assert_not_called()
 
     def test_malformed_uuid_returns_empty_without_query(self):
@@ -710,7 +709,7 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
                 'shakenfist.mariadb._get_engine') as mock_get_engine:
             self.assertEqual(
                 [], mariadb._direct_claim_coalescible_siblings(
-                    'net_op', 'network_uuid', 'not-a-uuid',
+                    'net_op', [('network_uuid', 'not-a-uuid')],
                     ['network_apply_update_dnsmasq'], 'also-not-a-uuid'))
             mock_get_engine.assert_not_called()
 
@@ -721,8 +720,8 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         result = mariadb._direct_claim_coalescible_siblings(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             ['network_apply_update_dnsmasq'],
             '99999999-9999-4999-8999-999999999999')
 
@@ -747,8 +746,8 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         result = mariadb._direct_claim_coalescible_siblings(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             ['network_apply_update_dnsmasq'],
             '99999999-9999-4999-8999-999999999999')
 
@@ -773,8 +772,8 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         mariadb._direct_claim_coalescible_siblings(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             ['network_apply_update_dnsmasq'],
             '99999999-9999-4999-8999-999999999999')
 
@@ -800,8 +799,8 @@ class ClaimCoalescibleSiblingsTestCase(base.ShakenFistTestCase):
         mock_get_engine.return_value = mock_engine
 
         result = mariadb._direct_claim_coalescible_siblings(
-            'net_op', 'network_uuid',
-            '11111111-1111-4111-8111-111111111111',
+            'net_op',
+            [('network_uuid', '11111111-1111-4111-8111-111111111111')],
             ['network_apply_update_dnsmasq'],
             '99999999-9999-4999-8999-999999999999')
 

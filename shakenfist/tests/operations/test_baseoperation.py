@@ -261,8 +261,7 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_claim.assert_called_once()
         kwargs = self.mock_claim.call_args.kwargs
         self.assertEqual(ObjectType.NET_OP, kwargs['operation_type'])
-        self.assertEqual('network_uuid', kwargs['target_column'])
-        self.assertEqual(NETWORK_UUID, kwargs['target_uuid'])
+        self.assertEqual([('network_uuid', NETWORK_UUID)], kwargs['keys'])
         self.assertEqual(
             ['network_apply_update_dnsmasq'], kwargs['task_names'])
         self.assertEqual(OP_UUID, kwargs['exclude_op_uuid'])
@@ -306,15 +305,17 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
 
     def test_fold_target_object_type_comes_from_the_schema(self):
         # Resolved through the schema model's target_fields map rather
-        # than hard-coded, so the multi-column key in #3884 extends the
-        # map instead of adding a special case here.
+        # than hard-coded. The multi-column key adds nothing to that
+        # map -- it declares its columns in
+        # ``coalescible_key_columns`` and resolves the event reference
+        # from the first of them.
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         self.assertEqual(
             ('network', NETWORK_UUID),
             op._coalescible_target_reference())
 
-    def test_target_reference_is_none_without_a_target_column(self):
-        # An operation type which declares no coalescing target at all.
+    def test_target_reference_is_none_without_a_key(self):
+        # An operation type which declares no coalescing key at all.
         # The fold cannot run for it, but the helper is public enough
         # that it must degrade rather than raise.
         op = _StubOp(_make_static_values())

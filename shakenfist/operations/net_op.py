@@ -49,13 +49,15 @@ class NetOp(BaseClusterOperation):
     # See ``BaseClusterOperation.coalescible_tasks`` and the
     # ``COALESCIBLE_TASKS`` block in
     # ``shakenfist/schema/operations/net_op.py`` for the rationale
-    # behind which tasks fold. The target column is ``network_uuid``
-    # -- every NetOp targets exactly one network, and the
+    # behind which tasks fold. The key is ``network_uuid`` alone --
+    # every NetOp targets exactly one network, and the
     # ``cluster_operations`` table already has an indexed
     # ``network_uuid`` column for the sibling-finding query the
-    # dispatcher / enqueue path will issue.
+    # dispatcher / enqueue path issues. That single column cannot tell
+    # one hypervisor's node-local work apart from another's, which is
+    # why ``network_ensure_mesh`` is not in ``COALESCIBLE_TASKS``.
     coalescible_tasks = schema.COALESCIBLE_TASKS
-    coalescible_target_column = 'network_uuid'
+    coalescible_key_columns = schema.COALESCIBLE_KEY_COLUMNS
 
     def __init__(self, static_values):
         self.upgrade(static_values)

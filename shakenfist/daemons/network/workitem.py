@@ -94,12 +94,19 @@ class Job(util_concurrency.Job):
         """The partition key for an operation.
 
         Ops sharing a target must always land on the same worker (see the
-        safety invariant above). The target column used by the coalescing
-        fold is authoritative when set; network_uuid covers the op types
-        that don't declare one; and the op's own uuid is a safe fallback
-        (an unshared key trivially preserves the invariant).
+        safety invariant above). The *first* column of the coalescing key
+        is authoritative when the op type declares one; network_uuid
+        covers the op types that don't; and the op's own uuid is a safe
+        fallback (an unshared key trivially preserves the invariant).
+
+        Only the first column is used: routing has to be at least as
+        coarse as the fold, so that any two ops a fold could match are
+        drained by the same worker. A finer routing key than the fold's
+        would split siblings across workers and break property (3) of
+        the invariant above.
         """
-        target_column = type(op).coalescible_target_column or 'network_uuid'
+        key_columns = type(op).coalescible_key_columns
+        target_column = key_columns[0] if key_columns else 'network_uuid'
         target = getattr(op, target_column, None)
         if target is None:
             return str(op.uuid)

@@ -118,7 +118,7 @@ class CoalescingSQLTestCase(
         self.assertEqual(
             SIBLING_UUID,
             mariadb._direct_find_existing_coalescible_op(
-                'net_op', 'network_uuid', NETWORK_UUID, TASK))
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_find_existing_returns_the_oldest_of_several(
@@ -133,7 +133,7 @@ class CoalescingSQLTestCase(
         self.assertEqual(
             SURVIVOR_UUID,
             mariadb._direct_find_existing_coalescible_op(
-                'net_op', 'network_uuid', NETWORK_UUID, TASK))
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_find_existing_ignores_a_non_queued_op(self, mock_get_engine):
@@ -147,7 +147,7 @@ class CoalescingSQLTestCase(
 
         self.assertIsNone(
             mariadb._direct_find_existing_coalescible_op(
-                'net_op', 'network_uuid', NETWORK_UUID, TASK))
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_find_existing_ignores_a_multi_task_op(self, mock_get_engine):
@@ -162,7 +162,7 @@ class CoalescingSQLTestCase(
 
         self.assertIsNone(
             mariadb._direct_find_existing_coalescible_op(
-                'net_op', 'network_uuid', NETWORK_UUID, TASK))
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_claim_siblings_folds_and_excludes_the_survivor(
@@ -177,7 +177,8 @@ class CoalescingSQLTestCase(
             conn.commit()
 
         folded = mariadb._direct_claim_coalescible_siblings(
-            'net_op', 'network_uuid', NETWORK_UUID, [TASK], SURVIVOR_UUID)
+            'net_op', [('network_uuid', NETWORK_UUID)], [TASK],
+            SURVIVOR_UUID)
         self.assertEqual([SIBLING_UUID], folded)
 
         states = mariadb._get_object_states_table()
@@ -197,7 +198,7 @@ class CoalescingSQLTestCase(
 
         self.assertEqual(
             [], mariadb._direct_claim_coalescible_siblings(
-                'net_op', 'network_uuid', NETWORK_UUID, [TASK],
+                'net_op', [('network_uuid', NETWORK_UUID)], [TASK],
                 SURVIVOR_UUID))
 
     @mock.patch('shakenfist.mariadb._get_engine')
@@ -219,7 +220,7 @@ class CoalescingSQLTestCase(
 
         self.assertEqual(
             [], mariadb._direct_claim_coalescible_siblings(
-                'net_op', 'network_uuid', NETWORK_UUID, [TASK],
+                'net_op', [('network_uuid', NETWORK_UUID)], [TASK],
                 SURVIVOR_UUID))
 
     @mock.patch('shakenfist.mariadb._get_engine')
@@ -242,7 +243,7 @@ class CoalescingSQLTestCase(
         self.assertEqual(
             [SIBLING_UUID],
             mariadb._direct_claim_coalescible_siblings(
-                'net_op', 'network_uuid', NETWORK_UUID,
+                'net_op', [('network_uuid', NETWORK_UUID)],
                 [TASK, other_task], SURVIVOR_UUID))
 
     @mock.patch('shakenfist.mariadb._get_engine')
@@ -262,7 +263,7 @@ class CoalescingSQLTestCase(
 
         self.assertIsNone(
             mariadb._direct_find_existing_coalescible_op(
-                'net_op', 'network_uuid', NETWORK_UUID, TASK))
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_find_existing_ignores_a_different_task(self, mock_get_engine):
@@ -274,7 +275,7 @@ class CoalescingSQLTestCase(
 
         self.assertIsNone(
             mariadb._direct_find_existing_coalescible_op(
-                'net_op', 'network_uuid', NETWORK_UUID, TASK))
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
 
     def test_an_unknown_operation_type_is_refused_loudly(self):
         # Both queries bind operation_type through ObjectType(). A value
@@ -284,10 +285,11 @@ class CoalescingSQLTestCase(
         with mock.patch('shakenfist.mariadb.LOG') as mock_log:
             self.assertIsNone(
                 mariadb._direct_find_existing_coalescible_op(
-                    'not_an_object_type', 'network_uuid', NETWORK_UUID, TASK))
+                    'not_an_object_type', [('network_uuid', NETWORK_UUID)],
+                    TASK))
             self.assertEqual(
                 [], mariadb._direct_claim_coalescible_siblings(
-                    'not_an_object_type', 'network_uuid', NETWORK_UUID,
+                    'not_an_object_type', [('network_uuid', NETWORK_UUID)],
                     [TASK], SURVIVOR_UUID))
         self.assertEqual(2, mock_log.warning.call_count)
         for call in mock_log.warning.call_args_list:
@@ -297,10 +299,10 @@ class CoalescingSQLTestCase(
         with mock.patch('shakenfist.mariadb.LOG') as mock_log:
             self.assertIsNone(
                 mariadb._direct_find_existing_coalescible_op(
-                    'net_op', 'namespace', NETWORK_UUID, TASK))
+                    'net_op', [('namespace', NETWORK_UUID)], TASK))
             self.assertEqual(
                 [], mariadb._direct_claim_coalescible_siblings(
-                    'net_op', 'namespace', NETWORK_UUID, [TASK],
+                    'net_op', [('namespace', NETWORK_UUID)], [TASK],
                     SURVIVOR_UUID))
         self.assertEqual(2, mock_log.warning.call_count)
         for call in mock_log.warning.call_args_list:

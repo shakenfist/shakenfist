@@ -67,11 +67,12 @@ class model_tasks(Enum):
 # participating hypervisors. The problem is that it is the one NetOp
 # task that does *node-local* work -- ``_apply_ensure_mesh`` diffs
 # **this** host's FDB -- and the coalescing key is
-# ``COALESCIBLE_TARGET_COLUMN``, i.e. the network alone. There is no
+# ``COALESCIBLE_KEY_COLUMNS``, i.e. the network alone. There is no
 # column on ``cluster_operations`` recording which node an op was
 # targeted at (``target`` is queue routing, and NetOp's model has no
 # ``node_uuid``), so "same network" is the finest grain the fold can
-# express, and it cannot tell hypervisor A's mesh op apart from
+# express -- ``COALESCIBLE_KEY_COLUMNS`` below is a one element
+# tuple -- and it cannot tell hypervisor A's mesh op apart from
 # hypervisor B's. Declaring it coalescible therefore let the network
 # node's survivor mark every other hypervisor's pending mesh op
 # ``complete`` without doing their work, leaving their FDBs stale --
@@ -84,11 +85,33 @@ COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
     model_tasks.network_apply_create_network_node,
 })
 
-# Indexed column on the ``cluster_operations`` table used by both the
+# The coalescing key: indexed columns on the ``cluster_operations``
+# table which together identify "the same work". Used by both the
 # enqueue-side dedup lookup (this module) and the worker-side fold
-# (``BaseClusterOperation.coalescible_target_column``) to identify
-# "same target". For NetOp every op is scoped to exactly one network.
-COALESCIBLE_TARGET_COLUMN: str = 'network_uuid'
+# (``NetOp.coalescible_key_columns``, which reads this constant), so
+# the two can never disagree about what a sibling is. A candidate op
+# must match every column.
+#
+# For NetOp that is the network alone: every op is scoped to exactly
+# one network, and nothing in the key distinguishes the node an op was
+# targeted at. That is the limitation which keeps
+# ``network_ensure_mesh`` out of COALESCIBLE_TASKS (see the note
+# above) and which #3884 is about.
+COALESCIBLE_KEY_COLUMNS: tuple[str, ...] = ('network_uuid',)
+
+
+def _coalescible_keys(network_uuid) -> list[tuple[str, str]]:
+    """Build the coalescing key for one enqueue.
+
+    One ``(column, value)`` pair per column of
+    ``COALESCIBLE_KEY_COLUMNS``, so the enqueue-side dedup below and
+    the worker-side fold in ``BaseClusterOperation.execute`` ask the
+    database exactly the same question. A column added to the tuple
+    without a value here raises ``KeyError`` at the call site rather
+    than silently narrowing or widening the key.
+    """
+    values = {'network_uuid': str(network_uuid)}
+    return [(column, values[column]) for column in COALESCIBLE_KEY_COLUMNS]
 
 
 class model(BaseModel):
@@ -170,8 +193,7 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
             and runs_after is None):
         existing_uuid = mariadb.find_existing_coalescible_op(
             operation_type=object_type.name.lower(),
-            target_column=COALESCIBLE_TARGET_COLUMN,
-            target_uuid=str(network_uuid),
+            keys=_coalescible_keys(network_uuid),
             task_name=tasks[0].name)
         if existing_uuid is not None:
             LOG.with_fields({

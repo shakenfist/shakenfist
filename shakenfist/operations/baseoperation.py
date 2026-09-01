@@ -120,15 +120,24 @@ class BaseClusterOperation(BaseOperation):
     # override with a frozenset of their schema's ``model_tasks``; the base
     # default is empty (no coalescing).
     #
-    # ``coalescible_target_column`` names the indexed column on the
-    # ``cluster_operations`` table to group by when finding sibling ops --
-    # typically the foreign key for the target object (``network_uuid``,
-    # ``instance_uuid``, ``node_uuid``). It must be set whenever
-    # ``coalescible_tasks`` is non-empty; both are read together by the
-    # dispatcher (worker-side dedup) and ``create_and_enqueue`` (enqueue-
-    # side dedup) in the next two steps of this plan.
+    # ``coalescible_key_columns`` names the indexed columns on the
+    # ``cluster_operations`` table which together identify "the same
+    # work" when finding sibling ops -- typically the foreign keys for
+    # the target objects (``network_uuid``, ``instance_uuid``,
+    # ``node_uuid``). A sibling has to match every column in the tuple,
+    # so a two-column key is strictly narrower than a one-column one: a
+    # key of ``('network_uuid', 'node_uuid')`` can tell one hypervisor's
+    # work on a network apart from another's, which the network alone
+    # cannot. The value for each column is read off the operation as an
+    # attribute of the same name.
+    #
+    # It must be non-empty whenever ``coalescible_tasks`` is non-empty;
+    # both are read together by the dispatcher (worker-side fold) and by
+    # ``create_and_enqueue`` (enqueue-side dedup). The *first* column is
+    # also the operation's routing key in the sf-net dispatcher, and is
+    # the object the fold's audit event is recorded against.
     coalescible_tasks: 'frozenset[Enum]' = frozenset()
-    coalescible_target_column: Optional[str] = None
+    coalescible_key_columns: tuple[str, ...] = ()
 
     def execution_duration_extra(
             self,
@@ -176,21 +185,28 @@ class BaseClusterOperation(BaseOperation):
     ) -> Optional[tuple[str, str]]:
         """The (object_type, uuid) this operation coalesces against.
 
-        Returns None when the operation declares no coalescing target,
-        when the target column is unset on this instance, or when the
-        schema does not say which object type the column names.
+        Returns None when the operation declares no coalescing key,
+        when the first key column is unset on this instance, or when
+        the schema does not say which object type that column names.
+
+        Only the *first* key column is used, deliberately. The event
+        this reference is for has to outlive the operation -- which is
+        hard deleted thirty seconds after going terminal (#3864) -- and
+        the object an operator queries afterwards is the network, not
+        the node the work happened to run on.
 
         The object type is resolved through the schema model's
         ``target_fields`` map -- the same declaration
         ``schema/operations/util.py:enqueue_cluster_operation`` uses to
-        write ``cluster_operation_targets`` rows -- rather than being
-        hard-coded per operation class. A future multi-column
-        coalescing key (#3884) adds columns to that map, not special
-        cases here.
+        write ``cluster_operation_targets`` rows. Nothing is added to
+        that map for the extra key columns: a column added there starts
+        writing a ``cluster_operation_targets`` row for every operation
+        and changes what ``has_pending_cluster_operation()`` reports.
         """
-        target_column = type(self).coalescible_target_column
-        if not target_column:
+        key_columns = type(self).coalescible_key_columns
+        if not key_columns:
             return None
+        target_column = key_columns[0]
 
         target_uuid = getattr(self, target_column, None)
         if target_uuid is None:
@@ -404,7 +420,7 @@ class BaseClusterOperation(BaseOperation):
         #    ops" status event on the survivor and on its coalescing
         #    target.
         coalescible = type(self).coalescible_tasks
-        target_column = type(self).coalescible_target_column
+        key_columns = type(self).coalescible_key_columns
 
         if coalescible:
             unique_tasks: list[Enum] = []
@@ -478,7 +494,7 @@ class BaseClusterOperation(BaseOperation):
         # Merging them buries the interesting case under the boring one
         # in the by-queue-class table, and decision 4's whole aim is
         # that "coalescing is doing nothing" stays answerable.
-        if not coalescible or not target_column:
+        if not coalescible or not key_columns:
             self.coalesce_outcome = 'type_not_coalescible'
         elif skip_due_to_empty_queue:
             self.coalesce_outcome = 'batch_size_one'
@@ -487,8 +503,21 @@ class BaseClusterOperation(BaseOperation):
         else:
             survivor_coalescible_tasks = [
                 t for t in unique_tasks if t in coalescible]
-            target_uuid_attr = getattr(self, target_column, None)
-            if not survivor_coalescible_tasks or target_uuid_attr is None:
+
+            # Every column of the key has to have a value on this
+            # operation. A missing one cannot narrow anything, and
+            # binding it as NULL would widen the fold to every
+            # operation which also lacks it -- so the fold is skipped
+            # rather than run on a partial key.
+            keys: list[tuple[str, str]] = []
+            for column in key_columns:
+                value = getattr(self, column, None)
+                if value is None:
+                    keys = []
+                    break
+                keys.append((column, str(value)))
+
+            if not survivor_coalescible_tasks or not keys:
                 self.coalesce_outcome = 'no_coalescible_tasks'
             else:
                 # Recorded before the call, not after it. If
@@ -501,8 +530,7 @@ class BaseClusterOperation(BaseOperation):
                 coalesce_start = time.monotonic()
                 folded = mariadb.claim_coalescible_siblings(
                     operation_type=self.object_type,
-                    target_column=target_column,
-                    target_uuid=str(target_uuid_attr),
+                    keys=keys,
                     task_names=[
                         t.name for t in survivor_coalescible_tasks],
                     exclude_op_uuid=str(self.uuid))
