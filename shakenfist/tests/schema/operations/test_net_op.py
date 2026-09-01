@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from shakenfist import exceptions
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
@@ -148,6 +149,42 @@ class NetOpTestCase(base.ShakenFistTestCase):
                 'networknode-clusteroperation-user_waiting')
         )
 
+    def test_create_and_enqueue_derives_node_uuid_from_target(self):
+        # ``target`` is queue routing, but for a per-node enqueue it
+        # *is* the node uuid -- decision 2 derives node_uuid from it
+        # rather than taking a separate parameter, so a caller cannot
+        # forget to pass one and silently degrade the coalescing key.
+        u1 = str(uuid4())
+        node = str(uuid4())
+
+        _, op_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_remove_nat],
+            priority=PRIORITY.user_facing,
+            target=node,
+        )
+
+        self.assertEqual(
+            node,
+            self.mock_mariadb.get_cluster_operation_metadata(
+                op_uuid)['node_uuid'])
+
+    def test_create_and_enqueue_node_uuid_none_for_networknode_target(self):
+        # The cluster-wide network-node queue is not a node's own queue,
+        # so it must not be mistaken for one -- node_uuid stays None.
+        u1 = str(uuid4())
+
+        _, op_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_remove_nat],
+            priority=PRIORITY.user_facing,
+            target='networknode',
+        )
+
+        self.assertIsNone(
+            self.mock_mariadb.get_cluster_operation_metadata(
+                op_uuid)['node_uuid'])
+
     def test_load_from_etcd(self):
         u1 = str(uuid4())
 
@@ -240,6 +277,70 @@ class NetOpTestCase(base.ShakenFistTestCase):
         )
 
         self.assertNotEqual(baseline_uuid, new_uuid)
+
+
+class EnqueueTimeCoalescibleGuardTestCase(base.ShakenFistTestCase):
+    """Decision 4: a coalescible task's target must be one the key can
+    distinguish, on a dispatcher that partitions its workers by it.
+
+    ``shakenfist/tests/schema/test_net_op_coalescing.py`` covers this
+    guard exhaustively with the enqueue path mocked out; these tests
+    exercise it through the same real MockMariaDB path the rest of this
+    module uses, so the derived node_uuid and the guard's own decision
+    are proven against the same enqueue.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_mariadb = MockMariaDB(self, node_count=1)
+        self.mock_mariadb.setup()
+
+    def test_coalescible_task_per_node_clusteroperation_family_raises(self):
+        # Decision 5: the default 'clusteroperation' family routes a
+        # per-node target to sf-queues, which has no per-target worker
+        # partitioning -- a node-aware key is necessary but not
+        # sufficient there. This is the case that must never regress.
+        self.assertRaises(
+            exceptions.InvalidCoalescibleEnqueue,
+            create_and_enqueue,
+            network_uuid=str(uuid4()),
+            tasks=[model_tasks.network_ensure_mesh],
+            priority=PRIORITY.user_facing,
+            target=str(uuid4()),
+        )
+
+    def test_coalescible_task_per_node_network_family_is_allowed(self):
+        # The case this phase exists to allow: family='network' reaches
+        # sf-net, which partitions its workers by target.
+        u1 = str(uuid4())
+        node = str(uuid4())
+
+        _, op_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_ensure_mesh],
+            priority=PRIORITY.user_facing,
+            target=node,
+            family='network',
+        )
+
+        metadata = self.mock_mariadb.get_cluster_operation_metadata(op_uuid)
+        self.assertEqual(node, metadata['node_uuid'])
+
+    def test_non_coalescible_task_per_node_target_is_always_allowed(self):
+        # The guard must not become a blanket ban on per-node NetOps: a
+        # task which never folds is unaffected by where it is drained,
+        # so it is fine on the default clusteroperation family too.
+        u1 = str(uuid4())
+        node = str(uuid4())
+
+        _, op_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_remove_nat],
+            priority=PRIORITY.user_facing,
+            target=node,
+        )
+
+        self.assertIsNotNone(op_uuid)
 
 
 class ModelTasksEnumTestCase(base.ShakenFistTestCase):

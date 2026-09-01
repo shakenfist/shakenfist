@@ -50,6 +50,13 @@ SURVIVOR_UUID = '99999999-9999-4999-8999-999999999999'
 SIBLING_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 TASK = 'network_apply_update_dnsmasq'
 
+# Two per-node NetOp keys, plus the cluster-wide (None) case. These stand
+# in for the two hypervisors in the phase 8 regression
+# (test_single_virtual_networks_work): a fold on node A's queue must
+# never touch node B's work on the same network.
+NODE_A_UUID = 'c0000000-0000-4000-8000-000000000001'
+NODE_B_UUID = 'c0000000-0000-4000-8000-000000000002'
+
 
 class CoalescingSQLTestCase(
         dbfixture.MariaDBTableFixture, base.ShakenFistTestCase):
@@ -62,13 +69,17 @@ class CoalescingSQLTestCase(
             json_shims=True)
 
     def _insert_op(self, conn, op_uuid, tasks=(TASK,), state='queued',
-                   created_at=100.0):
+                   created_at=100.0, node_uuid=None):
         """Insert one cluster operation and its state row.
 
         The two rows deliberately go in the way production writes them:
         the static row through the sa.Uuid bind processor, which stores
         the undashed form, and the state row as the dashed string every
         caller hands to set_state().
+
+        ``node_uuid`` defaults to ``None`` -- a cluster-wide op -- so
+        every caller written before the multi-column key still gets the
+        same row it always did.
         """
         ops = mariadb._get_cluster_operations_table()
         states = mariadb._get_object_states_table()
@@ -77,6 +88,7 @@ class CoalescingSQLTestCase(
             operation_type='net_op',
             created_at=created_at,
             network_uuid=uuid.UUID(NETWORK_UUID),
+            node_uuid=uuid.UUID(node_uuid) if node_uuid is not None else None,
             priority='user_facing',
             metadata_json={'tasks': list(tasks)}))
         conn.execute(sa.insert(states).values(
@@ -307,3 +319,259 @@ class CoalescingSQLTestCase(
         self.assertEqual(2, mock_log.warning.call_count)
         for call in mock_log.warning.call_args_list:
             self.assertIn('not a coalescible target column', call.args[0])
+
+    # -- Phase 11: the two-pair (network_uuid, node_uuid) key -----------
+    #
+    # These are the tests decision 8 exists to be proven by: a key that
+    # names node_uuid must be strictly narrower than the network alone,
+    # in both directions -- a per-node op folds only its own node's
+    # siblings, and a cluster-wide op (node_uuid unset, binding IS NULL)
+    # folds only other cluster-wide ops. Getting either direction wrong
+    # reproduces one of two real failures: the phase 8
+    # ``test_single_virtual_networks_work`` regression (one hypervisor's
+    # fold silently eating another's work) or decision 8's near-miss
+    # (widening the key to include node_uuid would have switched off the
+    # only coalescing the cluster does, by refusing every NULL-valued
+    # key instead of binding IS NULL).
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_claim_siblings_folds_a_sibling_on_the_same_node(
+            self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, node_uuid=NODE_A_UUID)
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_A_UUID)
+            conn.commit()
+
+        folded = mariadb._direct_claim_coalescible_siblings(
+            'net_op',
+            [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_A_UUID)],
+            [TASK], SURVIVOR_UUID)
+        self.assertEqual([SIBLING_UUID], folded)
+
+        states = mariadb._get_object_states_table()
+        with engine.connect() as conn:
+            rows = dict(conn.execute(sa.select(
+                states.c.object_uuid, states.c.state_value)).fetchall())
+        self.assertEqual('complete', rows[SIBLING_UUID])
+        self.assertEqual('queued', rows[SURVIVOR_UUID])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_claim_siblings_leaves_a_different_node_alone(
+            self, mock_get_engine):
+        # The phase 8 regression this whole phase exists to prevent
+        # recurring: node A's survivor must not fold node B's op on the
+        # same network, or B's mesh apply is silently never run.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, node_uuid=NODE_A_UUID)
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_B_UUID)
+            conn.commit()
+
+        folded = mariadb._direct_claim_coalescible_siblings(
+            'net_op',
+            [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_A_UUID)],
+            [TASK], SURVIVOR_UUID)
+        self.assertEqual([], folded)
+
+        states = mariadb._get_object_states_table()
+        with engine.connect() as conn:
+            rows = dict(conn.execute(sa.select(
+                states.c.object_uuid, states.c.state_value)).fetchall())
+        self.assertEqual('queued', rows[SIBLING_UUID])
+        self.assertEqual('queued', rows[SURVIVOR_UUID])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_claim_siblings_cluster_wide_survivor_folds_other_cluster_wide(
+            self, mock_get_engine):
+        # node_uuid unset on both sides binds IS NULL on both sides, so
+        # this is the pre-phase-11 behaviour: the two ops that actually
+        # fold today (network_apply_update_dnsmasq,
+        # network_apply_create_network_node) live on the cluster-wide
+        # queue and must keep folding each other under the wider key.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, node_uuid=None)
+            self._insert_op(conn, SIBLING_UUID, node_uuid=None)
+            conn.commit()
+
+        folded = mariadb._direct_claim_coalescible_siblings(
+            'net_op',
+            [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+            [TASK], SURVIVOR_UUID)
+        self.assertEqual([SIBLING_UUID], folded)
+
+        states = mariadb._get_object_states_table()
+        with engine.connect() as conn:
+            rows = dict(conn.execute(sa.select(
+                states.c.object_uuid, states.c.state_value)).fetchall())
+        self.assertEqual('complete', rows[SIBLING_UUID])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_claim_siblings_cluster_wide_survivor_leaves_per_node_op_alone(
+            self, mock_get_engine):
+        # The regression decision 8 exists to prevent: if a NULL key
+        # value were refused (rather than bound as IS NULL) the
+        # cluster-wide fold above would have silently stopped matching
+        # anything the moment the key widened. Proving the negative here
+        # -- a per-node sibling on the same network is untouched -- is
+        # the other half of the same property: IS NULL must be strictly
+        # narrower, not broader.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, node_uuid=None)
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_A_UUID)
+            conn.commit()
+
+        folded = mariadb._direct_claim_coalescible_siblings(
+            'net_op',
+            [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+            [TASK], SURVIVOR_UUID)
+        self.assertEqual([], folded)
+
+        states = mariadb._get_object_states_table()
+        with engine.connect() as conn:
+            rows = dict(conn.execute(sa.select(
+                states.c.object_uuid, states.c.state_value)).fetchall())
+        self.assertEqual('queued', rows[SIBLING_UUID])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_matches_only_the_same_node(
+            self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_A_UUID)
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op',
+                [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_A_UUID)],
+                TASK))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_ignores_a_different_nodes_op(
+            self, mock_get_engine):
+        # The enqueue-side counterpart of the phase 8 regression: a
+        # lookup for node A's work must not be satisfied by node B's
+        # pending op, or the caller believes its work is already queued
+        # when nobody is actually going to do it on node A.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_B_UUID)
+            conn.commit()
+
+        self.assertIsNone(
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op',
+                [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_A_UUID)],
+                TASK))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_cluster_wide_key_ignores_a_per_node_op(
+            self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_A_UUID)
+            conn.commit()
+
+        self.assertIsNone(
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op',
+                [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+                TASK))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_cluster_wide_key_matches_a_cluster_wide_op(
+            self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, node_uuid=None)
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op',
+                [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+                TASK))
+
+    def test_an_empty_key_list_is_refused_loudly(self):
+        # Without a single equality the statement would fold every
+        # pending operation of this type in the cluster -- this is the
+        # one case _coalescible_preflight refuses outright rather than
+        # narrowing (contrast a None *value*, which binds IS NULL).
+        with mock.patch('shakenfist.mariadb.LOG') as mock_log:
+            self.assertIsNone(
+                mariadb._direct_find_existing_coalescible_op(
+                    'net_op', [], TASK))
+            self.assertEqual(
+                [], mariadb._direct_claim_coalescible_siblings(
+                    'net_op', [], [TASK], SURVIVOR_UUID))
+        self.assertEqual(2, mock_log.warning.call_count)
+        for call in mock_log.warning.call_args_list:
+            self.assertIn('coalescing key is empty', call.args[0])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_a_malformed_network_uuid_skips_the_query_and_logs(
+            self, mock_get_engine):
+        # A malformed uuid in either key position must be a loud skip,
+        # not a raise -- letting a StatementError escape would kill the
+        # dispatcher worker thread over what is only a cost optimisation.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_A_UUID)
+            conn.commit()
+
+        with mock.patch('shakenfist.mariadb.LOG') as mock_log:
+            self.assertIsNone(
+                mariadb._direct_find_existing_coalescible_op(
+                    'net_op',
+                    [('network_uuid', 'not-a-uuid'),
+                     ('node_uuid', NODE_A_UUID)],
+                    TASK))
+            self.assertEqual(
+                [], mariadb._direct_claim_coalescible_siblings(
+                    'net_op',
+                    [('network_uuid', 'not-a-uuid'),
+                     ('node_uuid', NODE_A_UUID)],
+                    [TASK], SURVIVOR_UUID))
+        self.assertEqual(2, mock_log.warning.call_count)
+        for call in mock_log.warning.call_args_list:
+            self.assertIn('malformed uuid', call.args[0])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_a_malformed_node_uuid_skips_the_query_and_logs(
+            self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, node_uuid=NODE_A_UUID)
+            conn.commit()
+
+        with mock.patch('shakenfist.mariadb.LOG') as mock_log:
+            self.assertIsNone(
+                mariadb._direct_find_existing_coalescible_op(
+                    'net_op',
+                    [('network_uuid', NETWORK_UUID),
+                     ('node_uuid', 'not-a-uuid')],
+                    TASK))
+            self.assertEqual(
+                [], mariadb._direct_claim_coalescible_siblings(
+                    'net_op',
+                    [('network_uuid', NETWORK_UUID),
+                     ('node_uuid', 'not-a-uuid')],
+                    [TASK], SURVIVOR_UUID))
+        self.assertEqual(2, mock_log.warning.call_count)
+        for call in mock_log.warning.call_args_list:
+            self.assertIn('malformed uuid', call.args[0])
