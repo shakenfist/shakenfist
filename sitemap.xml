@@ -2,3438 +2,3438 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://shakenfist.com/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/community/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/features/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/glossary/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/manifesto/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/overview/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/agent-python/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/agent-python/developer-guide/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/agent-python/protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/clingwrap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/clingwrap/command-types/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/clingwrap/configuration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/clingwrap/examples/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/clingwrap/installation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/accounting/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/fundamentals/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/galera/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/instance-video/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/memory-mapped-devices/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/networking-shakenfist/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/neutron-legacy/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/neutron-linuxbridge/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/technology-primer/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/virtual-networking/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/cloudgood/virtualization-history/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/automated-pr-review/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/ci-review-automation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/code-review-tracking/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/consistency-audits/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/release-automation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/ci-review-automation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/compliance/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/console-logging/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/default-branch-naming/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/delete-branch-on-merge/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/dependency-name-normalization/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/diagram-format/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/docs-external-links/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/expensive-lane-path-filter/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/export-repo-config/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/github-security/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/llm-context-lint-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/llm-context-lint/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/llm-doc-structure/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/llm-tooling/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/merge-group-cancellation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/merge-queue-config/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/mermaid-lint-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/pin-indirect-dependencies/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/plan-index/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/plan-phase-references/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/plan-source-references/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/plan-template/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/push-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/pyproject-usage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/python-version/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/readme-absolute-links/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/readme-structure/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/release-process/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/renovate/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/review-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/review-scope-completeness/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/rust-unwrap-lint/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/secret-handling/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/security-sanitization/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/sfui-vendor/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/test-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/version-file-gitignore/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/workflow-standards/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-audit-compliance-split/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-code-review-tracking/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-consistency-audits-v2/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-consistency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-llm-doc-structure/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-plan-template-blocks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-push-audit-phase/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-review-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-stestr-testtools/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/amend/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/bench/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/bitmap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/chain-config/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/chain-discovery/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/check/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/commit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/compare/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/configuration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/convert/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/create/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/dd/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/development/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/format-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/format-detection-safety/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/format-internals/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/guest-architecture/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/info/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/installation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/map/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/measure/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/openstack-announcement-email/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/output-formats/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/quirks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/rebase/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/resize/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/rust-rationale/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/security-audits/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/security/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/snapshot/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/technology-primer/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/testing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/usage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/commentary/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/commentary/architectural-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/commentary/reading-order/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/crates/guest-protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/image_notes/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/image_notes/cirros-qcow2/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/image_notes/qcow2-v2/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/image_notes/virtualpc-vhd/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-375-guest-idt/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-01-abi/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-02-qcow2-planner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-03-guest/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-04-host-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-05-rust-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-06-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-07-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-08-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend-phase-09-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-amend/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-01-crate/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-02-abi/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-03-guest-read/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-04-host-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-05-write/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-06-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-07-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-phase-08-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-refcount-growth-phase-01-planner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-refcount-growth-phase-02-guest/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-refcount-growth-phase-03-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-refcount-growth-phase-04-fuzzer-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench-refcount-growth/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bench/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-01-parse/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-02-abi/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-03-planner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-04-guest/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-05-host-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-06-rust-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-07-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-08-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-09-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap-phase-10-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bitmap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes-phase-01-fixed-vhd-overflow/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes-phase-02-vhdx-resize-seqnum/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes-phase-03-qcow2-shrink-subbyte-refcount/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bug-fixes/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-01-abi/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-02-leak-planner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-03-refcount-planner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-04-guest-leaks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-05-guest-all/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-06-host/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-07-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-08-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-09-fuzz-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-10-fuzz-differential/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair-phase-11-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-check-repair/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-convert-followups/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-coverage-fuzzing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-01-emitters/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-02-guest-op/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-03-host-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-04-target-options/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-05-backing-file/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-06-preallocation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-07-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-08-integration-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-09-fuzz-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-10-fuzz-differential/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create-phase-11-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-create/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-01-abi/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-02-host-operands/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-03-guest-raw/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-04-guest-formats/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-05-rust-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-06-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-07-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-08-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-09-diff-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd-phase-10-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-dd/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-01-glibc-build/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-02-qemu-profiles/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-02b-qemu-output-parity/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-03-runner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-04-workflow/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci-phase-05-merge-queue/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-distro-matrix-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-01-detection/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-02-vdi-read/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-03-parallels-read/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-05-dmg-read/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-06-qed/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage-phase-07-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-format-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzz-autofix/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzzing-bugs-phase-01-create-emitters/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzzing-bugs-phase-02-measure-scan/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzzing-bugs-phase-03-measure-calc/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzzing-bugs-phase-04-measure-fixed-vhd/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzzing-bugs-phase-05-diff-fuzz-timeouts/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzzing-bugs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-01-extent-iterators/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-02-guest-op/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-03-host-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-04-output-formatting/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-05-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-06-integration-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-07-fuzz-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-08-fuzz-differential/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map-phase-09-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-map/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-01-calculators/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-02-allocation-scanners/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-03-guest-op/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-04-host-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-05-target-options/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-06-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-07-integration-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-08-fuzz-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-09-fuzz-differential/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure-phase-10-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-measure/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-01-semantics/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-02-gates/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-03-crate/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-04-commit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-05-rebase/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-06-bench/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-07-cow/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-08-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure-phase-09-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-qcow2-write-infrastructure/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-01-abi/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-02-rebase-planners/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-03-rebase-guest/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-04-rebase-host/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-05-rebase-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-06-commit-planners/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-07-commit-guest/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-08-commit-host/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-09-commit-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-10-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-11-diff-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit-phase-12-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-rebase-commit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-release-v0.2/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-release-v0.3/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-release/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-followup-01-targeted-prepass/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-01-skeleton/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-02-qcow2-grow/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-03-qcow2-shrink/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-04-vhd/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-05-vhdx/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-06-vmdk/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-07-guest-op/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-08-host-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-09-preallocation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-10-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-11-integration-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-12-fuzz/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize-phase-13-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-resize/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-01-abi/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-02-list-planner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-03-list-guest/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-04-list-host/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-05-refcount-planners/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-06-create/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-07-delete/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-08-apply/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-09-mutate-host/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-10-baselines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-11-integration-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-12-fuzz-coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-13-fuzz-differential/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot-phase-14-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-snapshot/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/building-with-docker/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/data-transfer-comparison/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/data-transfer-direct-memory/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/data-transfer-other/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/data-transfer-virtio-block/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/data-transfer-virtio-vsock/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/kvm-hello-world/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/kvm-hello-world2/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/kvm/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/performance-counters/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/virtio-block/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/virtio-block2/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/virtio-block3/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/virtio-block4/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/prototypes/virtio-block5/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-compression/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-encryption/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-format/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-implementation-notes/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-l1l2-tables/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-refcount/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-snapshots/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/qcow2/qcow2-write-planner/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/raw/raw-format/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/vmdk/vmdk-compression/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/vmdk/vmdk-extents/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/vmdk/vmdk-format/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/vmdk/vmdk-grain-tables/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/configuration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/console-sources/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/development/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/direct-qemu-harness/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/installation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/proxy-architecture/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/schema/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/testing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-05-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-host-subject/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxy-dev-releases/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-04-firewall/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-06-packaging/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-07-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy-phase-08-cutover/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-rust-proxy/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-07-polling/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-09-teardown/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-03-control-socket/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-04-port-latency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-test-harness/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-use-case-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/capabilities/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/channel-protocols/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/compression-protocols/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/console-vv-extensions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/protocol-overview/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/scancodes/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/spice-link-protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/usb-redirection/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/spice/vd-agent-protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/use-cases/ovirt/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/command-reference/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/development/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/docker-tarball-formats/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/installation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/internals/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/performance/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/pipeline/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/tar-format-selection/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/use-cases/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-info-check/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-make-the-speed-phase-01-httpx/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-make-the-speed/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-post-write-verification-phase-01-framework/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-post-write-verification-phase-03-registry/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-post-write-verification/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-quay-label-search-phase-01-api-client/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-quay-label-search-phase-03-commands/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-quay-label-search/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-registry-proxy/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/occystrap/plans/PLAN-structured-logging/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/channel-diagnostics-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/configuration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/control-socket-protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/design-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/development-macos/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/development/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/device-redirection/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/diagnostics/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/features/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/installation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/libvirt-spice-recommendations/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/macos-metrics-verification/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/multi-mode-parity/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/portability/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/releasing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/rendering-pipeline/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/session-lifecycle/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/spice-protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/troubleshooting/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/web-frontend/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/web-mode-internals/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/OPEN-QUESTIONS/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-android-apk/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports-phase-01-ring-buffer/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports-phase-02-channel-state/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports-phase-03-zip-output/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports-phase-04-gui-button/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports-phase-05-region-select/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports-phase-06-traffic-viewer/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports-phase-07-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bug-reports/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-01-metadata/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-02-snapshot/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-03-region/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bugreport-trigger-snapshot-phase-04-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-bugreport-trigger-snapshot/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-capture-phase-01-infra/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-capture-phase-02-pcap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-capture-phase-03-video/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-capture/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-ci-platform-matrix/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-connection-properties/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-01-workspace/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-02-reserve-names/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-03-compression/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-04-protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-05-usbredir/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction-phase-06-client/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-extraction/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-crate-release/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-cursor-rendering-phase-01-parse/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-cursor-rendering-phase-02-render/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-cursor-rendering/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-01-display/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-02-audio/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-03-session/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-04-robustness/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-05-cleanup/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt-phase-06-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-deferred-debt/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-01-plumbing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-02-fill/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-03-monochrome/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-04-copy-bits/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-05-image-rop/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-06-alpha/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-07-invers-and-warnings/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-08-pedantic/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops-phase-09-pedantic-handles/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-draw-ops/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-iteration-followups/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-window-sizing-phase-01-always-fit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-window-sizing-phase-02-toggle/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-window-sizing-phase-03-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-window-sizing-phase-04-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-window-sizing-phase-05-notify/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-display-window-sizing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-egui-0.34-followups/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-hamburger-menu-phase-01-migrate/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-hamburger-menu/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-01-profile/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-02-repaint/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-03-logging/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-04-latency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-05-metrics/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency-phase-06-push-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-idle-cpu-and-latency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-initial/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-macbook-bugreport-fixes/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-macos-runtime-metrics-phase-01-process/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-macos-runtime-metrics-phase-02-threads/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-macos-runtime-metrics-phase-03-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-macos-runtime-metrics/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-notifications-phase-01-store/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-notifications-phase-02-spice-notify/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-notifications-phase-03-existing-sources/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-notifications-phase-04-gui/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-notifications-phase-05-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-notifications/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-opus-decoder/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging-phase-01-portability/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging-phase-02-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging-phase-03-debian/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging-phase-04-rpm/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging-phase-05-macos/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging-phase-06-windows/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging-phase-07-release/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-packaging/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-paste-as-keystrokes-phase-01-translator/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-paste-as-keystrokes-phase-02-channel-cli/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-paste-as-keystrokes-phase-03-gui/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-paste-as-keystrokes-phase-04-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-paste-as-keystrokes/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pip-distribution/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr20-followup/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr23-followup/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup-phase-01-tests/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup-phase-02-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup-phase-03-polish/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-pr31-followup/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-remaining-issues/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-01-screenshot/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-02-latency-sparkline/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-screenshot-and-latency-hud-phase-03-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-screenshot-and-latency-hud/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-self-hosted-runners/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-01-disconnect-snapshot/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-02-reconnect/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-03-audio-volume/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-04-region-select/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-05-stream-destroy-all/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-06-channel-rebalance/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-07-traffic-arc/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-08-ring-segmentation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-09-connection-notifications/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback-phase-10-notification-bug-button/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-session-001-feedback/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-13-streaming-intermittency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-14-statusbar-pointer-leak/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-15-build-tcp-frame-warn/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-16-qxl-viability/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-17-patched-libspice-validation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-18-push-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-streaming-test-automation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-supply-chain-followups/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-supply-chain-scanning/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-two-stage-ci-phase-03-merge-queue/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-two-stage-ci-phase-04-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-two-stage-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-01-vmc-channel/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-02-usbredir-parser/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-03-device-backend/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-04-real-devices/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-05-device-connect/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-06-transfers/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-07-virtual-msc/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-08-ui/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-09-interrupt/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir-phase-10-testing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-redir/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-01-bus-fix/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-02-wire-tx/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-03-panel/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-04-enumerate/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-05-connect/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-06-add-disk/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-07-polish/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui-phase-08-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-usb-ui/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-video-keeping-up-phase-01-instrumentation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-video-keeping-up-phase-02-pcap-thread/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-video-keeping-up-phase-03-video-encode-thread/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-video-keeping-up-phase-04-render-latency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-video-keeping-up/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-01-extract/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-02-encoder/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-03-webrtc/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-04-server/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-05-iac/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-06-lifecycle/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-07-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend-phase-08-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-web-frontend/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webdav-phase-01-port-channel/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webdav-phase-02-mux-protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webdav-phase-03-webdav-server/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webdav-phase-04-integration/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webdav-phase-05-ui/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webdav-phase-06-testing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webdav/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-03-udp-addrs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-04-soak/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-webrtc-0.20-upgrade/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/completed/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-01-stream-report/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/agent_protocol/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/authentication/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/ci_api_coverage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/coding_rules/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/database_internals/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/io_performance_tuning/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/mypy/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/network_dispatcher/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/release_process/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/security_model/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/standards/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/state_machine/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/subsystem_internals/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/updating_docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/workflow/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/writing_an_endpoint/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/admin/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/agentoperations/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/artifacts/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/authentication/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/blob_checksums/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/blobs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/clusteroperations/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/instances/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/interfaces/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/label/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/networks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/nodes/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/developer_guide/api_reference/upload/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/artifacts/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/authentication/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/credential_rotation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/database/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/events/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/exception_tracking/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/installation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/load_balancing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/locks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/logging/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/node_health/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/power_states/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/python_versions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/scheduler/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/threads/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/upgrades/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/vdi_console_tokens/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/operator_guide/networking/overview/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-00-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-01-groundwork/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-02-schema/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-03-api/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-04-enforcement/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-deadlines-phase-05-retry/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-deadlines/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-agent-operation-dependencies/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-api-input-validation-phase-00-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-api-input-validation-phase-01-declaration-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-api-input-validation-phase-02-type-vocabulary/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-api-input-validation-phase-03-compile-and-warn/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-api-input-validation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-artifact-fetch-retry-with-backoff/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-artifact-ux-rework/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-attribute-field-masks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-01-glossary/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-02-key-objects/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-03-exchange/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-04-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-05-oidc-plan-refresh/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-06-secret-types/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation-phase-07-leak-detection/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-auth-federation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-00-retire-etcd/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-01-statelessness/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-02-config-untangle/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-03-grpc-tier/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-04-deploy-byo/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-05-ci-byo/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-06-ci-tier/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb-phase-07-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-byo-mariadb/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-ci-cloud-sizing-phase-00-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-ci-cloud-sizing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-ci-node-exec-assertions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-cluster-op-visibility-phase-01-ci-deflake/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-cluster-op-visibility/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-01-idle-loop/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-02-static-cache/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-03-client-consolidation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-04-attribution/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-05-next-tier/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-06-residual-load/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-07-regression-detection/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction-phase-08-push-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-database-load-reduction/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-embrace-tls/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-01-schema/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-02-write/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-03-prune/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-04-read/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-05-remove/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb-phase-06-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-eventlog-direct-mariadb/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-fix-cluster-operation-targets-unique-constraint/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-generic-allocator/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-grpc-bounded-replies/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-00-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-01-sf-api/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-02-grpc-health/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-03-watchdog/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks-phase-04-operator-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-health-checks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-kerbside-vdi-tokens-phase-01-signing-key/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-kerbside-vdi-tokens/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-netserv/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-carrier-model/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-01-per-node-queues/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-02-ensure-mesh/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-03-floating-ip/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-04-dnsmasq/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-05-lifecycle/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-06-maintain/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-07-rest-contract/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-08-cleanup/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade-phase-09-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-facade/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-network-service-ports/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-01-checks/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-02-evaluator/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-03-cascade/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-node-resource-health-phase-04-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-node-resource-health/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-oidc-authentication/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-01-config-cpu-ram/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-02-disk-metric/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-03-ansible-templating/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations-phase-04-docs-cleanup/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-per-host-resource-reservations/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-qemu-futures/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-queue-performance-phase-07-measure-and-decide/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-queue-performance-phase-08-push-audit/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-queue-performance-phase-09-prove-coalescing/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-queue-performance-phase-10-defer-latency/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-queue-performance/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-recurring-operations/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-apache-lb-phase-01-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-apache-lb-phase-02-remove/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-apache-lb/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-06-galaxy-role/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-06-step5b-ci-design/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-06-step6-legacy-removal/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-07-rename-cleanup/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-primary-phase-08-shared-ci/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-primary/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-00-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-01-json-logging/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-02-loki-shipper/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-03-ci-loki/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-04-ci-tooling/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-05-remove-rsyslog/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding-phase-06-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-remove-syslog-forwarding/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-exec-with-netlink/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-01-query/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-02-gating/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-03-auto-target/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-04-drop-column/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation-phase-05-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-replace-last-cluster-operation/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-00-decisions/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-00-findings/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-01-node-metrics-columns/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-02-capacity-tables/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-03-primitive/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-04-claims-api/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-04a-demand-guard/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-04b-client/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-04c-conductor-claims/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations-phase-06-affinity/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-scheduler-reservations/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-01-infrastructure/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-02-artifact/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-03-instance-network/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-04-iterators/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-05-adhoc/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-06-tests-docs/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering-phase-07-denorm-lists/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sql-pushdown-filtering/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-sticky-transfers/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/api-query-batching-roadmap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/plans/blob-storage-roadmap/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/release_notes/v07-v08/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/affinity/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/ansible/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/artifacts/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/authentication/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/consoles/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/events/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/metadata/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/objects/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
     <url>
          <loc>https://shakenfist.com/user_guide/usage/</loc>
-         <lastmod>2026-08-31</lastmod>
+         <lastmod>2026-09-01</lastmod>
     </url>
 </urlset>

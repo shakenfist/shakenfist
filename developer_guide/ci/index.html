@@ -13422,6 +13422,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-probes-traffic-is-exempted-from-the-idle-load-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The probe's traffic is exempted from the idle-load check
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13776,10 +13787,13 @@ description of it.</p>
 decisions behind it) added two data-gathering instruments to every
 functional cluster job, so that later phases can size CI's clouds from
 a distribution instead of the handful of hand-collected numbers the
-plan started from. Neither instrument gates anything -- see "Nothing
-here is a quality gate" below -- so a reader troubleshooting a CI
-failure can skip this section; it matters when reading a job's bundle
-afterwards, or when working on the sizing plan itself.</p>
+plan started from. Neither instrument gates anything itself -- see
+"Nothing here is a quality gate" below -- but the poller's own traffic
+does interact with a check that gates, which is the one reason a
+reader troubleshooting a CI failure might need this section; see "The
+probe's traffic is exempted from the idle-load check". Otherwise it
+matters when reading a job's bundle afterwards, or when working on the
+sizing plan itself.</p>
 <h3 id="two-instruments-not-one">Two instruments, not one<a class="headerlink" href="#two-instruments-not-one" title="Permanent link">&para;</a></h3>
 <p><strong>The headroom series</strong> is a poll. <code>tools/ci_headroom_probe.py</code> (in
 this repository) runs in the background on the cluster primary for the
@@ -13860,7 +13874,54 @@ it prints (committed vCPU as a fraction of the admission ledger,
 against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
 phase 0 set those bounds with no distribution to check them against,
 phase 2 replaces or defends them, and any enforcement is phase 5's to
-add. Nothing in CI today can fail because of this instrumentation.</p>
+add. No verdict this instrumentation prints can fail a job.</p>
+<p>That is not the same as the instrumentation being invisible to the
+checks that do gate, which is what this section used to say and what
+issue 3975 disproved -- see below.</p>
+<h3 id="the-probes-traffic-is-exempted-from-the-idle-load-check">The probe's traffic is exempted from the idle-load check<a class="headerlink" href="#the-probes-traffic-is-exempted-from-the-idle-load-check" title="Permanent link">&para;</a></h3>
+<p>The probe polls, and <code>test_no_unbudgeted_fixed_rate_database_polling</code>
+in the functional suite exists to notice polling. Each sample's <code>GET
+/nodes</code> runs <code>Node.external_view()</code> per node, which is one
+<code>GetNodeAttributes</code> and one <code>GetAllNodeDaemonStates</code> each, and its
+<code>GET /admin/resources</code> reads node metrics per node, which is one
+<code>GetNodeMetrics</code> each. On an N node cluster at the default 15 second
+interval that is N/15 per second for all three, from the <code>api</code> caller,
+flat across windows and indifferent to what the suite is doing --
+which is exactly the signature of the server-side polling loop the
+check is built to catch. It clears the unbudgeted ceiling, <code>max(0.25,
+0.05N)</code> per second, from four nodes upwards; it was found on the six
+node merge queue cluster, where all three read 0.3997/s against
+0.30/s and failed the build (issue 3975).</p>
+<p>Those three <code>(operation, caller)</code> pairs are therefore listed in
+<code>HARNESS_DRIVEN_PAIRS</code> in
+<code>shakenfist/deploy/shakenfist_ci/load_budget.py</code>, alongside the events
+reads the suite's own await helpers make. The budget file is
+deliberately not the home for them: no deployed cluster runs the
+probe, so a budget entry would model load that exists nowhere outside
+a CI job, and it would have to be a per-node term, raising every real
+cluster's ceiling in proportion to its size.</p>
+<p>Two consequences worth knowing:</p>
+<ul>
+<li><strong>The exemption costs coverage.</strong> CI can no longer see a <em>new</em>
+  fixed-rate poll of node state made through sf-api, whatever its
+  rate. The blind spot is CI's alone -- none of the three pairs is
+  budgeted for the <code>api</code> caller, so the
+  <code>ShakenFistUnbudgetedDatabasePolling</code> alert, which reads its
+  exclusions from the budget file rather than from that set, still
+  watches all three at the unbudgeted ceiling on every real cluster.
+  The pairs also stay visible in a run's <code>harness_driven</code> list rather
+  than being dropped from the report.</li>
+<li><strong>Retiring the probe means trimming the exemption.</strong> It outlives
+  its justification otherwise, and no test can catch that on its own:
+  the launcher (<code>ci_headroom_launch.sh</code>) and the workflow steps live
+  in <code>shakenfist/actions</code>, so a decommission done there stops the
+  probe without touching anything in this repository.
+  <code>test_the_suite_still_probes_cluster_headroom</code> covers what it can --
+  it fails if the probe is deleted here, stops sampling on a timer,
+  stops reading one of the two endpoints, or loses the note in its
+  docstring that records this obligation -- but a probe that is simply
+  never launched again looks identical to a running one from here.</li>
+</ul>
 <p>An absent census is not zero refusals. When the Loki query failed or
 log shipping was unhealthy, the report says so explicitly rather than
 printing "0 refusals", which would look exactly like a run that
