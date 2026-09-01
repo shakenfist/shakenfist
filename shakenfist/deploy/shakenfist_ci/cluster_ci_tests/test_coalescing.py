@@ -41,6 +41,14 @@ BURST = 6
 # op and another's are indistinguishable to both dedup paths while
 # doing different work on different hosts. See
 # docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+# How much longer to keep polling for a worker-side fold once a
+# per-node dedup event has been seen. The dedup proves the eventlog
+# drainer has already shipped this burst's coalescing events, so a fold
+# is at most a batch behind; the full deadline above only matters while
+# nothing at all has arrived. Cluster CI runs only in the merge queue,
+# where the difference is wall clock nobody gets back.
+POST_DEDUP_FOLD_GRACE = 15
+
 MESH_TASK = 'network_ensure_mesh'
 
 # The task ``network_ensure_mesh`` is always paired with on the
@@ -585,16 +593,31 @@ class TestCoalescing(base.BaseNamespacedTestCase):
         # and a drainer ships batches to sf-eventlog -- so poll rather
         # than reading once. The work itself is already done by this
         # point, so this is covering the shipping lag and nothing else.
+        #
+        # Two deadlines, because the common outcome here is the skip
+        # below -- dedups but no fold -- and waiting the full minute
+        # for a fold which is not coming is merge queue wall clock
+        # spent on nothing. Cluster CI only runs in the merge queue,
+        # and the test above this one already budgets 120s of its own.
+        # Once a dedup has arrived the drainer has demonstrably
+        # shipped this burst's coalescing events, so a fold, if there
+        # was one, is a batch or two behind rather than a minute.
         folds = []
         dedups = []
         events = []
         deadline = time.time() + 60
+        first_dedup_at = None
         while True:
             events = self.test_client.get_network_events(
                 self.net['uuid'], limit=1000)
             folds, dedups = self._per_node_mesh_signals(
                 events, network_node_name)
             if folds:
+                break
+            if dedups and first_dedup_at is None:
+                first_dedup_at = time.time()
+            if first_dedup_at is not None and time.time() > (
+                    first_dedup_at + POST_DEDUP_FOLD_GRACE):
                 break
             if time.time() > deadline:
                 break

@@ -608,6 +608,28 @@ class InvalidCoalescibleEnqueue(Exception):
     ...
 
 
+class CoalescingUnavailable(Exception):
+    """Raised when the database service cannot answer a coalescing query.
+
+    Today that means only one thing: a rolling upgrade in which the
+    ``sf-database`` on the other end predates the V2 coalescing RPCs
+    and answers ``UNIMPLEMENTED``. It is a distinct exception rather
+    than a ``None``/``[]`` return so the fold can record
+    ``coalescing_unavailable`` instead of ``ran`` with nothing folded.
+    Those two are indistinguishable in ``queue-wait-report.py``
+    otherwise, and "a fold that ran and matched nothing" reading the
+    same as "coalescing is switched off" is exactly the ambiguity
+    #3878 hid behind for three months.
+
+    Callers catch it. It never propagates to a user: the enqueue side
+    treats it as "no existing op" and inserts one, the fold side skips
+    and runs the task. Losing the optimisation for the length of an
+    upgrade is the intended outcome -- see decision 1 of
+    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md for
+    why a V1 fallback is not."""
+    ...
+
+
 class NetworkOperationFailed(Exception):
     """Raised by ``op.raise_for_error()`` when a cluster operation
     reached ``STATE_ERROR``. Carries the persisted ``ErrorReport`` as

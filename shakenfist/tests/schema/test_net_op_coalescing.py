@@ -119,6 +119,75 @@ class NetOpCoalescingGuardTestCase(base.ShakenFistTestCase):
         self.mock_enqueue.assert_called_once()
 
 
+class NetOpReusablePrioritiesTestCase(base.ShakenFistTestCase):
+    """Which pending ops an enqueue is allowed to be deduped onto.
+
+    Reuse is deliberately one-sided. A more urgent pending op is free
+    to adopt -- the work runs sooner than asked. A less urgent one is
+    not: queues are named '{target}-{family}-{priority}', so adopting
+    it means the caller in raise_for_error(), and the runs_after
+    dependency an instance start hangs off, wait out the slower lane's
+    queue-sit tail instead of their own.
+
+    Both coalescible tasks with two enqueue sites straddle the line.
+    Network.ensure_mesh enqueues network_ensure_mesh at user_facing
+    while daemons/network/maintain.py enqueues the same task, for the
+    same network and the same node, at background -- and it does so
+    precisely when is_mesh_okay() reports drift, which is the state a
+    network is in immediately after an instance starts elsewhere on it.
+    create_on_network_node and the maintainer straddle it the same way
+    for network_apply_create_network_node.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.enqueue = mock.patch(
+            'shakenfist.schema.operations.net_op.enqueue_cluster_operation')
+        self.mock_enqueue = self.enqueue.start()
+        self.addCleanup(self.enqueue.stop)
+
+    def test_more_urgent_priorities_are_reusable(self):
+        self.assertEqual(
+            ['user_waiting', 'user_facing'],
+            net_op._reusable_priorities(PRIORITY.user_facing))
+
+    def test_the_most_urgent_priority_may_only_reuse_itself(self):
+        self.assertEqual(
+            ['user_waiting'],
+            net_op._reusable_priorities(PRIORITY.user_waiting))
+
+    def test_the_least_urgent_priority_may_reuse_anything(self):
+        self.assertEqual(
+            [p.name for p in PRIORITY],
+            net_op._reusable_priorities(PRIORITY.background_high_io))
+
+    def test_no_priority_may_reuse_a_less_urgent_one(self):
+        # Stated as the property rather than as five hand written
+        # lists, so a PRIORITY member added later is covered without
+        # anyone remembering to come back here.
+        for priority in PRIORITY:
+            reusable = net_op._reusable_priorities(priority)
+            for name in reusable:
+                self.assertLessEqual(
+                    PRIORITY[name].value, priority.value,
+                    f'{priority.name} may not reuse {name}, which is less '
+                    f'urgent')
+            for other in PRIORITY:
+                if other.value <= priority.value:
+                    self.assertIn(other.name, reusable)
+
+    @mock.patch('shakenfist.mariadb.find_existing_coalescible_op',
+                return_value=None)
+    def test_the_enqueue_passes_the_reusable_set(self, mock_find):
+        net_op.create_and_enqueue(
+            str(uuid4()), [model_tasks.network_apply_update_dnsmasq],
+            PRIORITY.user_facing)
+        mock_find.assert_called_once()
+        self.assertEqual(
+            ['user_waiting', 'user_facing'],
+            mock_find.call_args.kwargs['priorities'])
+
+
 class NetOpEnqueueSiteTestCase(base.ShakenFistTestCase):
     """Every per-node enqueue site, checked statically.
 

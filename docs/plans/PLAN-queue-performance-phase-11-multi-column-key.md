@@ -407,7 +407,7 @@ is approved.
 | 11e | medium | sonnet | none | Unit coverage for the three new behaviours. In `shakenfist/tests/test_mariadb_coalescing.py`, cover a two-pair key: a sibling matching on network but not node is *not* folded, one matching both *is*, and a malformed uuid in either position skips the query with a log rather than raising. In `shakenfist/tests/operations/test_baseoperation.py`, cover the new fold-time predicate: per-node queue plus a node-aware key runs the fold, per-node queue plus a network-only key records `key_cannot_distinguish_queue`, and cluster-wide is unchanged. In `shakenfist/tests/schema/operations/test_net_op.py`, cover the derived `node_uuid` (set for a node target, `None` for `networknode`), the version-3 range acceptance, and both upgrade steps. Add the sweep from the Definition of done as a test so no operation schema can bump `current_version` again without its step. Every assertion that claims to prove a fix must be mutation-tested: revert the fix, confirm the test fails, restore. Report which ones you mutation-tested. |
 | 11f | high | opus | none | Functional CI coverage. Extend `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_coalescing.py` with a second test method asserting a fold happened on a *per-node* queue, reusing the existing fixture and the two event constants at `:12-20`. The shape to aim for: create enough contending instances on one network that `Network.ensure_mesh`'s per-node fan-out (`shakenfist/network/network.py:979-990`) puts more than one `network_ensure_mesh` operation on one node's queue at once, then assert a `coalesced sibling ops` event whose `extra` names that task. Note the existing test's own comment about sequential creates leaving nothing to coalesce (`:68`) -- that trap applies here too. Read the phase 9 plan's decision 2 for why the event is emitted against the network as well as the operation, and assert against the network: an operation is hard deleted thirty seconds after going terminal and takes its `event_objects` rows with it (#3864). |
 | 11g | medium | sonnet | none | Documentation and close-out. Update `docs/developer_guide/database_internals.md`'s coalescing section for the multi-column key and the renamed outcome. Update `CLAUDE.md`'s Common Pitfalls only if a *convention* changed. Fill in this plan's Results section, set the master plan's Execution row and the `docs/plans/index.md` row to Complete, and add a Future work entry for the deferred `sf-queues` half of #3884 naming the successor issue. Do not write measured numbers yet -- step 11h supplies them. |
-| 11h | medium | sonnet | none | **Deferred until `sfcbr` has run the merged build for at least 24 hours.** Re-run `tools/queue-wait-report.py` over a window of at least 24 hours and record, in this plan's Results and in the master plan's "What step 11 measured": the `net_op` fold outcome counts before and after, how many siblings the per-node fold actually collapses, and whether the fold's duration distribution moved with the wider key (decision 6's index question turns on this). Compare against the six hour pre-change baseline in survey finding 1. Two traps this plan has already paid for: `sfcbr` stamps local time with a `Z` suffix so a window read off the log records is ten hours out from the window Loki was asked for (phase 10 withdrew a whole finding to this), and every window must be fetch-verified against `count_over_time` with no chunk sitting at Loki's 5000 line ceiling. |
+| 11h | medium | sonnet | none | **Deferred until `sfcbr` has run the merged build for at least 24 hours.** Re-run `tools/queue-wait-report.py` over a window of at least 24 hours and record, in this plan's Results and in the master plan's "What step 11 measured": the `net_op` fold outcome counts before and after, how many siblings the per-node fold actually collapses, and whether the fold's duration distribution moved with the wider key (decision 6's index question turns on this). Also read `SHOW ENGINE INNODB STATUS` / `information_schema` for lock waits and deadlocks on `cluster_operations`: cross-node fold contention is a failure mode the pre-change baseline could not have contained, and duration alone cannot close decision 6 -- see the note in Results. Compare against the six hour pre-change baseline in survey finding 1. Two traps this plan has already paid for: `sfcbr` stamps local time with a `Z` suffix so a window read off the log records is ten hours out from the window Loki was asked for (phase 10 withdrew a whole finding to this), and every window must be fetch-verified against `count_over_time` with no chunk sitting at Loki's 5000 line ceiling. |
 
 ## Risks and mitigations
 
@@ -626,6 +626,27 @@ fold's duration distribution moved enough to revisit decision 6's
 no-new-index call, is unmeasured. Nothing in this Results section
 should be read as reporting a post-change number; there isn't one
 yet.
+
+**What 11h must additionally look for, from the PR #4007 review.**
+Decision 6 declined a composite `(network_uuid, node_uuid)` index on
+the evidence of the pre-change fold durations -- but that baseline
+*cannot* contain the new failure mode, because before this phase only
+the single elected network node ever ran a fold for a given network.
+Now every participating hypervisor does.
+`_direct_claim_coalescible_siblings` issues `SELECT ... FOR UPDATE`,
+and under REPEATABLE READ a range scan of `ix_cluster_ops_network` for
+one network takes next-key locks on every index record it examines,
+not only the ones whose `node_uuid` also matches. So per-node folds
+for the same network on different hosts can now serialise against each
+other, and can deadlock with the `UPDATE` which follows. Separately,
+the cluster-wide case binds `node_uuid IS NULL`, which the optimiser
+could choose to serve from `ix_cluster_ops_node` -- scanning every
+NULL-node row in the table rather than the handful for one network.
+
+So 11h measures lock waits and deadlocks on `cluster_operations`, not
+only the fold's own duration. If either shows up, the composite index
+makes the `FOR UPDATE` lock only the rows which actually match, and
+pins the plan. Do not close decision 6 on duration alone.
 
 ## Future work
 

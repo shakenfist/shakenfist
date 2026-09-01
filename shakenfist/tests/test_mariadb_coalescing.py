@@ -69,7 +69,8 @@ class CoalescingSQLTestCase(
             json_shims=True)
 
     def _insert_op(self, conn, op_uuid, tasks=(TASK,), state='queued',
-                   created_at=100.0, node_uuid=None):
+                   created_at=100.0, node_uuid=None,
+                   priority='user_facing'):
         """Insert one cluster operation and its state row.
 
         The two rows deliberately go in the way production writes them:
@@ -89,7 +90,7 @@ class CoalescingSQLTestCase(
             created_at=created_at,
             network_uuid=uuid.UUID(NETWORK_UUID),
             node_uuid=uuid.UUID(node_uuid) if node_uuid is not None else None,
-            priority='user_facing',
+            priority=priority,
             metadata_json={'tasks': list(tasks)}))
         conn.execute(sa.insert(states).values(
             object_uuid=op_uuid,
@@ -575,3 +576,102 @@ class CoalescingSQLTestCase(
         self.assertEqual(2, mock_log.warning.call_count)
         for call in mock_log.warning.call_args_list:
             self.assertIn('malformed uuid', call.args[0])
+
+    # ------------------------------------------------------------------
+    # The priority half of the dedup key.
+    #
+    # Reuse is one-sided: adopting a more urgent pending op is free,
+    # adopting a less urgent one means adopting its queue. Queue names
+    # are '{target}-{family}-{priority}', so a user_facing enqueue
+    # deduped onto a queued background op does not simply lose its lane
+    # -- the caller sitting in raise_for_error(), and the runs_after
+    # dependency an instance start hangs off, both then wait out the
+    # background lane's queue-sit tail. That overlap is real for both
+    # coalescible tasks which have two enqueue sites: the maintainer
+    # enqueues network_ensure_mesh and network_apply_create_network_node
+    # at background for the same network and node the interactive paths
+    # use at user_facing.
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_ignores_a_less_urgent_op(self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, priority='background')
+            conn.commit()
+
+        self.assertIsNone(
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK,
+                ['user_waiting', 'user_facing']))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_reuses_a_more_urgent_op(self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, priority='user_waiting')
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK,
+                ['user_waiting', 'user_facing', 'user_facing_high_io',
+                 'background']))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_reuses_an_op_at_the_same_priority(
+            self, mock_get_engine):
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, priority='user_facing')
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK,
+                ['user_waiting', 'user_facing']))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_without_priorities_matches_any(
+            self, mock_get_engine):
+        # An absent or empty list means no priority filter. That is the
+        # proto3 default, so it is also what a V2 server predating the
+        # field applies -- the pre-change behaviour, and a lost
+        # optimisation rather than a correctness problem.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, priority='background_high_io')
+            conn.commit()
+
+        for priorities in (None, []):
+            self.assertEqual(
+                SIBLING_UUID,
+                mariadb._direct_find_existing_coalescible_op(
+                    'net_op', [('network_uuid', NETWORK_UUID)], TASK,
+                    priorities),
+                f'priorities={priorities!r} should not have filtered')
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_picks_the_oldest_eligible_not_the_oldest(
+            self, mock_get_engine):
+        # The priority filter has to apply before the ORDER BY, not
+        # after: an older ineligible op must not shadow a younger
+        # eligible one.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(
+                conn, SIBLING_UUID, created_at=100.0, priority='background')
+            self._insert_op(
+                conn, SURVIVOR_UUID, created_at=200.0, priority='user_facing')
+            conn.commit()
+
+        self.assertEqual(
+            SURVIVOR_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK,
+                ['user_waiting', 'user_facing']))

@@ -510,6 +510,27 @@ class BaseClusterOperation(BaseOperation):
         key_distinguishes_queue = (
             queue_is_cluster_wide or key_distinguishes_node)
 
+        # A key column which is not an attribute of this operation at
+        # all is a different thing from one which is present and
+        # ``None``, and only the second is legitimate. ``None`` binds
+        # ``IS NULL``, which is how a cluster-wide NetOp -- no
+        # ``node_uuid`` -- folds only the other cluster-wide operations
+        # on its network. A column the class does not have is NULL on
+        # every row as well, so binding ``IS NULL`` for it would
+        # silently degenerate the key to whichever columns did resolve:
+        # for a NetOp, back to the network alone, which is exactly the
+        # phase 8 cross-node fold this phase exists to make impossible.
+        # The enqueue side catches its own version of this with the
+        # ``KeyError`` in ``_coalescible_keys``; this is the fold's.
+        #
+        # It skips rather than raises because a fold is an optimisation
+        # and killing the operation would be the worse outcome, and it
+        # gets its own recorded outcome rather than borrowing
+        # ``key_cannot_distinguish_queue`` so a mis-declaration is
+        # visible as a mis-declaration in the queue-wait report.
+        missing_key_columns = [
+            column for column in key_columns if not hasattr(self, column)]
+
         # Each branch records the guard which decided the outcome, so
         # the guards exist exactly once and the instrumentation cannot
         # report an outcome the code did not take -- which is the class
@@ -532,6 +553,14 @@ class BaseClusterOperation(BaseOperation):
             self.coalesce_outcome = 'batch_size_one'
         elif not key_distinguishes_queue:
             self.coalesce_outcome = 'key_cannot_distinguish_queue'
+        elif missing_key_columns:
+            self.log.with_fields({
+                'missing_columns': missing_key_columns,
+                'key_columns': list(key_columns),
+            }).error(
+                'Coalescing key names columns this operation does not '
+                'have, skipping the fold rather than widening the key')
+            self.coalesce_outcome = 'key_column_missing'
         else:
             survivor_coalescible_tasks = [
                 t for t in unique_tasks if t in coalescible]
@@ -550,11 +579,12 @@ class BaseClusterOperation(BaseOperation):
                 # cluster currently does the moment the key widens --
                 # see decision 8 of
                 # docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
-                # A column with no value *at all* is caught upstream, by
-                # ``_coalescible_keys``'s ``KeyError``.
+                # ``getattr`` with no default: every declared column
+                # is known to resolve, because ``missing_key_columns``
+                # above already skipped the fold if one did not.
                 keys: list[tuple[str, Optional[str]]] = []
                 for column in key_columns:
-                    value = getattr(self, column, None)
+                    value = getattr(self, column)
                     keys.append(
                         (column, None if value is None else str(value)))
 
@@ -566,12 +596,25 @@ class BaseClusterOperation(BaseOperation):
                 # than as a fold which was attempted.
                 self.coalesce_outcome = 'ran'
                 coalesce_start = time.monotonic()
-                folded = mariadb.claim_coalescible_siblings(
-                    operation_type=self.object_type,
-                    keys=keys,
-                    task_names=[
-                        t.name for t in survivor_coalescible_tasks],
-                    exclude_op_uuid=str(self.uuid))
+                try:
+                    folded = mariadb.claim_coalescible_siblings(
+                        operation_type=self.object_type,
+                        keys=keys,
+                        task_names=[
+                            t.name for t in survivor_coalescible_tasks],
+                        exclude_op_uuid=str(self.uuid))
+                except exceptions.CoalescingUnavailable:
+                    # A rolling upgrade against an sf-database which
+                    # predates the V2 RPCs. Overwrite the optimistic
+                    # 'ran' rather than leaving it: a fold that never
+                    # happened reported as 'ran' with zero siblings is
+                    # indistinguishable in queue-wait-report.py from a
+                    # fold that ran and matched nothing, and that
+                    # ambiguity is what let #3878 sit for three months.
+                    # The task still runs below; only the optimisation
+                    # is lost, and only for the length of the upgrade.
+                    folded = []
+                    self.coalesce_outcome = 'coalescing_unavailable'
                 self.coalesce_seconds = time.monotonic() - coalesce_start
                 self.coalesce_folded = len(folded)
                 if folded:

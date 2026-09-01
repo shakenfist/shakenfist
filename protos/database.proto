@@ -587,6 +587,19 @@ message FindExistingCoalescibleOpV2Request {
   string operation_type = 1;
   repeated CoalescibleKeyPair keys = 2;
   string task_name = 3;
+
+  // The priority names (PRIORITY enum member names, e.g.
+  // 'user_facing') a candidate op may carry and still be reused. The
+  // enqueue side hands over every priority at least as urgent as the
+  // caller's own, because adopting a less urgent pending op means
+  // waiting on its queue: a user_facing mesh enqueue deduped onto a
+  // queued background repair inherits the background lane's queue-sit
+  // tail while a caller blocks on raise_for_error(). An empty list
+  // means no priority filter, which is what an old V2 server which
+  // does not know this field will effectively apply -- that is the
+  // pre-change behaviour and is a lost optimisation rather than a
+  // correctness problem, unlike ignoring a key column.
+  repeated string priorities = 4;
 }
 
 // Lock Operations

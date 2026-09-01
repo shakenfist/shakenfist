@@ -232,6 +232,57 @@ class NetOpTestCase(base.ShakenFistTestCase):
                 and row.get('network_uuid') == u1
             ))
 
+    def test_enqueue_side_dedup_refuses_a_less_urgent_pending_op(self):
+        # The end to end version of the priority filter, through
+        # MockMariaDB rather than against the SQL. A background repair
+        # is already queued for this network and task -- which is what
+        # daemons/network/maintain.py enqueues whenever is_mesh_okay()
+        # reports drift -- and then an interactive caller asks for the
+        # same work at user_facing. Reusing the background op would
+        # hand the interactive caller a uuid on the background lane to
+        # block raise_for_error() against.
+        u1 = str(uuid4())
+
+        _, background_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.background,
+        )
+        _, interactive_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+
+        self.assertNotEqual(background_uuid, interactive_uuid)
+        self.assertEqual(
+            2,
+            sum(
+                1 for row
+                in self.mock_mariadb.cluster_operations_store.values()
+                if row.get('operation_type') == 'net_op'
+                and row.get('network_uuid') == u1
+            ))
+
+    def test_enqueue_side_dedup_reuses_a_more_urgent_pending_op(self):
+        # The other direction is fine and should still coalesce: the
+        # background caller inherits work which runs sooner than it
+        # asked for, which costs it nothing.
+        u1 = str(uuid4())
+
+        _, interactive_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.user_facing_high_io,
+        )
+        _, background_uuid = create_and_enqueue(
+            network_uuid=u1,
+            tasks=[model_tasks.network_apply_update_dnsmasq],
+            priority=PRIORITY.background,
+        )
+
+        self.assertEqual(interactive_uuid, background_uuid)
+
     def test_enqueue_side_dedup_skipped_for_non_coalescible_task(self):
         # network_remove_dnsmasq is *not* in COALESCIBLE_TASKS, so two
         # enqueues must produce two distinct rows.
@@ -441,6 +492,85 @@ class ModelVersionTestCase(base.ShakenFistTestCase):
             version=4,
             **self._base_kwargs()
         )
+
+    # The tests above exercise pydantic validation of an explicit
+    # version. These exercise DatabaseBackedObject.upgrade(), which is
+    # a different code path and the one a rolling upgrade actually
+    # takes: an older sf-net hands NetOp a static_values dict at the
+    # version its build wrote, and every intervening
+    # _upgrade_step_N_to_N+1 has to exist and run. upgrade() resolves
+    # each step with a bare getattr(self, step) and no default, so a
+    # missing step raises AttributeError rather than the documented
+    # UpgradeException -- which is survey finding 8 of the phase 11
+    # plan, and why _upgrade_step_1_to_2 exists at all despite doing
+    # nothing.
+    def _static_values_at_version(self, version):
+        # Deliberately built by *removing* the fields each version
+        # added rather than by listing them, so a field added to the
+        # model in a later version without a matching upgrade step
+        # shows up here.
+        static_values = {
+            'uuid': str(uuid4()),
+            'network_uuid': str(uuid4()),
+            'priority': 'user_facing',
+            'request_id': None,
+            'depends_on': None,
+            'runs_after': None,
+            'tasks': ['network_apply_update_dnsmasq'],
+            'version': version,
+        }
+        if version >= 2:
+            static_values['floating_address'] = None
+            static_values['inner_address'] = None
+        if version >= 3:
+            static_values['node_uuid'] = None
+        return static_values
+
+    def test_upgrade_from_version_1(self):
+        """A version-1 row loads, reaching version 3 with a null node."""
+        static_values = self._static_values_at_version(1)
+        op = NetOp(static_values)
+
+        self.assertEqual(current_version, static_values['version'])
+        self.assertIsNone(op.node_uuid)
+        self.assertIsNone(op.floating_address)
+        self.assertIsNone(op.inner_address)
+        # The key a cluster-wide operation folds on. A null node_uuid
+        # binds IS NULL, so an upgraded row folds only the other
+        # cluster-wide operations on its network -- exactly as a row
+        # written by this build does.
+        self.assertEqual(
+            [('network_uuid', str(op.network_uuid)), ('node_uuid', None)],
+            [(c, None if getattr(op, c) is None else str(getattr(op, c)))
+             for c in NetOp.coalescible_key_columns])
+
+    def test_upgrade_from_version_2(self):
+        """A version-2 row loads, gaining only the null node_uuid."""
+        static_values = self._static_values_at_version(2)
+        op = NetOp(static_values)
+
+        self.assertEqual(current_version, static_values['version'])
+        self.assertIn('node_uuid', static_values)
+        self.assertIsNone(static_values['node_uuid'])
+        self.assertIsNone(op.node_uuid)
+
+    def test_every_upgrade_step_between_the_versions_exists(self):
+        """Each step is a real callable, not just a name in the source.
+
+        The sweep in test_upgrade_step_sweep.py asks whether a step is
+        defined anywhere in the two modules. This asks the narrower
+        question upgrade() asks: does getattr(op, step) resolve on the
+        object, and does calling it with a static_values dict work.
+        """
+        op = NetOp(self._static_values_at_version(current_version))
+        for v in range(initial_version, current_version):
+            step = '_upgrade_step_%d_to_%d' % (v, v + 1)
+            step_func = getattr(op, step, None)
+            self.assertIsNotNone(
+                step_func, f'{step} does not resolve on a NetOp')
+            self.assertTrue(
+                callable(step_func), f'{step} is not callable')
+            step_func({'uuid': str(uuid4()), 'version': v})
 
 
 class CreateAndEnqueueFloatingIpTestCase(base.ShakenFistTestCase):
