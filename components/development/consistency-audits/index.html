@@ -1423,6 +1423,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Testing a change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-and-after-a-change-to-a-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before and after a change to a check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2794,6 +2811,34 @@
     
   
     Plan: give the pre-push audit a trigger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-audit-scripts-restructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: restructure the audit scripts into a package of check classes
   
 
     
@@ -6703,6 +6748,34 @@
     
   
     Consistency audit phase 3: skillsaw CI detection, upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 4: review scope and coverage
   
 
     
@@ -13529,6 +13602,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Testing a change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-and-after-a-change-to-a-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before and after a change to a check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13686,46 +13776,59 @@ closed.</p>
 <code>not_applicable</code> closes it too: "we decided this does not apply" and
 "this now complies" are both reasons not to keep a work item open.</p>
 <h2 id="adding-a-criterion">Adding a criterion<a class="headerlink" href="#adding-a-criterion" title="Permanent link">&para;</a></h2>
-<p>Four files, plus a fifth when the check shares a spec file with
-another, and they have to stay in sync. The invariants that span them
-are the ones that break, so they are the ones under test:
-<code>scripts/test_audit_check.py</code> holds the <code>check_calls()</code> scheduling
-test, and <code>scripts/test_audit_update_docs.py</code> holds the <code>COLUMN_NAMES</code>
-ones.</p>
+<p>Two files: the check and its specification.</p>
 <ol>
-<li><strong><code>scripts/audit-check.py</code></strong> -- add a <code>check_*()</code> function returning
-   a dict with <code>id</code>, <code>status</code> (<code>pass</code> / <code>fail</code> / <code>not_applicable</code>) and
-   <code>details</code>. Register it in <code>check_calls()</code>. The id written in
-   <code>check_calls()</code> must be the id the function returns, and a test
-   asserts it: the calls are deferred so that a scoped repository can
-   skip a check without running it, which means the table is what
-   schedules the check, not the function.</li>
-<li><strong><code>scripts/audit_common.py</code></strong> -- add the id to <code>AUDIT_METADATA</code>
-   (spec file, optional template) and <code>ISSUE_TITLES</code>. Both
-   <code>audit-manage-issues.py</code> and <code>audit-update-docs.py</code> read this
-   module.</li>
-<li><strong><code>docs/audits/&lt;check-id&gt;.md</code></strong> -- the specification, following the
-   structure in <code>docs/audits/README.md</code>. Under <code>## Projects</code>, link
-   <code>compliance.md#&lt;check-id&gt;</code>; the section appears there at the first
-   run. Do not add a <code>consistency-audit</code> marker block -- the tables
-   live on the compliance page so that every specification stays
-   reviewable, and <code>test_audit_update_docs.py</code> fails on a marker in a
-   spec.</li>
-<li><strong><code>scripts/audit-update-docs.py</code></strong> -- only if the check joins an
-   existing spec file rather than getting its own. Add a column heading
-   for the id to <code>COLUMN_NAMES</code>.</li>
-<li><strong><code>docs/audits/README.md</code></strong> -- add the file to the index.</li>
+<li><strong><code>scripts/audit/checks/&lt;family&gt;.py</code></strong> -- add a <code>Check</code> subclass to
+   the module whose specifications it belongs with. It declares what it
+   is as class attributes -- <code>id</code>, <code>spec</code>, <code>issue_title</code>, an optional
+   <code>template</code>, and a <code>column</code> heading when it shares a specification
+   page with another criterion -- and implements <code>run(repo)</code>, returning
+   <code>self.ok()</code>, <code>self.fail()</code> or <code>self.skip()</code>. Register the instance in
+   <code>CHECKS</code> in <code>scripts/audit/registry.py</code>, and add its id to
+   <code>ORDER</code> where you want it reported.</li>
 </ol>
-<p>Step 4 is the one that bites. Its absence broke the 2026-08-12 run:
-<code>review-marks-pre-commit</code> joined the workflow-standards spec without a
-heading, and rendering crashed <em>after</em> rewriting every <code>docs/audits/*.md</code>
-but before committing any -- so the whole fleet's tables silently stayed
-a day stale. Both halves of that are now fixed. <code>column_name()</code> prints
-an ugly heading and a warning rather than raising, because a run that
-publishes a bad label beats a run that publishes nothing; and
+<p>Put the applicability test in <code>applies(repo)</code> rather than at the top
+   of <code>run()</code>. The scheduler asks the cheap question first, which is
+   what lets a repository scoped by <code>only_checks</code> skip a criterion
+   without paying for it -- several of them query the GitHub API, and
+   on a private repository those calls fail for reasons that say
+   nothing about compliance.</p>
+<ol>
+<li><strong><code>docs/audits/&lt;check-id&gt;.md</code></strong> -- the specification, following the
+   structure in <code>docs/audits/README.md</code>, and a line for it in that
+   index. Under <code>## Projects</code>, link <code>compliance.md#&lt;check-id&gt;</code>; the
+   section appears there at the first run. Do not add a
+   <code>consistency-audit</code> marker block -- the tables live on the
+   compliance page so that every specification stays reviewable, and
+   <code>test_audit_update_docs.py</code> fails on a marker in a spec.</li>
+</ol>
+<p><code>AUDIT_METADATA</code> and <code>ISSUE_TITLES</code> in <code>scripts/audit_common.py</code>, and
+<code>COLUMN_NAMES</code> in <code>scripts/audit-update-docs.py</code>, are views over the
+registry rather than tables to update. There is no longer a way to
+schedule a criterion that is missing from one of them.</p>
+<p>They are still an interface, though, which is why
+<code>scripts/tests/test_metadata.py</code> freezes all three as literals. An
+issue title is the idempotency key for filing and closing: renaming one
+orphans every open issue for that criterion across the fleet. Adding a
+criterion adds a line to the frozen table; changing an existing line is
+meant to be difficult.</p>
+<p>The column heading is the part with history. Before it was a class
+attribute it was a fifth file to remember, and forgetting it broke the
+2026-08-12 run: <code>review-marks-pre-commit</code> joined the workflow-standards
+specification without a heading, and rendering crashed <em>after</em>
+rewriting every <code>docs/audits/*.md</code> but before committing any, so the
+whole fleet's tables silently stayed a day stale. Three things now
+stand between that and a repeat. <code>column_name()</code> prints an ugly
+heading and a warning rather than raising, because a run that
+publishes a bad label beats a run that publishes nothing;
 <code>test_multi_check_specs_have_a_heading_for_every_check</code> in
-<code>scripts/test_audit_update_docs.py</code> fails on the omission, so the
-fallback should never be reached from a tested tree.</p>
+<code>scripts/test_audit_update_docs.py</code> fails on the omission; and
+<code>test_criteria_sharing_a_spec_page_all_declare_a_column</code> in
+<code>scripts/tests/test_metadata.py</code> fails on it from the other direction,
+reading the registry rather than the documentation.</p>
+<p>Add tests beside the check, in <code>scripts/tests/test_&lt;family&gt;.py</code>. A
+criterion with no test module entry fails the contract tests in
+<code>scripts/tests/test_metadata.py</code>.</p>
 <p>A new criterion does not require a re-audit of anything else, and does
 not require touching any project repository. The next morning's run
 measures it everywhere and files the issues.</p>
@@ -13756,7 +13859,7 @@ and <em>on</em> the excluded list on the same page: both statements are true
 of it, because it is excluded from the conventions and audited for one
 thing anyway.
 <code>test_matrix_matches_the_documented_scope</code> in
-<code>scripts/test_audit_check.py</code> subtracts the scoped repositories before
+<code>scripts/tests/test_registry.py</code> subtracts the scoped repositories before
 comparing, so onboarding one the way the steps above say will fail that
 test.</p>
 <h2 id="testing-a-change">Testing a change<a class="headerlink" href="#testing-a-change" title="Permanent link">&para;</a></h2>
@@ -13768,11 +13871,13 @@ Most are triggered by any change under <code>scripts/</code>;
 <code>review-tracking-tests</code> always runs, and <code>issue-fix-extraction-tests</code>
 runs only for its own file and the template files it covers.
 Individually, which is quicker while iterating:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3 scripts/test_audit_check.py
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python3 scripts/test_audit_update_docs.py
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>python3 scripts/test_review_tracking.py
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>python3 scripts/test_check_audit_smoke.py
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>python3 scripts/test_issue_fix_extraction.py
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3 -m unittest discover -s scripts/tests -t scripts
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python3 scripts/test_audit_seams.py
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>python3 scripts/test_audit_snapshot.py
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>python3 scripts/test_audit_update_docs.py
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>python3 scripts/test_review_tracking.py
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>python3 scripts/test_check_audit_smoke.py
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>python3 scripts/test_issue_fix_extraction.py
 </code></pre></div>
 <p>The tests cover the machinery, not what a check <em>decides</em> about a real
 repository. Test that half against local clones:</p>
@@ -13792,6 +13897,36 @@ discard the result with <code>git restore docs/audits/</code>, which is now
 actively dangerous: the other 35 files in that directory are
 hand-written, and a <code>git restore</code> of the directory throws away
 whatever you were editing along with the generated page.</p>
+<h3 id="before-and-after-a-change-to-a-check">Before and after a change to a check<a class="headerlink" href="#before-and-after-a-change-to-a-check" title="Permanent link">&para;</a></h3>
+<p>The tests and a one-repository run both answer "does this do what I
+meant". Neither answers "does everything else still say exactly what
+it said yesterday", and that is the question that matters when a
+change touches shared code: a <code>details</code> string is published to
+<code>docs/audits/compliance.md</code> and into the body of every issue filed
+fleet-wide, so a rewording is a fleet-wide diff that no test fails on.</p>
+<p>Capture a baseline before the change, and compare after it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tools/audit-snapshot.sh ~/src/shakenfist /tmp/snap/before
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a># ... make the change ...
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>tools/audit-snapshot.sh ~/src/shakenfist /tmp/snap/after
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>tools/audit-snapshot.sh --diff /tmp/snap/before /tmp/snap/after
+</code></pre></div>
+<p>The capture takes about forty seconds for a dozen clones. It audits
+every checkout in the directory, skipping git worktrees, and strips
+the <code>timestamp</code> field so that two runs of an unchanged tree compare
+equal. <code>--diff</code> exits non-zero if anything differs and prints the
+status and details on both sides.</p>
+<p>Six checks reach the network -- <code>default-branch-naming</code>,
+<code>github-security</code>, <code>delete-branch-on-merge</code>, <code>merge-queue-config</code>,
+<code>merge-group-cancellation</code> and <code>sfui-vendor</code> -- so they can differ
+between two runs because a repository setting changed rather than
+because the code did. They are reported under their own heading and do
+not affect the exit code. <code>scripts/test_audit_snapshot.py</code> re-derives
+that list from <code>audit-check.py</code> and fails if a check grows a <code>gh</code> call
+without joining it.</p>
+<p>The snapshots are not committed. Generated JSON under <code>scripts/</code> or
+<code>docs/</code> would land in review scope and sit permanently stale in the
+review queue; a scratch directory and a repeatable command give the
+same guarantee without that.</p>
 <p><code>ci.yml</code> also runs the audit against this repository as a smoke test,
 via <code>scripts/check-audit-smoke.py</code>. Linting cannot reach the scheduled
 workflow's runtime assumptions -- the 2026-08-20 outage was a bare

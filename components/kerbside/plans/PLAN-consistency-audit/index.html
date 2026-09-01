@@ -2688,6 +2688,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-audit-scripts-restructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: restructure the audit scripts into a package of check classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/plans/PLAN-plan-template-blocks/" class="md-nav__link">
         
   
@@ -6700,6 +6728,34 @@
     
   
     Consistency audit phase 3: skillsaw CI detection, upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-consistency-audit-phase-04-review-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 4: review scope and coverage
   
 
     
@@ -13823,13 +13879,13 @@ to forcing it.</p>
 <tr>
 <td>3. Skillsaw CI detection, upstream</td>
 <td><a href="/components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/">PLAN-consistency-audit-phase-03-skillsaw-detection.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>16e6173</td>
 </tr>
 <tr>
-<td>4. Review coverage backlog</td>
-<td>PLAN-consistency-audit-phase-04-review-coverage.md</td>
-<td>Not started</td>
+<td>4. Review scope and coverage</td>
+<td><a href="/components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/">PLAN-consistency-audit-phase-04-review-coverage.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -13888,18 +13944,43 @@ repository changes. If <code>development</code> declines, the fallback
 is to record the divergence here and ask for a
 <code>REPO_OVERRIDES</code> exemption rather than to break a CI step
 that works.</p>
-<p><strong>Phase 4 -- review coverage backlog.</strong> Addresses #227.
-Seventy in-scope files need review against a threshold of
-five. This is a human review grind, not an implementation
-step: the phase's job is to sequence it into sessions that
-fit, pick an order that front-loads the files where a review
-is most likely to find something (<code>kerbside/api.py</code>,
-<code>kerbside/proxy_supervisor.py</code>, <code>kerbside/sf_token.py</code>,
-<code>kerbside/sources/ovirt.py</code>), and be honest that the
-remaining bulk is protocol documentation under <code>docs/spice/</code>
-that has never been read end to end. Every mark is a signed
-commit; the signing configuration in <code>AGENTS.md</code> is a
-prerequisite the phase must check before starting.</p>
+<p><strong>Phase 4 -- review scope and coverage.</strong> Addresses #227
+and the <code>review-scope-completeness</code> check. This is a human
+review grind, not an implementation step: the phase's job is
+to sequence it into sessions that fit and pick an order that
+front-loads the files where a review is most likely to find
+something (<code>kerbside/api.py</code>, <code>kerbside/proxy_supervisor.py</code>,
+<code>kerbside/sf_token.py</code>, <code>kerbside/sources/ovirt.py</code>, and the
+Jinja templates that render the endpoints the open security
+issues concern). Every mark is a signed commit; the signing
+configuration in <code>AGENTS.md</code> is a prerequisite the phase must
+check before starting.</p>
+<p><em>Corrected during phase 4 planning:</em> three of this sketch's
+claims did not survive contact with the tree.</p>
+<ul>
+<li>The backlog is <strong>77 files, not 70</strong> -- the 70 was measured
+  on 2026-08-29, before phases 2 and 3 and the renovate
+  merges landed.</li>
+<li><strong>The bulk is not <code>docs/spice/</code>.</strong> Those 9 files are the
+  smallest group of the six. The distribution is <code>kerbside/</code>
+  25, <code>tools/</code> 17, <code>docs/</code> 17, and 7 repository-root files
+  including <code>AGENTS.md</code> and <code>PUSH-AUDIT.md</code>.</li>
+<li><strong>The signing prerequisite does not pass, and never has.</strong>
+  <code>git config</code> has nothing set in either local or global
+  scope, and every mark-adding commit in history is unsigned
+  (<code>git log --format='%h %G? %s' -- REVIEWS.md</code> returns <code>N</code>
+  throughout). The 115 files that already count as reviewed
+  carry no attestation.</li>
+</ul>
+<p>The phase also absorbs a check that did not exist when this
+sketch was written. <code>review-scope-completeness</code> landed
+upstream on 2026-08-30 and fails with 44 orphaned files; it
+is folded in here rather than given a phase, because
+narrowing scope is the cheapest way to close a
+review-coverage issue and settling scope after the grind
+would mean redoing part of it. Fixing scope moves the
+in-scope count from 192 to 227 and the backlog from 77 to
+112, which is the honest number and a worse-looking one.</p>
 <p><strong>Phase 5 -- diagram discipline and mermaid linting.</strong>
 Resolves #370 and #381, both of which arrived on 2026-08-29
 while phase 2 was in flight, when <code>shakenfist/development</code>
@@ -14115,6 +14196,16 @@ phase links. When all phases are complete, set the status to
   will keep arriving. Consider whether the right end state
   is a further phase, a recurring session, or simply closing
   this plan and treating each new issue on its merits.</li>
+<li>The <code>review-coverage</code> audit runs <code>review-tracking.py
+  status</code>, which reads the sidecar and never checks whether
+  the commit carrying a mark was signed. A repository can
+  therefore pass the audit with no attestation at all, which
+  is what kerbside has been doing since the tooling was
+  adopted (phase 4 survey finding 4). The signature is the
+  attestation in this scheme, so an audit that ignores it
+  measures bookkeeping rather than review. Worth raising as
+  an issue on <code>shakenfist/development</code>, alongside the two
+  <code>github-security</code> defects below.</li>
 <li>
 <h1 id="227s-underlying-problem-is-that-review-coverage-decays">227's underlying problem is that review coverage decays<a class="headerlink" href="#227s-underlying-problem-is-that-review-coverage-decays" title="Permanent link">&para;</a></h1>
   with every merge -- the <code>prune-reviews</code> workflow

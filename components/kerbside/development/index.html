@@ -2688,6 +2688,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-audit-scripts-restructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: restructure the audit scripts into a package of check classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-plan-template-blocks/" class="md-nav__link">
         
   
@@ -6321,6 +6349,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-review-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A review session
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#signing-review-marks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6837,6 +6876,34 @@
     
   
     Consistency audit phase 3: skillsaw CI detection, upstream
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-consistency-audit-phase-04-review-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 4: review scope and coverage
   
 
     
@@ -13673,6 +13740,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-review-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A review session
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#signing-review-marks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13915,9 +13993,18 @@ on a syntax error, which is the actual check:</p>
 <p>Kerbside receives periodic whole-file human review in addition to the
 usual review of changes at pull request time; the current state is in
 <a href="https://github.com/shakenfist/kerbside/blob/develop/REVIEWS.md">REVIEWS.md</a>.
-Which files count is set by <code>.vscode/review-scope.toml</code>: Python, Rust,
-shell, and Markdown, less the plan archive in <code>docs/plans/</code> and the
-generated protobuf stubs.</p>
+Which files count is set by <code>.vscode/review-scope.toml</code>: the
+executable artifacts (Python, Rust, shell, JavaScript, protobuf), the
+configuration that is executable in practice (CI workflows,
+Dockerfiles, packaging and tool config), the Jinja templates that
+render the web UI, and the Markdown documentation. Excluded, each
+with a reason recorded in that file, are the plan archive in
+<code>docs/plans/</code>, the generated protobuf stubs, the vendored sfui tree,
+the exported GitHub configuration, <code>Cargo.lock</code>, the generated
+<code>docs/schema.html</code>, the qcow2 test fixtures, and <code>AUTHORS</code> and
+<code>LICENSE</code>. Anything matching neither list is reported by the
+consistency audit's <code>review-scope-completeness</code> check, so a new file
+type is a decision somebody makes rather than a silent omission.</p>
 <p>The state (<code>REVIEWS.md</code>, <code>.vscode/*.weaudit*</code>) is maintained with
 <code>tools/review-tracking.sh</code>, a wrapper around the shared helper in the
 <a href="https://github.com/shakenfist/development/blob/main/docs/code-review-tracking.md">shakenfist/development</a>
@@ -13930,16 +14017,61 @@ report effective coverage at HEAD. On develop itself the
 committing the result back as shakenfist-bot, and the daily
 consistency audit in shakenfist/development files an issue when five
 or more in-scope files need review.</p>
+<h3 id="a-review-session">A review session<a class="headerlink" href="#a-review-session" title="Permanent link">&para;</a></h3>
+<p>Work on a clean tree, from a clone that has just pulled:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>pull
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>./tools/review-tracking.sh<span class="w"> </span>prune
+</code></pre></div>
+<p>The pull is load-bearing rather than hygiene. The <code>prune-reviews</code>
+workflow commits prunes to develop between sessions, and marking
+reviews on a clone that has not picked those up risks a review-state
+commit that conflicts on push. If VSCode was already open, reload the
+window so weAudit re-reads its state file -- it does not watch the
+file for external changes.</p>
+<p>Then pick files, read them, and mark each one reviewed with weAudit's
+<em>Mark File as Reviewed</em>. Prefer working through a tranche in the
+order set by the phase 4 plan
+(<a href="/components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/">PLAN-consistency-audit-phase-04-review-coverage.md</a>)
+over <code>review-tracking.sh next</code>, which picks at random and will
+scatter that order. This lists what is still outstanding in a
+tranche, with the prefix changed to suit:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>./tools/review-tracking.sh<span class="w"> </span>status<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'never reviewed'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s1">'s/.*: //'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'^kerbside/'</span>
+</code></pre></div>
+<p>At the end of the session, stamp and commit. The stamp records each
+newly reviewed file's blob SHA and date in the sidecar, regenerates
+<code>REVIEWS.md</code>, and prints exactly what to <code>git add</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>./tools/review-tracking.sh<span class="w"> </span>stamp
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git<span class="w"> </span>add<span class="w"> </span>.vscode/*.weaudit*<span class="w"> </span>REVIEWS.md
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>git<span class="w"> </span>commit
+</code></pre></div>
+<p>Two things make a session's work count for nothing if they are
+missed. The tree must be clean when a file is marked, or the
+committed tree will not match what was actually read. And the commit
+must be signed -- check with <code>git log --format='%h %G? %s' -1</code>, where
+<code>N</code> means the mark landed with no attestation at all. See below.</p>
+<p>Findings go to issues, not into the same commit. A review session
+produces marks, and where it finds something, a GitHub issue; the fix
+is a separate change that gets reviewed on its own terms.</p>
 <h3 id="signing-review-marks">Signing review marks<a class="headerlink" href="#signing-review-marks" title="Permanent link">&para;</a></h3>
 <p>A review mark is an attestation, so the commit that introduces one
 must be signed -- that signature is what binds the reviewer to the
-exact content reviewed. Signing is configured per clone and is easy
-to forget in a fresh one; check it before stamping, because an
-unsigned review commit records a mark that nothing vouches for:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>config<span class="w"> </span>gpg.format<span class="w"> </span>x509
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git<span class="w"> </span>config<span class="w"> </span>gpg.x509.program<span class="w"> </span>gitsign
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>git<span class="w"> </span>config<span class="w"> </span>commit.gpgsign<span class="w"> </span><span class="nb">true</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>git<span class="w"> </span>config<span class="w"> </span>tag.gpgsign<span class="w"> </span><span class="nb">true</span>
+exact content reviewed.</p>
+<p>Review sessions run under a separate account, in a clone kept for
+that purpose, and the signing configuration below belongs in <strong>that</strong>
+clone rather than in a development one. <code>commit.gpgsign</code> applies to
+every commit git makes, so setting it in a clone used for ordinary
+work means signing ordinary work too, and blocking each commit on a
+Sigstore login for no benefit -- only the commits that add marks
+carry an attestation. Keeping the two clones separate makes that
+split structural instead of something to remember.</p>
+<p>In the review clone, then, check the configuration before stamping,
+because an unsigned review commit records a mark that nothing
+vouches for:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>git<span class="w"> </span>config<span class="w"> </span>gpg.format<span class="w"> </span>x509
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git<span class="w"> </span>config<span class="w"> </span>gpg.x509.program<span class="w"> </span>gitsign
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>git<span class="w"> </span>config<span class="w"> </span>commit.gpgsign<span class="w"> </span><span class="nb">true</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>git<span class="w"> </span>config<span class="w"> </span>tag.gpgsign<span class="w"> </span><span class="nb">true</span>
 </code></pre></div>
 <p>Verify with <code>git log --format='%h %G? %s'</code>; review commits should
 report <code>U</code> (signed, with gitsign's Fulcio chain not in a local trust
@@ -13968,11 +14100,11 @@ the repository.</p>
 change the canonical sfui checkout instead and re-vendor, or the
 next sync will silently discard the local change. To re-vendor from
 a clean, up-to-date sfui checkout:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>tools/vendor.sh<span class="w"> </span>&lt;path-to-kerbside&gt;/kerbside/api/static/sfui
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tools/vendor.sh<span class="w"> </span>&lt;path-to-kerbside&gt;/kerbside/api/static/sfui
 </code></pre></div>
 <p>To check whether the vendored copy has drifted from canonical sfui
 without copying anything:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>tools/vendor.sh<span class="w"> </span>--check<span class="w"> </span>&lt;path-to-kerbside&gt;/kerbside/api/static/sfui
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>tools/vendor.sh<span class="w"> </span>--check<span class="w"> </span>&lt;path-to-kerbside&gt;/kerbside/api/static/sfui
 </code></pre></div>
 <p>Both commands are run from the sfui checkout, not from kerbside.</p>
 <p>Re-vendor from sfui's <code>develop</code> branch once the change you need has
@@ -14029,22 +14161,22 @@ kerbside's dependencies installed. The tox environment already has
 them, which makes <code>.tox/py3/bin/python</code> the interpreter to reach for
 after any <code>tox -epy3</code> run; a virtualenv with <code>pip install -e .</code> works
 just as well. A bare system <code>python3</code> will not.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>tox<span class="w"> </span>-epy3<span class="w">  </span><span class="c1"># only if .tox/py3 does not exist yet</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>.tox/py3/bin/python<span class="w"> </span>tools/preview-templates.py<span class="w"> </span>login<span class="w"> </span>/tmp/preview
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>/tmp/preview<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>python3<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8099</span><span class="o">)</span><span class="w"> </span><span class="p">&amp;</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>chromium<span class="w"> </span>--headless<span class="w"> </span>--disable-gpu<span class="w"> </span>--no-sandbox<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span>--hide-scrollbars<span class="w"> </span>--window-size<span class="o">=</span><span class="m">1280</span>,1000<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span>--virtual-time-budget<span class="o">=</span><span class="m">4000</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span>--screenshot<span class="o">=</span>/tmp/login-dark.png<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span>http://localhost:8099/login.html
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>chromium<span class="w"> </span>--headless<span class="w"> </span>--disable-gpu<span class="w"> </span>--no-sandbox<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">    </span>--hide-scrollbars<span class="w"> </span>--window-size<span class="o">=</span><span class="m">1280</span>,1000<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">    </span>--virtual-time-budget<span class="o">=</span><span class="m">4000</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">    </span>--blink-settings<span class="o">=</span><span class="nv">preferredColorScheme</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">    </span>--screenshot<span class="o">=</span>/tmp/login-light.png<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">    </span>http://localhost:8099/login.html
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tox<span class="w"> </span>-epy3<span class="w">  </span><span class="c1"># only if .tox/py3 does not exist yet</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>.tox/py3/bin/python<span class="w"> </span>tools/preview-templates.py<span class="w"> </span>login<span class="w"> </span>/tmp/preview
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>/tmp/preview<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>python3<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8099</span><span class="o">)</span><span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>chromium<span class="w"> </span>--headless<span class="w"> </span>--disable-gpu<span class="w"> </span>--no-sandbox<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span>--hide-scrollbars<span class="w"> </span>--window-size<span class="o">=</span><span class="m">1280</span>,1000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span>--virtual-time-budget<span class="o">=</span><span class="m">4000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span>--screenshot<span class="o">=</span>/tmp/login-dark.png<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span>http://localhost:8099/login.html
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>chromium<span class="w"> </span>--headless<span class="w"> </span>--disable-gpu<span class="w"> </span>--no-sandbox<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">    </span>--hide-scrollbars<span class="w"> </span>--window-size<span class="o">=</span><span class="m">1280</span>,1000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="w">    </span>--virtual-time-budget<span class="o">=</span><span class="m">4000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="w">    </span>--blink-settings<span class="o">=</span><span class="nv">preferredColorScheme</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="w">    </span>--screenshot<span class="o">=</span>/tmp/login-light.png<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="w">    </span>http://localhost:8099/login.html
 </code></pre></div>
 <p>Three details are easy to get wrong:</p>
 <ul>
@@ -14085,9 +14217,9 @@ protection to cookie-borne tokens.</p>
 <code>.gitignore</code>d <code>target/</code>). Builds are wrapped in Docker via the crate's
 Makefile, which mounts the repo root so the crate can reach
 <code>kerbside/rpc/kerbside.proto</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>make<span class="w"> </span>-C<span class="w"> </span>rust/kerbside-proxy<span class="w"> </span>build<span class="w">   </span><span class="c1"># cargo build in the kerbside-proxy-dev image</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>make<span class="w"> </span>-C<span class="w"> </span>rust/kerbside-proxy<span class="w"> </span><span class="nb">test</span><span class="w">    </span><span class="c1"># cargo test</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>make<span class="w"> </span>-C<span class="w"> </span>rust/kerbside-proxy<span class="w"> </span>lint<span class="w">    </span><span class="c1"># cargo fmt --check + clippy -D warnings</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>make<span class="w"> </span>-C<span class="w"> </span>rust/kerbside-proxy<span class="w"> </span>build<span class="w">   </span><span class="c1"># cargo build in the kerbside-proxy-dev image</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>make<span class="w"> </span>-C<span class="w"> </span>rust/kerbside-proxy<span class="w"> </span><span class="nb">test</span><span class="w">    </span><span class="c1"># cargo test</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>make<span class="w"> </span>-C<span class="w"> </span>rust/kerbside-proxy<span class="w"> </span>lint<span class="w">    </span><span class="c1"># cargo fmt --check + clippy -D warnings</span>
 </code></pre></div>
 <p><code>build.rs</code> generates the tonic gRPC client from the same
 <code>kerbside/rpc/kerbside.proto</code> the Python side uses (vendored protoc, no
@@ -14239,8 +14371,8 @@ most when developing are:</p>
 </ul>
 <h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Permanent link">&para;</a></h2>
 <p>Active sessions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">proxychannels</span><span class="p">;</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">consoletokens</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">expires</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">NOW</span><span class="p">();</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">proxychannels</span><span class="p">;</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">consoletokens</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">expires</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">NOW</span><span class="p">();</span>
 </code></pre></div>
 <p>The daemon supervises the Rust proxy as a single child process (one
 tokio task per connection, not a worker process per connection), so
