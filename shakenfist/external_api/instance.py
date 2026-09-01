@@ -1637,19 +1637,21 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
 # The best documentation I can find for the format of this file and the various
 # fields is this source code:
 # https://gitlab.com/virt-viewer/virt-viewer/-/blob/master/src/virt-viewer-file.c
+# Note that virt-viewer accepts only 'spice' and 'vnc' as the type.
 VIRTVIEWER_TEMPLATE = """[virt-viewer]
 type=%(vdi_type)s
 host=%(node)s
-port=%(vdi_port)s%(vdi_tls_port)s
+port=%(vdi_port)s%(vdi_tls_port)s%(host_subject)s
 delete-this-file=1%(ca_cert)s
 """
 
 
 instance_vv_file_example = """[virt-viewer]
 type=spice
-host=sf-3
+host=192.168.1.53
 port=42281
 tls-port=43197
+host-subject=CN=sf-3
 delete-this-file=1
 ca=-----BEGIN CERTIFICATE-----\nMIIEF...16br/Fw==\n-----END CERTIFICATE-----\n"""
 
@@ -1679,6 +1681,14 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
     def get(self, instance_ref=None, instance_from_db=None):
         p = instance_from_db.ports
 
+        # placement['node'] holds a node UUID, which is not a connectable
+        # address. Emit the node's IP: a node name is not resolvable from
+        # outside the cluster either, and the TLS identity check travels in
+        # host-subject below rather than in the hostname.
+        n = Node.from_db(instance_from_db.placement.get('node'))
+        if not n:
+            return sf_api.error(404, 'placement node not found')
+
         cacert = ''
         if os.path.exists('/etc/pki/libvirt-spice/ca-cert.pem'):
             with open('/etc/pki/libvirt-spice/ca-cert.pem') as f:
@@ -1686,14 +1696,29 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
             cacert = '\nca=%s' % cacert.replace('\n', '\\n')
 
         tls_port = ''
+        host_subject = ''
         if p.get('vdi_tls_port'):
             tls_port = '\ntls-port=%s' % p['vdi_tls_port']
+            # Every hypervisor's SPICE certificate is signed by the same
+            # cluster CA, so without a pinned subject a viewer would accept
+            # any node in the cluster as this endpoint.
+            subject = n.spice_server_cert_subject
+            if subject:
+                host_subject = '\nhost-subject=%s' % subject
+
+        # video['vdi'] is Shaken Fist's internal enum. The SPICE variants
+        # (spiceconcurrent, spicedebug) are server-side policy invisible to
+        # the viewer, which accepts only 'spice' and 'vnc'.
+        vdi_type = instance_from_db.video['vdi']
+        if vdi_type.startswith('spice'):
+            vdi_type = 'spice'
 
         vvconfig = VIRTVIEWER_TEMPLATE % {
-            'vdi_type': instance_from_db.video['vdi'],
-            'node': instance_from_db.placement.get('node'),
+            'vdi_type': vdi_type,
+            'node': n.ip,
             'vdi_port': p.get('vdi_port'),
             'vdi_tls_port': tls_port,
+            'host_subject': host_subject,
             'ca_cert': cacert
         }
 
