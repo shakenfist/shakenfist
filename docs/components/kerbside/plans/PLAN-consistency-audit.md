@@ -236,8 +236,8 @@ to forcing it.
 |-------|------|--------|--------|
 | 1. Shared blocks, vendor stamp and settings closeout | [PLAN-consistency-audit-phase-01-blocks-and-stamp.md](/components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/) | Complete | cbca9b1 |
 | 2. Retire the comment addresser | [PLAN-consistency-audit-phase-02-retire-addresser.md](/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/) | Complete | 5f3c80c |
-| 3. Skillsaw CI detection, upstream | [PLAN-consistency-audit-phase-03-skillsaw-detection.md](/components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/) | In progress | |
-| 4. Review coverage backlog | PLAN-consistency-audit-phase-04-review-coverage.md | Not started | |
+| 3. Skillsaw CI detection, upstream | [PLAN-consistency-audit-phase-03-skillsaw-detection.md](/components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/) | Complete | 16e6173 |
+| 4. Review scope and coverage | [PLAN-consistency-audit-phase-04-review-coverage.md](/components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/) | In progress | |
 | 5. Diagram discipline and mermaid linting | PLAN-consistency-audit-phase-05-diagram-discipline.md | Not started | |
 | 6. Push audit | PLAN-consistency-audit-phase-06-push-audit.md | Not started | |
 
@@ -287,18 +287,44 @@ is to record the divergence here and ask for a
 `REPO_OVERRIDES` exemption rather than to break a CI step
 that works.
 
-**Phase 4 -- review coverage backlog.** Addresses #227.
-Seventy in-scope files need review against a threshold of
-five. This is a human review grind, not an implementation
-step: the phase's job is to sequence it into sessions that
-fit, pick an order that front-loads the files where a review
-is most likely to find something (`kerbside/api.py`,
-`kerbside/proxy_supervisor.py`, `kerbside/sf_token.py`,
-`kerbside/sources/ovirt.py`), and be honest that the
-remaining bulk is protocol documentation under `docs/spice/`
-that has never been read end to end. Every mark is a signed
-commit; the signing configuration in `AGENTS.md` is a
-prerequisite the phase must check before starting.
+**Phase 4 -- review scope and coverage.** Addresses #227
+and the `review-scope-completeness` check. This is a human
+review grind, not an implementation step: the phase's job is
+to sequence it into sessions that fit and pick an order that
+front-loads the files where a review is most likely to find
+something (`kerbside/api.py`, `kerbside/proxy_supervisor.py`,
+`kerbside/sf_token.py`, `kerbside/sources/ovirt.py`, and the
+Jinja templates that render the endpoints the open security
+issues concern). Every mark is a signed commit; the signing
+configuration in `AGENTS.md` is a prerequisite the phase must
+check before starting.
+
+*Corrected during phase 4 planning:* three of this sketch's
+claims did not survive contact with the tree.
+
+- The backlog is **77 files, not 70** -- the 70 was measured
+  on 2026-08-29, before phases 2 and 3 and the renovate
+  merges landed.
+- **The bulk is not `docs/spice/`.** Those 9 files are the
+  smallest group of the six. The distribution is `kerbside/`
+  25, `tools/` 17, `docs/` 17, and 7 repository-root files
+  including `AGENTS.md` and `PUSH-AUDIT.md`.
+- **The signing prerequisite does not pass, and never has.**
+  `git config` has nothing set in either local or global
+  scope, and every mark-adding commit in history is unsigned
+  (`git log --format='%h %G? %s' -- REVIEWS.md` returns `N`
+  throughout). The 115 files that already count as reviewed
+  carry no attestation.
+
+The phase also absorbs a check that did not exist when this
+sketch was written. `review-scope-completeness` landed
+upstream on 2026-08-30 and fails with 44 orphaned files; it
+is folded in here rather than given a phase, because
+narrowing scope is the cheapest way to close a
+review-coverage issue and settling scope after the grind
+would mean redoing part of it. Fixing scope moves the
+in-scope count from 192 to 227 and the backlog from 77 to
+112, which is the honest number and a worse-looking one.
 
 **Phase 5 -- diagram discipline and mermaid linting.**
 Resolves #370 and #381, both of which arrived on 2026-08-29
@@ -538,6 +564,16 @@ phase links. When all phases are complete, set the status to
   will keep arriving. Consider whether the right end state
   is a further phase, a recurring session, or simply closing
   this plan and treating each new issue on its merits.
+* The `review-coverage` audit runs `review-tracking.py
+  status`, which reads the sidecar and never checks whether
+  the commit carrying a mark was signed. A repository can
+  therefore pass the audit with no attestation at all, which
+  is what kerbside has been doing since the tooling was
+  adopted (phase 4 survey finding 4). The signature is the
+  attestation in this scheme, so an audit that ignores it
+  measures bookkeeping rather than review. Worth raising as
+  an issue on `shakenfist/development`, alongside the two
+  `github-security` defects below.
 * #227's underlying problem is that review coverage decays
   with every merge -- the `prune-reviews` workflow
   invalidates a mark whenever its file changes. Phase 4

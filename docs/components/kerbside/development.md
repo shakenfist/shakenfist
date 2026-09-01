@@ -116,9 +116,18 @@ npx -p @mermaid-js/mermaid-cli mmdc -i docs/index.md -o /tmp/index-rendered.md
 Kerbside receives periodic whole-file human review in addition to the
 usual review of changes at pull request time; the current state is in
 [REVIEWS.md](https://github.com/shakenfist/kerbside/blob/develop/REVIEWS.md).
-Which files count is set by `.vscode/review-scope.toml`: Python, Rust,
-shell, and Markdown, less the plan archive in `docs/plans/` and the
-generated protobuf stubs.
+Which files count is set by `.vscode/review-scope.toml`: the
+executable artifacts (Python, Rust, shell, JavaScript, protobuf), the
+configuration that is executable in practice (CI workflows,
+Dockerfiles, packaging and tool config), the Jinja templates that
+render the web UI, and the Markdown documentation. Excluded, each
+with a reason recorded in that file, are the plan archive in
+`docs/plans/`, the generated protobuf stubs, the vendored sfui tree,
+the exported GitHub configuration, `Cargo.lock`, the generated
+`docs/schema.html`, the qcow2 test fixtures, and `AUTHORS` and
+`LICENSE`. Anything matching neither list is reported by the
+consistency audit's `review-scope-completeness` check, so a new file
+type is a decision somebody makes rather than a silent omission.
 
 The state (`REVIEWS.md`, `.vscode/*.weaudit*`) is maintained with
 `tools/review-tracking.sh`, a wrapper around the shared helper in the
@@ -133,13 +142,73 @@ committing the result back as shakenfist-bot, and the daily
 consistency audit in shakenfist/development files an issue when five
 or more in-scope files need review.
 
+### A review session
+
+Work on a clean tree, from a clone that has just pulled:
+
+```bash
+git pull
+./tools/review-tracking.sh prune
+```
+
+The pull is load-bearing rather than hygiene. The `prune-reviews`
+workflow commits prunes to develop between sessions, and marking
+reviews on a clone that has not picked those up risks a review-state
+commit that conflicts on push. If VSCode was already open, reload the
+window so weAudit re-reads its state file -- it does not watch the
+file for external changes.
+
+Then pick files, read them, and mark each one reviewed with weAudit's
+*Mark File as Reviewed*. Prefer working through a tranche in the
+order set by the phase 4 plan
+([PLAN-consistency-audit-phase-04-review-coverage.md](/components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/))
+over `review-tracking.sh next`, which picks at random and will
+scatter that order. This lists what is still outstanding in a
+tranche, with the prefix changed to suit:
+
+```bash
+./tools/review-tracking.sh status | grep 'never reviewed' \
+    | sed 's/.*: //' | grep '^kerbside/'
+```
+
+At the end of the session, stamp and commit. The stamp records each
+newly reviewed file's blob SHA and date in the sidecar, regenerates
+`REVIEWS.md`, and prints exactly what to `git add`:
+
+```bash
+./tools/review-tracking.sh stamp
+git add .vscode/*.weaudit* REVIEWS.md
+git commit
+```
+
+Two things make a session's work count for nothing if they are
+missed. The tree must be clean when a file is marked, or the
+committed tree will not match what was actually read. And the commit
+must be signed -- check with `git log --format='%h %G? %s' -1`, where
+`N` means the mark landed with no attestation at all. See below.
+
+Findings go to issues, not into the same commit. A review session
+produces marks, and where it finds something, a GitHub issue; the fix
+is a separate change that gets reviewed on its own terms.
+
 ### Signing review marks
 
 A review mark is an attestation, so the commit that introduces one
 must be signed -- that signature is what binds the reviewer to the
-exact content reviewed. Signing is configured per clone and is easy
-to forget in a fresh one; check it before stamping, because an
-unsigned review commit records a mark that nothing vouches for:
+exact content reviewed.
+
+Review sessions run under a separate account, in a clone kept for
+that purpose, and the signing configuration below belongs in **that**
+clone rather than in a development one. `commit.gpgsign` applies to
+every commit git makes, so setting it in a clone used for ordinary
+work means signing ordinary work too, and blocking each commit on a
+Sigstore login for no benefit -- only the commits that add marks
+carry an attestation. Keeping the two clones separate makes that
+split structural instead of something to remember.
+
+In the review clone, then, check the configuration before stamping,
+because an unsigned review commit records a mark that nothing
+vouches for:
 
 ```bash
 git config gpg.format x509

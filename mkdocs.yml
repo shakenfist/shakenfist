@@ -148,6 +148,7 @@ nav:
                 - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
+                - "Plan: restructure the audit scripts into a package of check classes": components/development/plans/PLAN-audit-scripts-restructure.md
                 - "Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster": components/development/plans/PLAN-plan-template-blocks.md
                 - "Plan: split the generated compliance tables out of the audit specifications": components/development/plans/PLAN-audit-compliance-split.md
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
@@ -277,6 +278,7 @@ nav:
                 - "Consistency audit phase 1: shared blocks, vendor stamp and settings closeout": components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp.md
                 - "Consistency audit phase 2: retire the comment addresser": components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser.md
                 - "Consistency audit phase 3: skillsaw CI detection, upstream": components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection.md
+                - "Consistency audit phase 4: review scope and coverage": components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage.md
                 - "Convert the kerbside admin UI to sfui": components/kerbside/plans/PLAN-sfui-conversion.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
