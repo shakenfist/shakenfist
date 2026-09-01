@@ -13644,6 +13644,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-11-close-out-the-post-completion-defects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 11: Close out the post-completion defects
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13756,13 +13767,41 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
+  <a href="#bugs-found-during-this-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bugs fixed during this work
+        Bugs found during this work
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Bugs found during this work">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-completion-defects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-completion defects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#related-gap-not-a-defect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related gap (not a defect)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -14195,8 +14234,8 @@ Recommendations are recorded inline.</p>
 <tr>
 <td>0. Decisions and token format</td>
 <td>shakenfist</td>
-<td>PLAN-kerbside-vdi-tokens-phase-00-decisions.md</td>
-<td>Not started</td>
+<td>Folded into this document (no separate plan file)</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>1. Cluster signing key + pubkey publication</td>
@@ -14258,6 +14297,12 @@ Recommendations are recorded inline.</p>
 <td>PLAN-kerbside-vdi-tokens-phase-10-push-audit.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>11. Close out the post-completion defects (#4003, #4009)</td>
+<td>shakenfist</td>
+<td>See <em>Post-completion defects</em> below</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <h3 id="phase-0-decisions-and-token-format">Phase 0: Decisions and token format<a class="headerlink" href="#phase-0-decisions-and-token-format" title="Permanent link">&para;</a></h3>
@@ -14266,6 +14311,16 @@ down as a short normative spec (claims, algorithm, key
 storage, rotation, error responses) inside the phase plan.
 Everything downstream cites that spec. Plan at high effort —
 this is where cross-repo consistency is cheapest to buy.</p>
+<p><strong>What actually happened.</strong> No separate phase 0 plan file was
+ever written: the decisions, the token format and the Open
+questions were settled inline in this document, and every
+downstream phase cited them from here. That is a fine outcome
+and the phase is marked complete on that basis.</p>
+<p>The one obligation that was genuinely dropped is the issue
+tracker scan (see <em>Bugs found during this work</em> below, which
+sat empty from the plan's creation until 2026-09-01). Do not
+read the empty section as "no related bugs existed"; read it
+as "nobody looked".</p>
 <h3 id="phase-1-cluster-signing-key-and-pubkey-publication-sf">Phase 1: Cluster signing key and pubkey publication (SF)<a class="headerlink" href="#phase-1-cluster-signing-key-and-pubkey-publication-sf" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Add <code>cryptography</code> as a direct dependency (PyJWT needs it
@@ -14446,6 +14501,25 @@ last phase's diff alone. Findings land as their own pull
 request, and the plan is not complete until each is resolved
 or declined in writing here. If the audit finds nothing, that
 is recorded in one sentence.</p>
+<h3 id="phase-11-close-out-the-post-completion-defects">Phase 11: Close out the post-completion defects<a class="headerlink" href="#phase-11-close-out-the-post-completion-defects" title="Permanent link">&para;</a></h3>
+<p>Phases 1-9 all closed, and the feature works on a cluster that
+runs Kerbside. But two defects found on 2026-09-01 against
+sfcbr (a cluster that does <em>not</em> run Kerbside) mean the plan's
+own success criteria are not yet met — see <em>Post-completion
+defects</em> below. This phase exists so the plan is not filed as
+finished while they stand:</p>
+<ul>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4003" title="GitHub Issue: shakenfist/shakenfist #4003">shakenfist#4003</a></strong> — gate the <code>vdi-console-proxy</code>
+  capability on <code>config.KERBSIDE_URL</code>. Blocks two success
+  criteria and mission goal 5.</li>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4009" title="GitHub Issue: shakenfist/shakenfist #4009">shakenfist#4009</a></strong> — fix the direct <code>.vv</code> generator (<code>host</code>
+  is a node UUID, <code>type</code> is an SF-internal enum, no
+  <code>host-subject</code>) and add the CI coverage whose absence let it
+  rot.</li>
+</ul>
+<p>Both are shakenfist-only and independent of each other. Neither
+needs a Kerbside deployment to reproduce or to verify, which is
+precisely the property that was never tested.</p>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <p>None hard. This plan is independent of the BYO-MariaDB /
 remove-primary thread — it uses <code>cluster_config</code> as it exists
@@ -14529,7 +14603,12 @@ brief.</p>
   get a console for an instance in another namespace.</li>
 <li>The same command still works with only <code>remote-viewer</code>
   installed, and still works direct-to-hypervisor on
-  clusters with no <code>KERBSIDE_URL</code> configured.</li>
+  clusters with no <code>KERBSIDE_URL</code> configured.
+  <strong>NOT MET as at 2026-09-01</strong> — <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4003" title="GitHub Issue: shakenfist/shakenfist #4003">shakenfist#4003</a> (the
+  capability is advertised unconditionally, so the client
+  never reaches the direct path) and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4009" title="GitHub Issue: shakenfist/shakenfist #4009">shakenfist#4009</a> (the
+  direct <code>.vv</code> is malformed, and <code>remote-viewer</code> rejects its
+  <code>type</code> outright).</li>
 <li>Kerbside opens that console with zero Shaken Fist API calls
   on the exchange path (signature check + local DB only).</li>
 <li>A replayed exchange URL is rejected; an expired one is
@@ -14540,7 +14619,11 @@ brief.</p>
   static/oVirt sources.</li>
 <li>CI proves the end-to-end flow (kerbside SF lane) and the
   minting authorisation gate (SF cluster_ci), and the
-  pre-push checks pass in all four repos.</li>
+  pre-push checks pass in all four repos.
+  <strong>PARTIALLY MET</strong> — both of those lanes exist, but nothing
+  covers a Kerbside-<em>less</em> cluster, which is why #4003 and
+  #4009 both shipped. The pre-push audit (phase 10) has not
+  run.</li>
 <li>Documentation in all four repos reflects the feature, and
   the plan index status tables are current.</li>
 </ul>
@@ -14553,7 +14636,12 @@ brief.</p>
   rendering <code>sources.yaml</code> with a system credential, writing
   <code>KERBSIDE_URL</code> into <code>cluster_config</code>, and wiring kerbside's
   own TLS material. This lands as its own plan once the code
-  support here has proven itself.</li>
+  support here has proven itself. Now tracked as
+  <strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4004" title="GitHub Issue: shakenfist/shakenfist #4004">shakenfist#4004</a></strong>, which also carries the much smaller
+  first increment: a <code>kerbside_url</code> variable rendered into
+  <code>roles/node/templates/config</code>, so an operator can point a
+  cluster at a Kerbside deployed by other means without the
+  full infrastructure-group work.</li>
 <li>Kerbside admin-auth pluggability: kerbside's own login is
   Keystone-only (<code>kerbside/api.py:200</code>), which is an odd
   requirement for an SF-only deployment. Possibly converges
@@ -14565,10 +14653,60 @@ brief.</p>
 <li>Signing-key rotation automation (scheduled rotation rather
   than operator-initiated <code>sf-ctl</code>).</li>
 </ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>(To be filled in as encountered. A scan of the shakenfist and
-kerbside issue trackers for related open bugs should happen
-during phase 0 and be recorded here.)</p>
+<h3 id="bugs-found-during-this-work">Bugs found during this work<a class="headerlink" href="#bugs-found-during-this-work" title="Permanent link">&para;</a></h3>
+<p>The phase 0 tracker scan never happened, so this section sat
+empty through phases 1-9. It was opened on 2026-09-01, after
+the defects below were found by hand.</p>
+<h4 id="post-completion-defects">Post-completion defects<a class="headerlink" href="#post-completion-defects" title="Permanent link">&para;</a></h4>
+<p>Found on 2026-09-01 by running <code>sf-client instance
+vdiconsolefile</code> against <strong>sfcbr</strong>, a cluster with no Kerbside
+deployed. That configuration — the feature off — is the one
+combination no phase ever tested, and both defects live in it.</p>
+<ul>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4003" title="GitHub Issue: shakenfist/shakenfist #4003">shakenfist#4003</a></strong> — <code>vdi-console-proxy</code> is a static entry
+  in <code>API_CAPABILITIES</code> (<code>external_api/app.py</code>), so it is
+  advertised even when <code>config.KERBSIDE_URL</code> is empty. The
+  client's <code>check_capability()</code> is a substring match against
+  the root page and is the only feature-detection channel it
+  has, so it takes the proxy path and dies on the endpoint's
+  own <code>404 kerbside integration is not configured</code>, instead of
+  falling back to the direct <code>.vv</code>.</li>
+</ul>
+<p>This contradicts phase 2's decision 5, which reasoned that
+  "a client probes the <code>vdi-console-proxy</code> capability first
+  anyway". The probe cannot work: the advertisement is not
+  conditional on the config value the guard reads. The fix is
+  more than a one-liner because <code>render_capabilities()</code> walks
+  the dict unconditionally and <code>tests/external_api/test_root.py</code>
+  pins it exhaustively — both need a notion of a conditional
+  token.</p>
+<ul>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4009" title="GitHub Issue: shakenfist/shakenfist #4009">shakenfist#4009</a></strong> — the direct <code>.vv</code> from
+  <code>/vdiconsolehelper</code> is malformed. <code>host=</code> is substituted
+  from <code>instance.placement['node']</code>, which now holds a node
+  <strong>UUID</strong>, so it names a host that resolves nowhere;
+  <code>type=</code> is substituted from <code>instance.video['vdi']</code>, so a
+  <code>spiceconcurrent</code> instance emits a type that virt-viewer
+  rejects with "Unsupported graphic type"; and no
+  <code>host-subject</code> is emitted, leaving ryll's subject pinning
+  inert on this path (any cert from the cluster CA passes).
+  The module's own <code>instance_vv_file_example</code> docstring still
+  shows the correct <code>type=spice</code> / <code>host=sf-3</code>, so the code
+  has disagreed with its own example since placement moved to
+  UUIDs. No test in any repo parses a <code>.vv</code>, which is how all
+  three survived.</li>
+</ul>
+<p>Both are pure-shakenfist and reproduce without a Kerbside
+deployment. Phase 11 tracks closing them.</p>
+<h4 id="related-gap-not-a-defect">Related gap (not a defect)<a class="headerlink" href="#related-gap-not-a-defect" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4004" title="GitHub Issue: shakenfist/shakenfist #4004">shakenfist#4004</a></strong> — the ansible collection has no
+  <code>KERBSIDE_URL</code> knob, so no collection-deployed cluster can
+  turn the feature on. This is the deployer phase this plan
+  deliberately deferred (see Future work), not something that
+  regressed; it is filed so the gap lives in the tracker
+  rather than only in a plan bullet.</li>
+</ul>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>On creation of this plan: add a <em>Master plans</em> row to
 <code>docs/plans/index.md</code> and an entry to <code>docs/plans/order.yml</code>
