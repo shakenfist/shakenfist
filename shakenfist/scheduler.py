@@ -580,11 +580,18 @@ class Scheduler:
                     'requested_disk_gb': requested_disk_gb,
                     'disk_spec': inst.disk_spec,
                     'namespace': inst.namespace,
-                    'forced_candidates': bool(candidates),
+                    'forced_candidates': candidates is not None,
                     'metrics_age_seconds': diff,
                 })
 
-            if candidates:
+            # An empty forced list is still forced: the preflight
+            # redirect builds "every node except this one", and when
+            # that set is empty it means there is nowhere else to go,
+            # not "choose from the whole cluster" -- falling open here
+            # re-offered the one node the caller built the list to
+            # exclude (issue 4001). The pre_schedule stage below turns
+            # the empty set into a LowResourceException.
+            if candidates is not None:
                 add_event_multi(
                     EVENT_TYPE_AUDIT, related_objects,
                     'schedule forced candidates',

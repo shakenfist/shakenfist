@@ -264,6 +264,53 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             scheduler.Scheduler().find_candidates,
             fake_inst, candidates=['barry'])
 
+    def test_empty_forced_list_is_nowhere_not_everywhere(self):
+        # The preflight redirect builds "every node except this one",
+        # and on a single-node metrics snapshot that set is empty. An
+        # empty forced list must mean there is nowhere else to go, not
+        # fall open to the whole cluster -- which re-offers the one
+        # node the caller built the list to exclude (issue 4001).
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        exc = self.assertRaises(
+            exceptions.LowResourceException,
+            scheduler.Scheduler().find_candidates,
+            fake_inst, candidates=[])
+        self.assertEqual(
+            'No nodes remaining at scheduling stage pre_schedule', str(exc))
+
+    def test_empty_forced_list_is_published_as_forced(self):
+        # The schedule events are the primary diagnostic surface for
+        # placement decisions: a redirect with nowhere to go must not
+        # publish itself as a fresh whole-cluster decision (issue 4001).
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            self.assertRaises(
+                exceptions.LowResourceException,
+                scheduler.Scheduler().find_candidates,
+                fake_inst, candidates=[])
+
+        inputs = [c for c in aem.call_args_list
+                  if c.args[2] == 'schedule inputs']
+        self.assertEqual(1, len(inputs))
+        self.assertTrue(inputs[0].kwargs['extra']['forced_candidates'])
+
+        initial = [c for c in aem.call_args_list
+                   if c.args[2] == 'schedule initial candidates']
+        self.assertEqual(1, len(initial))
+        self.assertEqual([], initial[0].kwargs['extra']['candidates'])
+
+    def test_unforced_call_is_published_as_unforced(self):
+        # The other side of the discriminator: passing no candidates at
+        # all must still read as an open, whole-cluster decision.
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            scheduler.Scheduler().find_candidates(fake_inst)
+
+        inputs = [c for c in aem.call_args_list
+                  if c.args[2] == 'schedule inputs']
+        self.assertEqual(1, len(inputs))
+        self.assertFalse(inputs[0].kwargs['extra']['forced_candidates'])
+
 
 class MetricsRefreshTestCase(SchedulerTestCase):
     """Test that we refresh metrics."""
