@@ -25,6 +25,27 @@ TRACE_PATH = '/srv/ci/traces'
 CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 
 
+# An agent operation which ends in a terminal state other than "complete"
+# reaches the caller as one of these. Historically the client had no way to
+# say "this operation definitively failed": every await loop spun out its
+# whole budget and then raised AgentCommandError, so that is what the suite
+# caught and asserted. client-python#380 (agent operation deadlines phase 6)
+# teaches those loops to recognise a terminal state on the first poll and
+# raise the new, more precise AgentOperationFailed instead.
+#
+# Both client versions are in circulation while that lands: this repository's
+# CI builds the client from client-python's develop, and client-python's CI
+# builds the server from this repository's develop, so neither side can
+# switch first. Accepting either exception is what breaks that deadlock. The
+# getattr() is what makes an old client work -- AgentOperationFailed simply
+# does not exist there -- and can be narrowed to a plain reference once the
+# client change has merged. Phase 7 owns that cleanup, along with the rest of
+# this suite's await work.
+AGENT_OPERATION_FAILURES = (
+    apiclient.AgentCommandError,
+    getattr(apiclient, 'AgentOperationFailed', apiclient.AgentCommandError))
+
+
 # Some functional assertions need to observe real host state (network
 # namespaces, links, iptables, libvirt) on a *specific* cluster node, which is
 # not necessarily the node running the suite. The node-exec helpers on
@@ -445,7 +466,7 @@ class BaseTestCase(testtools.TestCase):
                 time.sleep(30)
                 retries += 1
 
-            except apiclient.AgentCommandError as e:
+            except AGENT_OPERATION_FAILURES as e:
                 self._emit_tracing_event({
                     'msg': 'Instance ready (cloud-init status) attempt failed',
                     'instance_uuid': instance_uuid,
@@ -474,7 +495,7 @@ class BaseTestCase(testtools.TestCase):
                     'msg': f'Debug data from {log_file}',
                     'data': data
                 })
-            except apiclient.AgentCommandError as e:
+            except AGENT_OPERATION_FAILURES as e:
                 self._emit_tracing_event({
                     'msg': f'Failed to gather debug data from {log_file}',
                     'error': e

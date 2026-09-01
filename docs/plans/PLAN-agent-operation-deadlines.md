@@ -614,7 +614,7 @@ the slot at all.
 | 4 | [PLAN-agent-operation-deadlines-phase-04-enforcement.md](PLAN-agent-operation-deadlines-phase-04-enforcement.md) | Complete | Enforcement: dequeue expiry, preflight expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check). Survey corrections applied at source: every address in decision 1 was refreshed after phase 1's refactor, the reaper is phase 5's rather than this phase's, and preflight is a fourth enforcement point the design sketch never listed. The phase plan also decides that an expiry records its reason as a state message and an audit event rather than as `.error`, which the `error` setter refuses from a non-`error` state |
 | 5 | [PLAN-agent-operation-deadlines-phase-05-retry.md](PLAN-agent-operation-deadlines-phase-05-retry.md) | Complete | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; the node-local reaper, covering a dead executor thread, no executor at all after a daemon restart, and a live executor wedged in the pre-connection wait. Survey corrections applied at source: decision 5's address for `reap_instance_executors()`, that retryability is evaluated over the whole command list rather than the command in flight, and that partial-result cleanup has a registered-blob case the design sketch did not cover. The phase plan also decides that the terminal-only pop and the reaper must land in one commit, because the pop rule alone turns a daemon restart from a leak into a wedge |
 | 6 | `PLAN-agent-operation-deadlines-phase-06-client.md` (in shakenfist/client-python, branch `agent-operation-deadlines-phase-06-client`) | Complete | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast). The plan file lives in the client repository because the code does, following the `PLAN-vdi-console-tokens.md` precedent; a relative link cannot cross repositories, so it is named here rather than linked. Survey corrections applied at source: the new parameters need a capability token before a client can send them safely, which phase 3 did not add and phase 6 does. The phase plan also decides to repair `await_agent_fetch()`'s three hardcoded timeout windows, which make its `timeout` argument a lie, because the phase rewrites those same loops |
-| 7 | | Not started | Docs (operator + developer guides, and the `v07-v08` release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on `!= 'complete'`, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note `docs/developer_guide/state_machine.md` is **not** this phase's: it is a rendering of `state_targets`, so phase 4 updated it when it added `expired` rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge |
+| 7 | | Not started | Docs (operator + developer guides, and the `v07-v08` release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states, and narrow `base.AGENT_OPERATION_FAILURES` to a plain `AgentOperationFailed` reference now that both client generations no longer need tolerating (audit finding: they spin on `!= 'complete'`, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note `docs/developer_guide/state_machine.md` is **not** this phase's: it is a rendering of `state_targets`, so phase 4 updated it when it added `expired` rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge |
 | 8 | | Not started | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
 Each phase gets its own detailed plan file before implementation.
@@ -680,3 +680,23 @@ see the second review response in
 `PLAN-agent-operation-deadlines-phase-04-enforcement.md`. The
 event-renewed loops above are untouched and remain phase 7's, as does
 restricting renewal to events that represent progress.
+
+**A second slice pulled forward, by CI ordering rather than by
+choice.** Phase 6's client change (client-python#380) makes a
+terminal agent operation state raise the new `AgentOperationFailed`
+on the first poll, where every await loop previously spun out its
+budget and raised `AgentCommandError`. Three places in this suite
+were written against the old behaviour: `test_get_missing_file` in
+both `smoke_ci_tests/test_agentops.py` and
+`guest_ci_tests/test_agentops.py` asserts `AgentCommandError`, and
+`_await_instance_ready`'s cloud-init retry loop (`base.py`) catches
+it twice -- so under the new client a failed health check would
+escape the retry rather than being retried. Neither repository could
+switch first, because this repository's CI builds the client from
+client-python's `develop` and client-python's CI builds the server
+from this repository's `develop`. The deadlock is broken by
+`base.AGENT_OPERATION_FAILURES`, a tuple which accepts either
+exception and resolves the new one through `getattr()` so it still
+imports against an old client. Phase 7 narrows it to a plain
+reference once the client change has merged and the ordering
+constraint is gone.

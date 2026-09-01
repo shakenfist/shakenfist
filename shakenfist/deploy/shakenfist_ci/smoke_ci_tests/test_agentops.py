@@ -2,7 +2,6 @@ import json
 import os
 import time
 
-from shakenfist_client import apiclient
 from testtools import content
 
 from shakenfist_ci import base
@@ -304,7 +303,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
         # Run a fetch command which should fail
         self.assertRaises(
-            apiclient.AgentCommandError, self.test_client.await_agent_fetch,
+            base.AGENT_OPERATION_FAILURES, self.test_client.await_agent_fetch,
             inst['uuid'], '/tmp/nosuch')
 
     def test_interface_plug_and_exec_dhcp(self):
