@@ -84,10 +84,13 @@ Phase 1 of `docs/plans/PLAN-ci-cloud-sizing.md` (see
 decisions behind it) added two data-gathering instruments to every
 functional cluster job, so that later phases can size CI's clouds from
 a distribution instead of the handful of hand-collected numbers the
-plan started from. Neither instrument gates anything -- see "Nothing
-here is a quality gate" below -- so a reader troubleshooting a CI
-failure can skip this section; it matters when reading a job's bundle
-afterwards, or when working on the sizing plan itself.
+plan started from. Neither instrument gates anything itself -- see
+"Nothing here is a quality gate" below -- but the poller's own traffic
+does interact with a check that gates, which is the one reason a
+reader troubleshooting a CI failure might need this section; see "The
+probe's traffic is exempted from the idle-load check". Otherwise it
+matters when reading a job's bundle afterwards, or when working on the
+sizing plan itself.
 
 ### Two instruments, not one
 
@@ -182,7 +185,58 @@ it prints (committed vCPU as a fraction of the admission ledger,
 against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
 phase 0 set those bounds with no distribution to check them against,
 phase 2 replaces or defends them, and any enforcement is phase 5's to
-add. Nothing in CI today can fail because of this instrumentation.
+add. No verdict this instrumentation prints can fail a job.
+
+That is not the same as the instrumentation being invisible to the
+checks that do gate, which is what this section used to say and what
+issue 3975 disproved -- see below.
+
+### The probe's traffic is exempted from the idle-load check
+
+The probe polls, and `test_no_unbudgeted_fixed_rate_database_polling`
+in the functional suite exists to notice polling. Each sample's `GET
+/nodes` runs `Node.external_view()` per node, which is one
+`GetNodeAttributes` and one `GetAllNodeDaemonStates` each, and its
+`GET /admin/resources` reads node metrics per node, which is one
+`GetNodeMetrics` each. On an N node cluster at the default 15 second
+interval that is N/15 per second for all three, from the `api` caller,
+flat across windows and indifferent to what the suite is doing --
+which is exactly the signature of the server-side polling loop the
+check is built to catch. It clears the unbudgeted ceiling, `max(0.25,
+0.05N)` per second, from four nodes upwards; it was found on the six
+node merge queue cluster, where all three read 0.3997/s against
+0.30/s and failed the build (issue 3975).
+
+Those three `(operation, caller)` pairs are therefore listed in
+`HARNESS_DRIVEN_PAIRS` in
+`shakenfist/deploy/shakenfist_ci/load_budget.py`, alongside the events
+reads the suite's own await helpers make. The budget file is
+deliberately not the home for them: no deployed cluster runs the
+probe, so a budget entry would model load that exists nowhere outside
+a CI job, and it would have to be a per-node term, raising every real
+cluster's ceiling in proportion to its size.
+
+Two consequences worth knowing:
+
+* **The exemption costs coverage.** CI can no longer see a *new*
+  fixed-rate poll of node state made through sf-api, whatever its
+  rate. The blind spot is CI's alone -- none of the three pairs is
+  budgeted for the `api` caller, so the
+  `ShakenFistUnbudgetedDatabasePolling` alert, which reads its
+  exclusions from the budget file rather than from that set, still
+  watches all three at the unbudgeted ceiling on every real cluster.
+  The pairs also stay visible in a run's `harness_driven` list rather
+  than being dropped from the report.
+* **Retiring the probe means trimming the exemption.** It outlives
+  its justification otherwise, and no test can catch that on its own:
+  the launcher (`ci_headroom_launch.sh`) and the workflow steps live
+  in `shakenfist/actions`, so a decommission done there stops the
+  probe without touching anything in this repository.
+  `test_the_suite_still_probes_cluster_headroom` covers what it can --
+  it fails if the probe is deleted here, stops sampling on a timer,
+  stops reading one of the two endpoints, or loses the note in its
+  docstring that records this obligation -- but a probe that is simply
+  never launched again looks identical to a running one from here.
 
 An absent census is not zero refusals. When the Loki query failed or
 log shipping was unhealthy, the report says so explicitly rather than
