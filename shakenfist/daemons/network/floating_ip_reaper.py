@@ -69,6 +69,46 @@ def _network_floating_gateways():
     return gateways
 
 
+def _rescue_reservation(ipam, address, owner, reservation_type, log, message):
+    """Repair a missing reservation, logging expected-versus-actual state.
+
+    Called when an active object holds ``address`` but the sweep's
+    ``in_use`` snapshot has no reservation for it. The snapshot is taken
+    at the start of the sweep, so an address whose owner reserved it
+    mid-sweep presents exactly the same way -- ``reserve()`` refusing to
+    write is how the two cases are told apart. Only a reserve which
+    actually wrote a row, or a refusal where the address turns out to be
+    held by someone other than its expected owner, is an error; both are
+    logged with the expected and actual reservation state so an
+    occurrence is diagnosable after the fact (issue 3984).
+    """
+    if ipam.reserve(address, owner, reservation_type,
+                    'Rescued from incorrect registration'):
+        log.with_fields({
+            'expected_user': owner,
+            'expected_type': reservation_type.value,
+            'actual_reservation': None
+        }).error(message)
+        return
+
+    # reserve() refused, so the address is reserved now despite not being
+    # in the snapshot. A reservation held by the expected owner was
+    # written after the snapshot -- benign sweep skew, not a fault. Any
+    # other holder means the address is double booked, which a rescue
+    # cannot repair.
+    actual = ipam.get_reservation(address)
+    fields = {
+        'expected_user': owner,
+        'expected_type': reservation_type.value,
+        'actual_reservation': actual.to_legacy_dict() if actual else None
+    }
+    if actual and (actual.user_type, str(actual.user_uuid)) == owner:
+        log.with_fields(fields).info(
+            'Floating reservation appeared mid-sweep, no rescue required')
+    else:
+        log.with_fields(fields).error(message)
+
+
 def reap_floating_ips():
     """Run one reconciliation sweep of the floating network's IPAM.
 
@@ -96,8 +136,10 @@ def reap_floating_ips():
     # that path along with its tests.
     #
     # Snapshot skew is safe. On the rescue paths a stale entry means at worst
-    # a reserve() which returns False, and read-then-reserve was never atomic
-    # anyway. On the leak path an address must look leaked across
+    # a reserve() which returns False -- which _rescue_reservation inspects
+    # rather than mistaking for a repaired fault (issue 3984), and
+    # read-then-reserve was never atomic anyway. On the leak path an address
+    # must look leaked across
     # LEAK_CONFIRMATION_SECONDS -- ten consecutive sweeps -- before anything
     # is released, so an address reserved after this snapshot drops out on
     # the next pass long before it could be reaped.
@@ -122,13 +164,11 @@ def reap_floating_ips():
         if fg:
             floating_gateways.append(fg)
             if fg not in in_use:
-                floating_network.ipam.reserve(
-                    fg, n.unique_label(), ReservationType.GATEWAY,
-                    'Rescued from incorrect registration')
-                LOG.with_fields({
-                    'network': n.uuid,
-                    'address': fg
-                }).error('Floating gateway not reserved correctly')
+                _rescue_reservation(
+                    floating_network.ipam, fg, n.unique_label(),
+                    ReservationType.GATEWAY,
+                    LOG.with_fields({'network': n.uuid, 'address': fg}),
+                    'Floating gateway not reserved correctly')
     LOG.info('Found floating gateways: %s' % floating_gateways)
 
     floating_addresses = []
@@ -137,13 +177,11 @@ def reap_floating_ips():
         if fa:
             floating_addresses.append(fa)
             if fa not in in_use:
-                floating_network.ipam.reserve(
-                    fa, ni.unique_label(), ReservationType.FLOATING,
-                    'Rescued from incorrect registration')
-                LOG.with_fields({
-                    'interface': ni.uuid,
-                    'address': fa
-                }).error('Floating address not reserved correctly')
+                _rescue_reservation(
+                    floating_network.ipam, fa, ni.unique_label(),
+                    ReservationType.FLOATING,
+                    LOG.with_fields({'interface': ni.uuid, 'address': fa}),
+                    'Floating address not reserved correctly')
     LOG.info('Found floating addresses: %s' % floating_addresses)
 
     floating_routed = []

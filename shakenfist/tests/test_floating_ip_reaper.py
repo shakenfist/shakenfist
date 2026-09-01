@@ -39,7 +39,7 @@ class FakeIPAM:
     ``table_reads``.
     """
 
-    def __init__(self, in_use=None, reservations=None):
+    def __init__(self, in_use=None, reservations=None, reserve_result=True):
         self.reserve_calls = []
         self.released = []
         self._in_use = in_use if in_use is not None else set()
@@ -47,6 +47,7 @@ class FakeIPAM:
         self.broadcast_address = '192.168.10.255'
         self.network_address = '192.168.10.0'
         self.table_reads = 0
+        self.reserve_result = reserve_result
 
     @property
     def in_use(self):
@@ -59,7 +60,7 @@ class FakeIPAM:
     def reserve(self, address, user, reservation_type, comment):
         self.reserve_calls.append(
             (address, user, reservation_type, comment))
-        return True
+        return self.reserve_result
 
     def get_address_at_index(self, idx):
         return '192.168.10.%d' % idx
@@ -159,6 +160,33 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
         self.assertEqual('192.168.10.42', address)
         self.assertEqual((ObjectType.INTERFACE, 'iface-uuid'), user)
         self.assertEqual(ReservationType.FLOATING, reservation_type)
+
+    def test_address_reserved_mid_sweep_does_not_log_an_error(self):
+        # The interface gained its floating address (and reservation)
+        # after the sweep snapshotted in_use, so the rescue's reserve()
+        # is refused. That is the sweep racing normal operation, not a
+        # fault, and must not log at error (issue 3984).
+        fake_ni = mock.MagicMock()
+        fake_ni.uuid = 'iface-uuid'
+        fake_ni.floating = {'floating_address': '192.168.10.42'}
+        fake_ni.unique_label.return_value = (
+            ObjectType.INTERFACE, 'iface-uuid')
+
+        actual = _reservation(
+            user_type=ObjectType.INTERFACE, user_uuid='iface-uuid')
+        actual.to_legacy_dict.return_value = {}
+        ipam = FakeIPAM(
+            in_use=set(),
+            reservations={'192.168.10.42': actual},
+            reserve_result=False)
+
+        with mock.patch.object(floating_ip_reaper, 'LOG') as log:
+            self.assertTrue(self._sweep(ipam, interfaces=[fake_ni]))
+
+        error_calls = [c for c in log.mock_calls if c[0].endswith('error')]
+        self.assertEqual(
+            [], error_calls,
+            'a reservation written mid-sweep was logged as an error')
 
     def test_no_floating_network_returns_false(self):
         with mock.patch.object(
@@ -310,6 +338,96 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
             self.assertRaises(
                 exceptions.DatabaseUnavailable,
                 floating_ip_reaper.reap_floating_ips)
+
+
+def _actual_reservation(user_type, user_uuid):
+    res = mock.Mock()
+    res.user_type = user_type
+    res.user_uuid = user_uuid
+    res.to_legacy_dict.return_value = {
+        'address': '192.168.10.42',
+        'user': (str(user_type), user_uuid) if user_type else None,
+        'when': 0,
+        'type': 'floating',
+        'comment': ''
+    }
+    return res
+
+
+class RescueReservationTestCase(base.ShakenFistTestCase):
+    """The rescue path must say what was expected, what was found, and
+    whether it actually repaired anything (issue 3984). A reservation
+    written between the sweep's in_use snapshot and the object walk is
+    benign skew, not an error.
+    """
+
+    OWNER = (ObjectType.INTERFACE, 'iface-uuid')
+
+    def _rescue(self, ipam):
+        log = mock.MagicMock()
+        floating_ip_reaper._rescue_reservation(
+            ipam, '192.168.10.42', self.OWNER, ReservationType.FLOATING,
+            log, 'Floating address not reserved correctly')
+        return log
+
+    def test_missing_reservation_is_rescued_and_logged_with_detail(self):
+        ipam = mock.MagicMock()
+        ipam.reserve.return_value = True
+
+        log = self._rescue(ipam)
+
+        ipam.reserve.assert_called_once_with(
+            '192.168.10.42', self.OWNER, ReservationType.FLOATING,
+            'Rescued from incorrect registration')
+        fields = log.with_fields.call_args[0][0]
+        self.assertEqual(self.OWNER, fields['expected_user'])
+        self.assertEqual('floating', fields['expected_type'])
+        self.assertIsNone(fields['actual_reservation'])
+        log.with_fields.return_value.error.assert_called_once_with(
+            'Floating address not reserved correctly')
+
+    def test_reservation_written_mid_sweep_is_not_an_error(self):
+        ipam = mock.MagicMock()
+        ipam.reserve.return_value = False
+        ipam.get_reservation.return_value = _actual_reservation(
+            ObjectType.INTERFACE, 'iface-uuid')
+
+        log = self._rescue(ipam)
+
+        log.with_fields.return_value.error.assert_not_called()
+        log.with_fields.return_value.info.assert_called_once_with(
+            'Floating reservation appeared mid-sweep, no rescue required')
+
+    def test_conflicting_reservation_logs_expected_versus_actual(self):
+        ipam = mock.MagicMock()
+        ipam.reserve.return_value = False
+        ipam.get_reservation.return_value = _actual_reservation(
+            ObjectType.INTERFACE, 'someone-else')
+
+        log = self._rescue(ipam)
+
+        log.with_fields.return_value.info.assert_not_called()
+        fields = log.with_fields.call_args[0][0]
+        self.assertEqual(self.OWNER, fields['expected_user'])
+        self.assertEqual(
+            ('interface', 'someone-else'),
+            tuple(fields['actual_reservation']['user']))
+        log.with_fields.return_value.error.assert_called_once_with(
+            'Floating address not reserved correctly')
+
+    def test_reservation_vanished_before_reread_is_still_an_error(self):
+        # reserve() refused but the row was gone by the time we read it
+        # back: something is churning this address and it deserves eyes.
+        ipam = mock.MagicMock()
+        ipam.reserve.return_value = False
+        ipam.get_reservation.return_value = None
+
+        log = self._rescue(ipam)
+
+        fields = log.with_fields.call_args[0][0]
+        self.assertIsNone(fields['actual_reservation'])
+        log.with_fields.return_value.error.assert_called_once_with(
+            'Floating address not reserved correctly')
 
 
 class CountingNetwork:
