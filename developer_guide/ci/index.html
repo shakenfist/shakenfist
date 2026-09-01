@@ -13451,6 +13451,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#affinity-test-skips-are-topology-dependent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affinity test skips are topology dependent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#upgrade-data-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13947,6 +13958,46 @@ all. Such a filter matches nothing, and the empty census that results
 is reported honestly as "no schedule stage events at all", which reads
 like an idle cluster rather than a broken query.</p>
 <h2 id="coverage-the-functional-suite-does-not-have">Coverage the functional suite does not have<a class="headerlink" href="#coverage-the-functional-suite-does-not-have" title="Permanent link">&para;</a></h2>
+<h3 id="affinity-test-skips-are-topology-dependent">Affinity test skips are topology dependent<a class="headerlink" href="#affinity-test-skips-are-topology-dependent" title="Permanent link">&para;</a></h3>
+<p><code>cluster_ci_tests/test_scheduler.py</code>'s <code>test_affinity</code> skips rather
+than passes on two degeneracies, because in both the assertion could
+not have failed and a pass would be a false green. The two carry
+different messages, and which one is expected depends on the
+topology -- so a permanently skipping run cannot be read as a healthy
+one:</p>
+<ul>
+<li><strong><code>only N candidates</code></strong> -- the scorer considered fewer than two
+  nodes, so affinity was never consulted. Expected on any cluster
+  with fewer than three hypervisors, where the test's own
+  <code>len(nodes) &lt; 3</code> guard usually fires first.</li>
+<li><strong><code>affine node not a candidate</code></strong> -- the node the test is affine to
+  was ejected by an admission filter (CPU, memory or disk) before
+  scoring. This is issue #3565's real mechanism and is not an
+  affinity defect. <strong>Expected on <code>slim-tier</code> until
+  <code>PLAN-ci-cloud-sizing</code> lands</strong>, since that topology runs the same
+  suite on roughly half the resources and the admission filters bind
+  there.</li>
+</ul>
+<p>Neither skip is expected on <code>slim-primary</code>. A <code>slim-primary</code> run
+reporting either one is a real signal: the cluster is smaller than it
+should be, or the scheduler is ejecting nodes it should not. Treat it
+as a failure to investigate rather than a pass.</p>
+<p>This expectation is <strong>documentation, not enforcement</strong>, and that is a
+deliberate trade rather than an oversight. A skip is green, so nothing
+in CI fails if <code>slim-primary</code> starts skipping too -- the "does not skip
+on a healthy three-node run" check was made once by hand. The obvious
+automation, failing rather than skipping when <code>get_nodes()</code> returns
+three or more, would fail every <code>slim-tier</code> run, and <code>slim-tier</code> is
+expected to skip until <code>PLAN-ci-cloud-sizing</code> lands. Once it does, and
+neither topology is expected to skip, that guard becomes worth adding:
+fail rather than skip on any cluster with three or more hypervisors.</p>
+<p><code>test_binary_affinity_prefers_the_tagged_node</code> shares both skips and
+reads the same way, since it asserts the binary model's soft half
+through the same helper.
+<code>test_unsatisfiable_require_with_tag_is_refused</code> shares neither: it
+asserts a refusal, needs no successful create and no candidate count,
+and so is expected to run on every topology including a single-node
+one. A skip there is a bug in the test.</p>
 <h3 id="upgrade-data-verification">Upgrade data verification<a class="headerlink" href="#upgrade-data-verification" title="Permanent link">&para;</a></h3>
 <p>Every functional job deploys a fresh cluster, so nothing in the suite
 observes an upgraded one. <code>cluster_ci_tests/test_upgrades.py</code> used to

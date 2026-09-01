@@ -11789,6 +11789,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affinity
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -11805,6 +11823,69 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-preference-promises-and-what-it-does-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a preference promises, and what it does not
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constraints-not-just-preferences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints, not just preferences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-weighted-form-is-deprecated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The weighted form is deprecated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -13343,6 +13424,58 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-preference-promises-and-what-it-does-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a preference promises, and what it does not
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constraints-not-just-preferences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints, not just preferences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-weighted-form-is-deprecated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The weighted form is deprecated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -13390,15 +13523,34 @@ affinity metadata entry like this:</p>
 preference value are, although generally we recommend they range from -100 to 100,
 where 100 means you'd really really love to be on the same hypervisor, and -100
 means you'd be very unhappy to be on the same hypervisor.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This weighted form is <strong>deprecated</strong>, and the magnitude is already
+ignored by the scheduler -- only the sign is read. It still works and
+will for at least one more release, but new specifications should use
+the constraint form described in
+<a href="#constraints-not-just-preferences">Constraints, not just preferences</a>.
+See <a href="#the-weighted-form-is-deprecated">The weighted form is deprecated</a>.</p>
+</div>
 <details class="info" open="open">
 <summary>Info</summary>
-<p>Under the hood, Shaken Fist filters possible candidate hypervisors based on
-the affinity coefficients specified. Only tags from within your namespace are
-considered for this filtration. This decision is only made on the original
-start up of an instance, and does not apply later. That is, if you change
-the tags or affinity of an instance after instance creation it will not
-affect that instance in any way, although it might affect scheduling decisions
-for future instances.</p>
+<p>Under the hood, weights <strong>rank</strong> the candidate hypervisors rather than
+filtering them. Every hypervisor which can host your instance at all
+remains a candidate whatever the weights say; the weights decide which
+of them is preferred. That distinction is the whole of the next
+section, and it is the difference between a preference and a promise.
+The constraint form described below does filter, and is how you ask
+for a hypervisor to be ruled out rather than merely disfavoured.</p>
+<p>Only tags from within your namespace are considered, for both forms.</p>
+<p>The specification is re-read <strong>every time the instance is scheduled</strong>,
+which includes every restart and reschedule and not only the original
+create. So a specification you change later applies from the next
+restart onwards, and a hard constraint no hypervisor can satisfy by
+then will refuse that restart -- after trying every hypervisor in the
+cluster, not only the one it was on. If you have an instance which
+must always be able to start, prefer <code>prefer_*</code> over <code>require_*</code>: a
+ranking with nothing to rank is harmless, and a constraint with
+nothing to satisfy it is not.</p>
 </details>
 <p>You can of course have more than one tag and affinity preference set at a time.
 So to extend our example, let's say that web servers do not prefer sharing with
@@ -13411,6 +13563,162 @@ like this:</p>
 </code></pre></div>
 <p>Or on the command line:</p>
 <p><code>sf-client instance set-metadata ...uuid... affinity '{"webserver": -10, "cache": 10}'</code></p>
+<h2 id="what-a-preference-promises-and-what-it-does-not">What a preference promises, and what it does not<a class="headerlink" href="#what-a-preference-promises-and-what-it-does-not" title="Permanent link">&para;</a></h2>
+<p>A preference is consulted <strong>when the scheduler has a choice</strong>. It is not a
+guarantee, and it is not a constraint.</p>
+<p>That distinction matters more than it sounds. The scheduler first decides
+which hypervisors <em>can</em> host your instance at all -- enough CPU, enough
+memory, enough disk -- and only then ranks the survivors by affinity. If
+that first step leaves exactly one candidate, there is no ranking to do:
+your instance is placed on the only node available, whether your affinity
+wanted it there or not.</p>
+<p>So a single-candidate placement is <strong>neither a preference honoured nor a
+preference violated</strong>. It is a placement made without consulting your
+preference, because there was nothing to consult it about. If you look at
+where two instances landed and conclude that affinity was ignored, check
+first how many candidates the scheduler actually had.</p>
+<p>The scheduling events tell you which happened. See
+<a href="/operator_guide/scheduler/">the scheduler operator guide</a> for how to read
+<code>schedule have highest affinity</code> and <code>schedule final candidates</code> to tell
+"scored wrong" apart from "had no choice".</p>
+<h2 id="constraints-not-just-preferences">Constraints, not just preferences<a class="headerlink" href="#constraints-not-just-preferences" title="Permanent link">&para;</a></h2>
+<p>Weights answer "would you rather", and there are times you need to answer
+"you must". Affinity therefore accepts a second value shape, using four
+reserved names instead of tag weights:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>{
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    "require_with_tag": ["database"],
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    "require_without_tag": ["batch"],
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    "prefer_with_tag": ["cache"],
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    "prefer_without_tag": ["webserver"]
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>}
+</code></pre></div>
+<p>Or on the command line:</p>
+<p><code>sf-client instance set-metadata ...uuid... affinity '{"require_without_tag": ["batch"]}'</code></p>
+<p>Each name takes a JSON list of tags, and you may use any subset of the four.</p>
+<p>All four match the tags of instances <strong>already placed on a candidate
+hypervisor</strong>, and only instances in <strong>your own namespace</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Strength</th>
+<th>Effect on a hypervisor hosting a matching instance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>require_with_tag</code></td>
+<td>hard</td>
+<td>Hypervisors hosting <em>no</em> matching instance cannot host yours at all</td>
+</tr>
+<tr>
+<td><code>require_without_tag</code></td>
+<td>hard</td>
+<td>Hypervisors hosting a matching instance cannot host yours at all</td>
+</tr>
+<tr>
+<td><code>prefer_with_tag</code></td>
+<td>soft</td>
+<td>+1 to the hypervisor's score, per matching instance</td>
+</tr>
+<tr>
+<td><code>prefer_without_tag</code></td>
+<td>soft</td>
+<td>-1 from the hypervisor's score, per matching instance</td>
+</tr>
+</tbody>
+</table>
+<p>The hard pair is applied alongside the CPU, memory and disk filters rather
+than as a ranking. If no hypervisor satisfies them, the create fails with a
+<strong>409 Conflict</strong> naming the constraint -- where the weighted form would have
+silently placed the instance anywhere. The soft pair behaves exactly as
+weights did: it ranks the hypervisors that survived the hard filters.</p>
+<details class="warning" open="open">
+<summary>Hard constraints are re-checked on every restart</summary>
+<p>A <code>require_*</code> constraint is not a create-time decision. The scheduler
+runs the same filter whenever the instance is scheduled, restarts and
+reschedules included, so an instance placed under
+<code>require_with_tag: ["database"]</code> can be refused later if the tagged
+neighbour it was placed beside has since been deleted. The refusal
+happens only after every hypervisor in the cluster has been tried, and
+the error names the constraint rather than reporting a full cluster.</p>
+<p>This is deliberate: a constraint which applied once and then stopped
+would be a create-time hint with a misleading name, and
+<code>require_without_tag</code> in particular is not something an instance stops
+needing on its second boot. But it does mean <code>require_*</code> trades some
+of an instance's ability to restart for the guarantee, where
+<code>prefer_*</code> does not.</p>
+</details>
+<p>Two things about that table are easy to read past, and both are covered in
+detail below. The soft forms are terms in a <strong>sum</strong> and not soft vetoes, so
+<code>prefer_without_tag</code> can be outvoted. And the namespace scope applies to the
+hard forms too, so <code>require_without_tag</code> is <strong>not</strong> an isolation primitive.</p>
+<details class="warning" open="open">
+<summary><code>prefer_*</code> terms are a sum, not a veto</summary>
+<p>Each matching neighbouring instance contributes +1 (for
+<code>prefer_with_tag</code>) or -1 (for <code>prefer_without_tag</code>), and the totals are
+summed <strong>across neighbours and across tags</strong>. So <code>prefer_without_tag</code>
+is a term in a sum rather than a soft veto, and a match on it can be
+outvoted by neighbour count on the other axis.</p>
+<p>Concretely, with <code>prefer_with_tag: ["web"]</code> and
+<code>prefer_without_tag: ["batch"]</code> both set: a hypervisor hosting three
+<code>web</code> instances and one <code>batch</code> scores +2, and beats a hypervisor
+hosting one <code>web</code> and no <code>batch</code> at +1 -- even though the first one
+has the tag you asked to avoid. If you need the avoidance honoured
+regardless of neighbour count, use <code>require_without_tag</code>.</p>
+</details>
+<details class="info" open="open">
+<summary><code>require_without_tag</code> is not an isolation primitive</summary>
+<p>Like the weighted form, the constraints only consider instances in
+<strong>your own namespace</strong>. <code>require_without_tag</code> will not keep your
+instance away from another tenant's workload, because it cannot see
+it. It is a placement constraint within your namespace, not a security
+or isolation boundary.</p>
+</details>
+<details class="warning" open="open">
+<summary>The first member of a <code>require_with_tag</code> group</summary>
+<p>The constraints match instances <em>already placed</em>, so the first
+instance of a group cannot be created under the constraint that
+defines the group. Ask for <code>require_with_tag: ["web"]</code> on a cluster
+where nothing in your namespace carries the <code>web</code> tag and every
+hypervisor is ejected, so you get a 409 -- including when the
+instance you are trying to create is the one that would carry the
+tag. This is the constraint working, not a bug, but it has no way
+out on its own.</p>
+<p>Seed the group first: create one instance carrying the tag and
+<em>without</em> the <code>require_with_tag</code> constraint, then create the rest
+with it. Or use <code>prefer_with_tag</code>, where having nothing to rank is
+harmless.</p>
+</details>
+<p>The two value shapes cannot be mixed in one specification. A dictionary of
+tag weights is the weighted form; a dictionary using the four reserved
+names is the constraint form; a dictionary containing both is rejected with
+a 400, because either way of resolving it would silently discard half of
+what you asked for.</p>
+<h2 id="the-weighted-form-is-deprecated">The weighted form is deprecated<a class="headerlink" href="#the-weighted-form-is-deprecated" title="Permanent link">&para;</a></h2>
+<p>Tag weights still work, and will keep working for at least one more
+release. They are mapped onto the constraint form when the scheduler reads
+them: a positive weight becomes <code>prefer_with_tag</code>, a negative weight
+becomes <code>prefer_without_tag</code>, and zero becomes nothing, which is what zero
+always meant.</p>
+<p><strong>The magnitude is discarded by that mapping.</strong> <code>{"webserver": -10}</code> and
+<code>{"webserver": -100}</code> now behave identically. This is deliberate: a weight
+was a multiplier on a count of neighbouring instances that you could not
+predict when you wrote it, so two weights were never really comparable.
+What replaces it is a quantity that is defined -- how many matching
+neighbours a hypervisor has.</p>
+<p>Ordering is unchanged whenever every weight in a specification shares a
+magnitude, which includes every single-tag specification. Where magnitudes
+differ, ordering can change: <code>{"a": 100, "b": 1}</code> maps to
+<code>prefer_with_tag: ["a", "b"]</code>, so a hypervisor carrying only <code>b</code> now ties
+with one carrying only <code>a</code>.</p>
+<p>Setting a weighted specification records a deprecation event against the
+instance. Note that this happens when the specification is <strong>accepted</strong>, so
+instances that were already carrying a weighted specification before the
+upgrade do not produce one -- see
+<a href="/operator_guide/scheduler/">the scheduler operator guide</a> for how to find
+them.</p>
+<h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist emits a series of events while making a scheduling decision for an
 instance, and those events are useful for debugging affinity operations. You can
 see the events for an instance with this command:</p>

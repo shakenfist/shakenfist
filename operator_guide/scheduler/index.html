@@ -13891,9 +13891,19 @@ a placement decision can be reconstructed after the fact (see
    filesystems. The candidate node publishes its own reservation as
    the <code>disk_reservation_gb</code> metric, so admission honours that
    node's per-host value rather than the evaluator's own config.</li>
+<li><strong>Hard affinity constraints</strong> -- if the instance requested
+   <code>require_with_tag</code> or <code>require_without_tag</code>, nodes which do not
+   satisfy them are excluded. This is admission, not ranking: a node
+   without a matching co-located instance cannot host this instance
+   at all. If it empties the candidate set the create fails with a
+   <strong>409</strong>, not a 507, because the cluster is not full -- it simply
+   has nowhere that satisfies the constraint, and no amount of added
+   capacity would change that. The stage is skipped entirely when no
+   hard constraint was requested.</li>
 <li><strong>Affinity</strong> -- surviving nodes are scored against the
    instance's affinity tags and only the highest-scoring group
-   continues.</li>
+   continues. Skipped when the instance requested no affinity, since
+   a scorer with nothing to score cannot change the ordering.</li>
 <li><strong>Queue health</strong> -- nodes with more than 20 waiting queue jobs
    are excluded; they are not keeping up.</li>
 <li><strong>Disk bandwidth</strong> -- nodes whose disks are saturated (busy
@@ -13910,7 +13920,7 @@ atomic capacity claim made once a candidate is chosen (see <a href="#admission-i
 is a guarded capacity claim</a>
 below), so a node that survives every pre-filter here can still be
 refused there if another concurrent create took the last slot first.
-Stages 7 and 8 are <strong>load shedding</strong>: they answer whether a node is a
+Stages 8 and 9 are <strong>load shedding</strong>: they answer whether a node is a
 good idea right now. Affinity sits between the two deliberately. A
 busy node is still a node the user asked for, so load shedding may
 narrow the winning affinity group but never moves placement out of it
@@ -14536,11 +14546,26 @@ tells the whole story:</p>
   compared against the hard maximum; for RAM it includes the
   reservation subtracted, or the committed memory compared against
   the counters' limit.</li>
+<li><code>schedule at stage affinity_constraints</code> is the hard constraint
+  filter, with a <code>dropped</code> map naming which of <code>require_with_tag</code> or
+  <code>require_without_tag</code> ejected each node. It is absent when no hard
+  constraint was requested.</li>
 <li><code>schedule have highest affinity</code> includes the winning score and
   a per-candidate <code>affinity_detail</code> breakdown of which neighbouring
-  instances contributed what. <code>schedule keeping affinity despite
+  instances contributed what. Its <code>candidates</code> field is the
+  <strong>winning tier after scoring</strong>, not the set the scorer was given;
+  the size of the set it considered is the number of entries in
+  <code>affinity_detail</code>. The two are easy to confuse and answer
+  different questions. <code>schedule keeping affinity despite
   transient load</code> follows it when load shedding was ignored to
-  honour that group.</li>
+  honour that group. <strong>The event has a second shape</strong>: an instance
+  which requested no soft affinity at all -- which is most of them
+  -- gets <code>affinity_detail: {}</code> and <code>highest_affinity: 0</code>, with
+  <code>candidates</code> and <code>by_affinity</code> still holding every candidate.
+  The scorer is skipped outright when there is nothing to score,
+  because walking every candidate's placed instances is not free,
+  so an empty breakdown there means "nothing was asked for" and
+  not "the events went missing".</li>
 <li><code>schedule have lowest cpu load</code> includes per-node <code>load_detail</code>:
   raw <code>cpu_load_1</code>, the denominator used, the normalised load, the
   committed-RAM fraction and the bucket.</li>
@@ -14571,6 +14596,93 @@ It also breaks the CPU decision out into <code>cpu_hard_max</code>,
 guarded capacity claim</a> for what
 <code>cpu_committed</code> and its <code>cpu_committed_row_present</code> companion actually
 mean.</p>
+<h3 id="was-affinity-ignored-or-was-there-no-choice">Was affinity ignored, or was there no choice?<a class="headerlink" href="#was-affinity-ignored-or-was-there-no-choice" title="Permanent link">&para;</a></h3>
+<p>This is the question almost every affinity report turns out to be,
+and the events answer it directly. Read them at the API's maximum
+limit, because the scheduling events are the <em>oldest</em> an instance has
+and a default read of 100 returns the newest:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sf-client instance events ...uuid... | head -50
+</code></pre></div>
+<p>Two events decide it, and they must come from the <strong>create-path</strong>
+scheduling pass. <code>find_candidates()</code> runs more than once per
+instance -- once unforced from the create path, and again forced
+against a single node by preflight -- so pick the pass whose
+<code>schedule inputs</code> event has <code>forced_candidates</code> false. The forced
+passes each publish an affinity event with exactly one candidate,
+which looks like a scorer that ignored you and is really a scorer
+that was given no choice.</p>
+<p>Then, in that pass's <code>schedule have highest affinity</code>:</p>
+<ul>
+<li><strong>Is <code>affinity_detail</code> empty?</strong> Then this instance requested no
+  soft affinity, the scorer was skipped, and there is nothing here
+  to diagnose. Check the instance's <code>affinity</code> metadata before
+  reading any further: a specification of nothing but <code>require_*</code>
+  constraints also lands here, and its story is in the <code>schedule at
+  stage affinity_constraints</code> event instead.</li>
+<li><strong>How many entries does <code>affinity_detail</code> have?</strong> That is how many
+  nodes the scorer actually considered. If it is 1, affinity was
+  never consulted: the placement is neither honoured nor violated,
+  and the answer lies in the earlier <code>schedule at stage ...</code> events,
+  whose <code>dropped</code> maps say which filter removed everything else.</li>
+<li><strong>Is the node you expected present in <code>affinity_detail</code> at all?</strong>
+  If not, it was removed by an admission filter -- CPU, memory or
+  disk -- <em>before</em> scoring. Again the <code>dropped</code> maps name the stage.
+  This is the common case, and it is a capacity story rather than an
+  affinity one.</li>
+<li><strong>If it is present, what did it score?</strong> Now the scoring is the
+  subject, and <code>affinity_detail</code>'s per-candidate <code>considered</code> list
+  names each neighbouring instance and what it contributed.</li>
+</ul>
+<p>Do not read <code>candidates</code> from that event as the size of the choice.
+It is the winning tier after scoring, so it is frequently 1 exactly
+when affinity worked.</p>
+<h3 id="finding-instances-that-still-use-weighted-affinity">Finding instances that still use weighted affinity<a class="headerlink" href="#finding-instances-that-still-use-weighted-affinity" title="Permanent link">&para;</a></h3>
+<p>The weighted form is deprecated and will be removed in a future
+release. Setting one records a <code>deprecated weighted affinity
+specification accepted</code> event on the instance -- but only at the
+moment it is accepted, so instances which already carried a weighted
+specification before the upgrade never emit one. Those have to be
+found by inspection:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">BINARY</span><span class="o">=</span><span class="s1">'require_with_tag require_without_tag prefer_with_tag prefer_without_tag'</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">for</span><span class="w"> </span>uuid<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>sf-client<span class="w"> </span>--simple<span class="w"> </span>instance<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n<span class="w"> </span>+2<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d,<span class="w"> </span>-f1<span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span>sf-client<span class="w"> </span>--simple<span class="w"> </span>instance<span class="w"> </span>show<span class="w"> </span><span class="s2">"</span><span class="nv">$uuid</span><span class="s2">"</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">'^metadata,affinity,'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d,<span class="w"> </span>-f3-<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">        </span><span class="p">|</span><span class="w"> </span><span class="nv">BINARY</span><span class="o">=</span><span class="s2">"</span><span class="nv">$BINARY</span><span class="s2">"</span><span class="w"> </span><span class="nv">UUID</span><span class="o">=</span><span class="s2">"</span><span class="nv">$uuid</span><span class="s2">"</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s1">import ast, os, sys</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="s1">raw = sys.stdin.read().strip()</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="s1">if not raw:</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="s1">    sys.exit()</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="s1">try:</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="s1">    spec = ast.literal_eval(raw)</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="s1">except (ValueError, SyntaxError):</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="s1">    sys.exit()</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="s1">binary = set(os.environ["BINARY"].split())</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="s1">if isinstance(spec, dict) and spec and not (set(spec) &amp; binary):</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="s1">    print("%s %s" % (os.environ["UUID"], spec))</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="s1">'</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="k">done</span>
+</code></pre></div>
+<p>The test is the same one the server uses: a dictionary which uses none
+of the four reserved names is the weighted form. Note that
+<code>instance show</code> renders metadata values as Python literals rather than
+JSON -- <code>{'static-runner': -10}</code>, with single quotes -- which is why
+this parses with <code>ast.literal_eval</code> and not <code>json.loads</code>.</p>
+<p>Run it before upgrading to the release that removes the weighted form,
+and convert what it finds: a positive weight becomes
+<code>prefer_with_tag</code>, a negative weight becomes <code>prefer_without_tag</code>, and
+zero can be dropped. Output looks like this (from a real cluster, 2026-08-30):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>27a969a1-189f-4161-a201-97149a4b7f48 {'static-runner': -10}
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>aae1c884-0878-4f36-b88a-dd32e95590e7 {'hypervisor': -50}
+</code></pre></div>
+<p>Check the magnitudes while you are there. Every weight in each of
+those specifications shares a magnitude -- they are single-tag
+specifications -- so the mapping preserves their ordering exactly and
+converting them changes nothing. A specification mixing magnitudes,
+such as <code>{"a": 100, "b": 1}</code>, is the one to look at twice: the mapping
+already discards the difference, so its ordering changed at the
+release which introduced the mapping rather than at the one which
+removes the weighted form.</p>
 <h2 id="mixed-version-clusters">Mixed-version clusters<a class="headerlink" href="#mixed-version-clusters" title="Permanent link">&para;</a></h2>
 <p>Metrics rows written by a resources daemon older than the
 reservation scheme lack the new fields. For exactly those rows the
