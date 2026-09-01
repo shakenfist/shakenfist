@@ -49,7 +49,7 @@ The vocabulary is a versioned shared block, `plan-status-vocabulary`,
 which every `PLAN-TEMPLATE.md` must carry (see the `plan-template`
 audit) so plans are written to it rather than corrected afterwards. It
 governs the master plan's own Execution phase table as well as the
-index row. A test in `scripts/test_audit_check.py` asserts the block
+index row. A test in `scripts/tests/test_plans.py` asserts the block
 and the list the audit enforces name the same terms, so the wording
 repositories are handed cannot drift from the wording they are measured
 against.

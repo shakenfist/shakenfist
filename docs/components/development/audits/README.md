@@ -25,8 +25,8 @@ per criterion to check every project against it in parallel.
 a whole: what the daily run does, how issues are filed and closed, how
 the compliance tables are regenerated, how to add a criterion, and how
 to bring a repository into scope. Read it before adding a file here --
-a new criterion touches four files (five if it shares a spec file with
-another check), and a spec file on its own does not measure anything.
+a new criterion is a check class and this specification, and a
+specification on its own does not measure anything.
 
 ## File structure
 
