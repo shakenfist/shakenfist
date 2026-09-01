@@ -196,34 +196,60 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
     # Neither the enqueue-side dedup below nor the worker-side fold in
     # ``BaseClusterOperation.execute`` keys on the queue: the dedup
     # query and ``claim_coalescible_siblings`` both match on
-    # (op_type, network_uuid, task, state), and ``cluster_operations``
-    # has no queue column to filter on. That is only sound while every
-    # coalescible task lives on the single cluster-wide network-node
-    # queue, where one elected worker drains everything and two
-    # enqueues for the same network really are the same work.
+    # (op_type, COALESCIBLE_KEY_COLUMNS, task, state), and
+    # ``cluster_operations`` has no queue column to filter on. The key
+    # therefore has to do the queue's job, and it only does so for a
+    # per-node enqueue if it names ``node_uuid``: without that column
+    # hypervisor A's op and hypervisor B's op are identical to both
+    # dedup paths while doing different work on different hosts, so
+    # folding them leaves one host's state unapplied. That is the bug
+    # which broke ``test_single_virtual_networks_work`` on the
+    # network-facade branch.
     #
-    # A coalescible task on a per-node queue (``target=<node_uuid>``)
-    # would break that: hypervisor A's op and hypervisor B's op look
-    # identical to both dedup paths, but do different work on
-    # different hosts, so folding them leaves one host's state
-    # unapplied. That is the bug which broke
-    # ``test_single_virtual_networks_work`` on the network-facade
-    # branch, and it is why ``network_ensure_mesh`` is not in
-    # COALESCIBLE_TASKS (see the note there).
+    # So the rule is not "coalescible tasks only on the cluster-wide
+    # queue" but "coalescible tasks only where the key distinguishes
+    # the target". A ``networknode`` enqueue qualifies because one
+    # elected worker drains that queue; a per-node enqueue qualifies
+    # when ``node_uuid`` is in the key and this operation has one.
+    # (``None`` is a legitimate key value -- it binds ``IS NULL`` and is
+    # how the cluster-wide ops fold only each other -- but a NULL node
+    # cannot distinguish one hypervisor from another, which is why the
+    # per-node case tests the value as well as the column.)
     #
     # Rather than leave that as a convention nobody checks, enforce it
     # here. It costs a set intersection per enqueue and turns a silent
     # class of cross-node state corruption into an immediate, loud
     # failure at the call site that introduced it.
     if target != 'networknode':
+        # The key has to name node_uuid, this operation has to have
+        # one, and the enqueue has to be going to a dispatcher which
+        # partitions its workers by target. That last condition is the
+        # ``family``: ``network`` routes to sf-net, which hashes every
+        # operation for a network to one worker thread, while the
+        # default ``clusteroperation`` routes to sf-queues, which does
+        # not partition at all. A node-aware key on a sf-queues queue
+        # would let two workers on the same node hold two operations
+        # for the same (network, node) at once -- see decision 5 of the
+        # phase 11 plan.
+        key_distinguishes_target = (
+            'node_uuid' in COALESCIBLE_KEY_COLUMNS
+            and node_uuid is not None
+            and family == 'network')
         misrouted = [t.name for t in tasks if t in COALESCIBLE_TASKS]
-        if misrouted:
+        if misrouted and not key_distinguishes_target:
             raise exceptions.InvalidCoalescibleEnqueue(
-                f'net_op tasks {misrouted} are declared coalescible, which '
-                f'is only sound on the cluster-wide networknode queue, but '
-                f'this enqueue targets {target!r}. Either drop the task from '
-                f'COALESCIBLE_TASKS or give the fold a key which '
-                f'distinguishes the target node (see issue #3884).')
+                f'net_op tasks {misrouted} are declared coalescible, but the '
+                f'coalescing key {COALESCIBLE_KEY_COLUMNS} cannot '
+                f'distinguish this enqueue\'s target {target!r} from another '
+                f'node\'s work. Either drop the task from '
+                f'COALESCIBLE_TASKS, or add node_uuid to '
+                f'COALESCIBLE_KEY_COLUMNS so the fold can tell the two '
+                f'apart, and route the enqueue to the network family so '
+                f'sf-net drains it. A node-aware key is only sound on a '
+                f'dispatcher which partitions its workers by target: sf-net '
+                f'does, sf-queues does not (see the phase 11 plan, decision '
+                f'5, and the successor issue it names for the sf-queues '
+                f'half). This enqueue is on the {family!r} family.')
 
     if (len(tasks) == 1
             and tasks[0] in COALESCIBLE_TASKS

@@ -21938,11 +21938,22 @@ def _grpc_work_queue_delete_row(row_id: int) -> bool:
 
 
 def _coalescible_key_pairs(
-        keys: 'list[tuple[str, str]]'
+        keys: 'list[tuple[str, Optional[str]]]'
 ) -> 'list[Any]':
-    """Convert a coalescing key into its protobuf representation."""
+    """Convert a coalescing key into its protobuf representation.
+
+    A ``None`` value means "this column must be NULL", which is a
+    narrower key rather than a missing one -- see decision 8 of
+    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+    proto3 cannot distinguish an empty string from an unset field, so
+    that has to travel as an explicit ``is_null`` flag; the V2 handlers
+    turn it back into a ``None`` before calling the direct functions.
+    """
     return [
-        database_pb2.CoalescibleKeyPair(column=column, uuid=str(value))
+        database_pb2.CoalescibleKeyPair(
+            column=column,
+            uuid='' if value is None else str(value),
+            is_null=value is None)
         for column, value in keys]
 
 
@@ -21960,7 +21971,7 @@ def _coalescible_key_pairs(
 # docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
 def _grpc_find_existing_coalescible_op(
         operation_type: str,
-        keys: 'list[tuple[str, str]]',
+        keys: 'list[tuple[str, Optional[str]]]',
         task_name: str) -> Optional[str]:
     """Read-only enqueue-side dedup lookup via the database microservice.
 
@@ -21997,7 +22008,7 @@ def _grpc_find_existing_coalescible_op(
 
 def _grpc_claim_coalescible_siblings(
         operation_type: str,
-        keys: 'list[tuple[str, str]]',
+        keys: 'list[tuple[str, Optional[str]]]',
         task_names: list[str],
         exclude_op_uuid: str) -> list[str]:
     """Fold sibling pending coalescible ops via the database microservice.
@@ -22681,15 +22692,23 @@ _COALESCIBLE_TARGET_COLUMNS = frozenset({
     'network_uuid', 'instance_uuid', 'node_uuid'})
 
 
-def _coalescible_key_description(keys: 'list[tuple[str, str]]') -> str:
-    """Render a coalescing key for a log message."""
-    return ','.join(f'{column}={value}' for column, value in keys)
+def _coalescible_key_description(
+        keys: 'list[tuple[str, Optional[str]]]') -> str:
+    """Render a coalescing key for a log message.
+
+    ``None`` is rendered as ``NULL`` rather than as ``None``, because
+    that is what it becomes in the statement: a key column with no value
+    matches operations whose column is NULL.
+    """
+    return ','.join(
+        f'{column}=' + ('NULL' if value is None else str(value))
+        for column, value in keys)
 
 
 def _coalescible_preflight(
         caller: str,
         operation_type: str,
-        keys: 'list[tuple[str, str]]',
+        keys: 'list[tuple[str, Optional[str]]]',
         *uuids: Optional[str]
 ) -> Optional[tuple[Any, list[tuple[str, Any]], list[Any]]]:
     """Validate and coerce the arguments both coalescing queries share.
@@ -22714,26 +22733,29 @@ def _coalescible_preflight(
     An empty key list is refused rather than treated as "match
     everything": without a single equality the statement would fold
     every pending operation of this type in the cluster.
+
+    A ``None`` *value* is not refused. It binds as ``IS NULL``, which is
+    a narrower key and not a missing one: a cluster-wide NetOp has no
+    node_uuid, so a ``('network_uuid', 'node_uuid')`` key with a NULL
+    node matches only the other cluster-wide operations on that network,
+    exactly as a per-node key matches only that node's. Refusing it
+    would have switched off the only coalescing the cluster does the
+    moment the key widened -- see decision 8 of
+    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md. The
+    protection against a caller who *forgot* a value lives upstream in
+    ``_coalescible_keys``, which raises ``KeyError`` for a column with
+    no entry at all: a missing entry is a bug, an explicit ``None`` is a
+    decision.
     """
     if not keys:
         LOG.warning(f'{caller} skipped, the coalescing key is empty')
         return None
 
-    for target_column, target_value in keys:
+    for target_column, _ in keys:
         if target_column not in _COALESCIBLE_TARGET_COLUMNS:
             LOG.warning(
                 f'{caller} skipped, {target_column!r} is not a coalescible '
                 f'target column')
-            return None
-
-        # A key column with no value would bind as ``IS NULL`` and match
-        # every operation which does not carry that column -- the exact
-        # opposite of narrowing the key. A column the caller cannot fill
-        # in cannot distinguish anything, so skip loudly instead.
-        if target_value is None or target_value == '':
-            LOG.warning(
-                f'{caller} skipped, coalescing key column '
-                f'{target_column!r} has no value')
             return None
 
     # object_states.object_type is an Enum(ObjectType) column, which
@@ -22761,6 +22783,8 @@ def _coalescible_preflight(
     # matching the insert path's _maybe_uuid usage. A malformed uuid
     # means there is nothing meaningful to coalesce against, so skip
     # rather than letting a StatementError kill the worker thread.
+    # _maybe_uuid passes None straight through, which is how a NULL key
+    # column reaches the statement builders below.
     try:
         coerced_keys = [
             (column, _maybe_uuid(value)) for column, value in keys]
@@ -22797,9 +22821,32 @@ def _coalescible_states_join(
     )
 
 
+def _coalescible_key_clause(
+        cluster_ops_table: sa.Table,
+        column: str,
+        value: Any) -> Any:
+    """One key column's filter for the two coalescing statements.
+
+    ``value`` of ``None`` means the column must be NULL, written with an
+    explicit ``.is_(None)`` because that is a deliberate part of the key
+    and not an oversight: a cluster-wide operation folds cluster-wide
+    operations, a per-node operation folds that node's. (SQLAlchemy
+    would render ``column == None`` the same way, but the reader -- and
+    flake8 -- should not have to work that out.)
+
+    The column name is whitelisted by ``_coalescible_preflight``, so the
+    ``getattr`` here can only resolve to a known column on the table
+    metadata rather than interpolating caller-supplied text into SQL.
+    """
+    key_column = getattr(cluster_ops_table.c, column)
+    if value is None:
+        return key_column.is_(None)
+    return key_column == value
+
+
 def _direct_find_existing_coalescible_op(
         operation_type: str,
-        keys: 'list[tuple[str, str]]',
+        keys: 'list[tuple[str, Optional[str]]]',
         task_name: str) -> Optional[str]:
     """Read-only enqueue-side dedup lookup.
 
@@ -22823,7 +22870,8 @@ def _direct_find_existing_coalescible_op(
     ``claim_coalescible_siblings`` (step 4) usually catches the
     duplicate on the way out, but not always -- the fold is skipped
     when the dispatcher dequeued a batch of one, and when the
-    survivor is not on a cluster-wide queue. When it is skipped the
+    survivor's key cannot distinguish the work on its queue
+    (``key_cannot_distinguish_queue``). When it is skipped the
     consequence is one extra execution of a task which is idempotent
     by the definition of being coalescible, so nothing breaks; at
     most one extra row gets inserted per race window either way,
@@ -22868,12 +22916,12 @@ def _direct_find_existing_coalescible_op(
                 .order_by(cluster_ops_table.c.created_at.asc())
                 .limit(1)
             )
-            # One equality per key pair. The columns are whitelisted in
-            # the preflight, so getattr() here can only resolve to a
-            # known column on the table metadata.
+            # One equality (or IS NULL) per key pair -- see
+            # _coalescible_key_clause.
             for column, value in coerced_keys:
                 stmt = stmt.where(
-                    getattr(cluster_ops_table.c, column) == value)
+                    _coalescible_key_clause(
+                        cluster_ops_table, column, value))
             row = conn.execute(stmt).fetchone()
             if row is None:
                 return None
@@ -22888,7 +22936,7 @@ def _direct_find_existing_coalescible_op(
 
 def _direct_claim_coalescible_siblings(
         operation_type: str,
-        keys: 'list[tuple[str, str]]',
+        keys: 'list[tuple[str, Optional[str]]]',
         task_names: list[str],
         exclude_op_uuid: str) -> list[str]:
     """Atomically transition sibling pending coalescible ops to COMPLETE.
@@ -22918,13 +22966,26 @@ def _direct_claim_coalescible_siblings(
       callers pre-filter to ``op_class.coalescible_tasks``.
 
     The statement is deliberately blind to which *queue* a sibling is
-    on -- ``cluster_operations`` has no queue column to filter by. That
-    is only sound because every coalescible task is confined to the
-    single cluster-wide network-node queue, drained by one elected
-    worker; the guard which enforces that lives at enqueue time in
-    ``schema/operations/net_op.py`` (``InvalidCoalescibleEnqueue``).
-    Without it a survivor on the network node folds away per-node
-    siblings doing genuinely different work on other hosts.
+    on -- ``cluster_operations`` has no queue column to filter by -- so
+    the *key* has to do that job instead, and it is the caller's
+    responsibility to hand over one which does. Both of the keys in use
+    do: a key whose ``node_uuid`` is NULL matches only the cluster-wide
+    operations, which one elected worker drains, and a key naming a node
+    matches only that node's operations, which that node's own
+    dispatcher drains. A key which names neither -- the network alone,
+    for an operation doing node-local work -- would let a survivor on
+    one host fold away another host's genuinely different work.
+
+    Two guards keep that from happening, and both are key-aware rather
+    than queue-aware: ``InvalidCoalescibleEnqueue`` in
+    ``schema/operations/net_op.py`` refuses to enqueue a coalescible
+    task where its key cannot distinguish the target, and
+    ``BaseClusterOperation.execute`` records
+    ``key_cannot_distinguish_queue`` and skips the fold rather than
+    issuing this statement. The full four-link argument is written out
+    in the PARTITIONED-WORKER SAFETY INVARIANT comment in
+    ``shakenfist/daemons/network/workitem.py``, which also says why it
+    does not extend to ``sf-queues``.
 
     Argument validation and the ``object_states`` join are shared with
     ``_direct_find_existing_coalescible_op`` -- see
@@ -22968,12 +23029,12 @@ def _direct_claim_coalescible_siblings(
                             '$.tasks[0]')).in_(task_names))
                 .with_for_update()
             )
-            # One equality per key pair. The columns are whitelisted in
-            # the preflight, so getattr() here can only resolve to a
-            # known column on the table metadata.
+            # One equality (or IS NULL) per key pair -- see
+            # _coalescible_key_clause.
             for column, value in coerced_keys:
                 select_stmt = select_stmt.where(
-                    getattr(cluster_ops_table.c, column) == value)
+                    _coalescible_key_clause(
+                        cluster_ops_table, column, value))
             rows = conn.execute(select_stmt).fetchall()
             if not rows:
                 return []
@@ -23860,12 +23921,15 @@ def delete_work_queue_row(row_id: int) -> bool:
 
 def find_existing_coalescible_op(
         operation_type: str,
-        keys: 'list[tuple[str, str]]',
+        keys: 'list[tuple[str, Optional[str]]]',
         task_name: str) -> Optional[str]:
     """Look up an existing pending coalescible op on the same target.
 
     ``keys`` is the coalescing key: a list of ``(column, uuid)``
-    pairs, all of which a candidate op must match.
+    pairs, all of which a candidate op must match. A ``None`` uuid
+    means the candidate's column must be NULL, which is how the
+    cluster-wide operations (whose ``node_uuid`` is unset) fold only
+    each other.
 
     Returns its uuid if found, otherwise ``None``. Used by
     ``create_and_enqueue`` for ops whose entire task list is a
@@ -23882,7 +23946,7 @@ def find_existing_coalescible_op(
 
 def claim_coalescible_siblings(
         operation_type: str,
-        keys: 'list[tuple[str, str]]',
+        keys: 'list[tuple[str, Optional[str]]]',
         task_names: list[str],
         exclude_op_uuid: str) -> list[str]:
     """Atomically fold sibling pending coalescible ops.

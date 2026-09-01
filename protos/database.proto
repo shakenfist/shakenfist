@@ -556,8 +556,17 @@ message CoalescibleKeyPair {
   // indexed column on the cluster_operations table and is validated
   // server side against a whitelist; ``uuid`` is the value that column
   // must equal for an op to be considered a sibling.
+  //
+  // ``is_null`` means "that column must be NULL" instead, which is a
+  // real and narrower key rather than a missing one: a cluster-wide
+  // NetOp carries no node_uuid, so it folds only the other cluster-wide
+  // ops. proto3 cannot tell an empty string from an unset field, so the
+  // flag is the only way to say it unambiguously -- when it is set the
+  // server binds IS NULL and ignores ``uuid``. See decision 8 of
+  // docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
   string column = 1;
   string uuid = 2;
+  bool is_null = 3;
 }
 
 message ClaimCoalescibleSiblingsV2Request {

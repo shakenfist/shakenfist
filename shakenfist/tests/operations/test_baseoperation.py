@@ -385,14 +385,16 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_claim.assert_called_once()
 
     def test_no_coalescing_call_when_queue_is_per_node(self):
-        # Per-node queues (``<node_uuid>-network-*`` and
+        # A per-node queue (``<node_uuid>-network-*`` and
         # ``<node_uuid>-clusteroperation-*``) MUST NOT fold across
-        # sibling ops, because the fold query keys on
-        # (op_type, target_uuid, task) and a sibling on a different
-        # node's queue is doing different work (e.g. mesh apply on
-        # hypervisor B vs hypervisor A). Folding would mark B's op
-        # complete without ever running it. See the comment in
-        # ``BaseClusterOperation.execute`` for the full story.
+        # sibling ops while the coalescing key is the network alone: a
+        # sibling on a different node's queue is doing different work
+        # (mesh apply on hypervisor B vs hypervisor A) and folding would
+        # mark B's op complete without ever running it. NetOp's key is
+        # ``('network_uuid',)`` here, so the guard fires. A key naming
+        # ``node_uuid`` is what lets this case through -- see the
+        # comment in ``BaseClusterOperation.execute`` for the full
+        # story.
         op = self._make_net_op(
             ['network_apply_update_dnsmasq'],
             queue_name=(
@@ -404,10 +406,12 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
 
     def test_no_coalescing_call_when_queue_name_unset(self):
         # An op loaded outside the dispatch path (e.g. by a unit test
-        # that doesn't set ``queue_name``) has ``None`` for the queue
-        # and we can't tell whether the fold would be safe. The
-        # conservative choice is to skip it -- the fold is a cost
-        # optimisation, not a correctness requirement.
+        # that doesn't set ``queue_name``) has ``None`` for the queue,
+        # and with a network-only key there is nothing else to say the
+        # fold is safe. The conservative choice is to skip it -- the
+        # fold is a cost optimisation, not a correctness requirement.
+        # (A key naming ``node_uuid`` would decide this on its own,
+        # without consulting the queue name at all.)
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.queue_name = None
         op.execute()
@@ -456,7 +460,8 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
                 '-network-user_facing'))
         op.execute()
 
-        self.assertEqual('not_cluster_wide', op.coalesce_outcome)
+        self.assertEqual(
+            'key_cannot_distinguish_queue', op.coalesce_outcome)
         self.assertIsNone(op.coalesce_seconds)
 
     def test_outcome_records_a_job_with_nothing_coalescible(self):

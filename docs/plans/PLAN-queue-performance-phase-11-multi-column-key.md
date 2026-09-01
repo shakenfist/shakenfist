@@ -282,7 +282,19 @@ is approved.
    own `{node_uuid}-network-*` queue; that queue is drained by exactly
    one dispatcher process, that node's net-worker; and within that
    process every operation for the same network hashes to the same
-   worker thread by `_routing_key`. So a fold can never mark complete
+   worker thread by `_routing_key`.
+
+   Link two is narrower than it first looks, and implementing this
+   step made that concrete. `enqueue_cluster_operation` builds the
+   queue name as `{target}-{family}-{priority}`, so a node uuid in
+   `target` puts the operation on `{node}-network-*` only when the
+   caller also passes `family='network'`. The default family is
+   `clusteroperation`, whose per-node queues go to `sf-queues` --
+   where link four does not exist. A key naming `node_uuid` is
+   therefore necessary for the fold to be safe but not sufficient:
+   both guards test the family as well, the enqueue-time one directly
+   and the fold-time one through the queue name's prefix. Reducing
+   either to a test of the key alone reopens decision 5's race. So a fold can never mark complete
    an operation another thread is executing, which is precisely
    property (3) of the existing invariant, now holding for per-node
    queues as well as cluster-wide ones. Record the outcome

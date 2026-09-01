@@ -548,8 +548,11 @@ itself):
   the operation reached the cross-op fold's guards at all:
     * `coalesce_outcome` — `ran` if the fold's SQL was issued, or
       which guard skipped it: `batch_size_one` (the dispatcher
-      dequeued only this op), `not_cluster_wide` (a per-node queue,
-      where folding would be unsafe), `type_not_coalescible` (this
+      dequeued only this op), `key_cannot_distinguish_queue` (the
+      operation's coalescing key cannot tell its work apart from work
+      on another queue, so folding would be unsafe -- reported as
+      `not_cluster_wide` by builds before the key became
+      multi-column), `type_not_coalescible` (this
       operation type declares no coalescing at all, which is every
       cluster operation that is not a `net_op` and so most of them)
       or `no_coalescible_tasks` (a type which could have coalesced,

@@ -3,16 +3,20 @@
 # The invariant that makes cluster operation coalescing safe.
 #
 # Neither dedup path keys on the queue: the enqueue-side lookup and the
-# worker-side fold both match on (op_type, network_uuid, task, state),
-# and cluster_operations has no queue column for them to filter on. That
-# is only sound while every coalescible task lives on the single
-# cluster-wide network-node queue, which one elected worker drains. A
-# coalescible task on a per-node queue is folded across nodes and one
-# host's work is silently never applied -- a stale FDB, invisible until
-# something much later fails.
+# worker-side fold both match on (op_type, COALESCIBLE_KEY_COLUMNS,
+# task, state), and cluster_operations has no queue column for them to
+# filter on. The key is therefore what has to distinguish one queue's
+# work from another's, and a coalescible task enqueued where it cannot
+# is folded across nodes with one host's work silently never applied --
+# a stale FDB, invisible until something much later fails.
 #
-# So the invariant is enforced at enqueue time, and this module is where
-# it is checked. See also the note on COALESCIBLE_TASKS in
+# The key does distinguish two cases: the cluster-wide network-node
+# queue, which one elected worker drains, and a per-node queue when the
+# key names node_uuid and the operation carries one. Everything else is
+# refused at enqueue time, and this module is where that is checked.
+# While COALESCIBLE_KEY_COLUMNS remains ('network_uuid',) that means
+# every per-node enqueue of a coalescible task, which is what the cases
+# below assert. See also the note on COALESCIBLE_TASKS in
 # shakenfist/schema/operations/net_op.py and the PARTITIONED-WORKER
 # SAFETY INVARIANT in shakenfist/daemons/network/workitem.py.
 

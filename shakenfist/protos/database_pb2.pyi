@@ -475,22 +475,33 @@ class CoalescibleKeyPair(_message.Message):
 
     COLUMN_FIELD_NUMBER: _builtins.int
     UUID_FIELD_NUMBER: _builtins.int
+    IS_NULL_FIELD_NUMBER: _builtins.int
     column: _builtins.str
     """One (column, uuid) pair of the coalescing key. ``column`` names an
     indexed column on the cluster_operations table and is validated
     server side against a whitelist; ``uuid`` is the value that column
     must equal for an op to be considered a sibling.
+
+    ``is_null`` means "that column must be NULL" instead, which is a
+    real and narrower key rather than a missing one: a cluster-wide
+    NetOp carries no node_uuid, so it folds only the other cluster-wide
+    ops. proto3 cannot tell an empty string from an unset field, so the
+    flag is the only way to say it unambiguously -- when it is set the
+    server binds IS NULL and ignores ``uuid``. See decision 8 of
+    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
     """
     uuid: _builtins.str
+    is_null: _builtins.bool
     def __init__(
         self,
         *,
         column: _builtins.str = ...,
         uuid: _builtins.str = ...,
+        is_null: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["column", b"column", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["column", b"column", "is_null", b"is_null", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

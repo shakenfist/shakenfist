@@ -274,6 +274,9 @@ def parse_line(line):
     coalesce_outcome = extra.get('coalesce_outcome')
     if not isinstance(coalesce_outcome, str):
         coalesce_outcome = None
+    else:
+        coalesce_outcome = RETIRED_COALESCE_OUTCOMES.get(
+            coalesce_outcome, coalesce_outcome)
 
     coalesce_seconds = extra.get('coalesce_seconds')
     if (not isinstance(coalesce_seconds, (int, float))
@@ -499,17 +502,36 @@ def apply_min_samples(groups, min_samples):
 # guard which skipped it. 'type_not_coalescible' is an operation type
 # which declares no coalescing at all -- most cluster operations, and
 # the boring case -- while 'no_coalescible_tasks' is a type which could
-# have coalesced and this time had nothing to. See
-# shakenfist/operations/baseoperation.py, whose guard chain is the
-# source of truth these strings are checked against by
-# test_every_outcome_the_code_records_is_reported.
+# have coalesced and this time had nothing to.
+# 'key_cannot_distinguish_queue' is the fold refusing to run because the
+# operation's coalescing key cannot tell its work apart from another
+# queue's. See shakenfist/operations/baseoperation.py, whose guard chain
+# is the source of truth these strings are checked against by
+# test_every_outcome_the_code_records_is_reported -- which compares as
+# sets, so a retired name belongs in RETIRED_COALESCE_OUTCOMES below and
+# not in this list.
 COALESCE_OUTCOMES = [
     'ran',
     'batch_size_one',
-    'not_cluster_wide',
+    'key_cannot_distinguish_queue',
     'no_coalescible_tasks',
     'type_not_coalescible',
 ]
+
+# Outcome names which no longer appear in baseoperation.py but still
+# appear in retained Loki history, mapped to the name they became. The
+# tool reads history, not just today's events: dropping a retired name
+# would silently stop counting every event emitted before the rename and
+# make the outcome columns stop summing to n -- which is the shape of
+# #3878 all over again. A rename is not a reason to lose the past.
+#
+# 'not_cluster_wide' was the phase 9 name for the guard which now asks
+# whether the coalescing key can distinguish the work on this queue,
+# rather than whether the queue is the cluster-wide one. The guard is
+# the same guard; only its question got wider (phase 11, decision 4).
+RETIRED_COALESCE_OUTCOMES = {
+    'not_cluster_wide': 'key_cannot_distinguish_queue',
+}
 
 
 class CoalesceGroup:

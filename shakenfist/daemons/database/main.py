@@ -258,7 +258,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
         Retained for one release so a rolling upgrade can still serve
         clients which predate ``FindExistingCoalescibleOpV2``. Its
-        single (column, uuid) pair is simply a one-element key.
+        single (column, uuid) pair is simply a one-element key, and it
+        can never mean NULL: a V1 client has no way to say so, and one
+        which sent an empty target_uuid meant "unset", which the
+        preflight's uuid coercion rejects.
         """
         try:
             self.monitor.counters['find_existing_coalescible_op'].inc()
@@ -288,7 +291,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
         Retained for one release so a rolling upgrade can still serve
         clients which predate ``ClaimCoalescibleSiblingsV2``. Its
-        single (column, uuid) pair is simply a one-element key.
+        single (column, uuid) pair is simply a one-element key, and it
+        can never mean NULL -- see ``FindExistingCoalescibleOp``.
         """
         try:
             self.monitor.counters['claim_coalescible_siblings'].inc()
@@ -319,12 +323,19 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         never falls back to it, because folding on the first column
         alone is the cross-node corruption this method exists to
         prevent. See ``mariadb._direct_find_existing_coalescible_op``.
+
+        A pair with ``is_null`` set means that column must be NULL --
+        proto3 has no null of its own, and an empty ``uuid`` string is
+        indistinguishable from an unset field. That is a narrower key,
+        not a missing one: it is how the cluster-wide operations, which
+        carry no ``node_uuid``, fold only each other.
         """
         try:
             self.monitor.counters['find_existing_coalescible_op_v2'].inc()
             uuid = mariadb._direct_find_existing_coalescible_op(
                 request.operation_type,
-                [(k.column, k.uuid) for k in request.keys],
+                [(k.column, None if k.is_null else k.uuid)
+                 for k in request.keys],
                 request.task_name)
             return database_pb2.FindExistingCoalescibleOpReply(
                 op_uuid=uuid or '')
@@ -342,7 +353,10 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
 
         As ``ClaimCoalescibleSiblings``, but the caller supplies a
         list of ``(column, uuid)`` pairs which must all match rather
-        than a single pair. See
+        than a single pair. A pair with ``is_null`` set means that
+        column must be NULL, which proto3 cannot express any other way
+        and which is a narrower key rather than a missing one -- see
+        ``FindExistingCoalescibleOpV2``. See
         ``mariadb._direct_claim_coalescible_siblings`` for the safety
         guards.
         """
@@ -350,7 +364,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             self.monitor.counters['claim_coalescible_siblings_v2'].inc()
             folded = mariadb._direct_claim_coalescible_siblings(
                 request.operation_type,
-                [(k.column, k.uuid) for k in request.keys],
+                [(k.column, None if k.is_null else k.uuid)
+                 for k in request.keys],
                 list(request.task_names),
                 request.exclude_op_uuid)
             return database_pb2.ClaimCoalescibleSiblingsReply(
