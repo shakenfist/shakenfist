@@ -267,6 +267,50 @@ like an idle cluster rather than a broken query.
 
 ## Coverage the functional suite does not have
 
+### Affinity test skips are topology dependent
+
+`cluster_ci_tests/test_scheduler.py`'s `test_affinity` skips rather
+than passes on two degeneracies, because in both the assertion could
+not have failed and a pass would be a false green. The two carry
+different messages, and which one is expected depends on the
+topology -- so a permanently skipping run cannot be read as a healthy
+one:
+
+- **`only N candidates`** -- the scorer considered fewer than two
+  nodes, so affinity was never consulted. Expected on any cluster
+  with fewer than three hypervisors, where the test's own
+  `len(nodes) < 3` guard usually fires first.
+- **`affine node not a candidate`** -- the node the test is affine to
+  was ejected by an admission filter (CPU, memory or disk) before
+  scoring. This is issue #3565's real mechanism and is not an
+  affinity defect. **Expected on `slim-tier` until
+  `PLAN-ci-cloud-sizing` lands**, since that topology runs the same
+  suite on roughly half the resources and the admission filters bind
+  there.
+
+Neither skip is expected on `slim-primary`. A `slim-primary` run
+reporting either one is a real signal: the cluster is smaller than it
+should be, or the scheduler is ejecting nodes it should not. Treat it
+as a failure to investigate rather than a pass.
+
+This expectation is **documentation, not enforcement**, and that is a
+deliberate trade rather than an oversight. A skip is green, so nothing
+in CI fails if `slim-primary` starts skipping too -- the "does not skip
+on a healthy three-node run" check was made once by hand. The obvious
+automation, failing rather than skipping when `get_nodes()` returns
+three or more, would fail every `slim-tier` run, and `slim-tier` is
+expected to skip until `PLAN-ci-cloud-sizing` lands. Once it does, and
+neither topology is expected to skip, that guard becomes worth adding:
+fail rather than skip on any cluster with three or more hypervisors.
+
+`test_binary_affinity_prefers_the_tagged_node` shares both skips and
+reads the same way, since it asserts the binary model's soft half
+through the same helper.
+`test_unsatisfiable_require_with_tag_is_refused` shares neither: it
+asserts a refusal, needs no successful create and no candidate count,
+and so is expected to run on every topology including a single-node
+one. A skip there is a bug in the test.
+
 ### Upgrade data verification
 
 Every functional job deploys a fresh cluster, so nothing in the suite

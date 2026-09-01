@@ -858,6 +858,65 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
         self.assertEqual(500, resp.status_code)
 
 
+class ExternalApiAffinityRefusalTestCase(
+        ExternalApiCreateAdmissionWalkTestCase):
+    """The create path answers 409 for an unsatisfiable hard affinity.
+
+    ``AffinityConstraintUnsatisfiable`` is a *subclass* of
+    ``LowResourceException``, chosen so that preflight's redirect keeps
+    working unchanged. Python matches ``except`` clauses in source
+    order, so the only thing standing between a 409 and a 507 is that
+    the subclass clause sits above the parent one in
+    ``external_api/instance.py``. That is invisible to a scheduler-level
+    test: one asserting the exception type passes identically whichever
+    clause caught it. These tests are here because this is the only
+    level at which the ordering is observable.
+    """
+
+    def _raises(self, exc):
+        fake = mock.MagicMock()
+        fake.find_candidates.side_effect = exc
+        return mock.patch(
+            'shakenfist.external_api.instance.SCHEDULER', fake)
+
+    def test_unsatisfiable_affinity_is_a_409(self):
+        constraint = ('no node satisfies require_with_tag=[\'database\'] '
+                      'at stage affinity_constraints')
+
+        with self._raises(
+                exceptions.AffinityConstraintUnsatisfiable(constraint)):
+            resp = self._post('affinity-nowhere')
+
+        self.assertEqual(409, resp.status_code, resp.get_json())
+        # The body has to name the constraint, or a 409 is no more
+        # actionable than the 507 it replaced.
+        self.assertIn('require_with_tag', resp.get_json()['error'])
+        self.assertIn('affinity_constraints', resp.get_json()['error'])
+
+    def test_a_real_capacity_refusal_is_still_a_507(self):
+        # The other half of the ordering. Reversing the two clauses
+        # turns every 409 into a 507 and this test keeps passing, so it
+        # is the pair that pins the behaviour, not either one alone.
+        with self._raises(exceptions.LowResourceException('cluster is full')):
+            resp = self._post('really-full')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        self.assertIn('cluster is full', resp.get_json()['error'])
+
+    def test_the_refused_instance_is_deleted(self):
+        # The instance exists only because it is created before
+        # scheduling runs. A 409 that left it behind would leak one per
+        # refused create, and the 507 path has always deleted.
+        with mock.patch('shakenfist.instance.Instance.'
+                        'enqueue_delete_due_error') as delete:
+            with self._raises(
+                    exceptions.AffinityConstraintUnsatisfiable('nope')):
+                resp = self._post('affinity-cleanup')
+
+        self.assertEqual(409, resp.status_code, resp.get_json())
+        delete.assert_called_once_with('scheduling failed')
+
+
 class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
     """Test that exceptions during JSON serialization are recorded."""
 

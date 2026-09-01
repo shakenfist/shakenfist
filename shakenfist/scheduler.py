@@ -82,6 +82,91 @@ def get_active_node_metrics():
     return metrics
 
 
+def _binary_affinity_spec(requested_affinity):
+    """Any affinity specification, as the binary form.
+
+    The two shapes live under one metadata key and are told apart by
+    their keys. A weighted specification is mapped here, at the point
+    the scheduler reads it, so that there is exactly one scoring path
+    rather than two which can drift apart.
+
+    Anything the validator would have refused is dropped rather than
+    raising: the scheduler reads specifications which were validated
+    when they were accepted, and one which predates a validation rule
+    should place somewhere rather than making an instance
+    unschedulable.
+    """
+    if not isinstance(requested_affinity, dict) or not requested_affinity:
+        return instance.map_weighted_affinity({})
+
+    if not set(requested_affinity) & set(instance.Instance.AFFINITY_BINARY_KEYS):
+        return instance.map_weighted_affinity(requested_affinity)
+
+    spec = {}
+    for k in instance.Instance.AFFINITY_BINARY_KEYS:
+        v = requested_affinity.get(k)
+        if not isinstance(v, list):
+            v = []
+        spec[k] = [t for t in v if isinstance(t, str) and t]
+    return spec
+
+
+def _hard_affinity_constraints(requested_affinity):
+    """The (require_with, require_without) tag lists for a spec."""
+    spec = _binary_affinity_spec(requested_affinity)
+    return (spec[instance.Instance.AFFINITY_REQUIRE_WITH],
+            spec[instance.Instance.AFFINITY_REQUIRE_WITHOUT])
+
+
+def _affinity_neighbour_skip(inst, instance_uuid, i):
+    """Should this co-located instance be ignored when matching tags?
+
+    Returns the audit record describing why it was skipped, or None if
+    it is a neighbour whose tags count. Both the hard require_* filter
+    and the soft scoring loop call this rather than restating the four
+    conditions, because a filter and a scorer which disagreed about
+    what counts as a neighbour would place an instance somewhere its
+    own audit trail says it should not be (coding_rules.md, "Never
+    restate a visibility predicate").
+
+    The namespace skip is the trust boundary: crossing it would let a
+    caller learn what another tenant is running by watching where
+    their own instances refuse to land.
+    """
+    if not i:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'instance row not found',
+        }
+    if i.uuid == inst.uuid:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'self',
+        }
+    if not i.tags:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'no tags',
+        }
+    if i.namespace != inst.namespace:
+        return {
+            'instance_uuid': instance_uuid,
+            'skipped': 'different namespace',
+            'namespace': i.namespace,
+        }
+    return None
+
+
+def _hard_affinity_description(require_with, require_without):
+    """Human readable text naming the constraints, for the 409 body."""
+    parts = []
+    if require_with:
+        parts.append('require_with_tag=%s' % sorted(require_with))
+    if require_without:
+        parts.append('require_without_tag=%s' % sorted(require_without))
+    return ', '.join(parts)
+
+
 class Scheduler:
     def __init__(self):
         # This UUID doesn't really mean much, except as a way of tracing the
@@ -165,6 +250,49 @@ class Scheduler:
         """
         return {row['node_uuid']: row
                 for row in mariadb.get_scheduler_node_capacity()}
+
+    def _satisfies_hard_affinity(self, inst, node, memo,
+                                 require_with, require_without):
+        """Does this node satisfy the instance's hard affinity constraints?
+
+        Constraints match the tags of *instances already placed on the
+        node*, exactly as the scorer does -- which here means calling
+        the same _affinity_neighbour_skip() rather than restating its
+        four conditions, so a filter and a scorer cannot disagree about
+        what counts as a neighbour. Shaken Fist has no node capability
+        tags, so there is nothing else they could match. The namespace
+        scope is inherited rather than chosen: crossing it would let a
+        caller learn what another tenant is running by watching where
+        their own instances refuse to land, which is why
+        require_without_tag is a within-namespace constraint and not an
+        isolation primitive.
+        """
+        node_instances = self._placed_instances(node, memo)
+        if node_instances is None:
+            return False, {'reason': 'node row not found'}
+
+        present = set()
+        for instance_uuid, i in node_instances:
+            if _affinity_neighbour_skip(inst, instance_uuid, i):
+                continue
+            for tag in i.tags:
+                present.add(tag)
+
+        missing = [t for t in require_with if t not in present]
+        if missing:
+            return False, {
+                'reason': 'no co-located instance carries a required tag',
+                'require_with_tag': missing,
+            }
+
+        excluded = [t for t in require_without if t in present]
+        if excluded:
+            return False, {
+                'reason': 'a co-located instance carries an excluded tag',
+                'require_without_tag': excluded,
+            }
+
+        return True, None
 
     def _placed_instances(self, node, memo):
         """The instances placed on a node, as (uuid, Instance or None) pairs.
@@ -378,7 +506,22 @@ class Scheduler:
         return True, None
 
     def _log_and_raise_on_error(
-            self, related_objects, stage, candidates, dropped=None):
+            self, related_objects, stage, candidates, dropped=None,
+            exception_class=exceptions.LowResourceException,
+            detail=None):
+        """Publish a filter stage's outcome, and raise if it emptied the set.
+
+        exception_class is defaulted so that every pre-existing caller
+        is unchanged. The hard affinity stage passes
+        AffinityConstraintUnsatisfiable, because "no node carries the
+        tag you required" is a conflict with the state of the cluster
+        and not a shortage of resources, and the create path answers
+        the two with different status codes.
+
+        detail is appended to the raised message. The message is built
+        here rather than by the caller, so a stage which wants to name
+        the constraint it refused on has to hand that text in.
+        """
         extra = {'candidates': candidates}
         if dropped:
             extra['dropped'] = dropped
@@ -388,8 +531,10 @@ class Scheduler:
                 EVENT_TYPE_AUDIT, related_objects,
                 f'schedule has no candidates at stage {stage}, aborting',
                 extra=extra)
-            raise exceptions.LowResourceException(
-                f'No nodes remaining at scheduling stage {stage}')
+            message = f'No nodes remaining at scheduling stage {stage}'
+            if detail:
+                message = f'{message}: {detail}'
+            raise exception_class(message)
 
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects,
@@ -526,6 +671,41 @@ class Scheduler:
                 related_objects, 'sufficient_free_disk', candidates,
                 dropped=dropped)
 
+            # Each candidate's placements are read once and memoised, so
+            # a node considered twice is only fetched once. The memo is
+            # shared by the hard constraint stage below and the scorer
+            # after it, so a create which uses both pays for one read.
+            placements = {}
+
+            requested_affinity = inst.affinity
+            require_with, require_without = _hard_affinity_constraints(
+                requested_affinity)
+
+            # Hard affinity constraints are admission, not ranking: a node
+            # which does not satisfy them cannot host the instance at all,
+            # so they filter here rather than contributing to a score.
+            #
+            # This stage returns without touching the placements memo when
+            # no hard constraint was requested. That matters because it
+            # runs before the load shedding filters have pruned anything,
+            # so populating the memo here would read placements for the
+            # full candidate set on every create -- including the great
+            # majority which request no affinity at all.
+            if require_with or require_without:
+                dropped = {}
+                for c in list(candidates):
+                    ok, reason = self._satisfies_hard_affinity(
+                        inst, c, placements, require_with, require_without)
+                    if not ok:
+                        dropped[c] = reason
+                        candidates.remove(c)
+                self._log_and_raise_on_error(
+                    related_objects, 'affinity_constraints', candidates,
+                    dropped=dropped,
+                    exception_class=exceptions.AffinityConstraintUnsatisfiable,
+                    detail=_hard_affinity_description(
+                        require_with, require_without))
+
             # Filter by affinity, if any has been specified. This runs on the
             # set of nodes which can actually fit the instance, but before the
             # queue depth and disk bandwidth filters below, which describe how
@@ -534,13 +714,24 @@ class Scheduler:
             # breakdown so that incorrect placement decisions (e.g. a tagged
             # neighbour being invisible) can be diagnosed from audit events.
             by_affinity = defaultdict(list)
-            requested_affinity = inst.affinity
             affinity_detail = {}
-            # Each candidate's placements are read once and memoised, so
-            # a node considered twice in this pass is only fetched once.
-            placements = {}
+            binary_spec = _binary_affinity_spec(requested_affinity)
+            scoring_tags = (
+                binary_spec[instance.Instance.AFFINITY_PREFER_WITH]
+                + binary_spec[instance.Instance.AFFINITY_PREFER_WITHOUT])
 
-            for c in list(candidates):
+            # A scorer with no tags to score cannot change the ordering,
+            # but the walk below reads every candidate's placements --
+            # one Node.from_db() plus one Instance.from_db() per placed
+            # instance -- so running it for the great majority of creates
+            # which request no affinity at all was pure cost. Skipping it
+            # reduces the measured database load rather than holding it
+            # flat. Everything downstream sees what it saw before: one
+            # tier, containing every candidate, scoring zero.
+            if not scoring_tags:
+                by_affinity[0] = list(candidates)
+
+            for c in (list(candidates) if scoring_tags else []):
                 node_instances = self._placed_instances(c, placements)
                 affinity = 0
                 considered = []
@@ -553,38 +744,34 @@ class Scheduler:
                     continue
 
                 for instance_uuid, i in node_instances:
-                    if not i:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'instance row not found',
-                        })
-                        continue
-                    if i.uuid == inst.uuid:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'self',
-                        })
-                        continue
-                    if not i.tags:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'no tags',
-                        })
-                        continue
-                    if i.namespace != inst.namespace:
-                        considered.append({
-                            'instance_uuid': instance_uuid,
-                            'skipped': 'different namespace',
-                            'namespace': i.namespace,
-                        })
+                    skipped = _affinity_neighbour_skip(inst, instance_uuid, i)
+                    if skipped:
+                        considered.append(skipped)
                         continue
 
+                    # Count proportional, not set membership: a node
+                    # carrying five instances of a group really is more
+                    # "with the group" than one carrying a single
+                    # instance, and the same in reverse for the avoid
+                    # direction. Note the score is a sum across
+                    # neighbours *and* across tags, so a
+                    # prefer_without_tag match can be outweighed by
+                    # neighbour count on the other axis.
+                    #
+                    # Weighted specifications reach here already mapped,
+                    # so there is one scoring path and not two.
                     matched = {}
                     contribution = 0
-                    for tag, val in requested_affinity.items():
+                    for tag in binary_spec[
+                            instance.Instance.AFFINITY_PREFER_WITH]:
                         if tag in i.tags:
-                            matched[tag] = int(val)
-                            contribution += int(val)
+                            matched[tag] = matched.get(tag, 0) + 1
+                            contribution += 1
+                    for tag in binary_spec[
+                            instance.Instance.AFFINITY_PREFER_WITHOUT]:
+                        if tag in i.tags:
+                            matched[tag] = matched.get(tag, 0) - 1
+                            contribution -= 1
                     considered.append({
                         'instance_uuid': instance_uuid,
                         'tags': list(i.tags),

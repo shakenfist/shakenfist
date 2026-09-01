@@ -161,6 +161,45 @@ class ConnectedVSockChannel():
         self.sock.close()
 
 
+def map_weighted_affinity(spec):
+    """Map a weighted affinity specification onto the binary form.
+
+    Positive weights become prefer_with_tag, negative become
+    prefer_without_tag, and zero maps to nothing -- which is what it
+    already meant, since a zero contribution never changed a score.
+
+    The magnitude is discarded. A caller choosing 100 rather than 1 was
+    choosing a multiplier on a neighbour count they cannot predict, so
+    the two were never comparable to each other or to anything else.
+    What survives is a quantity that is defined: how many matching
+    neighbours a node has.
+
+    That makes the mapping order preserving whenever every weight in a
+    specification shares a magnitude -- with uniform magnitude M the
+    weighted score is exactly M times the binary score for every
+    candidate -- which includes every single-tag specification. With
+    mixed magnitudes it demonstrably is not, and that divergence is
+    intended rather than an unstated exception.
+    """
+    prefer_with = []
+    prefer_without = []
+    for tag, weight in (spec or {}).items():
+        try:
+            weight = int(weight)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if weight > 0:
+            prefer_with.append(tag)
+        elif weight < 0:
+            prefer_without.append(tag)
+    return {
+        Instance.AFFINITY_REQUIRE_WITH: [],
+        Instance.AFFINITY_REQUIRE_WITHOUT: [],
+        Instance.AFFINITY_PREFER_WITH: prefer_with,
+        Instance.AFFINITY_PREFER_WITHOUT: prefer_without,
+    }
+
+
 class Instance(dbowo):
     object_type = ObjectType.INSTANCE
     initial_version = 19
@@ -245,6 +284,20 @@ class Instance(dbowo):
     # Metadata - Reserved Keys
     METADATA_KEY_TAGS = 'tags'
     METADATA_KEY_AFFINITY = 'affinity'
+
+    # The binary affinity model's four reserved names. They are keys
+    # *inside* the value of METADATA_KEY_AFFINITY, not metadata keys of
+    # their own: a second top level key would let a caller supply both
+    # models at once and mean nothing coherent. The two value shapes are
+    # told apart by type -- a dict of integers is the weighted form, a
+    # dict of these names mapping to lists is the binary one.
+    AFFINITY_REQUIRE_WITH = 'require_with_tag'
+    AFFINITY_REQUIRE_WITHOUT = 'require_without_tag'
+    AFFINITY_PREFER_WITH = 'prefer_with_tag'
+    AFFINITY_PREFER_WITHOUT = 'prefer_without_tag'
+    AFFINITY_BINARY_KEYS = (
+        AFFINITY_REQUIRE_WITH, AFFINITY_REQUIRE_WITHOUT,
+        AFFINITY_PREFER_WITH, AFFINITY_PREFER_WITHOUT)
 
     # Per-call memo of the instance_attributes row, only populated inside
     # an attribute_memo() block. Class level defaults so that an attribute

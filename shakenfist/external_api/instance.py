@@ -544,7 +544,8 @@ class InstancesEndpoint(api_base.Resource):
                 'configuration.', None),
             (404, 'Namespace, network, node, blob, snapshot, or label not found.', None),
             (406, 'Network not ready.', None),
-            (409, 'Network address in use.', None),
+            (409, 'Network address in use, or no node satisfies a hard '
+                'affinity constraint.', None),
             (507, 'Unable to allocate resources for the instance.', None)
          ]))
     @api_base.requires_namespace_exist_if_specified
@@ -836,6 +837,11 @@ class InstancesEndpoint(api_base.Resource):
         if metadata:
             for k, v in metadata.items():
                 inst.add_metadata_key(k, v)
+                # Emitted here rather than in the validator: that runs
+                # before Instance.new(), so there is no object to hang
+                # an event on, and the create path is the one a caller
+                # of the weighted form is most likely to be using.
+                _warn_if_weighted_affinity(inst, k, v)
 
         # Allocate IP addresses
         order = 0
@@ -868,6 +874,17 @@ class InstancesEndpoint(api_base.Resource):
             else:
                 candidates = SCHEDULER.find_candidates(
                     inst, candidates=[placed_on])
+
+        # This clause must stay *above* the LowResourceException one:
+        # AffinityConstraintUnsatisfiable is a subclass of it, and
+        # except clauses match in order, so reversing these two silently
+        # turns every 409 back into a 507.
+        except exceptions.AffinityConstraintUnsatisfiable as e:
+            inst.add_event(
+                EVENT_TYPE_AUDIT, 'schedule failed, affinity unsatisfiable',
+                extra={'message': str(e)})
+            inst.enqueue_delete_due_error('scheduling failed')
+            return sf_api.error(409, str(e), suppress_traceback=True)
 
         except exceptions.LowResourceException as e:
             inst.add_event(
@@ -1378,7 +1395,58 @@ class InstanceMetadatasEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
             extra={'key': key, 'value': value, 'method': 'post'})
+        _warn_if_weighted_affinity(instance_from_db, key, value)
         instance_from_db.add_metadata_key(key, value)
+
+
+AFFINITY_DEPRECATION_MESSAGE = (
+    'deprecated weighted affinity specification accepted')
+
+
+def _affinity_spec_is_weighted(value):
+    """Is this affinity value the deprecated weighted form?
+
+    The shape test lives here so that the validator and the deprecation
+    warning cannot disagree about which form a caller sent.
+    """
+    if not isinstance(value, dict) or not value:
+        return False
+    return not (set(value) & set(instance.Instance.AFFINITY_BINARY_KEYS))
+
+
+def _warn_if_weighted_affinity(inst, key, value):
+    """Warn, once per acceptance, that the weighted form is deprecated.
+
+    Emitted where the specification is *accepted* rather than where it
+    is consumed. Per-schedule would fire on every create and every
+    reschedule, and would need either an attribute write or a read of
+    the instance's own event history on the scheduling hot path; both
+    are the kind of addition the database load budget exists to catch.
+    Per-process would reset on every daemon restart.
+
+    Accept time also puts the warning where the caller can act on it,
+    at the moment they submit the deprecated form.
+
+    The limit this accepts, deliberately: it covers new acceptances
+    only. Every instance already carrying a weighted specification when
+    this shipped warns nobody, ever. The discovery recipe in the
+    operator guide is what covers those, and it is what the eventual
+    removal release will need.
+    """
+    if key != instance.Instance.METADATA_KEY_AFFINITY:
+        return
+    if not _affinity_spec_is_weighted(value):
+        return
+
+    inst.add_event(
+        EVENT_TYPE_AUDIT, AFFINITY_DEPRECATION_MESSAGE,
+        extra={
+            'affinity': value,
+            'mapped_to': instance.map_weighted_affinity(value),
+            'note': ('weighted affinity values are deprecated and will be '
+                     'removed in a future release; the magnitude is already '
+                     'ignored by the scheduler'),
+        })
 
 
 def _validate_instance_metadata(key, value):
@@ -1398,6 +1466,40 @@ def _validate_instance_metadata(key, value):
         if not isinstance(value, dict):
             return sf_api.error(
                 400, 'value for "affinity" key should be a valid JSON dictionary')
+
+        # The binary model is a second value shape under the same key,
+        # not a second key, so the two are told apart here by type. A
+        # dict whose keys are the four reserved names is the binary
+        # form; anything else is read as the weighted form and has to
+        # coerce to integers below. A spec mixing the two is refused
+        # rather than guessed at, because either guess silently
+        # discards half of what the caller asked for.
+        binary_keys = set(instance.Instance.AFFINITY_BINARY_KEYS)
+        present = set(value.keys())
+        if present & binary_keys:
+            unknown = present - binary_keys
+            if unknown:
+                return sf_api.error(
+                    400,
+                    'affinity keys %s are not valid alongside the binary '
+                    'affinity constraints; the weighted and binary forms '
+                    'cannot be mixed' % sorted(unknown))
+
+            for constraint, tags in value.items():
+                if not isinstance(tags, list):
+                    return sf_api.error(
+                        400,
+                        'value for affinity constraint "%s" should be a JSON '
+                        'list of tags' % constraint)
+                for tag in tags:
+                    # isinstance(True, str) is false, so booleans are
+                    # already excluded here, unlike in the weighted form.
+                    if not isinstance(tag, str) or not tag:
+                        return sf_api.error(
+                            400,
+                            'affinity constraint "%s" should contain only '
+                            'non-empty tag names' % constraint)
+            return
 
         for key_type, dv in value.items():
             # isinstance(True, int) is true in Python, so int(True) is 1 and a
@@ -1442,6 +1544,7 @@ class InstanceMetadataEndpoint(api_base.Resource):
         instance_from_db.add_event(
             EVENT_TYPE_AUDIT, 'set metadata key request from REST API',
             extra={'key': key, 'value': value, 'method': 'put'})
+        _warn_if_weighted_affinity(instance_from_db, key, value)
         instance_from_db.add_metadata_key(key, value)
 
     @swag_from(api_base.swagger_helper(

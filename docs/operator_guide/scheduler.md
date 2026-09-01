@@ -41,14 +41,24 @@ a placement decision can be reconstructed after the fact (see
    filesystems. The candidate node publishes its own reservation as
    the `disk_reservation_gb` metric, so admission honours that
    node's per-host value rather than the evaluator's own config.
-6. **Affinity** -- surviving nodes are scored against the
+6. **Hard affinity constraints** -- if the instance requested
+   `require_with_tag` or `require_without_tag`, nodes which do not
+   satisfy them are excluded. This is admission, not ranking: a node
+   without a matching co-located instance cannot host this instance
+   at all. If it empties the candidate set the create fails with a
+   **409**, not a 507, because the cluster is not full -- it simply
+   has nowhere that satisfies the constraint, and no amount of added
+   capacity would change that. The stage is skipped entirely when no
+   hard constraint was requested.
+7. **Affinity** -- surviving nodes are scored against the
    instance's affinity tags and only the highest-scoring group
-   continues.
-7. **Queue health** -- nodes with more than 20 waiting queue jobs
+   continues. Skipped when the instance requested no affinity, since
+   a scorer with nothing to score cannot change the ordering.
+8. **Queue health** -- nodes with more than 20 waiting queue jobs
    are excluded; they are not keeping up.
-8. **Disk bandwidth** -- nodes whose disks are saturated (busy
+9. **Disk bandwidth** -- nodes whose disks are saturated (busy
    more than 120% of wall time across spindles) are excluded.
-9. **Load ordering and weighted selection** -- the survivors are
+10. **Load ordering and weighted selection** -- the survivors are
    ordered by CPU load and committed RAM, best first, and a
    weighted-random shuffle spreads work across similar nodes. No
    node is dropped here. See below.
@@ -60,7 +70,7 @@ atomic capacity claim made once a candidate is chosen (see [Admission
 is a guarded capacity claim](#admission-is-a-guarded-capacity-claim)
 below), so a node that survives every pre-filter here can still be
 refused there if another concurrent create took the last slot first.
-Stages 7 and 8 are **load shedding**: they answer whether a node is a
+Stages 8 and 9 are **load shedding**: they answer whether a node is a
 good idea right now. Affinity sits between the two deliberately. A
 busy node is still a node the user asked for, so load shedding may
 narrow the winning affinity group but never moves placement out of it
@@ -708,11 +718,26 @@ tells the whole story:
   compared against the hard maximum; for RAM it includes the
   reservation subtracted, or the committed memory compared against
   the counters' limit.
+- `schedule at stage affinity_constraints` is the hard constraint
+  filter, with a `dropped` map naming which of `require_with_tag` or
+  `require_without_tag` ejected each node. It is absent when no hard
+  constraint was requested.
 - `schedule have highest affinity` includes the winning score and
   a per-candidate `affinity_detail` breakdown of which neighbouring
-  instances contributed what. `schedule keeping affinity despite
+  instances contributed what. Its `candidates` field is the
+  **winning tier after scoring**, not the set the scorer was given;
+  the size of the set it considered is the number of entries in
+  `affinity_detail`. The two are easy to confuse and answer
+  different questions. `schedule keeping affinity despite
   transient load` follows it when load shedding was ignored to
-  honour that group.
+  honour that group. **The event has a second shape**: an instance
+  which requested no soft affinity at all -- which is most of them
+  -- gets `affinity_detail: {}` and `highest_affinity: 0`, with
+  `candidates` and `by_affinity` still holding every candidate.
+  The scorer is skipped outright when there is nothing to score,
+  because walking every candidate's placed instances is not free,
+  so an empty breakdown there means "nothing was asked for" and
+  not "the events went missing".
 - `schedule have lowest cpu load` includes per-node `load_detail`:
   raw `cpu_load_1`, the denominator used, the normalised load, the
   committed-RAM fraction and the bucket.
@@ -743,6 +768,108 @@ It also breaks the CPU decision out into `cpu_hard_max`,
 guarded capacity claim](#admission-is-a-guarded-capacity-claim) for what
 `cpu_committed` and its `cpu_committed_row_present` companion actually
 mean.
+
+### Was affinity ignored, or was there no choice?
+
+This is the question almost every affinity report turns out to be,
+and the events answer it directly. Read them at the API's maximum
+limit, because the scheduling events are the *oldest* an instance has
+and a default read of 100 returns the newest:
+
+```
+sf-client instance events ...uuid... | head -50
+```
+
+Two events decide it, and they must come from the **create-path**
+scheduling pass. `find_candidates()` runs more than once per
+instance -- once unforced from the create path, and again forced
+against a single node by preflight -- so pick the pass whose
+`schedule inputs` event has `forced_candidates` false. The forced
+passes each publish an affinity event with exactly one candidate,
+which looks like a scorer that ignored you and is really a scorer
+that was given no choice.
+
+Then, in that pass's `schedule have highest affinity`:
+
+- **Is `affinity_detail` empty?** Then this instance requested no
+  soft affinity, the scorer was skipped, and there is nothing here
+  to diagnose. Check the instance's `affinity` metadata before
+  reading any further: a specification of nothing but `require_*`
+  constraints also lands here, and its story is in the `schedule at
+  stage affinity_constraints` event instead.
+- **How many entries does `affinity_detail` have?** That is how many
+  nodes the scorer actually considered. If it is 1, affinity was
+  never consulted: the placement is neither honoured nor violated,
+  and the answer lies in the earlier `schedule at stage ...` events,
+  whose `dropped` maps say which filter removed everything else.
+- **Is the node you expected present in `affinity_detail` at all?**
+  If not, it was removed by an admission filter -- CPU, memory or
+  disk -- *before* scoring. Again the `dropped` maps name the stage.
+  This is the common case, and it is a capacity story rather than an
+  affinity one.
+- **If it is present, what did it score?** Now the scoring is the
+  subject, and `affinity_detail`'s per-candidate `considered` list
+  names each neighbouring instance and what it contributed.
+
+Do not read `candidates` from that event as the size of the choice.
+It is the winning tier after scoring, so it is frequently 1 exactly
+when affinity worked.
+
+### Finding instances that still use weighted affinity
+
+The weighted form is deprecated and will be removed in a future
+release. Setting one records a `deprecated weighted affinity
+specification accepted` event on the instance -- but only at the
+moment it is accepted, so instances which already carried a weighted
+specification before the upgrade never emit one. Those have to be
+found by inspection:
+
+```bash
+#!/bin/bash
+BINARY='require_with_tag require_without_tag prefer_with_tag prefer_without_tag'
+for uuid in $(sf-client --simple instance list | tail -n +2 | cut -d, -f1); do
+    sf-client --simple instance show "$uuid" 2>/dev/null \
+        | grep '^metadata,affinity,' | head -1 | cut -d, -f3- \
+        | BINARY="$BINARY" UUID="$uuid" python3 -c '
+import ast, os, sys
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit()
+try:
+    spec = ast.literal_eval(raw)
+except (ValueError, SyntaxError):
+    sys.exit()
+binary = set(os.environ["BINARY"].split())
+if isinstance(spec, dict) and spec and not (set(spec) & binary):
+    print("%s %s" % (os.environ["UUID"], spec))
+'
+done
+```
+
+The test is the same one the server uses: a dictionary which uses none
+of the four reserved names is the weighted form. Note that
+`instance show` renders metadata values as Python literals rather than
+JSON -- `{'static-runner': -10}`, with single quotes -- which is why
+this parses with `ast.literal_eval` and not `json.loads`.
+
+Run it before upgrading to the release that removes the weighted form,
+and convert what it finds: a positive weight becomes
+`prefer_with_tag`, a negative weight becomes `prefer_without_tag`, and
+zero can be dropped. Output looks like this (from a real cluster, 2026-08-30):
+
+```
+27a969a1-189f-4161-a201-97149a4b7f48 {'static-runner': -10}
+aae1c884-0878-4f36-b88a-dd32e95590e7 {'hypervisor': -50}
+```
+
+Check the magnitudes while you are there. Every weight in each of
+those specifications shares a magnitude -- they are single-tag
+specifications -- so the mapping preserves their ordering exactly and
+converting them changes nothing. A specification mixing magnitudes,
+such as `{"a": 100, "b": 1}`, is the one to look at twice: the mapping
+already discards the difference, so its ordering changed at the
+release which introduced the mapping rather than at the one which
+removes the weighted form.
 
 ## Mixed-version clusters
 
