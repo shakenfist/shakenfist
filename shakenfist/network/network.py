@@ -914,13 +914,16 @@ class Network(dbowo):
         The fan-out enumerates the set of nodes hosting any of this
         network's interfaces, plus the network node (which participates
         in every mesh -- see below), and enqueues one ensure_mesh op on
-        each node's per-node ``network`` queue. The
-        enqueue-side dedup in ``net_op.create_and_enqueue`` is keyed on
-        ``target='networknode'`` only, so per-node enqueues are *not*
-        collapsed across nodes -- each node's worker sees its own op
-        and updates its own FDB. Worker-side coalescing on the per-node
-        queue is similarly gated off (see the ``queue_is_cluster_wide``
-        check in ``BaseClusterOperation.execute``).
+        each node's per-node ``network`` queue. Both coalescing paths
+        key on ``(network_uuid, node_uuid)``, so these ops are
+        collapsed *within* a node and never across nodes -- each node's
+        worker still sees an op and updates its own FDB, but N
+        enqueues for one node become one execution. The full argument
+        for why that is safe on a per-node queue is the
+        PARTITIONED-WORKER SAFETY INVARIANT comment in
+        ``shakenfist/daemons/network/workitem.py``; the short version
+        is that this queue is drained by exactly one process and, in
+        it, one worker thread per network.
 
         Returns the local-node op when this caller's node is itself a
         participant, so the caller's existing
