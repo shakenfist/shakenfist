@@ -122,8 +122,11 @@ in this phase needs to redo them.
    and is already populated -- for other operation types.** The column
    is declared at `shakenfist/mariadb.py:2069` with
    `sa.Index('ix_cluster_ops_node', 'node_uuid')` at `:2076`, and
-   `_direct_create_cluster_operation` extracts it from the metadata
-   dict unconditionally at `:21010`. `_COALESCIBLE_TARGET_COLUMNS`
+   the enqueue path extracts it from the metadata dict
+   unconditionally -- in `_direct_create_and_enqueue_cluster_operation`
+   at `:21226`, which is the function `enqueue_cluster_operation`
+   actually reaches; `_direct_create_cluster_operation` at `:21010`
+   does the same thing but is not on this path. `_COALESCIBLE_TARGET_COLUMNS`
    (`mariadb.py:22648`) already whitelists it. So the claim in #3884
    that the column "is simply always NULL for NetOps today" is correct
    as stated, but the reason is only that NetOp's model has no
@@ -331,6 +334,55 @@ is approved.
    assertion is a second test method in that class, sharing the
    fixture. A separate file would duplicate the setup and, more to the
    point, would not fail if someone deleted the shared helper.
+
+8. **A key column with no value binds `IS NULL`, and that is the
+   correct narrower semantics -- not a reason to skip the fold.**
+   Recorded after step 11b, because it is the one place the original
+   decisions were wrong and it would have turned this phase into a
+   regression. `COALESCIBLE_KEY_COLUMNS` is a property of the operation
+   class, so widening it to `('network_uuid', 'node_uuid')` in step 11d
+   widens it for *every* NetOp -- including
+   `network_apply_update_dnsmasq` and
+   `network_apply_create_network_node`, the two tasks that actually
+   fold today, which live on the cluster-wide queue and therefore carry
+   `node_uuid = None`. Step 11a's preflight refuses a `None`-valued key
+   column outright, so widening the tuple would have silently disabled
+   the only coalescing the cluster does. It would have been logged and
+   it would have been measured, but only after the fact.
+
+   The fix is to bind `None` as `IS NULL` rather than refuse it. That
+   is exactly right on both sides: a cluster-wide operation folds only
+   other cluster-wide operations, because they are the ones whose
+   `node_uuid` is also NULL, and a per-node operation folds only
+   operations for its own node. Both are strictly narrower than
+   today's network-only key, which is the property the whole phase
+   rests on. The empty-key-list refusal stays -- with no equality at
+   all the statement would fold everything -- and the protection
+   against a caller who simply forgot to supply a value stays too, in
+   `_coalescible_keys`'s `KeyError`: a missing dict entry is a bug, an
+   explicit `None` is a decision.
+
+   Proto3 has no null, so `CoalescibleKeyPair.uuid` being an empty
+   string cannot mean "match NULL" unambiguously. Add a
+   `bool is_null = 3` to the pair. The V2 messages have not shipped,
+   so this is a free change now and would not be later.
+
+9. **The extra NODE reference on the "operation created" audit event
+   is accepted, not suppressed.** `enqueue_cluster_operation`
+   (`shakenfist/schema/operations/util.py:101-112`) fans that event out
+   to every metadata key ending in `_uuid` whose value is not `None`,
+   so giving `NetOp` a `node_uuid` means a per-node mesh enqueue now
+   also records the event against the node. This is worth a decision
+   rather than a shrug, because event volume has bitten this project
+   before. Three reasons to keep it. It is one extra `event_objects`
+   row per per-node NetOp, which the six hour baseline in finding 1
+   puts at roughly 150 an hour on `sfcbr`. `NodeNetOp` already behaves
+   exactly this way, so the alternative is an inconsistency rather than
+   a saving. And step 11d exists to *reduce* the number of these
+   operations, so the net effect on volume is expected to be negative.
+   Suppressing it would mean changing that `_uuid` scan, which would
+   also change every other operation type -- a much larger blast radius
+   than the thing being avoided.
 
 ## Step plan
 
