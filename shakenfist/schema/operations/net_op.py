@@ -26,7 +26,7 @@ LOG, HANDLER = logs.setup(__name__)
 
 object_type = ObjectType.NET_OP
 initial_version = 1
-current_version = 2
+current_version = 3
 
 
 class model_tasks(Enum):
@@ -94,13 +94,15 @@ COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
 #
 # For NetOp that is the network alone: every op is scoped to exactly
 # one network, and nothing in the key distinguishes the node an op was
-# targeted at. That is the limitation which keeps
-# ``network_ensure_mesh`` out of COALESCIBLE_TASKS (see the note
-# above) and which #3884 is about.
+# targeted at. The model now records ``node_uuid`` for per-node
+# enqueues, so the value is available to widen this to
+# ``('network_uuid', 'node_uuid')`` -- but widening it is what lets
+# ``network_ensure_mesh`` back into COALESCIBLE_TASKS, and that
+# happens together with the two guards, not here. See #3884.
 COALESCIBLE_KEY_COLUMNS: tuple[str, ...] = ('network_uuid',)
 
 
-def _coalescible_keys(network_uuid) -> list[tuple[str, str]]:
+def _coalescible_keys(network_uuid, node_uuid) -> list[tuple[str, str]]:
     """Build the coalescing key for one enqueue.
 
     One ``(column, value)`` pair per column of
@@ -109,18 +111,44 @@ def _coalescible_keys(network_uuid) -> list[tuple[str, str]]:
     database exactly the same question. A column added to the tuple
     without a value here raises ``KeyError`` at the call site rather
     than silently narrowing or widening the key.
+
+    ``node_uuid`` is collected even though it is not currently in
+    ``COALESCIBLE_KEY_COLUMNS``. That is the point of gathering the
+    values in a dict: the column tuple can be widened in one place
+    without also having to remember to thread a new value through
+    every caller of this helper.
     """
-    values = {'network_uuid': str(network_uuid)}
+    values = {
+        'network_uuid': str(network_uuid),
+        'node_uuid': None if node_uuid is None else str(node_uuid),
+    }
     return [(column, values[column]) for column in COALESCIBLE_KEY_COLUMNS]
 
 
 class model(BaseModel):
+    # ``node_uuid`` is deliberately absent from this map, even though
+    # it is a model field. ``enqueue_cluster_operation``
+    # (``shakenfist/schema/operations/util.py``) iterates
+    # ``target_fields`` to write ``cluster_operation_targets`` rows, so
+    # listing it here would start recording a NODE target row for every
+    # per-node NetOp -- changing what ``has_pending_cluster_operation()``
+    # reports for a node and growing a table the cleaner has to keep up
+    # with. The coalescing key is declared separately, in
+    # ``COALESCIBLE_KEY_COLUMNS``, precisely so it does not have to
+    # borrow this map.
     target_fields: ClassVar[dict[str, ObjectType]] = {
         'network_uuid': ObjectType.NETWORK,
     }
 
     uuid: UUID4
     network_uuid: UUID4
+    # The node this operation was targeted at, or None for the
+    # cluster-wide network-node queue. Recorded so the fold's key can
+    # tell one hypervisor's node-local work apart from another's;
+    # ``cluster_operations`` already has an indexed ``node_uuid``
+    # column which ``_direct_create_and_enqueue_cluster_operation``
+    # populates from the metadata dict, so no migration is involved.
+    node_uuid: Optional[UUID4] = None
     floating_address: Optional[str] = None
     inner_address: Optional[str] = None
     priority: PRIORITY
@@ -143,6 +171,16 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
                        depends_on=None, runs_after=None,
                        target='networknode', family='clusteroperation',
                        floating_address=None, inner_address=None):
+    # ``target`` is queue routing, but for the per-node ``network``
+    # family it *is* the node uuid -- ``Network.ensure_mesh`` and the
+    # network maintainer both pass a node uuid there. So the value the
+    # coalescing key needs is already in hand, and deriving it here is
+    # strictly better than adding a ``node_uuid`` parameter: a caller
+    # who forgot to pass one would silently produce an operation whose
+    # key degrades to the network alone, and the fold would then match
+    # it against another node's work. There is no way to forget this.
+    node_uuid = None if target == 'networknode' else target
+
     # Enqueue-side dedup: if this enqueue is a single coalescible task
     # on a network that already has an equivalent pending op in the
     # queue, return that op's uuid instead of inserting a duplicate.
@@ -193,7 +231,7 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
             and runs_after is None):
         existing_uuid = mariadb.find_existing_coalescible_op(
             operation_type=object_type.name.lower(),
-            keys=_coalescible_keys(network_uuid),
+            keys=_coalescible_keys(network_uuid, node_uuid),
             task_name=tasks[0].name)
         if existing_uuid is not None:
             LOG.with_fields({
@@ -228,6 +266,7 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         m = model(
             uuid=operation_uuid,
             network_uuid=network_uuid,
+            node_uuid=node_uuid,
             floating_address=floating_address,
             inner_address=inner_address,
             priority=priority,
@@ -241,6 +280,7 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         LOG.with_fields({
             'uuid': operation_uuid,
             'network_uuid': network_uuid,
+            'node_uuid': node_uuid,
             'floating_address': floating_address,
             'inner_address': inner_address,
             'priority': priority,
