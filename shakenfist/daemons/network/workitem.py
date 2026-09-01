@@ -83,10 +83,14 @@ class Job(util_concurrency.Job):
         #             i.   a (network_uuid, node_uuid) key can only match
         #                  ops carrying that node's uuid;
         #             ii.  every such op was enqueued to that node's own
-        #                  {node_uuid}-network-* queue (net_op's
+        #                  {node_uuid}-network-* queue. net_op's
         #                  create_and_enqueue derives node_uuid from the
-        #                  enqueue target, so this is true by
-        #                  construction);
+        #                  enqueue target, and the queue name is
+        #                  {target}-{family}-{priority}, so this holds
+        #                  exactly when the enqueue also chose
+        #                  family='network' -- which is why the
+        #                  enqueue-time guard tests the family and not
+        #                  only the key;
         #             iii. that queue is drained by exactly one dispatcher
         #                  process, that node's own net-worker; and
         #             iv.  within that process, every op for the same

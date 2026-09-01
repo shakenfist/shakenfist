@@ -44,8 +44,8 @@ class model_tasks(Enum):
     network_apply_delete_network_node = 12
 
 
-# Tasks for which N pending ops on the same network can be folded
-# into a single execution by the worker (step 4) or skipped at
+# Tasks for which N pending ops sharing a coalescing key can be
+# folded into a single execution by the worker (step 4) or skipped at
 # enqueue time (step 5):
 #
 # * ``network_apply_update_dnsmasq`` regenerates the dnsmasq config
@@ -55,34 +55,55 @@ class model_tasks(Enum):
 # * ``network_apply_create_network_node`` is idempotent network-node
 #   setup -- running it twice in a row leaves the same state as
 #   running it once.
+# * ``network_ensure_mesh`` diffs **this** host's FDB against the
+#   current set of participating hypervisors, so a later run subsumes
+#   an earlier one on the same host.
 #
 # The remaining tasks are *not* coalescible -- they carry per-op
 # parameters (specific floating IPs, specific mac/ip lease pairs)
 # or are order-sensitive against an opposite task (remove vs
 # update / delete vs create).
 #
-# ``network_ensure_mesh`` deliberately is NOT in this set, even
-# though it looks like the best candidate in the file: it is
-# idempotent and it only depends on the current snapshot of
-# participating hypervisors. The problem is that it is the one NetOp
-# task that does *node-local* work -- ``_apply_ensure_mesh`` diffs
-# **this** host's FDB -- and the coalescing key is
-# ``COALESCIBLE_KEY_COLUMNS``, i.e. the network alone. There is no
-# column on ``cluster_operations`` recording which node an op was
-# targeted at (``target`` is queue routing, and NetOp's model has no
-# ``node_uuid``), so "same network" is the finest grain the fold can
-# express -- ``COALESCIBLE_KEY_COLUMNS`` below is a one element
-# tuple -- and it cannot tell hypervisor A's mesh op apart from
-# hypervisor B's. Declaring it coalescible therefore let the network
-# node's survivor mark every other hypervisor's pending mesh op
-# ``complete`` without doing their work, leaving their FDBs stale --
-# the ``test_single_virtual_networks_work`` failure described in
-# ``BaseClusterOperation.execute``. That was inert while the fold's
-# join was broken (#3878) and would have gone live with the fix; see
-# #3884 for the multi-column key that would let it back in.
+# ``network_ensure_mesh`` is the one NetOp task which does *node-local*
+# work, and it is in this set only because the key below names
+# ``node_uuid`` and because of where its per-node enqueues are routed.
+# Both conditions are load bearing, and neither alone is enough.
+#
+# The key half. The fold's SQL is blind to queues --
+# ``cluster_operations`` has no queue column -- so the key has to
+# distinguish them instead. ``(network_uuid, node_uuid)`` does: a
+# cluster-wide operation carries ``node_uuid = None``, which binds
+# ``IS NULL`` and therefore matches only the other cluster-wide
+# operations, while a per-node operation matches only operations
+# carrying its own node's uuid. With the network alone -- the key
+# before #3884 -- hypervisor A's mesh op and hypervisor B's were
+# indistinguishable, so A's survivor marked B's op ``complete``
+# without doing B's work and left B's FDB stale. That is the
+# ``test_single_virtual_networks_work`` failure described in
+# ``BaseClusterOperation.execute``.
+#
+# The routing half. Every per-node enqueue of ``network_ensure_mesh``
+# goes to ``family='network'`` -- ``Network.ensure_mesh`` and both
+# sites in the network maintainer pass it -- and that family is what
+# puts the operation on ``{node_uuid}-network-*``, drained by that
+# node's own sf-net dispatcher, within which every operation for a
+# network hashes to a single worker thread. So a fold can never mark
+# complete an operation another thread is executing. The default
+# ``clusteroperation`` family routes per-node queues to sf-queues
+# instead, which starts one worker per claimed item with no routing
+# key at all: two of its workers can hold two operations for the same
+# (network, node) at once, and one's fold can flip the other's
+# operation to ``complete`` mid-dequeue. A coalescible task on that
+# family would be unsafe however wide the key. Both guards refuse it
+# -- ``InvalidCoalescibleEnqueue`` below at enqueue time, and
+# ``BaseClusterOperation.execute``'s ``key_cannot_distinguish_queue``
+# at fold time -- but the reason they do is here. The argument in
+# full, and why it stops at sf-net, is the PARTITIONED-WORKER SAFETY
+# INVARIANT comment in ``shakenfist/daemons/network/workitem.py``.
 COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
     model_tasks.network_apply_update_dnsmasq,
     model_tasks.network_apply_create_network_node,
+    model_tasks.network_ensure_mesh,
 })
 
 # The coalescing key: indexed columns on the ``cluster_operations``
@@ -92,17 +113,20 @@ COALESCIBLE_TASKS: frozenset[model_tasks] = frozenset({
 # the two can never disagree about what a sibling is. A candidate op
 # must match every column.
 #
-# For NetOp that is the network alone: every op is scoped to exactly
-# one network, and nothing in the key distinguishes the node an op was
-# targeted at. The model now records ``node_uuid`` for per-node
-# enqueues, so the value is available to widen this to
-# ``('network_uuid', 'node_uuid')`` -- but widening it is what lets
-# ``network_ensure_mesh`` back into COALESCIBLE_TASKS, and that
-# happens together with the two guards, not here. See #3884.
-COALESCIBLE_KEY_COLUMNS: tuple[str, ...] = ('network_uuid',)
+# For NetOp that is the network and the node the operation was
+# targeted at. Every op is scoped to exactly one network;
+# ``node_uuid`` is the node uuid for a per-node enqueue and ``None``
+# for the cluster-wide network-node queue, where it binds ``IS NULL``
+# rather than being dropped from the key. The result is strictly
+# narrower than the network alone in both directions -- cluster-wide
+# operations fold only each other, a hypervisor's node-local work
+# folds only its own -- which is what lets ``network_ensure_mesh``
+# into COALESCIBLE_TASKS above.
+COALESCIBLE_KEY_COLUMNS: tuple[str, ...] = ('network_uuid', 'node_uuid')
 
 
-def _coalescible_keys(network_uuid, node_uuid) -> list[tuple[str, str]]:
+def _coalescible_keys(
+        network_uuid, node_uuid) -> list[tuple[str, Optional[str]]]:
     """Build the coalescing key for one enqueue.
 
     One ``(column, value)`` pair per column of
@@ -112,11 +136,11 @@ def _coalescible_keys(network_uuid, node_uuid) -> list[tuple[str, str]]:
     without a value here raises ``KeyError`` at the call site rather
     than silently narrowing or widening the key.
 
-    ``node_uuid`` is collected even though it is not currently in
-    ``COALESCIBLE_KEY_COLUMNS``. That is the point of gathering the
-    values in a dict: the column tuple can be widened in one place
-    without also having to remember to thread a new value through
-    every caller of this helper.
+    Values are gathered into a dict rather than built positionally so
+    the column tuple can be changed in one place without threading a
+    new value through every caller. A ``None`` value is a decision, not
+    an omission: it binds ``IS NULL`` in both queries, which is how the
+    cluster-wide operations fold only each other.
     """
     values = {
         'network_uuid': str(network_uuid),
@@ -208,13 +232,15 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
     #
     # So the rule is not "coalescible tasks only on the cluster-wide
     # queue" but "coalescible tasks only where the key distinguishes
-    # the target". A ``networknode`` enqueue qualifies because one
-    # elected worker drains that queue; a per-node enqueue qualifies
-    # when ``node_uuid`` is in the key and this operation has one.
-    # (``None`` is a legitimate key value -- it binds ``IS NULL`` and is
-    # how the cluster-wide ops fold only each other -- but a NULL node
-    # cannot distinguish one hypervisor from another, which is why the
-    # per-node case tests the value as well as the column.)
+    # the target, on a dispatcher which partitions by it". A
+    # ``networknode`` enqueue qualifies because one elected worker
+    # drains that queue; a per-node enqueue qualifies when ``node_uuid``
+    # is in the key, this operation has one, and the enqueue is on the
+    # ``network`` family so sf-net drains it. (``None`` is a legitimate
+    # key value -- it binds ``IS NULL`` and is how the cluster-wide ops
+    # fold only each other -- but a NULL node cannot distinguish one
+    # hypervisor from another, which is why the per-node case tests the
+    # value as well as the column.)
     #
     # Rather than leave that as a convention nobody checks, enforce it
     # here. It costs a set intersection per enqueue and turns a silent

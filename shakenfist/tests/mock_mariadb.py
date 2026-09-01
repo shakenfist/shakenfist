@@ -3809,22 +3809,38 @@ class MockMariaDB():
         """Mirror ``mariadb._coalescible_preflight``'s key validation.
 
         An empty key list or a column outside the whitelist means the
-        real code skips the query entirely, so the mock must too.
+        real code skips the query entirely, so the mock must too. A
+        ``None`` *value* is not a skip: the real preflight passes it
+        through ``_maybe_uuid`` unchanged and the statement binds
+        ``IS NULL``, which is a narrower key rather than a missing one.
+        An empty string is a skip, because ``_maybe_uuid('')`` raises
+        and the real code logs and returns. See decision 8 of
+        docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
         """
         if not keys:
             return False
         for column, value in keys:
             if column not in {'network_uuid', 'instance_uuid', 'node_uuid'}:
                 return False
-            if value is None or value == '':
+            if value is not None and value == '':
                 return False
         return True
 
     @staticmethod
     def _coalescible_row_matches(op_row, keys):
-        """True when a stored op row matches every pair of the key."""
+        """True when a stored op row matches every pair of the key.
+
+        A ``None`` in the key matches only a row whose column is unset,
+        mirroring the ``IS NULL`` clause ``_coalescible_key_clause``
+        emits. That is what keeps the cluster-wide operations folding
+        only each other once the key names ``node_uuid``.
+        """
         for column, value in keys:
-            if str(op_row.get(column) or '') != str(value):
+            stored = op_row.get(column)
+            if value is None:
+                if stored is not None and str(stored) != '':
+                    return False
+            elif str(stored or '') != str(value):
                 return False
         return True
 

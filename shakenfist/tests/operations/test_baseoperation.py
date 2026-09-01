@@ -261,7 +261,13 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_claim.assert_called_once()
         kwargs = self.mock_claim.call_args.kwargs
         self.assertEqual(ObjectType.NET_OP, kwargs['operation_type'])
-        self.assertEqual([('network_uuid', NETWORK_UUID)], kwargs['keys'])
+        # The key is every declared column, including the ones unset on
+        # this operation: a cluster-wide NetOp has no node_uuid, and
+        # None binds IS NULL so it folds only the other cluster-wide
+        # operations on this network.
+        self.assertEqual(
+            [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+            kwargs['keys'])
         self.assertEqual(
             ['network_apply_update_dnsmasq'], kwargs['task_names'])
         self.assertEqual(OP_UUID, kwargs['exclude_op_uuid'])
