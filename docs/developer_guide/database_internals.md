@@ -397,26 +397,43 @@ Op classes that have such tasks declare them on the class:
 ```python
 class NetOp(BaseClusterOperation):
     coalescible_tasks = schema.COALESCIBLE_TASKS
-    coalescible_target_column = 'network_uuid'
+    coalescible_key_columns = ('network_uuid', 'node_uuid')
 ```
 
-`coalescible_target_column` names the indexed column on
-`cluster_operations` used to group sibling ops. The fold runs at
-two layers, both controlled by this metadata:
+`coalescible_key_columns` names a *tuple* of indexed columns on
+`cluster_operations`, not a single one: a sibling has to match every
+column before it counts as the same work, so the key can be narrower
+than "the same network" without any query rewriting. A column with
+no value on the operation binds `IS NULL` rather than being dropped
+from the comparison -- that distinction matters here. `NetOp`'s two
+cluster-wide tasks (`network_apply_update_dnsmasq`,
+`network_apply_create_network_node`) carry `node_uuid = None`, so
+they fold only each other; `network_ensure_mesh`, enqueued per
+participating hypervisor, carries its own node's uuid and folds only
+that node's own siblings. Both are strictly narrower than the
+network-alone key this replaced, which is the property the whole
+widening rests on. Binding `None` as `IS NULL` was a correction made
+mid-phase: an earlier version of the preflight refused a `None` key
+value outright, which would have silently switched off the only
+coalescing the cluster does the moment the key grew a second column
+-- see decision 8 in
+`docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md`.
+
+The fold runs at two layers, both controlled by this metadata:
 
 * **Enqueue-side dedup**
   (`mariadb.find_existing_coalescible_op`): `create_and_enqueue`
   in the schema module checks for an existing pending single-task
-  coalescible op on the same target before inserting a new row. If
-  found, the new caller's `op_uuid` is the existing op's `op_uuid`.
-  All `raise_for_error` waiters then block on the same op and the
-  worker runs it once.
+  coalescible op matching every key column before inserting a new
+  row. If found, the new caller's `op_uuid` is the existing op's
+  `op_uuid`. All `raise_for_error` waiters then block on the same op
+  and the worker runs it once.
 
 * **Worker-side fold**
   (`mariadb.claim_coalescible_siblings`): inside
   `BaseClusterOperation.execute`, the survivor atomically
-  transitions every other pending coalescible op on the same target
-  to `STATE_COMPLETE` in one SQL statement. When the dispatcher
+  transitions every other pending coalescible op matching the same
+  key to `STATE_COMPLETE` in one SQL statement. When the dispatcher
   surfaces a folded sibling's `work_queue` row, the terminal-state
   branch drops it cleanly. A `'coalesced sibling ops'` event
   on the survivor records the folded uuids.
@@ -424,3 +441,60 @@ two layers, both controlled by this metadata:
 The enqueue-side dedup is the cheaper of the two -- the row never
 gets inserted -- but the worker-side fold is the safety net for the
 race where two concurrent callers both lose the lookup.
+
+### Both guards are key-aware *and* family-aware
+
+`cluster_operations` has no queue column, so the key is the only
+thing either primitive's SQL can use to confine a fold to the
+operations one dispatcher process actually drains. But naming
+`node_uuid` in the key is necessary, not sufficient: which
+dispatcher drains a per-node operation also depends on the *queue
+family* the enqueue chose, because `enqueue_cluster_operation`
+builds the queue name as `{target}-{family}-{priority}`. A node
+target only reaches `sf-net`'s per-node `{node}-network-*` queue
+when the caller also passes `family='network'`; the default
+`clusteroperation` family routes the same target to `sf-queues`
+instead, which fills spare worker slots from a single unpartitioned
+dequeue call and has no per-target routing at all. `sf-net`, by
+contrast, hashes every operation for a given target to one worker
+thread (`_routing_key` in `shakenfist/daemons/network/workitem.py`),
+so a fold there can never mark an operation complete while another
+thread is executing it. That guarantee is the load-bearing part of
+the safety argument for a per-node fold, and it does not extend to
+`sf-queues` -- see the `PARTITIONED-WORKER SAFETY INVARIANT` comment
+at the top of `Job.__init__` in that file for the argument in full,
+including why `NodeNetOp.network_apply_create_hypervisor` (whose
+model already carries both columns) stays out of
+`COALESCIBLE_TASKS`.
+
+Both guards therefore test the family as well as the key:
+
+* The enqueue-time guard (`InvalidCoalescibleEnqueue` in
+  `shakenfist/schema/operations/net_op.py`) refuses a coalescible
+  task enqueued to a non-`networknode` target unless `node_uuid` is
+  in `coalescible_key_columns`, the operation's derived `node_uuid`
+  is set, *and* the enqueue is on the `network` family.
+* The fold-time guard (`BaseClusterOperation.execute`) admits a
+  per-node queue on the same condition, read off the queue name's
+  `{target}-{family}-` prefix, and records the outcome
+  `key_cannot_distinguish_queue` when it refuses. That name replaces
+  `not_cluster_wide`; `tools/queue-wait-report.py` still maps the old
+  name out of retained log history rather than dropping it, since it
+  was the recorded outcome for every build before the key became
+  multi-column.
+
+### The V2 gRPC methods
+
+`ClaimCoalescibleSiblingsV2` and `FindExistingCoalescibleOpV2` take a
+`repeated CoalescibleKeyPair keys` in place of the V1 RPCs' scalar
+`target_column`/`target_uuid`, as new RPC names rather than a new
+field on the existing messages. A repeated field would be
+wire-compatible but unsafe across a rolling upgrade: an old
+`sf-database` would silently ignore the extra columns and fold on
+the network alone, which is exactly the cross-node corruption the
+wider key exists to prevent. An old server answers a V2 call with
+`UNIMPLEMENTED`, and the client treats that as "coalescing
+unavailable" and skips the fold rather than falling back to V1 -- a
+loud, temporary loss of an optimisation instead of a quiet
+correctness failure. The V1 RPCs are unchanged and stay for one
+release.

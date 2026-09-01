@@ -533,4 +533,132 @@ expensive to redo:
 
 ## Results
 
-Not yet executed.
+Steps 11a-11g are done. Step 11h (the `sfcbr` re-measurement) is
+outstanding -- see below.
+
+**What was built.** The coalescing key generalised from a single
+`(column, value)` pair to a tuple of them
+(`coalescible_key_columns`), read by both the enqueue-side dedup and
+the worker-side fold, and by `_routing_key`. `NetOp` gained
+`node_uuid` (derived from `target` inside `create_and_enqueue`, never
+taken as a parameter) and moved to version 3, which also added the
+`_upgrade_step_1_to_2` that finding 8 showed was missing since the
+version 2 bump. New V2 gRPC RPCs (`ClaimCoalescibleSiblingsV2` /
+`FindExistingCoalescibleOpV2`) carry a repeated `CoalescibleKeyPair`
+in place of the V1 RPCs' scalar pair, so a rolling upgrade against an
+old `sf-database` answers `UNIMPLEMENTED` and skips the fold rather
+than silently folding on the network alone. Both the enqueue-time and
+fold-time guards became key-aware and family-aware rather than being
+deleted, `network_ensure_mesh` is back in `COALESCIBLE_TASKS` with the
+key `(network_uuid, node_uuid)`, and the `not_cluster_wide` outcome
+was renamed `key_cannot_distinguish_queue` (`tools/queue-wait-report.py`
+still maps the old name out of retained log history). Verified end to
+end against a real database, not mocks: a node A survivor folds only
+node A's sibling and leaves node B's queued, and narrowing the key
+back to the network alone reproduces the phase 8 bug exactly. Unit
+coverage is 26 tests (`8418ad3d6`), functional CI asserts a per-node
+fold and verifies the mesh is correct afterwards (`7bbbb57d6`).
+
+**Two mid-phase corrections, both recorded honestly rather than
+folded silently into the step that found them.**
+
+* **Decision 8: a `None` key value must bind `IS NULL`, not be
+  refused.** `coalescible_key_columns` is a property of the operation
+  *class*, so widening it to `('network_uuid', 'node_uuid')` in step
+  11d widened it for every `NetOp` -- including the two cluster-wide
+  tasks that already fold today, which carry `node_uuid = None`.
+  Step 11a's original preflight refused a `None`-valued key column
+  outright. Left as originally decided, step 11d would have silently
+  disabled the only coalescing the cluster currently does: it would
+  have been logged and it would have been measured, but only after
+  the fact, by someone looking at a graph that had quietly gone flat.
+  The fix, made in `41a3cf670`/`075e17627` and recorded as decision 8
+  after being found in review of step 11b, binds `None` as `IS NULL`
+  instead -- exactly the narrower semantics the whole phase needs: a
+  cluster-wide operation folds only other cluster-wide operations,
+  and a per-node operation folds only its own node's. Proto3 has no
+  null, so `CoalescibleKeyPair` carries an explicit `is_null` bool
+  rather than overloading an empty string.
+
+* **A key naming `node_uuid` is necessary but not sufficient -- the
+  queue family decides which dispatcher drains the work.** Also found
+  in review, before step 11c was committed rather than after: the
+  first draft of both guards tested only whether the key could
+  distinguish nodes, not which dispatcher would actually claim the
+  operation. `enqueue_cluster_operation` builds the queue name as
+  `{target}-{family}-{priority}`, so a node uuid in `target` reaches
+  `sf-net`'s per-node `{node}-network-*` queue only when the caller
+  also passes `family='network'`; the default `clusteroperation`
+  family routes the same target to `sf-queues`, which has no
+  per-worker routing key at all. A key-only guard would have let a
+  hypothetical future per-node `clusteroperation`-family enqueue pass
+  both checks while being unsafe to fold. Both guards were tightened
+  to test the family as well as the key before `075e17627` was
+  committed -- the enqueue guard directly, the fold guard through the
+  queue name's prefix -- and the `PARTITIONED-WORKER SAFETY INVARIANT`
+  comment in `shakenfist/daemons/network/workitem.py` states the
+  four-link argument this depends on in full, including why it stops
+  at `sf-net` and does not reach `sf-queues`.
+
+**A third defect found on the way, in test infrastructure rather than
+production code.** `shakenfist/tests/mock_mariadb.py`'s coalescing
+preflight still refused a `None` key value after `41a3cf670` reversed
+that behaviour in the real `mariadb.py`. With the widened key, every
+cluster-wide `NetOp` carries a `None` `node_uuid`, so the mock would
+have silently reported "no coalescing" for every one of them --
+mock-based assertions in step 11e would have measured nothing rather
+than failing loudly, which is the worse of the two failure modes for
+a test double. Found and fixed in `a597dc127`, in the same commit
+that turned mesh folding on, because that is the step whose
+verification depended on the mock behaving correctly.
+
+**Step 11h is outstanding.** It requires `sfcbr` to have run the
+merged build for at least 24 hours, which had not yet happened when
+this close-out step ran. The only real numbers available are still
+the pre-change baseline from survey finding 1 (a six hour `sfcbr`
+window, before any of this phase's code existed): 1,510 `net_op`
+samples, the fold ran 263 times and folded 4 siblings, 581 were
+refused by the per-node-queue guard, and on the per-node `network`
+family lane 573 of 919 operations (62%) dequeued alongside at least
+one sibling -- the ceiling on what a per-node fold could collapse.
+Whether the wider key actually reaches that ceiling, and whether the
+fold's duration distribution moved enough to revisit decision 6's
+no-new-index call, is unmeasured. Nothing in this Results section
+should be read as reporting a post-change number; there isn't one
+yet.
+
+## Future work
+
+* **The `sf-queues` half of #3884 remains deferred**, per decision 5.
+  `NodeNetOp.network_apply_create_hypervisor`'s model already carries
+  both `network_uuid` and `node_uuid`, so no schema change would be
+  needed to give it the same two-column key this phase gave `NetOp`
+  -- but `sf-queues` is a `WorkerPoolDaemon` with no per-target
+  routing key, so the fourth link of the safety argument (one worker
+  thread per target within the draining process) does not hold there.
+  Two of its workers can hold two operations for the same `(network,
+  node)` at once, and one's fold can flip the other's operation to
+  `complete` in the window between that worker's own
+  `if op.state.value != STATE_QUEUED: return` check
+  (`shakenfist/daemons/queues/workitem.py:181-182`) and its transition
+  to `executing` -- `state_targets` has no `complete -> executing`
+  edge. Making it safe means either partitioning the `sf-queues`
+  worker pool by target, mirroring `sf-net`'s `_routing_key`, or
+  making dequeue-to-`executing` a single atomic transition; both are
+  real pieces of work with a blast radius beyond coalescing, and
+  should be scoped and decided on their own merits.
+
+  A successor issue naming this race concretely was intended to exist
+  by the end of this step (this plan's Definition of done, and the
+  `InvalidCoalescibleEnqueue` error message in
+  `shakenfist/schema/operations/net_op.py` already promise one), but
+  filing GitHub issues and posting comments turned out to be outside
+  what this close-out session's tooling permissions allow. The
+  content above is written to be filed as-is; #3884 also still needs
+  the comment recording survey findings 2, 3 and 6 that the plan's
+  "Corrections made at source" section called for. Both are one `gh`
+  command each and are left for the operator or a session with the
+  right permissions to run.
+
+* **Step 11h**, the `sfcbr` re-measurement described above, once the
+  merged build has run for at least 24 hours.
