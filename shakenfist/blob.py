@@ -1215,6 +1215,17 @@ def http_fetch(
                         'percentage': int(percentage),
                         'bytes_fetched': fetched
                     })
+
+                # A blob under fetch has no references -- the artifact index
+                # reference is only created once the fetch succeeds -- so the
+                # cluster daemon's unreferenced blob reaper sees it as unused
+                # since fetched_at and reaps it mid-flight once the fetch
+                # outlives the 300 second grace period (issue 4000). Persist
+                # last_used as a heartbeat while data is flowing; a fetch
+                # whose process dies stops refreshing it and is collected as
+                # before.
+                b.record_usage()
+
                 if (next_percentage - percentage) < 0:
                     next_percentage += 10
                 last_event = time.time()
