@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-08-31T13:02:39.008665+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-01T11:19:37.364378+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -570,7 +570,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | development | compliant | - |
 | divergulent | compliant | - |
 | instar | compliant | - |
-| kerbside | compliant | - |
+| kerbside | non-compliant | shakenfist/kerbside#390 |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
@@ -581,7 +581,8 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 
 Details for non-compliant projects:
 
-- **shakenfist** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:132, docs/developer_guide/ci.md:183, docs/developer_guide/ci.md:184, docs/developer_guide/database_internals.md:335, docs/developer_guide/database_internals.md:339, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)
+- **kerbside** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:163
+- **shakenfist** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:204, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:135, docs/developer_guide/ci.md:186, docs/developer_guide/ci.md:187, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)
 
 ## plan-source-references
 
@@ -623,7 +624,7 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | N/A | - |
+| development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#79 |
 | instar | compliant | - |
 | kerbside | compliant | - |
@@ -861,8 +862,8 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 65 of 126 in-scope files reviewed at HEAD; 61 need review (threshold 5)
-- **kerbside** (Status): 115 of 192 in-scope files reviewed at HEAD; 77 need review (threshold 5)
+- **development** (Status): 83 of 168 in-scope files reviewed at HEAD; 85 need review (threshold 5)
+- **kerbside** (Status): 123 of 227 in-scope files reviewed at HEAD; 104 need review (threshold 5)
 - **ryll** (Status): 89 of 191 in-scope files reviewed at HEAD; 102 need review (threshold 5)
 
 ## review-scope-completeness
@@ -880,7 +881,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 | development | compliant | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#385 |
+| kerbside | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
@@ -892,7 +893,6 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 Details for non-compliant projects:
 
 - **actions** (Status): 4 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
-- **kerbside** (Status): 44 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
 - **ryll** (Status): 37 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
 
 ## rust-unwrap-lint
@@ -1040,25 +1040,25 @@ Details for non-compliant projects:
 
 Criterion: [workflow-standards.md](/components/development/audits/workflow-standards/)
 
-| Project | Permissions | Linting | Review marks | flake8wrap | Runners | Static tags | VM size | devpi fallback | devpi IP | Issue |
+| Project | flake8wrap | Runners | Static tags | VM size | Permissions | Linting | devpi fallback | devpi IP | Review marks | Issue |
 |---------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
-| actions | compliant | compliant | compliant | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| agent-python | compliant | compliant | N/A | non-compliant | non-compliant | compliant | non-compliant | N/A | compliant | shakenfist/agent-python#105, shakenfist/agent-python#130, shakenfist/agent-python#82 |
-| client-python | compliant | compliant | N/A | compliant | compliant | compliant | non-compliant | N/A | compliant | shakenfist/client-python#378 |
-| client-python-k3s | compliant | compliant | N/A | compliant | compliant | compliant | compliant | N/A | compliant | - |
-| clingwrap | compliant | compliant | N/A | compliant | compliant | compliant | non-compliant | N/A | compliant | shakenfist/clingwrap#125 |
-| cloudgood | N/A | compliant | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
-| development | compliant | compliant | N/A | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| divergulent | compliant | compliant | N/A | compliant | compliant | compliant | compliant | N/A | compliant | - |
-| instar | compliant | compliant | N/A | N/A | compliant | compliant | compliant | N/A | compliant | - |
+| actions | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | compliant | - |
+| agent-python | non-compliant | non-compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/agent-python#105, shakenfist/agent-python#130, shakenfist/agent-python#82 |
+| client-python | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/client-python#378 |
+| client-python-k3s | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
+| clingwrap | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/clingwrap#125 |
+| cloudgood | N/A | N/A | N/A | N/A | N/A | compliant | N/A | N/A | N/A | - |
+| development | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
+| divergulent | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
+| instar | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | kerbside | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | - |
-| kerbside-patches | compliant | compliant | N/A | N/A | compliant | compliant | non-compliant | N/A | compliant | shakenfist/kerbside-patches#1637 |
-| library-utilities | compliant | compliant | N/A | compliant | compliant | compliant | compliant | N/A | compliant | - |
-| occystrap | compliant | compliant | N/A | non-compliant | compliant | compliant | non-compliant | N/A | compliant | shakenfist/occystrap#126, shakenfist/occystrap#67 |
+| kerbside-patches | N/A | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/kerbside-patches#1637 |
+| library-utilities | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
+| occystrap | non-compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/occystrap#126, shakenfist/occystrap#67 |
 | private-ci | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
-| ryll | compliant | compliant | N/A | N/A | compliant | compliant | compliant | N/A | compliant | - |
-| sfui | compliant | compliant | N/A | N/A | compliant | compliant | compliant | compliant | compliant | - |
-| shakenfist | compliant | compliant | N/A | non-compliant | compliant | compliant | non-compliant | non-compliant | compliant | shakenfist/shakenfist#3057, shakenfist/shakenfist#3418, shakenfist/shakenfist#3977 |
+| ryll | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
+| sfui | N/A | compliant | compliant | compliant | compliant | compliant | compliant | compliant | N/A | - |
+| shakenfist | non-compliant | compliant | compliant | non-compliant | compliant | compliant | non-compliant | compliant | N/A | shakenfist/shakenfist#3057, shakenfist/shakenfist#3418, shakenfist/shakenfist#3977 |
 
 Details for non-compliant projects:
 
