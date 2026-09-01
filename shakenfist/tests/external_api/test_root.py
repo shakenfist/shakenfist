@@ -51,7 +51,7 @@ EXPECTED_CAPABILITIES = {
         'vdi-console-proxy', 'instance-put-blob', 'instance-execute',
         'instance-get', 'instance-screenshot', 'get-instance-namespace',
         'hot-plug-interface', 'include-queued-agent-operations',
-        'instance-clusteroperations'],
+        'instance-clusteroperations', 'agentoperation-deadlines'],
     'networks': [
         'list-addresses', 'route-addresses', 'get-network-namespace',
         'provide-dns', 'extra-dns-entries', 'network-clusteroperations',

@@ -322,7 +322,15 @@ API_CAPABILITIES = {
         'vdi-console-proxy', 'instance-put-blob', 'instance-execute',
         'instance-get', 'instance-screenshot', 'get-instance-namespace',
         'hot-plug-interface', 'include-queued-agent-operations',
-        'instance-clusteroperations'],
+        'instance-clusteroperations',
+        # agentoperation-deadlines names, as a set, the parameters a
+        # client can send once it sees this token: deadline_seconds on
+        # instance-put-blob, instance-execute and instance-get, and
+        # progress_timeout_seconds on instance-put-blob and
+        # instance-get only -- instance-execute deliberately refuses
+        # it. Without the token a new client cannot tell these
+        # parameters exist and must not send them.
+        'agentoperation-deadlines'],
     'networks': [
         'list-addresses', 'route-addresses', 'get-network-namespace',
         'provide-dns', 'extra-dns-entries', 'network-clusteroperations',
