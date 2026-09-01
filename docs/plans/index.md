@@ -102,7 +102,7 @@ checker's blind spot, and the only numbers here it cannot recompute.
 | 2026-07-17 | [Attribute field masks everywhere](PLAN-attribute-field-masks.md) | Masked attribute writes, and the node instances list un-packed into `object_references` | Complete | 2 of 2 |
 | 2026-07-19 | [Truthful cluster operation visibility](PLAN-cluster-op-visibility.md) | An observational flag, so "is anything in flight?" stops counting background housekeeping | In progress | 2 of 7 |
 | 2026-07-19 | [Database load reduction](PLAN-database-load-reduction.md) | Cut steady-state MariaDB load from the `sf-database` tier, and keep it cut | Complete | 8 of 8 |
-| 2026-07-19 | [Kerbside VDI console tokens](PLAN-kerbside-vdi-tokens.md) | Cluster-signed tokens exchanged for a VDI console session, across four repositories | In progress | 9 of 11 |
+| 2026-07-19 | [Kerbside VDI console tokens](PLAN-kerbside-vdi-tokens.md) | Cluster-signed tokens exchanged for a VDI console session, across four repositories | In progress | 10 of 12 |
 | 2026-07-19 | [Node resource health](PLAN-node-resource-health.md) | Declarative dependency checks driving node state, so a dead disk stops scheduling | Complete | 5 of 5 |
 | 2026-07-21 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | Per-node RAM, CPU and disk reservation overrides | Complete | 4 of 4 |
 | 2026-07-28 | [sf-netserv](PLAN-netserv.md) | Replace dnsmasq with a Rust per-network service plane | Proposed | — |

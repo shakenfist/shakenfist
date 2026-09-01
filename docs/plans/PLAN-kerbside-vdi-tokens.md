@@ -371,7 +371,7 @@ Recommendations are recorded inline.
 
 | Phase | Repo | Plan | Status |
 |-------|------|------|--------|
-| 0. Decisions and token format | shakenfist | PLAN-kerbside-vdi-tokens-phase-00-decisions.md | Not started |
+| 0. Decisions and token format | shakenfist | Folded into this document (no separate plan file) | Complete |
 | 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Complete |
 | 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | Complete |
 | 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Complete |
@@ -382,6 +382,7 @@ Recommendations are recorded inline.
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete |
 | 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete |
 | 10. Push audit | all | PLAN-kerbside-vdi-tokens-phase-10-push-audit.md | Not started |
+| 11. Close out the post-completion defects (#4003, #4009) | shakenfist | See *Post-completion defects* below | Not started |
 
 ### Phase 0: Decisions and token format
 
@@ -390,6 +391,18 @@ down as a short normative spec (claims, algorithm, key
 storage, rotation, error responses) inside the phase plan.
 Everything downstream cites that spec. Plan at high effort —
 this is where cross-repo consistency is cheapest to buy.
+
+**What actually happened.** No separate phase 0 plan file was
+ever written: the decisions, the token format and the Open
+questions were settled inline in this document, and every
+downstream phase cited them from here. That is a fine outcome
+and the phase is marked complete on that basis.
+
+The one obligation that was genuinely dropped is the issue
+tracker scan (see *Bugs found during this work* below, which
+sat empty from the plan's creation until 2026-09-01). Do not
+read the empty section as "no related bugs existed"; read it
+as "nobody looked".
 
 ### Phase 1: Cluster signing key and pubkey publication (SF)
 
@@ -577,6 +590,27 @@ request, and the plan is not complete until each is resolved
 or declined in writing here. If the audit finds nothing, that
 is recorded in one sentence.
 
+### Phase 11: Close out the post-completion defects
+
+Phases 1-9 all closed, and the feature works on a cluster that
+runs Kerbside. But two defects found on 2026-09-01 against
+sfcbr (a cluster that does *not* run Kerbside) mean the plan's
+own success criteria are not yet met — see *Post-completion
+defects* below. This phase exists so the plan is not filed as
+finished while they stand:
+
+- **shakenfist#4003** — gate the `vdi-console-proxy`
+  capability on `config.KERBSIDE_URL`. Blocks two success
+  criteria and mission goal 5.
+- **shakenfist#4009** — fix the direct `.vv` generator (`host`
+  is a node UUID, `type` is an SF-internal enum, no
+  `host-subject`) and add the CI coverage whose absence let it
+  rot.
+
+Both are shakenfist-only and independent of each other. Neither
+needs a Kerbside deployment to reproduce or to verify, which is
+precisely the property that was never tested.
+
 ## Dependencies on other plans
 
 None hard. This plan is independent of the BYO-MariaDB /
@@ -673,6 +707,11 @@ We will know this plan is complete when:
 * The same command still works with only `remote-viewer`
   installed, and still works direct-to-hypervisor on
   clusters with no `KERBSIDE_URL` configured.
+  **NOT MET as at 2026-09-01** — shakenfist#4003 (the
+  capability is advertised unconditionally, so the client
+  never reaches the direct path) and shakenfist#4009 (the
+  direct `.vv` is malformed, and `remote-viewer` rejects its
+  `type` outright).
 * Kerbside opens that console with zero Shaken Fist API calls
   on the exchange path (signature check + local DB only).
 * A replayed exchange URL is rejected; an expired one is
@@ -684,6 +723,10 @@ We will know this plan is complete when:
 * CI proves the end-to-end flow (kerbside SF lane) and the
   minting authorisation gate (SF cluster_ci), and the
   pre-push checks pass in all four repos.
+  **PARTIALLY MET** — both of those lanes exist, but nothing
+  covers a Kerbside-*less* cluster, which is why #4003 and
+  #4009 both shipped. The pre-push audit (phase 10) has not
+  run.
 * Documentation in all four repos reflects the feature, and
   the plan index status tables are current.
 
@@ -696,7 +739,12 @@ We will know this plan is complete when:
   rendering `sources.yaml` with a system credential, writing
   `KERBSIDE_URL` into `cluster_config`, and wiring kerbside's
   own TLS material. This lands as its own plan once the code
-  support here has proven itself.
+  support here has proven itself. Now tracked as
+  **shakenfist#4004**, which also carries the much smaller
+  first increment: a `kerbside_url` variable rendered into
+  `roles/node/templates/config`, so an operator can point a
+  cluster at a Kerbside deployed by other means without the
+  full infrastructure-group work.
 * Kerbside admin-auth pluggability: kerbside's own login is
   Keystone-only (`kerbside/api.py:200`), which is an odd
   requirement for an SF-only deployment. Possibly converges
@@ -708,11 +756,63 @@ We will know this plan is complete when:
 * Signing-key rotation automation (scheduled rotation rather
   than operator-initiated `sf-ctl`).
 
-### Bugs fixed during this work
+### Bugs found during this work
 
-(To be filled in as encountered. A scan of the shakenfist and
-kerbside issue trackers for related open bugs should happen
-during phase 0 and be recorded here.)
+The phase 0 tracker scan never happened, so this section sat
+empty through phases 1-9. It was opened on 2026-09-01, after
+the defects below were found by hand.
+
+#### Post-completion defects
+
+Found on 2026-09-01 by running `sf-client instance
+vdiconsolefile` against **sfcbr**, a cluster with no Kerbside
+deployed. That configuration — the feature off — is the one
+combination no phase ever tested, and both defects live in it.
+
+- **shakenfist#4003** — `vdi-console-proxy` is a static entry
+  in `API_CAPABILITIES` (`external_api/app.py`), so it is
+  advertised even when `config.KERBSIDE_URL` is empty. The
+  client's `check_capability()` is a substring match against
+  the root page and is the only feature-detection channel it
+  has, so it takes the proxy path and dies on the endpoint's
+  own `404 kerbside integration is not configured`, instead of
+  falling back to the direct `.vv`.
+
+  This contradicts phase 2's decision 5, which reasoned that
+  "a client probes the `vdi-console-proxy` capability first
+  anyway". The probe cannot work: the advertisement is not
+  conditional on the config value the guard reads. The fix is
+  more than a one-liner because `render_capabilities()` walks
+  the dict unconditionally and `tests/external_api/test_root.py`
+  pins it exhaustively — both need a notion of a conditional
+  token.
+
+- **shakenfist#4009** — the direct `.vv` from
+  `/vdiconsolehelper` is malformed. `host=` is substituted
+  from `instance.placement['node']`, which now holds a node
+  **UUID**, so it names a host that resolves nowhere;
+  `type=` is substituted from `instance.video['vdi']`, so a
+  `spiceconcurrent` instance emits a type that virt-viewer
+  rejects with "Unsupported graphic type"; and no
+  `host-subject` is emitted, leaving ryll's subject pinning
+  inert on this path (any cert from the cluster CA passes).
+  The module's own `instance_vv_file_example` docstring still
+  shows the correct `type=spice` / `host=sf-3`, so the code
+  has disagreed with its own example since placement moved to
+  UUIDs. No test in any repo parses a `.vv`, which is how all
+  three survived.
+
+Both are pure-shakenfist and reproduce without a Kerbside
+deployment. Phase 11 tracks closing them.
+
+#### Related gap (not a defect)
+
+- **shakenfist#4004** — the ansible collection has no
+  `KERBSIDE_URL` knob, so no collection-deployed cluster can
+  turn the feature on. This is the deployer phase this plan
+  deliberately deferred (see Future work), not something that
+  regressed; it is filed so the gap lives in the tracker
+  rather than only in a plan bullet.
 
 ### Documentation index maintenance
 
