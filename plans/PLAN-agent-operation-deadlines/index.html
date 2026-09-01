@@ -14057,6 +14057,13 @@ change, done as its own commit before the enforcement logic lands.</p>
 and get the 600-second server default, which is tighter than the 900s
 constant it replaces but far above observed legitimate operation
 times.</p>
+<p>New clients against old servers need a guard, which this section
+originally did not cover and phase 6 planning added. <code>log_request</code>
+merges the request body into handler kwargs unconditionally, so a
+<code>deadline_seconds</code> reaching a server that predates phase 3 is an
+undeclared kwarg rather than an ignored field. The client gates every
+send on <code>check_capability('agentoperation-deadlines')</code>, a token phase
+3 should have added to <code>API_CAPABILITIES</code> and phase 6 adds.</p>
 <h2 id="decisions-from-phase-0">Decisions from phase 0<a class="headerlink" href="#decisions-from-phase-0" title="Permanent link">&para;</a></h2>
 <p>Resolved 2026-08-15 with the operator, on the evidence in
 <code>PLAN-agent-operation-deadlines-phase-00-decisions.md</code> (a 50-transfer
@@ -14214,9 +14221,9 @@ the slot at all.</p>
 </tr>
 <tr>
 <td>6</td>
-<td></td>
-<td>Not started</td>
-<td>client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>: await loops poll to their full timeout on terminal failure states instead of failing fast)</td>
+<td><code>PLAN-agent-operation-deadlines-phase-06-client.md</code> (in shakenfist/client-python, branch <code>agent-operation-deadlines-phase-06-client</code>)</td>
+<td>Complete</td>
+<td>client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>: await loops poll to their full timeout on terminal failure states instead of failing fast). The plan file lives in the client repository because the code does, following the <code>PLAN-vdi-console-tokens.md</code> precedent; a relative link cannot cross repositories, so it is named here rather than linked. Survey corrections applied at source: the new parameters need a capability token before a client can send them safely, which phase 3 did not add and phase 6 does. The phase plan also decides to repair <code>await_agent_fetch()</code>'s three hardcoded timeout windows, which make its <code>timeout</code> argument a lie, because the phase rewrites those same loops</td>
 </tr>
 <tr>
 <td>7</td>
