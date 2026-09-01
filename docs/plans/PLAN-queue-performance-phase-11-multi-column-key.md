@@ -505,7 +505,9 @@ is approved.
 * A successor issue exists for the `sf-queues` half of #3884, naming
   the two-worker race in decision 5 concretely enough to be actioned
   without re-deriving it, and #3884 carries a comment recording survey
-  findings 2, 3 and 6.
+  findings 2, 3 and 6. Both done: the successor is #4017, and the
+  comment is
+  https://github.com/shakenfist/shakenfist/issues/3884#issuecomment-5499964712.
 * `pre-commit run --all-files` is clean, and proto stubs were
   regenerated with `tox -e genprotos` and committed.
 * Step 11h has recorded measured numbers, or this plan says explicitly
@@ -669,17 +671,12 @@ pins the plan. Do not close decision 6 on duration alone.
   real pieces of work with a blast radius beyond coalescing, and
   should be scoped and decided on their own merits.
 
-  A successor issue naming this race concretely was intended to exist
-  by the end of this step (this plan's Definition of done, and the
-  `InvalidCoalescibleEnqueue` error message in
-  `shakenfist/schema/operations/net_op.py` already promise one), but
-  filing GitHub issues and posting comments turned out to be outside
-  what this close-out session's tooling permissions allow. The
-  content above is written to be filed as-is; #3884 also still needs
-  the comment recording survey findings 2, 3 and 6 that the plan's
-  "Corrections made at source" section called for. Both are one `gh`
-  command each and are left for the operator or a session with the
-  right permissions to run.
+  This is filed as **#4017**, which states the race above concretely
+  and names both ways out. The `InvalidCoalescibleEnqueue` message in
+  `shakenfist/schema/operations/net_op.py` cites that number rather
+  than promising an issue in the abstract. #3884 also carries the
+  comment recording survey findings 2, 3 and 6 that the plan's
+  "Corrections made at source" section called for.
 
 * **Step 11h**, the `sfcbr` re-measurement described above, once the
   merged build has run for at least 24 hours.

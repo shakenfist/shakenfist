@@ -305,8 +305,8 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
                 f'sf-net drains it. A node-aware key is only sound on a '
                 f'dispatcher which partitions its workers by target: sf-net '
                 f'does, sf-queues does not (see the phase 11 plan, decision '
-                f'5, and the successor issue it names for the sf-queues '
-                f'half). This enqueue is on the {family!r} family.')
+                f'5, and issue #4017 for the sf-queues half). This enqueue '
+                f'is on the {family!r} family.')
 
     if (len(tasks) == 1
             and tasks[0] in COALESCIBLE_TASKS
