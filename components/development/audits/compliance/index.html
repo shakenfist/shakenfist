@@ -14322,7 +14322,7 @@ verdict, and see
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-08-31T13:02:39.008665+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-09-01T11:19:37.364378+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -16319,8 +16319,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/390" title="GitHub Issue: shakenfist/kerbside #390">kerbside#390</a></td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
@@ -16361,7 +16361,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>shakenfist</strong> (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:199, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:132, docs/developer_guide/ci.md:183, docs/developer_guide/ci.md:184, docs/developer_guide/database_internals.md:335, docs/developer_guide/database_internals.md:339, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)</li>
+<li><strong>kerbside</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:163</li>
+<li><strong>shakenfist</strong> (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:204, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:135, docs/developer_guide/ci.md:186, docs/developer_guide/ci.md:187, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)</li>
 </ul>
 <h2 id="plan-source-references">plan-source-references<a class="headerlink" href="#plan-source-references" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-source-references/">plan-source-references.md</a></p>
@@ -16508,7 +16509,7 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>N/A</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -17381,8 +17382,8 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>actions</strong> (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)</li>
-<li><strong>development</strong> (Status): 65 of 126 in-scope files reviewed at HEAD; 61 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 115 of 192 in-scope files reviewed at HEAD; 77 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 83 of 168 in-scope files reviewed at HEAD; 85 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 123 of 227 in-scope files reviewed at HEAD; 104 need review (threshold 5)</li>
 <li><strong>ryll</strong> (Status): 89 of 191 in-scope files reviewed at HEAD; 102 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
@@ -17443,8 +17444,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/385" title="GitHub Issue: shakenfist/kerbside #385">kerbside#385</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
@@ -17486,7 +17487,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>actions</strong> (Status): 4 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
-<li><strong>kerbside</strong> (Status): 44 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
 <li><strong>ryll</strong> (Status): 37 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
 </ul>
 <h2 id="rust-unwrap-lint">rust-unwrap-lint<a class="headerlink" href="#rust-unwrap-lint" title="Permanent link">&para;</a></h2>
@@ -18006,92 +18006,92 @@ does.</p>
 <thead>
 <tr>
 <th>Project</th>
-<th>Permissions</th>
-<th>Linting</th>
-<th>Review marks</th>
 <th>flake8wrap</th>
 <th>Runners</th>
 <th>Static tags</th>
 <th>VM size</th>
+<th>Permissions</th>
+<th>Linting</th>
 <th>devpi fallback</th>
 <th>devpi IP</th>
+<th>Review marks</th>
 <th>Issue</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>actions</td>
+<td>N/A</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>non-compliant</td>
+<td>non-compliant</td>
+<td>compliant</td>
+<td>non-compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>N/A</td>
-<td>non-compliant</td>
-<td>non-compliant</td>
 <td>compliant</td>
-<td>non-compliant</td>
 <td>N/A</td>
-<td>compliant</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/105" title="GitHub Issue: shakenfist/agent-python #105">agent-python#105</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/130" title="GitHub Issue: shakenfist/agent-python #130">agent-python#130</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/82" title="GitHub Issue: shakenfist/agent-python #82">agent-python#82</a></td>
 </tr>
 <tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
 <td>compliant</td>
 <td>non-compliant</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/378" title="GitHub Issue: shakenfist/client-python #378">client-python#378</a></td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
 <td>compliant</td>
 <td>compliant</td>
-<td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
 <td>clingwrap</td>
 <td>compliant</td>
 <td>compliant</td>
-<td>N/A</td>
-<td>compliant</td>
-<td>compliant</td>
 <td>compliant</td>
 <td>non-compliant</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/125" title="GitHub Issue: shakenfist/clingwrap #125">clingwrap#125</a></td>
 </tr>
 <tr>
 <td>cloudgood</td>
 <td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
 <td>compliant</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>N/A</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>N/A</td>
@@ -18099,41 +18099,41 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
 <td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
 <td>divergulent</td>
 <td>compliant</td>
 <td>compliant</td>
-<td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
 <td>instar</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
 <td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
@@ -18151,41 +18151,41 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside-patches</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
 <td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>non-compliant</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/1637" title="GitHub Issue: shakenfist/kerbside-patches #1637">kerbside-patches#1637</a></td>
 </tr>
 <tr>
 <td>library-utilities</td>
 <td>compliant</td>
 <td>compliant</td>
-<td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
 <td>occystrap</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
 <td>non-compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>non-compliant</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/126" title="GitHub Issue: shakenfist/occystrap #126">occystrap#126</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/67" title="GitHub Issue: shakenfist/occystrap #67">occystrap#67</a></td>
 </tr>
 <tr>
@@ -18203,41 +18203,41 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
 <td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
 <td>N/A</td>
 <td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>N/A</td>
 <td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
 <td>shakenfist</td>
+<td>non-compliant</td>
 <td>compliant</td>
+<td>compliant</td>
+<td>non-compliant</td>
+<td>compliant</td>
+<td>compliant</td>
+<td>non-compliant</td>
 <td>compliant</td>
 <td>N/A</td>
-<td>non-compliant</td>
-<td>compliant</td>
-<td>compliant</td>
-<td>non-compliant</td>
-<td>non-compliant</td>
-<td>compliant</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3057" title="GitHub Issue: shakenfist/shakenfist #3057">shakenfist#3057</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3418" title="GitHub Issue: shakenfist/shakenfist #3418">shakenfist#3418</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3977" title="GitHub Issue: shakenfist/shakenfist #3977">shakenfist#3977</a></td>
 </tr>
 </tbody>

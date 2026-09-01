@@ -8027,6 +8027,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#post-completion-defects-shaken-fist-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-completion defects (Shaken Fist side)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#key-kerbside-touch-points" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13502,6 +13513,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#post-completion-defects-shaken-fist-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-completion defects (Shaken Fist side)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#key-kerbside-touch-points" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13589,7 +13611,7 @@ when each phase starts:</p>
 <tr>
 <td>9. Full cross-repo end-to-end lane + kerbside exchange/proxy lane + KERBSIDE_URL provisioning (real SF, post-merge)</td>
 <td><a href="/components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/">PLAN-kerbside-vdi-tokens-phase-09-e2e.md</a></td>
-<td>In progress</td>
+<td>Done</td>
 </tr>
 </tbody>
 </table>
@@ -13600,6 +13622,43 @@ ryll, and client-python repositories — see the master plan
 for the full table, the token-flow diagram, the alternatives
 considered, and the open questions and their
 recommendations.</p>
+<h2 id="post-completion-defects-shaken-fist-side">Post-completion defects (Shaken Fist side)<a class="headerlink" href="#post-completion-defects-shaken-fist-side" title="Permanent link">&para;</a></h2>
+<p>All kerbside-side phases are done and the exchange path works.
+Two defects found on 2026-09-01, by running <code>sf-client instance
+vdiconsolefile</code> against a Shaken Fist cluster with <strong>no kerbside
+deployed</strong>, mean the master plan is not finished. Both are
+shakenfist-only; neither needs a change here, and neither
+affects a cluster that does run kerbside. They are recorded so
+this side of the plan does not read as complete when the plan
+as a whole is not:</p>
+<ul>
+<li>
+<p><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4003" title="GitHub Issue: shakenfist/shakenfist #4003">shakenfist#4003</a></strong> — Shaken Fist advertises the
+  <code>vdi-console-proxy</code> capability unconditionally, even with
+  <code>KERBSIDE_URL</code> empty, so <code>shakenfist_client</code> takes the proxy
+  path on a kerbside-less cluster and fails instead of falling
+  back to its direct-to-hypervisor <code>.vv</code>.</p>
+</li>
+<li>
+<p><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4009" title="GitHub Issue: shakenfist/shakenfist #4009">shakenfist#4009</a></strong> — Shaken Fist's <em>direct</em> <code>.vv</code> (the
+  non-kerbside path, <code>/vdiconsolehelper</code>) is malformed: <code>host=</code>
+  carries a node UUID, <code>type=</code> carries an SF-internal enum
+  value that virt-viewer rejects, and no <code>host-subject</code> is
+  emitted. The last of those is worth noting here: the
+  host_subject work in phase 6 and <code>PLAN-host-subject.md</code> gave
+  kerbside-sourced consoles subject pinning, and the direct
+  path never picked it up, so it is the weaker of the two
+  paths on exactly the property that work set out to fix.</p>
+</li>
+<li>
+<p><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4004" title="GitHub Issue: shakenfist/shakenfist #4004">shakenfist#4004</a></strong> — the Shaken Fist ansible collection has
+  no <code>KERBSIDE_URL</code> knob, so no collection-deployed cluster can
+  turn the integration on at all. This is the deployer phase
+  the master plan deliberately deferred, now tracked as an
+  issue.</p>
+</li>
+</ul>
+<p>The master plan carries these as its phase 11.</p>
 <h2 id="key-kerbside-touch-points">Key kerbside touch points<a class="headerlink" href="#key-kerbside-touch-points" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>kerbside/api.py:516</code> — the <code>NovaToken</code> resource the new
