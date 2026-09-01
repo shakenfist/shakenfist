@@ -453,12 +453,117 @@ conductor.
 | Step | Effort | Model | Isolation | Brief for sub-agent | Status |
 |------|--------|-------|-----------|---------------------|--------|
 | 0 | low | sonnet | none | Prerequisite gate, **rewritten 2026-08-29**. Phase 4b must have merged its verbs and the 503 mapping in `STATUS_CODES_TO_ERRORS` (finding 3) to client-python's `develop` -- which it did on 2026-08-28 as `135ab53`. It does **not** need a release: the conductor pip-installs `git+https://github.com/shakenfist/client-python@develop` with `state: latest` and has since 2026-07-12, per phase 4b's finding 8 and decision D7. So the gate is a deploy, not a tag. Verify against the host rather than the playbook, because `state: latest` only re-pulls when the playbook runs: `/srv/shakenfist/private-ci/venv/bin/python -c 'import shakenfist_client.apiclient as a; print(a.Client.create_namespace_claim, a.ServiceUnavailableException)'`. Both names must resolve. The conductor runs on `maui`, so this is `ssh maui` and the command above. If either name does not resolve, the conductor has not been deployed since 2026-08-28 and running `conductor.yml` (`manage.yml`, tag `conductor`) is what opens this phase -- a deploy makes the gate true whatever it says now, so running the playbook is a valid substitute for checking it. Phase 4b's close-out on 2026-08-29 also carries the "deployed venv resolves the verbs" item that used to sit in its own definition of done: it was moved here, because a conductor deploy is this phase's entry gate and not 4b's deliverable. **Answered on 2026-08-29.** Both names resolve in the deployed venv on `maui`: `Client.create_namespace_claim` and `ServiceUnavailableException` are present, so the conductor has been deployed since client-python#375 merged and is carrying the claim verbs. Run by Michael on the host, because `ssh` to `maui` is refused from the development host for both `ansible@` and the default user. The client's version string was not captured and is not needed -- the branch install has no meaningful version, which is the point of D7, so what matters is that the names are there. **This phase's prerequisite is met and steps 1 to 5 may start.** | Complete |
-| 1 | medium | sonnet | worktree | (private-ci) Sizing accessor. Add `get_claim_sizes()` to `conductor/db.py` beside `get_cost_observations()` (`:1419`), returning the worst observed `peak_allocated_cpus`, `peak_allocated_ram_mb` and `peak_allocated_disk_gb` grouped by `(repo, job_name)` with no minimum run count, from the same summary table that function reads. Read that function first: the peaks it exposes are already a MAX over summary rows, so this is a re-grouping of the same data, not a new measurement. Write the docstring to say why the key and threshold differ from its sibling -- claims cover the whole namespace and peaks are topology-deterministic, so one observation seeds a claim, whereas a runner-size recommendation needs three runs before it changes anything. Unit tests beside `conductor/tests/test_provisioner_costs.py`'s existing coverage. Commit subject: `conductor: size claims from observed peaks.` | Not started |
-| 2 | high | opus | worktree | (private-ci) Claim creation and refusal handling in `conductor/provisioner.py`, per Design and E3/E4/E6. Add the sizing helper (max of `CI_SIZES[ci_size]` and 1.2x the step 1 peaks, ceiling per dimension), the claim request in `create_workers()` between `add_namespace_trust()` and `allocate_network()`, and the three-branch refusal handling. This was checked against sfcbr on 2026-08-27 during phase 4b and needs no re-checking: an over-large claim on a claim-free namespace answers **507**, raised as `InsufficientResourcesException`, with a per-dimension body naming the limit, the current usage and the request. The same request against a namespace which already holds a claim answers 409, because `exists` is evaluated first -- which is what the phase 4a soak recorded and why its "impossible claim" line said 409. The conductor claims on a namespace it has just created, so 507 is the case E6's first branch must catch. Add the metrics from Design. The namespace teardown on refusal must not be able to raise past the loop. Tests: the refusal branches, the sizing floor when no observation exists, and that a refused combination leaves `requested` unchanged. Commit subject: `conductor: claim capacity before starting a runner.` | Not started |
-| 3 | medium | sonnet | worktree | (private-ci) Claim deletion in `remove_namespace()` (`provisioner.py:606`), per Design: list the namespace's claims through the client, delete each, count them, catch as broadly as the neighbouring steps and never raise. Place it after `collect_namespace_costs()` and before `delete_all_instances()`, and comment why that position rather than after the instances are gone. Note that `delete_namespace` later in the same function is routinely deferred while network deletes settle (`:705-719`), which is why this cannot be left to the namespace's own `hard_delete()`. Commit subject: `conductor: release capacity claims at teardown.` | Not started |
-| 4 | medium | sonnet | worktree | (private-ci) Dashboard surface. Add claim outcomes and claim-size-versus-measured-peak to the conductor dashboard, following the patterns in `conductor/dashboard.py`, `conductor/web.py` and the existing templates. Queue-wait age is already present (`metrics.py:59`) and must not be duplicated. Keep it to what an operator would act on: how many claims were refused for capacity in the last day, and which jobs are claiming furthest from what they measured. Commit subject: `conductor: show what claims are doing.` | Not started |
+| 1 | medium | sonnet | worktree | (private-ci) Sizing accessor. Add `get_claim_sizes()` to `conductor/db.py` beside `get_cost_observations()` (`:1419`), returning the worst observed `peak_allocated_cpus`, `peak_allocated_ram_mb` and `peak_allocated_disk_gb` grouped by `(repo, job_name)` with no minimum run count, from the same summary table that function reads. Read that function first: the peaks it exposes are already a MAX over summary rows, so this is a re-grouping of the same data, not a new measurement. Write the docstring to say why the key and threshold differ from its sibling -- claims cover the whole namespace and peaks are topology-deterministic, so one observation seeds a claim, whereas a runner-size recommendation needs three runs before it changes anything. Unit tests beside `conductor/tests/test_provisioner_costs.py`'s existing coverage. Commit subject: `conductor: size claims from observed peaks.` | Complete |
+| 2 | high | opus | worktree | (private-ci) Claim creation and refusal handling in `conductor/provisioner.py`, per Design and E3/E4/E6. Add the sizing helper (max of `CI_SIZES[ci_size]` and 1.2x the step 1 peaks, ceiling per dimension), the claim request in `create_workers()` between `add_namespace_trust()` and `allocate_network()`, and the three-branch refusal handling. This was checked against sfcbr on 2026-08-27 during phase 4b and needs no re-checking: an over-large claim on a claim-free namespace answers **507**, raised as `InsufficientResourcesException`, with a per-dimension body naming the limit, the current usage and the request. The same request against a namespace which already holds a claim answers 409, because `exists` is evaluated first -- which is what the phase 4a soak recorded and why its "impossible claim" line said 409. The conductor claims on a namespace it has just created, so 507 is the case E6's first branch must catch. Add the metrics from Design. The namespace teardown on refusal must not be able to raise past the loop. Tests: the refusal branches, the sizing floor when no observation exists, and that a refused combination leaves `requested` unchanged. Commit subject: `conductor: claim capacity before starting a runner.` | Complete |
+| 3 | medium | sonnet | worktree | (private-ci) Claim deletion in `remove_namespace()` (`provisioner.py:606`), per Design: list the namespace's claims through the client, delete each, count them, catch as broadly as the neighbouring steps and never raise. Place it after `collect_namespace_costs()` and before `delete_all_instances()`, and comment why that position rather than after the instances are gone. Note that `delete_namespace` later in the same function is routinely deferred while network deletes settle (`:705-719`), which is why this cannot be left to the namespace's own `hard_delete()`. Commit subject: `conductor: release capacity claims at teardown.` | Complete |
+| 4 | medium | sonnet | worktree | (private-ci) Dashboard surface. Add claim outcomes and claim-size-versus-measured-peak to the conductor dashboard, following the patterns in `conductor/dashboard.py`, `conductor/web.py` and the existing templates. Queue-wait age is already present (`metrics.py:59`) and must not be duplicated. Keep it to what an operator would act on: how many claims were refused for capacity in the last day, and which jobs are claiming furthest from what they measured. Commit subject: `conductor: show what claims are doing.` | Complete |
 | 5 | n/a | management session | none | Deploy and observe for at least seven days of normal CI load. Record in the Observations section below: claims created and deleted; capacity refusals per day and whether they correlate with cluster load; transient refusals; `conductor_claims_failed_total`, which must be zero; every `placement admitted over namespace capacity claim` audit event on the cluster with its dimension; the distribution of claim size against measured peak per `(repo, job_name)`; and whether the reconciler reported any drift in `cluster_capacity.claimed_*` that a leaked claim would explain. | Not started |
 | 6 | medium | opus | worktree | Close-out, in this repository. Write the observation record into this plan, then answer phase 5's question explicitly: does the data support flipping `CLAIM_ENFORCEMENT_HARD`, and if not, what is still missing. If the anti-starvation question now has data behind it, say what the data says and leave the policy to its own phase. Update the master plan's phase table and `docs/plans/index.md`. Commit subject: `scheduler: record what conductor claims measured.` | Not started |
+
+### Implementation notes (2026-09-01)
+
+Steps 1 to 4 are written and land in private-ci on the branch
+`scheduler-reservations-phase-04c-conductor-claims`, as four commits
+carrying the subjects above. Complete here means the code exists and
+its tests pass; it does not mean deployed, and step 5's window has not
+opened. The private-ci tree had moved since the survey, so one
+reference in the step 1 brief is stale and is corrected here rather
+than in the brief: `get_cost_observations()` is at `db.py:1655`, not
+`:1419`.
+
+Four things were decided during implementation that the plan did not
+settle. Each is recorded because a reviewer would otherwise have to
+infer it from the diff.
+
+**A capacity refusal breaks out of the (label, size) combination
+rather than continuing within it.** E6 says "`continue` to the next
+(label, size) combination", which in the loop as written are two
+different statements: `continue` advances to the next runner of the
+*same* combination. Break is the reading that matches the sentence and
+the intent -- a 507 is a property of the cluster and this
+combination's footprint, so the next runner of the same shape would be
+refused identically, while a different shape may still fit, which is
+why the outer loop carries on.
+
+**An empty exception tuple is warned about at import.** The refusal
+classes are looked up defensively, as `CLEANUP_EXCEPTIONS` already is,
+because the 503 mapping only arrived in client-python#375. An empty
+tuple is a valid `except` clause that never matches, so an older
+client silently reclassifies that refusal into E6's third branch. For
+a 503 that is a miscounted metric; for a 507 it is the loss of
+back-pressure itself, with every refusal counted as a bug in the
+conductor and the runner started anyway. That is too quiet to leave to
+a counter, so it is said in the startup log.
+
+**Claim outcomes are recorded in a new `claim_events` table.** The
+dashboard item the step 4 brief asks for -- "how many claims were
+refused for capacity in the last day" -- cannot be answered from a
+Prometheus counter, which is cumulative and resets on each of the
+several redeploys a day this conductor gets. This is an append-only
+audit log and is not the local bookkeeping E7 rules out: it records
+what happened to a request, never which claims exist, and nothing
+reads it back to decide whether a claim needs deleting. Step 5's
+observation record reads the same history.
+
+**The dashboard shape was not agreed first.** The back brief calls
+that out as cheap to propose and tedious to redo. It was built to the
+step 4 brief's own words -- refusals in the last day, and the jobs
+claiming furthest from what they measured -- following the existing
+`sizing-section` panel, so it should be cheap to redo if the shape is
+wrong.
+
+### Back brief answers
+
+1. **An over-large claim on a claim-free namespace answers 507**,
+   raised as `InsufficientResourcesException`, per the 2026-08-27
+   check the plan already records. That is what E6's first branch
+   catches. The same request against a namespace which already holds
+   a claim answers 409, because `exists` is evaluated first; the
+   conductor claims on a namespace it has just created, so it never
+   meets that path.
+
+2. **The sizing formula could not be evaluated against real cost
+   data.** It is written as
+   `max(CI_SIZES[ci_size], ceil(1.2 x peak))` per dimension, and its
+   arithmetic is covered by unit tests, but checking it against three
+   real `(repo, job_name)` pairs needs the conductor's database, which
+   lives on `maui`. `ssh` there is refused from the development host
+   for both `ansible@` and the default user, exactly as step 0 found.
+   **This item is outstanding and is the one thing that should happen
+   before the deploy**, since a formula that produces absurd claims
+   would be discovered as a CI outage rather than as a number. Run on
+   `maui`:
+
+   ```bash
+   /srv/shakenfist/private-ci/venv/bin/python -c "
+   from conductor import db, provisioner
+   sizes = db.get_claim_sizes()
+   for key in sorted(sizes)[:3]:
+       repo, job = key
+       job_desc = {'repo': repo, 'job_name': job}
+       print(key, sizes[key])
+       for size in ('s', 'm', 'xl'):
+           print('   ', size,
+                 provisioner.claim_size_for(size, job_desc, sizes)[0])
+   "
+   ```
+
+3. **A claim request that outlasts `SF_CALL_TIMEOUT` is E6's third
+   branch**, and the namespace is **not** cleaned up. The conductor's
+   client wrapper raises `sfclient.SFTimeout` (not the client's own
+   `TimeoutException`), which is neither refusal class, so it is
+   counted in `conductor_claims_failed_total` and the runner is
+   provisioned with no claim -- the deliberate degradation.
+
+   There is a consequence worth stating, because it is an argument for
+   E7 that E7 does not make. The server may have created the claim
+   before the client gave up, in which case a claim exists that the
+   conductor believes failed. Because teardown lists the namespace's
+   claims and deletes what it finds rather than deleting UUIDs it
+   remembers, that orphan is still released at teardown. Nothing extra
+   is needed, and the observable signature is
+   `conductor_claims_failed_total` rising while claims appear on the
+   cluster -- worth checking for during step 5's window.
 
 ## Risks and mitigations
 
