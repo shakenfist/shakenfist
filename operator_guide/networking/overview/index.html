@@ -14186,8 +14186,11 @@ itself):</p>
   the operation reached the cross-op fold's guards at all:
     * <code>coalesce_outcome</code> — <code>ran</code> if the fold's SQL was issued, or
       which guard skipped it: <code>batch_size_one</code> (the dispatcher
-      dequeued only this op), <code>not_cluster_wide</code> (a per-node queue,
-      where folding would be unsafe), <code>type_not_coalescible</code> (this
+      dequeued only this op), <code>key_cannot_distinguish_queue</code> (the
+      operation's coalescing key cannot tell its work apart from work
+      on another queue, so folding would be unsafe -- reported as
+      <code>not_cluster_wide</code> by builds before the key became
+      multi-column), <code>type_not_coalescible</code> (this
       operation type declares no coalescing at all, which is every
       cluster operation that is not a <code>net_op</code> and so most of them)
       or <code>no_coalescible_tasks</code> (a type which could have coalesced,
@@ -14271,17 +14274,37 @@ itself):</p>
   no trace on the network's event stream at all, since the op it
   reuses was created by some earlier caller.</li>
 </ul>
-<p>Only the cluster-wide <code>networknode</code> queue is ever deduped, in
-  either direction. Neither primitive can filter on which queue a
-  sibling is on -- <code>cluster_operations</code> has no queue column -- so a
-  coalescible task on a per-node queue would be folded across
-  nodes, and one hypervisor's work silently never applied. That is
-  enforced at enqueue time rather than left to convention: a
-  coalescible task enqueued to a per-node target raises
-  <code>InvalidCoalescibleEnqueue</code>. It is also why <code>network_ensure_mesh</code>
-  is <em>not</em> coalescible despite looking like the best candidate --
-  it updates the local host's FDB, so two mesh ops on one network
-  are the same work only if they are on the same node. See #3884.</p>
+<p>Neither primitive can filter on which queue a sibling is on --
+  <code>cluster_operations</code> has no queue column -- so what confines a
+  fold to siblings the same dispatcher process actually drains is
+  the coalescing <em>key</em>: a tuple of <code>cluster_operations</code> columns a
+  sibling has to match every one of, not the single <code>network_uuid</code>
+  column this used to be. For <code>net_op</code> the key is <code>(network_uuid,
+  node_uuid)</code>, and a column with no value binds <code>IS NULL</code> rather
+  than being dropped, so a cluster-wide operation (<code>node_uuid =
+  None</code>) folds only other cluster-wide operations while a per-node
+  operation folds only its own node's. That is what makes
+  <code>network_ensure_mesh</code> -- which updates only the enqueuing host's
+  own FDB -- safe to coalesce despite being node-local work: two
+  mesh ops for different nodes no longer look like the same key.</p>
+<p>Naming <code>node_uuid</code> in the key is necessary but not sufficient. A
+  per-node fold is only safe on a dispatcher that partitions its
+  workers by target, which <code>sf-net</code> does (every operation for a
+  network hashes to one worker thread) and <code>sf-queues</code> does not
+  (spare slots are filled from a single unpartitioned dequeue call).
+  Which dispatcher a per-node operation reaches depends on the queue
+  <em>family</em> as well as the key -- <code>network</code> routes to <code>sf-net</code>,
+  the default <code>clusteroperation</code> routes to <code>sf-queues</code> -- so both
+  guards test the family too. That is enforced at enqueue time
+  rather than left to convention: a coalescible task enqueued to a
+  per-node target on a family <code>sf-queues</code> drains raises
+  <code>InvalidCoalescibleEnqueue</code>. It is also why
+  <code>NodeNetOp.network_apply_create_hypervisor</code>, whose model already
+  carries both columns, is <em>not</em> coalescible: it is drained by
+  <code>sf-queues</code>, where the per-worker-partitioning guarantee the
+  argument rests on does not hold. See
+  <a href="../../../plans/PLAN-queue-performance-phase-11-multi-column-key/">PLAN-queue-performance-phase-11-multi-column-key.md</a>
+  and #3884.</p>
 <h3 id="reading-these-events-back">Reading these events back<a class="headerlink" href="#reading-these-events-back" title="Permanent link">&para;</a></h3>
 <p>Neither event survives its operation for long, so plan to read them
 from the log stream rather than from the database.</p>

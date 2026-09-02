@@ -13658,8 +13658,8 @@ multi-column key that would let per-node tasks coalesce properly.</p>
 </tr>
 <tr>
 <td>11. Multi-column coalescing key</td>
-<td>(not yet planned)</td>
-<td>Not started</td>
+<td><a href="../PLAN-queue-performance-phase-11-multi-column-key/">PLAN-queue-performance-phase-11-multi-column-key.md</a></td>
+<td>In progress</td>
 </tr>
 </tbody>
 </table>
@@ -13837,14 +13837,43 @@ See
     operations look identical to both dedup paths while doing
     different work on different hosts. That is why
     <code>network_ensure_mesh</code> was removed from <code>COALESCIBLE_TASKS</code> in
-    phase 8, and why <code>network_apply_create_hypervisor</code> -- fanned out
-    per instance during node startup, and idempotent -- has never
-    been coalescible despite the step 6 audit identifying it.
-    Generalising the key to a list of <code>(column, value)</code> pairs lets
-    both back in. Filed as #3884. Not yet planned. Phase 9 comes
-    first deliberately: generalising a primitive that was silently
-    broken for three months, before anything proves it works on a
-    running cluster, repeats the mistake.</p>
+    phase 8. Generalising the key to a list of <code>(column, value)</code>
+    pairs lets it back in. Filed as #3884. Phase 9 came first
+    deliberately: generalising a primitive that was silently broken
+    for three months, before anything proved it worked on a running
+    cluster, would have repeated the mistake. See
+    <a href="../PLAN-queue-performance-phase-11-multi-column-key/">PLAN-queue-performance-phase-11-multi-column-key.md</a>.</p>
+<p>Planning that phase corrected two things this section used to
+say. First, there are <strong>three</strong> guards holding the single-column
+key safe, not the one #3884 names: the enqueue-time
+<code>InvalidCoalescibleEnqueue</code> check, the fold's own
+<code>queue_is_cluster_wide</code> skip in
+<code>BaseClusterOperation.execute</code>, and the task's absence from
+<code>COALESCIBLE_TASKS</code>. All three have to move together or the
+change measures as a no-op. Second,
+<code>network_apply_create_hypervisor</code> is <strong>not</strong> part of phase 11
+after all. Its model already carries <code>node_uuid</code>, so it looks
+like the cheap half, but it is a <code>NodeNetOp</code> drained by
+<code>sf-queues</code>, whose worker pool has no per-target routing key --
+the partitioned-worker invariant that makes a per-node fold safe
+for <code>sf-net</code> simply does not exist there. It is deferred to a
+successor issue on its own merits.</p>
+<p><strong>The code has landed; the measurement has not.</strong> The key
+generalised to a tuple end to end, <code>network_ensure_mesh</code> is back
+in <code>COALESCIBLE_TASKS</code> with the key <code>(network_uuid, node_uuid)</code>,
+both guards became key-aware and family-aware, and unit and
+functional CI both verify the per-node fold against a real
+database rather than by inspection. Execution surfaced two
+corrections beyond what planning anticipated: a <code>None</code> key value
+has to bind <code>IS NULL</code> rather than being refused, or widening the
+key would have silently switched off the only coalescing the
+cluster already does; and naming <code>node_uuid</code> in the key is
+necessary but not sufficient, because the queue <em>family</em> decides
+which dispatcher drains the work, so both guards test the family
+as well. Both are recorded as decisions 8 and the family
+condition on decision 4 in the phase plan. What has not happened
+yet is step 11h, the <code>sfcbr</code> re-measurement -- see "What step 11
+measured" below.</p>
 </li>
 </ol>
 <h2 id="what-step-7-measured">What step 7 measured<a class="headerlink" href="#what-step-7-measured" title="Permanent link">&para;</a></h2>
@@ -14834,6 +14863,35 @@ docstring now shows a <code>query_range</code> loop that pages the window in
 half-hour chunks, and points at <code>count_over_time</code> for totals. Anyone
 repeating this measurement should check that no chunk comes back at
 the ceiling.</p>
+<h2 id="what-step-11-measured">What step 11 measured<a class="headerlink" href="#what-step-11-measured" title="Permanent link">&para;</a></h2>
+<p><strong>Nothing yet.</strong> This section is a placeholder, not a gap in
+transcription -- step 11h, the <code>sfcbr</code> re-measurement, is deferred
+until the merged build has run there for at least 24 hours (it had
+not, as of this close-out), and no other window has been captured
+with the wider key deployed. Do not read the absence of numbers here
+as "no effect measured"; it is "not measured".</p>
+<p>The only real numbers available are the pre-change baseline from the
+phase 11 plan's survey finding 1, gathered <em>before</em> any of this
+phase's code existed and included here only as the yardstick step 11h
+measures against:</p>
+<ul>
+<li><strong><code>sfcbr</code></strong>, six hours, 4,653 <code>execution duration</code> events, 1,510 of
+  them <code>net_op</code>. The fold <code>ran</code> 263 times and folded 4 siblings. 581
+  were refused outright by the (then single-column) per-node-queue
+  guard -- read as an upper bound on what a per-node fold could
+  reach, not a count of foldable work, since an operation with no
+  coalescible task at all lands in the same bucket. On the per-node
+  <code>network</code> family lane, 573 of 919 operations (62%) dequeued
+  alongside at least one sibling, which is the ceiling the wider key
+  is trying to close on.</li>
+</ul>
+<p>When step 11h runs, this section should report, against that
+baseline: the <code>net_op</code> fold outcome counts before and after with the
+wider key deployed, how many siblings the per-node fold actually
+collapses, and whether <code>claim_coalescible_siblings</code>'s duration
+distribution moved -- which is what decision 6's no-new-index call
+turns on. See the phase 11 plan's Results section for the build
+itself and the two mid-phase corrections found while landing it.</p>
 <h2 id="audit-findings-step-6">Audit findings (step 6)<a class="headerlink" href="#audit-findings-step-6" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -14881,11 +14939,19 @@ the ceiling.</p>
   enqueues N node_net_ops where one would do. Marking it
   coalescible needs the find/claim primitives to filter on both
   <code>node_uuid</code> <strong>and</strong> <code>network_uuid</code> (same network on the same
-  node), which the current <code>target_column</code> parameter does not
+  node), which the current <code>target_column</code> parameter did not
   support. Generalising to a list of <code>(column, value)</code> pairs is
-  straightforward; deferred so step 5's CI run gives us
-  measurable baseline numbers first. Now scheduled as phase 11,
-  behind phase 9, and tracked as #3884.</p>
+  what phase 11 built, and it is straightforward on the model side
+  -- <code>NodeNetOp</code> already carries both columns. It turned out <strong>not</strong>
+  to be enough on its own: <code>network_apply_create_hypervisor</code> is
+  drained by <code>sf-queues</code>, whose worker pool has no per-target routing
+  key, so the partitioned-worker safety argument that makes a
+  per-node fold sound for <code>sf-net</code> does not hold there. Phase 11
+  gave the wider key to <code>network_ensure_mesh</code> (drained by <code>sf-net</code>)
+  instead and deferred this task to a successor issue on its own
+  merits -- see decision 5 and the Future work section of
+  <a href="../PLAN-queue-performance-phase-11-multi-column-key/">PLAN-queue-performance-phase-11-multi-column-key.md</a>.
+  Tracked as #3884.</p>
 </li>
 <li>
 <p><strong>Explicit fairness for low-priority queues</strong>. The dequeue
