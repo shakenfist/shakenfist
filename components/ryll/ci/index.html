@@ -6632,7 +6632,7 @@
   <span class="md-ellipsis">
     
   
-    Consistency audit phase 4: review scope and coverage
+    Consistency audit phase 4: review scope and session scaffolding
   
 
     
@@ -14157,10 +14157,6 @@ consistency audit.</p>
 <td>Bot-triggered PR re-review (<code>@shakenfist-bot please re-review</code>)</td>
 </tr>
 <tr>
-<td><code>pr-address-comments.yml</code></td>
-<td>Bot-triggered comment addressing (<code>@shakenfist-bot please address comments</code>)</td>
-</tr>
-<tr>
 <td><code>pr-retest.yml</code></td>
 <td>Bot-triggered CI re-run (<code>@shakenfist-bot please retest</code>)</td>
 </tr>
@@ -14188,8 +14184,8 @@ other:</p>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.workflow }}-${{ github.ref }}-my-job</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
-<p>Comment-triggered workflows (<code>pr-retest</code>, <code>pr-re-review</code>,
-<code>pr-address-comments</code>) need a different group key:</p>
+<p>Comment-triggered workflows (<code>pr-retest</code>, <code>pr-re-review</code>) need a
+different group key:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pr-retest-${{ github.event.issue.number }}</span>
 </code></pre></div>
 <p><code>github.ref</code> points at the default branch for <code>issue_comment</code>
