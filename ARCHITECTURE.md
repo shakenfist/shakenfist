@@ -121,21 +121,15 @@ behaviour are in
 
 Shaken Fist uses VXLAN mesh networking:
 
-```
-+------------------+          +------------------+
-|     Node 1       |          |     Node 2       |
-|  +------------+  |  VXLAN   |  +------------+  |
-|  |   VM A     |  |<-------->|  |   VM B     |  |
-|  +-----+------+  |  mesh    |  +-----+------+  |
-|        |         |          |        |         |
-|  +-----+------+  |          |  +-----+------+  |
-|  | veth/tap   |  |          |  | veth/tap   |  |
-|  +-----+------+  |          |  +-----+------+  |
-|        |         |          |        |         |
-|  +-----+------+  |          |  +-----+------+  |
-|  | br-vxlan   |  |          |  | br-vxlan   |  |
-|  +------------+  |          |  +------------+  |
-+------------------+          +------------------+
+```mermaid
+flowchart TB
+    subgraph node1["Node 1"]
+        vma["VM A"] --- tap1["veth/tap"] --- br1["br-vxlan"]
+    end
+    subgraph node2["Node 2"]
+        vmb["VM B"] --- tap2["veth/tap"] --- br2["br-vxlan"]
+    end
+    br1 <-->|VXLAN mesh| br2
 ```
 
 ### Storage
