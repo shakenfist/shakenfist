@@ -128,7 +128,7 @@ dependencies = [
     "oslo.concurrency==7.6.1",
     "oslo.config==10.7.0",
     "oslo.i18n==6.9.0",
-    "oslo.utils==10.1.1",
+    "oslo.utils==10.2.0",
     "packaging==26.3",
     "pycparser==3.0",
     "PyJWT==2.13.0",
