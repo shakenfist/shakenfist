@@ -244,20 +244,29 @@ smoke testing, input events (scancodes, pointer coordinates), and
 cursor overlay updates. `send_control(&[u8])` and `control_rx()`
 are the public API.
 
-A datachannel's SCTP stream id is assigned from the DTLS role at
-creation time, and there is no role before the handshake, so any
-datachannel created ahead of negotiation — on both sides — lands
-on stream 1. Our `control` datachannel and the browser shell's
-`control-seed` (`ryll/src/web/assets/app.js`) are both created
-ahead of negotiation, so in the common case they collide on the
-same stream: each side's channel is already in its own id map when
-the peer's DCEP open arrives, the driver does not announce it, and
-`on_data_channel` never fires. The remote peer's messages instead
-surface on our *own* `control_dc`, pumped as `"local-dc"` — which
-is harmless here, since both directions still work, but it means
-the `on_data_channel` path (pumped as `"remote-dc"`) is dead in
-normal operation. What is left for it is a datachannel the peer
-opens *after* negotiation, where the stream ids no longer collide.
+The channel is negotiated **out of band**: both ends create their
+own end on a fixed SCTP stream id — `CONTROL_DC_STREAM_ID` (0) in
+`shakenfist-spice-webrtc/src/bridge.rs`, and the matching
+`negotiated: true, id: 0` in `ryll/src/web/assets/app.js`. Neither
+side announces the channel in band, so no DCEP open is sent, no
+`ondatachannel` fires, and both ends address the same stream by
+construction. The remote peer's messages surface on our *own*
+`control_dc`, pumped as `"local-dc"`.
+
+In-band negotiation would not do. RFC 8832 §6 ties an in-band
+stream id to the DTLS role — even ids from the client, odd from the
+server — so a channel opened in band by each side is *two* channels
+on two streams, and each end has to notice and adopt the other's.
+Pinning the id removes that question entirely, along with any
+dependence on which end won the DTLS role negotiation. It also
+removes a real hazard: webrtc-rs before 0.20.4 assigned every
+pre-negotiation channel stream 1 regardless of role, which made the
+two ends collide onto one stream and appear to work; 0.20.4 fixed
+the assignment, and anything relying on that collision broke.
+
+The `on_data_channel` path (pumped as `"remote-dc"`) is therefore
+dead in normal operation. What is left for it is a datachannel the
+peer opens in band, which ryll's own client never does.
 
 `spawn_synthetic_audio_pump()` remains available for testing
 without a SPICE server: it emits a 440 Hz sine wave encoded as
