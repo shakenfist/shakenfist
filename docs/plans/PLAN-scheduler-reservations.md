@@ -456,11 +456,35 @@ is here.
   for it; see the phase plan's Future work for why the trace turned
   out to show designed behaviour.
 
-  One caveat on its exit: the merge-queue run for #3971 shows
-  `failure` overall, because `Ubuntu 24.04 cluster` failed. All
-  three affinity cluster tests passed on `Debian 12 cluster` and
-  the tier platform passed too, so the affinity evidence is sound,
-  but as with #3930 the gate was bypassed rather than met.
+  One caveat on its exit: the merge-queue run for #3971
+  (`33452092452`) shows `failure` overall, because `Ubuntu 24.04
+  cluster` (job `99684426208`) failed. All three affinity cluster
+  tests passed on `Debian 12 cluster` and the tier platform passed
+  too, so the affinity evidence is sound, but as with #3930 the
+  gate was bypassed rather than met.
+
+  That failure was triaged at close-out rather than left
+  unattributed, since a phase adding a hard filter stage to the
+  scheduler is exactly where an unexplained platform-specific
+  cluster failure should not be waved through. The job ran one
+  failing test, `test_imagefetch.TestHTTPFetch.`
+  `test_disappearing_source_instance`, which refuses at instance
+  create with `507 {"error": "No nodes remaining at scheduling
+  stage sufficient_idle_cpu"}`. That is the **#3772** 507 family,
+  and it cannot be this phase's doing: `test_imagefetch.py`
+  contains no affinity metadata anywhere, and the refusing stage
+  runs at `scheduler.py:646`, ahead of the new
+  `affinity_constraints` stage at `:703`, so the create never
+  reached the code this phase added. It is tracked by #3772
+  rather than by anything new, and recorded there as a recurrence
+  (comment `5507548920`) because `test_imagefetch` was not among
+  that umbrella's existing signatures. What the triage rests on is
+  the stage named in the refusal and a reading of the test and the
+  pipeline, not on a rerun -- nobody re-ran the job. The same
+  job's headroom census shows the refusal was the admission ledger
+  ("would exceed hard max CPUs", 16 drops) while the committed-to-
+  ledger p90 sat at 0.370, which is the reading
+  `PLAN-ci-cloud-sizing.md` already argues.
 
   Its step 7 close-out ran a day after the code merged, and #3565
   was closed in the interval with no comment on it. The phase plan

@@ -1905,12 +1905,17 @@ step 4.
 
 ## Close-out (2026-09-01)
 
-Steps 1, 3, 4, 5 and 6 merged as #3957, #3971 and #3972 between
-2026-08-29 and 2026-09-01. Steps 2 and 7 ran on 2026-09-01, a day
-after the code landed, which is why every status column in this
-file said `Not started` against merged work for a day: step 7 edits
-the plan file that step 1 merges, so it cannot run until that merge
-has happened, and nothing enforced the follow-up.
+Steps 1, 4, 5 and 6 merged as #3971 and step 3 as #3972, on
+2026-09-01 and 2026-08-31 respectively (merge times in UTC).
+**#3957 was this plan file itself and carried no step work** --
+its three changed files are all under `docs/plans/` -- so an
+earlier draft of this paragraph, which credited it with
+implementation, was wrong; the master plan's phase status note had
+it right. Steps 2 and 7 ran on 2026-09-01, a day after the code
+landed, which is why every status column in this file said `Not
+started` against merged work for a day: step 7 edits the plan file
+that step 1 merges, so it cannot run until that merge has
+happened, and nothing enforced the follow-up.
 
 **#3565 was closed on 2026-08-31 with no comment.** Step 2's
 disposition was posted afterwards, as comment `5489559241` on
@@ -1958,6 +1963,15 @@ The three worth naming:
 
 ## Future work
 
+- **The one unticked done-criterion.** "Mutating the scorer to
+  ignore negative affinity contributions fails the inst3
+  assertion and no other test" is recorded above as unverified,
+  and is the only criterion guarding the negative half of the
+  rewritten test. It is carried here rather than closed out with
+  the phase, because marking the phase `Complete` otherwise
+  retires it silently. Discharging it costs one cluster CI cycle
+  per mutation and is worth folding into the next change that
+  spends one on `test_scheduler.py` anyway.
 - **Removing the weighted affinity form.** Needs its own
   release and deprecation window; see F4 and the risk above.
 - **The placement retry behaviour of finding 6.** Filed by step 2
@@ -1966,7 +1980,7 @@ The three worth naming:
   pinning exercise actually concluded: the trace does *not* show a
   defect. What looked like a retry landing on a just-refused node
   is the create path's designed demand waiver
-  (`external_api/instance.py:951-957`) admitting a node the guard
+  (`external_api/instance.py:951-958`) admitting a node the guard
   had refused on demand alone, followed by preflight re-validating
   that placement through its opening forced call
   (`node_inst_netdesc_op.py:159`) eighteen seconds later on the
@@ -1974,9 +1988,13 @@ The three worth naming:
   already holds and never calls `find_candidates()` again, so it
   cannot publish a forced event at all. #4001 is the fourth
   mechanism -- `find_candidates()` testing `if candidates:`
-  (`scheduler.py:586`) so an empty exclusion list reverts to the
-  whole cluster -- and it is filed on a reading of the code, said
-  in as many words on the issue, rather than on the trace.
+  (`scheduler.py:587`) so an empty exclusion list reverts to the
+  whole cluster, in the `else` at `:598` which rebuilds the list
+  from every key in `self.metrics` -- and it is filed on a reading
+  of the code, said in as many words on the issue, rather than on
+  the trace. The step 2 brief above still cites `scheduler.py:400`
+  and `:441` for the same branch; those are the line numbers as
+  they stood when the brief was written and no longer resolve.
 - **Whether an activity metric belongs in the ranking at all.**
   Phase 00a's surviving observation: `cpu_load_1` measures
   activity, not occupancy, so a node packed with idle instances
