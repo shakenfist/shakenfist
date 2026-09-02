@@ -59,10 +59,11 @@ PROGRESS_PERSIST_INTERVAL = 10
 # How often the executor's socket loop actually evaluates the timing
 # budgets. The loop is not rate limited -- recv() returns as soon as a
 # packet arrives, so an active transfer iterates thousands of times a
-# second -- and an operation with a NULL deadline resolves its default
-# against self.state.update_time, which is an uncached GetState round
-# trip. Checking once a second is ample resolution for a 30 second
-# window and bounds the cost regardless of which branch is taken.
+# second. Checking once a second is ample resolution for a 30 second
+# window and bounds the cost of the checks themselves; the one database
+# read a check can imply (resolving a NULL deadline's anchor) is paid
+# at most once per executor, not once per check -- see the anchor cache
+# in expire_if_out_of_budget() and issue #4014.
 BUDGET_CHECK_INTERVAL = 1
 
 # How often the executor reaper looks at a single instance's agent
@@ -647,6 +648,11 @@ class SideChannelExecutorJob(SideChannelJob):
         self._last_progress_persisted = 0.0
         self._last_budget_check = 0.0
 
+        # The State a NULL deadline resolves its default against, read
+        # at most once for the life of this executor rather than on
+        # every budget check. See expire_if_out_of_budget().
+        self._deadline_anchor = None
+
         self.ready = False
         self.welcomed = False
         self.log = LOG.with_fields({
@@ -976,8 +982,7 @@ class SideChannelExecutorJob(SideChannelJob):
         This replaced a fixed 900 second backstop.
         """
         # Rate limited, because the caller is the socket loop and the
-        # deadline_passed() call below can be a database read; see
-        # BUDGET_CHECK_INTERVAL.
+        # checks below are work; see BUDGET_CHECK_INTERVAL.
         now = time.time()
         if now - self._last_budget_check < BUDGET_CHECK_INTERVAL:
             return False
@@ -986,7 +991,27 @@ class SideChannelExecutorJob(SideChannelJob):
         # The wall-clock deadline. Queue time and preflight time have
         # already been spent from it, so this can fire almost
         # immediately after dispatch.
-        if self.agentop.deadline_passed():
+        #
+        # A NULL deadline -- a row written by an API server which
+        # predates deadlines -- resolves the server default against the
+        # operation's state row, and reading that is an uncached
+        # GetObjectState round trip. Unanchored, this check is
+        # therefore a fixed-rate database poll of up to 1/s per live
+        # executor for the whole life of the operation (issue #4014).
+        # The anchor cannot move while this executor exists: dispatch
+        # and reaping for an instance serialise in this one process,
+        # and a retry builds a new executor. So read it once and hand
+        # it to every later check. The state in hand at the first check
+        # is normally still queued, which makes the deadline this
+        # enforces at most tighter than the per-read resolution it
+        # replaces -- and it is the same anchor agent_operation_next()
+        # already checked against at dispatch. An operation with a
+        # stored deadline never reaches the read at all, and
+        # deadline_passed() does not read state when its own resolution
+        # short-circuits.
+        if self.agentop.deadline is None and self._deadline_anchor is None:
+            self._deadline_anchor = self.agentop.state
+        if self.agentop.deadline_passed(state=self._deadline_anchor):
             self.log.error(
                 'Operation deadline passed while executing, aborting '
                 'executor')

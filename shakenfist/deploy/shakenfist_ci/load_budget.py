@@ -252,10 +252,51 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # in ci_headroom_probe.py's own docstring, in the CI headroom section of
 # docs/developer_guide/ci.md, and against #3975 in PLAN-ci-cloud-sizing.md.
 #
+# The agent operation await helper is the same shape a third time, and it
+# brings the cluster's side of the conversation in with it. _await_command()
+# in shakenfist_ci/base.py submits an agent operation and then reads it back
+# on a time.sleep(1) timer until it reaches a terminal state; every read is
+# one GetAgentOperationAttributes from api, because the operation's external
+# view reads its attributes row for results, last_progress and attempts.
+# The agent-heavy tests call it back to back, so for as long as any of them
+# is running the suite works through agent operations at a rate set by its
+# own timers -- and every per-operation cost the cluster pays to serve that
+# stream arrives at the same harness-paced rate. On the sidechannel daemon
+# that is a handful of GetObjectState reads per operation (the dispatch and
+# retirement reads in Instance.agent_operation_next(), and the state
+# machine's read-before-write validation on each transition the executor
+# makes) plus the RecordEventBatch calls carrying the operation's lifecycle
+# audit events. In the smoke run which found this (issue 4014) all three
+# pairs held their rate across every window while the suite's activity
+# nearly tripled around them, which is the signature this check calls a
+# poll -- held for the usual reason: the pacemaker is a harness constant,
+# not the cluster. (The issue read the sidechannel pairs as a new 1/s
+# executor poll, but that read only exists for a NULL-deadline row, which a
+# current API server never writes -- and the executor now anchors it once
+# per executor regardless, see expire_if_out_of_budget() in
+# shakenfist/daemons/sidechannel/main.py.)
+#
+# The budget is the wrong home for all three, and not only because no
+# deployed cluster runs agent operations on a one second timer. The model
+# has no term for load which scales with in-flight operations: an instance
+# doing no agent work costs nothing here and one streaming a large put-blob
+# costs the operation's whole lifecycle, so a per_instance_qps coefficient
+# would just encode the rate CI's tests happen to run at, which is the
+# hand-fitting the yaml header forbids. On the cluster the budget derives
+# from, none of the three cleared the 0.10/s inclusion cut.
+#
+# What it costs, said plainly: this check can no longer see a new
+# fixed-rate poll which reads object states or records event batches from
+# the sidechannel daemon, or one which reads agent operation attributes
+# through sf-api. Real clusters keep watching all three pairs at the
+# unbudgeted ceiling, because ShakenFistUnbudgetedDatabasePolling takes its
+# exclusions from the budget file and not from here.
+#
 # Anything added here needs the same two things: a named loop which produces
 # it, and a reason the budget is the wrong home for it.
 # test_harness_driven_pairs_are_not_budgeted,
-# test_the_suite_still_polls_an_events_endpoint and
+# test_the_suite_still_polls_an_events_endpoint,
+# test_the_suite_still_awaits_agent_operations and
 # test_the_suite_still_probes_cluster_headroom hold both ends of that up.
 HARNESS_DRIVEN_PAIRS = frozenset([
     # shakenfist_ci/base.py's await helpers, on a time.sleep(5) timer.
@@ -264,6 +305,12 @@ HARNESS_DRIVEN_PAIRS = frozenset([
     ('GetAllNodeDaemonStates', 'api'),
     ('GetNodeAttributes', 'api'),
     ('GetNodeMetrics', 'api'),
+    # shakenfist_ci/base.py's _await_command(), on a time.sleep(1)
+    # timer, and the sidechannel daemon serving the agent operation
+    # stream that timer paces.
+    ('GetAgentOperationAttributes', 'api'),
+    ('GetObjectState', 'sidechannel'),
+    ('RecordEventBatch', 'sidechannel'),
 ])
 
 

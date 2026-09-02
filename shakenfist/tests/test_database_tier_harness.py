@@ -276,6 +276,68 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             'GetObjectEvents/api in HARNESS_DRIVEN_PAIRS -- drop the '
             'exemption and let the idle load check see the pair again.')
 
+    def test_the_agent_operation_pairs_are_exempt(self):
+        # The three pairs the smoke topology measured in issue 4014. The
+        # api one is the suite's own 1s poll in _await_command(); the two
+        # sidechannel ones are the cluster's per-operation cost of serving
+        # the agent operation stream that poll paces, which arrives at the
+        # harness's rate for the same reason.
+        for pair in (('GetAgentOperationAttributes', 'api'),
+                     ('GetObjectState', 'sidechannel'),
+                     ('RecordEventBatch', 'sidechannel')):
+            self.assertTrue(
+                harness.harness_driven(pair),
+                '%s/%s is not exempt, so a smoke run whose agent operation '
+                'tests span the measurement windows will fail '
+                'test_no_unbudgeted_fixed_rate_database_polling again '
+                '(issue 4014).' % pair)
+
+        # Scoped to the callers which actually carry the harness-paced
+        # traffic. The same operations from other daemons are ordinary
+        # server side traffic: GetObjectState has a budget entry for every
+        # other daemon, and a new fixed-rate poll from one of them must
+        # still be visible.
+        self.assertFalse(
+            harness.harness_driven(('GetObjectState', 'api')))
+        self.assertFalse(
+            harness.harness_driven(('GetObjectState', 'net')))
+        self.assertFalse(
+            harness.harness_driven(('RecordEventBatch', 'queues')))
+        self.assertFalse(
+            harness.harness_driven(('GetAgentOperationAttributes',
+                                    'sidechannel')))
+
+    def test_the_suite_still_awaits_agent_operations(self):
+        # The argument for exempting the agent operation pairs is that
+        # _await_command() in base.py reads an agent operation back on a
+        # timer, and that the suite's agent tests pace the cluster's own
+        # work through it. If that loop is ever rewritten onto a
+        # notification, the exemption stops being an explanation and
+        # becomes a hole. Derived rather than asserted, for the same
+        # reason as the events check above.
+        tree = _parse('shakenfist', 'deploy', 'shakenfist_ci', 'base.py')
+
+        polling_loops = []
+        for loop in _sleeping_loops(tree):
+            for node in ast.walk(loop):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if (isinstance(func, ast.Attribute)
+                        and func.attr == 'get_agent_operation'):
+                    polling_loops.append(loop.lineno)
+                    break
+
+        self.assertNotEqual(
+            [], polling_loops,
+            'No loop in shakenfist_ci/base.py both sleeps and reads an '
+            'agent operation back, so the suite no longer polls agent '
+            'operations on a timer. That is the justification for '
+            'exempting GetAgentOperationAttributes/api, '
+            'GetObjectState/sidechannel and RecordEventBatch/sidechannel '
+            'in HARNESS_DRIVEN_PAIRS -- drop those three and let the idle '
+            'load check see the pairs again.')
+
     def test_the_headroom_probe_pairs_are_exempt(self):
         # The other half of the contract that
         # test_the_suite_still_probes_cluster_headroom holds up. That one
