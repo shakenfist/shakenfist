@@ -13784,8 +13784,9 @@ closed.</p>
    <code>template</code>, and a <code>column</code> heading when it shares a specification
    page with another criterion -- and implements <code>run(repo)</code>, returning
    <code>self.ok()</code>, <code>self.fail()</code> or <code>self.skip()</code>. Register the instance in
-   <code>CHECKS</code> in <code>scripts/audit/registry.py</code>, and add its id to
-   <code>ORDER</code> where you want it reported.</li>
+   <code>CHECKS</code> in <code>scripts/audit/registry.py</code>, beside the rest of its
+   family -- that list is the order the results are reported in, and
+   there is no second table to add the id to.</li>
 </ol>
 <p>Put the applicability test in <code>applies(repo)</code> rather than at the top
    of <code>run()</code>. The scheduler asks the cheap question first, which is
