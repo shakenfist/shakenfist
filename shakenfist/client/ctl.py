@@ -3,6 +3,7 @@ import importlib
 import json
 import logging
 import os
+import sys
 import time
 import uuid as uuid_module
 from dataclasses import dataclass
@@ -160,10 +161,13 @@ def cli(ctx: click.Context, verbose: Optional[bool] = None) -> None:
 
 
 def _read_stdin_value() -> str:
+    # sys.stdin is read directly rather than via click.get_text_stream(),
+    # which click 8.5.0 deprecated for removal in click 9.0.
+    #
     # Trailing newlines are stripped because callers (including ansible's
     # command module) routinely append one; other whitespace is preserved
     # in case it is part of the value.
-    return click.get_text_stream('stdin').read().rstrip('\n')
+    return sys.stdin.read().rstrip('\n')
 
 
 @click.command()
