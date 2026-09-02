@@ -13836,13 +13836,17 @@ are:</p>
 <td>Optional log shipping to an operator-provided Loki. See <a href="../logging/">Logging</a>.</td>
 </tr>
 <tr>
+<td><code>kerbside_url</code></td>
+<td>Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the <a href="../vdi_console_tokens/">VDI console tokens operator guide</a>.</td>
+</tr>
+<tr>
 <td><code>extra_config</code></td>
 <td>A JSON list of additional cluster configuration settings, for example <code>[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]</code>. Optional.</td>
 </tr>
 </tbody>
 </table>
-<p>To offer users proxied graphical consoles via Kerbside, set <code>KERBSIDE_URL</code>
-(and optionally <code>KERBSIDE_TOKEN_DURATION</code>) through <code>extra_config</code>, then
+<p>To offer users proxied graphical consoles via Kerbside, set <code>kerbside_url</code>
+(and optionally <code>KERBSIDE_TOKEN_DURATION</code> through <code>extra_config</code>), then
 bootstrap and rotate the signing key as described in the
 <a href="../vdi_console_tokens/">VDI console tokens operator guide</a>. This is a manual,
 opt-in integration; it stays disabled while <code>KERBSIDE_URL</code> is unset.</p>

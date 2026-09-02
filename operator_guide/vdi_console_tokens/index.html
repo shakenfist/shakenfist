@@ -13543,13 +13543,14 @@ today. You deploy and configure a Kerbside proxy out of band (see the
 Shaken Fist at it as below.</p>
 </div>
 <p>To enable it, set <code>KERBSIDE_URL</code> to your Kerbside deployment's public base
-URL. You can do this at install time by adding it to <code>extra_config</code> in your
-<code>group_vars/all.yml</code> (see <a href="../installation/">Installation</a>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">extra_config</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">KERBSIDE_URL</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://kerbside.example.com</span>
+URL. You can do this at deploy time by setting the collection's
+<code>kerbside_url</code> variable in your <code>group_vars/all.yml</code> (see
+<a href="../installation/">Installation</a>), which renders it into every node's
+<code>/etc/sf/config</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">kerbside_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://kerbside.example.com</span>
 </code></pre></div>
-<p>or on a running cluster with <code>sf-ctl</code>:</p>
+<p>or on a running cluster with <code>sf-ctl</code> (a <code>cluster_config</code> value overrides
+the rendered file at process start):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sf-ctl<span class="w"> </span>set-config<span class="w"> </span>KERBSIDE_URL<span class="w"> </span>https://kerbside.example.com
 </code></pre></div>
 <p><code>KERBSIDE_URL</code> is both the base for the returned console URL and the token
