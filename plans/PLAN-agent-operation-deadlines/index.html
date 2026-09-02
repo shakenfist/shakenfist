@@ -14229,7 +14229,7 @@ the slot at all.</p>
 <td>7</td>
 <td></td>
 <td>Not started</td>
-<td>Docs (operator + developer guides, and the <code>v07-v08</code> release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note <code>docs/developer_guide/state_machine.md</code> is <strong>not</strong> this phase's: it is a rendering of <code>state_targets</code>, so phase 4 updated it when it added <code>expired</code> rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge</td>
+<td>Docs (operator + developer guides, and the <code>v07-v08</code> release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states, and narrow <code>base.AGENT_OPERATION_FAILURES</code> to a plain <code>AgentOperationFailed</code> reference now that both client generations no longer need tolerating (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note <code>docs/developer_guide/state_machine.md</code> is <strong>not</strong> this phase's: it is a rendering of <code>state_targets</code>, so phase 4 updated it when it added <code>expired</code> rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge</td>
 </tr>
 <tr>
 <td>8</td>
@@ -14294,6 +14294,25 @@ see the second review response in
 <code>PLAN-agent-operation-deadlines-phase-04-enforcement.md</code>. The
 event-renewed loops above are untouched and remain phase 7's, as does
 restricting renewal to events that represent progress.</p>
+<p><strong>A second slice pulled forward, by CI ordering rather than by
+choice.</strong> Phase 6's client change (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/380" title="GitHub Issue: shakenfist/client-python #380">client-python#380</a>) makes a
+terminal agent operation state raise the new <code>AgentOperationFailed</code>
+on the first poll, where every await loop previously spun out its
+budget and raised <code>AgentCommandError</code>. Three places in this suite
+were written against the old behaviour: <code>test_get_missing_file</code> in
+both <code>smoke_ci_tests/test_agentops.py</code> and
+<code>guest_ci_tests/test_agentops.py</code> asserts <code>AgentCommandError</code>, and
+<code>_await_instance_ready</code>'s cloud-init retry loop (<code>base.py</code>) catches
+it twice -- so under the new client a failed health check would
+escape the retry rather than being retried. Neither repository could
+switch first, because this repository's CI builds the client from
+client-python's <code>develop</code> and client-python's CI builds the server
+from this repository's <code>develop</code>. The deadlock is broken by
+<code>base.AGENT_OPERATION_FAILURES</code>, a tuple which accepts either
+exception and resolves the new one through <code>getattr()</code> so it still
+imports against an old client. Phase 7 narrows it to a plain
+reference once the client change has merged and the ordering
+constraint is gone.</p>
 
 
 
