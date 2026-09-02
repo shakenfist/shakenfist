@@ -503,7 +503,7 @@ class _BudgetAgentOp(_FakeAgentOp):
     """A fake operation whose two timing budgets are directly settable."""
 
     def __init__(self, deadline_passed=False, progress_timeout=30.0,
-                 commands=None, attempts=0):
+                 commands=None, attempts=0, deadline=1700000000.0):
         # A stall only reaches a terminal state when a retry is
         # impossible, so these fakes default to a command list which
         # cannot be retried. The retry path itself is exercised in
@@ -513,13 +513,42 @@ class _BudgetAgentOp(_FakeAgentOp):
             attempts=attempts, deadline_passed=deadline_passed)
         self._progress_timeout = progress_timeout
         self.deadline_checks = 0
+        self.anchor_states = []
 
-    def deadline_passed(self):
+        # A stored absolute deadline by default, because that is what
+        # every operation a current API server creates carries. Tests
+        # of the NULL-deadline anchor path pass deadline=None.
+        self.deadline = deadline
+
+    def deadline_passed(self, state=None):
         self.deadline_checks += 1
+        self.anchor_states.append(state)
         return self._deadline_passed
 
     def effective_progress_timeout(self):
         return self._progress_timeout
+
+
+class _AnchorAgentOp(_BudgetAgentOp):
+    """A budget fake which counts how often its state row is read.
+
+    On the real object every state read is an uncached GetObjectState
+    round trip, which is what the executor's anchor cache exists to
+    bound (issue #4014).
+    """
+
+    def __init__(self, **kwargs):
+        self.state_reads = 0
+        super().__init__(**kwargs)
+
+    @property
+    def state(self):
+        self.state_reads += 1
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        self._state = _FakeState(value)
 
 
 class _ProgressHandler:
@@ -551,6 +580,7 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
         job.ready = ready
         job._last_progress = last_progress
         job._last_budget_check = 0.0
+        job._deadline_anchor = None
         job.commands = []
         job._blob_partial_file = None
         job.log = mock.MagicMock()
@@ -558,10 +588,8 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
 
     def test_the_check_is_rate_limited(self):
         # The caller is the socket loop, which iterates once per packet
-        # during a transfer. A NULL-deadline operation resolves its
-        # default against self.state.update_time, which is an uncached
-        # database read, so an unthrottled check is thousands of reads
-        # a second.
+        # during a transfer, so an unthrottled check runs thousands of
+        # times a second for no gain in resolution.
         agentop = _BudgetAgentOp(deadline_passed=False)
         job = self._make_executor(agentop, handler=_SilentHandler())
 
@@ -579,6 +607,47 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
         with mock.patch('time.time', return_value=self.NOW + 1.5):
             self.assertFalse(job.expire_if_out_of_budget())
         self.assertEqual(2, agentop.deadline_checks)
+
+    def test_a_null_deadline_reads_its_anchor_once(self):
+        # A NULL deadline (a row written by an API server which
+        # predates deadlines) resolves the server default against the
+        # operation's state row, which on the real object is an
+        # uncached database read. The anchor cannot move for the life
+        # of this executor, so however many budget checks run, it is
+        # read once and the same State handed to every check --
+        # otherwise this method is a fixed-rate database poll of 1/s
+        # per live executor (issue #4014).
+        agentop = _AnchorAgentOp(deadline=None, deadline_passed=False)
+        job = self._make_executor(agentop, handler=_SilentHandler())
+
+        for offset in (0.0, 1.5, 3.0):
+            with mock.patch('time.time', return_value=self.NOW + offset):
+                self.assertFalse(job.expire_if_out_of_budget())
+
+        self.assertEqual(3, agentop.deadline_checks)
+        self.assertEqual(1, agentop.state_reads)
+        # Every check was anchored, and on the one State that was read.
+        self.assertEqual(3, len(agentop.anchor_states))
+        for anchor in agentop.anchor_states:
+            self.assertIs(agentop.anchor_states[0], anchor)
+        self.assertIsNotNone(agentop.anchor_states[0])
+
+    def test_a_stored_deadline_never_reads_an_anchor(self):
+        # Every operation a current API server creates carries an
+        # absolute deadline, and resolving one costs no database read
+        # at all -- so the executor must not read the state row just to
+        # have an anchor it will never use.
+        agentop = _AnchorAgentOp(deadline=1700000000.0,
+                                 deadline_passed=False)
+        job = self._make_executor(agentop, handler=_SilentHandler())
+
+        for offset in (0.0, 1.5, 3.0):
+            with mock.patch('time.time', return_value=self.NOW + offset):
+                self.assertFalse(job.expire_if_out_of_budget())
+
+        self.assertEqual(3, agentop.deadline_checks)
+        self.assertEqual(0, agentop.state_reads)
+        self.assertEqual([None, None, None], agentop.anchor_states)
 
     def test_passed_deadline_expires_and_stops(self):
         agentop = _BudgetAgentOp(deadline_passed=True)
@@ -796,6 +865,7 @@ class ExecutorDispatchWindowTestCase(base.ShakenFistTestCase):
         job.ready = True
         job._last_progress = 0.0
         job._last_budget_check = 0.0
+        job._deadline_anchor = None
         job._blob_partial_file = None
         job.log = mock.MagicMock()
         job._send_commands_single_envelope = mock.MagicMock()
@@ -951,6 +1021,7 @@ class ExecutorPartialBlobTeardownTestCase(base.ShakenFistTestCase):
         job.ready = False
         job._last_progress = 0.0
         job._last_budget_check = 0.0
+        job._deadline_anchor = None
         job._blob_uuid = None
         job._stat_result = None
         job._agent_path_for_get = None
@@ -1080,6 +1151,7 @@ class ExecutorDispatchTerminalGuardTestCase(base.ShakenFistTestCase):
         job.ready = True
         job._last_progress = 0.0
         job._last_budget_check = 0.0
+        job._deadline_anchor = None
         job._blob_partial_file = None
         job.log = mock.MagicMock()
         job._send_commands_single_envelope = mock.MagicMock()
@@ -1333,6 +1405,7 @@ class ExecutorRetryTestCase(base.ShakenFistTestCase):
         job.ready = False
         job._last_progress = 0.0
         job._last_budget_check = 0.0
+        job._deadline_anchor = None
         job.commands = []
         job._blob_partial_file = None
         job.log = mock.MagicMock()
@@ -1497,6 +1570,7 @@ class DispatchRecordsAnAttemptTestCase(base.ShakenFistTestCase):
         job.ready = True
         job._last_progress = 0.0
         job._last_budget_check = 0.0
+        job._deadline_anchor = None
         job._blob_partial_file = None
         job.log = mock.MagicMock()
         job._send_commands_single_envelope = mock.MagicMock()
