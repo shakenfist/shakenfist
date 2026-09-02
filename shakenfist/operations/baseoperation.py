@@ -120,15 +120,27 @@ class BaseClusterOperation(BaseOperation):
     # override with a frozenset of their schema's ``model_tasks``; the base
     # default is empty (no coalescing).
     #
-    # ``coalescible_target_column`` names the indexed column on the
-    # ``cluster_operations`` table to group by when finding sibling ops --
-    # typically the foreign key for the target object (``network_uuid``,
-    # ``instance_uuid``, ``node_uuid``). It must be set whenever
-    # ``coalescible_tasks`` is non-empty; both are read together by the
-    # dispatcher (worker-side dedup) and ``create_and_enqueue`` (enqueue-
-    # side dedup) in the next two steps of this plan.
+    # ``coalescible_key_columns`` names the indexed columns on the
+    # ``cluster_operations`` table which together identify "the same
+    # work" when finding sibling ops -- typically the foreign keys for
+    # the target objects (``network_uuid``, ``instance_uuid``,
+    # ``node_uuid``). A sibling has to match every column in the tuple,
+    # so a two-column key is strictly narrower than a one-column one: a
+    # key of ``('network_uuid', 'node_uuid')`` can tell one hypervisor's
+    # work on a network apart from another's, which the network alone
+    # cannot. The value for each column is read off the operation as an
+    # attribute of the same name; an attribute which is ``None`` binds
+    # as ``IS NULL``, which narrows the key rather than dropping it --
+    # a cluster-wide NetOp has no ``node_uuid``, and folds only the
+    # other operations which also have none.
+    #
+    # It must be non-empty whenever ``coalescible_tasks`` is non-empty;
+    # both are read together by the dispatcher (worker-side fold) and by
+    # ``create_and_enqueue`` (enqueue-side dedup). The *first* column is
+    # also the operation's routing key in the sf-net dispatcher, and is
+    # the object the fold's audit event is recorded against.
     coalescible_tasks: 'frozenset[Enum]' = frozenset()
-    coalescible_target_column: Optional[str] = None
+    coalescible_key_columns: tuple[str, ...] = ()
 
     def execution_duration_extra(
             self,
@@ -176,21 +188,28 @@ class BaseClusterOperation(BaseOperation):
     ) -> Optional[tuple[str, str]]:
         """The (object_type, uuid) this operation coalesces against.
 
-        Returns None when the operation declares no coalescing target,
-        when the target column is unset on this instance, or when the
-        schema does not say which object type the column names.
+        Returns None when the operation declares no coalescing key,
+        when the first key column is unset on this instance, or when
+        the schema does not say which object type that column names.
+
+        Only the *first* key column is used, deliberately. The event
+        this reference is for has to outlive the operation -- which is
+        hard deleted thirty seconds after going terminal (#3864) -- and
+        the object an operator queries afterwards is the network, not
+        the node the work happened to run on.
 
         The object type is resolved through the schema model's
         ``target_fields`` map -- the same declaration
         ``schema/operations/util.py:enqueue_cluster_operation`` uses to
-        write ``cluster_operation_targets`` rows -- rather than being
-        hard-coded per operation class. A future multi-column
-        coalescing key (#3884) adds columns to that map, not special
-        cases here.
+        write ``cluster_operation_targets`` rows. Nothing is added to
+        that map for the extra key columns: a column added there starts
+        writing a ``cluster_operation_targets`` row for every operation
+        and changes what ``has_pending_cluster_operation()`` reports.
         """
-        target_column = type(self).coalescible_target_column
-        if not target_column:
+        key_columns = type(self).coalescible_key_columns
+        if not key_columns:
             return None
+        target_column = key_columns[0]
 
         target_uuid = getattr(self, target_column, None)
         if target_uuid is None:
@@ -404,7 +423,7 @@ class BaseClusterOperation(BaseOperation):
         #    ops" status event on the survivor and on its coalescing
         #    target.
         coalescible = type(self).coalescible_tasks
-        target_column = type(self).coalescible_target_column
+        key_columns = type(self).coalescible_key_columns
 
         if coalescible:
             unique_tasks: list[Enum] = []
@@ -440,27 +459,56 @@ class BaseClusterOperation(BaseOperation):
         # treated as "we don't know, be conservative" and the fold runs.
         skip_due_to_empty_queue = self.dispatcher_batch_size == 1
 
-        # Skip the cross-op fold for per-node queues. The fold query keys
-        # on (op_type, target_uuid, task) -- which collapses to "the
-        # same network" for NetOp -- and would otherwise mark a sibling
-        # op on a *different* node's queue as complete, leaving that
-        # node's apply work undone. This is the bug that broke
+        # Skip the cross-op fold when the coalescing key cannot tell
+        # this operation's work apart from work on another queue. The
+        # fold's SQL is blind to queues -- ``cluster_operations`` has no
+        # queue column -- so the key is what has to do it, and there are
+        # exactly two ways it can:
+        #
+        #   * A cluster-wide ``networknode-*`` queue is drained by a
+        #     single elected worker, so any sibling the fold finds is one
+        #     this same worker would otherwise have processed itself.
+        #   * A key which names ``node_uuid`` matches only operations
+        #     carrying that node's uuid, every one of which was enqueued
+        #     to that node's own ``{node_uuid}-network-*`` queue, drained
+        #     by exactly one dispatcher process, within which every
+        #     operation for the same network hashes to one worker thread.
+        #     The full argument, and why it does not extend to
+        #     ``sf-queues``, is the PARTITIONED-WORKER SAFETY INVARIANT
+        #     comment in ``shakenfist/daemons/network/workitem.py``.
+        #
+        # Without one of those, folding marks a sibling on a *different*
+        # node's queue complete and leaves that node's apply work undone.
+        # That is the bug which broke
         # ``test_single_virtual_networks_work`` on the network-facade
         # branch: with ``Network.ensure_mesh`` fanned out to every
-        # participating hypervisor, hypervisor A's worker would
-        # otherwise fold hypervisor B's pending ensure_mesh and B's
-        # FDB would never get updated.
+        # participating hypervisor, hypervisor A's worker folded away
+        # hypervisor B's pending ensure_mesh and B's FDB was never
+        # updated.
         #
-        # The cluster-wide ``networknode-*`` queues are safe because a
-        # single elected worker drains them, so any sibling found is
-        # one this same worker will eventually process. The intra-node
-        # case (multiple sources enqueueing the same op onto the same
-        # per-node queue) loses the fold's optimisation but is rare
-        # enough that the duplicate executions don't matter at the
-        # measured single-digit-percent rate.
+        # The node branch tests the queue name as well as the key, and
+        # both halves of that name matter. ``enqueue_cluster_operation``
+        # builds it as ``{target}-{family}-{priority}``, so a per-node
+        # operation on the ``network`` family goes to
+        # ``{node_uuid}-network-*``, drained only by that node's
+        # net-worker -- which is links (ii) and (iii) of the argument
+        # above. The default family is ``clusteroperation``, whose
+        # per-node queues are drained by sf-queues instead, and
+        # sf-queues starts one worker per claimed item with no routing
+        # key at all: link (iv) simply does not exist there. A key which
+        # names ``node_uuid`` is necessary for the fold to be safe but
+        # is not sufficient, so do not reduce this to a test of the key.
         queue_is_cluster_wide = (
             self.queue_name is not None
             and self.queue_name.startswith('networknode-'))
+        node_uuid = getattr(self, 'node_uuid', None)
+        key_distinguishes_node = (
+            'node_uuid' in key_columns
+            and node_uuid is not None
+            and self.queue_name is not None
+            and self.queue_name.startswith(f'{node_uuid}-network-'))
+        key_distinguishes_queue = (
+            queue_is_cluster_wide or key_distinguishes_node)
 
         # Each branch records the guard which decided the outcome, so
         # the guards exist exactly once and the instrumentation cannot
@@ -478,19 +526,38 @@ class BaseClusterOperation(BaseOperation):
         # Merging them buries the interesting case under the boring one
         # in the by-queue-class table, and decision 4's whole aim is
         # that "coalescing is doing nothing" stays answerable.
-        if not coalescible or not target_column:
+        if not coalescible or not key_columns:
             self.coalesce_outcome = 'type_not_coalescible'
         elif skip_due_to_empty_queue:
             self.coalesce_outcome = 'batch_size_one'
-        elif not queue_is_cluster_wide:
-            self.coalesce_outcome = 'not_cluster_wide'
+        elif not key_distinguishes_queue:
+            self.coalesce_outcome = 'key_cannot_distinguish_queue'
         else:
             survivor_coalescible_tasks = [
                 t for t in unique_tasks if t in coalescible]
-            target_uuid_attr = getattr(self, target_column, None)
-            if not survivor_coalescible_tasks or target_uuid_attr is None:
+
+            if not survivor_coalescible_tasks:
                 self.coalesce_outcome = 'no_coalescible_tasks'
             else:
+                # Every declared column goes into the key, including the
+                # ones which are unset on this operation: ``None`` binds
+                # as ``IS NULL``, which is a *narrower* key rather than
+                # an absent one. A cluster-wide NetOp has no
+                # ``node_uuid``, so it folds only the other cluster-wide
+                # operations on its network, exactly as a per-node
+                # operation folds only its own node's. Abandoning the
+                # fold instead would switch off the only coalescing the
+                # cluster currently does the moment the key widens --
+                # see decision 8 of
+                # docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+                # A column with no value *at all* is caught upstream, by
+                # ``_coalescible_keys``'s ``KeyError``.
+                keys: list[tuple[str, Optional[str]]] = []
+                for column in key_columns:
+                    value = getattr(self, column, None)
+                    keys.append(
+                        (column, None if value is None else str(value)))
+
                 # Recorded before the call, not after it. If
                 # claim_coalescible_siblings raises, a caller which
                 # catches and continues would otherwise emit an event
@@ -501,8 +568,7 @@ class BaseClusterOperation(BaseOperation):
                 coalesce_start = time.monotonic()
                 folded = mariadb.claim_coalescible_siblings(
                     operation_type=self.object_type,
-                    target_column=target_column,
-                    target_uuid=str(target_uuid_attr),
+                    keys=keys,
                     task_names=[
                         t.name for t in survivor_coalescible_tasks],
                     exclude_op_uuid=str(self.uuid))

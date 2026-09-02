@@ -470,6 +470,109 @@ class FindExistingCoalescibleOpReply(_message.Message):
 Global___FindExistingCoalescibleOpReply: _TypeAlias = FindExistingCoalescibleOpReply  # noqa: Y015
 
 @_typing.final
+class CoalescibleKeyPair(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    COLUMN_FIELD_NUMBER: _builtins.int
+    UUID_FIELD_NUMBER: _builtins.int
+    IS_NULL_FIELD_NUMBER: _builtins.int
+    column: _builtins.str
+    """One (column, uuid) pair of the coalescing key. ``column`` names an
+    indexed column on the cluster_operations table and is validated
+    server side against a whitelist; ``uuid`` is the value that column
+    must equal for an op to be considered a sibling.
+
+    ``is_null`` means "that column must be NULL" instead, which is a
+    real and narrower key rather than a missing one: a cluster-wide
+    NetOp carries no node_uuid, so it folds only the other cluster-wide
+    ops. proto3 cannot tell an empty string from an unset field, so the
+    flag is the only way to say it unambiguously -- when it is set the
+    server binds IS NULL and ignores ``uuid``. See decision 8 of
+    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+    """
+    uuid: _builtins.str
+    is_null: _builtins.bool
+    def __init__(
+        self,
+        *,
+        column: _builtins.str = ...,
+        uuid: _builtins.str = ...,
+        is_null: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["column", b"column", "is_null", b"is_null", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CoalescibleKeyPair: _TypeAlias = CoalescibleKeyPair  # noqa: Y015
+
+@_typing.final
+class ClaimCoalescibleSiblingsV2Request(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OPERATION_TYPE_FIELD_NUMBER: _builtins.int
+    KEYS_FIELD_NUMBER: _builtins.int
+    TASK_NAMES_FIELD_NUMBER: _builtins.int
+    EXCLUDE_OP_UUID_FIELD_NUMBER: _builtins.int
+    operation_type: _builtins.str
+    """As ClaimCoalescibleSiblingsRequest, but the single
+    target_column/target_uuid pair is replaced by a list of them. Every
+    pair must match for an op to be folded, so a key of
+    (network_uuid, node_uuid) can distinguish two hypervisors' work on
+    the same network where the V1 key could not.
+    """
+    exclude_op_uuid: _builtins.str
+    @_builtins.property
+    def keys(self) -> _containers.RepeatedCompositeFieldContainer[Global___CoalescibleKeyPair]: ...
+    @_builtins.property
+    def task_names(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        operation_type: _builtins.str = ...,
+        keys: _abc.Iterable[Global___CoalescibleKeyPair] | None = ...,
+        task_names: _abc.Iterable[_builtins.str] | None = ...,
+        exclude_op_uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["exclude_op_uuid", b"exclude_op_uuid", "keys", b"keys", "operation_type", b"operation_type", "task_names", b"task_names"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ClaimCoalescibleSiblingsV2Request: _TypeAlias = ClaimCoalescibleSiblingsV2Request  # noqa: Y015
+
+@_typing.final
+class FindExistingCoalescibleOpV2Request(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OPERATION_TYPE_FIELD_NUMBER: _builtins.int
+    KEYS_FIELD_NUMBER: _builtins.int
+    TASK_NAME_FIELD_NUMBER: _builtins.int
+    operation_type: _builtins.str
+    """As FindExistingCoalescibleOpRequest, but with the multi-column key
+    described on ClaimCoalescibleSiblingsV2Request.
+    """
+    task_name: _builtins.str
+    @_builtins.property
+    def keys(self) -> _containers.RepeatedCompositeFieldContainer[Global___CoalescibleKeyPair]: ...
+    def __init__(
+        self,
+        *,
+        operation_type: _builtins.str = ...,
+        keys: _abc.Iterable[Global___CoalescibleKeyPair] | None = ...,
+        task_name: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["keys", b"keys", "operation_type", b"operation_type", "task_name", b"task_name"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___FindExistingCoalescibleOpV2Request: _TypeAlias = FindExistingCoalescibleOpV2Request  # noqa: Y015
+
+@_typing.final
 class ClusterLockRequest(_message.Message):
     """Lock Operations"""
 

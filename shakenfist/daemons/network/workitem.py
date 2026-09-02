@@ -70,13 +70,60 @@ class Job(util_concurrency.Job):
         #      two ops with the same target on two different queues are
         #      drained by two different daemons and (1) says nothing about
         #      them. The fold's SQL cannot filter on queue either --
-        #      cluster_operations has no queue column. What actually makes
-        #      the fold safe is that every coalescible task is confined to
-        #      the cluster-wide networknode queue, enforced at enqueue time
-        #      by the InvalidCoalescibleEnqueue guard in
-        #      schema/operations/net_op.py. Do not weaken that guard on the
-        #      strength of this invariant; it is the guard that holds, not
-        #      this one.
+        #      cluster_operations has no queue column. So the *key* is what
+        #      has to confine a fold to one process, and there are two ways
+        #      it does:
+        #
+        #        a. A cluster-wide networknode-* queue is drained by the
+        #           single elected network node, so every sibling the fold
+        #           can find is one this same process would have run.
+        #        b. A key which includes node_uuid, on an op which carries
+        #           one. That case rests on four links, all of which have
+        #           to hold together:
+        #             i.   a (network_uuid, node_uuid) key can only match
+        #                  ops carrying that node's uuid;
+        #             ii.  every such op was enqueued to that node's own
+        #                  {node_uuid}-network-* queue. net_op's
+        #                  create_and_enqueue derives node_uuid from the
+        #                  enqueue target, and the queue name is
+        #                  {target}-{family}-{priority}, so this holds
+        #                  exactly when the enqueue also chose
+        #                  family='network' -- which is why the
+        #                  enqueue-time guard tests the family and not
+        #                  only the key;
+        #             iii. that queue is drained by exactly one dispatcher
+        #                  process, that node's own net-worker; and
+        #             iv.  within that process, every op for the same
+        #                  network hashes to the same worker thread via
+        #                  _routing_key() below.
+        #           Together those give property (3) for per-node queues as
+        #           well: the folded sibling is not being executed
+        #           anywhere, because the only thread which could be
+        #           executing it is the one doing the folding.
+        #
+        #      Both guards enforcing this are key-aware, not queue-aware:
+        #      InvalidCoalescibleEnqueue in schema/operations/net_op.py
+        #      refuses the enqueue, and BaseClusterOperation.execute()
+        #      records key_cannot_distinguish_queue and skips the fold.
+        #      Weaken either only by strengthening the key, never by
+        #      arguing from this invariant alone -- link (iv) is this
+        #      invariant, and it is one link of four.
+        #
+        #      The argument does NOT extend to sf-queues, and that is a
+        #      deliberate limit rather than an oversight. sf-queues is a
+        #      WorkerPoolDaemon: it fills its spare slots from a single
+        #      dequeue_work_items() call (shakenfist/daemons/daemon.py)
+        #      and starts one worker per claimed item, with no routing key
+        #      and no per-target affinity, so link (iv) simply does not
+        #      exist there. Two of its workers can hold two ops for the
+        #      same (network, node) at once, and one's fold can flip the
+        #      other's op to complete in the window between that worker's
+        #      queued-state check and its own transition to executing --
+        #      for which state_targets has no edge. That is why
+        #      NodeNetOp.network_apply_create_hypervisor is not
+        #      coalescible even though its model already carries both key
+        #      columns. See decision 5 of
+        #      docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
         #
         # Additionally each queue is drained by exactly ONE dispatcher
         # process: per-node {node_uuid}-network-* queues only by that node's
@@ -94,12 +141,19 @@ class Job(util_concurrency.Job):
         """The partition key for an operation.
 
         Ops sharing a target must always land on the same worker (see the
-        safety invariant above). The target column used by the coalescing
-        fold is authoritative when set; network_uuid covers the op types
-        that don't declare one; and the op's own uuid is a safe fallback
-        (an unshared key trivially preserves the invariant).
+        safety invariant above). The *first* column of the coalescing key
+        is authoritative when the op type declares one; network_uuid
+        covers the op types that don't; and the op's own uuid is a safe
+        fallback (an unshared key trivially preserves the invariant).
+
+        Only the first column is used: routing has to be at least as
+        coarse as the fold, so that any two ops a fold could match are
+        drained by the same worker. A finer routing key than the fold's
+        would split siblings across workers and break property (3) of
+        the invariant above.
         """
-        target_column = type(op).coalescible_target_column or 'network_uuid'
+        key_columns = type(op).coalescible_key_columns
+        target_column = key_columns[0] if key_columns else 'network_uuid'
         target = getattr(op, target_column, None)
         if target is None:
             return str(op.uuid)

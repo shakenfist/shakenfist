@@ -12,6 +12,8 @@ from shakenfist.tests import base
 
 OP_UUID = '11111111-1111-4111-8111-111111111111'
 NETWORK_UUID = '22222222-2222-4222-8222-222222222222'
+NODE_UUID = '55555555-5555-4555-8555-555555555555'
+OTHER_NODE_UUID = '66666666-6666-4666-8666-666666666666'
 
 
 class _StubOp(BaseClusterOperation):
@@ -36,10 +38,11 @@ def _make_static_values():
     }
 
 
-def _make_net_op_static_values(tasks):
+def _make_net_op_static_values(tasks, node_uuid=None):
     return {
         'uuid': OP_UUID,
         'network_uuid': NETWORK_UUID,
+        'node_uuid': node_uuid,
         'priority': 'user_facing_high_io',
         'request_id': None,
         'depends_on': None,
@@ -211,16 +214,17 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_claim.return_value = []
         self.addCleanup(self.claim_patcher.stop)
 
-    def _make_net_op(self, task_names, queue_name=None):
-        op = NetOp(_make_net_op_static_values(task_names))
+    def _make_net_op(self, task_names, queue_name=None, node_uuid=None):
+        op = NetOp(_make_net_op_static_values(task_names, node_uuid=node_uuid))
         # ``dispatch_task`` is wired by the concrete op; patch it so
         # we observe which tasks would actually run.
         op.dispatch_task = mock.MagicMock()
         # The cross-op fold only runs when the op was dequeued from a
-        # cluster-wide ``networknode-*`` queue. Default the tests to
-        # one of those so the legacy assertions still exercise the
-        # fold; tests that want to exercise the skip path pass an
-        # explicit per-node ``queue_name``.
+        # cluster-wide ``networknode-*`` queue, or from a per-node queue
+        # whose key names ``node_uuid``. Default the tests to the
+        # cluster-wide case so the legacy assertions still exercise the
+        # fold; tests that want to exercise the per-node cases pass an
+        # explicit ``queue_name`` (and usually ``node_uuid``).
         if queue_name is None:
             queue_name = 'networknode-clusteroperation-user_facing'
         op.queue_name = queue_name
@@ -261,8 +265,13 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_claim.assert_called_once()
         kwargs = self.mock_claim.call_args.kwargs
         self.assertEqual(ObjectType.NET_OP, kwargs['operation_type'])
-        self.assertEqual('network_uuid', kwargs['target_column'])
-        self.assertEqual(NETWORK_UUID, kwargs['target_uuid'])
+        # The key is every declared column, including the ones unset on
+        # this operation: a cluster-wide NetOp has no node_uuid, and
+        # None binds IS NULL so it folds only the other cluster-wide
+        # operations on this network.
+        self.assertEqual(
+            [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+            kwargs['keys'])
         self.assertEqual(
             ['network_apply_update_dnsmasq'], kwargs['task_names'])
         self.assertEqual(OP_UUID, kwargs['exclude_op_uuid'])
@@ -306,15 +315,17 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
 
     def test_fold_target_object_type_comes_from_the_schema(self):
         # Resolved through the schema model's target_fields map rather
-        # than hard-coded, so the multi-column key in #3884 extends the
-        # map instead of adding a special case here.
+        # than hard-coded. The multi-column key adds nothing to that
+        # map -- it declares its columns in
+        # ``coalescible_key_columns`` and resolves the event reference
+        # from the first of them.
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         self.assertEqual(
             ('network', NETWORK_UUID),
             op._coalescible_target_reference())
 
-    def test_target_reference_is_none_without_a_target_column(self):
-        # An operation type which declares no coalescing target at all.
+    def test_target_reference_is_none_without_a_key(self):
+        # An operation type which declares no coalescing key at all.
         # The fold cannot run for it, but the helper is public enough
         # that it must degrade rather than raise.
         op = _StubOp(_make_static_values())
@@ -384,14 +395,19 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.mock_claim.assert_called_once()
 
     def test_no_coalescing_call_when_queue_is_per_node(self):
-        # Per-node queues (``<node_uuid>-network-*`` and
+        # A per-node queue (``<node_uuid>-network-*`` and
         # ``<node_uuid>-clusteroperation-*``) MUST NOT fold across
-        # sibling ops, because the fold query keys on
-        # (op_type, target_uuid, task) and a sibling on a different
-        # node's queue is doing different work (e.g. mesh apply on
-        # hypervisor B vs hypervisor A). Folding would mark B's op
-        # complete without ever running it. See the comment in
-        # ``BaseClusterOperation.execute`` for the full story.
+        # sibling ops when this operation carries no ``node_uuid`` of its
+        # own: a sibling on a different node's queue is doing different
+        # work (mesh apply on hypervisor B vs hypervisor A) and folding
+        # would mark B's op complete without ever running it. NetOp's key
+        # names ``node_uuid`` here, but this op's own ``node_uuid`` is
+        # unset (``None``), so the key still cannot tell this queue's
+        # work apart from another node's and the guard fires. Setting
+        # ``node_uuid`` to match the queue is what lets this case
+        # through -- see the "runs on a per-node queue" test below and
+        # the comment in ``BaseClusterOperation.execute`` for the full
+        # story.
         op = self._make_net_op(
             ['network_apply_update_dnsmasq'],
             queue_name=(
@@ -403,10 +419,12 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
 
     def test_no_coalescing_call_when_queue_name_unset(self):
         # An op loaded outside the dispatch path (e.g. by a unit test
-        # that doesn't set ``queue_name``) has ``None`` for the queue
-        # and we can't tell whether the fold would be safe. The
-        # conservative choice is to skip it -- the fold is a cost
-        # optimisation, not a correctness requirement.
+        # that doesn't set ``queue_name``) has ``None`` for the queue,
+        # and with a network-only key there is nothing else to say the
+        # fold is safe. The conservative choice is to skip it -- the
+        # fold is a cost optimisation, not a correctness requirement.
+        # (A key naming ``node_uuid`` would decide this on its own,
+        # without consulting the queue name at all.)
         op = self._make_net_op(['network_apply_update_dnsmasq'])
         op.queue_name = None
         op.execute()
@@ -455,8 +473,117 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
                 '-network-user_facing'))
         op.execute()
 
-        self.assertEqual('not_cluster_wide', op.coalesce_outcome)
+        self.assertEqual(
+            'key_cannot_distinguish_queue', op.coalesce_outcome)
         self.assertIsNone(op.coalesce_seconds)
+
+    # -- Phase 11: the per-node fold guard (decisions 4 and 5) ---------
+    #
+    # ``key_distinguishes_node`` in ``BaseClusterOperation.execute``
+    # requires three things at once: the key names ``node_uuid``, this
+    # operation carries one, and the queue name is that same node's own
+    # ``{node_uuid}-network-*`` queue. Each test below removes exactly
+    # one of those and checks the fold still refuses -- except the one
+    # where all three hold, which is the case this phase exists to
+    # allow.
+
+    def test_coalescing_runs_on_a_per_node_queue_with_a_node_aware_key(self):
+        # All three conditions hold: the key names node_uuid, this op
+        # carries one, and the queue is that node's own network queue.
+        # This is the case decision 4's four-link argument makes safe.
+        op = self._make_net_op(
+            ['network_ensure_mesh'],
+            queue_name=f'{NODE_UUID}-network-user_facing',
+            node_uuid=NODE_UUID)
+        op.execute()
+
+        self.mock_claim.assert_called_once()
+        kwargs = self.mock_claim.call_args.kwargs
+        self.assertEqual(
+            [('network_uuid', NETWORK_UUID), ('node_uuid', NODE_UUID)],
+            kwargs['keys'])
+        self.assertEqual('ran', op.coalesce_outcome)
+
+    def test_fold_skipped_on_a_per_node_clusteroperation_family_queue(self):
+        # Decision 5, and the case that must never regress: a per-node
+        # queue on the *clusteroperation* family is drained by
+        # sf-queues, which has no per-target worker partitioning. A
+        # node-aware key is necessary but not sufficient -- the queue
+        # name's family half has to be checked too, or two of sf-queues'
+        # workers could hold two operations for the same (network, node)
+        # at once and one's fold could flip the other's operation to
+        # complete mid-dequeue.
+        op = self._make_net_op(
+            ['network_ensure_mesh'],
+            queue_name=f'{NODE_UUID}-clusteroperation-user_facing',
+            node_uuid=NODE_UUID)
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+        self.assertEqual(
+            'key_cannot_distinguish_queue', op.coalesce_outcome)
+
+    def test_fold_skipped_when_queue_belongs_to_a_different_node(self):
+        # The queue name's node half must match this operation's own
+        # node_uuid, not just any node's ``*-network-*`` queue -- an op
+        # cannot be safely folded against a queue it was not enqueued
+        # to.
+        op = self._make_net_op(
+            ['network_ensure_mesh'],
+            queue_name=f'{OTHER_NODE_UUID}-network-user_facing',
+            node_uuid=NODE_UUID)
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+        self.assertEqual(
+            'key_cannot_distinguish_queue', op.coalesce_outcome)
+
+    def test_fold_skipped_when_queue_name_is_none_with_node_set(self):
+        # An op loaded outside the dispatch path has no queue_name at
+        # all, even when its node_uuid is set (e.g. read back from the
+        # database by something other than the dispatcher). With no
+        # queue to check against, the conservative choice is to skip.
+        op = self._make_net_op(
+            ['network_ensure_mesh'], node_uuid=NODE_UUID)
+        op.queue_name = None
+        op.execute()
+
+        self.mock_claim.assert_not_called()
+        self.assertEqual(
+            'key_cannot_distinguish_queue', op.coalesce_outcome)
+
+    def test_fold_runs_for_a_cluster_wide_queue_with_node_uuid_unset(self):
+        # The other side of decision 8: a cluster-wide op (node_uuid
+        # unset) on the cluster-wide queue still folds, with
+        # ('node_uuid', None) in the key so it binds IS NULL and only
+        # matches other cluster-wide siblings.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        self.mock_claim.assert_called_once()
+        kwargs = self.mock_claim.call_args.kwargs
+        self.assertEqual(
+            [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+            kwargs['keys'])
+        self.assertEqual('ran', op.coalesce_outcome)
+
+    def test_fold_skipped_for_a_network_only_key_on_a_per_node_queue(self):
+        # Even with a node_uuid set on the operation and on the queue
+        # name, a key which does not name node_uuid at all -- the
+        # pre-phase-11 shape -- must still refuse the per-node fold.
+        # ``key_distinguishes_node`` tests the key's columns, not just
+        # the operation's attributes.
+        with mock.patch.object(
+                NetOp, 'coalescible_key_columns', ('network_uuid',)):
+            op = self._make_net_op(
+                ['network_apply_update_dnsmasq'],
+                queue_name=f'{NODE_UUID}-network-user_facing',
+                node_uuid=NODE_UUID)
+            op.execute()
+
+        self.mock_claim.assert_not_called()
+        self.assertEqual(
+            'key_cannot_distinguish_queue', op.coalesce_outcome)
 
     def test_outcome_records_a_job_with_nothing_coalescible(self):
         op = self._make_net_op(['network_remove_dnsmasq'])

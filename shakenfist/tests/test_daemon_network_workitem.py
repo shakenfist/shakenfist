@@ -390,7 +390,7 @@ class ExponentialBackoffMapTest(base.ShakenFistTestCase):
 
 
 class FakeNetOp:
-    coalescible_target_column = 'network_uuid'
+    coalescible_key_columns = ('network_uuid',)
 
     def __init__(self, uuid, network_uuid):
         self.uuid = uuid
@@ -398,7 +398,7 @@ class FakeNetOp:
 
 
 class FakeUntargetedOp:
-    coalescible_target_column = None
+    coalescible_key_columns = ()
 
     def __init__(self, uuid):
         self.uuid = uuid

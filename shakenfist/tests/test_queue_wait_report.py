@@ -94,6 +94,16 @@ COALESCE_SKIPPED = (
     '"coalesce_outcome": "batch_size_one"}, '
     '"net_op": "4ed3668d-351c-4f86-b1aa-f86547ce1929", "program": "sf-net"}')
 
+# An event from a build predating the phase 11 rename, as it still sits
+# in retained Loki history.
+COALESCE_RETIRED_OUTCOME = (
+    '{"message": "execution duration", "event_type": "usage", '
+    '"extra": {"seconds": 0.1, "wait_seconds": 0.5, "defer_count": 0, '
+    '"queue_name": '
+    '"11111111-1111-4111-8111-111111111111-network-user_facing", '
+    '"coalesce_outcome": "not_cluster_wide"}, '
+    '"net_op": "5ed3668d-351c-4f86-b1aa-f86547ce1930", "program": "sf-net"}')
+
 # A journal line: the JSON is preceded by a syslog style prefix.
 JOURNAL_PREFIXED = (
     'Aug 23 17:49:41 sf-3 sf-queues[1903915]: ' + PER_NODE)
@@ -387,6 +397,15 @@ class CoalescingParseTestCase(base.ShakenFistTestCase):
         self.assertIsNone(sample.coalesce_seconds)
         self.assertIsNone(sample.coalesce_folded)
 
+    def test_a_retired_outcome_name_is_still_counted(self):
+        # The tool reads retained history, which still carries the phase
+        # 9 name for the guard phase 11 renamed. Dropping it would stop
+        # counting every event emitted before the rename, and the outcome
+        # columns would quietly stop summing to n.
+        sample = report.parse_line(COALESCE_RETIRED_OUTCOME)
+        self.assertEqual(
+            'key_cannot_distinguish_queue', sample.coalesce_outcome)
+
     def test_an_older_event_carries_none_of_them(self):
         # Not zero. An event from a build predating the instrumentation
         # says nothing about coalescing, and reading it as "the fold ran
@@ -459,9 +478,20 @@ class CoalescingReportTestCase(base.ShakenFistTestCase):
         self.assertEqual('3', row['folded'])
         self.assertEqual('2', row['ran'])
         self.assertEqual('1', row['batch_size_one'])
-        self.assertEqual('0', row['not_cluster_wide'])
+        self.assertEqual('0', row['key_cannot_distinguish_queue'])
         # 0.2s, rendered in milliseconds rather than as '0.20'.
         self.assertEqual('200.0', row['max ms'])
+
+    def test_a_retired_outcome_name_lands_in_its_new_column(self):
+        # End to end, not just at parse time: the renamed guard's old
+        # events have to appear in the table rather than vanishing from
+        # it.
+        out = self._run([COALESCED, COALESCE_RETIRED_OUTCOME])
+        headings = report.COALESCE_HEADINGS
+        row = dict(zip(headings[1:],
+                       self._coalescing_row(out, 'net_op')[1:]))
+        self.assertEqual('2', row['n'])
+        self.assertEqual('1', row['key_cannot_distinguish_queue'])
 
     def test_a_fold_which_ran_and_found_nothing_is_not_a_fold_which_never_ran(
             self):

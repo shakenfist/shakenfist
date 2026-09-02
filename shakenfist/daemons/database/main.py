@@ -255,13 +255,19 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         Returns the uuid of an existing pending coalescible op on
         the same target, or an empty string when there's no match.
         See ``mariadb._direct_find_existing_coalescible_op``.
+
+        Retained for one release so a rolling upgrade can still serve
+        clients which predate ``FindExistingCoalescibleOpV2``. Its
+        single (column, uuid) pair is simply a one-element key, and it
+        can never mean NULL: a V1 client has no way to say so, and one
+        which sent an empty target_uuid meant "unset", which the
+        preflight's uuid coercion rejects.
         """
         try:
             self.monitor.counters['find_existing_coalescible_op'].inc()
             uuid = mariadb._direct_find_existing_coalescible_op(
                 request.operation_type,
-                request.target_column,
-                request.target_uuid,
+                [(request.target_column, request.target_uuid)],
                 request.task_name)
             return database_pb2.FindExistingCoalescibleOpReply(
                 op_uuid=uuid or '')
@@ -282,13 +288,17 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         affected uuids. See
         ``mariadb._direct_claim_coalescible_siblings`` for the
         safety guards.
+
+        Retained for one release so a rolling upgrade can still serve
+        clients which predate ``ClaimCoalescibleSiblingsV2``. Its
+        single (column, uuid) pair is simply a one-element key, and it
+        can never mean NULL -- see ``FindExistingCoalescibleOp``.
         """
         try:
             self.monitor.counters['claim_coalescible_siblings'].inc()
             folded = mariadb._direct_claim_coalescible_siblings(
                 request.operation_type,
-                request.target_column,
-                request.target_uuid,
+                [(request.target_column, request.target_uuid)],
                 list(request.task_names),
                 request.exclude_op_uuid)
             return database_pb2.ClaimCoalescibleSiblingsReply(
@@ -296,6 +306,73 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database ClaimCoalescibleSiblings failed', e)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=[])
+
+    def FindExistingCoalescibleOpV2(
+        self,
+        request: database_pb2.FindExistingCoalescibleOpV2Request,
+        context: grpc.ServicerContext
+    ) -> database_pb2.FindExistingCoalescibleOpReply:
+        """Read-only enqueue-side dedup lookup, multi-column key.
+
+        As ``FindExistingCoalescibleOp``, but the caller supplies a
+        list of ``(column, uuid)`` pairs which must all match rather
+        than a single pair. The V1 method is retained for one release
+        so a rolling upgrade can still serve old clients; a new client
+        never falls back to it, because folding on the first column
+        alone is the cross-node corruption this method exists to
+        prevent. See ``mariadb._direct_find_existing_coalescible_op``.
+
+        A pair with ``is_null`` set means that column must be NULL --
+        proto3 has no null of its own, and an empty ``uuid`` string is
+        indistinguishable from an unset field. That is a narrower key,
+        not a missing one: it is how the cluster-wide operations, which
+        carry no ``node_uuid``, fold only each other.
+        """
+        try:
+            self.monitor.counters['find_existing_coalescible_op_v2'].inc()
+            uuid = mariadb._direct_find_existing_coalescible_op(
+                request.operation_type,
+                [(k.column, None if k.is_null else k.uuid)
+                 for k in request.keys],
+                request.task_name)
+            return database_pb2.FindExistingCoalescibleOpReply(
+                op_uuid=uuid or '')
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database FindExistingCoalescibleOpV2 failed', e)
+            return database_pb2.FindExistingCoalescibleOpReply(op_uuid='')
+
+    def ClaimCoalescibleSiblingsV2(
+        self,
+        request: database_pb2.ClaimCoalescibleSiblingsV2Request,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ClaimCoalescibleSiblingsReply:
+        """Fold sibling pending coalescible ops, multi-column key.
+
+        As ``ClaimCoalescibleSiblings``, but the caller supplies a
+        list of ``(column, uuid)`` pairs which must all match rather
+        than a single pair. A pair with ``is_null`` set means that
+        column must be NULL, which proto3 cannot express any other way
+        and which is a narrower key rather than a missing one -- see
+        ``FindExistingCoalescibleOpV2``. See
+        ``mariadb._direct_claim_coalescible_siblings`` for the safety
+        guards.
+        """
+        try:
+            self.monitor.counters['claim_coalescible_siblings_v2'].inc()
+            folded = mariadb._direct_claim_coalescible_siblings(
+                request.operation_type,
+                [(k.column, None if k.is_null else k.uuid)
+                 for k in request.keys],
+                list(request.task_names),
+                request.exclude_op_uuid)
+            return database_pb2.ClaimCoalescibleSiblingsReply(
+                folded_op_uuids=folded)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ClaimCoalescibleSiblingsV2 failed', e)
             return database_pb2.ClaimCoalescibleSiblingsReply(
                 folded_op_uuids=[])
 
@@ -6250,6 +6327,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'clear_work_queue_claim', 'delete_work_queue_row',
             'claim_coalescible_siblings',
             'find_existing_coalescible_op',
+            'claim_coalescible_siblings_v2',
+            'find_existing_coalescible_op_v2',
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
             'get_cluster_config', 'set_cluster_config',

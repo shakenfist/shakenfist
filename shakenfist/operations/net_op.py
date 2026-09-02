@@ -1,3 +1,5 @@
+from typing import Any
+
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import mariadb
@@ -49,19 +51,30 @@ class NetOp(BaseClusterOperation):
     # See ``BaseClusterOperation.coalescible_tasks`` and the
     # ``COALESCIBLE_TASKS`` block in
     # ``shakenfist/schema/operations/net_op.py`` for the rationale
-    # behind which tasks fold. The target column is ``network_uuid``
-    # -- every NetOp targets exactly one network, and the
-    # ``cluster_operations`` table already has an indexed
-    # ``network_uuid`` column for the sibling-finding query the
-    # dispatcher / enqueue path will issue.
+    # behind which tasks fold. The key is
+    # ``('network_uuid', 'node_uuid')``: every NetOp targets exactly
+    # one network, and ``node_uuid`` records the node a per-node
+    # enqueue was aimed at, or ``None`` -- binding ``IS NULL`` -- for
+    # the cluster-wide network-node queue. Both are indexed columns on
+    # ``cluster_operations``, which is the table the sibling-finding
+    # query the dispatcher / enqueue path issues matches against. The
+    # second column is what tells one hypervisor's node-local work
+    # apart from another's, and is half of why
+    # ``network_ensure_mesh`` can be in ``COALESCIBLE_TASKS``; the
+    # other half is that every per-node enqueue of it goes to the
+    # ``network`` family, which sf-net partitions by target.
     coalescible_tasks = schema.COALESCIBLE_TASKS
-    coalescible_target_column = 'network_uuid'
+    coalescible_key_columns = schema.COALESCIBLE_KEY_COLUMNS
 
     def __init__(self, static_values):
         self.upgrade(static_values)
         super().__init__(static_values, schema)
 
         self.__network_uuid = static_values['network_uuid']
+        # Read with .get(): a row written before version 3 has no
+        # node_uuid key at all. The upgrade steps below insert one, but
+        # only for rows which actually travel through upgrade().
+        self.__node_uuid = static_values.get('node_uuid')
         self.__floating_address = static_values.get('floating_address')
         self.__inner_address = static_values.get('inner_address')
 
@@ -69,13 +82,46 @@ class NetOp(BaseClusterOperation):
             'operation_type': self.object_type,
             'operation_uuid': self.uuid,
             'network_uuid': self.network_uuid,
+            'node_uuid': self.node_uuid,
             'tasks': self.tasks
         })
+
+    @classmethod
+    def _upgrade_step_1_to_2(cls, static_values: dict[str, Any]) -> None:
+        # A deliberate no-op. The 1-to-2 bump only added the optional
+        # floating_address and inner_address fields, both of which
+        # default to None on the model and are read here with .get(),
+        # so a version-1 record needs no rewriting to become a
+        # version-2 one.
+        #
+        # The method must exist anyway. BaseObject.upgrade() resolves
+        # each step with a bare getattr(self, step) and no default
+        # (shakenfist/baseobject.py), so a missing step raises
+        # AttributeError rather than the UpgradeException the branch
+        # below that getattr is written to raise. Until this method
+        # existed, loading a version-1 NetOp row crashed instead of
+        # upgrading -- narrow, because cluster operations are hard
+        # deleted thirty seconds after going terminal, but real during
+        # a rolling upgrade.
+        pass
+
+    @classmethod
+    def _upgrade_step_2_to_3(cls, static_values: dict[str, Any]) -> None:
+        # Version 3 added node_uuid, which records the node a per-node
+        # operation was targeted at. An operation written before the
+        # bump predates the per-node coalescing key, so there is
+        # nothing to recover the value from; None is both the model
+        # default and the correct answer.
+        static_values['node_uuid'] = None
 
     # Static values
     @property
     def network_uuid(self):
         return self.__network_uuid
+
+    @property
+    def node_uuid(self):
+        return self.__node_uuid
 
     @property
     def floating_address(self):
@@ -90,6 +136,7 @@ class NetOp(BaseClusterOperation):
         retval = super().external_view()
         retval.update({
             'network_uuid': self.network_uuid,
+            'node_uuid': self.node_uuid,
             'floating_address': self.floating_address,
             'inner_address': self.inner_address,
         })

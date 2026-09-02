@@ -548,8 +548,11 @@ itself):
   the operation reached the cross-op fold's guards at all:
     * `coalesce_outcome` — `ran` if the fold's SQL was issued, or
       which guard skipped it: `batch_size_one` (the dispatcher
-      dequeued only this op), `not_cluster_wide` (a per-node queue,
-      where folding would be unsafe), `type_not_coalescible` (this
+      dequeued only this op), `key_cannot_distinguish_queue` (the
+      operation's coalescing key cannot tell its work apart from work
+      on another queue, so folding would be unsafe -- reported as
+      `not_cluster_wide` by builds before the key became
+      multi-column), `type_not_coalescible` (this
       operation type declares no coalescing at all, which is every
       cluster operation that is not a `net_op` and so most of them)
       or `no_coalescible_tasks` (a type which could have coalesced,
@@ -635,17 +638,38 @@ itself):
   no trace on the network's event stream at all, since the op it
   reuses was created by some earlier caller.
 
-  Only the cluster-wide `networknode` queue is ever deduped, in
-  either direction. Neither primitive can filter on which queue a
-  sibling is on -- `cluster_operations` has no queue column -- so a
-  coalescible task on a per-node queue would be folded across
-  nodes, and one hypervisor's work silently never applied. That is
-  enforced at enqueue time rather than left to convention: a
-  coalescible task enqueued to a per-node target raises
-  `InvalidCoalescibleEnqueue`. It is also why `network_ensure_mesh`
-  is *not* coalescible despite looking like the best candidate --
-  it updates the local host's FDB, so two mesh ops on one network
-  are the same work only if they are on the same node. See #3884.
+  Neither primitive can filter on which queue a sibling is on --
+  `cluster_operations` has no queue column -- so what confines a
+  fold to siblings the same dispatcher process actually drains is
+  the coalescing *key*: a tuple of `cluster_operations` columns a
+  sibling has to match every one of, not the single `network_uuid`
+  column this used to be. For `net_op` the key is `(network_uuid,
+  node_uuid)`, and a column with no value binds `IS NULL` rather
+  than being dropped, so a cluster-wide operation (`node_uuid =
+  None`) folds only other cluster-wide operations while a per-node
+  operation folds only its own node's. That is what makes
+  `network_ensure_mesh` -- which updates only the enqueuing host's
+  own FDB -- safe to coalesce despite being node-local work: two
+  mesh ops for different nodes no longer look like the same key.
+
+  Naming `node_uuid` in the key is necessary but not sufficient. A
+  per-node fold is only safe on a dispatcher that partitions its
+  workers by target, which `sf-net` does (every operation for a
+  network hashes to one worker thread) and `sf-queues` does not
+  (spare slots are filled from a single unpartitioned dequeue call).
+  Which dispatcher a per-node operation reaches depends on the queue
+  *family* as well as the key -- `network` routes to `sf-net`,
+  the default `clusteroperation` routes to `sf-queues` -- so both
+  guards test the family too. That is enforced at enqueue time
+  rather than left to convention: a coalescible task enqueued to a
+  per-node target on a family `sf-queues` drains raises
+  `InvalidCoalescibleEnqueue`. It is also why
+  `NodeNetOp.network_apply_create_hypervisor`, whose model already
+  carries both columns, is *not* coalescible: it is drained by
+  `sf-queues`, where the per-worker-partitioning guarantee the
+  argument rests on does not hold. See
+  [PLAN-queue-performance-phase-11-multi-column-key.md](../../plans/PLAN-queue-performance-phase-11-multi-column-key.md)
+  and #3884.
 
 ### Reading these events back
 
