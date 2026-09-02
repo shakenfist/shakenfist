@@ -449,12 +449,14 @@ is here.
   than dropped: **#3967** (closed) -- affinity metadata values
   returned 500 rather than 400 for lists, dicts, `null` and
   `Infinity` -- was fixed by step 3 on its own branch so a live
-  public-API 500 did not wait on the model work. **#4001** (open)
-  -- the preflight redirect reverting to the whole cluster when its
-  exclusion set comes out empty -- is filed on a reading of the
-  code and explicitly *not* on the trace that prompted the search
-  for it; see the phase plan's Future work for why the trace turned
-  out to show designed behaviour.
+  public-API 500 did not wait on the model work. **#4001** (closed
+  2026-09-01) -- the preflight redirect reverting to the whole
+  cluster when its exclusion set comes out empty -- was filed on a
+  reading of the code and explicitly *not* on the trace that
+  prompted the search for it, and was fixed by the issue-fix
+  workflow (`9d7fbc24c`) the same day; see the phase plan's
+  close-out for the fix and for why the trace turned out to show
+  designed behaviour.
 
   One caveat on its exit: the merge-queue run for #3971
   (`33452092452`) shows `failure` overall, because `Ubuntu 24.04
@@ -473,8 +475,8 @@ is here.
   stage sufficient_idle_cpu"}`. That is the **#3772** 507 family,
   and it cannot be this phase's doing: `test_imagefetch.py`
   contains no affinity metadata anywhere, and the refusing stage
-  runs at `scheduler.py:646`, ahead of the new
-  `affinity_constraints` stage at `:703`, so the create never
+  runs at `scheduler.py:653`, ahead of the new
+  `affinity_constraints` stage at `:710`, so the create never
   reached the code this phase added. It is tracked by #3772
   rather than by anything new, and recorded there as a recurrence
   (comment `5507548920`) because `test_imagefetch` was not among

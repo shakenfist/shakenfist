@@ -1922,6 +1922,40 @@ disposition was posted afterwards, as comment `5489559241` on
 #3565. Recorded because a silent close is the failure mode this step
 exists to prevent, and it happened anyway.
 
+### The placement retry behaviour of finding 6, and #4001
+
+Step 2 filed **#4001** per F8, "Preflight redirect silently
+re-offers the node it excluded when the exclusion set is empty".
+**It was fixed and closed on 2026-09-01**, by `9d7fbc24c` on the
+issue-fix workflow, while this close-out was being written -- so
+it is recorded here rather than carried as future work. The fix
+tests `candidates is not None` (`scheduler.py:594`) in place of
+the truth test, and an empty forced list now reaches
+`pre_schedule` and raises `LowResourceException` instead of
+falling through to the `else` at `:607` which rebuilds the list
+from every key in `self.metrics`. The `schedule inputs` event's
+`forced_candidates` flag (`scheduler.py:583`) reports the same
+distinction, so the audit trail no longer says `false` for a call
+that was forced.
+
+Note what the pinning exercise actually concluded, because that
+part is unaffected by the fix: the trace does *not* show a defect.
+What looked like a retry landing on a just-refused node is the
+create path's designed demand waiver
+(`external_api/instance.py:951-958`) admitting a node the guard
+had refused on demand alone, followed by preflight re-validating
+that placement through its opening forced call
+(`node_inst_netdesc_op.py:159`) eighteen seconds later on the
+chosen node. The create path's second walk re-walks the list it
+already holds and never calls `find_candidates()` again, so it
+cannot publish a forced event at all. #4001 was the fourth
+mechanism, filed on a reading of the code -- said in as many words
+on the issue -- rather than on the trace, and the fix's own commit
+message agrees that only the empty-list case changes. The step 2
+brief above still cites `scheduler.py:400` and `:441` for that
+branch; those are the line numbers as they stood when the brief
+was written and no longer resolve.
+
 ### What the definition of done actually verified
 
 Thirty-eight of the thirty-nine criteria are ticked against
@@ -1948,7 +1982,7 @@ The three worth naming:
   `mock.patch.object` under the existing mocked-mariadb harness in
   both trees, three candidates each. Step 4's criterion asked for a
   wash and step 5's for a reduction; the reduction is total,
-  because `if not scoring_tags` (`scheduler.py:731`) skips the walk
+  because `if not scoring_tags` (`scheduler.py:738`) skips the walk
   outright and the require stage returns before touching the memo
   (`:694`).
 
@@ -1974,27 +2008,6 @@ The three worth naming:
   spends one on `test_scheduler.py` anyway.
 - **Removing the weighted affinity form.** Needs its own
   release and deprecation window; see F4 and the risk above.
-- **The placement retry behaviour of finding 6.** Filed by step 2
-  per F8 as **#4001**, "Preflight redirect silently re-offers the
-  node it excluded when the exclusion set is empty". Note what the
-  pinning exercise actually concluded: the trace does *not* show a
-  defect. What looked like a retry landing on a just-refused node
-  is the create path's designed demand waiver
-  (`external_api/instance.py:951-958`) admitting a node the guard
-  had refused on demand alone, followed by preflight re-validating
-  that placement through its opening forced call
-  (`node_inst_netdesc_op.py:159`) eighteen seconds later on the
-  chosen node. The create path's second walk re-walks the list it
-  already holds and never calls `find_candidates()` again, so it
-  cannot publish a forced event at all. #4001 is the fourth
-  mechanism -- `find_candidates()` testing `if candidates:`
-  (`scheduler.py:587`) so an empty exclusion list reverts to the
-  whole cluster, in the `else` at `:598` which rebuilds the list
-  from every key in `self.metrics` -- and it is filed on a reading
-  of the code, said in as many words on the issue, rather than on
-  the trace. The step 2 brief above still cites `scheduler.py:400`
-  and `:441` for the same branch; those are the line numbers as
-  they stood when the brief was written and no longer resolve.
 - **Whether an activity metric belongs in the ranking at all.**
   Phase 00a's surviving observation: `cpu_load_1` measures
   activity, not occupancy, so a node packed with idle instances
