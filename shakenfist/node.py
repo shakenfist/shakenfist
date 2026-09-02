@@ -611,6 +611,13 @@ class Node(dbo):
         return attrs.installed_version
 
     @property
+    def spice_server_cert_subject(self):
+        attrs = self._load_attributes()
+        if attrs is None:
+            return None
+        return attrs.spice_server_cert_subject
+
+    @property
     def blobs(self):
         """Return list of blob UUIDs present on this node.
 
