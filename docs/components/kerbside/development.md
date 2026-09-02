@@ -159,11 +159,12 @@ window so weAudit re-reads its state file -- it does not watch the
 file for external changes.
 
 Then pick files, read them, and mark each one reviewed with weAudit's
-*Mark File as Reviewed*. Prefer working through a tranche in the
-order set by the phase 4 plan
+*Mark File as Reviewed*. The review scope and scaffolding plan
 ([PLAN-consistency-audit-phase-04-review-coverage.md](/components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/))
-over `review-tracking.sh next`, which picks at random and will
-scatter that order. This lists what is still outstanding in a
+groups the outstanding files into tranches, ordered so the files
+most likely to repay a reading come first. Prefer working through
+a tranche over `review-tracking.sh next`, which picks at random
+and will scatter that order. This lists what is still outstanding in a
 tranche, with the prefix changed to suit:
 
 ```bash
@@ -184,8 +185,15 @@ git commit
 Two things make a session's work count for nothing if they are
 missed. The tree must be clean when a file is marked, or the
 committed tree will not match what was actually read. And the commit
-must be signed -- check with `git log --format='%h %G? %s' -1`, where
-`N` means the mark landed with no attestation at all. See below.
+must be signed:
+
+```bash
+git cat-file commit HEAD | grep -q '^gpgsig' && echo signed
+```
+
+That form works from any clone. `%G?` is the richer check once the
+clone is configured for it, and "Signing review marks" below covers
+both.
 
 Findings go to issues, not into the same commit. A review session
 produces marks, and where it finds something, a GitHub issue; the fix
@@ -222,6 +230,22 @@ report `U` (signed, with gitsign's Fulcio chain not in a local trust
 store) rather than `N` (unsigned). `gitsign` needs an interactive
 Sigstore login on first use, so run `gitsign-credential-cache &` to
 authenticate once per session instead of once per commit.
+
+`%G?` is only meaningful in a clone that can interpret the signature.
+It verifies against whatever `gpg.format` the clone has configured,
+so in a development clone -- which sets none, and therefore defaults
+to OpenPGP -- a perfectly good x509 signature is unparseable and
+reports `N`, indistinguishable from no signature at all. To ask
+whether a commit is signed from anywhere, look at the object rather
+than at the verification result:
+
+```bash
+git cat-file commit <sha> | grep -q '^gpgsig' && echo signed
+```
+
+This distinction has already caused one wrong conclusion in this
+repository's planning documents, so it is worth knowing before
+auditing review history from a clone you do not review in.
 
 The bot's `prune` commits are deliberately unsigned: pruning only
 ever removes marks, so it cannot manufacture an attestation. Only

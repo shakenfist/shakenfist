@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-01T11:19:37.364378+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-02T10:53:52.109550+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -862,7 +862,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 83 of 168 in-scope files reviewed at HEAD; 85 need review (threshold 5)
+- **development** (Status): 100 of 168 in-scope files reviewed at HEAD; 68 need review (threshold 5)
 - **kerbside** (Status): 123 of 227 in-scope files reviewed at HEAD; 104 need review (threshold 5)
 - **ryll** (Status): 89 of 191 in-scope files reviewed at HEAD; 102 need review (threshold 5)
 
@@ -994,18 +994,19 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | development | N/A | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
-| kerbside | compliant | - |
+| kerbside | non-compliant | shakenfist/kerbside#395 |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | non-compliant | shakenfist/private-ci#17 |
-| ryll | compliant | - |
+| private-ci | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#349 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 
 Details for non-compliant projects:
 
-- **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## version-file-gitignore
 
