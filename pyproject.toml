@@ -143,7 +143,7 @@ dependencies = [
     "stevedore==5.9.1",
     "typing-inspection==0.4.4",
     "typing_extensions==4.16.0",
-    "wrapt==2.3.0",
+    "wrapt==2.4.0",
     "zope.event==6.2",
     "zope.interface==8.6",
     # END_OF_INDIRECT_DEPS
