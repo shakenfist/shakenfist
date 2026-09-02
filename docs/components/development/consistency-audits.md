@@ -142,8 +142,9 @@ Two files: the check and its specification.
    `template`, and a `column` heading when it shares a specification
    page with another criterion -- and implements `run(repo)`, returning
    `self.ok()`, `self.fail()` or `self.skip()`. Register the instance in
-   `CHECKS` in `scripts/audit/registry.py`, and add its id to
-   `ORDER` where you want it reported.
+   `CHECKS` in `scripts/audit/registry.py`, beside the rest of its
+   family -- that list is the order the results are reported in, and
+   there is no second table to add the id to.
 
    Put the applicability test in `applies(repo)` rather than at the top
    of `run()`. The scheduler asks the cheap question first, which is
