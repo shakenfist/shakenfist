@@ -278,7 +278,7 @@ nav:
                 - "Consistency audit phase 1: shared blocks, vendor stamp and settings closeout": components/kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp.md
                 - "Consistency audit phase 2: retire the comment addresser": components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser.md
                 - "Consistency audit phase 3: skillsaw CI detection, upstream": components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection.md
-                - "Consistency audit phase 4: review scope and coverage": components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage.md
+                - "Consistency audit phase 4: review scope and session scaffolding": components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage.md
                 - "Convert the kerbside admin UI to sfui": components/kerbside/plans/PLAN-sfui-conversion.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md

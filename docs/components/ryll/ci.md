@@ -272,7 +272,6 @@ consistency audit.
 | `renovate.yml` | Automated dependency updates (hourly) |
 | `export-repo-config.yml` | Daily repository configuration export |
 | `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
-| `pr-address-comments.yml` | Bot-triggered comment addressing (`@shakenfist-bot please address comments`) |
 | `pr-retest.yml` | Bot-triggered CI re-run (`@shakenfist-bot please retest`) |
 | `prune-reviews.yml` | Prune stale review marks after each push to develop |
 
@@ -299,8 +298,8 @@ jobs:
       cancel-in-progress: true
 ```
 
-Comment-triggered workflows (`pr-retest`, `pr-re-review`,
-`pr-address-comments`) need a different group key:
+Comment-triggered workflows (`pr-retest`, `pr-re-review`) need a
+different group key:
 
 ```yaml
       group: pr-retest-${{ github.event.issue.number }}

@@ -1,36 +1,44 @@
-# Consistency audit phase 4: review scope and coverage
+# Consistency audit phase 4: review scope and session scaffolding
 
 Master plan:
 [PLAN-consistency-audit.md](/components/kerbside/plans/PLAN-consistency-audit/)
 
 **Planning effort:** high. Two of the three judgements in this
 phase are permanent: which file types are subject to human review
-for the life of the repository, and what to do about the fact
-that no review mark this repository has ever recorded was signed.
-The third, the order in which 112 files get read, decides whether
+for the life of the repository, and which clone carries the
+signing configuration that makes a review mark an attestation.
+The third, the order in which 104 files get read, decides whether
 the first sessions find anything.
 
 ## Scope
 
 **In scope:**
 
-- Issue #227 (`review-coverage`): 77 in-scope files need review
-  against a threshold of fewer than 5.
 - The `review-scope-completeness` check, which fails today with
   44 orphaned files and has **no issue open against kerbside
   yet**. It is folded in here rather than given a phase of its
   own; see decision 1.
-- Configuring commit signing in this clone, and deciding what to
-  do about the unsigned marks already in history.
+- Settling which clone carries the commit signing configuration,
+  and confirming that the marks already in history are attested.
 - An ordered work queue and a per-session recipe, so the grind
   can be picked up by any session without re-deriving the order.
 
 **Out of scope:**
 
-- Re-reviewing the 115 files that already carry a mark. Their
-  marks are unattested (survey finding 4) and that is worth
-  knowing, but re-attesting without re-reading would be a
-  signature over a claim nobody checked.
+- **Reading the files.** Issue #227 (`review-coverage`) stays
+  open when this phase completes, and closing it is not this
+  phase's job or the master plan's. The reading happens in
+  separate sessions on their own clock; the issue is recomputed
+  against HEAD daily, names exactly which files remain, and
+  closes itself from a passing audit run. See decision 5 of the
+  master plan. This phase delivers the scope, the order and the
+  recipe, and stops.
+
+- Re-reviewing the 115 files that already carry a mark. Those
+  marks were made by 29 signed commits and three unsigned ones
+  predating 2026-08-14 (survey finding 4, as corrected). The
+  three are not worth re-reading to re-attest, since they will
+  come round again on their next natural staleness.
 - Teaching the `review-coverage` audit to care about signatures.
   That is an upstream change to `shakenfist/development` and is
   recorded as future work, not done here. See decision 4.
@@ -79,26 +87,57 @@ conclusion -- that the bulk is low-yield reading -- does not
 follow from a corrected distribution.
 
 **4. No review mark this repository has ever recorded was
-signed.** `git log --format='%h %G? %s' -- REVIEWS.md` returns
-`N` for every commit, including the four that added marks:
-`742dd06` *reviews: CI workflows and tools*, `08422d6` *review:
-test tooling*, `7b67f12` *review: tempest plugin*, `bc30959`
-*review: rust proxy churn*. `N` is "no signature", not "cannot
-verify" -- the merge commits alongside them show `E` for
-GitHub's key, which is the "cannot verify" case, so the two are
-distinguishable and this is the former.
+signed.** **This finding was wrong, and was corrected on
+2026-09-02.** It is left here rather than deleted because the
+way it was wrong is the useful part.
 
-The cause is that nothing is configured: `git config --get
-gpg.format`, `gpg.x509.program` and `commit.gpgsign` are all
-empty in both local and global scope, though `gitsign` is
-installed at `/usr/bin/gitsign`. `.claude/CLAUDE.md` and
-`AGENTS.md` (line 191) both document the configuration as a
-prerequisite; nobody ran it. The sketch called signing "a
-prerequisite the phase must check before starting", which is
-right, but it assumed the check would pass. The consequence is
-larger than a config step: the attestation the whole scheme
-rests on is absent for the 115 files that already count as
-reviewed.
+The survey ran `git log --format='%h %G? %s' -- REVIEWS.md`,
+saw `N` against every commit, and read `N` as "no signature".
+That reading is only safe in a clone that can interpret the
+signature. `%G?` verifies using whatever `gpg.format` the
+current clone has configured; this is a development clone with
+none set, so git defaults to OpenPGP, finds an x509/SMIME blob
+it cannot parse, and reports `N`. The signatures were there the
+whole time.
+
+The test that does not depend on local configuration is to look
+at the commit object rather than at a verification result:
+
+```bash
+git log --no-merges --format=%H -- REVIEWS.md '.vscode/*.weaudit*' |
+    while read sha; do
+        git cat-file commit "$sha" | grep -q '^gpgsig' &&
+            echo "$sha signed" || echo "$sha unsigned"
+    done
+```
+
+That gives **29 signed** commits, every one carrying gitsign's
+x509 `-----BEGIN SIGNED MESSAGE-----` form, and 46 unsigned. The
+46 break down as 38 `Prune stale review marks` commits, which is
+exactly the convention -- a prune removes an attestation and
+asserts nothing, so it is correctly unsigned -- and 8 others, of
+which three add marks and five are tooling, scope or
+documentation changes that add none.
+
+**Merge commits are excluded deliberately, and the exclusion is
+the point.** One merge in this set is signed -- `37c11de` *Merge
+branch 'develop' into reviews* -- but with GitHub's web-flow
+**PGP** key rather than a reviewer's x509 certificate, so it
+attests to nothing about any reading. Counting it would be the
+same class of error as the one this finding retracts, one level
+down: taking the presence of a signature for the presence of an
+attestation. Without `--no-merges` the total reads 30, which is
+the number this document first claimed.
+
+Signing began with `8189265` on 2026-08-14 and every mark-adding
+commit since carries a signature. Three earlier ones do not --
+`24d266d` *review: alembic* and `6f83fb5` *review: frontmatter*
+(both 2026-08-03/04) and `461268b` *review: ovirt use case,
+proxy architecture* (2026-08-13).
+
+So the prerequisite the sketch asked the phase to check does
+pass, in the clone where it matters. What this phase actually
+had to settle was *which* clone that is, which is decision 6.
 
 **5. A new audit check fails, with no issue filed.**
 `review-scope-completeness` landed upstream in `d3244d6` on
@@ -194,24 +233,45 @@ leaking a hypervisor ticket) and #131 (forgeable JWT). Autoescape
 behaviour and any `|safe` filter live in these files and nowhere
 else. They are read in tranche 2, not left to the end.
 
-**4. Configure signing now; do not retroactively sign the
-existing marks.** Every mark from this phase forward is signed,
-which is a `git config` away and is done in step 4b. The 115
-existing marks stay as they are. Re-signing them would produce a
-signature attesting that somebody read a file at a content
-version, when what actually happened is that somebody read it and
-the attestation was never captured -- and there is no way now to
-tell the two apart from the outside. Re-reading 115 files to
-attest them properly is not worth it against re-reading them on
-their next natural staleness.
+**4. Leave the three unsigned early marks alone.** Signing has
+been in place since 2026-08-14 and the marks made since are
+attested. Three from before that date are not, and they stay as
+they are: re-signing them now would produce a signature
+attesting that somebody read a file at a content version, when
+what actually happened is that somebody read it and the
+attestation was not captured -- and nothing from the outside
+can tell those two apart. They will come round again on their
+next natural staleness, and that is the honest way to attest
+them.
 
-The gap is worth recording upstream rather than only here: the
+*Revised 2026-09-02.* This decision was originally written on
+the survey's claim that **no** mark had ever been signed, and
+said "configure signing now" as though the whole scheme were
+unstarted. It was not; see survey finding 4.
+
+The audit gap is worth recording upstream regardless: the
 `review-coverage` audit runs `review-tracking.py status`, which
 reads the sidecar and never looks at whether the commit carrying
 a mark was signed. A repository can therefore pass the audit
-with no attestation at all, which is what kerbside has been
-doing. Raising that with `shakenfist/development` is future
-work, noted in the master plan, not this phase's job.
+with no attestation at all. Kerbside happens to attest anyway,
+by convention rather than because anything checks -- which is
+precisely why it is worth raising with
+`shakenfist/development`. That is future work, noted in the
+master plan, not this phase's job.
+
+**5. No agent pre-reads a file and hands the human a summary to
+mark against.** The review mark asserts that a person read the
+file. An agent-written briefing note, however good, becomes the
+thing that gets read, and the mark then attests to the summary.
+The upstream workflow's line about "Claude Code in the integrated
+terminal for questions" is the supported use and the boundary:
+answering a question about a file the human is reading is fine;
+producing the reading is not.
+
+This is the second decision a reader might argue with, since it
+declines the one available speed-up on a 23,000-line grind. The
+answer is that the speed-up would empty the marks of meaning,
+and the marks are the entire product.
 
 **6. Signing configuration belongs in the review account's clone,
 not in a development clone.** Review sessions run under a separate
@@ -229,27 +289,13 @@ clone was to hand. It applies to the clone that makes review marks.
 The settings were reverted; a development clone should have none of
 them.
 
-The survey's finding stands unchanged and is worth restating so it is
-not read as a consequence of this mix-up: every mark-adding commit on
-develop is unsigned (`742dd06`, `08422d6`, `7b67f12`, `bc30959`), so
-the 115 files that already count as reviewed carry no attestation.
-That is a fact about the commits on the branch, whatever any clone's
-configuration says, and it is why the Definition of done asks for
-confirmation against a real commit rather than against a config file.
-
-**5. No agent pre-reads a file and hands the human a summary to
-mark against.** The review mark asserts that a person read the
-file. An agent-written briefing note, however good, becomes the
-thing that gets read, and the mark then attests to the summary.
-The upstream workflow's line about "Claude Code in the integrated
-terminal for questions" is the supported use and the boundary:
-answering a question about a file the human is reading is fine;
-producing the reading is not.
-
-This is the second decision a reader might argue with, since it
-declines the one available speed-up on a 23,000-line grind. The
-answer is that the speed-up would empty the marks of meaning,
-and the marks are the entire product.
+The mix-up had a second cause, found later: the survey believed no
+mark had ever been signed, so setting the configuration looked
+overdue rather than misplaced. Both errors have the same root --
+reading `%G?` in a clone that cannot interpret an x509 signature.
+See survey finding 4. The Definition of done asks for confirmation
+against a real commit object rather than against `%G?` or a config
+file for exactly this reason.
 
 ## Step plan
 
@@ -261,8 +307,8 @@ the table under *The review sessions*.
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 4a | high | opus | none | Rewrite `.vscode/review-scope.toml` in the phase 4 worktree so `./tools/review-tracking.sh scope-orphans` reports zero orphans, and **stop before committing** -- this needs Michael's ratification (gate 1). The 44 orphans are listed by that command; run it first. Apply decision 2's candidate list: add `*.html`, `*.toml`, `*.ini`, `*.json`, `*.conf`, `*.cfg`, `*.mako`, `*.svg`, `*.txt`, `*Dockerfile`, `Makefile`, `*/Makefile`, `.dockerignore`, `.gitignore`, `*.gitignore` to `include`, plus the three extensionless paths `etc/kerbside.conf.example`, `demo/kerbside-demo-env` and `tools/run-tempest-tests`. Add to `exclude`, each with a one-line reason in the comment block above: `.github/exported-config/*`, `rust/kerbside-proxy/Cargo.lock`, `docs/schema.html`, `tests/fixtures/*.qcow2`, `AUTHORS`, `LICENSE`. Use `tests/fixtures/*.qcow2` and not `tests/fixtures/*`, which would also drop `tests/fixtures/README.md`. Follow the file's existing style: a prose comment block explaining the reasoning, then the two lists. Verify with `scope-orphans` (expect the "every tracked file is either in scope or explicitly excluded" line) and with `status`, and report both numbers: expect **227 in scope, 112 needing review**. If either number differs, report it rather than adjusting patterns until it matches. *Outcome: 227 in scope as predicted, but 104 needing review rather than 112 -- see the note below the tranche table.* |
-| 4b | low | sonnet | none | **Nothing to do in this clone.** See decision 6: review sessions run under a separate account in a separate clone, and the signing configuration belongs there. Do not set `commit.gpgsign` in a development clone. The step remains in the table because the phase must still confirm, before tranche 1, that the review clone signs -- `git log --format='%h %G? %s' -1` after the first mark-adding commit, where `N` means it landed with no attestation. `gitsign` authenticates through an interactive Sigstore OIDC browser flow, so run `gitsign-credential-cache &` once in that clone rather than authenticating per commit. If the flow cannot complete, stop -- do not disable signing to get a mark through, because an unsigned mark is indistinguishable later from the 115 already in history. |
-| 4c | medium | sonnet | none | Add the per-session recipe to `docs/development.md`, in the review tracking section that already documents `tools/review-tracking.sh`. It must cover: pull on a clean tree, then `./tools/review-tracking.sh prune`; pick files from the current tranche rather than from `next` (which chooses at random and would scatter the order this plan sets); read and mark in weAudit; then `./tools/review-tracking.sh stamp`, `git add .vscode/*.weaudit* REVIEWS.md`, and a **signed** commit. Give the one-liner that lists a tranche's outstanding files, so a session does not re-derive it: `./tools/review-tracking.sh status \| grep 'never reviewed' \| sed 's/.*: //' \| grep '^kerbside/'` with the prefix swapped per tranche. State that the commit must be signed and how to check (`git log --format='%h %G? %s' -1`; `N` means it landed unsigned). Cross-link the upstream workflow doc rather than restating it -- `docs/code-review-tracking.md` in shakenfist/development is the authority. Keep to the repository's 80-column wrap. |
+| 4b | low | sonnet | none | **Nothing to do in this clone.** See decision 6: review sessions run under a separate account in a separate clone, and the signing configuration belongs there. Do not set `commit.gpgsign` in a development clone. The step remains in the table because the phase must still confirm that the review clone signs. Check the commit object, not `%G?`: `git cat-file commit HEAD | grep -q '^gpgsig'` after the first mark-adding commit. `%G?` reports `N` for a perfectly good x509 signature in any clone without `gpg.format = x509`, which is how the survey came to believe no mark had ever been signed. `gitsign` authenticates through an interactive Sigstore OIDC browser flow, so run `gitsign-credential-cache &` once in that clone rather than authenticating per commit. If the flow cannot complete, stop -- do not disable signing to get a mark through, because an unsigned mark is indistinguishable later from the 115 already in history. |
+| 4c | medium | sonnet | none | Add the per-session recipe to `docs/development.md`, in the review tracking section that already documents `tools/review-tracking.sh`. It must cover: pull on a clean tree, then `./tools/review-tracking.sh prune`; pick files from the current tranche rather than from `next` (which chooses at random and would scatter the order this plan sets); read and mark in weAudit; then `./tools/review-tracking.sh stamp`, `git add .vscode/*.weaudit* REVIEWS.md`, and a **signed** commit. Give the one-liner that lists a tranche's outstanding files, so a session does not re-derive it: `./tools/review-tracking.sh status \| grep 'never reviewed' \| sed 's/.*: //' \| grep '^kerbside/'` with the prefix swapped per tranche. State that the commit must be signed and how to check it in a way that does not depend on the clone's `gpg.format`. Cross-link the upstream workflow doc rather than restating it -- `docs/code-review-tracking.md` in shakenfist/development is the authority. Keep to the repository's 80-column wrap. |
 
 Each step is its own commit:
 
@@ -315,72 +361,84 @@ a phase that pretends it is three will stall and look stuck.
 
 | Risk | Mitigation |
 |------|------------|
-| Scope is widened to satisfy `review-scope-completeness` and the review-coverage number gets worse, so the next reader thinks phase 4 went backwards. | Stated in decision 1 and carried into the master plan and the index row as part of the planning commit, with both before and after numbers. The Definition of done names 227 in scope and 112 needing review as the *expected* post-4a state, so hitting it reads as success rather than regression. |
-| The grind stalls after two sessions and the phase sits `In progress` for months with no way to tell progress from abandonment. | The tranche table is the progress meter: `status` filtered by tranche prefix says exactly where the phase is, and step 4c writes that one-liner into `docs/development.md` so any session can answer the question in one command. A stalled phase is a legitimate outcome to report; an unmeasurable one is not. |
+| Scope is widened to satisfy `review-scope-completeness` and the review-coverage number gets worse, so the next reader thinks phase 4 went backwards. | Stated in decision 1 and carried into the master plan and the index row as part of the planning commit, with both before and after numbers. The Definition of done names 227 in scope as the *expected* post-4a state, so hitting it reads as success rather than regression. The backlog landed at 104 rather than 112, for the reason given under the tranche table. |
+| The reading stalls after two sessions with no way to tell progress from abandonment. | This is why the reading is tracked by #227 rather than by a plan status (decision 5 of the master plan): the audit recomputes coverage against HEAD daily, so the issue cannot go stale in the way a status column can. The tranche table is the ordering, and step 4c writes into `docs/development.md` the one-liner that says where the reading has got to. |
 | A session marks files reviewed on a tree with uncommitted edits, so the mark attests to content that was never committed. | The upstream workflow's first rule, restated in 4c: mark only on a clean tree. `prune` catches it after the fact -- the blob SHA will not match at HEAD -- but after the fact means the reading has to be redone. |
-| gitsign cannot complete its browser flow in a headless or remote session, and signing gets quietly turned off to unblock a commit. | 4b makes this a stop-and-report condition rather than a judgement call, but only for the commits it applies to. An unsigned mark is worse than a delayed one: it is indistinguishable, later, from the 115 already in history. |
+| gitsign cannot complete its browser flow in a headless or remote session, and signing gets quietly turned off to unblock a commit. | 4b makes this a stop-and-report condition rather than a judgement call, but only for the commits it applies to. An unsigned mark is worse than a delayed one: nothing downstream checks for a signature, so it will pass every audit while attesting to nothing. |
 | Signing configuration is set in a development clone, where `commit.gpgsign true` makes git attempt to sign every ordinary commit and ordinary work blocks on a Sigstore login for no benefit. | Decision 6. The configuration belongs in the review account's clone only. This phase set it here during implementation and reverted it; the four settings are unset in both local and global scope, which is the state a development clone should be in. |
 | An agent is asked to "help with" a review session and ends up producing the reading the mark attests to. | Decision 5, and the step table stops at 4c for exactly this reason. There is no sub-agent step in this phase that reads a file under review. |
 | `review-scope-completeness` files an issue against kerbside between now and 4a landing, and it looks like the phase missed it. | Expected, not a problem. The check fails today and the issue is overdue; when it appears it is the same finding this phase is already fixing, and it closes on the audit run after 4a merges. |
 
 ## Definition of done
 
-- [ ] `./tools/review-tracking.sh scope-orphans` prints *every
+Every item below was verified against `develop` at `b62a27c`
+on 2026-09-02, after the phase merged as `ade2788`.
+
+- [x] `./tools/review-tracking.sh scope-orphans` prints *every
       tracked file is either in scope or explicitly excluded* and
       exits zero.
+- [x] The `review-scope-completeness` audit passes for kerbside:
+      *Every tracked file is either in review scope or explicitly
+      excluded*.
 - [x] `./tools/review-tracking.sh status` reports **227 in-scope
       files** immediately after 4a. The backlog came out at **104**,
       not the predicted 112, because eight of the files entering
       scope already carried stamps from earlier sessions; the
       discrepancy is explained under the tranche table rather than
       tuned away.
-- [ ] Every `exclude` entry added by 4a has a reason in the
+- [x] Every `exclude` entry added by 4a has a reason in the
       comment block that says what the file is, not merely that
-      it is excluded.
-- [ ] `tests/fixtures/README.md` is still in scope after 4a.
-- [ ] The **review account's clone** signs, confirmed against the
-      first mark-adding commit rather than against its config. No
-      signing configuration is set in a development clone; the 4a and
-      4c commits are correctly unsigned, adding no review mark.
-- [ ] `docs/development.md` gives a session recipe that a reader
+      it is excluded. All twelve do.
+- [x] `tests/fixtures/README.md` is still in scope after 4a.
+- [x] No signing configuration is set in a development clone --
+      `gpg.format`, `gpg.x509.program`, `commit.gpgsign` and
+      `tag.gpgsign` are unset in both local and global scope --
+      and the convention is written down in `docs/development.md`.
+      The 4a and 4c commits are correctly unsigned, adding no
+      review mark.
+- [x] `docs/development.md` gives a session recipe that a reader
       can follow without opening the upstream document, and the
       tranche one-liner in it runs and produces file paths.
-- [ ] `pre-commit run --all-files` is clean.
-- [ ] The audit's `review-scope-completeness` check passes for
-      kerbside.
-- [ ] `review-coverage` reports fewer than 5 files needing review
-      and issue #227 closes from a passing audit run.
+- [x] `pre-commit run --all-files` is clean.
 
-The last two are on different clocks. `review-scope-completeness`
-passes as soon as 4a merges. `review-coverage` needs the tranches
-done, so this phase stays `In progress` across many sessions by
-design -- which is what the phase is, not a sign it is stuck.
+Two things this phase deliberately does **not** wait for, both
+of which belong to the reading rather than to the scaffolding
+(decision 5 of the master plan):
+
+- `review-coverage` reporting fewer than 5 files needing review,
+  and #227 closing from a passing audit run. The issue stays
+  open, recomputed daily, and is the sole tracker of the reading.
+- Confirmation that the **review account's clone** still signs,
+  which can only be checked against a real mark-adding commit.
+  The 29 signed marks already in history say it does, so this is
+  a spot check rather than an open question -- but make it
+  against the commit object, not `%G?` (survey finding 4).
 
 ## Back brief
 
 The thing to notice about this phase is that its measured
-numbers get worse first. 4a takes the backlog from 77 to 112 and
-that is the correct outcome; a phase report that leads with "112
+numbers get worse first. 4a takes the backlog from 77 to 104 and
+that is the correct outcome; a phase report that leads with "104
 files need review" without leading with why is going to read as
 a failure.
 
-Two gates:
-
-**Gate 1, before 4a is committed.** The scope config decides what
-is subject to human review for the life of the repository, and
-the argument for including a file type is easier to make now than
-to revisit later. Show the proposed `include` and `exclude` lists
-with the reason for each addition and the resulting numbers, and
-wait. In particular the three that are genuine judgement calls
-rather than bookkeeping: the Jinja templates and SVG icons
+**Gate 1, before 4a is committed** -- passed. The scope config
+decides what is subject to human review for the life of the
+repository, and the argument for including a file type is easier
+to make now than to revisit later. The proposed `include` and
+`exclude` lists were shown with the reason for each addition and
+the resulting numbers, and agreed. The three genuine judgement
+calls rather than bookkeeping: the Jinja templates and SVG icons
 (in, decision 3), the ignore files (`.dockerignore` decides what
 ships in an image, so in), and `AUTHORS`/`LICENSE` (out, not
 authored here).
 
-**Gate 2, after the first review session.** One session against
-tranche 1 is enough to calibrate the 800-1,200 lines per hour
-estimate the tranche table is built on. If the real rate is half
-that, the plan is a twenty-session plan and the tranche
-boundaries should move before another ten sessions are spent
-against the wrong shape. Report the actual rate, not a
-reassurance.
+**Not a gate, but carry it into the first reading session.** One
+session against tranche 1 is enough to calibrate the 800-1,200
+lines per hour estimate the tranche table is built on. If the
+real rate is half that, this is a twenty-session job and the
+tranche boundaries should move before another ten sessions are
+spent against the wrong shape. That recalibration is a change to
+this document, not to any plan's status; the reading is tracked
+by #227 (decision 5 of the master plan) and this phase completed
+when the scaffolding did.
