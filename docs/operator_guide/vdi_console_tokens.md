@@ -61,16 +61,17 @@ adds the proxied path.
     Shaken Fist at it as below.
 
 To enable it, set `KERBSIDE_URL` to your Kerbside deployment's public base
-URL. You can do this at install time by adding it to `extra_config` in your
-`group_vars/all.yml` (see [Installation](installation.md)):
+URL. You can do this at deploy time by setting the collection's
+`kerbside_url` variable in your `group_vars/all.yml` (see
+[Installation](installation.md)), which renders it into every node's
+`/etc/sf/config`:
 
 ```yaml
-extra_config:
-  - name: KERBSIDE_URL
-    value: https://kerbside.example.com
+kerbside_url: https://kerbside.example.com
 ```
 
-or on a running cluster with `sf-ctl`:
+or on a running cluster with `sf-ctl` (a `cluster_config` value overrides
+the rendered file at process start):
 
 ```bash
 sf-ctl set-config KERBSIDE_URL https://kerbside.example.com

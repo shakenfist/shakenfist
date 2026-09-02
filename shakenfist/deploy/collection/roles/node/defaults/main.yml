@@ -57,6 +57,13 @@ loki_base_url: ""
 loki_tenant: ""
 loki_auth_header: ""
 
+# Kerbside VDI console proxy base URL. Empty leaves the proxied-console
+# integration off. The value is also the minted token's audience claim, so it
+# must equal the Kerbside deployment's SF_CONSOLE_TOKEN_AUDIENCE exactly.
+# Deploying Kerbside itself, and provisioning the signing key with
+# sf-ctl ensure-kerbside-signing-key, remain the operator's job.
+kerbside_url: ""
+
 # Extra certificate authorities to trust when fetching a federated identity
 # provider's JWKS. Empty means the system trust store alone. Set this to a
 # path on the nodes when the provider is behind a private CA, which a self
