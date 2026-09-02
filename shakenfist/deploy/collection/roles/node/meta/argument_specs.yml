@@ -192,6 +192,20 @@ argument_specs:
           - Loki auth header (a secret). Rendered into
             SHAKENFIST_LOKI_AUTH_HEADER on every node when set, because every
             daemon ships its own logs.
+      kerbside_url:
+        type: str
+        default: ""
+        description:
+          - >-
+            Base URL of a Kerbside VDI console proxy, for example
+            https://kerbside.example.com. Rendered into
+            SHAKENFIST_KERBSIDE_URL on every node when set; empty, the
+            default, leaves the proxied-console integration off. The value
+            is used verbatim as the console token audience, so it must
+            equal the Kerbside deployment's SF_CONSOLE_TOKEN_AUDIENCE
+            exactly. Deploying Kerbside itself, and provisioning the
+            signing key with sf-ctl ensure-kerbside-signing-key, remain
+            the operator's job.
       federation_jwks_ca_bundle:
         type: str
         default: ""

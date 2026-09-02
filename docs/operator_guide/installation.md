@@ -187,10 +187,11 @@ are:
 | `mariadb_host`, `mariadb_port`, `mariadb_user`, `mariadb_password`, `mariadb_database` | Connection details for your MariaDB server. Only database-tier nodes render these into `/etc/sf/config`. They must match what you provisioned with `tools/bootstrap-mariadb.sql`. |
 | `server_package`, `client_package` | The pip package references to install; default to the released `shakenfist` and `shakenfist-client` on PyPI. |
 | `loki_base_url`, `loki_tenant`, `loki_auth_header` | Optional log shipping to an operator-provided Loki. See [Logging](logging.md). |
+| `kerbside_url` | Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the [VDI console tokens operator guide](vdi_console_tokens.md). |
 | `extra_config` | A JSON list of additional cluster configuration settings, for example `[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]`. Optional. |
 
-To offer users proxied graphical consoles via Kerbside, set `KERBSIDE_URL`
-(and optionally `KERBSIDE_TOKEN_DURATION`) through `extra_config`, then
+To offer users proxied graphical consoles via Kerbside, set `kerbside_url`
+(and optionally `KERBSIDE_TOKEN_DURATION` through `extra_config`), then
 bootstrap and rotate the signing key as described in the
 [VDI console tokens operator guide](vdi_console_tokens.md). This is a manual,
 opt-in integration; it stays disabled while `KERBSIDE_URL` is unset.

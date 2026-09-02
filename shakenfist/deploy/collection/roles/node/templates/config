@@ -77,3 +77,13 @@ SHAKENFIST_LOKI_AUTH_HEADER="{{ loki_auth_header }}"
 {% if federation_jwks_ca_bundle %}
 SHAKENFIST_FEDERATION_JWKS_CA_BUNDLE="{{ federation_jwks_ca_bundle }}"
 {% endif %}
+
+{# Kerbside VDI console proxy base URL. Rendered on every node, because any
+   API node may mint console tokens, and only when configured; unset leaves
+   the proxied-console integration off. The value doubles as the token
+   audience and must equal kerbside's SF_CONSOLE_TOKEN_AUDIENCE exactly, so
+   it is rendered verbatim rather than derived. A KERBSIDE_URL row in
+   cluster_config overrides this at process start. #}
+{% if kerbside_url %}
+SHAKENFIST_KERBSIDE_URL="{{ kerbside_url }}"
+{% endif %}
