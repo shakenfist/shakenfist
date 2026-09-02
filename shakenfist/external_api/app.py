@@ -281,6 +281,31 @@ def log_response_info(response):
 #
 # Tokens are append-only in practice: removing one silently changes
 # behaviour in released clients, which match on substring presence.
+#
+# A token whose endpoint only functions under some cluster configuration
+# must be declared as a ConditionalCapability rather than a plain string,
+# so that it is advertised exactly when the endpoint can honour it.
+class ConditionalCapability:
+    """A capability token advertised only while its predicate holds.
+
+    The root page is a client's only feature-detection channel, so a
+    static token for an endpoint that 404s under the cluster's actual
+    configuration sends every probing client down a path the cluster
+    cannot honour, with no fallback (issue 4003: vdi-console-proxy was
+    advertised on Kerbside-less clusters, so vdiconsole died on the
+    endpoint's own 404 instead of degrading to the direct .vv path).
+    The predicate must read the same config value the endpoint's guard
+    reads, and is evaluated on every render.
+    """
+
+    def __init__(self, token, predicate):
+        self.token = token
+        self.predicate = predicate
+
+    def advertised(self):
+        return bool(self.predicate())
+
+
 API_CAPABILITIES = {
     'admin': ['cluster-cacert', 'cluster-resources', 'vdi-token-pubkey'],
     'agent-operations': [
@@ -319,7 +344,13 @@ API_CAPABILITIES = {
     'events': ['events-by-type'],
     'instances': [
         'pure-affinity', 'spice-vdi-console', 'vdi-console-helper',
-        'vdi-console-proxy', 'instance-put-blob', 'instance-execute',
+        # vdi-console-proxy is gated on the same config value the
+        # /vdiconsoleproxy endpoint's own guard reads: with KERBSIDE_URL
+        # unset the endpoint 404s, and a client that sees the token takes
+        # the proxy path instead of falling back to the direct .vv.
+        ConditionalCapability(
+            'vdi-console-proxy', lambda: config.KERBSIDE_URL),
+        'instance-put-blob', 'instance-execute',
         'instance-get', 'instance-screenshot', 'get-instance-namespace',
         'hot-plug-interface', 'include-queued-agent-operations',
         'instance-clusteroperations',
@@ -340,11 +371,27 @@ API_CAPABILITIES = {
 }
 
 
+def advertised_capabilities():
+    """API_CAPABILITIES resolved to the plain tokens currently advertised.
+
+    Conditional tokens whose predicate does not hold are omitted; the
+    rest are flattened to their token strings.
+    """
+    return {
+        family: [
+            token.token if isinstance(token, ConditionalCapability)
+            else token
+            for token in tokens
+            if not isinstance(token, ConditionalCapability)
+            or token.advertised()]
+        for family, tokens in API_CAPABILITIES.items()}
+
+
 def render_capabilities():
-    """Render API_CAPABILITIES as the list items the root page serves."""
+    """Render the advertised capabilities as the root page's list items."""
     return ''.join(
         '<li>%s: %s</li>' % (family, ', '.join(tokens))
-        for family, tokens in API_CAPABILITIES.items())
+        for family, tokens in advertised_capabilities().items())
 
 
 class Root(api_base.Resource):

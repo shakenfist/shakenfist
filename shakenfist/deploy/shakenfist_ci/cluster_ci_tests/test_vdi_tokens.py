@@ -49,6 +49,38 @@ class TestVDIConsoleTokens(base.BaseNamespacedTestCase):
         self._await_instance_create(inst['uuid'])
         return inst['uuid']
 
+    def test_capability_advertisement_matches_configuration(self):
+        """The root page advertises vdi-console-proxy iff the endpoint works.
+
+        check_capability() is the client's only feature-detection channel,
+        and a client that sees the token takes the proxy path with no 404
+        fallback -- so a cluster that advertises it while /vdiconsoleproxy
+        404s breaks vdiconsole for every client (issue 4003). That is the
+        Kerbside-less combination no other test covers: this test never
+        skips, asserting absence on a feature-off cluster and presence on
+        a Kerbside-enabled one.
+        """
+        advertised = self.test_client.check_capability('vdi-console-proxy')
+
+        instance_uuid = self._create_spice_instance(
+            self.test_client, self.namespace)
+        try:
+            self.test_client._request_url(
+                'GET', '/instances/%s/vdiconsoleproxy' % instance_uuid)
+            feature_on = True
+        except apiclient.ResourceNotFoundException:
+            feature_on = False
+        except apiclient.InternalServerError:
+            # KERBSIDE_URL is set but no signing key is provisioned yet.
+            # The feature is on (if misconfigured), so advertising it is
+            # correct.
+            feature_on = True
+
+        self.assertEqual(
+            feature_on, advertised,
+            'the vdi-console-proxy capability advertisement does not match '
+            'the vdiconsoleproxy endpoint behaviour')
+
     def test_mint_and_verify_console_token(self):
         instance_uuid = self._create_spice_instance(
             self.test_client, self.namespace)
