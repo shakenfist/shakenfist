@@ -39,6 +39,16 @@
       ]
     },
     {
+      "description": "Group oslo updates together. The OpenStack oslo libraries are released in lockstep and share internal interfaces, so they must update together",
+      "groupName": "oslo",
+      "matchPackageNames": [
+        "oslo.concurrency",
+        "oslo.config",
+        "oslo.i18n",
+        "oslo.utils"
+      ]
+    },
+    {
       "description": "Group zope updates together",
       "groupName": "zope",
       "matchPackageNames": [
