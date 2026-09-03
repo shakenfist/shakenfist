@@ -46,15 +46,8 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         # Execute a command
-        start_time = time.time()
         aop = self.test_client.instance_execute(inst['uuid'], 'whoami')
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 30:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(inst['uuid'], aop, 30, 'whoami')
 
         self.assertTrue(
             '0' in aop['results'],
@@ -87,18 +80,12 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         # Execute a command
-        start_time = time.time()
         aop = self.test_client.instance_execute(
             inst['uuid'], 'cat /var/log/syslog')
 
         # Wait for the operation to complete
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 30:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(
+            inst['uuid'], aop, 30, 'cat /var/log/syslog')
 
         self.assertTrue(
             '0' in aop['results'],
@@ -141,17 +128,8 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Request that the agent copy the file to the instance
         op = self.test_client.instance_put_blob(
             inst['uuid'], input_blob, '/tmp/fibonacci.py', 'ugo+rx')
-
-        start_time = time.time()
-        while time.time() - start_time < 120:
-            if op['state'] == 'complete':
-                break
-            time.sleep(5)
-            op = self.test_client.get_agent_operation(op['uuid'])
-
-        if op['state'] != 'complete':
-            self.fail('Agent put operation %s did not complete in 120 seconds (%s)'
-                      % (op['uuid'], op['state']))
+        op = self._await_agentop_complete(
+            inst['uuid'], op, 120, 'put fibonacci.py')
 
         # Request that the agent execute the file
         _, data = self.test_client.await_agent_command(
@@ -198,29 +176,15 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
 
-        start_time = time.time()
         aop = self.test_client.instance_put_blob(
             inst['uuid'], blob_uuid, '/tmp/foo', 'ugo+r')
-
-        # Wait for the operation to complete
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 30:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(inst['uuid'], aop, 30, 'put /tmp/foo')
 
         # Now ensure the data arrived correctly
         aop = self.test_client.instance_execute(
             inst['uuid'], 'sha512sum /tmp/foo')
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 60:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(
+            inst['uuid'], aop, 60, 'sha512sum /tmp/foo')
 
         remote_hash = aop['results']['0']['stdout'].split(' ')[0]
         self.assertEqual(
@@ -228,17 +192,11 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             f'Cluster hash {cluster_hash} does not match remote hash'
             f'{remote_hash}')
 
-        # Now fetch the data back
+        # Now fetch the data back. get-file is the heaviest operation (the
+        # agent reads the file, hashes it and uploads it back as a new blob),
+        # so it gets a more generous independent budget.
         aop = self.test_client.instance_get(inst['uuid'], '/tmp/foo')
-
-        # Wait for the operation to complete
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 60:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(inst['uuid'], aop, 120, 'get /tmp/foo')
 
         self.assertTrue(
             '0' in aop['results'],

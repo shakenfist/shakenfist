@@ -999,6 +999,54 @@ class BaseNamespacedTestCase(BaseTestCase):
 
         self._remove_namespace(self.namespace)
 
+    def _await_agentop_complete(self, instance_uuid, aop, timeout,
+                                description='agent operation'):
+        # Poll a single agent operation to completion with its own independent
+        # timeout window. Previously test_instance_put_and_get_blob shared one
+        # start_time across three sequential operations, so the last and
+        # heaviest of them (get-file, which reads, hashes and uploads a blob
+        # back to the cluster) was left only whatever budget the earlier
+        # operations had not already consumed. Under under-cloud contention
+        # that remainder collapsed and get-file "timed out" while still
+        # legitimately executing -- the intermittent merge-queue flake.
+        #
+        # Hoisted here from guest_ci_tests/test_agentops.py in agent
+        # operation deadlines phase 7: a0cc243ad fixed this bug in that
+        # file's copy of test_instance_put_and_get_blob but never in the
+        # smoke suite's near-identical copy, which runs on every pull
+        # request and kept the flake alive. A shared implementation is what
+        # stops a fix from half-landing again. This is also where the
+        # terminal-state check lives -- an operation which reaches expired
+        # or error now fails immediately instead of burning the rest of its
+        # window and then reporting a bare timeout.
+        #
+        # It sits on BaseNamespacedTestCase rather than beside _await_command
+        # on BaseTestCase because it polls as self.test_client, which only
+        # the namespaced class creates. Polling as the system client instead
+        # would work -- it is admin -- but it would be a different assertion
+        # about what a namespaced caller can see, which is not this step's
+        # to make.
+        start_time = time.time()
+        while aop['state'] != 'complete':
+            if aop['state'] in self.AGENT_OPERATION_FAILED_STATES:
+                self._raise_agent_operation_failure(
+                    instance_uuid, description, aop,
+                    f"agent operation {aop['uuid']} for {description} "
+                    f"finished in state {aop['state']} instead of "
+                    'completing')
+
+            if time.time() - start_time > timeout:
+                self._raise_agent_operation_failure(
+                    instance_uuid, description, aop,
+                    f"agent operation {aop['uuid']} for {description} was "
+                    f"still in state {aop['state']} after {timeout} "
+                    'seconds')
+
+            time.sleep(5)
+            aop = self.test_client.get_agent_operation(aop['uuid'])
+
+        return aop
+
 
 class TestDistroBoots(BaseNamespacedTestCase):
     def setUp(self):
