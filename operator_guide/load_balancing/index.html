@@ -13299,6 +13299,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#example-apache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Apache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#example-haproxy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13781,6 +13792,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#example-apache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Apache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#example-haproxy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13934,8 +13956,9 @@ wins:</p>
 <a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="nb">ProxyPassReverse</span><span class="w"> </span><span class="s2">"/api"</span><span class="w"> </span><span class="s2">"balancer://sfapi"</span>
 </code></pre></div>
 <p>The full file (including the matching <code>ProxyPassReverse</code> rules, the HTTP-to-
-HTTPS redirect, TLS configuration, and the blob-transfer directives) is in
-<code>examples/apache-loadbalancer.conf</code>.</p>
+HTTPS redirect, TLS configuration, <code>/readyz</code> health checking as described
+under <a href="#health-checks">Health checks</a>, and the blob-transfer directives) is
+in <code>examples/apache-loadbalancer.conf</code>.</p>
 <h3 id="nginx">nginx<a class="headerlink" href="#nginx" title="Permanent link">&para;</a></h3>
 <p>Copy <code>examples/nginx-loadbalancer.conf</code>, edit it for your environment, and
 enable it:</p>
@@ -13975,10 +13998,11 @@ so the request path is preserved unchanged:</p>
 </code></pre></div>
 <p>The full file in <code>examples/nginx-loadbalancer.conf</code> adds the rest of a
 production-ready configuration: the <code>Host</code>, <code>X-Real-IP</code> and <code>X-Forwarded-*</code>
-headers, upstream keepalive, a block that drops PHP vulnerability scanners, a
-root catch-all so clients that omit the <code>/api</code> prefix still work, the bare
-<code>/api</code> redirect, the HTTP-to-HTTPS redirect, TLS termination, and the
-blob-transfer directives described below.</p>
+headers, upstream keepalive, passive health checking as described under
+<a href="#health-checks">Health checks</a>, a block that drops PHP vulnerability
+scanners, a root catch-all so clients that omit the <code>/api</code> prefix still work,
+the bare <code>/api</code> redirect, the HTTP-to-HTTPS redirect, TLS termination, and
+the blob-transfer directives described below.</p>
 <h2 id="blob-transfers">Blob transfers<a class="headerlink" href="#blob-transfers" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist streams large disk images and blobs -- often many gigabytes --
 through the API. Configure your proxy to allow large, unbuffered request
@@ -14064,18 +14088,36 @@ backend CA -- that is your choice (see the proxy-to-backend note under
 <a href="#example-configurations">Example configurations</a>). The health probe rides
 that same backend leg, so configure the probe with whichever scheme (HTTP or
 HTTPS) you use for the backend traffic itself.</p>
+<h3 id="example-apache">Example: Apache<a class="headerlink" href="#example-apache" title="Permanent link">&para;</a></h3>
+<p>Apache health-checks balancer members with <code>mod_proxy_hcheck</code> (which needs
+<code>mod_watchdog</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>a2enmod<span class="w"> </span>proxy_hcheck<span class="w"> </span>watchdog
+</code></pre></div>
+<p>Then add the health-check parameters to each <code>BalancerMember</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">&lt;Proxy</span><span class="w"> </span><span class="s">"balancer://sfapi"</span><span class="nt">&gt;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="c"># hcmethod=GET hcuri=/readyz: probe /readyz. hcinterval=5 hcfails=2:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="c"># mark the worker down after 2 failed probes (~10s, well inside the</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="c"># 25s drain grace). hcpasses=2: restore after 2 successes.</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nb">BalancerMember</span><span class="w"> </span><span class="s2">"http://10.0.0.1:13000"</span><span class="w"> </span>hcmethod=GET<span class="w"> </span>hcuri=/readyz<span class="w"> </span>hcinterval=5<span class="w"> </span>hcpasses=2<span class="w"> </span>hcfails=2
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="nb">BalancerMember</span><span class="w"> </span><span class="s2">"http://10.0.0.2:13000"</span><span class="w"> </span>hcmethod=GET<span class="w"> </span>hcuri=/readyz<span class="w"> </span>hcinterval=5<span class="w"> </span>hcpasses=2<span class="w"> </span>hcfails=2
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nt">&lt;/Proxy&gt;</span>
+</code></pre></div>
+<p><code>mod_proxy_hcheck</code> treats any status of <code>400</code> or higher as a failed probe,
+so a <code>503 not ready</code> from a draining or database-isolated worker takes the
+member out of rotation after two probes. This is what
+<code>examples/apache-loadbalancer.conf</code> ships.</p>
 <h3 id="example-haproxy">Example: HAProxy<a class="headerlink" href="#example-haproxy" title="Permanent link">&para;</a></h3>
 <p>HAProxy has first-class active HTTP health checks. Use <code>option httpchk</code> to
 define the probe and <code>http-check expect status 200</code> to require a <code>200</code>, then
 enable per-server checking with <code>check inter 5s fall 2 rise 2</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>backend sfapi
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    option httpchk GET /readyz
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    http-check expect status 200
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    # check inter 5s fall 2 rise 2: probe every 5s, mark down after 2
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    # consecutive failures (~10s, well inside the 25s drain grace),
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    # restore after 2 successes.
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    server sfapi1 10.0.0.1:13000 check inter 5s fall 2 rise 2
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    server sfapi2 10.0.0.2:13000 check inter 5s fall 2 rise 2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>backend sfapi
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    option httpchk GET /readyz
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    http-check expect status 200
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    # check inter 5s fall 2 rise 2: probe every 5s, mark down after 2
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    # consecutive failures (~10s, well inside the 25s drain grace),
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    # restore after 2 successes.
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    server sfapi1 10.0.0.1:13000 check inter 5s fall 2 rise 2
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    server sfapi2 10.0.0.2:13000 check inter 5s fall 2 rise 2
 </code></pre></div>
 <p>A <code>503 not ready</code> from a draining or database-isolated worker fails the
 <code>expect status 200</code> check, and HAProxy drains it after two probes.</p>
@@ -14088,23 +14130,29 @@ on its own.</p>
 <p>The passive approach uses <code>max_fails</code> and <code>fail_timeout</code> on the <code>upstream</code>
 servers, plus <code>proxy_next_upstream</code> so a <code>503</code> is retried against another
 backend rather than returned to the client:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">upstream</span><span class="w"> </span><span class="s">sfapi</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="c1"># Passive health checking: after 2 failed requests, take the backend</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="c1"># out of rotation for 10s, then probe it again with live traffic.</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="kn">server</span><span class="w"> </span><span class="n">10.0.0.1</span><span class="p">:</span><span class="mi">13000</span><span class="w"> </span><span class="s">max_fails=2</span><span class="w"> </span><span class="s">fail_timeout=10s</span><span class="p">;</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="kn">server</span><span class="w"> </span><span class="n">10.0.0.2</span><span class="p">:</span><span class="mi">13000</span><span class="w"> </span><span class="s">max_fails=2</span><span class="w"> </span><span class="s">fail_timeout=10s</span><span class="p">;</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">}</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="k">location</span><span class="w"> </span><span class="s">/api/</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://sfapi/</span><span class="p">;</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="c1"># Treat a 503 (and connection errors/timeouts) as "try the next</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="c1"># backend" instead of returning it to the client.</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="kn">proxy_next_upstream</span><span class="w"> </span><span class="s">error</span><span class="w"> </span><span class="s">timeout</span><span class="w"> </span><span class="s">http_503</span><span class="p">;</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">upstream</span><span class="w"> </span><span class="s">sfapi</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="c1"># Passive health checking: after 2 failed requests, take the backend</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="c1"># out of rotation for 10s, then probe it again with live traffic.</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="kn">server</span><span class="w"> </span><span class="n">10.0.0.1</span><span class="p">:</span><span class="mi">13000</span><span class="w"> </span><span class="s">max_fails=2</span><span class="w"> </span><span class="s">fail_timeout=10s</span><span class="p">;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="kn">server</span><span class="w"> </span><span class="n">10.0.0.2</span><span class="p">:</span><span class="mi">13000</span><span class="w"> </span><span class="s">max_fails=2</span><span class="w"> </span><span class="s">fail_timeout=10s</span><span class="p">;</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">}</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="k">location</span><span class="w"> </span><span class="s">/api/</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://sfapi/</span><span class="p">;</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="c1"># Treat a 503 (and connection errors/timeouts) as "try the next</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="c1"># backend" instead of returning it to the client.</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="kn">proxy_next_upstream</span><span class="w"> </span><span class="s">error</span><span class="w"> </span><span class="s">timeout</span><span class="w"> </span><span class="s">http_503</span><span class="p">;</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="p">}</span>
 </code></pre></div>
+<p>This is what <code>examples/nginx-loadbalancer.conf</code> ships (with
+<code>proxy_next_upstream</code> at the <code>server</code> level so it covers every location).</p>
 <p>Be aware of the limitation: because this is passive, FOSS nginx only learns a
 worker is draining when a real request happens to hit it and fail. It will not
-pull a node out of rotation purely because <code>/readyz</code> returns <code>503</code>.</p>
+pull a node out of rotation purely because <code>/readyz</code> returns <code>503</code>. And the
+passive approach has a floor: <code>proxy_next_upstream</code> can only re-route a failed
+request while some <em>other</em> backend in the pool is healthy. A deploy that
+restarts every worker at once leaves nothing to fail over to, and in that case
+a client-side retry is the only remaining defence.</p>
 <p>If you need true active <code>/readyz</code> polling with nginx, you must either run
 <strong>NGINX Plus</strong> (which has the <code>health_check</code> directive), or run an <strong>external
 prober</strong> -- a small sidecar that polls each worker's <code>/readyz</code> and pulls a node
@@ -14157,22 +14205,22 @@ targets on port <code>13000</code>. The unhealthy threshold of <code>2</code> at
 interval means the ALB drains a worker ~10 s after it starts returning <code>503</code>,
 well inside the 25 s drain grace.</p>
 <p>In Terraform:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lb_target_group"</span><span class="w"> </span><span class="nv">"sfapi"</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"sfapi"</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="na">port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">13000</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="na">vpc_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nb">health_check</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="na">protocol</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="na">path</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"/readyz"</span>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="na">matcher</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"200"</span>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">    </span><span class="na">interval</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="m">5</span>
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">    </span><span class="na">timeout</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">    </span><span class="na">healthy_threshold</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">    </span><span class="na">unhealthy_threshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
-<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lb_target_group"</span><span class="w"> </span><span class="nv">"sfapi"</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"sfapi"</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="na">port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">13000</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="na">vpc_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nb">health_check</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="na">protocol</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="na">path</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"/readyz"</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="na">matcher</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"200"</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="na">interval</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="m">5</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="na">timeout</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="na">healthy_threshold</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">    </span><span class="na">unhealthy_threshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="p">}</span>
 </code></pre></div>
 
 
