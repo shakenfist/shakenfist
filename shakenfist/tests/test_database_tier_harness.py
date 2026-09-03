@@ -43,7 +43,7 @@ harness = _load_harness()
 # node per sample, which have no api entry in the budget. Bound once
 # because both halves of test_the_headroom_probe_pairs_are_exempt read it
 # and a drift between them would quietly stop testing the caller scoping.
-PROBE_OPERATIONS = ('GetAllNodeDaemonStates', 'GetNodeAttributes',
+PROBE_OPERATIONS = ('GetAllNodeDaemonStates', 'GetNode', 'GetNodeAttributes',
                     'GetNodeMetrics')
 
 
@@ -343,8 +343,12 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # test_the_suite_still_probes_cluster_headroom holds up. That one
         # fails if the probe goes while these stay; this one fails if these
         # go while the probe stays, which is how issue 3975 read in merge CI
-        # -- all three at N/15 per second, over the unbudgeted ceiling, on
-        # every cluster job big enough to reach it.
+        # -- the probe's pairs at N/15 per second, over the unbudgeted
+        # ceiling, on every cluster job big enough to reach it. GetNode is
+        # in the list because leaving it out is exactly the mistake the
+        # #3975 fix made: the exemption was written from the three RPCs
+        # named in that issue's body, and the GetNode the roster iterator's
+        # hydration issues came back as issue 4028.
         for operation in PROBE_OPERATIONS:
             self.assertTrue(
                 harness.harness_driven((operation, 'api')),
@@ -354,19 +358,21 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
                 'cluster of four nodes or more at the probe\'s default 15s '
                 'interval, where N/15 clears the max(0.25, 0.05N) unbudgeted '
                 'ceiling (observed on the six node merge queue cluster, '
-                'issue 3975).' % operation)
+                'issues 3975 and 4028).' % operation)
 
             # Scoped to the caller which actually makes them. The same
             # operations from a daemon are ordinary server side traffic and
-            # stay budgeted.
+            # stay budgeted: sf-queues carries budget entries for three of
+            # them, and GetNode is budgeted for sf-net.
+            caller = 'net' if operation == 'GetNode' else 'queues'
             self.assertFalse(
-                harness.harness_driven((operation, 'queues')),
-                '%s/queues is exempt, but no part of the CI harness makes '
-                'that call -- sf-queues does, and the budget is its home.'
-                % operation)
+                harness.harness_driven((operation, caller)),
+                '%s/%s is exempt, but no part of the CI harness makes '
+                'that call -- sf-%s does, and the budget is its home.'
+                % (operation, caller, caller))
 
     def test_the_suite_still_probes_cluster_headroom(self):
-        # The argument for exempting the three node-state pairs is that
+        # The argument for exempting the four node-state pairs is that
         # tools/ci_headroom_probe.py reads the node roster and the cluster
         # resources on a timer for the whole functional test step. That probe
         # is phase 1 instrumentation and is meant to come out once the sizing
@@ -381,9 +387,9 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             os.path.exists(path),
             'tools/ci_headroom_probe.py is gone, so nothing polls the node '
             'roster on a timer during a CI run any more. That is the entire '
-            'justification for exempting GetNodeAttributes/api, '
+            'justification for exempting GetNode/api, GetNodeAttributes/api, '
             'GetAllNodeDaemonStates/api and GetNodeMetrics/api in '
-            'HARNESS_DRIVEN_PAIRS -- drop those three and let the idle load '
+            'HARNESS_DRIVEN_PAIRS -- drop those four and let the idle load '
             'check see the pairs again.')
 
         tree = _parse('tools', 'ci_headroom_probe.py')
@@ -424,7 +430,7 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             'HARNESS_DRIVEN_PAIRS', ast.get_docstring(tree) or '',
             'tools/ci_headroom_probe.py\'s docstring no longer names '
             'HARNESS_DRIVEN_PAIRS, so nothing in the file a decommission '
-            'starts from says that retiring the probe means trimming three '
+            'starts from says that retiring the probe means trimming four '
             'pairs from shakenfist/deploy/shakenfist_ci/load_budget.py. Put '
             'the note back, or drop the exemption with the probe.')
 

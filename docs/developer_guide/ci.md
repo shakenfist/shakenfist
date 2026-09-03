@@ -195,19 +195,24 @@ issue 3975 disproved -- see below.
 
 The probe polls, and `test_no_unbudgeted_fixed_rate_database_polling`
 in the functional suite exists to notice polling. Each sample's `GET
-/nodes` runs `Node.external_view()` per node, which is one
+/nodes` hydrates each node from the iterator, which is one `GetNode`
+each, then runs `Node.external_view()` per node, which is one
 `GetNodeAttributes` and one `GetAllNodeDaemonStates` each, and its
 `GET /admin/resources` reads node metrics per node, which is one
 `GetNodeMetrics` each. On an N node cluster at the default 15 second
-interval that is N/15 per second for all three, from the `api` caller,
+interval that is N/15 per second for all four, from the `api` caller,
 flat across windows and indifferent to what the suite is doing --
 which is exactly the signature of the server-side polling loop the
 check is built to catch. It clears the unbudgeted ceiling, `max(0.25,
 0.05N)` per second, from four nodes upwards; it was found on the six
-node merge queue cluster, where all three read 0.3997/s against
-0.30/s and failed the build (issue 3975).
+node merge queue cluster, where three of the pairs read 0.3997/s
+against 0.30/s and failed the build (issue 3975). The fix written for
+that issue exempted only the three RPCs its body named, so the
+`GetNode` the iterator issues came back as issue 4028 -- which of the
+probe's pairs clears the check's activity-spread bar varies run to
+run, and on those runs `GetNode` cleared it alone.
 
-Those three `(operation, caller)` pairs are therefore listed in
+Those four `(operation, caller)` pairs are therefore listed in
 `HARNESS_DRIVEN_PAIRS` in
 `shakenfist/deploy/shakenfist_ci/load_budget.py`, alongside the events
 reads the suite's own await helpers make. The budget file is
@@ -220,11 +225,11 @@ Two consequences worth knowing:
 
 * **The exemption costs coverage.** CI can no longer see a *new*
   fixed-rate poll of node state made through sf-api, whatever its
-  rate. The blind spot is CI's alone -- none of the three pairs is
+  rate. The blind spot is CI's alone -- none of the four pairs is
   budgeted for the `api` caller, so the
   `ShakenFistUnbudgetedDatabasePolling` alert, which reads its
   exclusions from the budget file rather than from that set, still
-  watches all three at the unbudgeted ceiling on every real cluster.
+  watches all four at the unbudgeted ceiling on every real cluster.
   The pairs also stay visible in a run's `harness_driven` list rather
   than being dropped from the report.
 * **Retiring the probe means trimming the exemption.** It outlives
