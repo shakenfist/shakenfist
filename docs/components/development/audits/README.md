@@ -144,8 +144,11 @@ attached rather than quietly disappearing from the table.
 | [release-process.md](/components/development/audits/release-process/) | pyproject.toml, release.yml, RELEASE-SETUP.md |
 | [ci-review-automation.md](/components/development/audits/ci-review-automation/) | Automated review, developer automation workflows |
 | [renovate.md](/components/development/audits/renovate/) | Renovate for dependency bumps |
+| [renovate-lockstep-groups.md](/components/development/audits/renovate-lockstep-groups/) | Dependency families released in lockstep bump as one pull request |
 | [pin-indirect-dependencies.md](/components/development/audits/pin-indirect-dependencies/) | Pinning transitive dependencies |
 | [dependency-name-normalization.md](/components/development/audits/dependency-name-normalization/) | One spelling per pinned distribution |
+| [unused-declared-dependency.md](/components/development/audits/unused-declared-dependency/) | Declared dependencies are imported, or carry a recorded reason they are not |
+| [undeclared-direct-dependency.md](/components/development/audits/undeclared-direct-dependency/) | Nothing imported is left resting on a generated transitive pin |
 | [export-repo-config.md](/components/development/audits/export-repo-config/) | Repo configuration export |
 | [default-branch-naming.md](/components/development/audits/default-branch-naming/) | Default branch conventions |
 | [github-security.md](/components/development/audits/github-security/) | Dependabot, secret scanning, CodeQL |

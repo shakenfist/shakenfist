@@ -109,6 +109,7 @@ nav:
                 - "Audit: Credential handling and leak detection": components/development/audits/secret-handling.md
                 - "Audit: Default branch naming": components/development/audits/default-branch-naming.md
                 - "Audit: Delete branch on merge": components/development/audits/delete-branch-on-merge.md
+                - "Audit: Dependencies declared but never imported": components/development/audits/unused-declared-dependency.md
                 - "Audit: Dependency name normalization": components/development/audits/dependency-name-normalization.md
                 - "Audit: diagram format": components/development/audits/diagram-format.md
                 - "Audit: Expensive lane path filtering": components/development/audits/expensive-lane-path-filter.md
@@ -118,6 +119,7 @@ nav:
                 - "Audit: HTTP header and file path sanitization": components/development/audits/security-sanitization.md
                 - "Audit: Human review coverage": components/development/audits/review-coverage.md
                 - "Audit: Human review scope completeness": components/development/audits/review-scope-completeness.md
+                - "Audit: Imports satisfied only by a transitive pin": components/development/audits/undeclared-direct-dependency.md
                 - "Audit: Links out of docs/ are absolute": components/development/audits/docs-external-links.md
                 - "Audit: LLM context linting": components/development/audits/llm-context-lint.md
                 - "Audit: LLM context linting in pre-commit and CI": components/development/audits/llm-context-lint-ci.md
@@ -137,6 +139,7 @@ nav:
                 - "Audit: README structure": components/development/audits/readme-structure.md
                 - "Audit: Release process": components/development/audits/release-process.md
                 - "Audit: Renovate for dependency bumps": components/development/audits/renovate.md
+                - "Audit: Renovate groups for lockstep dependency families": components/development/audits/renovate-lockstep-groups.md
                 - "Audit: Rust unwrap lint": components/development/audits/rust-unwrap-lint.md
                 - "Audit: sfui vendored copy": components/development/audits/sfui-vendor.md
                 - "Audit: Test coverage": components/development/audits/test-coverage.md
