@@ -14015,7 +14015,7 @@ table entirely (decision D8).</p>
 <tr>
 <td>4c. Conductor claim integration</td>
 <td><a href="../PLAN-scheduler-reservations-phase-04c-conductor-claims/">PLAN-scheduler-reservations-phase-04c-conductor-claims.md</a></td>
-<td>Not started</td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>5. Caller migration and hard ceiling</td>
@@ -14105,6 +14105,20 @@ is here.</p>
   of its own measurements, which reclassifies the fix from a deferred
   tuning question to a correction; see the phase plan's <em>What the
   survey found</em>.</p>
+</li>
+<li>
+<p><strong>Phase 4c</strong>'s steps 1 to 4 are implemented on the private-ci branch
+  <code>scheduler-reservations-phase-04c-conductor-claims</code> as of 2026-09-01:
+  the sizing accessor, claim creation with E6's three refusal branches,
+  release at teardown, and the dashboard surface. What remains is step
+  5, a minimum of seven days of normal CI load after a deploy, and step
+  6's write-up. The phase plan carries the back brief answers and the
+  four implementation decisions the plan itself did not settle. One
+  back brief item is outstanding and should be discharged before the
+  deploy: the sizing formula has not been evaluated against real cost
+  data, because that needs the conductor's database on <code>maui</code> and <code>ssh</code>
+  there is refused from the development host. The plan carries the
+  command to run.</p>
 </li>
 <li>
 <p><strong>Phase 6</strong> was executed out of order, ahead of phases 4c and 5,

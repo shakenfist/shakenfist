@@ -13531,6 +13531,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-notes-2026-09-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation notes (2026-09-01)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief answers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -14060,7 +14088,7 @@ conductor.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>(private-ci) Sizing accessor. Add <code>get_claim_sizes()</code> to <code>conductor/db.py</code> beside <code>get_cost_observations()</code> (<code>:1419</code>), returning the worst observed <code>peak_allocated_cpus</code>, <code>peak_allocated_ram_mb</code> and <code>peak_allocated_disk_gb</code> grouped by <code>(repo, job_name)</code> with no minimum run count, from the same summary table that function reads. Read that function first: the peaks it exposes are already a MAX over summary rows, so this is a re-grouping of the same data, not a new measurement. Write the docstring to say why the key and threshold differ from its sibling -- claims cover the whole namespace and peaks are topology-deterministic, so one observation seeds a claim, whereas a runner-size recommendation needs three runs before it changes anything. Unit tests beside <code>conductor/tests/test_provisioner_costs.py</code>'s existing coverage. Commit subject: <code>conductor: size claims from observed peaks.</code></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2</td>
@@ -14068,7 +14096,7 @@ conductor.</p>
 <td>opus</td>
 <td>worktree</td>
 <td>(private-ci) Claim creation and refusal handling in <code>conductor/provisioner.py</code>, per Design and E3/E4/E6. Add the sizing helper (max of <code>CI_SIZES[ci_size]</code> and 1.2x the step 1 peaks, ceiling per dimension), the claim request in <code>create_workers()</code> between <code>add_namespace_trust()</code> and <code>allocate_network()</code>, and the three-branch refusal handling. This was checked against sfcbr on 2026-08-27 during phase 4b and needs no re-checking: an over-large claim on a claim-free namespace answers <strong>507</strong>, raised as <code>InsufficientResourcesException</code>, with a per-dimension body naming the limit, the current usage and the request. The same request against a namespace which already holds a claim answers 409, because <code>exists</code> is evaluated first -- which is what the phase 4a soak recorded and why its "impossible claim" line said 409. The conductor claims on a namespace it has just created, so 507 is the case E6's first branch must catch. Add the metrics from Design. The namespace teardown on refusal must not be able to raise past the loop. Tests: the refusal branches, the sizing floor when no observation exists, and that a refused combination leaves <code>requested</code> unchanged. Commit subject: <code>conductor: claim capacity before starting a runner.</code></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3</td>
@@ -14076,7 +14104,7 @@ conductor.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>(private-ci) Claim deletion in <code>remove_namespace()</code> (<code>provisioner.py:606</code>), per Design: list the namespace's claims through the client, delete each, count them, catch as broadly as the neighbouring steps and never raise. Place it after <code>collect_namespace_costs()</code> and before <code>delete_all_instances()</code>, and comment why that position rather than after the instances are gone. Note that <code>delete_namespace</code> later in the same function is routinely deferred while network deletes settle (<code>:705-719</code>), which is why this cannot be left to the namespace's own <code>hard_delete()</code>. Commit subject: <code>conductor: release capacity claims at teardown.</code></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4</td>
@@ -14084,7 +14112,7 @@ conductor.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>(private-ci) Dashboard surface. Add claim outcomes and claim-size-versus-measured-peak to the conductor dashboard, following the patterns in <code>conductor/dashboard.py</code>, <code>conductor/web.py</code> and the existing templates. Queue-wait age is already present (<code>metrics.py:59</code>) and must not be duplicated. Keep it to what an operator would act on: how many claims were refused for capacity in the last day, and which jobs are claiming furthest from what they measured. Commit subject: <code>conductor: show what claims are doing.</code></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>5</td>
@@ -14104,6 +14132,105 @@ conductor.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="implementation-notes-2026-09-01">Implementation notes (2026-09-01)<a class="headerlink" href="#implementation-notes-2026-09-01" title="Permanent link">&para;</a></h3>
+<p>Steps 1 to 4 are written and land in private-ci on the branch
+<code>scheduler-reservations-phase-04c-conductor-claims</code>, as four commits
+carrying the subjects above. Complete here means the code exists and
+its tests pass; it does not mean deployed, and step 5's window has not
+opened. The private-ci tree had moved since the survey, so one
+reference in the step 1 brief is stale and is corrected here rather
+than in the brief: <code>get_cost_observations()</code> is at <code>db.py:1655</code>, not
+<code>:1419</code>.</p>
+<p>Four things were decided during implementation that the plan did not
+settle. Each is recorded because a reviewer would otherwise have to
+infer it from the diff.</p>
+<p><strong>A capacity refusal breaks out of the (label, size) combination
+rather than continuing within it.</strong> E6 says "<code>continue</code> to the next
+(label, size) combination", which in the loop as written are two
+different statements: <code>continue</code> advances to the next runner of the
+<em>same</em> combination. Break is the reading that matches the sentence and
+the intent -- a 507 is a property of the cluster and this
+combination's footprint, so the next runner of the same shape would be
+refused identically, while a different shape may still fit, which is
+why the outer loop carries on.</p>
+<p><strong>An empty exception tuple is warned about at import.</strong> The refusal
+classes are looked up defensively, as <code>CLEANUP_EXCEPTIONS</code> already is,
+because the 503 mapping only arrived in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/375" title="GitHub Issue: shakenfist/client-python #375">client-python#375</a>. An empty
+tuple is a valid <code>except</code> clause that never matches, so an older
+client silently reclassifies that refusal into E6's third branch. For
+a 503 that is a miscounted metric; for a 507 it is the loss of
+back-pressure itself, with every refusal counted as a bug in the
+conductor and the runner started anyway. That is too quiet to leave to
+a counter, so it is said in the startup log.</p>
+<p><strong>Claim outcomes are recorded in a new <code>claim_events</code> table.</strong> The
+dashboard item the step 4 brief asks for -- "how many claims were
+refused for capacity in the last day" -- cannot be answered from a
+Prometheus counter, which is cumulative and resets on each of the
+several redeploys a day this conductor gets. This is an append-only
+audit log and is not the local bookkeeping E7 rules out: it records
+what happened to a request, never which claims exist, and nothing
+reads it back to decide whether a claim needs deleting. Step 5's
+observation record reads the same history.</p>
+<p><strong>The dashboard shape was not agreed first.</strong> The back brief calls
+that out as cheap to propose and tedious to redo. It was built to the
+step 4 brief's own words -- refusals in the last day, and the jobs
+claiming furthest from what they measured -- following the existing
+<code>sizing-section</code> panel, so it should be cheap to redo if the shape is
+wrong.</p>
+<h3 id="back-brief-answers">Back brief answers<a class="headerlink" href="#back-brief-answers" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>An over-large claim on a claim-free namespace answers 507</strong>,
+   raised as <code>InsufficientResourcesException</code>, per the 2026-08-27
+   check the plan already records. That is what E6's first branch
+   catches. The same request against a namespace which already holds
+   a claim answers 409, because <code>exists</code> is evaluated first; the
+   conductor claims on a namespace it has just created, so it never
+   meets that path.</p>
+</li>
+<li>
+<p><strong>The sizing formula could not be evaluated against real cost
+   data.</strong> It is written as
+   <code>max(CI_SIZES[ci_size], ceil(1.2 x peak))</code> per dimension, and its
+   arithmetic is covered by unit tests, but checking it against three
+   real <code>(repo, job_name)</code> pairs needs the conductor's database, which
+   lives on <code>maui</code>. <code>ssh</code> there is refused from the development host
+   for both <code>ansible@</code> and the default user, exactly as step 0 found.
+   <strong>This item is outstanding and is the one thing that should happen
+   before the deploy</strong>, since a formula that produces absurd claims
+   would be discovered as a CI outage rather than as a number. Run on
+   <code>maui</code>:</p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/srv/shakenfist/private-ci/venv/bin/python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="s2">from conductor import db, provisioner</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="s2">sizes = db.get_claim_sizes()</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="s2">for key in sorted(sizes)[:3]:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="s2">    repo, job = key</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="s2">    job_desc = {'repo': repo, 'job_name': job}</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="s2">    print(key, sizes[key])</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="s2">    for size in ('s', 'm', 'xl'):</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="s2">        print('   ', size,</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="s2">              provisioner.claim_size_for(size, job_desc, sizes)[0])</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="s2">"</span>
+</code></pre></div>
+<ol>
+<li><strong>A claim request that outlasts <code>SF_CALL_TIMEOUT</code> is E6's third
+   branch</strong>, and the namespace is <strong>not</strong> cleaned up. The conductor's
+   client wrapper raises <code>sfclient.SFTimeout</code> (not the client's own
+   <code>TimeoutException</code>), which is neither refusal class, so it is
+   counted in <code>conductor_claims_failed_total</code> and the runner is
+   provisioned with no claim -- the deliberate degradation.</li>
+</ol>
+<p>There is a consequence worth stating, because it is an argument for
+   E7 that E7 does not make. The server may have created the claim
+   before the client gave up, in which case a claim exists that the
+   conductor believes failed. Because teardown lists the namespace's
+   claims and deletes what it finds rather than deleting UUIDs it
+   remembers, that orphan is still released at teardown. Nothing extra
+   is needed, and the observable signature is
+   <code>conductor_claims_failed_total</code> rising while claims appear on the
+   cluster -- worth checking for during step 5's window.</p>
 <h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <p><strong>Claim creation refusals stop CI.</strong> The realistic failure of
 this phase. Claim creation is a hard admission even in the
