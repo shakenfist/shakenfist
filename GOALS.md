@@ -35,7 +35,7 @@
 * Drop generic methods on the database service which mimic etcd calls -- `get`, `put`, etc. Instead the database service should own all of the business logic around accessing the database tier, and calls to the database service should in the form of coherent requests -- list all uploads on this node for example.
 * Stop converting UUIDs to strings all the time.
 * mTLS for inter-cluster traffic.
-* I am not confident that the affinity rules for instances work as expected.
+* Remove the deprecated weighted affinity form. The affinity rules themselves are no longer in doubt: the soft form *ranks* the hypervisors which survived admission and does not admit anything itself, so a placement with a single candidate neither honours nor violates a preference, and `require_with_tag` / `require_without_tag` are how you ask for admission rather than for a ranking. That is documented in `docs/user_guide/affinity.md` and was settled by phase 6 of `docs/plans/PLAN-scheduler-reservations.md`, which also closed issue 3565. What is left is retiring the numeric weights, which needs its own release and deprecation window; `docs/operator_guide/scheduler.md` has the recipe for finding instances still carrying one.
 * systemd restarts often timeout / fail.
 * I am no longer sure that many binaries / systemd services is a good idea. Perhaps one big binary would be better?
 
