@@ -359,7 +359,7 @@ table entirely (decision D8).
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | In progress |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete |
-| 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | In progress |
+| 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
 

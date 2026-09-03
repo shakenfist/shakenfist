@@ -291,29 +291,37 @@ precisely the #3772 shape. It gains a guard-refusal census beside
 its stage census. The done-criterion is that it is run against a
 real captured series, not that the code was written.
 
-**G7: no schema migration; two proto changes, both
+**G7: no schema migration; three proto changes, all
 additive reply fields.** Nothing here adds a table, an index or a
 migration -- stated because every other phase in this plan did
 add schema, and a reviewer should be able to confirm the absence
 quickly rather than search for it.
 
-There are two proto changes, not one. `shortfall` joins
-`CapacityDimensionDetail` (step 1), and the
+**Corrected in the close-out (2026-09-03): three proto changes,
+not the two this decision first counted.** `shortfall` joins
+`CapacityDimensionDetail` (step 1), the
 `ReleaseInstancePlacement` reply gains the post-release counters
-(step 2). The second was found late, while checking this plan's
-own step 2 brief against the tree: that brief originally said to
-take the counters "from the reply already bound as `result`", and
-`ReleasePlacementResult` (`mariadb.py:25416-25422`) carries
-`success`, `error`, `released` and `clamped` and no numbers at
-all. G4's symmetry cannot be had caller-side -- the released
-*amounts* can (`instance.py:1500` holds them), the resulting
-*counters* cannot.
+(step 2), and `AdmitInstancePlacementReply` gains `claim_uuid`
+(field 14). The second was found late, while checking this
+plan's own step 2 brief against the tree: that brief originally
+said to take the counters "from the reply already bound as
+`result`", and `ReleasePlacementResult`
+(`mariadb.py:25416-25422`) carries `success`, `error`, `released`
+and `clamped` and no numbers at all. G4's symmetry cannot be had
+caller-side -- the released *amounts* can (`instance.py:1500`
+holds them), the resulting *counters* cannot. The third was found
+later still, by the follow-up pass that closed a gap step 4 left
+open: recording the claim exceedance against the namespace (G2)
+needs a way to say *which* claim, and nothing on the wire carried
+the claim's own uuid back to the caller, so the follow-up widened
+the admission reply to add it. Recorded here so a reader does not
+find `claim_uuid` in the diff and wonder where it came from.
 
-Both are additive fields on reply messages, so an older client
-reading a newer server sees proto3 defaults rather than an error,
-and neither needs `tox -e genprotos` output hand-edited. Widening
-a reply is a bigger change than reporting a computed value, which
-is why step 2 is opus at high effort and not sonnet.
+All three are additive fields on reply messages, so an older
+client reading a newer server sees proto3 defaults rather than an
+error, and none needs `tox -e genprotos` output hand-edited.
+Widening a reply is a bigger change than reporting a computed
+value, which is why step 2 is opus at high effort and not sonnet.
 
 ## Execution
 
@@ -394,33 +402,50 @@ Each item is falsifiable, and the commands quoted were run
 against `develop` at `948055063` while writing this plan, so the
 "today" figures are measurements rather than expectations.
 
-- [ ] `grep -c "'/.*events'" shakenfist/external_api/app.py`
+- [x] `grep -c "'/.*events'" shakenfist/external_api/app.py`
       returns 7, having returned 5 today. Both new routes appear
       in the published OpenAPI specification, which is checked by
       `test_openapi_spec.py` rather than by reading the file.
-- [ ] A `GET` of `/auth/namespaces/<ns>/claims/<uuid>/events`
+- [x] A `GET` of `/auth/namespaces/<ns>/claims/<uuid>/events`
       returns the claim's events, and a `GET` of
       `/auth/namespaces/<ns>/events` returns the namespace's --
       including the `namespace claim deleted, capacity returned`
       event that `namespace_claim.py:415-420` has been writing to
       an unreadable destination since phase 4.
-- [ ] A placement which draws a namespace past its claim produces
+- [x] A placement which draws a namespace past its claim produces
       **two** events, one on the instance and one on the
       namespace, carrying the same dimensions and correlatable by
       claim uuid. Checked by reading both objects' events after
       one create, not by reading the code.
-- [ ] Every refused dimension in a `dimensions` or
+- [x] Every refused dimension in a `dimensions` or
       `claim_dimensions` list carries a `shortfall` equal to
-      `used + requested - limit`, and never a negative one.
+      `effective_used - limit`, and never a negative one, where
+      `effective_used` is `used + requested` on a charged
+      dimension and `used` alone on an uncharged one. Stated
+      against `effective_used` rather than the flat
+      `used + requested - limit` this criterion first carried:
+      the demand dimension is built with `charged=False`,
+      because the guard never charges the incoming placement on
+      demand, so the flat form would have demanded a number
+      which disagrees with `exceeded` on exactly that dimension.
+      Corrected during step 1, which found the single builder
+      `_capacity_dimension()` that every guard funnels through.
       Asserted by a unit test which builds a refusal with
       `used + requested < limit` on one dimension and an
       exceedance on another, and checks both.
-- [ ] `instance placement released` and `instance placed` carry
+- [x] `instance placement released` and `instance placed` carry
       the same counter vocabulary. Falsifiable by diffing the two
-      `extra` key sets in a test: the release event's keys are a
-      subset of the placement event's, and today the difference
-      is every key but `node`.
-- [ ] An unreadable capacity table produces an audit event on the
+      `extra` key sets in a test: every counter name on the
+      release event also appears on the placement event, and
+      today the difference is every key but `node`. Phrased as
+      "every counter name" rather than the plain subset this
+      criterion first carried, because step 2 found the subset
+      property was unsatisfiable as stated -- the release event
+      reports `disk_gb` and `instance placed` did not report it
+      at all, so `instance placed` gains it rather than the
+      release event dropping a third of the released
+      allocation.
+- [x] An unreadable capacity table produces an audit event on the
       scheduling instance which names the degradation, and an
       empty-but-readable table produces **no** such event. Both
       halves asserted -- the second is the one that catches an
@@ -428,13 +453,13 @@ against `develop` at `948055063` while writing this plan, so the
       list, which would fire on every create on a cluster the
       reconciler has not reached yet (P7 says that is a normal
       state, not an error).
-- [ ] `ci_headroom_report.py` reports a non-zero guard-refusal
+- [x] `ci_headroom_report.py` reports a non-zero guard-refusal
       count for a captured series in which the guard refused, and
       its output is pasted into this plan. Not "the census was
       added" -- run against real data, because the file's own
       history is that its stage census was written against
       assumptions and corrected after a run.
-- [ ] `ci_headroom_report.py` still imports nothing outside the
+- [x] `ci_headroom_report.py` still imports nothing outside the
       standard library and still exits zero on malformed input.
       Checked by `grep -n '^import \|^from '` on the file --
       trailing spaces deliberate, since a bare `^import` also
@@ -442,24 +467,510 @@ against `develop` at `948055063` while writing this plan, so the
       and by running it against a truncated series. Today that
       returns argparse, collections, datetime, json, sys and
       traceback, and nothing else.
-- [ ] The share of `events` rows whose message begins
+- [x] The share of `events` rows whose message begins
       `schedule ` is recorded as a number in this plan, with the
       window it was measured over, or the plan says the
       measurement could not be run and why.
-- [ ] **No guard outcome changed.** The diff touches no
+- [x] **No guard outcome changed.** The diff touches no
       comparison inside `_direct_admit_instance_placement()`, no
       `_has_sufficient_*()` return value, and no
       `CLAIM_ENFORCEMENT_HARD`. Verified by reading the diff of
       `mariadb.py` and `scheduler.py` in the management session
       and stating so in the close-out.
-- [ ] The master plan's phase 7 stub no longer describes the
+- [x] The master plan's phase 7 stub no longer describes the
       three D9 deliverables as unbuilt, and its Execution-table
       name is no longer "Diagnostic-mode rejection logging".
       Both corrected in the planning commit, so this item is
       already true when the phase starts and is listed to stop a
       later step redoing it.
-- [ ] `pre-commit run --all-files` passes, including
+- [x] `pre-commit run --all-files` passes, including
       `check-plan-status.py` and `check-doc-anchors.py`.
+
+## What the tool reported
+
+Step 6's done-criterion is a run, not a diff, so this is what the
+tool printed against real data.
+
+**The data.** Cluster CI run 33732626981 (`Functional tests`,
+`merge_group`, 2026-09-03), artifact
+`bundle-shakenfist-full-debian-12-slim-tier`. The series is that
+bundle's `traces/headroom.jsonl`: 114 samples over 1695 seconds
+across three hypervisors. The census is the same bundle's
+`traces/headroom-census.json`, the Loki `query_range` response
+`ci_headroom_collect.sh` collected during the run: 1155 records.
+
+**The first finding is about the collector, not the cluster.** The
+census carries zero capacity guard events. It is collected with the
+LogQL filter `|~ "schedule (at stage|has no candidates at stage)"`
+(`tools/ci_headroom_collect.sh` in `shakenfist/actions`), which
+selects the stage messages and nothing below them, so no census CI
+collects today can show a guard refusal however many there were. The
+new section says exactly that rather than printing a zero:
+
+```
+Shaken Fist CI headroom report
+==============================
+Label:  full-debian-12-slim-tier, run 33732626981
+
+Series
+------
+  File:              bundle/traces/headroom.jsonl
+  Samples:           114 usable, 0 failed (an "error" record), 0 unparseable lines
+  Window:            2026-09-03 09:20:56Z to 2026-09-03 09:49:11Z (1695 seconds)
+  LEDGER UNREADABLE: 11 of 114 samples had cpu_committed_row_present false
+    for every node at once. The capacity read returns an empty
+    map for an unreadable table and for an empty one alike, so
+    it means no counter was visible at all.
+    That is NOT that the cluster was idle.
+    Those samples are excluded from the committed CPU figures
+    below. Memory is unaffected: it comes from node metrics.
+
+Ledger provenance (D7)
+----------------------
+  Node-samples with a capacity row (cpu_limit):     309
+  Node-samples which fell back to cpu_hard_max:     0
+  Fallbacks inside ledger-unreadable samples:       33
+  Node-samples with no CPU ledger at all:           0
+  The third figure is a failed capacity read, not evidence about
+  the two ledgers. Those samples are already excluded from the
+  headroom figures, and D7 should read the second line alone.
+
+Cluster-wide headroom
+---------------------
+                          n     p90    peak   ledger p90 frac peak frac
+  committed vCPU        103     9.0    10.0     12.0    0.750     0.833
+  committed memory (MB) 114 22200.0 24248.0 107640.0    0.206     0.225
+  Fractions are computed per sample and then percentiled, so each
+  one is a ratio something actually stood at. Both sides of the CPU
+  fraction are summed over the nodes which have a ledger, so it
+  cannot exceed 1.0 because a node was missing one.
+
+Committed vCPU, per node
+------------------------
+  node                                   n p90 peak ledger p90 frac peak frac
+  13db082e-b18d-4c7a-b8e3-27af4ce5c2f5 103 5.0  6.0    6.0    0.833     1.000
+  8aae58ad-993a-433e-9763-1d28189d1678 103 3.0  3.0    3.0    1.000     1.000
+  9cf90efe-c566-405b-a416-5d8195c9aa17 103 2.0  3.0    3.0    0.667     1.000
+
+Committed memory (MB), per node
+-------------------------------
+  node                                   n    p90   peak  ledger p90 frac peak frac
+  13db082e-b18d-4c7a-b8e3-27af4ce5c2f5 114 7168.0 8192.0 35880.0    0.200     0.228
+  8aae58ad-993a-433e-9763-1d28189d1678 114 9052.0 9052.0 35880.0    0.252     0.252
+  9cf90efe-c566-405b-a416-5d8195c9aa17 114 8028.0 9052.0 35880.0    0.224     0.252
+
+Nodes absent from per_node
+--------------------------
+  Every node in every roster appeared in that sample per_node.
+  Nodes visible in per_node: 3 at fewest, 3 at most, across 114 samples.
+  That is what the samples could see, which is not the same as
+  how many hypervisors the cluster had.
+
+Refusal census
+--------------
+  File:              bundle/traces/headroom-census.json
+  Log records read:  1155 (1155 were schedule stage events, 0 were capacity guard events, 0 lines unparseable)
+  stage                  events aborts dropped                                                            kind
+  sufficient_idle_cpu       145      1      30                                                             cpu
+  affinity_constraints        1      1       2                   not a stage this report knows; counted anyway
+  cpu_max_per_instance      145      0       0                   not a stage this report knows; counted anyway
+  is_hypervisor             145      0       0                   not a stage this report knows; counted anyway
+  pre_schedule              145      0       0                   not a stage this report knows; counted anyway
+  queue_state               143      0       0                   not a stage this report knows; counted anyway
+  sufficient_free_disk      144      0       0                                                      disk space
+  sufficient_idle_disk      143      0       0 disk BANDWIDTH -- a rate predicate, which sizing cannot address
+  sufficient_idle_memory    144      0       0                                                          memory
+  Tallied by the stage string observed in the events, never by a
+  list held here (D10), so a stage added or renamed in the
+  scheduler still appears above.
+
+  Drop reasons, by stage:
+    affinity_constraints:
+          2  no co-located instance carries a required tag
+    sufficient_idle_cpu:
+         30  would exceed hard max CPUs
+
+Capacity guard census
+---------------------
+  NO CAPACITY GUARD EVENTS IN THIS CENSUS.
+  Read that as a fact about the query before reading it as a
+  fact about the cluster: the census is collected with a LogQL
+  filter, and if that filter selects only the scheduler stage
+  messages then a guard which refused every candidate leaves
+  nothing here to count. The filter must also match
+  'instance placement denied'
+  and 'placement admitted over namespace capacity claim'
+  for this section to mean anything at all.
+  This census DID carry 1155 schedule stage events, so the log
+  shipping path was healthy and the filter is the difference.
+
+D3 band verdict (PROVISIONAL bounds 0.35 / 0.70)
+------------------------------------------------
+  p90 committed vCPU / ledger, cluster wide: 0.750
+  Verdict: OVERSUBSCRIBED -- above the provisional upper bound of 0.70
+  These bounds are PROVISIONAL. Phase 0 set them without any
+  distribution to check them against, and phase 2 replaces them or
+  defends them. Nothing gates on this verdict: this phase computes
+  and prints the band, and phase 5 owns turning it into a guardrail.
+
+  Refusal warning: YES. 30 candidate drops at a capacity stage.
+  Per D3 that is a warning in its own right, whatever the ratio
+  says: a poll every fifteen seconds cannot see a refusal, which
+  begins and ends between samples.
+  2 further drops at stages this report does not classify (see the
+  census table above). They are not counted in the warning
+  either way, because nothing here knows whether they are
+  capacity stages -- a scheduler stage added since this tool
+  was written lands here.
+  Guard refusals: NOT COLLECTED in this census (see the capacity
+  guard section). Unknown, not zero.
+```
+
+**And the run did refuse.** The guard's events are in the bundle --
+127 `instance placement denied` and one `placement admitted over
+namespace capacity claim`, in the primary's
+`_commands/journalctl-sf-units`, which is the same JSON promtail
+ships to Loki. Rebuilding the `query_range` envelope from those
+records (unmodified, beyond repairing the `[pid]:` journalctl renders
+inside the first token) and re-running gives what a widened collector
+filter would have produced:
+
+```
+Capacity guard census
+---------------------
+  Placements refused by the guard: 127
+
+  Refusals by failing stage:
+    stage refusals                   what it guards
+    node       127 the node's own capacity counters
+
+  Refusals by exceeded dimension. A refusal exceeding two
+  dimensions is counted once under each, so the column sums to
+  more than the refusal count; "alone" is the subset where that
+  dimension was the only one exceeded.
+    dimension refusals alone                                                               what it is
+    demand         127   127 measured CPU load plus the D13 feedforward estimate -- NOT an allocation
+
+  Of the 127 refusals exceeding the demand dimension:
+      111  measured CPU load alone was already over the limit
+       16  the D13 feedforward estimate is what carried it over
+  Demand is not an allocation, so a refusal here is a rate
+  prediction rather than a cloud which ran out of room, and the
+  second line is an estimator finding rather than a sizing one.
+
+  No refused dimension carried a shortfall field. That is a
+  series written by a build predating it, not a shortfall of
+  zero; the three numbers it is derived from are in the events.
+
+  Claim exceedances (ADMITTED, never refused): 1
+    These placements SUCCEEDED. CLAIM_ENFORCEMENT_HARD is False, so
+    advisory mode admits over a claim on purpose and this is the
+    system doing what the operator asked. It is the signal a
+    declared footprint needs revising (D9), and it is never added
+    to the refusal count above.
+    namespace                admitted over claim
+    ci-claimaccount-evzkzyho                   1
+    Claim dimensions exceeded: cpus x1, disk_gb x1, memory_mb x1
+
+D3 band verdict (PROVISIONAL bounds 0.35 / 0.70)
+------------------------------------------------
+  p90 committed vCPU / ledger, cluster wide: 0.750
+  Verdict: OVERSUBSCRIBED -- above the provisional upper bound of 0.70
+  These bounds are PROVISIONAL. Phase 0 set them without any
+  distribution to check them against, and phase 2 replaces them or
+  defends them. Nothing gates on this verdict: this phase computes
+  and prints the band, and phase 5 owns turning it into a guardrail.
+
+  Refusal warning: YES. 30 candidate drops at a capacity stage.
+  Per D3 that is a warning in its own right, whatever the ratio
+  says: a poll every fifteen seconds cannot see a refusal, which
+  begins and ends between samples.
+  2 further drops at stages this report does not classify (see the
+  census table above). They are not counted in the warning
+  either way, because nothing here knows whether they are
+  capacity stages -- a scheduler stage added since this tool
+  was written lands here.
+  Guard refusals: YES. The ledger refused 127 placements, of which 127
+  refused something a caller asked for. Whatever the ratio above
+  says, a refused placement is a create which did not happen.
+  127 of them were refused on the demand dimension ALONE, with
+  every allocated dimension inside its limit. That is not a
+  cloud which ran out of room; see the split above.
+  1 placement was admitted OVER a namespace capacity claim. Advisory mode
+  did what the operator asked; this is calibration data, not a
+  failure, and it is no part of the refusal counts above.
+```
+
+**What that says.** Every one of the 127 refusals is at the `node`
+stage on the `demand` dimension **alone**, with cpus, memory_mb and
+disk_gb all inside their limits -- the #3813 shape, in a run whose
+stage census reports one aborted stage and calls the guard layer
+clean. That is the #3772 reading G6 exists to prevent, observed
+rather than argued. The split says 111 of them had measured CPU load
+already over the limit and 16 were carried over it by the D13
+feedforward estimate; the split is computed the way the guard
+compares, which since phase 4a does not charge the incoming
+placement.
+
+The claim exceedance is reported as its own thing and never added to
+the refusal count: namespace `ci-claimaccount-evzkzyho`, all three
+dimensions, **admitted**. Advisory mode did what the operator asked.
+
+No dimension in this series carries a `shortfall`: the captured run
+predates step 1. The tool says so rather than printing zero, since a
+shortfall of zero would read as a refusal that was not actually over.
+
+**Exit status on malformed input is zero**, checked against a
+truncated series, a truncated census, two paths that do not exist,
+5KB of `/dev/urandom` as both inputs, two empty files, and an
+unrecognised argument. All six exit 0. `grep -n '^import \|^from '`
+on the tool still returns argparse, collections, datetime, json, sys
+and traceback and nothing else.
+
+**Follow-up, deliberately not done here.** Widening the collector's
+LogQL filter to match the two guard messages is a change to
+`shakenfist/actions`, not to this repository, and until it lands the
+new section will print "NOT COLLECTED" on every CI run. It is
+recorded under future work rather than smuggled into this phase.
+
+## What the measurement found
+
+Step 7 tests G1. It is a measurement step: no event emission was
+changed, and the diff for the step touches this file only.
+
+**The fan-out is one row per event, not one per object.**
+`add_event_multi()` builds a single spool payload whose `objects`
+key is a list, and enqueues that one payload
+(`shakenfist/eventlog.py:113-131`). The drainer ships it through
+`mariadb.record_event_batch()`, which reaches
+`_direct_record_event_batch()` (`shakenfist/mariadb.py:5533`)
+either directly or via the database daemon's `RecordEventBatch`
+servicer (`shakenfist/daemons/database/main.py:5394`), which only
+rebuilds `EventRecord`s and calls that same function. Its loop is
+explicit -- per record, one `INSERT ... IGNORE` into `events`,
+then one `INSERT ... IGNORE` into `event_objects` for each entry
+of `record.objects`:
+
+```python
+    for record in events:
+        event_stmt = sa.insert(events_table).prefix_with('IGNORE').values(...)
+        conn.execute(event_stmt)
+        ...
+        for object_type, object_uuid in record.objects:
+            obj_stmt = sa.insert(event_objects_table).prefix_with('IGNORE').values(...)
+            conn.execute(obj_stmt)
+```
+
+So N related objects cost one `events` row and N `event_objects`
+rows. `message` lives on the `events` row, so the message-prefix
+share below is not multiplied by object count; only the child
+table is.
+
+The premise the step was given about the forced path needs one
+correction. `node_inst_netdesc_op.py:159` passes
+`candidates=[config.NODE_UUID]` -- exactly one node, so two
+related objects. The list of "every node except this one" is built
+at `node_inst_netdesc_op.py:200`, the redirect after a failed
+preflight, and that is the only path which can multiply the child
+table by the cluster size. In the measured window it never fired:
+all 669 `schedule forced candidates` events carried a candidate
+list of length one, matching the single `schedule has no
+candidates at stage` event in the same window. Today's fan-out on
+sfcbr is therefore at most 2x on `event_objects`, and 1x on
+`events`.
+
+**The share is about five percent.** Measured over the 24 hours
+and the 7 days ending 2026-09-03T10:04:10Z, on sfcbr.
+
+| quantity | 24h | 7d |
+|----------|-----|----|
+| `events` rows written to MariaDB | 502,220 | 2,935,059 |
+| ...of those, `event_type="audit"` | 263,790 | -- |
+| scheduling events (`schedule ...` or `started scheduling`) | 24,339 | 114,732 |
+| **share of all `events` rows** | **4.85%** | **3.91%** |
+| share of `audit` rows | 9.23% | -- |
+| schedules (`started scheduling`) | 1,552 | -- |
+| scheduling events per schedule | 15.7 | -- |
+
+Of the 15.7, 14.4 come from `find_candidates()` itself; the
+remainder is `RecordedOperation`'s `schedule finished` and the
+capacity guard's `schedule candidate refused by capacity guard`.
+The 14.4 is the eight stage events plus `started scheduling`,
+`schedule inputs`, `schedule initial candidates`, `schedule have
+highest affinity`, `schedule have lowest cpu load` and `schedule
+final candidates`, plus the 0.43 `schedule forced candidates` per
+schedule -- so the fifteen-per-schedule figure in the Situation
+section is confirmed rather than revised.
+
+**Method.** Two sources, because no single one answers it. The
+denominator is the authoritative MariaDB write count: Prometheus
+on maui scrapes `database_events_inserted_total` from both
+`sf-database` gateways, and that counter is incremented in
+`_direct_record_event_batch()` only after the transaction commits.
+The numerator is the Loki event echo on the `sfcbr` tenant,
+`{job="shakenfist"}` narrowed to `add_event_multi` records whose
+`message` field begins `schedule ` or equals `started scheduling`.
+A direct MariaDB query was attempted first and was not available
+from this host.
+
+The echo is a sound numerator even though it undercounts the
+table as a whole. It is gated by `LOG_EVENTS_TO_LOKI` (on for
+sfcbr) and by per-call `suppress_event_logging`; no scheduler call
+site suppresses, and `eventlog_spool_dropped_total` increased by
+zero over the seven days, so every scheduling event was both
+written and echoed. The echo does undercount the denominator --
+363,893 echoed against 502,220 written in the same 24 hours --
+which is why the denominator is taken from the counter instead.
+That gap is the six `suppress_event_logging=True` call sites, and
+it cross-checks: 248,260 echoed `audit` lines against 263,790
+`audit` rows written is a 5.9% shortfall, accounted for by
+`baseobject.py:430`'s suppressed `object created`. Treating that
+5.9% as an upper bound on echo loss for scheduling events too
+would move the share to 5.1%, not to a different order of
+magnitude.
+
+sfcbr is the CI cluster, so this is a create-heavy workload and
+close to a worst case for the scheduling share. For scale, its
+`events` table held 13.2 million rows at 5.8 inserted per second.
+
+**Verdict on G1.** The scheduling trail is 4.9% of rows written on
+a create-heavy cluster -- an order of magnitude below the
+two-thirds share that made the namespace-key storm a real problem
+-- so the measurement supports G1's decision to leave these events
+unconditional.
+
+One latent risk is worth carrying rather than acting on here: the
+`node_inst_netdesc_op.py:200` redirect is the one path whose
+`event_objects` cost scales with cluster size, and it is rare
+today only because preflight almost always succeeds. If a future
+change makes redirects common on a large cluster, the child-table
+cost is worth re-measuring. That is a note, not a change.
+
+## Close-out (2026-09-03)
+
+**Step 1** added `shortfall` to `CapacityDimensionDetail` and
+`CapacityDimensionDetailDict`, computed once in the shared
+`_capacity_dimension()` builder as `max(0.0, effective_used -
+limit)`, so every dimension in `dimensions` and
+`claim_dimensions` reports it and no two consumers can disagree
+about the sign convention.
+
+**Step 2** widened `ReleaseInstancePlacementReply` with the
+post-release node counters and evented them, alongside the
+released amounts already held caller-side, on `instance
+placement released`. The release half of the ledger now carries
+the same counter vocabulary the drawdown half's `instance
+placed` always has.
+
+**Step 3** added the two REST events endpoints:
+`/auth/namespaces/<namespace>/events` and
+`/auth/namespaces/<namespace>/claims/<claim_ref>/events`, both
+admin-gated and mirroring the five existing per-object events
+endpoints exactly.
+
+**Step 4**, plus a follow-up pass, recorded the claim-exceedance
+facts against the namespace as well as the instance (G2), and
+the follow-up added `claim_uuid` to `AdmitInstancePlacementReply`
+so both copies of the event can name which claim was actually
+drawn down -- the third proto change G7 undercounted, corrected
+above.
+
+**Step 5** added `SchedulerNodeCapacityRead`, a `NamedTuple`
+carrying a `degraded` flag alongside the rows, threaded from
+`get_scheduler_node_capacity()` through `_capacity_by_node()` to
+`find_candidates()`, which fires `schedule could not read the
+capacity counters` on the degraded path only.
+
+**Step 6** added a guard-refusal census to
+`tools/ci_headroom_report.py` and ran it against a real cluster
+CI job (see "What the tool reported" above).
+
+**Step 7** measured the scheduling event trail's share of
+`events` rows written on sfcbr (see "What the measurement found"
+above): 4.85% over 24 hours and 3.91% over 7 days -- an order of
+magnitude below the roughly two-thirds share that made the
+namespace-key event storm a real problem. **This supports G1's
+decision** to leave the trail unconditional rather than gating
+it behind a diagnostic mode.
+
+**A follow-up pass**, closing a gap G4's own symmetry check
+found, added `disk_gb` to `instance placed`: the release event
+already reported it and the placement event did not, so the
+placement event gained the field rather than the release event
+dropping a third of the allocation it reports.
+
+### The most important finding: the CI collector cannot see any of this yet
+
+`tools/ci_headroom_collect.sh`, in the separate
+`shakenfist/actions` repository, filters Loki with
+`|~ "schedule (at stage|has no candidates at stage)"`. That
+selects the scheduler stage messages and nothing recorded below
+them, so **no census CI collects today can contain a capacity
+guard refusal, however many occurred.** Step 6's own captured
+series proved this directly: its shipped census carried 1155
+schedule-stage records and zero guard records, from a run that
+had in fact refused 127 placements. Demonstrating the new code
+against real data required reconstructing the guard's events
+from the same bundle's raw journals rather than reading them
+from the collected census. Widening the collector's filter is a
+change to `shakenfist/actions`, out of scope for this plan, and
+is recorded under Future work below -- no issue has been filed
+for it yet.
+
+The reconstructed run is itself worth keeping as a finding: all
+127 `instance placement denied` events were at the `node` stage,
+all 127 on the `demand` dimension **alone**, with cpus,
+memory_mb and disk_gb inside their limits on every one -- the
+#3813 shape -- in a run whose stage census reported one aborted
+stage and read as a clean run. This is exactly the #3772 reading
+G6 exists to catch, observed rather than argued. It is directly
+relevant to issue #3772 -- the run's own three-node `slim-tier`
+topology is the territory `PLAN-ci-cloud-sizing` covers -- but it
+does not close that issue: sizing the CI clouds is that plan's
+job, not this one's.
+
+### A test had to be relaxed, and could not be verified by CI failing
+
+Step 2 relaxed
+`test_the_reference_lookup_runs_outside_the_release_transaction`
+in `shakenfist/tests/test_mariadb_capacity_admission.py`. Its
+assertion was a blanket "no `SELECT` executes inside the
+transaction," which the new post-release counter read violates
+by design: that read is a read-after-our-own-write against a row
+the release transaction's own guarded `UPDATE` already locked,
+the same pattern the admission transaction already relied on.
+The test now asserts the narrower and correct invariant its
+admission twin already used -- no read establishes a read view
+before the transaction's first write
+(`_assert_no_read_before_the_first_write`) -- which the counter
+read satisfies and the old blanket assertion never needed to
+express. CI's MariaDB is 10.11, which predates
+`innodb_snapshot_isolation` being on by default and so cannot
+produce the ER_CHECKREAD failure the guarded-update-first
+invariant exists to avoid; neither the old assertion nor the new
+one would have failed under CI's MariaDB regardless of which one
+was correct. This was verified by reading the statement order
+the code issues, not by a test turning red and then green.
+
+### Correction: the preflight redirect's candidate count
+
+The step 7 brief's premise about the preflight redirect needed
+one correction, already made in "What the measurement found"
+above rather than in the frozen Execution table brief itself, per
+this plan family's convention of correcting forward rather than
+rewriting history: `node_inst_netdesc_op.py:159` passes exactly
+one candidate node (`candidates=[config.NODE_UUID]`), not every
+node. The list of every other node in the cluster is built at
+line 200, the redirect that fires after a failed preflight --
+the only path whose `event_objects` cost can scale with cluster
+size, and it did not fire in the measured window.
+
+### Definition of done
+
+Every item is ticked and verified against the tree rather than
+assumed: `pre-commit run --all-files`, including
+`check-plan-status.py` and `check-doc-anchors.py`, was run and
+passed clean as part of writing this close-out.
 
 ## Future work
 
@@ -474,10 +985,19 @@ Recorded here rather than absorbed, per the survey:
   events.** Both new endpoints are admin-gated (G2). The
   narrower gate is the safe default and the wider one is a real
   request an operator will eventually make.
-- **`docs/plans/index.md`'s phase arithmetic.** The plan's row
-  reads "9 of 14" and this phase does not change it; planning is
-  not completing. Noted so the close-out remembers to move it to
-  10 and nothing else does it early.
+- **The census collector's LogQL filter, in
+  `shakenfist/actions`.** `tools/ci_headroom_collect.sh` queries
+  `|~ "schedule (at stage|has no candidates at stage)"`, which
+  stops above the guard, so the new guard census prints "NOT
+  COLLECTED" on every CI run until that filter also matches
+  `instance placement denied` and `placement admitted over
+  namespace capacity claim`. Step 6 proved the parser against the
+  run's own shipped records; making CI collect them is a change to
+  another repository and wants its own issue -- none has been
+  filed yet. Until it lands, the census section is honest about
+  being empty rather than reporting zero refusals -- which is the
+  behaviour that matters, but it is not the same as the data being
+  there.
 
 ## Back brief
 

@@ -106,6 +106,18 @@ older `sf-database` reads as "no breakdown available" rather than a
 breakdown of zeroes; the three allocation dimensions never carry the
 keys.
 
+Every dimension detail also carries `shortfall`
+(`_capacity_dimension()`, phase 7): `max(0.0, effective_used -
+limit)`, where `effective_used` is `used + requested` on a charged
+dimension and `used` alone on the uncharged demand dimension -- the
+same `effective_used` the `exceeded` flag above compares against
+`limit`, so the two fields never disagree about which dimensions are
+over. Floored rather than signed, because a negative shortfall is
+headroom the three reported numbers already let a reader derive, and
+a field meaning "shortfall" in one row and "spare" in another is
+worse than absent. It is reported, never tested against a guard
+decision.
+
 There used to be a second ledger here: `Scheduler._committed_vcpus()`,
 a Python walk over each candidate's `INSTANCE_LOCATION` rows added as
 a stopgap for the CPU stage (issue 3498). It was deleted by the same
@@ -246,7 +258,12 @@ Two decisions deliberately diverge from placement admission:
   we hold the lock on, which the invariant permits — and returned in
   `claim_over_limit` / `claim_dimensions`, deliberately separate from
   `failing_stage` and `dimensions`, which both mean "this was refused".
-  `Instance._event_claim_over_limit()` turns them into the audit event.
+  `Instance._event_claim_over_limit()` turns them into the audit
+  events -- one on the instance and, since phase 7 (G2), the same
+  facts again on the namespace, because a claim's own events die
+  with the claim and the namespace is where the calibration history
+  needs to survive one. See [Namespace capacity
+  claims](../operator_guide/scheduler.md#namespace-capacity-claims).
   Read-back rather than the probe-then-force idiom beside it because
   probe-then-force would make every create in a claimed namespace pay a
   probe round trip, and the namespaces that want claims are the ones
