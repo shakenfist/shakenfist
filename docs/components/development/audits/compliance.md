@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-02T10:53:52.109550+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-03T10:53:53.639434+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -43,7 +43,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | library-utilities | non-compliant | shakenfist/library-utilities#32 |
 | occystrap | non-compliant | shakenfist/occystrap#120 |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#303 |
+| ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#26 |
 | shakenfist | non-compliant | shakenfist/shakenfist#3314 |
 
@@ -54,7 +54,6 @@ Details for non-compliant projects:
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
 - **library-utilities** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **occystrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
-- **ryll** (Status): the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
 - **shakenfist** (Status): Missing pr-retest.yml; pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 
@@ -181,7 +180,7 @@ Criterion: [diagram-format.md](/components/development/audits/diagram-format/)
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3978 |
+| shakenfist | compliant | - |
 
 Details for non-compliant projects:
 
@@ -189,7 +188,6 @@ Details for non-compliant projects:
 - **cloudgood** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/memory-mapped-devices.md:729
 - **instar** (Status): 13 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:21, docs/format-detection-safety.md:48, docs/technology-primer.md:988, docs/prototypes/kvm-hello-world.md:18, docs/prototypes/kvm-hello-world2.md:22, docs/prototypes/virtio-block.md:49, docs/prototypes/virtio-block.md:96, docs/prototypes/virtio-block2.md:25, docs/prototypes/virtio-block3.md:26, docs/prototypes/virtio-block5.md:65 (+3 more)
 - **occystrap** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/internals.md:30
-- **shakenfist** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:124
 
 ## docs-external-links
 
@@ -563,14 +561,14 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | compliant | - |
-| client-python | compliant | - |
+| client-python | non-compliant | shakenfist/client-python#382 |
 | client-python-k3s | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
 | divergulent | compliant | - |
 | instar | compliant | - |
-| kerbside | non-compliant | shakenfist/kerbside#390 |
+| kerbside | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
@@ -581,8 +579,8 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:163
-- **shakenfist** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:204, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:135, docs/developer_guide/ci.md:186, docs/developer_guide/ci.md:187, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)
+- **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
+- **shakenfist** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:135, docs/developer_guide/ci.md:186, docs/developer_guide/ci.md:187, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)
 
 ## plan-source-references
 
@@ -592,7 +590,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 |---------|--------|--------|
 | actions | non-compliant | shakenfist/actions#43 |
 | agent-python | N/A | - |
-| client-python | N/A | - |
+| client-python | compliant | - |
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
@@ -803,6 +801,35 @@ Criterion: [release-process.md](/components/development/audits/release-process/)
 | sfui | N/A | - |
 | shakenfist | compliant | - |
 
+## renovate-lockstep-groups
+
+Criterion: [renovate-lockstep-groups.md](/components/development/audits/renovate-lockstep-groups/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | N/A | - |
+| instar | N/A | - |
+| kerbside | non-compliant | shakenfist/kerbside#401 |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | N/A | - |
+| private-ci | N/A | - |
+| ryll | N/A | - |
+| sfui | N/A | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4045 |
+
+Details for non-compliant projects:
+
+- **kerbside** (Status): Not grouped for Renovate: oslo (oslo.concurrency, oslo.config, oslo.i18n, oslo.utils) -- the OpenStack oslo libraries. Add a packageRules entry with a groupName covering every member, unrestricted by matchUpdateTypes
+- **shakenfist** (Status): Not grouped for Renovate: oslo (oslo.concurrency, oslo.config, oslo.i18n, oslo.utils) -- the OpenStack oslo libraries. Add a packageRules entry with a groupName covering every member, unrestricted by matchUpdateTypes
+
 ## renovate
 
 Criterion: [renovate.md](/components/development/audits/renovate/)
@@ -862,9 +889,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 100 of 168 in-scope files reviewed at HEAD; 68 need review (threshold 5)
-- **kerbside** (Status): 123 of 227 in-scope files reviewed at HEAD; 104 need review (threshold 5)
-- **ryll** (Status): 89 of 191 in-scope files reviewed at HEAD; 102 need review (threshold 5)
+- **development** (Status): 95 of 171 in-scope files reviewed at HEAD; 76 need review (threshold 5)
+- **kerbside** (Status): 122 of 227 in-scope files reviewed at HEAD; 105 need review (threshold 5)
+- **ryll** (Status): 85 of 188 in-scope files reviewed at HEAD; 103 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -872,7 +899,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#48 |
+| actions | compliant | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -892,8 +919,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 
 Details for non-compliant projects:
 
-- **actions** (Status): 4 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
-- **ryll** (Status): 37 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
+- **ryll** (Status): 36 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
 
 ## rust-unwrap-lint
 
@@ -994,7 +1020,7 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | development | N/A | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#395 |
+| kerbside | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
@@ -1005,8 +1031,68 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 - **ryll** (Status): ryll/src/web/assets/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+
+## undeclared-direct-dependency
+
+Criterion: [undeclared-direct-dependency.md](/components/development/audits/undeclared-direct-dependency/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | N/A | - |
+| instar | N/A | - |
+| kerbside | non-compliant | shakenfist/kerbside#400 |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | N/A | - |
+| private-ci | N/A | - |
+| ryll | N/A | - |
+| sfui | N/A | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4044 |
+
+Details for non-compliant projects:
+
+- **kerbside** (Status): Imported but declared only as a transitive pin: packaging (pyproject.toml:110), PyJWT (pyproject.toml:113), requests (pyproject.toml:118), urllib3 (pyproject.toml:125). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run
+- **shakenfist** (Status): Imported but declared only as a transitive pin: jsonschema (pyproject.toml:123), marshmallow (pyproject.toml:125), oslo.concurrency (pyproject.toml:128), packaging (pyproject.toml:132), PyJWT (pyproject.toml:134), pylogrus (pyproject.toml:135), six (pyproject.toml:142). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run
+
+## unused-declared-dependency
+
+Criterion: [unused-declared-dependency.md](/components/development/audits/unused-declared-dependency/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | non-compliant | shakenfist/agent-python#131 |
+| client-python | non-compliant | shakenfist/client-python#383 |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#50 |
+| clingwrap | compliant | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | compliant | - |
+| instar | N/A | - |
+| kerbside | non-compliant | shakenfist/kerbside#399 |
+| kerbside-patches | N/A | - |
+| library-utilities | compliant | - |
+| occystrap | compliant | - |
+| private-ci | N/A | - |
+| ryll | N/A | - |
+| sfui | N/A | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4043 |
+
+Details for non-compliant projects:
+
+- **agent-python** (Status): Declared but never imported: grpcio-status (pyproject.toml:29), grpcio-tools (pyproject.toml:30). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **client-python** (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **kerbside** (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), flask-request-id-middleware (pyproject.toml:47), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **shakenfist** (Status): Declared but never imported: chardet (pyproject.toml:90), clingwrap (pyproject.toml:37), flask-request-id-middleware (pyproject.toml:69), gevent (pyproject.toml:62), greenlet (pyproject.toml:61), grpcio-status (pyproject.toml:84), grpcio-tools (pyproject.toml:85), pbr (pyproject.toml:52), requests-toolbelt (pyproject.toml:89), urllib3 (pyproject.toml:91), uv (pyproject.toml:32). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 
 ## version-file-gitignore
 
@@ -1053,7 +1139,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 | divergulent | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | instar | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | kerbside | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | - |
-| kerbside-patches | N/A | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/kerbside-patches#1637 |
+| kerbside-patches | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | library-utilities | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | occystrap | non-compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/occystrap#126, shakenfist/occystrap#67 |
 | private-ci | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
@@ -1068,7 +1154,6 @@ Details for non-compliant projects:
 - **agent-python** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:25 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **client-python** (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:23 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **clingwrap** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
-- **kerbside-patches** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:514 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **occystrap** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **occystrap** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:17 (self-hosted, vm, debian-12), python-unit-tests.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **shakenfist** (flake8wrap): Missing shellcheck disable=SC2086 directive
