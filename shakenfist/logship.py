@@ -42,8 +42,8 @@ import json
 import logging
 from typing import Any
 
-from pylogrus import JsonFormatter
 from shakenfist_utilities import logs
+from shakenfist_utilities.logs import JsonFormatter
 
 from shakenfist.config import config
 
@@ -51,29 +51,17 @@ from shakenfist.config import config
 LOG, _ = logs.setup(__name__)
 
 
-# The library installs a ``JsonFormatter`` on each per-module
-# logger when running with structured logging (v0.8.5+). We reuse
-# that instance so the field list is a single source of truth.
-# Under older library versions the per-module handlers carry a
-# ``TextFormatter`` instead, so no ``JsonFormatter`` exists to
-# lift; this fallback list reconstructs the library's field list.
+# The library installs a ``JsonFormatter`` on each per-module logger
+# when running with structured logging (v0.8.5+). We reuse that
+# instance so the field list is a single source of truth. Under older
+# library versions the per-module handlers carry a ``TextFormatter``
+# instead, so no ``JsonFormatter`` exists to lift and we build one from
+# ``logs.ENABLED_FIELDS``.
 #
-# IMPORTANT: keep this list in sync with
-# ``shakenfist_utilities/logs.py`` ``setup()`` ``enabled_fields``
-# until the library exposes the list directly (future work). It is
-# only used when no library ``JsonFormatter`` is found.
-_FALLBACK_ENABLED_FIELDS = [
-    ('name', 'logger_name'),
-    ('asctime', 'ts'),
-    ('levelname', 'level'),
-    ('process', 'pid'),
-    ('threadName', 'thread_name'),
-    'message',
-    ('exception', 'exception_class'),
-    ('stacktrace', 'stack_trace'),
-    'module',
-    ('funcName', 'function'),
-]
+# That list used to be duplicated here, with a comment asking for the
+# library to expose it directly. It now does, so there is no longer a
+# copy that can drift out of step with the field-name contract in the
+# library's docs/log-record-fields.md.
 
 
 def _json_safe_fields(fields: dict[str, Any]) -> dict[str, Any]:
@@ -149,7 +137,7 @@ def _find_library_json_formatter() -> 'JsonFormatter | None':
     pattern) and returns the first ``JsonFormatter`` found. Under
     v0.8.5+ the library installs one on each per-module handler;
     under older versions the handlers carry a ``TextFormatter`` and
-    this returns None so the caller uses the fallback field list.
+    this returns None so the caller builds one instead.
     """
     for name in list(logging.root.manager.loggerDict.keys()) + ['']:
         for handler in logging.getLogger(name).handlers:
@@ -163,15 +151,13 @@ def _build_formatter() -> JsonFormatter:
 
     Reuse the library's ``JsonFormatter`` instance if one is
     already installed (single source of truth, no field drift);
-    otherwise fall back to reconstructing the documented field
-    list (the v0.8.4 case, where per-module handlers carry a
-    ``TextFormatter``).
+    otherwise build one from the library's exported field list (the
+    v0.8.4 case, where per-module handlers carry a ``TextFormatter``).
     """
     existing = _find_library_json_formatter()
     if existing is not None:
         return existing
-    return JsonFormatter(
-        datefmt='Z', enabled_fields=_FALLBACK_ENABLED_FIELDS)
+    return JsonFormatter(datefmt='Z', enabled_fields=logs.ENABLED_FIELDS)
 
 
 def start(daemon_name: str) -> None:

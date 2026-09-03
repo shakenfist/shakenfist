@@ -71,13 +71,10 @@ dependencies = [
     # Imported directly, rather than reached through whichever package
     # happens to require them today, so what keeps them installed is a
     # declaration and not a transitive pin the reconciler could drop.
-    # logship.py imports pylogrus (which arrives via
-    # shakenfist-utilities), tools/render-review.py imports jsonschema
-    # (via flasgger) and tools/build-collection.py imports packaging
-    # (via the oslo stack).
+    # tools/render-review.py imports jsonschema (via flasgger) and
+    # tools/build-collection.py imports packaging (via the oslo stack).
     "jsonschema==4.26.0",                 # mit
     "packaging==26.3",                    # apache2
-    "pylogrus==0.4.0",                    # mit
 
     "gunicorn[gevent]==26.2.0",           # mit
 
@@ -156,6 +153,7 @@ dependencies = [
     "oslo.utils==10.2.0",
     "pbr==7.0.3",
     "pycparser==3.0",
+    "pylogrus==0.4.0",
     "pyparsing==3.3.2",
     "python-dotenv==1.2.3",
     "pytz==2026.3.post1",
