@@ -218,6 +218,14 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
          'limit_disk_gb', {'type': 'integer', 'minimum': 0}),
         ('/auth/namespaces/{namespace}/claims/{claim_ref}', 'put',
          'expires_in_seconds', {'type': 'integer', 'minimum': 1}),
+        # The two capacity events endpoints. Their limit shares the
+        # bounds every other events endpoint publishes, and for the
+        # same reason: the server coerces anything below 1 to the
+        # default and caps at 1000, so both bounds are backed.
+        ('/auth/namespaces/{namespace}/events', 'get', 'limit',
+         {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
+        ('/auth/namespaces/{namespace}/claims/{claim_ref}/events', 'get',
+         'limit', {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
     ]
 
     # A published parameter is this table's business if it carries a

@@ -46,7 +46,8 @@ EXPECTED_CAPABILITIES = {
         'artifact-clusteroperations'],
     'auth': [
         'trusted-issuers', 'generated-key-secrets', 'scope-enforcement',
-        'mapping-rules', 'federated-exchange', 'namespace-claims'],
+        'mapping-rules', 'federated-exchange', 'namespace-claims',
+        'namespace-events', 'namespace-claim-events'],
     'blobs': [
         'blob-metadata', 'blob-search-by-hash', 'blob-data-limit',
         'blob-hash-sha1', 'blob-hash-sha256', 'blob-hash-xxh128',

@@ -21,6 +21,7 @@ from unittest import mock
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_claim import NamespaceClaim
+from shakenfist.schema.event import EventReadRow
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -555,3 +556,113 @@ class ClaimObjectStateTestCase(ClaimEndpointTestCase):
             '/auth/namespaces/ci/claims/%s' % claim_uuid,
             headers={'Authorization': self.admin})
         self.assertEqual(404, resp.status_code)
+
+
+class CapacityEventsTestCase(ClaimEndpointTestCase):
+    """The namespace and claim events endpoints.
+
+    A claim's accounting is only completely legible across two reads.
+    The claim's own events explain what it did while it existed, and
+    the namespace's outlive it -- which matters because growing a claim
+    by deleting and recreating it is a thing operators do, and
+    hard_delete() takes the claim's events with it.
+
+    The reads themselves are mocked at the database layer: MockMariaDB
+    does not store events, and what is under test here is routing,
+    gating and which object each endpoint asks about, not the query.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.claim_uuid = self._created()
+
+        self.events = mock.patch(
+            'shakenfist.mariadb.get_object_events',
+            return_value=[EventReadRow(
+                event_uuid='2b1e1b1a-1c1d-4e1f-8a1b-1c1d1e1f2a3b',
+                event_type='audit', timestamp=1755300000.0, fqdn='sf-1',
+                message='namespace claim deleted, capacity returned',
+                extra={'claim': self.claim_uuid})])
+        self.mock_events = self.events.start()
+        self.addCleanup(self.events.stop)
+
+    def test_a_namespaces_events_are_readable(self):
+        # The end to end case this endpoint exists for: the claim
+        # deletion event namespace_claim.py records against the
+        # namespace had no reader until now.
+        resp = self.client.get(
+            '/auth/namespaces/ci/events',
+            headers={'Authorization': self.admin})
+        self.assertEqual(200, resp.status_code, resp.get_data(as_text=True))
+
+        body = resp.get_json()
+        self.assertEqual(1, len(body))
+        self.assertEqual('namespace claim deleted, capacity returned',
+                         body[0]['message'])
+
+        # A namespace is keyed by its name, not a uuid.
+        self.mock_events.assert_called_once_with(
+            'namespace', 'ci', limit=100, event_type=None)
+
+    def test_a_claims_events_are_readable(self):
+        resp = self.client.get(
+            '/auth/namespaces/ci/claims/%s/events' % self.claim_uuid,
+            headers={'Authorization': self.admin})
+        self.assertEqual(200, resp.status_code, resp.get_data(as_text=True))
+        self.assertEqual(1, len(resp.get_json()))
+
+        object_type, object_uuid = self.mock_events.call_args.args
+        self.assertEqual('namespace_claim', object_type)
+        self.assertEqual(self.claim_uuid, str(object_uuid))
+
+    def test_the_query_parameters_reach_the_read(self):
+        # events-by-type behaviour, the same as the five endpoints that
+        # predate these two.
+        for path in ['/auth/namespaces/ci/events',
+                     '/auth/namespaces/ci/claims/%s/events' % self.claim_uuid]:
+            self.mock_events.reset_mock()
+            resp = self.client.get(
+                path, headers={'Authorization': self.admin},
+                data=json.dumps({'event_type': 'audit', 'limit': 5}))
+            self.assertEqual(200, resp.status_code, path)
+            self.assertEqual(
+                {'limit': 5, 'event_type': 'audit'},
+                self.mock_events.call_args.kwargs)
+
+    def test_an_unknown_namespace_or_claim_is_not_found(self):
+        self.assertEqual(404, self.client.get(
+            '/auth/namespaces/nosuch/events',
+            headers={'Authorization': self.admin}).status_code)
+        self.assertEqual(404, self.client.get(
+            '/auth/namespaces/ci/claims/%s/events'
+            % '1e1a4c4a-0f0e-4c4b-9a9b-0d0c0b0a0908',
+            headers={'Authorization': self.admin}).status_code)
+
+    def test_a_claim_is_not_readable_through_another_namespace(self):
+        # The namespace segment is load bearing here exactly as it is
+        # on the CRUD verbs; a claim addressed through a namespace it
+        # does not belong to is a 404, not somebody else's events.
+        self.assertEqual(404, self.client.get(
+            '/auth/namespaces/other/claims/%s/events' % self.claim_uuid,
+            headers={'Authorization': self.admin}).status_code)
+
+    def test_events_are_admin_only(self):
+        # Both endpoints are gated like the claim verbs they sit
+        # beside, including against the owner of the namespace in the
+        # URL: a namespace's event trail names the instances, nodes and
+        # other namespaces its capacity accounting involved.
+        for token in [self.owner, self.stranger]:
+            for path in ['/auth/namespaces/ci/events',
+                         '/auth/namespaces/ci/claims/%s/events'
+                         % self.claim_uuid]:
+                resp = self.client.get(
+                    path, headers={'Authorization': token})
+                self.assertEqual(401, resp.status_code, path)
+        self.mock_events.assert_not_called()
+
+    def test_an_unauthenticated_caller_is_refused(self):
+        self.assertEqual(401, self.client.get(
+            '/auth/namespaces/ci/events').status_code)
+        self.assertEqual(401, self.client.get(
+            '/auth/namespaces/ci/claims/%s/events'
+            % self.claim_uuid).status_code)
