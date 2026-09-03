@@ -2921,6 +2921,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#renovate-lockstep-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        renovate-lockstep-groups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#renovate" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2991,6 +3002,28 @@
     <span class="md-ellipsis">
       
         sfui-vendor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#undeclared-direct-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        undeclared-direct-dependency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unused-declared-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unused-declared-dependency
       
     </span>
   </a>
@@ -14257,6 +14290,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#renovate-lockstep-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        renovate-lockstep-groups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#renovate" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14327,6 +14371,28 @@
     <span class="md-ellipsis">
       
         sfui-vendor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#undeclared-direct-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        undeclared-direct-dependency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unused-declared-dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unused-declared-dependency
       
     </span>
   </a>
@@ -14406,7 +14472,7 @@ verdict, and see
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-09-02T10:53:52.109550+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-09-03T10:53:53.639434+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -14490,8 +14556,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/303" title="GitHub Issue: shakenfist/ryll #303">ryll#303</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -14512,7 +14578,6 @@ does.</p>
 <li><strong>cloudgood</strong> (Status): Missing workflows: pr-re-review.yml</li>
 <li><strong>library-utilities</strong> (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main</li>
 <li><strong>occystrap</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch</li>
-<li><strong>ryll</strong> (Status): the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch</li>
 <li><strong>sfui</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch</li>
 <li><strong>shakenfist</strong> (Status): Missing pr-retest.yml; pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch</li>
 </ul>
@@ -15006,8 +15071,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3978" title="GitHub Issue: shakenfist/shakenfist #3978">shakenfist#3978</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 </tbody>
 </table>
@@ -15017,7 +15082,6 @@ does.</p>
 <li><strong>cloudgood</strong> (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/memory-mapped-devices.md:729</li>
 <li><strong>instar</strong> (Status): 13 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:21, docs/format-detection-safety.md:48, docs/technology-primer.md:988, docs/prototypes/kvm-hello-world.md:18, docs/prototypes/kvm-hello-world2.md:22, docs/prototypes/virtio-block.md:49, docs/prototypes/virtio-block.md:96, docs/prototypes/virtio-block2.md:25, docs/prototypes/virtio-block3.md:26, docs/prototypes/virtio-block5.md:65 (+3 more)</li>
 <li><strong>occystrap</strong> (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/internals.md:30</li>
-<li><strong>shakenfist</strong> (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:124</li>
 </ul>
 <h2 id="docs-external-links">docs-external-links<a class="headerlink" href="#docs-external-links" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/docs-external-links/">docs-external-links.md</a></p>
@@ -16368,8 +16432,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/382" title="GitHub Issue: shakenfist/client-python #382">client-python#382</a></td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -16403,8 +16467,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/390" title="GitHub Issue: shakenfist/kerbside #390">kerbside#390</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
@@ -16445,8 +16509,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>kerbside</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:163</li>
-<li><strong>shakenfist</strong> (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:204, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:135, docs/developer_guide/ci.md:186, docs/developer_guide/ci.md:187, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)</li>
+<li><strong>client-python</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121</li>
+<li><strong>shakenfist</strong> (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:82, docs/developer_guide/ci.md:135, docs/developer_guide/ci.md:186, docs/developer_guide/ci.md:187, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:161 (+12 more)</li>
 </ul>
 <h2 id="plan-source-references">plan-source-references<a class="headerlink" href="#plan-source-references" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-source-references/">plan-source-references.md</a></p>
@@ -16471,7 +16535,7 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>N/A</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -17259,6 +17323,109 @@ does.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="renovate-lockstep-groups">renovate-lockstep-groups<a class="headerlink" href="#renovate-lockstep-groups" title="Permanent link">&para;</a></h2>
+<p>Criterion: <a href="/components/development/audits/renovate-lockstep-groups/">renovate-lockstep-groups.md</a></p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Status</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actions</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>clingwrap</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>cloudgood</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>development</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>instar</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/401" title="GitHub Issue: shakenfist/kerbside #401">kerbside#401</a></td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>private-ci</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4045" title="GitHub Issue: shakenfist/shakenfist #4045">shakenfist#4045</a></td>
+</tr>
+</tbody>
+</table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>kerbside</strong> (Status): Not grouped for Renovate: oslo (oslo.concurrency, oslo.config, oslo.i18n, oslo.utils) -- the OpenStack oslo libraries. Add a packageRules entry with a groupName covering every member, unrestricted by matchUpdateTypes</li>
+<li><strong>shakenfist</strong> (Status): Not grouped for Renovate: oslo (oslo.concurrency, oslo.config, oslo.i18n, oslo.utils) -- the OpenStack oslo libraries. Add a packageRules entry with a groupName covering every member, unrestricted by matchUpdateTypes</li>
+</ul>
 <h2 id="renovate">renovate<a class="headerlink" href="#renovate" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/renovate/">renovate.md</a></p>
 <table>
@@ -17466,9 +17633,9 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>actions</strong> (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)</li>
-<li><strong>development</strong> (Status): 100 of 168 in-scope files reviewed at HEAD; 68 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 123 of 227 in-scope files reviewed at HEAD; 104 need review (threshold 5)</li>
-<li><strong>ryll</strong> (Status): 89 of 191 in-scope files reviewed at HEAD; 102 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 95 of 171 in-scope files reviewed at HEAD; 76 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 122 of 227 in-scope files reviewed at HEAD; 105 need review (threshold 5)</li>
+<li><strong>ryll</strong> (Status): 85 of 188 in-scope files reviewed at HEAD; 103 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/review-scope-completeness/">review-scope-completeness.md</a></p>
@@ -17483,8 +17650,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/48" title="GitHub Issue: shakenfist/actions #48">actions#48</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -17570,8 +17737,7 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): 4 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
-<li><strong>ryll</strong> (Status): 37 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
+<li><strong>ryll</strong> (Status): 36 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
 </ul>
 <h2 id="rust-unwrap-lint">rust-unwrap-lint<a class="headerlink" href="#rust-unwrap-lint" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/rust-unwrap-lint/">rust-unwrap-lint.md</a></p>
@@ -17937,8 +18103,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/395" title="GitHub Issue: shakenfist/kerbside #395">kerbside#395</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
@@ -17979,8 +18145,216 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
 <li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+</ul>
+<h2 id="undeclared-direct-dependency">undeclared-direct-dependency<a class="headerlink" href="#undeclared-direct-dependency" title="Permanent link">&para;</a></h2>
+<p>Criterion: <a href="/components/development/audits/undeclared-direct-dependency/">undeclared-direct-dependency.md</a></p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Status</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actions</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>clingwrap</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>cloudgood</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>development</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>instar</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/400" title="GitHub Issue: shakenfist/kerbside #400">kerbside#400</a></td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>private-ci</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4044" title="GitHub Issue: shakenfist/shakenfist #4044">shakenfist#4044</a></td>
+</tr>
+</tbody>
+</table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>kerbside</strong> (Status): Imported but declared only as a transitive pin: packaging (pyproject.toml:110), PyJWT (pyproject.toml:113), requests (pyproject.toml:118), urllib3 (pyproject.toml:125). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run</li>
+<li><strong>shakenfist</strong> (Status): Imported but declared only as a transitive pin: jsonschema (pyproject.toml:123), marshmallow (pyproject.toml:125), oslo.concurrency (pyproject.toml:128), packaging (pyproject.toml:132), PyJWT (pyproject.toml:134), pylogrus (pyproject.toml:135), six (pyproject.toml:142). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run</li>
+</ul>
+<h2 id="unused-declared-dependency">unused-declared-dependency<a class="headerlink" href="#unused-declared-dependency" title="Permanent link">&para;</a></h2>
+<p>Criterion: <a href="/components/development/audits/unused-declared-dependency/">unused-declared-dependency.md</a></p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Status</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actions</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>agent-python</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/131" title="GitHub Issue: shakenfist/agent-python #131">agent-python#131</a></td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/383" title="GitHub Issue: shakenfist/client-python #383">client-python#383</a></td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/50" title="GitHub Issue: shakenfist/client-python-k3s #50">client-python-k3s#50</a></td>
+</tr>
+<tr>
+<td>clingwrap</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>cloudgood</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>development</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>instar</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/399" title="GitHub Issue: shakenfist/kerbside #399">kerbside#399</a></td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>private-ci</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4043" title="GitHub Issue: shakenfist/shakenfist #4043">shakenfist#4043</a></td>
+</tr>
+</tbody>
+</table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>agent-python</strong> (Status): Declared but never imported: grpcio-status (pyproject.toml:29), grpcio-tools (pyproject.toml:30). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
+<li><strong>client-python</strong> (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
+<li><strong>client-python-k3s</strong> (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
+<li><strong>kerbside</strong> (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), flask-request-id-middleware (pyproject.toml:47), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
+<li><strong>shakenfist</strong> (Status): Declared but never imported: chardet (pyproject.toml:90), clingwrap (pyproject.toml:37), flask-request-id-middleware (pyproject.toml:69), gevent (pyproject.toml:62), greenlet (pyproject.toml:61), grpcio-status (pyproject.toml:84), grpcio-tools (pyproject.toml:85), pbr (pyproject.toml:52), requests-toolbelt (pyproject.toml:89), urllib3 (pyproject.toml:91), uv (pyproject.toml:32). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
 </ul>
 <h2 id="version-file-gitignore">version-file-gitignore<a class="headerlink" href="#version-file-gitignore" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/version-file-gitignore/">version-file-gitignore.md</a></p>
@@ -18239,13 +18613,13 @@ does.</p>
 <td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
-<td>non-compliant</td>
 <td>compliant</td>
 <td>compliant</td>
-<td>N/A</td>
 <td>compliant</td>
 <td>N/A</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/1637" title="GitHub Issue: shakenfist/kerbside-patches #1637">kerbside-patches#1637</a></td>
+<td>compliant</td>
+<td>N/A</td>
+<td>-</td>
 </tr>
 <tr>
 <td>library-utilities</td>
@@ -18334,7 +18708,6 @@ does.</p>
 <li><strong>agent-python</strong> (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:25 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
 <li><strong>client-python</strong> (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:23 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
 <li><strong>clingwrap</strong> (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
-<li><strong>kerbside-patches</strong> (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:514 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
 <li><strong>occystrap</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
 <li><strong>occystrap</strong> (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:17 (self-hosted, vm, debian-12), python-unit-tests.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
 <li><strong>shakenfist</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
