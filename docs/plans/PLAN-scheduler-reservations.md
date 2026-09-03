@@ -356,7 +356,7 @@ table entirely (decision D8).
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete |
-| 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Not started |
+| 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | In progress |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete |
 | 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
@@ -424,6 +424,19 @@ is here.
   of its own measurements, which reclassifies the fix from a deferred
   tuning question to a correction; see the phase plan's *What the
   survey found*.
+
+- **Phase 4c**'s steps 1 to 4 are implemented on the private-ci branch
+  `scheduler-reservations-phase-04c-conductor-claims` as of 2026-09-01:
+  the sizing accessor, claim creation with E6's three refusal branches,
+  release at teardown, and the dashboard surface. What remains is step
+  5, a minimum of seven days of normal CI load after a deploy, and step
+  6's write-up. The phase plan carries the back brief answers and the
+  four implementation decisions the plan itself did not settle. One
+  back brief item is outstanding and should be discharged before the
+  deploy: the sizing formula has not been evaluated against real cost
+  data, because that needs the conductor's database on `maui` and `ssh`
+  there is refused from the development host. The plan carries the
+  command to run.
 
 - **Phase 6** was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
