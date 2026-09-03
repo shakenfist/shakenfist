@@ -30,6 +30,11 @@ Repositories with no `docs/plans/` directory are N/A. Whether every
 project should plan this way is a separate decision, not smuggled in
 here.
 
+Fenced code blocks are not read. An index that shows what a row looks
+like is documenting its own conventions rather than listing a plan, so
+the example's columns are not judged as a table and its links do not
+register the plans they name.
+
 ### The status vocabulary
 
 A status cell holds exactly one of `Proposed`, `Not started`,

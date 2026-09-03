@@ -133,6 +133,7 @@ nav:
                 - "Audit: Plan references in source": components/development/audits/plan-source-references.md
                 - "Audit: Plan template": components/development/audits/plan-template.md
                 - "Audit: Pre-push audit file": components/development/audits/push-audit.md
+                - "Audit: Push audit phase in master plans": components/development/audits/plan-audit-phase.md
                 - "Audit: pyproject.toml usage": components/development/audits/pyproject-usage.md
                 - "Audit: Python version and type hints": components/development/audits/python-version.md
                 - "Audit: README absolute links": components/development/audits/readme-absolute-links.md
