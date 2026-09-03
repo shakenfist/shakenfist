@@ -99,6 +99,13 @@ so they bump together:
 }
 ```
 
+Where a family is released in lockstep rather than merely coupled --
+the oslo libraries cut coordinated releases, so four pull requests
+arrive the same evening for one upstream event -- grouping stops being
+a preference and becomes an audited requirement. See
+[renovate-lockstep-groups.md](/components/development/audits/renovate-lockstep-groups/), which is
+the criterion that measures it; this section stays the general advice.
+
 Server projects (shakenfist, kerbside) pin exactly (`==`) and use
 renovate's default range strategy, which bumps those pins on every
 release. That is right for software running on infrastructure we

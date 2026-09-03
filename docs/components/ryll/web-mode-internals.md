@@ -268,6 +268,59 @@ The `on_data_channel` path (pumped as `"remote-dc"`) is therefore
 dead in normal operation. What is left for it is a datachannel the
 peer opens in band, which ryll's own client never does.
 
+#### Message framing
+
+`send_control(&[u8])` writes bytes, so every control message the
+browser receives is a *binary* frame. `RTCDataChannel.binaryType`
+defaults to `"blob"` per the W3C specification, and
+`TextDecoder.decode` cannot take a `Blob` — it throws, `onmessage`
+catches, and the message is discarded with a console warning.
+`app.js` therefore sets `dc.binaryType = 'arraybuffer'` explicitly
+at channel creation.
+
+This is not belt-and-braces. Chromium defaults the property to
+`"arraybuffer"` rather than `"blob"`, which is why the omission
+went unnoticed; Firefox follows the specification, and every
+control message the server sent was silently dropped for the life
+of every Firefox session — no mouse mode, no cursor shape or
+position, no no-video notice. See ryll#348.
+
+#### The hello handshake
+
+The browser sends `{"type":"hello"}` as soon as its end of the
+control channel opens, and the server answers with the current
+mouse mode — plus a no-video notice, if that viewer negotiated no
+codec we can send. The server cannot push either unprompted: it
+learned the mouse mode from SPICE session-init, seconds before the
+page loaded, and `send_control` drops anything written before the
+channel is open.
+
+**The hello is retried until it is answered**, on the backoff in
+`HELLO_BACKOFFS_MS` (200 ms doubling to 3.2 s, five attempts). It
+has to be, because the first message written after `onopen` can be
+dropped by the far end without any indication. `onopen` reports
+this end's readiness, not the peer's; webrtc-rs creates its side of
+the channel separately and has no `data_channel` to hand a message
+to until the SCTP connected procedure has dialled it. A message
+arriving in that window is refused with `ErrDataChannelNotExisted`
+and discarded — not buffered, not NACKed, and invisible from the
+browser, which sees an open channel and a server that never
+replies.
+
+Left unretried that costs the whole session: the viewer keeps
+`app.js`'s default mouse mode rather than the negotiated one, and a
+viewer with no common video codec is never told why the picture is
+missing. `hello` is idempotent on the server — it reads the current
+mode and replies — so a duplicate that crosses a reply in flight
+costs one extra `mouse-mode` message and nothing else. The first
+viewport rides along with each attempt, since it was written in the
+same breath as the first hello and is lost in the same window.
+
+Receipt of a `mouse-mode` message cancels the retry. That is the
+right signal rather than "any inbound message": the server also
+pushes `mouse-mode` unprompted when the mode changes mid-session,
+and either way its arrival means the answer is here. See ryll#347.
+
 `spawn_synthetic_audio_pump()` remains available for testing
 without a SPICE server: it emits a 440 Hz sine wave encoded as
 Opus at 50 fps (20 ms per frame, 960 samples at 48 kHz), through
