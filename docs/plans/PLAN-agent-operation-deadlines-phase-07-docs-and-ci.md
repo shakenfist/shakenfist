@@ -260,6 +260,16 @@ timeout and none has a terminal-state check.
    wrong, and deleting it while fixing the same bug in the other file
    would lose that.
 
+   **Correction (step 7a).** The helper landed on
+   `base.BaseNamespacedTestCase`, not `BaseTestCase` as decided above.
+   It polls as `self.test_client`, and only
+   `BaseNamespacedTestCase.setUp()` constructs that attribute
+   (`base.py:1072`); leaving it on `BaseTestCase` would have been a
+   latent `AttributeError` for any non-namespaced caller that ever
+   reached it. The management session read step 7a's diff, made this
+   move, and amended the commit before it landed — see Review
+   follow-ups.
+
 3. **The three event-renewed loops keep the progress window and gain a
    ceiling.** Both numbers are named constants on `BaseTestCase`, so
    the ceiling is one place to change and the timeout message can
@@ -421,66 +431,113 @@ Made in the planning commit, so a later step does not repeat them:
 
 ## Definition of done
 
-Every item is checkable by running the command next to it.
+Every item is checkable by running the command next to it. The final
+item is the one that gates the merge: it is unticked below, and until
+it is satisfied the four tests in
+`smoke_ci_tests/test_agentop_deadlines.py` are unverified — step 7d's
+own commit message says as much, and nothing a management session can
+read substitutes for a run against a real cluster.
 
-- [ ] No `getattr(apiclient` remains in the CI suite:
+- [x] No `getattr(apiclient` remains in the CI suite:
       `! grep -rn "getattr(apiclient" shakenfist/deploy/shakenfist_ci/`
-- [ ] `AGENT_OPERATION_FAILURES` names three exceptions and no shim:
+- [x] `AGENT_OPERATION_FAILURES` names three exceptions and no shim:
       `grep -A3 "^AGENT_OPERATION_FAILURES = (" shakenfist/deploy/shakenfist_ci/base.py`
       shows `AgentCommandError`, `AgentOperationFailed` and
       `AgentAwaitTimeout`.
-- [ ] Both `test_get_missing_file` assertions name the narrow
+- [x] Both `test_get_missing_file` assertions name the narrow
       exception:
       `grep -n "AgentOperationFailed" shakenfist/deploy/shakenfist_ci/*/test_agentops.py`
       returns two lines, and
       `grep -c "AGENT_OPERATION_FAILURES" shakenfist/deploy/shakenfist_ci/*_ci_tests/test_agentops.py`
       returns zero for both.
-- [ ] No unguarded agent-operation poll loop remains in the suite:
+- [x] No unguarded agent-operation poll loop remains in the suite:
       `grep -rn "while aop\['state'\] != 'complete'" shakenfist/deploy/shakenfist_ci/`
       returns nothing.
-- [ ] The helper is shared, not duplicated:
+
+      Correction: run as written, that command returns two lines, not
+      nothing — `_await_command` (`base.py:914`, phase 4's own
+      terminal-state check) and `_await_agentop_complete` itself
+      (`base.py:1159`). Both open with this exact condition and both
+      check `AGENT_OPERATION_FAILED_STATES` before looping again; the
+      grep cannot distinguish a guarded loop from an unguarded one when
+      both share the loop head's text. Read by hand, no loop that lacks
+      a terminal-state check remains, which is the substantive claim
+      this item is checking for.
+- [x] The helper is shared, not duplicated:
       `grep -rn "def _await_agentop_complete" shakenfist/deploy/shakenfist_ci/`
-      returns exactly one line, in `base.py`.
-- [ ] The smoke put/get test no longer shares a clock: in
+      returns exactly one line, in `base.py` (on
+      `BaseNamespacedTestCase`; see decision 2's correction).
+- [x] The smoke put/get test no longer shares a clock: in
       `smoke_ci_tests/test_agentops.py`, `test_instance_put_and_get_blob`
       contains no `start_time` reused across two waits.
-- [ ] All three event-renewed loops have a ceiling: each of
+- [x] All three event-renewed loops have a ceiling: each of
       `_await_agent_state`, `_await_instance_create` and
       `_await_objects_ready` in `base.py` references a ceiling
       constant distinct from its progress window.
-- [ ] No timeout message states a duration that disagrees with its
+- [x] No timeout message states a duration that disagrees with its
       constant: read the three messages and check each against the
       constant it quotes. `_await_agent_state`'s "5 minutes" for 500
-      seconds is the known instance.
-- [ ] Renewal only happens on progress events: every one of the three
+      seconds is the known instance. All three messages now build their
+      duration from `_await_expired()`'s f-strings, which quote the
+      real constant rather than hardcoded prose.
+- [x] Renewal only happens on progress events: every one of the three
       loops renews through `_renew_progress()`, and
       `grep -n "limit=1)" shakenfist/deploy/shakenfist_ci/base.py`
       returns nothing — no renewal call reads a single event of any
       type any more. `PROGRESS_EVENT_TYPES` on `BaseTestCase` names
       the set, and excludes `usage`, `resources`, `health` and
       `prune`.
-- [ ] `smoke_ci_tests/test_agentop_deadlines.py` exists and contains
+- [x] `smoke_ci_tests/test_agentop_deadlines.py` exists and contains
       four tests, or fewer with each omission recorded in Future work
-      and its reason given.
-- [ ] `docs/operator_guide/agent_operations.md` exists, is listed in
+      and its reason given. All four scenarios are present; none was
+      omitted.
+- [x] `docs/operator_guide/agent_operations.md` exists, is listed in
       `mkdocs.yml`, and names all three of
       `AGENT_OPERATION_DEFAULT_DEADLINE`,
       `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` and
       `AGENT_OPERATION_MAX_ATTEMPTS`:
       `grep -c "AGENT_OPERATION_" docs/operator_guide/agent_operations.md`
       is at least 3.
-- [ ] The release note covers retry and the client:
+- [x] The release note covers retry and the client:
       `grep -n "AGENT_OPERATION_MAX_ATTEMPTS\|--progress-timeout\|AgentOperationFailed" docs/release_notes/v07-v08.md`
       returns at least one line for each.
-- [ ] No fact about the timing budgets is stated differently on two
+- [x] No fact about the timing budgets is stated differently on two
       pages: the defaults quoted in
       `docs/operator_guide/agent_operations.md`,
       `docs/developer_guide/api_reference/instances.md:680` and
-      `docs/release_notes/v07-v08.md:744` agree.
-- [ ] `pre-commit run --all-files` exits zero.
+      `docs/release_notes/v07-v08.md:744` agree (600 seconds and 30
+      seconds, in all three).
+- [x] `pre-commit run --all-files` exits zero.
 - [ ] CI has run green on the branch, including the smoke suite, and
       the new deadline tests appear in its results rather than being
-      skipped.
+      skipped. **Not satisfied.** The branch has not been pushed, and
+      the functional suite needs a real cluster that this closeout does
+      not have access to. This is what gates the merge; see What
+      remains.
+
+## Review follow-ups
+
+After step 7a landed, the management session read its diff and moved
+`_await_agentop_complete()` from `BaseTestCase` to
+`BaseNamespacedTestCase`, then amended the commit before continuing to
+7b. The reason is decision 2's correction above: the helper polls as
+`self.test_client`, which only `BaseNamespacedTestCase.setUp()`
+constructs, and leaving it on `BaseTestCase` would have been a latent
+`AttributeError` for the first non-namespaced caller to reach it.
+
+## What remains
+
+The code and documentation are done and reviewed: five commits, 7a
+through 7e, landed everything the step plan describes, and this
+closeout has independently re-run every Definition of done check that
+does not need a cluster. What is left is the one that does: a green CI
+run on this branch, including the smoke suite, with the four tests in
+`test_agentop_deadlines.py` appearing in the results rather than being
+skipped. The branch has not been pushed yet. Phase 7's status in
+`PLAN-agent-operation-deadlines.md`'s Execution table stays `In
+progress`, and the plan's row in `docs/plans/index.md` stays at `7 of
+9`, until that run happens; both flip to `Complete` and `8 of 9` once
+it does.
 
 ## Future work
 
@@ -498,6 +555,43 @@ Every item is checkable by running the command next to it.
   them into one parameterised module is a larger change than this
   phase should carry, and belongs to whoever next has a reason to
   touch both.
+- **A latent regression from phase 6, repaired here by accident.**
+  Phase 6 changed `await_agent_command()`'s timeout path in
+  client-python from raising `AgentCommandError` to raising the new
+  `AgentAwaitTimeout`. `base.AGENT_OPERATION_FAILURES` did not name the
+  new exception, so between phase 6 landing and step 7b,
+  `_await_instance_ready`'s cloud-init retry loop silently stopped
+  retrying a timed-out health check — it had retried them before, as
+  `AgentCommandError`. Step 7b restores that coverage by adding
+  `AgentAwaitTimeout` to the tuple. Worth naming because it is a
+  general hazard: changing which exception a client raises silently
+  narrows every `except` tuple downstream that was written against the
+  old one.
+- **The two `test_agentops.py` files diverged slightly rather than
+  converging**, which the entry above already names as a duplication
+  hazard. The specific new drift: step 7a gave the smoke suite's
+  `test_instance_put_and_get_blob` independent budgets of 30/60/120,
+  while the guest copy keeps 60/60/120, because each preserved its own
+  original first-operation budget. The shared-clock bug is gone from
+  both, but the files are still near-exact copies with one number
+  different.
+- **Decision 3 was corrected during execution**, by step 7c, and the
+  correction is written into the decision itself. Noted here only so a
+  reader does not go looking for an uncorrected copy elsewhere.
+- **Step 7d found no server-side enforcement bug**, which this plan's
+  out-of-scope section anticipated it might. Record the one thing it
+  did establish that the documentation now relies on: `agent/execute`
+  never goes through preflight — the endpoint sets the queued state
+  directly — so an expired execute was expired either at dequeue or
+  inside the executor, never at the preflight check that bounds other
+  operation types.
+- **Step 7e found and fixed two stale documentation facts** outside
+  this phase's stated scope, both licensed by the "no fact stated
+  differently on two pages" Definition-of-done criterion:
+  `docs/operator_guide/database.md` still said `attempts` and
+  `last_progress` were recorded but not yet consumed, and
+  `docs/developer_guide/api_reference/instances.md` still said nothing
+  is retried. Both were true before phase 5 and false after it.
 
 ## Back brief
 
