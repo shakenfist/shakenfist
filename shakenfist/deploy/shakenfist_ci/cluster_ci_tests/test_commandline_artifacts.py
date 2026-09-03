@@ -2,21 +2,25 @@ import json
 import sys
 import time
 
-from oslo_concurrency import processutils
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import process
 
 
-def _exec(cmd):
-    sys.stderr.write('\n----- Exec: %s -----\n' % cmd)
-    out, err = processutils.execute(cmd, shell=True)
+def _exec(cmd, env=None):
+    # mask_secrets() on the way to stderr is a backstop, not the
+    # protection: _exec_client() hands the namespace key to sf-client
+    # through env rather than building it into cmd, so there is nothing
+    # here to mask. See process.SECRET_FLAG_RE.
+    sys.stderr.write('\n----- Exec: %s -----\n' % process.mask_secrets(cmd))
+    out, err = process.execute(cmd, shell=True, env=env)
     for line in out.split('\n'):
         sys.stderr.write('out: %s\n' % line)
     sys.stderr.write('\n')
     for line in err.split('\n'):
         sys.stderr.write('err: %s\n' % line)
-    sys.stderr.write('\n----- End: %s -----\n' % cmd)
+    sys.stderr.write('\n----- End: %s -----\n' % process.mask_secrets(cmd))
     return out
 
 
@@ -28,9 +32,16 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         super().__init__(*args, **kwargs)
 
     def _exec_client(self, cmd):
-        return _exec('sf-client --apiurl %s --namespace %s --key %s %s'
-                     % (self.test_client.base_url, self.namespace,
-                        self.namespace_key, cmd))
+        # sf-client has read SHAKENFIST_API_URL, SHAKENFIST_NAMESPACE and
+        # SHAKENFIST_KEY since v0.2.5. Using them keeps the namespace key
+        # out of the command line, which _exec() writes to stderr on every
+        # invocation and which the harness prints again on failure.
+        return _exec('sf-client %s' % cmd,
+                     env={
+                         'SHAKENFIST_API_URL': self.test_client.base_url,
+                         'SHAKENFIST_NAMESPACE': self.namespace,
+                         'SHAKENFIST_KEY': self.namespace_key,
+                     })
 
     def test_artifact_commands(self):
         # Ensure we have a version of cirros in the cache
