@@ -14106,6 +14106,21 @@ with per-node RAM unchanged -- so the same reshape can relax the
 CPU filter while tightening the memory one. Whether the test
 actually gets greener is therefore not settled by this plan; it is
 one more thing phase 2's per-stage refusal counts must show.</p>
+<p><em>Correction (2026-09-01), from scheduler-reservations phase 6:</em>
+the worry above is discharged, and <code>test_affinity</code> should be
+dropped from the corpus of signatures this plan has to worry
+about masking. It no longer asserts co-location at all. #3565's
+disposition established that the traced failure had the candidate
+set collapsing to a single node before affinity was scored, so the
+test was asserting a guarantee the product never made; it now
+asserts that the scheduler <em>scored</em> the affine node highest among
+the candidates it had, and <strong>skips</strong> when the affine node was
+ejected by an admission filter before scoring. That skip is
+exactly the condition a small cloud produces, so growing the
+cloud can no longer turn this test green by hiding the question --
+the question has been answered, and the test reports "no
+information" rather than passing. #3772 and #3907 are unaffected
+and remain the live masking risk.</p>
 <h3 id="candidate-shapes">Candidate shapes<a class="headerlink" href="#candidate-shapes" title="Permanent link">&para;</a></h3>
 <p>Illustrative only -- phase 2 supplies the peak-demand figure that
 turns these into a decision.</p>
@@ -14669,15 +14684,21 @@ sure none of them is closed by accident:</p>
   Directly caused by the CI node shape this plan is changing, and
   the reason open question 1 leans towards widening nodes rather
   than lowering the reservation.</li>
-<li><strong>#3565</strong> (open) -- <code>test_affinity</code>. Its title already says
-  "soft affinity loses to resource filters under suite
+<li><strong>#3565</strong> (closed 2026-08-31) -- <code>test_affinity</code>. Its title
+  said "soft affinity loses to resource filters under suite
   concurrency". The most frequent <code>slim-primary</code> failure in the
   sampled window, always the same signature: instances that
   should share a node do not. Its most recent traced occurrence
   binds at the memory stage rather than the CPU one, so a bigger
   cloud may quieten it, may not, and either way decides nothing
-  about whether the scheduler was right. It needs a disposition in
-  phase 0 before phase 4.</li>
+  about whether the scheduler was right. <strong>Its disposition is
+  written</strong>, by scheduler-reservations phase 6, and the title was
+  wrong: in the traced run the candidate set had collapsed to one
+  node before affinity was scored, so affinity lost no tiebreak
+  and was never consulted. It closed on a test change rather than
+  a scheduler change. This plan's requirement that it get a
+  disposition in phase 0 before phase 4 is therefore satisfied,
+  and nothing here waits on it.</li>
 <li><strong>#3975</strong> (closed) -- the phase 1 headroom probe failed a merge
   queue build. Its per-sample <code>GET /nodes</code> and <code>GET
   /admin/resources</code> read node state once per node, so at the default

@@ -14025,7 +14025,7 @@ table entirely (decision D8).</p>
 <tr>
 <td>6. Affinity model rework</td>
 <td><a href="../PLAN-scheduler-reservations-phase-06-affinity/">PLAN-scheduler-reservations-phase-06-affinity.md</a></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>7. Diagnostic-mode rejection logging</td>
@@ -14095,7 +14095,8 @@ is here.</p>
   merged by hand. The three claims tests passed on all three
   cluster platforms inside that failed run, so the evidence is
   sound, but the gate was bypassed rather than met.</li>
-<li><strong>Phase 4a</strong> was inserted on 2026-08-22, between phases 4 and 5,
+<li>
+<p><strong>Phase 4a</strong> was inserted on 2026-08-22, between phases 4 and 5,
   because #3813 was a live defect in phase 3's shipped admission code
   and phase 5 makes that code the sole gate on placement. It completed
   on 2026-08-24. The soak measured the fix: demand-only refusals fell
@@ -14103,8 +14104,73 @@ is here.</p>
   62% to 4.1%. Its survey found that the D13 seed constant was transcribed from the wrong row
   of its own measurements, which reclassifies the fix from a deferred
   tuning question to a correction; see the phase plan's <em>What the
-  survey found</em>.</li>
+  survey found</em>.</p>
+</li>
+<li>
+<p><strong>Phase 6</strong> was executed out of order, ahead of phases 4c and 5,
+  and completed on 2026-09-01. It merged as #3972 (the validator
+  400s), #3971 (the binary model, the transition mapping and the
+  documentation) and #3957 (this plan file).</p>
+</li>
 </ul>
+<p><strong>#3565 closed on a test change, not a scheduler change.</strong> The
+  traced occurrence of 2026-08-26 had the candidate set collapsing
+  to a single node before affinity was scored, so the anti-affinity
+  instance placed on the node it had correctly scored <code>-100</code> simply
+  because a scorer given one candidate has nothing to do -- and the
+  half of the assertion that <em>passed</em> was the same forced choice.
+  Affinity was never consulted in either direction. The test now
+  asserts that the scheduler <em>scored</em> the affine node highest among
+  the candidates it had, and skips when it had none to choose
+  between. A later reader looking for the missing scheduler fix
+  should stop here: there is not one, and D6's three positions are
+  disposed of under F2 and F7 in the phase plan. The filter that
+  did the damage was <code>sufficient_idle_memory</code>, not the
+  <code>sufficient_idle_cpu</code> the issue title named for a year.</p>
+<p>Two things the phase found and did not fix, both recorded rather
+  than dropped: <strong>#3967</strong> (closed) -- affinity metadata values
+  returned 500 rather than 400 for lists, dicts, <code>null</code> and
+  <code>Infinity</code> -- was fixed by step 3 on its own branch so a live
+  public-API 500 did not wait on the model work. <strong>#4001</strong> (closed
+  2026-09-01) -- the preflight redirect reverting to the whole
+  cluster when its exclusion set comes out empty -- was filed on a
+  reading of the code and explicitly <em>not</em> on the trace that
+  prompted the search for it, and was fixed by the issue-fix
+  workflow (<code>9d7fbc24c</code>) the same day; see the phase plan's
+  close-out for the fix and for why the trace turned out to show
+  designed behaviour.</p>
+<p>One caveat on its exit: the merge-queue run for #3971
+  (<code>33452092452</code>) shows <code>failure</code> overall, because <code>Ubuntu 24.04
+  cluster</code> (job <code>99684426208</code>) failed. All three affinity cluster
+  tests passed on <code>Debian 12 cluster</code> and the tier platform passed
+  too, so the affinity evidence is sound, but as with #3930 the
+  gate was bypassed rather than met.</p>
+<p>That failure was triaged at close-out rather than left
+  unattributed, since a phase adding a hard filter stage to the
+  scheduler is exactly where an unexplained platform-specific
+  cluster failure should not be waved through. The job ran one
+  failing test, <code>test_imagefetch.TestHTTPFetch.</code>
+  <code>test_disappearing_source_instance</code>, which refuses at instance
+  create with <code>507 {"error": "No nodes remaining at scheduling
+  stage sufficient_idle_cpu"}</code>. That is the <strong>#3772</strong> 507 family,
+  and it cannot be this phase's doing: <code>test_imagefetch.py</code>
+  contains no affinity metadata anywhere, and the refusing stage
+  runs at <code>scheduler.py:653</code>, ahead of the new
+  <code>affinity_constraints</code> stage at <code>:710</code>, so the create never
+  reached the code this phase added. It is tracked by #3772
+  rather than by anything new, and recorded there as a recurrence
+  (comment <code>5507548920</code>) because <code>test_imagefetch</code> was not among
+  that umbrella's existing signatures. What the triage rests on is
+  the stage named in the refusal and a reading of the test and the
+  pipeline, not on a rerun -- nobody re-ran the job. The same
+  job's headroom census shows the refusal was the admission ledger
+  ("would exceed hard max CPUs", 16 drops) while the committed-to-
+  ledger p90 sat at 0.370, which is the reading
+  <code>PLAN-ci-cloud-sizing.md</code> already argues.</p>
+<p>Its step 7 close-out ran a day after the code merged, and #3565
+  was closed in the interval with no comment on it. The phase plan
+  records both, because a phase whose bookkeeping trails its code
+  by a day is a phase whose status columns lie for a day.</p>
 <h3 id="phase-scope-stubs">Phase scope stubs<a class="headerlink" href="#phase-scope-stubs" title="Permanent link">&para;</a></h3>
 <p>Each stub is the seed for that phase's plan file; decisions
 referenced as D-numbers are in the phase 0 decisions document.</p>

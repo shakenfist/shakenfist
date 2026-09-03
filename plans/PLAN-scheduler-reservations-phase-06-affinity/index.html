@@ -14291,7 +14291,7 @@ of argument are to re-read.</p>
 <td>opus</td>
 <td>worktree</td>
 <td>Rewrite <code>test_affinity</code> onto the scheduler's audit events per F2 and F3, asserting affinity tier membership rather than final co-location, and skipping (not passing) on a degenerate run. <strong>Full brief: <a href="#step-1-brief-rewrite-test_affinity-onto-the-events">Step 1</a>.</strong></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2</td>
@@ -14299,7 +14299,7 @@ of argument are to re-read.</p>
 <td>sonnet</td>
 <td>none</td>
 <td>(GitHub) The #3565 disposition, once step 1 has merged. Comment on #3565 recording F2: the traced 2026-08-26 run shows a single-candidate set, so affinity was never consulted, and both halves of the assertion had the same cause; the issue is closed by candidate fix 2 rather than by a scheduler change; D6's three positions are disposed of by F2 and F7. Close it. Then deal with the retry behaviour from finding 6, and <strong>pin it to a call site before filing</strong> (F8). Re-read that comment's event payloads against the three sites finding 6 names: the create path's demand-waiving second walk (<code>external_api/instance.py:924-940</code>), the preflight redirect that rebuilds the candidate list excluding the current node (<code>operations/node_inst_netdesc_op.py:172-180</code>), and preflight's opening forced call against <code>config.NODE_UUID</code> (<code>:156</code>), which runs on the node the create path has just chosen. There is a fourth mechanism, at the second of those sites rather than at a new one, and it is the only one of the four whose code path demonstrably re-offers a node it has just refused: <code>find_candidates()</code> tests <code>if candidates:</code> (<code>scheduler.py:400</code>, <code>:441</code>), so an <em>empty</em> forced list is treated as unforced and reverts to the whole cluster -- including the node the redirect built the list to exclude. The redirect means "every node except this one" and silently means "every node" whenever that set comes out empty. Check the trace against this as well as the three above; if it is not the mechanism, it is still worth recording as its own observation. File the issue against whichever the trace matches, quoting the payloads and naming the file and line. If none of them matches, file it as an observation that says so in as many words rather than asserting a mechanism -- a wrong issue is worse than none. Cross-reference it from #3565's closing comment. Do <strong>not</strong> file the validator defect here: step 3 files and closes its own issue, deliberately, so that a live public-API 500 does not wait on this step, which waits on step 1 (F1). If step 3 has already landed, reference its issue from #3565's closure alongside the retry one. Also comment on <code>PLAN-ci-cloud-sizing</code>'s tracking of #3565 that its "needs a disposition in phase 0 before phase 4" is now satisfied. Include <em>(Triage assisted by Claude Code)</em>.</td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3</td>
@@ -14307,7 +14307,7 @@ of argument are to re-read.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>The validator 500, on its own branch and its own issue: widen the <code>int()</code> coercion handler to <code>(TypeError, ValueError, OverflowError)</code> and refuse booleans. Depends on nothing else here. <strong>Full brief: <a href="#step-3-brief-the-validator-500">Step 3</a>.</strong></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>4</td>
@@ -14315,7 +14315,7 @@ of argument are to re-read.</p>
 <td>opus</td>
 <td>worktree</td>
 <td>Build the binary affinity model: the four reserved keys, the hard <code>require_*</code> filter stage, the 409, and the three preflight abort messages. <strong>Full brief: <a href="#step-4-brief-the-binary-model">Step 4</a>.</strong></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>5</td>
@@ -14323,7 +14323,7 @@ of argument are to re-read.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>Map weighted specifications onto the binary form where the scheduler reads them, and emit a deprecation event where a specification is accepted. <strong>Full brief: <a href="#step-5-brief-the-transition-mapping">Step 5</a>.</strong></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>6</td>
@@ -14331,7 +14331,7 @@ of argument are to re-read.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>Documentation: rewrite <code>docs/user_guide/affinity.md</code>, put the diagnostic and discovery recipes in <code>docs/operator_guide/scheduler.md</code>, and record which skip is expected on which CI topology. <strong>Full brief: <a href="#step-6-brief-documentation">Step 6</a>.</strong></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>7</td>
@@ -14339,7 +14339,7 @@ of argument are to re-read.</p>
 <td>sonnet</td>
 <td>worktree</td>
 <td>(shakenfist) Close-out. Set phase 6 to <code>Complete</code> in the master plan Execution table, confirm <code>docs/plans/index.md</code>'s arithmetic, and record in the phase status notes that #3565 closed on a test change rather than a scheduler change, with F2's one-line reason so a later reader does not reopen it looking for the missing fix. Also settle <code>GOALS.md:38</code>, "I am not confident that the affinity rules for instances work as expected" -- the project-level form of the uncertainty this phase exists to resolve, and the one artifact that should not still say it afterwards. Rewrite it to what is now known (affinity ranks, it does not admit; a single-candidate placement is neither honoured nor violated; hard constraints are the way to ask for admission) or delete it, but do not leave it standing. Commit subject: <code>scheduler: close out phase 6.</code></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -15015,7 +15015,7 @@ first, which is the same rule and the same reason as phase 4b
 step 4.</p>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No assertion in <code>test_affinity</code> compares <code>inst2['node']</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No assertion in <code>test_affinity</code> compares <code>inst2['node']</code>
       or <code>inst3['node']</code> to anything. Checked with
       <code>grep -n "inst[23]\['node'\]" cluster_ci_tests/test_scheduler.py</code>,
       which today returns lines 125 and 129 and must return
@@ -15029,7 +15029,7 @@ step 4.</p>
       about inst2 and inst3. (Run at planning time: the more
       obvious <code>inst\['node'\]</code> matches nothing at all, because
       the assertions name <code>inst1</code>, <code>inst2</code> and <code>inst3</code>.)</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>test_affinity</code> skips, with a message naming the candidate
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>test_affinity</code> skips, with a message naming the candidate
       count, when the <em>unforced</em> pass's <code>schedule have highest
       affinity</code> event holds fewer than two <code>affinity_detail</code>
       entries. Three wrong sources are ruled out and none may
@@ -15039,7 +15039,7 @@ step 4.</p>
       entry), and <code>extra['candidates']</code> <em>within the correct
       event</em>, which is the post-scoring winning tier and not the
       input set.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>test_affinity</code> also skips, with a <strong>different</strong> message,
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>test_affinity</code> also skips, with a <strong>different</strong> message,
       when inst1's node is absent from the unforced pass's
       <code>affinity_detail</code> keys -- the affinity target was ejected
       by an admission filter before scoring. Falsifiable by
@@ -15047,18 +15047,18 @@ step 4.</p>
       other names the missing node, and CI output tells them
       apart. Without this the test fails on the one mechanism F2
       holds is not a scheduler defect.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong><code>test_affinity</code> does not skip on a healthy three-node
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong><code>test_affinity</code> does not skip on a healthy three-node
       run.</strong> This is the check that catches the whole family of
       gate mistakes above, both of which were caught in review
       rather than by a criterion, and it is falsifiable in one
       run against sfcbr.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>test_affinity</code> fails, rather than skipping, when the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>test_affinity</code> fails, rather than skipping, when the
       unforced <code>schedule inputs</code> / <code>schedule have highest
       affinity</code> pair cannot be found -- a missing event means
       the read was wrong, not that the run was degenerate.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Mutating the scorer to ignore negative affinity
       contributions fails the inst3 assertion and no other test.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A create with <code>require_with_tag</code> naming a tag no
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A create with <code>require_with_tag</code> naming a tag no
       <em>co-located instance</em> carries fails with <strong>409</strong>, naming
       the constraint and the stage -- not 507, not a traceback
       and not a silent placement. 507 is the specific wrong
@@ -15067,19 +15067,19 @@ step 4.</p>
       ("a no-candidate refusal naming that stage") was satisfied
       by it. (Instance tags, not node properties -- Shaken Fist
       has no node capability tags.)</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A create carrying a <strong>weighted</strong> affinity spec emits the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A create carrying a <strong>weighted</strong> affinity spec emits the
       deprecation event, checked by reading that instance's own
       events after a create. Stated against the create path
       deliberately: the two metadata endpoints are the easy half,
       and an implementation that covers only them warns nobody
       who used the form the way <code>test_affinity</code> does.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>test_affinity</code>'s event read passes <code>event_type='audit'</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>test_affinity</code>'s event read passes <code>event_type='audit'</code>
       and <code>limit=1000</code> explicitly, and pairs the unforced
       scheduling events by <code>request_id</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/</code> says in as many words that <code>require_without_tag</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/</code> says in as many words that <code>require_without_tag</code>
       is scoped to the requesting namespace and is not an
       isolation primitive.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A weighted spec and its mapped binary equivalent produce
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A weighted spec and its mapped binary equivalent produce
       the same candidate ordering <strong>for specs in which every
       weight has the same magnitude</strong> (which includes every
       single-tag spec; positive scaling is order-preserving,
@@ -15094,7 +15094,7 @@ step 4.</p>
       magnitude deliberately, so a criterion demanding identical
       ordering in every case would be a gate step 5 cannot pass,
       and the only way to pass it would be to abandon F4.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The discovery recipe for existing weighted specs exists in
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The discovery recipe for existing weighted specs exists in
       <code>docs/</code>, and has been <strong>run once against a real cluster</strong>
       with its output recorded. Step 5's deprecation event
       reaches new acceptances only, so this recipe is the whole
@@ -15102,10 +15102,10 @@ step 4.</p>
       spec when the removal release lands -- and it is the one
       load-bearing deliverable in this plan that would otherwise
       have no falsifiable criterion at all.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> #3565 is closed with the F2 reasoning recorded on it, and
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> #3565 is closed with the F2 reasoning recorded on it, and
       the forced-candidate retry defect exists as its own issue,
       referenced from #3565.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No document still tells phase 6 to rule out the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No document still tells phase 6 to rule out the
       lost-spreading mechanism <strong>without saying, at that point,
       that it is already ruled out</strong>. The superseded instruction
       stays in the master plan stub, immediately under a dated
@@ -15114,9 +15114,9 @@ step 4.</p>
       phrasing -- "no document still tells phase 6 to rule it
       out" -- was false in the same commit that asserted it, and
       a criterion false at merge time is not a criterion.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/</code> states that a single-candidate placement is neither
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/</code> states that a single-candidate placement is neither
       a preference honoured nor violated.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> An affinity dictionary <strong>value</strong> which is a list, a dict,
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> An affinity dictionary <strong>value</strong> which is a list, a dict,
       <code>None</code> or <code>Infinity</code> is refused with a 400 from instance
       create and from both metadata endpoints -- that is,
       <code>{'affinity': {'first-node': ['a']}}</code>, not <code>{'affinity':
@@ -15132,7 +15132,7 @@ step 4.</p>
       is refused by <code>isinstance(value, dict)</code> (<code>:1398-1400</code>) and
       one which is <code>None</code> by <code>if not value</code> (<code>:1387-1388</code>). Only
       the inner coercion leaks.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>{'affinity': {'first-node': true}}</code> is refused with a<ol>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>{'affinity': {'first-node': true}}</code> is refused with a<ol>
 <li>This one is a <strong>deliberate compatibility break</strong>, not
   a 500 being fixed: <code>int(True)</code> is 1, so it is accepted
   today, and under F4's mapping it would quietly become
@@ -15143,7 +15143,7 @@ step 4.</p>
   <code>except</code> rather than replacing the coercion.</li>
 </ol>
 </li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Nothing in the preflight abort path reads the <code>except</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Nothing in the preflight abort path reads the <code>except</code>
       clause's exception variable outside its suite. Falsifiable
       by grepping <code>node_inst_netdesc_op.py</code> for a bare <code>e</code> below
       <code>:162</code>: the guards at <code>:166</code> and <code>:170</code> must test a local
@@ -15151,13 +15151,13 @@ step 4.</p>
       exception itself. A <code>NameError</code> here passes the PR and
       fails in the merge queue, because that path runs only
       under cluster CI.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>_log_and_raise_on_error()</code> grows a defaulted
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>_log_and_raise_on_error()</code> grows a defaulted
       <code>exception_class</code> argument and every pre-existing call site
       is unchanged, checked by grep. Without it the require stage
       cannot both publish through the helper and raise
       <code>AffinityConstraintUnsatisfiable</code>, which two parts of this
       plan had asked for at once.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A create requesting <strong>no</strong> <code>require_*</code> constraint performs
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A create requesting <strong>no</strong> <code>require_*</code> constraint performs
       no more <code>_placed_instances()</code> reads than it does today,
       measured against <code>shakenfist/data/database_load_budget.yaml</code>.
       Hoisting the memo alone does not achieve this; the require
@@ -15167,7 +15167,7 @@ step 4.</p>
       existing baseline, which step 4 leaves alone: the
       short-circuit that would reduce it belongs to step 5, so
       this bullet asks step 4 for a wash and not for a saving.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> After step 5, a create requesting no affinity at all
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> After step 5, a create requesting no affinity at all
       performs <strong>fewer</strong> <code>_placed_instances()</code> reads than it does
       today, measured the same way. This is the criterion the
       short-circuit is for, and it is separate from the bullet
@@ -15177,13 +15177,13 @@ step 4.</p>
       cannot be separated from the mapping -- see the step 4
       brief for why a short-circuit landing alone would silently
       stop scoring affinity for every existing caller.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>test_affinity</code> uses the <code>request_id</code> pairing only when
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>test_affinity</code> uses the <code>request_id</code> pairing only when
       that id is truthy, and fails rather than skips when neither
       the pairing nor adjacency identifies a pass. A match whose
       key is null on both sides would select the forced preflight
       pass and skip forever, which is the fourth route to the
       failure F3 exists to prevent.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A create requesting <strong>no</strong> affinity at all still schedules.
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A create requesting <strong>no</strong> affinity at all still schedules.
       This is the cheap guard on the short-circuit: the affinity
       walk is what populates <code>by_affinity</code>, and
       <code>sorted(by_affinity, reverse=True)[0]</code> over an empty
@@ -15192,7 +15192,7 @@ step 4.</p>
       with no <code>affinity</code> metadata, which is most of the existing
       suite -- the criterion is here because a load reduction
       that breaks every ordinary create is not a load reduction.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A well-formed <strong>binary</strong> specification is accepted by all
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A well-formed <strong>binary</strong> specification is accepted by all
       three entry points -- instance create and both metadata
       endpoints -- and not refused by the widened <code>int()</code> loop
       step 3 installs. The binary form's values are lists, which
@@ -15200,26 +15200,26 @@ step 4.</p>
       discrimination has to run above it. Two steps each correct
       in isolation compose into a validator that rejects the
       feature, and only a criterion spanning both catches it.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The <strong>409 is asserted at the API level</strong>, not only as an
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The <strong>409 is asserted at the API level</strong>, not only as an
       exception type in the scheduler suite. F9 calls the
       <code>except</code>-clause ordering the entire mechanism, and a test
       which asserts <code>AffinityConstraintUnsatisfiable</code> was raised
       passes identically whether the create path answered 409 or
       507 -- so the scheduler suite cannot see the one mistake
       the ordering exists to prevent.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The preflight abort guards at <code>node_inst_netdesc_op.py</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The preflight abort guards at <code>node_inst_netdesc_op.py</code>
       <code>:166</code> and <code>:170</code> are exercised by a unit test. Both run
       only in the queue daemon under cluster CI, so anything
       wrong with them -- the <code>NameError</code> above, or a guard
       testing the wrong flag -- passes the pull request and fails
       in the merge queue.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/</code> states the <code>require_with_tag</code> bootstrapping dead
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/</code> states the <code>require_with_tag</code> bootstrapping dead
       end and its workaround in the same place as the constraint
       table. The first member of a group cannot be placed under
       the constraint that defines the group, which is the model
       working and reads as a bug; an operator who meets it
       undocumented files one.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A <strong>weighted</strong> affinity specification still produces a
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A <strong>weighted</strong> affinity specification still produces a
       populated <code>affinity_detail</code>, asserted by a unit test. This is
       the guard on the short-circuit's other edge: the <code>prefer_*</code>
       lists of a weighted spec are empty until step 5's mapping fills
@@ -15229,14 +15229,14 @@ step 4.</p>
       no-affinity bullet above does not catch it, and neither does
       the weighted-vs-binary ordering test, which belongs to the same
       step as the mapping.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Both of <code>test_affinity</code>'s skip conditions are evaluated
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Both of <code>test_affinity</code>'s skip conditions are evaluated
       <strong>per instance</strong>, against inst2's unforced pass and inst3's,
       and the test skips if either is degenerate. Falsifiable by
       reading the two assertion call sites: each passes that
       instance's own events. Guards computed once from inst2 leave
       the inst3 assertion running against a pass that may have had
       no choice.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/user_guide/affinity.md</code> no longer says that affinity
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/user_guide/affinity.md</code> no longer says that affinity
       <strong>filters</strong> candidate hypervisors on the strength of the
       weights. It says so today, in an admonition, and that is the
       exact over-strong reading F2 identifies as the root of #3565 --
@@ -15246,21 +15246,21 @@ step 4.</p>
       word is not simply wrong now: <code>require_*</code> does filter. The
       criterion is that the page says which half filters and which
       half ranks.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>All three</strong> preflight abort messages name affinity when the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>All three</strong> preflight abort messages name affinity when the
       constraint is what failed, <code>:276</code> included. Falsifiable by
       grepping the three <code>AbortInstanceStart</code> sites for a branch on
       <code>AffinityConstraintUnsatisfiable</code>. <code>:276</code> is the one inside an
       <code>except</code> suite, so it is the easiest of the three -- which is
       how an earlier draft came to describe it without instructing
       it.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The binary model has <strong>cluster-CI</strong> coverage, not unit
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The binary model has <strong>cluster-CI</strong> coverage, not unit
       coverage alone: a <code>prefer_with_tag</code> tier assertion and a
       <code>require_with_tag</code> refusal asserted as a 409. The project
       prefers functional tests where only one is possible, and the
       two behaviours least convincing under mocked placements -- the
       bootstrapping dead end and the namespace scope -- are
       properties of a real cluster's instance population.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A well-formed <strong>binary</strong> specification schedules without
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A well-formed <strong>binary</strong> specification schedules without
       raising, asserted by a unit test that drives
       <code>find_candidates()</code> with the binary shape -- and so does a
       stored specification the validator would refuse today, such
@@ -15272,7 +15272,7 @@ step 4.</p>
       <code>LowResourceException</code> and <code>CandidateNodeNotFoundException</code>.
       The weighted-spec bullet above guards the opposite
       direction and does not cover this.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Both directions of the namespace scope are asserted by unit
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Both directions of the namespace scope are asserted by unit
       tests: a node hosting a tagged instance in <strong>another</strong>
       namespace neither satisfies <code>require_with_tag</code> nor trips
       <code>require_without_tag</code>. The plan decides this scope as a
@@ -15283,7 +15283,7 @@ step 4.</p>
       regression guard and not only a sentence. Cheap with mocked
       placements, and falsifiable by deleting the namespace skip
       and watching both fail.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The require stage reuses the scorer's neighbour skips rather
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The require stage reuses the scorer's neighbour skips rather
       than restating them, asserted by a test that a <strong>placed</strong>
       instance carrying tag <code>x</code> can still be rescheduled under
       <code>require_without_tag: ['x']</code>. Preflight calls
@@ -15293,21 +15293,21 @@ step 4.</p>
       and then every other node too. The scorer's own self-skip
       has no test today, so this criterion closes a gap on both
       sides of the shared predicate.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/user_guide/affinity.md</code> says that a hard constraint is
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/user_guide/affinity.md</code> says that a hard constraint is
       re-evaluated on <strong>every restart and reschedule</strong>, not only at
       create, and that a changed specification applies from then
       on. Both halves of the admonition it replaces are wrong
       today, and F10 explains why the second half is the more
       dangerous one now that a re-read can refuse rather than
       merely re-rank.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The stage-ordering narrative in
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The stage-ordering narrative in
       <code>docs/operator_guide/scheduler.md</code> and the one-line pipeline
       summary in <code>ARCHITECTURE.md:170</code> both name the hard affinity
       stage in its place between disk capacity and affinity
       scoring. Falsifiable by grep. Step 4 inserts a pipeline
       stage, and a pipeline described in two places is wrong in
       two places.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>ARCHITECTURE.md</code>'s one-line summary no longer lists queue
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>ARCHITECTURE.md</code>'s one-line summary no longer lists queue
       health or disk bandwidth among the hard pre-filters applied
       before affinity is scored. It does today, and both are
       wrong: <code>queue_state</code> (<code>scheduler.py:624</code>) and
@@ -15317,14 +15317,110 @@ step 4.</p>
       An insert-only edit satisfies the bullet above while leaving
       the summary contradicting both the code and the operator
       guide, which is why this is its own criterion.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes.</li>
+</ul>
+<h2 id="close-out-2026-09-01">Close-out (2026-09-01)<a class="headerlink" href="#close-out-2026-09-01" title="Permanent link">&para;</a></h2>
+<p>Steps 1, 4, 5 and 6 merged as #3971 and step 3 as #3972, on
+2026-09-01 and 2026-08-31 respectively (merge times in UTC).
+<strong>#3957 was this plan file itself and carried no step work</strong> --
+its three changed files are all under <code>docs/plans/</code> -- so an
+earlier draft of this paragraph, which credited it with
+implementation, was wrong; the master plan's phase status note had
+it right. Steps 2 and 7 ran on 2026-09-01, a day after the code
+landed, which is why every status column in this file said <code>Not
+started</code> against merged work for a day: step 7 edits the plan file
+that step 1 merges, so it cannot run until that merge has
+happened, and nothing enforced the follow-up.</p>
+<p><strong>#3565 was closed on 2026-08-31 with no comment.</strong> Step 2's
+disposition was posted afterwards, as comment <code>5489559241</code> on</p>
+<h1 id="3565-recorded-because-a-silent-close-is-the-failure-mode-this-step">3565. Recorded because a silent close is the failure mode this step<a class="headerlink" href="#3565-recorded-because-a-silent-close-is-the-failure-mode-this-step" title="Permanent link">&para;</a></h1>
+<p>exists to prevent, and it happened anyway.</p>
+<h3 id="the-placement-retry-behaviour-of-finding-6-and-4001">The placement retry behaviour of finding 6, and #4001<a class="headerlink" href="#the-placement-retry-behaviour-of-finding-6-and-4001" title="Permanent link">&para;</a></h3>
+<p>Step 2 filed <strong>#4001</strong> per F8, "Preflight redirect silently
+re-offers the node it excluded when the exclusion set is empty".
+<strong>It was fixed and closed on 2026-09-01</strong>, by <code>9d7fbc24c</code> on the
+issue-fix workflow, while this close-out was being written -- so
+it is recorded here rather than carried as future work. The fix
+tests <code>candidates is not None</code> (<code>scheduler.py:594</code>) in place of
+the truth test, and an empty forced list now reaches
+<code>pre_schedule</code> and raises <code>LowResourceException</code> instead of
+falling through to the <code>else</code> at <code>:607</code> which rebuilds the list
+from every key in <code>self.metrics</code>. The <code>schedule inputs</code> event's
+<code>forced_candidates</code> flag (<code>scheduler.py:583</code>) reports the same
+distinction, so the audit trail no longer says <code>false</code> for a call
+that was forced.</p>
+<p>Note what the pinning exercise actually concluded, because that
+part is unaffected by the fix: the trace does <em>not</em> show a defect.
+What looked like a retry landing on a just-refused node is the
+create path's designed demand waiver
+(<code>external_api/instance.py:951-958</code>) admitting a node the guard
+had refused on demand alone, followed by preflight re-validating
+that placement through its opening forced call
+(<code>node_inst_netdesc_op.py:159</code>) eighteen seconds later on the
+chosen node. The create path's second walk re-walks the list it
+already holds and never calls <code>find_candidates()</code> again, so it
+cannot publish a forced event at all. #4001 was the fourth
+mechanism, filed on a reading of the code -- said in as many words
+on the issue -- rather than on the trace, and the fix's own commit
+message agrees that only the empty-list case changes. The step 2
+brief above still cites <code>scheduler.py:400</code> and <code>:441</code> for that
+branch; those are the line numbers as they stood when the brief
+was written and no longer resolve.</p>
+<h3 id="what-the-definition-of-done-actually-verified">What the definition of done actually verified<a class="headerlink" href="#what-the-definition-of-done-actually-verified" title="Permanent link">&para;</a></h3>
+<p>Thirty-eight of the thirty-nine criteria are ticked against
+evidence gathered at close-out rather than against recollection.
+The three worth naming:</p>
+<ul>
+<li>
+<p><strong>"<code>test_affinity</code> does not skip on a healthy three-node run"</strong>
+  is the criterion this phase's whole test rewrite turns on, and it
+  is now discharged with a citation: run <code>33452092452</code>, job
+  <code>99684426210</code>, <code>Debian 12 cluster</code>, where
+  <code>TestAffinity.test_affinity ... ok</code> in 29.8s alongside
+  <code>test_binary_affinity_prefers_the_tagged_node ... ok</code> and
+  <code>test_unsatisfiable_require_with_tag_is_refused ... ok</code>, 102
+  passed and 0 failed. The same run's stage census shows
+  <code>affinity_constraints</code> dropping 5 candidates for "no co-located
+  instance carries a required tag", so the hard stage is
+  demonstrably firing in cluster CI and not merely present.</p>
+</li>
+<li>
+<p><strong>The two <code>_placed_instances()</code> read-count criteria were
+  measured, not reasoned about.</strong> A create requesting no affinity
+  performs <strong>3</strong> reads on <code>98d15817d</code> (the develop commit before
+  this phase's implementation merged, one read per candidate node)
+  and <strong>0</strong> on <code>b54f126e5</code>. Measured by counting calls through
+  <code>mock.patch.object</code> under the existing mocked-mariadb harness in
+  both trees, three candidates each. Step 4's criterion asked for a
+  wash and step 5's for a reduction; the reduction is total,
+  because <code>if not scoring_tags</code> (<code>scheduler.py:738</code>) skips the walk
+  outright and the require stage returns before touching the memo
+  (<code>:694</code>).</p>
+</li>
+<li>
+<p><strong>One criterion is left unticked</strong>, and deliberately: "mutating
+  the scorer to ignore negative affinity contributions fails the
+  inst3 assertion and no other test". That mutation was step 1's
+  check at implementation time. Re-running it at close-out needs a
+  cluster CI cycle per mutation, since the inst3 assertion lives in
+  the cluster suite, and this close-out did not spend one. It is
+  recorded as unverified rather than ticked on the strength of
+  somebody having probably done it.</p>
+</li>
 </ul>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong>The one unticked done-criterion.</strong> "Mutating the scorer to
+  ignore negative affinity contributions fails the inst3
+  assertion and no other test" is recorded above as unverified,
+  and is the only criterion guarding the negative half of the
+  rewritten test. It is carried here rather than closed out with
+  the phase, because marking the phase <code>Complete</code> otherwise
+  retires it silently. Discharging it costs one cluster CI cycle
+  per mutation and is worth folding into the next change that
+  spends one on <code>test_scheduler.py</code> anyway.</li>
 <li><strong>Removing the weighted affinity form.</strong> Needs its own
   release and deprecation window; see F4 and the risk above.</li>
-<li><strong>The placement retry behaviour of finding 6.</strong> Filed by
-  step 2 per F8, once step 2 has pinned it to a call site.</li>
 <li><strong>Whether an activity metric belongs in the ranking at all.</strong>
   Phase 00a's surviving observation: <code>cpu_load_1</code> measures
   activity, not occupancy, so a node packed with idle instances
