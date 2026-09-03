@@ -25383,6 +25383,13 @@ class CapacityDimensionDetailDict(TypedDict):
     used: float
     requested: float
     exceeded: bool
+    # How far over the limit this dimension sits: max(0.0, used +
+    # requested - limit), floored rather than signed. A negative
+    # shortfall would be headroom, and the three fields above already
+    # carry the numbers headroom would be derived from -- a field
+    # meaning "shortfall" in one row and "spare" in another is worse
+    # than absent. Reported alongside exceeded, never used to decide it.
+    shortfall: float
     # Present only on the demand dimension: the two terms whose sum is
     # used. cpu_load_1 is measured ground truth, expected_demand is the
     # D13 feedforward estimate, and which one made used exceed the limit
@@ -25411,6 +25418,12 @@ class AdmitPlacementResult(TypedDict):
     # and an over-claim placement is admitted.
     claim_over_limit: bool
     claim_dimensions: list[CapacityDimensionDetailDict]
+    # The claim this admission was charged against, in dashed uuid form,
+    # so an event recorded on the namespace can name which claim it was.
+    # Empty when no claim was drawn down at all -- an unclaimed
+    # namespace, or a move, which charges nothing on the namespace side.
+    # Read the name for absence, never a zero.
+    claim_uuid: str
 
 
 class ReleasePlacementResult(TypedDict):
@@ -25420,6 +25433,19 @@ class ReleasePlacementResult(TypedDict):
     error: str
     released: bool
     clamped: bool
+    # The released node's counters after the decrement, in the same
+    # vocabulary AdmitPlacementResult reports its post-drawdown ones, so
+    # both halves of the placement ledger read the same way. They
+    # describe the one node named by counters_node_uuid; that name is
+    # empty -- and these four are zero -- when nothing was released,
+    # when the node has no capacity row (P7), or when the release
+    # spanned more than one node. Read the name, never a zero, to tell
+    # "not reported" from "the node now holds nothing".
+    counters_node_uuid: str
+    node_used_cpus: int
+    node_used_memory_mb: int
+    node_used_disk_gb: int
+    node_expected_demand: float
 
 
 class SchedulerNodeCapacityRow(TypedDict):
@@ -25433,6 +25459,32 @@ class SchedulerNodeCapacityRow(TypedDict):
     used_memory_mb: int
     used_disk_gb: int
     expected_demand: float
+
+
+class SchedulerNodeCapacityRead(NamedTuple):
+    """The capacity counters, plus whether the read which produced them failed.
+
+    ``rows`` is empty both for a table the reconciler has not populated
+    yet and for one which could not be read at all, so the two are told
+    apart by ``degraded`` and never by the rows themselves. The first is
+    an ordinary state -- a node without a row admits unguarded (P7) --
+    and the second is a cluster flying blind, so a caller which
+    conflates them cannot report either honestly.
+
+    A tuple rather than a list carrying a flag: a caller has to unpack
+    it to reach the rows at all, so the degraded case is in front of
+    whoever writes the next call site rather than behind an attribute
+    they would have to remember exists. A caller which genuinely does
+    not care discards it explicitly.
+
+    ``degraded`` describes *this process's* read. The database daemon's
+    own swallow (``_direct_get_scheduler_node_capacity()`` inside the
+    servicer) is not carried on the wire, because the reply message has
+    no field for it; a gRPC client learns only that its own call failed.
+    """
+
+    rows: list[SchedulerNodeCapacityRow]
+    degraded: bool
 
 
 class _AdmissionDenied(Exception):
@@ -25541,14 +25593,20 @@ def _capacity_dimension(
     refusal from an estimator defect (issue 3913). The keys are absent
     (not zero) on the three allocation dimensions, which have no such
     split.
+
+    ``shortfall`` is reported, never tested: it is derived from the same
+    effective-used value ``exceeded`` compares against ``limit``, floored
+    at zero, so the two fields never disagree about which dimensions are
+    over. It does not participate in any guard decision.
     """
+    effective_used = used + requested if charged else used
     detail: CapacityDimensionDetailDict = {
         'dimension': dimension,
         'limit': float(limit),
         'used': float(used),
         'requested': float(requested),
-        'exceeded': bool(
-            used + requested > limit if charged else used > limit),
+        'exceeded': bool(effective_used > limit),
+        'shortfall': max(0.0, float(effective_used) - float(limit)),
     }
     if cpu_load_1 is not None:
         detail['cpu_load_1'] = float(cpu_load_1)
@@ -25572,6 +25630,7 @@ def _dimension_from_proto(d: Any) -> CapacityDimensionDetailDict:
         'used': float(d.used),
         'requested': float(d.requested),
         'exceeded': bool(d.exceeded),
+        'shortfall': float(d.shortfall),
     }
     if d.HasField('cpu_load_1'):
         detail['cpu_load_1'] = float(d.cpu_load_1)
@@ -25596,6 +25655,22 @@ def _empty_admit_result() -> AdmitPlacementResult:
         'node_expected_demand': 0.0,
         'claim_over_limit': False,
         'claim_dimensions': [],
+        'claim_uuid': '',
+    }
+
+
+def _empty_release_result() -> ReleasePlacementResult:
+    """A successful release reply which has not released anything yet."""
+    return {
+        'success': True,
+        'error': '',
+        'released': False,
+        'clamped': False,
+        'counters_node_uuid': '',
+        'node_used_cpus': 0,
+        'node_used_memory_mb': 0,
+        'node_used_disk_gb': 0,
+        'node_expected_demand': 0.0,
     }
 
 
@@ -26419,6 +26494,13 @@ def _direct_admit_instance_placement(
             # create in a claimed namespace pay a probe round trip
             # (D5 rejects probe-then-force for exactly that).
             if claim_charged:
+                # Name the claim before reading it back, so a caller
+                # recording the exceedance against the namespace can say
+                # which claim it was against. This is the probe's own
+                # local rather than a new query -- the ER_CHECKREAD
+                # invariant above forbids adding a read here that is not
+                # against a row this transaction already wrote.
+                outcome['claim_uuid'] = str(claim_uuid)
                 row = conn.execute(sa.select(claims).where(
                     claims.c.uuid == claim_uuid)).first()
                 if row is not None:
@@ -26505,8 +26587,8 @@ def _direct_release_instance_placement(
     state ``deleted``.
     """
     engine = _get_engine()
-    result: ReleasePlacementResult = {
-        'success': True, 'error': '', 'released': False, 'clamped': False}
+    capacity = _get_scheduler_node_capacity_table()
+    result = _empty_release_result()
 
     try:
         named_node = UUID(node_uuid) if node_uuid else None
@@ -26517,8 +26599,7 @@ def _direct_release_instance_placement(
         return result
 
     def _release() -> ReleasePlacementResult:
-        outcome: ReleasePlacementResult = {
-            'success': True, 'error': '', 'released': False, 'clamped': False}
+        outcome = _empty_release_result()
 
         # The reference lookup and the branch select, on their own
         # connection outside the transaction below, for the reason in the
@@ -26550,10 +26631,39 @@ def _direct_release_instance_placement(
                     conn, probe.claim_uuid, cpus, memory_mb, disk_gb):
                 outcome['clamped'] = True
 
+            decremented: list[UUID] = []
             for node_key in sorted(set(probe.nodes), key=lambda u: u.int):
-                _, clamped = _floored_node_decrement(
+                touched, clamped = _floored_node_decrement(
                     conn, node_key, cpus, memory_mb, disk_gb)
                 outcome['clamped'] = outcome['clamped'] or clamped
+                if touched:
+                    decremented.append(node_key)
+
+            # MariaDB has no UPDATE ... RETURNING, so the post-release
+            # counters are a follow-up PK SELECT inside the transaction,
+            # exactly as _direct_admit_instance_placement() reads its
+            # post-drawdown ones. Legal for the same reason: this is a
+            # read after our own write, on a row this transaction
+            # already holds the lock on, which is what the ER_CHECKREAD
+            # invariant permits. Only rows _floored_node_decrement()
+            # reported touching are read, so a node with no capacity row
+            # (P7) is never selected on an unlocked key.
+            #
+            # Reported only when exactly one node was decremented. A
+            # release spanning two nodes -- a historical duplicate,
+            # which is what the admission RPC exists to stop producing
+            # -- has no single row that describes it, and naming one of
+            # them would be a number nobody could interpret.
+            if len(decremented) == 1:
+                row = conn.execute(sa.select(capacity).where(
+                    capacity.c.node_uuid == decremented[0])).first()
+                if row is not None:
+                    outcome['counters_node_uuid'] = str(decremented[0])
+                    outcome['node_used_cpus'] = int(row.used_cpus)
+                    outcome['node_used_memory_mb'] = int(row.used_memory_mb)
+                    outcome['node_used_disk_gb'] = int(row.used_disk_gb)
+                    outcome['node_expected_demand'] = float(
+                        row.expected_demand)
 
             _delete_instance_location_rows(
                 conn, instance_uuid, source_nodes=probe.nodes)
@@ -26573,7 +26683,7 @@ def _direct_release_instance_placement(
         return result
 
 
-def _direct_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
+def _direct_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
     """Read every scheduler_node_capacity row.
 
     A plain unfiltered SELECT: the table has one row per schedulable
@@ -26581,6 +26691,11 @@ def _direct_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
     wants all of it. Read outside a transaction -- a caller summarising
     cluster capacity is describing a moving target whatever it does, and
     holding a snapshot would only serialise it against admission.
+
+    A failed query returns no rows and ``degraded=True`` rather than
+    raising, because this read stands in front of admission rather than
+    being it. The flag is the only thing which tells that outcome from
+    an empty table.
     """
     engine = _get_engine()
     capacity = _get_scheduler_node_capacity_table()
@@ -26588,7 +26703,7 @@ def _direct_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
     try:
         with engine.connect() as conn:
             rows = conn.execute(sa.select(capacity)).fetchall()
-        return [
+        return SchedulerNodeCapacityRead(rows=[
             {
                 'node_uuid': str(row.node_uuid),
                 'limit_cpus': int(row.limit_cpus),
@@ -26600,10 +26715,10 @@ def _direct_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
                 'expected_demand': float(row.expected_demand),
             }
             for row in rows
-        ]
+        ], degraded=False)
     except OperationalError as e:
         LOG.warning(f'MariaDB query failed for scheduler_node_capacity: {e}')
-        return []
+        return SchedulerNodeCapacityRead(rows=[], degraded=True)
 
 
 def _grpc_admit_instance_placement(
@@ -26654,6 +26769,7 @@ def _grpc_admit_instance_placement(
         result['claim_over_limit'] = bool(reply.claim_over_limit)
         result['claim_dimensions'] = [
             _dimension_from_proto(d) for d in reply.claim_dimensions]
+        result['claim_uuid'] = reply.claim_uuid
         return result
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC AdmitInstancePlacement failed: {e}')
@@ -26680,8 +26796,7 @@ def _grpc_release_instance_placement(
     release that could not be recorded is repaired by the next reconcile
     pass rather than by blocking the delete.
     """
-    result: ReleasePlacementResult = {
-        'success': True, 'error': '', 'released': False, 'clamped': False}
+    result = _empty_release_result()
     try:
         stub = _get_database_stub()
         request = database_pb2.ReleaseInstancePlacementRequest(
@@ -26698,6 +26813,14 @@ def _grpc_release_instance_placement(
         result['error'] = reply.error
         result['released'] = bool(reply.released)
         result['clamped'] = bool(reply.clamped)
+        # Additive reply fields, so an sf-database predating them reads
+        # as proto3 defaults: an empty counters_node_uuid, which is
+        # exactly the "not reported" the caller already has to handle.
+        result['counters_node_uuid'] = reply.counters_node_uuid
+        result['node_used_cpus'] = int(reply.node_used_cpus)
+        result['node_used_memory_mb'] = int(reply.node_used_memory_mb)
+        result['node_used_disk_gb'] = int(reply.node_used_disk_gb)
+        result['node_expected_demand'] = float(reply.node_expected_demand)
         return result
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC ReleaseInstancePlacement failed: {e}')
@@ -26706,7 +26829,7 @@ def _grpc_release_instance_placement(
         return result
 
 
-def _grpc_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
+def _grpc_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
     """Read the per-node capacity counters via the database microservice.
 
     Bounded like the admission call it runs in front of. This read is on
@@ -26716,6 +26839,10 @@ def _grpc_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
     window that bounding the admission closed (issue 3586). Nothing is
     lost by failing early: the caller degrades to measurement-only
     pre-filtering and the guard still refuses correctly.
+
+    The swallow stays; what it now returns is ``degraded=True`` beside
+    the empty list, so the caller can say the read failed instead of
+    reporting a cluster with no counters at all.
     """
     try:
         stub = _get_database_stub()
@@ -26723,7 +26850,7 @@ def _grpc_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
         reply = _grpc_call(
             stub.GetSchedulerNodeCapacity, request,
             timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
-        return [
+        return SchedulerNodeCapacityRead(rows=[
             {
                 'node_uuid': row.node_uuid,
                 'limit_cpus': int(row.limit_cpus),
@@ -26735,10 +26862,10 @@ def _grpc_get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
                 'expected_demand': float(row.expected_demand),
             }
             for row in reply.rows
-        ]
+        ], degraded=False)
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.warning(f'gRPC GetSchedulerNodeCapacity failed: {e}')
-        return []
+        return SchedulerNodeCapacityRead(rows=[], degraded=True)
 
 
 def admit_instance_placement(
@@ -26769,16 +26896,21 @@ def admit_instance_placement(
          'admitted': bool, 'unguarded': bool, 'clamped': bool,
          'failing_stage': '' | 'cluster' | 'claim' | 'node',
          'dimensions': [{'dimension': str, 'limit': float, 'used': float,
-                         'requested': float, 'exceeded': bool}, ...],
+                         'requested': float, 'exceeded': bool,
+                         'shortfall': float}, ...],
          'node_used_cpus': int, 'node_used_memory_mb': int,
          'node_used_disk_gb': int, 'node_expected_demand': float,
-         'claim_over_limit': bool, 'claim_dimensions': [...]}
+         'claim_over_limit': bool, 'claim_dimensions': [...],
+         'claim_uuid': str}
 
     ``claim_over_limit`` and ``claim_dimensions`` are the advisory
     accounting of D16: the placement *was* admitted, and the namespace's
     claim is now over its limits in the named dimensions. They are
     separate from ``failing_stage``/``dimensions``, which describe a
-    refusal.
+    refusal. ``claim_uuid`` names the claim that was charged -- whether
+    or not it went over -- so an event recorded against the namespace
+    can say which claim it was about; it is empty, never a zero uuid,
+    when no claim was drawn down at all.
 
     ``success`` says the RPC ran; ``admitted`` says what it decided.
     A caller that treats a failed RPC as a denial would walk to the next
@@ -26814,12 +26946,22 @@ def release_instance_placement(
     Returns:
 
         {'success': bool, 'error': str, 'released': bool,
-         'clamped': bool}
+         'clamped': bool, 'counters_node_uuid': str,
+         'node_used_cpus': int, 'node_used_memory_mb': int,
+         'node_used_disk_gb': int, 'node_expected_demand': float}
 
     ``released`` is False when there was nothing to release, which is
     how a repeat call (``hard_delete()`` behind ``_delete_globally()``,
     or a second delete attempt on an errored instance) is told from a
     real one.
+
+    The four counters are the released node's, *after* the decrement,
+    named in the vocabulary ``admit_instance_placement()`` reports its
+    post-drawdown ones so both halves of the ledger read alike.
+    ``counters_node_uuid`` names the node they describe and is empty
+    when they were not reported -- nothing released, no capacity row
+    (P7), or a release spanning more than one node. Test that name
+    rather than a zero counter.
     """
     if _use_database_service():
         return _grpc_release_instance_placement(
@@ -26828,14 +26970,17 @@ def release_instance_placement(
         instance_uuid, namespace, node_uuid, cpus, memory_mb, disk_gb)
 
 
-def get_scheduler_node_capacity() -> list[SchedulerNodeCapacityRow]:
+def get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
     """The materialised per-node capacity counters, one dict per row.
 
     These are the numbers admission actually draws down, so a reader
     which wants to publish "what would this cluster admit?" must read
     them rather than recompute a second ledger of its own.
 
-    Returns an empty list if the table is empty or unreadable. Only
+    Returns ``(rows, degraded)``. ``rows`` is empty if the table is
+    empty *or* unreadable, and ``degraded`` says which: True means the
+    read itself failed and this process knows nothing about the
+    cluster's counters, rather than the cluster having none. Only
     hypervisors the reconciler considers schedulable have a row, so an
     absent node is not an error: it is a node whose capacity the
     reconciler declined to guess (P7), which admits unguarded.
@@ -27952,6 +28097,7 @@ def _grpc_create_namespace_claim(
                 'used': float(d.used),
                 'requested': float(d.requested),
                 'exceeded': bool(d.exceeded),
+                'shortfall': float(d.shortfall),
             } for d in reply.dimensions]
         if reply.HasField('claim'):
             result['claim'] = _claim_from_proto(reply.claim)
@@ -27990,6 +28136,7 @@ def _grpc_update_namespace_claim(
                 'used': float(d.used),
                 'requested': float(d.requested),
                 'exceeded': bool(d.exceeded),
+                'shortfall': float(d.shortfall),
             } for d in reply.dimensions]
         if reply.HasField('claim'):
             result['claim'] = _claim_from_proto(reply.claim)
@@ -28087,7 +28234,8 @@ def create_namespace_claim(
          'refused_reason': '' | 'capacity' | 'no_cluster_capacity'
                               | 'exists',
          'dimensions': [{'dimension': str, 'limit': float, 'used': float,
-                         'requested': float, 'exceeded': bool}, ...],
+                         'requested': float, 'exceeded': bool,
+                         'shortfall': float}, ...],
          'claim': {...} | None}
 
     ``success`` says the RPC ran; ``created`` says what it decided.

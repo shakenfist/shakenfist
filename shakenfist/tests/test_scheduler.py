@@ -854,6 +854,99 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.assertEqual(16.0 - 7, node3['cpu_available'])
 
 
+class DegradedCapacityReadTestCase(SchedulerTestCase):
+    """A read which failed is published; an empty table is not (G5).
+
+    ``mariadb.get_scheduler_node_capacity()`` swallows a database
+    outage and returns no rows, deliberately: the read is on the
+    instance create hot path and on the queues daemon's preflight
+    redirect, so restoring the default retry budget would reopen the
+    watchdog window issue 3586 closed. That swallow stays. What it
+    cannot be allowed to stay is invisible -- a cluster whose counters
+    nobody could read pre-filters on measurement alone, and nothing in
+    the instance's event trail said so.
+
+    The other half matters just as much. A cluster the reconciler has
+    not reached yet has an empty table, which is an ordinary state (P7:
+    a node with no row admits unguarded rather than refusing every
+    create mid-upgrade), so an implementation which evented on
+    emptiness would fire on every single create there.
+    """
+
+    EVENT = 'schedule could not read the capacity counters'
+
+    def _capacity_events(self, aem):
+        return [c for c in aem.call_args_list if c[0][2] == self.EVENT]
+
+    def _baseline(self):
+        # As CapacityCounterTestCase: cpu_schedulable=1 and the fake
+        # config's ratio of 16 cap each node at 16 vCPUs, with the
+        # measurement claiming none are in use.
+        return {
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'cpu_schedulable': 1,
+            'memory_available': 22000,
+            'memory_max': 24000,
+            'disk_free_instances': 2000*GiB,
+            'cpu_total_instance_vcpus': 0,
+            'cpu_available': 12,
+        }
+
+    def test_a_failed_read_publishes_exactly_one_event(self):
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.node_capacity_read_degraded = True
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+
+        published = self._capacity_events(aem)
+        self.assertEqual(1, len(published), aem.call_args_list)
+        extra = published[0][1]['extra']
+        self.assertEqual(['sufficient_idle_cpu', 'sufficient_idle_memory'],
+                         extra['degraded_stages'])
+        self.assertIn('admission is unchanged', extra['effect'])
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'),
+            set(extra['candidates']))
+
+        # Observability only: the same nodes come out as would have with
+        # a readable but unpopulated table. Nothing here filters.
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
+
+    def test_an_empty_but_readable_table_publishes_nothing(self):
+        # The cluster mid-upgrade, or any cluster before its first
+        # reconcile: no rows, no failure, and so no event -- otherwise
+        # every create on it would carry a false alarm.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+
+        self.assertEqual([], self._capacity_events(aem), aem.call_args_list)
+        self.assertSetEqual(
+            self._node_uuids_set('node2', 'node3', 'node4'), set(nodes))
+
+    def test_a_populated_table_publishes_nothing(self):
+        # The event is keyed on the read, not on what the counters then
+        # do: a row which actually prunes a candidate is a working read.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            used_cpus=16)
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            nodes = scheduler.Scheduler().find_candidates(fake_inst)
+
+        self.assertEqual([], self._capacity_events(aem), aem.call_args_list)
+        self.assertSetEqual(
+            self._node_uuids_set('node3', 'node4'), set(nodes))
+
+
 class RamCapacityCounterTestCase(SchedulerTestCase):
     """The RAM pre-filter reads the counters the guard will draw down.
 

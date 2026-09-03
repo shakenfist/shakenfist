@@ -133,6 +133,12 @@ class MockMariaDB():
         # with no capacity row admits unguarded. Tests which want the
         # guard to bite seed a row with set_node_capacity().
         self.node_capacity = {}
+        # Whether a read of those rows reports itself as degraded. False
+        # is a readable table, however empty; True is the swallowed
+        # DatabaseUnavailable / RpcError in
+        # mariadb._grpc_get_scheduler_node_capacity(), which returns no
+        # rows and says so.
+        self.node_capacity_read_degraded = False
         # Mock namespace_claims rows, keyed by claim uuid, as the real
         # table is. Empty by default, which is the unclaimed namespace:
         # the claim stage is skipped entirely and nothing about it
@@ -2978,11 +2984,19 @@ class MockMariaDB():
         per schedulable hypervisor and declines to guess for the rest.
         ``demand_limit`` is mock-internal configuration, not a column,
         so it is not returned.
+
+        Returns the same (rows, degraded) pair the real accessor does.
+        Set ``node_capacity_read_degraded`` to simulate the swallowed
+        read failure: no rows, and a caller which can tell that from an
+        unpopulated table.
         """
-        return [
+        if self.node_capacity_read_degraded:
+            return mariadb.SchedulerNodeCapacityRead(rows=[], degraded=True)
+
+        return mariadb.SchedulerNodeCapacityRead(rows=[
             {k: v for k, v in dict(row, node_uuid=node_uuid).items()
              if k != 'demand_limit'}
-            for node_uuid, row in self.node_capacity.items()]
+            for node_uuid, row in self.node_capacity.items()], degraded=False)
 
     def _decrement_node_capacity(self, node_uuid, cpus, memory_mb, disk_gb):
         """Floored decrement of one node's counters, as the RPC does (P6).
@@ -3077,7 +3091,7 @@ class MockMariaDB():
             'dimensions': [], 'node_used_cpus': 0,
             'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
             'node_expected_demand': 0.0, 'claim_over_limit': False,
-            'claim_dimensions': []}
+            'claim_dimensions': [], 'claim_uuid': ''}
 
         attrs = self.instance_attributes.get(str(instance_uuid))
         if attrs is None:
@@ -3160,6 +3174,12 @@ class MockMariaDB():
         # Nothing can refuse from here on, so the counters are charged --
         # the namespace side first, in the real transaction's order.
         if claim is not None:
+            # Which claim was drawn down, so a caller recording an
+            # exceedance against the namespace can name it. Reported
+            # whether or not the claim went over, and left empty when
+            # there was no claim to charge (an unclaimed namespace, or a
+            # move) exactly as the real reply leaves it.
+            result['claim_uuid'] = claim['uuid']
             for dimension, requested in (('cpus', cpus),
                                          ('memory_mb', memory_mb),
                                          ('disk_gb', disk_gb)):
@@ -3224,7 +3244,10 @@ class MockMariaDB():
         decrement.
         """
         result = {
-            'success': True, 'error': '', 'released': False, 'clamped': False}
+            'success': True, 'error': '', 'released': False, 'clamped': False,
+            'counters_node_uuid': '', 'node_used_cpus': 0,
+            'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
+            'node_expected_demand': 0.0}
 
         nodes = [
             r.source_uuid for r in self.object_references.values()
@@ -3247,9 +3270,24 @@ class MockMariaDB():
                 namespace, cpus, memory_mb, disk_gb):
             result['clamped'] = True
 
+        decremented = []
         for node in sorted(set(nodes)):
             if self._decrement_node_capacity(node, cpus, memory_mb, disk_gb):
                 result['clamped'] = True
+            if self.node_capacity.get(str(node)) is not None:
+                decremented.append(node)
+
+        # The post-release counters, reported only when exactly one node
+        # was decremented -- the real implementation says why, and a
+        # node with no seeded capacity row is P7's fail-open case there
+        # as it is here.
+        if len(decremented) == 1:
+            row = self.node_capacity[str(decremented[0])]
+            result['counters_node_uuid'] = str(decremented[0])
+            result['node_used_cpus'] = row['used_cpus']
+            result['node_used_memory_mb'] = row['used_memory_mb']
+            result['node_used_disk_gb'] = row['used_disk_gb']
+            result['node_expected_demand'] = row['expected_demand']
 
         # As in the real implementation, the rows deleted are exactly
         # the rows credited back: a named release leaves a row on

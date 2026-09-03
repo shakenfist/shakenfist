@@ -9325,6 +9325,7 @@ class CapacityDimensionDetail(_message.Message):
     EXCEEDED_FIELD_NUMBER: _builtins.int
     CPU_LOAD_1_FIELD_NUMBER: _builtins.int
     EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    SHORTFALL_FIELD_NUMBER: _builtins.int
     dimension: _builtins.str
     """cpus, memory_mb, disk_gb or demand"""
     limit: _builtins.float
@@ -9343,6 +9344,13 @@ class CapacityDimensionDetail(_message.Message):
     as "no breakdown available" rather than a breakdown of zeroes.
     """
     expected_demand: _builtins.float
+    shortfall: _builtins.float
+    """max(0, used + requested - limit) (or max(0, used - limit) on the
+    uncharged demand dimension): how far over the limit this dimension
+    sits, or 0 when it does not. Floored rather than signed so a
+    negative value never has to be read as headroom -- the three
+    numbers above already let a reader derive that.
+    """
     def __init__(
         self,
         *,
@@ -9353,10 +9361,11 @@ class CapacityDimensionDetail(_message.Message):
         exceeded: _builtins.bool = ...,
         cpu_load_1: _builtins.float | None = ...,
         expected_demand: _builtins.float | None = ...,
+        shortfall: _builtins.float = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "limit", b"limit", "requested", b"requested", "used", b"used"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "limit", b"limit", "requested", b"requested", "shortfall", b"shortfall", "used", b"used"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType__cpu_load_1: _TypeAlias = _typing.Literal["cpu_load_1"]  # noqa: Y015
     _WhichOneofArgType__cpu_load_1: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1"]  # noqa: Y015
@@ -9386,6 +9395,7 @@ class AdmitInstancePlacementReply(_message.Message):
     NODE_EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
     CLAIM_OVER_LIMIT_FIELD_NUMBER: _builtins.int
     CLAIM_DIMENSIONS_FIELD_NUMBER: _builtins.int
+    CLAIM_UUID_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -9421,6 +9431,21 @@ class AdmitInstancePlacementReply(_message.Message):
     used is what the claim held before this admission, requested is this
     admission's allocation, limit is the claim's ceiling.
     """
+    claim_uuid: _builtins.str
+    """The claim this admission was actually charged against, so an audit
+    event recorded on the *namespace* can name which claim it was. A
+    namespace holds one active claim at a time, but an operator who
+    grows a claim by delete-and-create leaves a namespace trail whose
+    events span several claims, and the namespace name alone cannot
+    then say which one an exceedance was against.
+
+    Empty -- never a zero uuid -- when no claim was drawn down: an
+    unclaimed namespace charges the cluster singleton instead, and a
+    move charges nothing on the namespace side at all. Read the name
+    for absence, so a reply from an sf-database predating this field
+    reads as "not reported" rather than as a real value.
+    Dashed uuid form, or empty
+    """
     @_builtins.property
     def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
     @_builtins.property
@@ -9441,10 +9466,11 @@ class AdmitInstancePlacementReply(_message.Message):
         node_expected_demand: _builtins.float = ...,
         claim_over_limit: _builtins.bool = ...,
         claim_dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
+        claim_uuid: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "claim_uuid", b"claim_uuid", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -9497,6 +9523,11 @@ class ReleaseInstancePlacementReply(_message.Message):
     RELEASED_FIELD_NUMBER: _builtins.int
     CLAMPED_FIELD_NUMBER: _builtins.int
     ERROR_FIELD_NUMBER: _builtins.int
+    NODE_USED_CPUS_FIELD_NUMBER: _builtins.int
+    NODE_USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    NODE_USED_DISK_GB_FIELD_NUMBER: _builtins.int
+    NODE_EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    COUNTERS_NODE_UUID_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     released: _builtins.bool
@@ -9507,6 +9538,28 @@ class ReleaseInstancePlacementReply(_message.Message):
     """
     clamped: _builtins.bool
     error: _builtins.str
+    node_used_cpus: _builtins.int
+    """The released node's counters *after* the decrement, read back by PK
+    SELECT inside the transaction for the same reason the admission
+    reply reads its post-drawdown ones (MariaDB has no UPDATE ...
+    RETURNING). Together with the amounts the caller already holds they
+    make the placement ledger auditable coming down as well as going
+    up, in the vocabulary the admission reply already uses.
+
+    They describe exactly one node, named by counters_node_uuid. That
+    is empty -- and these four are zero -- when nothing was released,
+    when the node has no capacity row (P7's fail-open case), or when
+    the release spanned more than one node: a release of a historical
+    duplicate has no single row that describes it, and reporting one of
+    them would be a number nobody could interpret. Read
+    counters_node_uuid, never a zero, to tell "not reported" from "the
+    node now holds nothing".
+    """
+    node_used_memory_mb: _builtins.int
+    node_used_disk_gb: _builtins.int
+    node_expected_demand: _builtins.float
+    counters_node_uuid: _builtins.str
+    """Dashed uuid form, or empty"""
     def __init__(
         self,
         *,
@@ -9514,10 +9567,15 @@ class ReleaseInstancePlacementReply(_message.Message):
         released: _builtins.bool = ...,
         clamped: _builtins.bool = ...,
         error: _builtins.str = ...,
+        node_used_cpus: _builtins.int = ...,
+        node_used_memory_mb: _builtins.int = ...,
+        node_used_disk_gb: _builtins.int = ...,
+        node_expected_demand: _builtins.float = ...,
+        counters_node_uuid: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "error", b"error", "released", b"released", "success", b"success"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "counters_node_uuid", b"counters_node_uuid", "error", b"error", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "released", b"released", "success", b"success"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

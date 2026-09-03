@@ -674,6 +674,9 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # Exactly at the claim's limits, which is not over them.
         self.assertFalse(result['claim_over_limit'])
         self.assertEqual([], result['claim_dimensions'])
+        # And the reply names the claim it charged, whether or not that
+        # charge went over.
+        self.assertEqual(str(claim_uuid), result['claim_uuid'])
 
     def test_a_claim_that_would_overflow_is_admitted_and_reported(self):
         # D16: claim ceilings are advisory for one release. The
@@ -691,6 +694,10 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual([], result['dimensions'])
 
         self.assertTrue(result['claim_over_limit'])
+        # Which claim went over, read out of the same transaction that
+        # charged it -- the namespace name alone cannot say, once an
+        # operator has grown a claim by delete-and-create.
+        self.assertEqual(str(claim_uuid), result['claim_uuid'])
         detail = {d['dimension']: d for d in result['claim_dimensions']}
         # Only the dimension actually over is named: memory and disk had
         # room and must not be reported as if they did not.
@@ -746,6 +753,9 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertTrue(result['admitted'], result['error'])
         self.assertFalse(result['claim_over_limit'])
         self.assertEqual([], result['claim_dimensions'])
+        # A move charges nothing on the namespace side, so it names no
+        # claim either.
+        self.assertEqual('', result['claim_uuid'])
         after = self._claim(claim_uuid)
         self.assertEqual(before.used_cpus, after.used_cpus)
         self.assertEqual(before.used_memory_mb, after.used_memory_mb)
@@ -756,6 +766,9 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertTrue(result['admitted'], result['error'])
         self.assertFalse(result['claim_over_limit'])
         self.assertEqual([], result['claim_dimensions'])
+        # No claim was drawn down, so there is no claim to name and the
+        # empty string is what says so -- never a zero uuid.
+        self.assertEqual('', result['claim_uuid'])
 
     def test_the_claim_guard_binds_when_enforcement_is_turned_on(self):
         # Phase 5's flip, exercised against a real server so its guard is

@@ -2786,6 +2786,12 @@ message CapacityDimensionDetail {
   // as "no breakdown available" rather than a breakdown of zeroes.
   optional double cpu_load_1 = 6;
   optional double expected_demand = 7;
+  // max(0, used + requested - limit) (or max(0, used - limit) on the
+  // uncharged demand dimension): how far over the limit this dimension
+  // sits, or 0 when it does not. Floored rather than signed so a
+  // negative value never has to be read as headroom -- the three
+  // numbers above already let a reader derive that.
+  double shortfall = 8;
 }
 
 message AdmitInstancePlacementReply {
@@ -2820,6 +2826,19 @@ message AdmitInstancePlacementReply {
   // admission's allocation, limit is the claim's ceiling.
   bool claim_over_limit = 12;
   repeated CapacityDimensionDetail claim_dimensions = 13;
+  // The claim this admission was actually charged against, so an audit
+  // event recorded on the *namespace* can name which claim it was. A
+  // namespace holds one active claim at a time, but an operator who
+  // grows a claim by delete-and-create leaves a namespace trail whose
+  // events span several claims, and the namespace name alone cannot
+  // then say which one an exceedance was against.
+  //
+  // Empty -- never a zero uuid -- when no claim was drawn down: an
+  // unclaimed namespace charges the cluster singleton instead, and a
+  // move charges nothing on the namespace side at all. Read the name
+  // for absence, so a reply from an sf-database predating this field
+  // reads as "not reported" rather than as a real value.
+  string claim_uuid = 14;   // Dashed uuid form, or empty
 }
 
 message ReleaseInstancePlacementRequest {
@@ -2843,6 +2862,26 @@ message ReleaseInstancePlacementReply {
   bool released = 2;
   bool clamped = 3;
   string error = 4;
+  // The released node's counters *after* the decrement, read back by PK
+  // SELECT inside the transaction for the same reason the admission
+  // reply reads its post-drawdown ones (MariaDB has no UPDATE ...
+  // RETURNING). Together with the amounts the caller already holds they
+  // make the placement ledger auditable coming down as well as going
+  // up, in the vocabulary the admission reply already uses.
+  //
+  // They describe exactly one node, named by counters_node_uuid. That
+  // is empty -- and these four are zero -- when nothing was released,
+  // when the node has no capacity row (P7's fail-open case), or when
+  // the release spanned more than one node: a release of a historical
+  // duplicate has no single row that describes it, and reporting one of
+  // them would be a number nobody could interpret. Read
+  // counters_node_uuid, never a zero, to tell "not reported" from "the
+  // node now holds nothing".
+  int64 node_used_cpus = 5;
+  int64 node_used_memory_mb = 6;
+  int64 node_used_disk_gb = 7;
+  double node_expected_demand = 8;
+  string counters_node_uuid = 9;   // Dashed uuid form, or empty
 }
 
 message GetSchedulerNodeCapacityRequest {}

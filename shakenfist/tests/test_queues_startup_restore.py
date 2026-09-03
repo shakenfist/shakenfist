@@ -240,7 +240,10 @@ class RestorePlacementReconciliationTestCase(base.ShakenFistTestCase):
             'dimensions': [], 'node_used_cpus': 0, 'node_used_memory_mb': 0,
             'node_used_disk_gb': 0, 'node_expected_demand': 0.0}
         release_reply = {
-            'success': True, 'error': '', 'released': True, 'clamped': False}
+            'success': True, 'error': '', 'released': True, 'clamped': False,
+            'counters_node_uuid': '', 'node_used_cpus': 0,
+            'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
+            'node_expected_demand': 0.0}
 
         with contextlib.ExitStack() as stack:
             stack.enter_context(mock.patch.object(

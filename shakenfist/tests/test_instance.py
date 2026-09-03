@@ -15,6 +15,7 @@ from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist.config import SFConfig
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -1742,6 +1743,116 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
               'requested': 2.0, 'exceeded': True}],
             extras[0]['claim_dimensions'])
 
+    def _capture_admissions(self):
+        """Patch the admission RPC so its replies can be read back.
+
+        The reply is not otherwise observable from outside
+        place_instance(), and claim_uuid's whole contract is about what
+        the reply carries when nothing was charged.
+        """
+        replies = []
+
+        def _admit(*args, **kwargs):
+            reply = self.mock_mariadb._mariadb_admit_instance_placement(
+                *args, **kwargs)
+            replies.append(reply)
+            return reply
+
+        return replies, mock.patch(
+            'shakenfist.mariadb.admit_instance_placement', side_effect=_admit)
+
+    def test_an_over_claim_create_also_events_the_namespace(self):
+        # G2: the instance's own trail says its placement went over; the
+        # namespace's trail durably records the same facts, because
+        # "what happened to my namespace's capacity" outlives any one
+        # instance's placement. One placement, two events -- one on the
+        # instance (already covered above) and one on the namespace --
+        # carrying the same claim_dimensions, and correlatable both by
+        # the instance uuid and by the uuid of the claim actually drawn
+        # down. The claim uuid is the one that survives an operator
+        # growing a claim by delete-and-create, which is the case G2
+        # exists for.
+        claim = self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            with mock.patch(
+                    'shakenfist.instance.eventlog.add_event') as ns_event:
+                self.inst.place_instance(self.node2)
+
+        instance_extras = self._claim_events(add_event)
+        self.assertEqual(1, len(instance_extras))
+
+        self.assertEqual(1, ns_event.call_count)
+        args, kwargs = ns_event.call_args
+        self.assertEqual(
+            (EVENT_TYPE_AUDIT, 'namespace', 'unittest',
+             self.CLAIM_EVENT),
+            args)
+        self.assertTrue(kwargs['suppress_event_logging'])
+
+        ns_extra = kwargs['extra']
+        self.assertEqual(str(self.inst.uuid), ns_extra['instance'])
+        self.assertEqual(self.node2, ns_extra['node'])
+        self.assertEqual('unittest', ns_extra['namespace'])
+        # Same dimensions on both events -- this is one fact, recorded
+        # twice.
+        self.assertEqual(
+            instance_extras[0]['claim_dimensions'],
+            ns_extra['claim_dimensions'])
+
+        # And it names the claim that was actually drawn down, on both
+        # copies, so the namespace's trail says *which* claim was
+        # exceeded rather than only that some claim was.
+        self.assertEqual(claim['uuid'], ns_extra['claim'])
+        self.assertEqual(claim['uuid'], instance_extras[0]['claim'])
+        # The claim really is the one that moved, not a uuid that merely
+        # happens to be seeded.
+        self.assertEqual(2, claim['used_cpus'])
+
+    def test_an_unclaimed_placement_reports_no_claim_uuid(self):
+        # A namespace with no claim charges the cluster singleton, not a
+        # claim, so there is no claim uuid to report and the reply must
+        # say so with an empty name rather than inventing one. Readers
+        # test for the name, never for a zero.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        replies, patcher = self._capture_admissions()
+        with patcher:
+            with mock.patch.object(self.inst, 'add_event') as add_event:
+                self.inst.place_instance(self.node2)
+
+        self.assertEqual(1, len(replies))
+        self.assertEqual('', replies[0]['claim_uuid'])
+        # Nothing was over a claim there is not, either.
+        self.assertFalse(replies[0]['claim_over_limit'])
+        self.assertEqual([], self._claim_events(add_event))
+
+    def test_a_claimed_placement_names_the_claim_it_charged(self):
+        # The complement: a claim which is *not* exceeded still reports
+        # which claim the placement was charged against, because the
+        # field names the drawdown rather than the exceedance.
+        claim = self.mock_mariadb.set_namespace_claim(
+            'unittest', limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        replies, patcher = self._capture_admissions()
+        with patcher:
+            self.inst.place_instance(self.node2)
+
+        self.assertEqual(1, len(replies))
+        self.assertEqual(claim['uuid'], replies[0]['claim_uuid'])
+        self.assertFalse(replies[0]['claim_over_limit'])
+
     def test_a_create_within_the_claim_is_not_evented(self):
         self.mock_mariadb.set_namespace_claim(
             'unittest', limit_cpus=16, limit_memory_mb=16384,
@@ -1971,6 +2082,137 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
 
         # P8: where the instance was is still readable after delete.
         self.assertEqual(self.node2, self.inst.placement['node'])
+
+    #
+    # G4: the placement ledger is only auditable from events if both
+    # halves are legible. 'instance placed' carries the node, the
+    # request and the post-drawdown counters; 'instance placement
+    # released' used to carry the node and nothing else.
+    #
+    COUNTER_KEYS = {'node_used_cpus', 'node_used_memory_mb',
+                    'node_used_disk_gb', 'node_expected_demand'}
+
+    def _event_extra(self, add_event, message):
+        """The extra dict of the one event carrying this message."""
+        extras = [c.kwargs['extra'] for c in add_event.call_args_list
+                  if c.args[1] == message]
+        self.assertEqual(
+            1, len(extras), f'expected exactly one {message!r} event, '
+            f'got {len(extras)}')
+        return extras[0]
+
+    def test_the_release_event_carries_the_placement_vocabulary(self):
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        # Another instance's usage, so the counters this release reports
+        # are not zero and a dropped field cannot pass as a real value.
+        row['used_cpus'] = 8
+        row['used_memory_mb'] = 8192
+        row['used_disk_gb'] = 32
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+            placed = self._event_extra(add_event, 'instance placed')
+            self.inst._delete_globally()
+            released = self._event_extra(
+                add_event, 'instance placement released')
+
+        # Strictly more than the node it used to carry on its own.
+        self.assertTrue(
+            set(released) > {'node'},
+            f'the release event still carries only the node: {released}')
+
+        # And the counters are named the way the drawdown half names
+        # them, so a consumer reading both halves of the ledger needs
+        # one vocabulary rather than two.
+        self.assertTrue(
+            self.COUNTER_KEYS <= set(placed),
+            f'the placement event lost a counter: {sorted(placed)}')
+        self.assertTrue(
+            self.COUNTER_KEYS <= set(released),
+            "the release event does not use the placement event's counter "
+            f'names: {sorted(released)}')
+
+        # What was given back: the same triple handed to the RPC.
+        self.assertEqual(
+            {'node': self.node2, 'cpus': 2, 'memory_mb': 2048, 'disk_gb': 8},
+            {k: released[k]
+             for k in ('node', 'cpus', 'memory_mb', 'disk_gb')})
+
+        # And where the node's counters stand afterwards -- the other
+        # instance's usage, with this one's contribution credited back.
+        self.assertEqual(8, released['node_used_cpus'])
+        self.assertEqual(8192, released['node_used_memory_mb'])
+        self.assertEqual(32, released['node_used_disk_gb'])
+
+    def test_the_placement_event_names_every_counter_the_release_does(self):
+        # G4's done-criterion, as a set relation rather than as a list
+        # nobody remembers to update: every name the release half
+        # reports must also be a name the drawdown half reports, so one
+        # vocabulary reads the ledger in both directions. disk_gb is the
+        # key that made this unsatisfiable -- 'instance placed' reported
+        # cpus and memory_mb and left a third of the allocation out
+        # entirely -- so the placement event gains it rather than the
+        # release event dropping it.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+            placed = self._event_extra(add_event, 'instance placed')
+            self.inst._delete_globally()
+            released = self._event_extra(
+                add_event, 'instance placement released')
+
+        self.assertIn(
+            'disk_gb', placed,
+            f'the placement event does not report disk: {sorted(placed)}')
+        self.assertTrue(
+            set(released) <= set(placed),
+            'the release event uses names the placement event does not: '
+            f'{sorted(set(released) - set(placed))}')
+
+        # And the two halves agree on what those names mean, because
+        # both read _capacity_claim: the request drawn down and the
+        # request given back are the same triple.
+        self.assertEqual(
+            {'cpus': 2, 'memory_mb': 2048, 'disk_gb': 8},
+            {k: placed[k] for k in ('cpus', 'memory_mb', 'disk_gb')})
+        self.assertEqual(
+            {k: released[k] for k in ('cpus', 'memory_mb', 'disk_gb')},
+            {k: placed[k] for k in ('cpus', 'memory_mb', 'disk_gb')})
+
+    def test_a_release_with_no_capacity_row_reports_no_counters(self):
+        # P7's fail-open case: this node has no capacity row, so there
+        # are no counters to report and a zero would read as "the node
+        # now holds nothing" rather than "nobody looked".
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+            self.inst._delete_globally()
+            released = self._event_extra(
+                add_event, 'instance placement released')
+
+        self.assertEqual(
+            {'node': self.node2, 'cpus': 2, 'memory_mb': 2048, 'disk_gb': 8},
+            released)
+
+    def test_an_unnamed_release_events_the_node_it_released_from(self):
+        # hard_delete()'s sweep passes an empty node_uuid on purpose --
+        # it knows the instance rather than its node -- and an event
+        # naming no node is unreadable, so the reply's node fills in.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst._release_placement()
+            released = self._event_extra(
+                add_event, 'instance placement released')
+
+        self.assertEqual(self.node2, released['node'])
 
     def test_repeated_delete_of_an_errored_instance_releases_once(self):
         # _delete_globally() names the release node from the placement
