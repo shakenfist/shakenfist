@@ -5,6 +5,7 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestAgentOperations(base.BaseNamespacedTestCase):
@@ -272,7 +273,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
         # Run a fetch command which should fail
         self.assertRaises(
-            base.AGENT_OPERATION_FAILURES, self.test_client.await_agent_fetch,
+            apiclient.AgentOperationFailed, self.test_client.await_agent_fetch,
             inst['uuid'], '/tmp/nosuch')
 
     def test_interface_plug_and_exec_dhcp(self):

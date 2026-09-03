@@ -25,25 +25,30 @@ TRACE_PATH = '/srv/ci/traces'
 CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 
 
-# An agent operation which ends in a terminal state other than "complete"
-# reaches the caller as one of these. Historically the client had no way to
-# say "this operation definitively failed": every await loop spun out its
-# whole budget and then raised AgentCommandError, so that is what the suite
-# caught and asserted. client-python#380 (agent operation deadlines phase 6)
-# teaches those loops to recognise a terminal state on the first poll and
-# raise the new, more precise AgentOperationFailed instead.
+# await_agent_command() and await_agent_fetch() can raise three unrelated
+# exceptions, sharing no base class beyond Exception, so this tuple has to
+# enumerate them:
 #
-# Both client versions are in circulation while that lands: this repository's
-# CI builds the client from client-python's develop, and client-python's CI
-# builds the server from this repository's develop, so neither side can
-# switch first. Accepting either exception is what breaks that deadlock. The
-# getattr() is what makes an old client work -- AgentOperationFailed simply
-# does not exist there -- and can be narrowed to a plain reference once the
-# client change has merged. Phase 7 owns that cleanup, along with the rest of
-# this suite's await work.
+# - AgentOperationFailed -- the operation reached a terminal failure state.
+#   Raised from _await_agentop() in the client.
+# - AgentAwaitTimeout -- the operation never completed within the caller's
+#   own budget.
+# - AgentCommandError -- the operation completed but the result is unusable:
+#   no results, unexpected stderr, or no stdout/content blob.
+#
+# This tuple exists for catching, not asserting. Its two consumers, the
+# cloud-init retry loop and its debug-gathering loop in
+# _await_instance_ready() below, both mean "this attempt gave us no usable
+# answer, retry" -- so it is deliberately not narrowed to AgentOperationFailed
+# alone, even though client-python#380 has now merged and the getattr() shim
+# that used to accommodate an older client (which lacked AgentOperationFailed
+# entirely) is gone. Narrowing it would let a health check whose command
+# writes to stderr escape the retry on its first attempt. Assertion sites
+# want the opposite and use AgentOperationFailed directly.
 AGENT_OPERATION_FAILURES = (
     apiclient.AgentCommandError,
-    getattr(apiclient, 'AgentOperationFailed', apiclient.AgentCommandError))
+    apiclient.AgentOperationFailed,
+    apiclient.AgentAwaitTimeout)
 
 
 # Some functional assertions need to observe real host state (network
