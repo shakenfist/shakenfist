@@ -9350,6 +9350,10 @@ class CapacityDimensionDetail(_message.Message):
     sits, or 0 when it does not. Floored rather than signed so a
     negative value never has to be read as headroom -- the three
     numbers above already let a reader derive that.
+    optional for the same reason as the two fields above: a shortfall
+    of zero on an exceeded dimension is a contradiction, so a reply
+    from an sf-database predating this field must read as "not
+    reported" rather than as a refusal which was not actually over.
     """
     def __init__(
         self,
@@ -9361,20 +9365,24 @@ class CapacityDimensionDetail(_message.Message):
         exceeded: _builtins.bool = ...,
         cpu_load_1: _builtins.float | None = ...,
         expected_demand: _builtins.float | None = ...,
-        shortfall: _builtins.float = ...,
+        shortfall: _builtins.float | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand", "shortfall", b"shortfall"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "limit", b"limit", "requested", b"requested", "shortfall", b"shortfall", "used", b"used"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "limit", b"limit", "requested", b"requested", "shortfall", b"shortfall", "used", b"used"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType__cpu_load_1: _TypeAlias = _typing.Literal["cpu_load_1"]  # noqa: Y015
     _WhichOneofArgType__cpu_load_1: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1"]  # noqa: Y015
     _WhichOneofReturnType__expected_demand: _TypeAlias = _typing.Literal["expected_demand"]  # noqa: Y015
     _WhichOneofArgType__expected_demand: _TypeAlias = _typing.Literal["_expected_demand", b"_expected_demand"]  # noqa: Y015
+    _WhichOneofReturnType__shortfall: _TypeAlias = _typing.Literal["shortfall"]  # noqa: Y015
+    _WhichOneofArgType__shortfall: _TypeAlias = _typing.Literal["_shortfall", b"_shortfall"]  # noqa: Y015
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__cpu_load_1) -> _WhichOneofReturnType__cpu_load_1 | None: ...
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__expected_demand) -> _WhichOneofReturnType__expected_demand | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__shortfall) -> _WhichOneofReturnType__shortfall | None: ...
 
 Global___CapacityDimensionDetail: _TypeAlias = CapacityDimensionDetail  # noqa: Y015
 
@@ -9648,16 +9656,25 @@ class GetSchedulerNodeCapacityReply(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     ROWS_FIELD_NUMBER: _builtins.int
+    DEGRADED_FIELD_NUMBER: _builtins.int
+    degraded: _builtins.bool
+    """The daemon's own read of the table failed, so the empty rows list
+    means "could not be read" rather than "the reconciler has not
+    populated it yet". Without this the client only ever learns that
+    *its* call failed, and a MariaDB-side failure inside the database
+    tier reaches the scheduler indistinguishable from an empty table.
+    """
     @_builtins.property
     def rows(self) -> _containers.RepeatedCompositeFieldContainer[Global___SchedulerNodeCapacityRow]: ...
     def __init__(
         self,
         *,
         rows: _abc.Iterable[Global___SchedulerNodeCapacityRow] | None = ...,
+        degraded: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["rows", b"rows"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["degraded", b"degraded", "rows", b"rows"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

@@ -74,15 +74,18 @@ What the numbers mean:
   ram_max minus ram_available is what the instances actually hold. A node
   publishing no ram_max has no memory ledger at all and is counted, not
   divided by.
-* **Ledger unreadable is not idle.** The capacity read swallows failure --
-  mariadb.get_scheduler_node_capacity() returns an empty list when the table
-  is unreadable as well as when it is empty, and _capacity_by_node() hands
-  that straight on -- which makes every cpu_committed zero and every
-  cpu_committed_row_present false at once. A sample in that state is
-  excluded from the committed CPU figures and reported, rather than averaged
-  in as a cluster doing nothing. Note that an unreadable table and one the
-  reconciler has never populated are indistinguishable from here; both are
-  worth knowing and neither is an idle cluster.
+* **Ledger unreadable is not idle.** A failed capacity read makes every
+  cpu_committed zero and every cpu_committed_row_present false at once, which
+  from the payload alone looks exactly like a cluster doing nothing. The
+  server now tells the two apart -- mariadb.get_scheduler_node_capacity()
+  returns rows and a separate degraded flag, the database daemon forwards its
+  own read failure on that flag, and the scheduler events "schedule could not
+  read the capacity counters" when it is set -- but the sampled series this
+  report reads carries no such flag, so from here an unreadable table and one
+  the reconciler has never populated are still indistinguishable. A sample in
+  that state is therefore excluded from the committed CPU figures and
+  reported rather than averaged in; the scheduler event is where the
+  difference is visible, and both states are worth knowing whichever it was.
 * **A node missing from per_node has four possible meanings**, which is why
   the probe records the roster beside every sample: not a hypervisor,
   metrics older than 120s, a queue over UNREASONABLE_QUEUE_LENGTH, or gone.
@@ -537,7 +540,7 @@ class GuardCensus:
         self.sole_exceedance = collections.Counter()
         self.stage_dimensions = collections.defaultdict(collections.Counter)
         self.unenforced = 0
-        self.no_dimensions = 0
+        self.empty_dimensions = 0
         self.nothing_exceeded = 0
 
         # The demand dimension carries the two terms whose sum is `used`
@@ -551,7 +554,15 @@ class GuardCensus:
         # deliberately not computed here when it is absent: G3 puts the
         # definition of shortfall in one place, server side, so that two
         # consumers cannot disagree about its sign convention.
+        #
+        # Two dicts, for the same reason the rest of this class keeps the
+        # claim tallies apart from the refusal ones: a claim exceedance is
+        # an admitted placement, so its shortfall says how far past a
+        # declared footprint a namespace went, not how far short of the
+        # ledger a refused create fell. One dict would print the second
+        # number under the first heading.
         self.shortfalls = {}
+        self.claim_shortfalls = {}
 
         self.claims = 0
         self.claim_malformed = 0
@@ -614,12 +625,12 @@ class GuardCensus:
                          else UNKNOWN_DIMENSION)
         return names, details, True
 
-    def _note_shortfall(self, entry, name):
+    def _note_shortfall(self, into, entry, name):
         shortfall = numeric(entry.get('shortfall'))
         if shortfall is None:
             return
-        if name not in self.shortfalls or shortfall > self.shortfalls[name]:
-            self.shortfalls[name] = shortfall
+        if name not in into or shortfall > into[name]:
+            into[name] = shortfall
 
     def _note_demand_split(self, entry):
         """Which term of the demand dimension carried it past the limit.
@@ -650,8 +661,8 @@ class GuardCensus:
     def observe_denial(self, extra):
         self.denials += 1
         stage = extra.get('failing_stage') if isinstance(extra, dict) else None
-        self.stages[stage if isinstance(stage, str) and stage else UNKNOWN_STAGE] += 1
         stage_label = stage if isinstance(stage, str) and stage else UNKNOWN_STAGE
+        self.stages[stage_label] += 1
 
         if isinstance(extra, dict) and extra.get('enforce') is False:
             # A ground-truth writer's denial, which does not refuse a
@@ -663,7 +674,6 @@ class GuardCensus:
         names, details, well_formed = self._dimensions_of(extra, 'dimensions')
         if not well_formed:
             self.malformed += 1
-            self.no_dimensions += 1
             return
 
         for entry in details:
@@ -671,12 +681,17 @@ class GuardCensus:
                 continue
             name = entry.get('dimension')
             name = name if isinstance(name, str) and name else UNKNOWN_DIMENSION
-            self._note_shortfall(entry, name)
+            self._note_shortfall(self.shortfalls, entry, name)
             if name == 'demand':
                 self._note_demand_split(entry)
 
         if not details:
-            self.no_dimensions += 1
+            # A dimensions list this tool could read, which was empty. A
+            # different fact from the one below -- there was nothing to
+            # mark exceeded, rather than something which was not marked --
+            # and a different fact again from malformed, which is a shape
+            # this tool did not recognise at all.
+            self.empty_dimensions += 1
         if not names:
             # The guard refused and marked nothing exceeded. Worth seeing:
             # it is either a guard this tool does not understand or an
@@ -708,7 +723,8 @@ class GuardCensus:
                 continue
             name = entry.get('dimension')
             self._note_shortfall(
-                entry, name if isinstance(name, str) and name
+                self.claim_shortfalls, entry,
+                name if isinstance(name, str) and name
                 else UNKNOWN_DIMENSION)
         for name in set(names):
             self.claim_exceeded[name] += 1
@@ -1360,10 +1376,18 @@ def print_guard_census(census):
         print('  cleaner, or startup reconciliation) recording where a domain')
         print('  already is. Those refuse nothing a user asked for.')
     if guard.malformed:
-        print('  %d %s carried no usable dimensions list and are counted here'
-              % (guard.malformed, plural(guard.malformed, 'event')))
+        print('  %d %s carried no usable dimensions list and %s counted here'
+              % (guard.malformed, plural(guard.malformed, 'event'),
+                 plural(guard.malformed, 'is', 'are')))
         print('  but explain nothing. That is an event shape this tool does')
         print('  not understand, not a cluster fact.')
+    if guard.empty_dimensions:
+        print('  %d %s carried a readable but EMPTY dimensions list, which is'
+              % (guard.empty_dimensions,
+                 plural(guard.empty_dimensions, 'event')))
+        print('  a guard which refused without saying against what. Counted')
+        print('  apart from the malformed events above, whose shape this tool')
+        print('  could not read at all.')
 
     if guard.stages:
         rows = []
@@ -1431,10 +1455,10 @@ def print_guard_census(census):
 
     if guard.shortfalls:
         print()
-        print('  Worst shortfall seen per dimension, as the event reported')
-        print('  it. The server computes it where the guard made the')
-        print('  comparison, floored at zero, so nothing here recomputes it')
-        print('  and no two readers can disagree about its sign:')
+        print('  Worst shortfall seen per dimension among these REFUSALS, as')
+        print('  the event reported it. The server computes it where the guard')
+        print('  made the comparison, floored at zero, so nothing here')
+        print('  recomputes it and no two readers can disagree about its sign:')
         for dimension in sorted(guard.shortfalls):
             print('    %-12s %s' % (dimension, fmt(guard.shortfalls[dimension], 3)))
     elif guard.denials:
@@ -1473,6 +1497,14 @@ def print_guard_census(census):
             '%s x%d' % (name, count)
             for name, count in sorted(guard.claim_exceeded.items(),
                                       key=lambda kv: (-kv[1], kv[0]))))
+    if guard.claim_shortfalls:
+        print('    Worst amount over the claim, per dimension, as the event')
+        print('    reported it. This is how far past a declared footprint a')
+        print('    namespace went on an ADMITTED placement, and it is not the')
+        print('    refusal shortfall above:')
+        for dimension in sorted(guard.claim_shortfalls):
+            print('      %-12s %s'
+                  % (dimension, fmt(guard.claim_shortfalls[dimension], 3)))
 
 
 def print_verdict(cpu_fractions, census, series):
@@ -1548,8 +1580,8 @@ def print_verdict(cpu_fractions, census, series):
         print('  says, a refused placement is a create which did not happen.')
         sole_demand = guard.sole_exceedance.get('demand', 0)
         if sole_demand:
-            print('  %d of them were refused on the demand dimension ALONE, with'
-                  % sole_demand)
+            print('  %d of them %s refused on the demand dimension ALONE, with'
+                  % (sole_demand, plural(sole_demand, 'was', 'were')))
             print('  every allocated dimension inside its limit. That is not a')
             print('  cloud which ran out of room; see the split above.')
     else:

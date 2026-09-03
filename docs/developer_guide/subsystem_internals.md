@@ -116,7 +116,12 @@ over. Floored rather than signed, because a negative shortfall is
 headroom the three reported numbers already let a reader derive, and
 a field meaning "shortfall" in one row and "spare" in another is
 worse than absent. It is reported, never tested against a guard
-decision.
+decision. Its proto field is `optional` for the same reason the
+demand breakdown's are: zero is a value a shortfall cannot honestly
+take on a dimension flagged `exceeded`, so a reply from an older
+`sf-database` must read as "not reported" rather than as a refusal
+which was not actually over. Absence, not zero, is what a consumer
+checks.
 
 There used to be a second ledger here: `Scheduler._committed_vcpus()`,
 a Python walk over each candidate's `INSTANCE_LOCATION` rows added as

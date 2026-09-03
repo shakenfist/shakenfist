@@ -1554,6 +1554,25 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         # was charged" reads as, so an old server cannot fabricate one.
         self.assertEqual('', unpacked['claim_uuid'])
 
+    def test_a_reply_without_a_shortfall_reads_as_absent_not_zero(self):
+        # The same window again, and the one field where the proto3
+        # default is actively misleading: a dimension flagged exceeded
+        # cannot honestly carry a shortfall of zero, because zero means
+        # it was not over. An sf-database predating the field must
+        # therefore unpack with no shortfall key at all -- which is what
+        # ci_headroom_report.py reads to say "this series predates the
+        # field" rather than printing 0.000 under a refusal.
+        reply = database_pb2.AdmitInstancePlacementReply(
+            success=True, admitted=False, failing_stage='node')
+        reply.dimensions.add(dimension='cpus', limit=8.0, used=6.0,
+                             requested=4.0, exceeded=True)
+        unpacked, _ = self._unpack(reply)
+        self.assertEqual(
+            [{'dimension': 'cpus', 'limit': 8.0, 'used': 6.0,
+              'requested': 4.0, 'exceeded': True}],
+            unpacked['dimensions'])
+        self.assertNotIn('shortfall', unpacked['dimensions'][0])
+
     def test_over_claim_round_trip_preserves_the_advisory_detail(self):
         # An admitted placement carrying advisory over-limit detail: the
         # two dimension lists must not bleed into each other, because
@@ -1843,6 +1862,28 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
         self.assertEqual([], read.rows)
         self.assertTrue(read.degraded)
 
+    def test_a_degraded_daemon_read_crosses_the_wire(self):
+        # Every daemon except sf-database reaches this table over gRPC,
+        # so a MariaDB-side failure inside the database tier has to be
+        # forwarded or it arrives at the scheduler as an empty table --
+        # which is a normal state (P7) and would be read as one.
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_scheduler_node_capacity',
+                return_value=mariadb.SchedulerNodeCapacityRead(
+                    rows=[], degraded=True)):
+            reply = self._servicer().GetSchedulerNodeCapacity(
+                database_pb2.GetSchedulerNodeCapacityRequest(),
+                mock.MagicMock())
+        self.assertTrue(reply.degraded)
+
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            unpacked = mariadb._grpc_get_scheduler_node_capacity()
+        self.assertEqual([], unpacked.rows)
+        self.assertTrue(unpacked.degraded)
+
     def test_the_capacity_read_uses_the_bounded_budget(self):
         # This read sits in front of the admission RPC on the create hot
         # path (find_candidates(), and the queues daemon preflight), so
@@ -1866,6 +1907,10 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
                 database_pb2.GetSchedulerNodeCapacityRequest(),
                 mock.MagicMock())
         self.assertEqual(0, len(reply.rows))
+        # An exception escaping the direct read is the same outcome as a
+        # read which reported itself degraded, and must not be delivered
+        # as a table which is merely empty.
+        self.assertTrue(reply.degraded)
 
     def test_the_rpc_has_a_prometheus_counter(self):
         with mock.patch.object(database_main.daemon.WorkerPoolDaemon,

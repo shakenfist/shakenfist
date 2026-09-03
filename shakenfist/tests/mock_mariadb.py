@@ -3115,14 +3115,9 @@ class MockMariaDB():
             for dimension, requested in (('cpus', cpus),
                                          ('memory_mb', memory_mb),
                                          ('disk_gb', disk_gb)):
-                limit = claim['limit_' + dimension]
-                used = claim['used_' + dimension]
-                dimensions.append({
-                    'dimension': dimension,
-                    'limit': float(limit),
-                    'used': float(used),
-                    'requested': float(requested),
-                    'exceeded': used + requested > limit})
+                dimensions.append(mariadb._capacity_dimension(
+                    dimension, claim['limit_' + dimension],
+                    claim['used_' + dimension], requested))
             if any(d['exceeded'] for d in dimensions):
                 result['failing_stage'] = 'claim'
                 result['dimensions'] = dimensions
@@ -3139,14 +3134,9 @@ class MockMariaDB():
             for dimension, requested in (('cpus', cpus),
                                          ('memory_mb', memory_mb),
                                          ('disk_gb', disk_gb)):
-                limit = row['limit_' + dimension]
-                used = row['used_' + dimension]
-                dimensions.append({
-                    'dimension': dimension,
-                    'limit': float(limit),
-                    'used': float(used),
-                    'requested': float(requested),
-                    'exceeded': used + requested > limit})
+                dimensions.append(mariadb._capacity_dimension(
+                    dimension, row['limit_' + dimension],
+                    row['used_' + dimension], requested))
             if enforce_demand and row['demand_limit'] is not None:
                 # Check-then-charge, as the real clause does since phase
                 # 4a: the incoming placement's demand_add is reported but
@@ -3157,12 +3147,9 @@ class MockMariaDB():
                 # exceeded set -- would make the P9 waiver tests in
                 # test_external_api.py exercise a walk the real code
                 # never takes.
-                dimensions.append({
-                    'dimension': 'demand',
-                    'limit': float(row['demand_limit']),
-                    'used': float(row['expected_demand']),
-                    'requested': float(demand_add),
-                    'exceeded': row['expected_demand'] > row['demand_limit']})
+                dimensions.append(mariadb._capacity_dimension(
+                    'demand', row['demand_limit'], row['expected_demand'],
+                    demand_add, charged=False))
             if any(d['exceeded'] for d in dimensions):
                 result['failing_stage'] = 'node'
                 result['dimensions'] = dimensions
@@ -3190,12 +3177,9 @@ class MockMariaDB():
                 # the triple reads exactly as a denial's does, and only
                 # the dimensions actually over are reported.
                 if used + requested > limit:
-                    result['claim_dimensions'].append({
-                        'dimension': dimension,
-                        'limit': float(limit),
-                        'used': float(used),
-                        'requested': float(requested),
-                        'exceeded': True})
+                    result['claim_dimensions'].append(
+                        mariadb._capacity_dimension(
+                            dimension, limit, used, requested))
             result['claim_over_limit'] = bool(result['claim_dimensions'])
 
         if row is not None:

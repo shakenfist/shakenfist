@@ -2791,7 +2791,11 @@ message CapacityDimensionDetail {
   // sits, or 0 when it does not. Floored rather than signed so a
   // negative value never has to be read as headroom -- the three
   // numbers above already let a reader derive that.
-  double shortfall = 8;
+  // optional for the same reason as the two fields above: a shortfall
+  // of zero on an exceeded dimension is a contradiction, so a reply
+  // from an sf-database predating this field must read as "not
+  // reported" rather than as a refusal which was not actually over.
+  optional double shortfall = 8;
 }
 
 message AdmitInstancePlacementReply {
@@ -2903,6 +2907,12 @@ message SchedulerNodeCapacityRow {
 
 message GetSchedulerNodeCapacityReply {
   repeated SchedulerNodeCapacityRow rows = 1;
+  // The daemon's own read of the table failed, so the empty rows list
+  // means "could not be read" rather than "the reconciler has not
+  // populated it yet". Without this the client only ever learns that
+  // *its* call failed, and a MariaDB-side failure inside the database
+  // tier reaches the scheduler indistinguishable from an empty table.
+  bool degraded = 2;
 }
 
 // Namespace claim CRUD (MariaDB)

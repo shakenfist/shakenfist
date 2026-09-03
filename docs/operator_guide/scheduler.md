@@ -737,15 +737,18 @@ tells the whole story:
   reservation subtracted, or the committed memory compared against
   the counters' limit.
 - `schedule could not read the capacity counters` appears only when
-  the read of `scheduler_node_capacity` itself failed -- a database
-  outage, or the bounded gRPC budget expiring -- and says the CPU and
-  RAM pre-filters ran on the live measurements alone for this
-  decision. It is *not* emitted for an empty table: a cluster the
-  reconciler has not reached yet has no rows at all, which is normal
-  and admits unguarded. Admission is unchanged either way, so this
-  marks a decision made with less information rather than a decision
-  made differently. Seeing it repeatedly points at the database tier
-  rather than at the scheduler.
+  the read of `scheduler_node_capacity` itself failed, and says the
+  CPU and RAM pre-filters ran on the live measurements alone for this
+  decision. It covers both places the read can fail: this daemon's own
+  gRPC call, when the database service is unreachable or the bounded
+  gRPC budget expires, and the query `sf-database` runs against
+  MariaDB, which the reply reports back on its `degraded` field. It is
+  *not* emitted for an empty table: a cluster the reconciler has not
+  reached yet has no rows at all, which is normal and admits
+  unguarded. Admission is unchanged either way, so this marks a
+  decision made with less information rather than a decision made
+  differently. Seeing it repeatedly points at the database tier rather
+  than at the scheduler.
 - `schedule at stage affinity_constraints` is the hard constraint
   filter, with a `dropped` map naming which of `require_with_tag` or
   `require_without_tag` ejected each node. It is absent when no hard

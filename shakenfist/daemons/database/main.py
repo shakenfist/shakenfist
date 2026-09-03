@@ -2768,23 +2768,26 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         empty reply: the caller is an admin summary which reports a
         node with no row as uncounted rather than as full.
 
-        The read's ``degraded`` flag is dropped here rather than
-        forwarded, because the reply message has no field to carry it.
-        A client therefore learns that *its own* call failed, not that
-        this daemon's query did; adding a wire field for the second is
-        future work, and a behavioural change this observability step
-        deliberately does not make mid-soak.
+        The read's ``degraded`` flag is forwarded rather than dropped.
+        Every daemon except this one reaches the table over gRPC, so
+        without it a MariaDB-side failure here would arrive at the
+        scheduler as an empty table -- indistinguishable from a cluster
+        the reconciler has not populated yet (P7), and so silent where
+        the whole point of the flag is that it is not. An exception
+        escaping the direct read is degraded for the same reason.
         """
         try:
             self.monitor.counters['get_scheduler_node_capacity'].inc()
-            reply = database_pb2.GetSchedulerNodeCapacityReply()
-            for row in mariadb._direct_get_scheduler_node_capacity().rows:
+            read = mariadb._direct_get_scheduler_node_capacity()
+            reply = database_pb2.GetSchedulerNodeCapacityReply(
+                degraded=read.degraded)
+            for row in read.rows:
                 reply.rows.add(**row)
             return reply
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database GetSchedulerNodeCapacity failed', e)
-            return database_pb2.GetSchedulerNodeCapacityReply()
+            return database_pb2.GetSchedulerNodeCapacityReply(degraded=True)
 
     # =========================================================
     # Namespace Claim CRUD (MariaDB)

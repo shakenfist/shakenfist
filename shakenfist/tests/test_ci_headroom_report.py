@@ -1147,6 +1147,45 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             'A census predating the shortfall field reported a shortfall of '
             'zero, which reads as a refusal that was not actually over.')
 
+    def test_a_claim_shortfall_is_not_reported_as_a_refusal_shortfall(self):
+        """The two shortfalls answer different questions.
+
+        A refusal's shortfall is how far short of the ledger a create
+        which did not happen fell. A claim's is how far past a declared
+        footprint an ADMITTED placement went. Printing the second under
+        the first heading invents a refusal on a dimension nothing
+        refused, which is the conflation the whole census is built to
+        avoid.
+        """
+        census = self._census([
+            denial_event(dimensions=[
+                dimension('demand', 1.5, 2.9, 0.6, True,
+                          cpu_load_1=2.4, expected_demand=0.5)]),
+            claim_event(claim_dimensions=[
+                dimension('cpus', 1.0, 0.0, 2.0, True, shortfall=1.0)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'No refused dimension carried a shortfall field', output,
+            'The claim exceedance supplied a shortfall for a dimension no '
+            'refusal exceeded, and it was printed as a refusal shortfall.')
+        self.assertIn('Worst amount over the claim', output)
+        self.assertEqual(
+            1, output.count('cpus         1.000'),
+            'The claim shortfall appears twice, so it is being printed under '
+            'both headings rather than only the claim one.')
+
+    def test_an_empty_dimensions_list_is_not_a_malformed_event(self):
+        """A readable but empty list is a different fact from an unreadable one."""
+        census = self._census([denial_event(dimensions=[])])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('carried a readable but EMPTY dimensions list', output)
+        self.assertNotIn('carried no usable dimensions list', output)
+
     def test_an_unenforced_denial_is_counted_apart(self):
         """A ground-truth writer's denial refuses nothing a caller asked for."""
         census = self._census([

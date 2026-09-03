@@ -25389,7 +25389,12 @@ class CapacityDimensionDetailDict(TypedDict):
     # carry the numbers headroom would be derived from -- a field
     # meaning "shortfall" in one row and "spare" in another is worse
     # than absent. Reported alongside exceeded, never used to decide it.
-    shortfall: float
+    # NotRequired for the same reason the two demand terms below are:
+    # _capacity_dimension() always sets it, but a reply from an
+    # sf-database predating the wire field carries no shortfall at all,
+    # and zero is a value this field cannot honestly take on a dimension
+    # which is flagged exceeded. Absent means "not reported".
+    shortfall: NotRequired[float]
     # Present only on the demand dimension: the two terms whose sum is
     # used. cpu_load_1 is measured ground truth, expected_demand is the
     # D13 feedforward estimate, and which one made used exceed the limit
@@ -25477,10 +25482,12 @@ class SchedulerNodeCapacityRead(NamedTuple):
     they would have to remember exists. A caller which genuinely does
     not care discards it explicitly.
 
-    ``degraded`` describes *this process's* read. The database daemon's
-    own swallow (``_direct_get_scheduler_node_capacity()`` inside the
-    servicer) is not carried on the wire, because the reply message has
-    no field for it; a gRPC client learns only that its own call failed.
+    ``degraded`` covers both halves of the read. A gRPC client sets it
+    when its own call fails, and the database daemon forwards its own
+    swallow (``_direct_get_scheduler_node_capacity()`` inside the
+    servicer) on the reply's ``degraded`` field, so a MariaDB failure
+    inside the database tier is not delivered to every other daemon as
+    an empty table.
     """
 
     rows: list[SchedulerNodeCapacityRow]
@@ -25618,11 +25625,12 @@ def _capacity_dimension(
 def _dimension_from_proto(d: Any) -> CapacityDimensionDetailDict:
     """One CapacityDimensionDetail proto message back into dict form.
 
-    The demand breakdown fields are optional in the proto so that
-    explicit presence, not the proto3 zero default, decides whether the
-    dict carries them: a reply from an sf-database predating the fields
-    must read as "no breakdown available" rather than as a breakdown of
-    zeroes under a non-zero used (issue 3913).
+    The demand breakdown fields and the shortfall are optional in the
+    proto so that explicit presence, not the proto3 zero default,
+    decides whether the dict carries them: a reply from an sf-database
+    predating the fields must read as "not reported" rather than as a
+    breakdown of zeroes under a non-zero used (issue 3913), or as a
+    refusal which was not actually over its limit.
     """
     detail: CapacityDimensionDetailDict = {
         'dimension': d.dimension,
@@ -25630,8 +25638,9 @@ def _dimension_from_proto(d: Any) -> CapacityDimensionDetailDict:
         'used': float(d.used),
         'requested': float(d.requested),
         'exceeded': bool(d.exceeded),
-        'shortfall': float(d.shortfall),
     }
+    if d.HasField('shortfall'):
+        detail['shortfall'] = float(d.shortfall)
     if d.HasField('cpu_load_1'):
         detail['cpu_load_1'] = float(d.cpu_load_1)
     if d.HasField('expected_demand'):
@@ -26842,7 +26851,11 @@ def _grpc_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
 
     The swallow stays; what it now returns is ``degraded=True`` beside
     the empty list, so the caller can say the read failed instead of
-    reporting a cluster with no counters at all.
+    reporting a cluster with no counters at all. The daemon's own read
+    can fail while this call succeeds, so the reply's ``degraded`` is
+    carried through rather than assumed false: without that, a MariaDB
+    failure inside the database tier would reach every client except
+    sf-database itself as an empty table.
     """
     try:
         stub = _get_database_stub()
@@ -26862,7 +26875,7 @@ def _grpc_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
                 'expected_demand': float(row.expected_demand),
             }
             for row in reply.rows
-        ], degraded=False)
+        ], degraded=bool(reply.degraded))
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.warning(f'gRPC GetSchedulerNodeCapacity failed: {e}')
         return SchedulerNodeCapacityRead(rows=[], degraded=True)
@@ -28091,14 +28104,7 @@ def _grpc_create_namespace_claim(
         result['created'] = bool(reply.created)
         result['refused_reason'] = reply.refused_reason
         result['dimensions'] = [
-            {
-                'dimension': d.dimension,
-                'limit': float(d.limit),
-                'used': float(d.used),
-                'requested': float(d.requested),
-                'exceeded': bool(d.exceeded),
-                'shortfall': float(d.shortfall),
-            } for d in reply.dimensions]
+            _dimension_from_proto(d) for d in reply.dimensions]
         if reply.HasField('claim'):
             result['claim'] = _claim_from_proto(reply.claim)
         return result
@@ -28130,14 +28136,7 @@ def _grpc_update_namespace_claim(
         result['updated'] = bool(reply.updated)
         result['refused_reason'] = reply.refused_reason
         result['dimensions'] = [
-            {
-                'dimension': d.dimension,
-                'limit': float(d.limit),
-                'used': float(d.used),
-                'requested': float(d.requested),
-                'exceeded': bool(d.exceeded),
-                'shortfall': float(d.shortfall),
-            } for d in reply.dimensions]
+            _dimension_from_proto(d) for d in reply.dimensions]
         if reply.HasField('claim'):
             result['claim'] = _claim_from_proto(reply.claim)
         return result

@@ -1736,11 +1736,14 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(extras))
         self.assertEqual(self.node2, extras[0]['node'])
         self.assertEqual('unittest', extras[0]['namespace'])
-        # Only the dimension actually over is reported, and its usage is
-        # what the claim held before this admission.
+        # Only the dimension actually over is reported, its usage is
+        # what the claim held before this admission, and the shortfall
+        # is the one the shared builder computes -- the mock goes
+        # through mariadb._capacity_dimension() precisely so this
+        # asserts a shape production can actually emit.
         self.assertEqual(
             [{'dimension': 'cpus', 'limit': 1.0, 'used': 0.0,
-              'requested': 2.0, 'exceeded': True}],
+              'requested': 2.0, 'exceeded': True, 'shortfall': 1.0}],
             extras[0]['claim_dimensions'])
 
     def _capture_admissions(self):
@@ -1938,7 +1941,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(2, claim['used_cpus'])
         self.assertEqual(
             [{'dimension': 'cpus', 'limit': 1.0, 'used': 0.0,
-              'requested': 2.0, 'exceeded': True}],
+              'requested': 2.0, 'exceeded': True, 'shortfall': 1.0}],
             extras[0]['claim_dimensions'])
 
     def test_the_mock_can_produce_a_claim_stage_denial(self):
@@ -2197,6 +2200,43 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {'node': self.node2, 'cpus': 2, 'memory_mb': 2048, 'disk_gb': 8},
             released)
+
+    def test_a_release_spanning_two_nodes_reports_no_counters(self):
+        # A historical duplicate -- the shape the admission RPC exists
+        # to stop producing. Two nodes were credited back, so no single
+        # capacity row describes the release, and naming one of them
+        # would be a number nobody could interpret. Reporting the
+        # counters anyway would read as "the node now holds this",
+        # which would be true of neither node.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node3, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+        # The duplicate, written behind the RPC's back precisely because
+        # the RPC cannot produce one.
+        self.mock_mariadb._mariadb_record_relationship(
+            ObjectType.NODE, self.node3,
+            RelationshipType.INSTANCE_LOCATION, None,
+            ObjectType.INSTANCE, self.instance_uuid)
+        self.assertEqual(sorted([self.node2, self.node3]), self._placed_on())
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst._release_placement()
+            released = self._event_extra(
+                add_event, 'instance placement released')
+
+        self.assertEqual(
+            set(), self.COUNTER_KEYS & set(released),
+            'a release spanning two nodes reported one node\'s counters: '
+            f'{sorted(released)}')
+        # What was given back is still reported: that half of the
+        # vocabulary does not depend on which node held it.
+        self.assertEqual(
+            {'cpus': 2, 'memory_mb': 2048, 'disk_gb': 8},
+            {k: released[k] for k in ('cpus', 'memory_mb', 'disk_gb')})
 
     def test_an_unnamed_release_events_the_node_it_released_from(self):
         # hard_delete()'s sweep passes an empty node_uuid on purpose --

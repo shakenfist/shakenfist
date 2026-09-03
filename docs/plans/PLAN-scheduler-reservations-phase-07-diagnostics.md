@@ -317,11 +317,21 @@ the claim's own uuid back to the caller, so the follow-up widened
 the admission reply to add it. Recorded here so a reader does not
 find `claim_uuid` in the diff and wonder where it came from.
 
-All three are additive fields on reply messages, so an older
+**Corrected again in the review follow-up (2026-09-04): four
+proto changes.** `GetSchedulerNodeCapacityReply` gains `bool
+degraded = 2` so the database daemon's own failed read reaches
+its clients, and `shortfall` becomes `optional` -- the same
+change of kind the demand breakdown fields already made, for the
+same reason. See the review follow-up section below.
+
+All four are additive fields on reply messages, so an older
 client reading a newer server sees proto3 defaults rather than an
 error, and none needs `tox -e genprotos` output hand-edited.
-Widening a reply is a bigger change than reporting a computed
-value, which is why step 2 is opus at high effort and not sonnet.
+Proto3 defaults are only a safe reading where the default is a
+meaning the field can honestly carry, which is why two of these
+are `optional` and not plain scalars. Widening a reply is a
+bigger change than reporting a computed value, which is why step
+2 is opus at high effort and not sonnet.
 
 ## Execution
 
@@ -972,9 +982,99 @@ assumed: `pre-commit run --all-files`, including
 `check-plan-status.py` and `check-doc-anchors.py`, was run and
 passed clean as part of writing this close-out.
 
+## Review follow-up (2026-09-04)
+
+The automated reviewer raised eight items on PR #4052, four of
+them defects. All eight are addressed here; each was checked
+against the tree before being acted on, and the four defects were
+real.
+
+**Two "not reported" sentinels were missing, and one of them
+contradicted a field this phase added.** `shortfall` went onto
+the wire as a plain `double`, so an sf-database predating it
+returns proto3's zero and every exceeded dimension unpacks as
+`shortfall: 0.0` -- a value that field cannot honestly take,
+since zero means the dimension was not over. That is exactly the
+reading `ci_headroom_report.py` prints "this series predates the
+field" to avoid, and it could never fire, because the key was
+always present. It is now `optional double`, set only under
+`HasField()`, so `CapacityDimensionDetailDict.shortfall` is
+`NotRequired` and absence means absence. G7's count of proto
+changes rises from three to four.
+
+**The degraded read did not cross the gRPC boundary.** Step 5
+added `degraded` to the accessor and the servicer's docstring
+recorded, honestly, that the reply had no field to carry it --
+so a MariaDB-side failure inside the database tier reached every
+other daemon as an empty table, which is a *normal* state (P7)
+and reads as one. Since every daemon except `sf-database` gets
+here over gRPC, that is the common case rather than the corner
+one, and `docs/operator_guide/scheduler.md` overstated what an
+operator could see. Rather than narrow the documentation to the
+weaker claim, `GetSchedulerNodeCapacityReply` gained `bool
+degraded = 2`, additive like the other three: the servicer
+forwards the direct read's flag, an exception escaping that read
+also reports degraded, and the client carries the reply's flag
+instead of assuming `False`. The operator guide now names both
+places the read can fail, which is what it should have said.
+
+**The mock built dimension dicts by hand.** Almost all unit
+coverage runs through `MockMariaDB`, which constructed its
+`dimensions` and `claim_dimensions` entries inline and so never
+carried a `shortfall` -- leaving G3's done-criterion unverified
+everywhere the guard is actually exercised, and pinning an
+exact-dict assertion in `test_instance.py` to a shape production
+cannot emit. The mock now calls `mariadb._capacity_dimension()`
+(with `charged=False` on demand, as the real clause is), which
+also stops the two drifting on `exceeded`. The same hand-built
+shape was found twice more, in `_grpc_create_namespace_claim()`
+and `_grpc_update_namespace_claim()`; both now use
+`_dimension_from_proto()`, so there is exactly one conversion in
+each direction.
+
+**The census merged two different shortfalls.** `_note_shortfall()`
+was called from both `observe_denial()` and `observe_claim()` into
+one dict, printed under the refusal heading -- so a claim
+exceedance's shortfall appeared as a refusal on a dimension
+nothing refused. That is the precise conflation `GuardCensus`'s
+docstring says it exists to prevent. Refusal and claim shortfalls
+are now separate dicts printed under their own headings.
+
+The four lesser items are done too: the module docstring's
+account of the accessor contract (which this phase falsified),
+`no_dimensions` (now `empty_dimensions`, counting only the
+readable-but-empty case, and printed rather than dead), two
+number-agreement slips in the output, and a duplicated stage-label
+expression.
+
+Five tests were added or tightened: shortfall absence across the
+wire, the degraded flag across the wire in both directions, the
+two shortfall tables staying apart, an empty dimensions list not
+being read as malformed, and a release spanning two nodes
+reporting no counters. The two exact-dict claim assertions in
+`test_instance.py` now include the shortfall the shared builder
+produces.
+
+One review suggestion is deliberately **not** taken here:
+functional (`shakenfist_ci`) coverage of the two new events
+endpoints. `test_namespace_claims.py` routes every request
+through a client verb on purpose, and there is no verb for either
+endpoint yet -- adding them is a `client-python` change of the
+kind phase 4b did, not a review fix to this branch. Recorded
+below.
+
 ## Future work
 
 Recorded here rather than absorbed, per the survey:
+
+- **Client verbs for the two events endpoints, and the
+  functional tests which follow them.** The endpoints are covered
+  by unit tests which mock `get_object_events`, so nothing
+  exercises the real read against a namespace's or a claim's
+  stored events. Cluster CI builds the client from a
+  `client-python` checkout at `develop`, so a verb is usable here
+  as soon as it merges; the work is a client change plus a test in
+  `test_events.py`, not a change to this branch.
 
 - **A cross-object event query.** Seven per-object endpoints is
   six more than a triage tool wants. `events-by-type` is a
