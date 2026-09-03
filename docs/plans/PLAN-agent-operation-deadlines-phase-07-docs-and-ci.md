@@ -263,24 +263,58 @@ timeout and none has a terminal-state check.
 3. **The three event-renewed loops keep the progress window and gain a
    ceiling.** Both numbers are named constants on `BaseTestCase`, so
    the ceiling is one place to change and the timeout message can
-   quote the real number. Renewal is restricted by passing
-   `event_type` to the events call rather than by filtering the
-   returned list, so the narrowing happens in SQL.
+   quote the real number.
+
+   Renewal is restricted **client-side**, by reading a small window of
+   recent events per poll and picking the newest one whose type
+   represents progress. Step 7c rejected this plan's original
+   instruction to narrow in SQL by passing `event_type` to the events
+   call, and the reason is that the call takes one type, not a set:
+   `get_instance_events`, `get_network_events`, `get_artifact_events`
+   and `get_blob_events` all funnel into `_get_events(...,
+   event_type, limit)` (`client-python:shakenfist_client/apiclient.py:542`),
+   and the server is `Optional[str]` the whole way down
+   (`external_api/base.py:object_events_response` into
+   `mariadb.get_object_events`). Narrowing to a three-type set
+   server-side would therefore be three HTTP requests per poll per
+   object rather than one. This suite's events polling rate is already
+   a tracked load concern — `shakenfist/deploy/shakenfist_ci/load_budget.py`
+   excludes the harness's own events traffic from the database load
+   budget by hand, and says at length what that exclusion costs — so
+   tripling it to avoid a list comprehension in the harness is the
+   worse trade. The `limit` on the existing call goes from 1 to 10
+   instead, which is enough to see past a burst of periodic events,
+   and costs nothing extra on the wire.
 
    Which types count as progress is the implementing step's call
-   against `shakenfist/constants.py:93-113`, but the plan's position
-   is `status` and `mutate` renew, and `usage`, `resources`, `health`
-   and `prune` do not — the periodic channels are exactly the ones
-   that renew a dead wait forever. A test which needs an event type
-   outside that set to make progress is a test whose await is looking
-   at the wrong signal.
+   against `shakenfist/constants.py:93-113`. The plan's position was
+   that `status` and `mutate` renew and the periodic channels
+   (`usage`, `resources`, `health`, `prune`) do not. Step 7c verified
+   that against what is actually written during instance create,
+   agent readiness and network, artifact and blob readiness, and
+   **added `audit`** to the set: between a network reaching `initial`
+   and reaching `created` the only events on the network object are
+   `audit` (`network/bridged_vxlan_network.py`), so `status` and
+   `mutate` alone would cover a network create by its two bracketing
+   state changes and nothing in between. The plan's position held for
+   the other three — `mutate` on every phase boundary, `status` on
+   the image and blob fetch percentages. Excluding the other four
+   costs nothing: `resources` and `health` are written only against
+   nodes, and `prune` and `historic` are never written at all.
 
-   The `events-by-type` capability gate means an old server would make
-   the filtered call raise `IncapableException`. The suite always runs
-   against a cluster built from this repository, so this is not a
-   compatibility risk; the step should confirm the capability is
-   declared rather than add a fallback path for a case that cannot
-   arise.
+   The filter is not a proof, and the step's comment says so. Two
+   writers still emit a progress-typed event on a timer while nothing
+   progresses — `blob.py`'s "waiting for existing download to
+   complete" `audit` every ten seconds, and the network maintain
+   daemon re-emitting "network not ok" `status` every thirty. That is
+   an argument for the ceiling, not for a narrower set: no event
+   filter can tell a wait that is progressing from one that is only
+   being talked about.
+
+   Because the narrowing is client-side, the `events-by-type`
+   capability gate is not reached for the type filter. It is still
+   reached for `limit`, which the loops already passed before this
+   phase, so nothing about the capability requirement changes.
 
 4. **The functional tests go in the smoke suite, in a new file.** The
    four scenarios are server-behaviour tests, not guest-behaviour
@@ -418,10 +452,13 @@ Every item is checkable by running the command next to it.
       constant: read the three messages and check each against the
       constant it quotes. `_await_agent_state`'s "5 minutes" for 500
       seconds is the known instance.
-- [ ] Renewal is filtered server-side:
-      `grep -n "event_type=" shakenfist/deploy/shakenfist_ci/base.py`
-      shows the filter on every renewal call, and no renewal call
-      passes only `limit=1`.
+- [ ] Renewal only happens on progress events: every one of the three
+      loops renews through `_renew_progress()`, and
+      `grep -n "limit=1)" shakenfist/deploy/shakenfist_ci/base.py`
+      returns nothing — no renewal call reads a single event of any
+      type any more. `PROGRESS_EVENT_TYPES` on `BaseTestCase` names
+      the set, and excludes `usage`, `resources`, `health` and
+      `prune`.
 - [ ] `smoke_ci_tests/test_agentop_deadlines.py` exists and contains
       four tests, or fewer with each omission recorded in Future work
       and its reason given.
