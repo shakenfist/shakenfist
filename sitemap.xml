@@ -245,6 +245,10 @@
          <lastmod>2026-09-03</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/renovate-lockstep-groups/</loc>
+         <lastmod>2026-09-03</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/renovate/</loc>
          <lastmod>2026-09-03</lastmod>
     </url>
@@ -274,6 +278,14 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/audits/test-coverage/</loc>
+         <lastmod>2026-09-03</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/audits/undeclared-direct-dependency/</loc>
+         <lastmod>2026-09-03</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/audits/unused-declared-dependency/</loc>
          <lastmod>2026-09-03</lastmod>
     </url>
     <url>

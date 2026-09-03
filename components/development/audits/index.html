@@ -1573,6 +1573,34 @@
   
   
     <li class="md-nav__item">
+      <a href="unused-declared-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Dependencies declared but never imported
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="dependency-name-normalization/" class="md-nav__link">
         
   
@@ -1805,6 +1833,34 @@
     
   
     Audit: Human review scope completeness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="undeclared-direct-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Imports satisfied only by a transitive pin
   
 
     
@@ -2337,6 +2393,34 @@
     
   
     Audit: Renovate for dependency bumps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="renovate-lockstep-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Renovate groups for lockstep dependency families
   
 
     
@@ -13767,12 +13851,24 @@ attached rather than quietly disappearing from the table.</p>
 <td>Renovate for dependency bumps</td>
 </tr>
 <tr>
+<td><a href="/components/development/audits/renovate-lockstep-groups/">renovate-lockstep-groups.md</a></td>
+<td>Dependency families released in lockstep bump as one pull request</td>
+</tr>
+<tr>
 <td><a href="/components/development/audits/pin-indirect-dependencies/">pin-indirect-dependencies.md</a></td>
 <td>Pinning transitive dependencies</td>
 </tr>
 <tr>
 <td><a href="/components/development/audits/dependency-name-normalization/">dependency-name-normalization.md</a></td>
 <td>One spelling per pinned distribution</td>
+</tr>
+<tr>
+<td><a href="/components/development/audits/unused-declared-dependency/">unused-declared-dependency.md</a></td>
+<td>Declared dependencies are imported, or carry a recorded reason they are not</td>
+</tr>
+<tr>
+<td><a href="/components/development/audits/undeclared-direct-dependency/">undeclared-direct-dependency.md</a></td>
+<td>Nothing imported is left resting on a generated transitive pin</td>
 </tr>
 <tr>
 <td><a href="/components/development/audits/export-repo-config/">export-repo-config.md</a></td>

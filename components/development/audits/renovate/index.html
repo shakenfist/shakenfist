@@ -16,7 +16,7 @@
         <link rel="prev" href="../release-process/">
       
       
-        <link rel="next" href="../rust-unwrap-lint/">
+        <link rel="next" href="../renovate-lockstep-groups/">
       
       
         
@@ -1573,6 +1573,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../unused-declared-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Dependencies declared but never imported
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../dependency-name-normalization/" class="md-nav__link">
         
   
@@ -1805,6 +1833,34 @@
     
   
     Audit: Human review scope completeness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../undeclared-direct-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Imports satisfied only by a transitive pin
   
 
     
@@ -2475,6 +2531,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../renovate-lockstep-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Renovate groups for lockstep dependency families
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -13711,6 +13795,12 @@ so they bump together:</p>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="p">]</span>
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">}</span>
 </code></pre></div>
+<p>Where a family is released in lockstep rather than merely coupled --
+the oslo libraries cut coordinated releases, so four pull requests
+arrive the same evening for one upstream event -- grouping stops being
+a preference and becomes an audited requirement. See
+<a href="/components/development/audits/renovate-lockstep-groups/">renovate-lockstep-groups.md</a>, which is
+the criterion that measures it; this section stays the general advice.</p>
 <p>Server projects (shakenfist, kerbside) pin exactly (<code>==</code>) and use
 renovate's default range strategy, which bumps those pins on every
 release. That is right for software running on infrastructure we

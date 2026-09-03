@@ -1569,6 +1569,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/unused-declared-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Dependencies declared but never imported
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/dependency-name-normalization/" class="md-nav__link">
         
   
@@ -1801,6 +1829,34 @@
     
   
     Audit: Human review scope completeness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/audits/undeclared-direct-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Imports satisfied only by a transitive pin
   
 
     
@@ -2333,6 +2389,34 @@
     
   
     Audit: Renovate for dependency bumps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/audits/renovate-lockstep-groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Renovate groups for lockstep dependency families
   
 
     
@@ -10366,6 +10450,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Control datachannel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#message-framing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message framing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-hello-handshake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The hello handshake
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -13964,6 +14076,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Control datachannel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#message-framing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Message framing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-hello-handshake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The hello handshake
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -14502,6 +14642,51 @@ the assignment, and anything relying on that collision broke.</p>
 <p>The <code>on_data_channel</code> path (pumped as <code>"remote-dc"</code>) is therefore
 dead in normal operation. What is left for it is a datachannel the
 peer opens in band, which ryll's own client never does.</p>
+<h4 id="message-framing">Message framing<a class="headerlink" href="#message-framing" title="Permanent link">&para;</a></h4>
+<p><code>send_control(&amp;[u8])</code> writes bytes, so every control message the
+browser receives is a <em>binary</em> frame. <code>RTCDataChannel.binaryType</code>
+defaults to <code>"blob"</code> per the W3C specification, and
+<code>TextDecoder.decode</code> cannot take a <code>Blob</code> — it throws, <code>onmessage</code>
+catches, and the message is discarded with a console warning.
+<code>app.js</code> therefore sets <code>dc.binaryType = 'arraybuffer'</code> explicitly
+at channel creation.</p>
+<p>This is not belt-and-braces. Chromium defaults the property to
+<code>"arraybuffer"</code> rather than <code>"blob"</code>, which is why the omission
+went unnoticed; Firefox follows the specification, and every
+control message the server sent was silently dropped for the life
+of every Firefox session — no mouse mode, no cursor shape or
+position, no no-video notice. See <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/348" title="GitHub Issue: shakenfist/ryll #348">ryll#348</a>.</p>
+<h4 id="the-hello-handshake">The hello handshake<a class="headerlink" href="#the-hello-handshake" title="Permanent link">&para;</a></h4>
+<p>The browser sends <code>{"type":"hello"}</code> as soon as its end of the
+control channel opens, and the server answers with the current
+mouse mode — plus a no-video notice, if that viewer negotiated no
+codec we can send. The server cannot push either unprompted: it
+learned the mouse mode from SPICE session-init, seconds before the
+page loaded, and <code>send_control</code> drops anything written before the
+channel is open.</p>
+<p><strong>The hello is retried until it is answered</strong>, on the backoff in
+<code>HELLO_BACKOFFS_MS</code> (200 ms doubling to 3.2 s, five attempts). It
+has to be, because the first message written after <code>onopen</code> can be
+dropped by the far end without any indication. <code>onopen</code> reports
+this end's readiness, not the peer's; webrtc-rs creates its side of
+the channel separately and has no <code>data_channel</code> to hand a message
+to until the SCTP connected procedure has dialled it. A message
+arriving in that window is refused with <code>ErrDataChannelNotExisted</code>
+and discarded — not buffered, not NACKed, and invisible from the
+browser, which sees an open channel and a server that never
+replies.</p>
+<p>Left unretried that costs the whole session: the viewer keeps
+<code>app.js</code>'s default mouse mode rather than the negotiated one, and a
+viewer with no common video codec is never told why the picture is
+missing. <code>hello</code> is idempotent on the server — it reads the current
+mode and replies — so a duplicate that crosses a reply in flight
+costs one extra <code>mouse-mode</code> message and nothing else. The first
+viewport rides along with each attempt, since it was written in the
+same breath as the first hello and is lost in the same window.</p>
+<p>Receipt of a <code>mouse-mode</code> message cancels the retry. That is the
+right signal rather than "any inbound message": the server also
+pushes <code>mouse-mode</code> unprompted when the mode changes mid-session,
+and either way its arrival means the answer is here. See <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/347" title="GitHub Issue: shakenfist/ryll #347">ryll#347</a>.</p>
 <p><code>spawn_synthetic_audio_pump()</code> remains available for testing
 without a SPICE server: it emits a 440 Hz sine wave encoded as
 Opus at 50 fps (20 ms per frame, 960 samples at 48 kHz), through
