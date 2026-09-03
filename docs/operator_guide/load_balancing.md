@@ -91,8 +91,9 @@ ProxyPassReverse "/api" "balancer://sfapi"
 ```
 
 The full file (including the matching `ProxyPassReverse` rules, the HTTP-to-
-HTTPS redirect, TLS configuration, and the blob-transfer directives) is in
-`examples/apache-loadbalancer.conf`.
+HTTPS redirect, TLS configuration, `/readyz` health checking as described
+under [Health checks](#health-checks), and the blob-transfer directives) is
+in `examples/apache-loadbalancer.conf`.
 
 ### nginx
 
@@ -140,10 +141,11 @@ location = /apispec_1.json {
 
 The full file in `examples/nginx-loadbalancer.conf` adds the rest of a
 production-ready configuration: the `Host`, `X-Real-IP` and `X-Forwarded-*`
-headers, upstream keepalive, a block that drops PHP vulnerability scanners, a
-root catch-all so clients that omit the `/api` prefix still work, the bare
-`/api` redirect, the HTTP-to-HTTPS redirect, TLS termination, and the
-blob-transfer directives described below.
+headers, upstream keepalive, passive health checking as described under
+[Health checks](#health-checks), a block that drops PHP vulnerability
+scanners, a root catch-all so clients that omit the `/api` prefix still work,
+the bare `/api` redirect, the HTTP-to-HTTPS redirect, TLS termination, and
+the blob-transfer directives described below.
 
 ## Blob transfers
 
@@ -230,6 +232,32 @@ backend CA -- that is your choice (see the proxy-to-backend note under
 that same backend leg, so configure the probe with whichever scheme (HTTP or
 HTTPS) you use for the backend traffic itself.
 
+### Example: Apache
+
+Apache health-checks balancer members with `mod_proxy_hcheck` (which needs
+`mod_watchdog`):
+
+```bash
+sudo a2enmod proxy_hcheck watchdog
+```
+
+Then add the health-check parameters to each `BalancerMember`:
+
+```apache
+<Proxy "balancer://sfapi">
+    # hcmethod=GET hcuri=/readyz: probe /readyz. hcinterval=5 hcfails=2:
+    # mark the worker down after 2 failed probes (~10s, well inside the
+    # 25s drain grace). hcpasses=2: restore after 2 successes.
+    BalancerMember "http://10.0.0.1:13000" hcmethod=GET hcuri=/readyz hcinterval=5 hcpasses=2 hcfails=2
+    BalancerMember "http://10.0.0.2:13000" hcmethod=GET hcuri=/readyz hcinterval=5 hcpasses=2 hcfails=2
+</Proxy>
+```
+
+`mod_proxy_hcheck` treats any status of `400` or higher as a failed probe,
+so a `503 not ready` from a draining or database-isolated worker takes the
+member out of rotation after two probes. This is what
+`examples/apache-loadbalancer.conf` ships.
+
 ### Example: HAProxy
 
 HAProxy has first-class active HTTP health checks. Use `option httpchk` to
@@ -278,9 +306,16 @@ location /api/ {
 }
 ```
 
+This is what `examples/nginx-loadbalancer.conf` ships (with
+`proxy_next_upstream` at the `server` level so it covers every location).
+
 Be aware of the limitation: because this is passive, FOSS nginx only learns a
 worker is draining when a real request happens to hit it and fail. It will not
-pull a node out of rotation purely because `/readyz` returns `503`.
+pull a node out of rotation purely because `/readyz` returns `503`. And the
+passive approach has a floor: `proxy_next_upstream` can only re-route a failed
+request while some *other* backend in the pool is healthy. A deploy that
+restarts every worker at once leaves nothing to fail over to, and in that case
+a client-side retry is the only remaining defence.
 
 If you need true active `/readyz` polling with nginx, you must either run
 **NGINX Plus** (which has the `health_check` directive), or run an **external
