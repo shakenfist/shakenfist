@@ -171,6 +171,7 @@ attached rather than quietly disappearing from the table.
 | [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/) | Repositories with mermaid diagrams render them in CI, so a broken one fails the build |
 | [plan-source-references.md](/components/development/audits/plan-source-references/) | Plan references in source and configuration still resolve |
 | [plan-index.md](/components/development/audits/plan-index/) | docs/plans/index.md layout, date ordering, plan coverage and the status vocabulary |
+| [plan-audit-phase.md](/components/development/audits/plan-audit-phase/) | Master plans end with a phase that runs PUSH-AUDIT.md over the whole plan's work |
 | [push-audit.md](/components/development/audits/push-audit/) | PUSH-AUDIT.md naming, versioned shared blocks, and an AGENTS.md reference to it |
 | [plan-template.md](/components/development/audits/plan-template/) | PLAN-TEMPLATE.md shared blocks, including the sub-agent model roster and the push-audit phase |
 | [test-coverage.md](/components/development/audits/test-coverage/) | Unit and functional test coverage |
