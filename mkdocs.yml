@@ -495,6 +495,7 @@ nav:
         - "Blob Storage Roadmap": plans/blob-storage-roadmap.md
     - Operator Guide:
        - "Installation": operator_guide/installation.md
+       - "Agent Operations": operator_guide/agent_operations.md
        - "Artifacts": operator_guide/artifacts.md
        - "Authentication": operator_guide/authentication.md
        - "Database": operator_guide/database.md
