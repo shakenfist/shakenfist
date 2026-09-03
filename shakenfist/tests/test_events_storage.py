@@ -8,6 +8,7 @@
 #   - test_event_dlq.py           (direct-path writes via _MockEngine/_MockConnection)
 #   - test_cluster_operation_targets.py  (public-router tests)
 
+import time
 from unittest import mock
 
 import grpc
@@ -842,6 +843,19 @@ class DirectPruneEventsByTypeTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(10000, total)
 
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_expired_deadline_stops_before_any_batch(self, mock_get_engine):
+        """An already-expired deadline issues no queries (issue 4034)."""
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=AssertionError('no queries'))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_prune_events_by_type(
+            'audit', 3600.0, deadline=time.time() - 1.0)
+
+        self.assertEqual(0, total)
+        self.assertEqual(0, conn.execute.call_count)
+
 
 # ---------------------------------------------------------------------------
 # _direct_prune_api_request_events tests  (Stage B)
@@ -902,6 +916,8 @@ class DirectPruneApiRequestEventsTestCase(base.ShakenFistTestCase):
 # _direct_prune_orphan_events tests  (Stage C)
 # ---------------------------------------------------------------------------
 
+@mock.patch('shakenfist.mariadb._save_orphan_prune_cursor')
+@mock.patch('shakenfist.mariadb._load_orphan_prune_cursor', return_value='')
 class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
     """Tests for _direct_prune_orphan_events()."""
 
@@ -909,7 +925,8 @@ class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
         return mariadb.ORPHAN_EVENTS_PRUNED._value.get()
 
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_increments_orphan_counter(self, mock_get_engine):
+    def test_increments_orphan_counter(
+            self, mock_get_engine, mock_load, mock_save):
         """ORPHAN_EVENTS_PRUNED increments by the rowcount of each batch."""
         conn = _MockConnection()
         conn.execute = mock.Mock(side_effect=[
@@ -927,7 +944,7 @@ class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_loops_until_select_empty_and_advances_cursor(
-            self, mock_get_engine):
+            self, mock_get_engine, mock_load, mock_save):
         """Two batches then an empty select: totals sum, uuid cursor advances."""
         conn = _MockConnection()
         conn.execute = mock.Mock(side_effect=[
@@ -950,10 +967,12 @@ class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
             EVENT_UUID_1, conn.execute.call_args_list[2][0][1]['cursor'])
         self.assertEqual(
             EVENT_UUID_2, conn.execute.call_args_list[4][0][1]['cursor'])
+        # The final position is persisted for the next sweep to resume from.
+        mock_save.assert_called_once_with(EVENT_UUID_2)
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_orphan_antijoin_is_select_only_delete_is_by_pk(
-            self, mock_get_engine):
+            self, mock_get_engine, mock_load, mock_save):
         """The anti-join lives in the non-locking SELECT; the DELETE is by PK.
 
         Issue 3982: a DELETE ... LEFT JOIN ... LIMIT next-key-locks every
@@ -981,6 +1000,94 @@ class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [EVENT_UUID_1],
             conn.execute.call_args_list[1][0][1]['event_uuids'])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_expired_deadline_stops_before_any_batch(
+            self, mock_get_engine, mock_load, mock_save):
+        """An already-expired deadline issues no queries and keeps the cursor.
+
+        Issue 4034: the sweep must stop cleanly between batches once its
+        time budget is spent, persisting its position so the next daily
+        sweep resumes rather than restarting from the table head.
+        """
+        mock_load.return_value = EVENT_UUID_1
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=AssertionError('no queries'))
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_prune_orphan_events(
+            deadline=time.time() - 1.0)
+
+        self.assertEqual(0, total)
+        self.assertEqual(0, conn.execute.call_count)
+        mock_save.assert_called_once_with(EVENT_UUID_1)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_resumed_walk_wraps_once_and_stops_at_start(
+            self, mock_get_engine, mock_load, mock_save):
+        """A walk resumed mid-table wraps to the head and stops at its start.
+
+        Issue 4034: resuming from the persisted cursor covers the tail
+        first, then wraps to '' to cover the head that resuming skipped,
+        and finishes once it reaches the start position again rather
+        than re-walking the tail a second time.
+        """
+        start = 'cccccccc-0000-0000-0000-000000000000'
+        head = 'aaaaaaaa-0000-0000-0000-000000000000'
+        tail = 'eeeeeeee-0000-0000-0000-000000000000'
+        past_start = 'dddddddd-0000-0000-0000-000000000000'
+        mock_load.return_value = start
+        conn = _MockConnection()
+        conn.execute = mock.Mock(side_effect=[
+            # Tail batch from the resumed cursor, then the end of the PK.
+            _select_result(_MockRow(event_uuid=tail)),
+            _MockResult(rowcount=3),
+            _select_result(),
+            # Wrapped pass from the head; the second batch reaches a uuid
+            # at or beyond the start position, so the walk is complete.
+            _select_result(_MockRow(event_uuid=head)),
+            _MockResult(rowcount=2),
+            _select_result(_MockRow(event_uuid=past_start)),
+            _MockResult(rowcount=1),
+        ])
+        mock_get_engine.return_value = _MockEngine(conn)
+
+        total = mariadb._direct_prune_orphan_events()
+
+        self.assertEqual(6, total)
+        self.assertEqual(7, conn.execute.call_count)
+        self.assertEqual(
+            start, conn.execute.call_args_list[0][0][1]['cursor'])
+        self.assertEqual(
+            '', conn.execute.call_args_list[3][0][1]['cursor'])
+        self.assertEqual(
+            head, conn.execute.call_args_list[5][0][1]['cursor'])
+        mock_save.assert_called_once_with(past_start)
+
+
+# ---------------------------------------------------------------------------
+# Orphan prune cursor persistence tests
+# ---------------------------------------------------------------------------
+
+class OrphanPruneCursorTestCase(base.ShakenFistTestCase):
+    """The orphan sweep cursor round-trips through cluster_config."""
+
+    @mock.patch('shakenfist.mariadb._direct_get_all_cluster_config',
+                return_value={})
+    def test_load_returns_empty_string_when_unset(self, mock_get):
+        self.assertEqual('', mariadb._load_orphan_prune_cursor())
+
+    @mock.patch('shakenfist.mariadb._direct_get_all_cluster_config',
+                return_value={
+                    mariadb._PRUNE_ORPHAN_CURSOR_KEY: EVENT_UUID_1})
+    def test_load_returns_persisted_cursor(self, mock_get):
+        self.assertEqual(EVENT_UUID_1, mariadb._load_orphan_prune_cursor())
+
+    @mock.patch('shakenfist.mariadb._direct_set_cluster_config')
+    def test_save_writes_cluster_config_key(self, mock_set):
+        mariadb._save_orphan_prune_cursor(EVENT_UUID_2)
+        mock_set.assert_called_once_with(
+            mariadb._PRUNE_ORPHAN_CURSOR_KEY, EVENT_UUID_2)
 
 
 # ---------------------------------------------------------------------------
@@ -1030,6 +1137,45 @@ class DirectPruneEventsOrchestratorTestCase(base.ShakenFistTestCase):
         mock_api_request.assert_called_once()
         mock_orphan.assert_called_once()
         self.assertEqual(130, total)
+
+    @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
+    @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)
+    @mock.patch('shakenfist.mariadb._direct_prune_events_by_type', return_value=0)
+    def test_stages_share_one_time_budget(
+            self, mock_by_type, mock_api_request, mock_orphan):
+        """All three stages receive the same wall-clock deadline.
+
+        Issue 4034: the sweep bounds itself at PRUNE_EVENTS_TIME_BUDGET
+        so the PruneEvents reply always beats the client's RPC deadline.
+        """
+        before = time.time()
+        mariadb._direct_prune_events()
+        after = time.time()
+
+        deadlines = set()
+        for call in mock_by_type.call_args_list:
+            deadlines.add(call[1]['deadline'])
+        deadlines.add(mock_api_request.call_args[1]['deadline'])
+        deadlines.add(mock_orphan.call_args[1]['deadline'])
+
+        self.assertEqual(1, len(deadlines))
+        deadline = deadlines.pop()
+        self.assertGreaterEqual(
+            deadline, before + mariadb.PRUNE_EVENTS_TIME_BUDGET)
+        self.assertLessEqual(
+            deadline, after + mariadb.PRUNE_EVENTS_TIME_BUDGET)
+
+    def test_rpc_timeout_exceeds_server_budget(self):
+        """The client deadline must outlast the server's sweep budget.
+
+        Issue 4034: if the RPC timeout is not comfortably above the
+        server's self-imposed budget, the client abandons a healthy
+        sweep and reports phantom failure while the server keeps
+        deleting rows.
+        """
+        self.assertGreaterEqual(
+            mariadb.PRUNE_EVENTS_RPC_TIMEOUT,
+            mariadb.PRUNE_EVENTS_TIME_BUDGET + 60.0)
 
     @mock.patch('shakenfist.mariadb._direct_prune_orphan_events', return_value=0)
     @mock.patch('shakenfist.mariadb._direct_prune_api_request_events', return_value=0)

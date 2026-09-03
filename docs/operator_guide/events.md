@@ -122,6 +122,15 @@ The prune runs in three stages:
    no longer referenced by any `event_objects` row. This is the
    step that actually deletes the event content.
 
+The whole sweep runs under a 25 minute wall-clock budget so
+that its reply always reaches the cluster maintainer before the
+RPC deadline, however large the tables have grown. A sweep
+which exhausts the budget stops cleanly between batches and
+logs that it did so; the orphan sweep persists its position
+(the `EVENTS_PRUNE_ORPHAN_CURSOR` key in `cluster_config`) and
+resumes from there at the next daily sweep, so an oversized day
+delays completion rather than losing work.
+
 ### Retention configuration
 
 Retention ages are in seconds. The defaults below are the
