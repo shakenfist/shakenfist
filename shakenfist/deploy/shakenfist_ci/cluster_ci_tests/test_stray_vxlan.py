@@ -2,10 +2,10 @@ import json
 import random
 import time
 
-from oslo_concurrency import processutils
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import process
 
 
 class StrayVxlanHostMixin:
@@ -58,7 +58,7 @@ class StrayVxlanHostMixin:
                 self._node_exec(
                     self.node, ['ip', 'link', 'delete', device],
                     sudo=True, check_exit_code=False)
-            except processutils.ProcessExecutionError:
+            except process.ProcessExecutionError:
                 pass
 
     def _plant_orphan(self, vxid, mesh_nic, with_bridge=True):

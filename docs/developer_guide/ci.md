@@ -77,6 +77,56 @@ from another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.
 
+## Running commands from the functional suite
+
+`shakenfist_ci/process.py` is how the functional suite shells out. It is
+`subprocess.run()` with an acceptable-exit-code list, and it replaced
+`oslo_concurrency.processutils.execute()` -- which the harness was importing
+without declaring, and which nothing else in this repository used.
+
+Three things about it are load-bearing, and are the reason it is a module
+rather than ten inline `subprocess` calls:
+
+* **Output is returned unstripped, and decoded with `os.fsdecode`.** Callers
+  split on newlines and parse JSON, so a trailing newline is data. `ip`, `ssh`
+  and the client run against real hosts and occasionally emit a byte that is
+  not UTF-8; `fsdecode` maps it to a surrogate instead of losing the test to a
+  `UnicodeDecodeError`.
+* **stdin is `/dev/null`.** `ssh` reads stdin, and a command that inherited
+  the test runner's would block rather than fail.
+* **`ProcessTimeoutError` subclasses `ProcessExecutionError`.** A node that
+  accepts an ssh connection and then wedges is exactly as untestable as one
+  that refuses it, so `_require_node_exec()` skips on both without being
+  taught the difference.
+
+### Credentials go through the environment, not argv
+
+`_exec()` in the command-line tests writes every command it runs to stderr,
+and the harness prints it again on failure. So the namespace key reaches
+`sf-client` as `SHAKENFIST_KEY` in the child's environment -- along with
+`SHAKENFIST_NAMESPACE` and `SHAKENFIST_API_URL`, which the client has honoured
+since v0.2.5 -- and never appears on a command line at all.
+
+`process.mask_secrets()` exists as well, and rewrites the value of
+`--key`-shaped flags to `***` before a command or its output goes into an
+exception. It is a backstop and not the protection. Name-based redaction is
+the technique this repository already abandoned once in the API layer, for the
+reason recorded under "Credential-carrying routes are not logged, not
+redacted" in `coding_rules.md`: it silently starts leaking the day somebody
+adds a name it has not heard of. It cannot match a short option, a positional
+secret, or a flag nobody thought of. Keep the credential out of the string.
+
+### Node-exec commands have a timeout
+
+`_node_exec()` passes `SF_CI_NODE_EXEC_TIMEOUT` (seconds, default 300) to
+every command it runs, local or over ssh. These are introspection commands --
+`ip`, `iptables`, `virsh` -- so one of them taking minutes means the node is
+wedged, which is a state a test may well have just put it in. ssh's
+`ConnectTimeout=10` bounds the TCP connect only, and does nothing for a session
+that connects and then stops responding; without this the job would stall
+until the CI runner's own timeout killed it, with no indication of which test
+was to blame.
+
 ## CI headroom instrumentation
 
 Phase 1 of `docs/plans/PLAN-ci-cloud-sizing.md` (see

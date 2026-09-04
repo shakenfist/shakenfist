@@ -12,9 +12,10 @@ import sys
 import time
 
 import testtools
-from oslo_concurrency import processutils
 from prettytable import PrettyTable
 from shakenfist_client import apiclient
+
+from shakenfist_ci import process
 
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -54,6 +55,16 @@ AGENT_OPERATION_FAILURES = (
 SF_CI_SSH_USER = os.environ.get('SF_CI_SSH_USER', 'debian')
 SF_CI_SSH_KEY = os.environ.get(
     'SF_CI_SSH_KEY', os.path.expanduser('~/.ssh/id_rsa'))
+
+# How long a node-exec command may run before it is killed. These are
+# introspection commands -- ip, iptables, virsh -- so any of them taking
+# minutes means the node is wedged, which is a thing a test may well have
+# just done to it. ssh's ConnectTimeout bounds the TCP connect only: a
+# session which connects and then stops responding, because the node's
+# storage has hung, would otherwise stall the job until the CI runner's
+# own timeout killed it with no indication of which test was to blame.
+SF_CI_NODE_EXEC_TIMEOUT = int(
+    os.environ.get('SF_CI_NODE_EXEC_TIMEOUT', '300'))
 
 
 # The delete endpoint refuses a namespace which still owns a live
@@ -237,10 +248,9 @@ class BaseTestCase(testtools.TestCase):
         """Log the current net namespaces."""
         sys.stderr.write(
             '----------------------- netns -----------------------\n')
-        out, err = processutils.execute('sudo ip netns', shell=True,
-                                        check_exit_code=[0, 1])
-        for line in out:
-            sys.stderr.write(line)
+        out, _ = process.execute('sudo ip netns', shell=True,
+                                 check_exit_code=[0, 1])
+        sys.stderr.write(out)
         sys.stderr.write(
             '----------------------- end netns -----------------------\n')
 
@@ -286,7 +296,7 @@ class BaseTestCase(testtools.TestCase):
 
     def _local_ipv4_addresses(self):
         """The set of IPv4 addresses configured on the local host."""
-        out, _ = processutils.execute('ip', '-json', 'addr', 'show')
+        out, _ = process.execute('ip', '-json', 'addr', 'show')
         addresses = set()
         for link in json.loads(out):
             for addr in link.get('addr_info', []):
@@ -308,9 +318,11 @@ class BaseTestCase(testtools.TestCase):
 
         args is a list of command arguments. The command runs directly when
         node is this host, otherwise over ssh to the node's mesh IP. Raises
-        processutils.ProcessExecutionError on an unexpected exit code;
+        process.ProcessExecutionError on an unexpected exit code;
         check_exit_code may be True (only 0), False (any), or a list of
-        acceptable codes.
+        acceptable codes. A command which runs longer than
+        SF_CI_NODE_EXEC_TIMEOUT is killed and raises
+        process.ProcessTimeoutError, which is a subclass of the same.
         """
         if sudo:
             args = ['sudo', *args]
@@ -323,17 +335,18 @@ class BaseTestCase(testtools.TestCase):
             acceptable = check_exit_code
 
         if self._node_is_local(node):
-            return processutils.execute(*args, check_exit_code=acceptable)
+            return process.execute(*args, check_exit_code=acceptable,
+                                   timeout=SF_CI_NODE_EXEC_TIMEOUT)
 
         remote = ' '.join(shlex.quote(a) for a in args)
-        return processutils.execute(
+        return process.execute(
             'ssh', '-i', SF_CI_SSH_KEY,
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             '-o', 'LogLevel=ERROR',
             '-o', 'ConnectTimeout=10',
             '%s@%s' % (SF_CI_SSH_USER, node['ip']), '--', remote,
-            check_exit_code=acceptable)
+            check_exit_code=acceptable, timeout=SF_CI_NODE_EXEC_TIMEOUT)
 
     def _require_node_exec(self, node):
         """Skip the test loudly if commands cannot be run on node.
@@ -349,7 +362,7 @@ class BaseTestCase(testtools.TestCase):
 
         try:
             self._node_exec(node, ['true'])
-        except processutils.ProcessExecutionError as e:
+        except process.ProcessExecutionError as e:
             self.skipTest(
                 'Cannot exec on node %s (%s) over the mesh: %s. See '
                 'docs/plans/PLAN-ci-node-exec-assertions.md for the deploy '
