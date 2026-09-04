@@ -56,11 +56,12 @@ fact tight.
 
 Retiring this tool takes one more step than deleting it and its workflow
 steps. Its sampling reads to the functional idle-load check as a fixed-rate
-poll of node state -- `N / --interval` per second of GetNodeAttributes,
-GetAllNodeDaemonStates and GetNodeMetrics from the `api` caller on an N node
-cluster -- so those three (operation, caller) pairs are exempted in
-HARNESS_DRIVEN_PAIRS in `shakenfist/deploy/shakenfist_ci/load_budget.py`
-(issue 3975). Trim them when this tool goes, or the check keeps a blind spot
+poll of node state -- `N / --interval` per second of GetNode,
+GetNodeAttributes, GetAllNodeDaemonStates and GetNodeMetrics from the `api`
+caller on an N node cluster -- so those four (operation, caller) pairs are
+exempted in HARNESS_DRIVEN_PAIRS in
+`shakenfist/deploy/shakenfist_ci/load_budget.py` (issues 3975 and 4028).
+Trim them when this tool goes, or the check keeps a blind spot
 which nothing produces the traffic for any more. This is worth saying here
 rather than only beside the exemption because the launcher
 (`ci_headroom_launch.sh`) and the workflow steps live in `shakenfist/actions`:

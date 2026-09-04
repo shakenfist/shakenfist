@@ -831,15 +831,18 @@ sure none of them is closed by accident:
 - **#3975** (closed) -- the phase 1 headroom probe failed a merge
   queue build. Its per-sample `GET /nodes` and `GET
   /admin/resources` read node state once per node, so at the default
-  15s interval it produces N/15 per second of `GetNodeAttributes`,
-  `GetAllNodeDaemonStates` and `GetNodeMetrics` from the `api`
-  caller, which clears the idle-load check's unbudgeted ceiling from
-  four nodes upwards. D15 said nothing in this phase can fail a
-  build; that was true of the phase's own verdicts and false of its
-  traffic. Fixed by exempting the three pairs in
+  15s interval it produces N/15 per second of `GetNode`,
+  `GetNodeAttributes`, `GetAllNodeDaemonStates` and `GetNodeMetrics`
+  from the `api` caller, which clears the idle-load check's
+  unbudgeted ceiling from four nodes upwards. D15 said nothing in
+  this phase can fail a build; that was true of the phase's own
+  verdicts and false of its traffic. Fixed by exempting the pairs in
   `HARNESS_DRIVEN_PAIRS`, not by lengthening the interval or
-  widening the budget. **This carries an obligation into whichever
-  phase retires the probe: trim those three pairs from
+  widening the budget -- in two steps, because the #3975 fix
+  exempted only the three RPCs that issue's body named, and the
+  `GetNode` the roster iterator's hydration issues came back as
+  #4028. **This carries an obligation into whichever phase retires
+  the probe: trim those four pairs from
   `shakenfist/deploy/shakenfist_ci/load_budget.py` at the same
   time.** Nothing enforces it, because the launcher and the workflow
   steps are in `shakenfist/actions` and a decommission done there
