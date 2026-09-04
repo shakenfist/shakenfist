@@ -800,6 +800,19 @@ class SFConfig(BaseSettings):
             'this value is never logged.'
         )
     )
+    LOKI_MAX_LINE_AGE: int = Field(
+        518400,
+        description=(
+            'Maximum age in seconds of a spooled log line the drainer will '
+            'still attempt to ship. Older rows are discarded at drain time '
+            '(counted by logship_expired_lines_total) because Loki rejects '
+            'samples older than its reject_old_samples_max_age (one week by '
+            'default) and a permanently-rejected row at the head of the '
+            'FIFO spool would otherwise block everything behind it. Keep '
+            'this below the Loki server\'s configured maximum age; the '
+            'default is six days.'
+        )
+    )
     LOG_EVENTS_TO_LOKI: bool = Field(
         True,
         description=(

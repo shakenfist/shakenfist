@@ -18,14 +18,21 @@ One drainer thread per process. Lifecycle:
   the next process startup (or a sibling daemon's startup) rescues
   it via ``logship_spool.initialise`` orphan recovery.
 
-On push failure the batch is left in the spool and retried on the
-next drain tick; the spool itself is the durability boundary.
+On a transient push failure (timeout, connection error, 429, 5xx)
+the batch is left in the spool and retried on the next drain tick;
+the spool itself is the durability boundary. A permanent rejection
+(any other 4xx, most commonly Loki's ``reject_old_samples``) drops
+the batch instead -- retrying it can never succeed, and retaining
+it would poison the head of the FIFO spool forever (issue 4054).
+Rows older than ``LOKI_MAX_LINE_AGE`` are discarded before the
+push for the same reason.
 
 This is a fork of ``eventlog_drainer.py`` with the sink swapped
 from ``mariadb.record_event_batch`` to a Loki HTTP POST. The
-constants, the ``_DrainerThread`` loop, the backoff, the
-leave-failed-rows-in-spool retry contract, and the ``atexit``
-drain are all identical.
+constants, the ``_DrainerThread`` loop, the backoff and the
+``atexit`` drain are all identical; the retry contract differs as
+above because HTTP, unlike the eventlog's database sink, can
+reject a batch permanently.
 """
 import atexit
 import threading
@@ -84,19 +91,41 @@ LOGSHIP_PUSH_SECONDS = Histogram(
     'logship_push_seconds',
     'Wall time spent in a Loki push request.')
 
+LOGSHIP_EXPIRED_LINES = Counter(
+    'logship_expired_lines_total',
+    'Spooled log lines discarded at drain time because their age '
+    'exceeded LOKI_MAX_LINE_AGE.')
+
+LOGSHIP_REJECTED_LINES = Counter(
+    'logship_rejected_lines_total',
+    'Spooled log lines dropped because Loki permanently rejected '
+    'their batch with a non-retryable 4xx status.')
+
+
+# _push_to_loki result values. SUCCESS deletes the batch; FAILURE
+# (transient: exception, timeout, 429, 5xx) retains it for retry;
+# REJECTED (any other 4xx) deletes it too, because a permanent
+# rejection retried forever wedges the FIFO spool.
+PUSH_SUCCESS = 'success'
+PUSH_FAILURE = 'failure'
+PUSH_REJECTED = 'rejected'
+
 
 _drainer_thread: Optional['_DrainerThread'] = None
 _drainer_lock = threading.Lock()
 
 
-def _push_to_loki(daemon_name: str, body: dict[str, Any]) -> bool:
-    """POST a push body to Loki. Returns True on a 2xx response.
+def _push_to_loki(daemon_name: str, body: dict[str, Any]) -> tuple[str, str]:
+    """POST a push body to Loki.
 
-    Never raises out of the drainer loop: any ``requests``
-    exception (timeout, connection error) or a non-2xx status is
-    caught and reported as ``False`` so the batch is retained for
-    retry. The ``LOKI_AUTH_HEADER`` value is opaque and is never
-    logged.
+    Returns a ``(result, detail)`` tuple. ``result`` is
+    ``PUSH_SUCCESS`` on a 2xx; ``PUSH_FAILURE`` on anything
+    retryable (a ``requests`` exception, 429, or 5xx);
+    ``PUSH_REJECTED`` on any other 4xx, which is a permanent
+    rejection retrying can never fix. ``detail`` is a short
+    human-readable cause for the caller's warning log. Never
+    raises out of the drainer loop. The ``LOKI_AUTH_HEADER``
+    value is opaque and is never logged.
     """
     url = f'{config.LOKI_BASE_URL.rstrip("/")}/loki/api/v1/push'
     headers = {'Content-Type': 'application/json'}
@@ -121,18 +150,28 @@ def _push_to_loki(daemon_name: str, body: dict[str, Any]) -> bool:
             'error': str(e),
             'error_type': type(e).__name__,
         }).debug('Loki push raised a request exception')
-        return False
+        return PUSH_FAILURE, f'{type(e).__name__}: {e}'
 
     if 200 <= resp.status_code < 300:
         LOGSHIP_PUSH_TOTAL.labels(result='success').inc()
-        return True
+        return PUSH_SUCCESS, ''
 
-    LOGSHIP_PUSH_TOTAL.labels(result='failure').inc()
-    LOG.with_fields({
-        'daemon': daemon_name,
-        'status_code': resp.status_code,
-    }).debug('Loki push returned a non-2xx status')
-    return False
+    # The response body's first line carries the actual cause (for
+    # example Loki's "entry ... has timestamp too old"); it flows
+    # into the caller's WARNING via detail so the reason a batch was
+    # refused is visible without running the daemon at DEBUG.
+    try:
+        body_first_line = (resp.text or '').splitlines()[0][:200]
+    except Exception:
+        body_first_line = ''
+    detail = f'HTTP {resp.status_code}: {body_first_line}'
+
+    if resp.status_code == 429 or resp.status_code >= 500:
+        LOGSHIP_PUSH_TOTAL.labels(result='failure').inc()
+        return PUSH_FAILURE, detail
+
+    LOGSHIP_PUSH_TOTAL.labels(result='rejected').inc()
+    return PUSH_REJECTED, detail
 
 
 class _DrainerThread(threading.Thread):
@@ -140,8 +179,10 @@ class _DrainerThread(threading.Thread):
 
     Reads in batches of ``DRAIN_BATCH_SIZE``, ships each batch to
     Loki via ``_push_to_loki``, deletes spool rows on success. On
-    failure, leaves the rows in the spool and applies exponential
-    backoff; the next drain tick re-reads them.
+    a transient failure, leaves the rows in the spool and applies
+    exponential backoff; the next drain tick re-reads them. On a
+    permanent rejection, deletes the rows anyway so one bad batch
+    cannot block the FIFO spool behind it.
     """
 
     def __init__(self, daemon_name: str) -> None:
@@ -223,10 +264,11 @@ class _DrainerThread(threading.Thread):
     def _drain_one_batch(self) -> int:
         """Ship up to DRAIN_BATCH_SIZE lines to Loki.
 
-        Returns the number of lines successfully shipped (and
-        deleted from the spool). Returns 0 if the spool is empty
-        or the push failed -- the caller distinguishes the two via
-        ``spool.count()``.
+        Returns the number of lines removed from the spool --
+        shipped, expired, or dropped after a permanent rejection.
+        Returns 0 if the spool is empty or a transient push
+        failure retained the batch -- the caller distinguishes the
+        two via ``spool.count()``.
         """
         spool = logship_spool.get_spool()
         if spool is None:
@@ -236,18 +278,55 @@ class _DrainerThread(threading.Thread):
         if not batch:
             return 0
 
+        # Discard rows Loki would reject as too old before they are
+        # pushed. This also heals a spool wedged by an earlier build
+        # (or a long outage) on the first drain after startup.
+        cutoff_ns = int(
+            (time.time() - config.LOKI_MAX_LINE_AGE) * 1_000_000_000)
+        expired = [row for row in batch if row[1] < cutoff_ns]
+        if expired:
+            spool.delete_ids(row_id for row_id, _, _ in expired)
+            LOGSHIP_EXPIRED_LINES.inc(len(expired))
+            LOG.with_fields({
+                'daemon': self._daemon_name,
+                'expired_lines': len(expired),
+                'max_line_age': config.LOKI_MAX_LINE_AGE,
+            }).warning('Discarded spooled log lines older than '
+                       'LOKI_MAX_LINE_AGE')
+            batch = [row for row in batch if row[1] >= cutoff_ns]
+            if not batch:
+                return len(expired)
+
         body = self._build_push_body(batch)
-        if _push_to_loki(self._daemon_name, body):
+        result, detail = _push_to_loki(self._daemon_name, body)
+        if result == PUSH_SUCCESS:
             # Success. Clear the rows from the spool and reset the
             # backoff so the next failure starts at INITIAL.
             spool.delete_ids(row_id for row_id, _, _ in batch)
             self._backoff = BACKOFF_INITIAL
-            return len(batch)
+            return len(expired) + len(batch)
 
-        # Failure. Leave the batch in the spool for retry on the
-        # next tick and back off.
-        self._on_push_failure('Loki push failed')
-        return 0
+        if result == PUSH_REJECTED:
+            # Permanent rejection: retrying can never succeed, and
+            # retaining the batch would block the FIFO spool behind
+            # it forever. Drop it and move on -- on a mixed batch
+            # Loki has already ingested the acceptable entries, so
+            # a retry would also duplicate those.
+            spool.delete_ids(row_id for row_id, _, _ in batch)
+            LOGSHIP_REJECTED_LINES.inc(len(batch))
+            self._backoff = BACKOFF_INITIAL
+            LOG.with_fields({
+                'daemon': self._daemon_name,
+                'rejected_lines': len(batch),
+                'detail': detail,
+            }).warning('Loki permanently rejected a log batch; '
+                       'dropping it')
+            return len(expired) + len(batch)
+
+        # Transient failure. Leave the batch in the spool for retry
+        # on the next tick and back off.
+        self._on_push_failure(f'Loki push failed: {detail}')
+        return len(expired)
 
     def _on_push_failure(self, reason: str) -> None:
         """Apply exponential backoff and log."""
