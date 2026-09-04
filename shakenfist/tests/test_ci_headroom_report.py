@@ -932,3 +932,268 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
             'The two causes of a fallback were reported as one number, '
             'so a reader reconciling the ledgers cannot tell a real '
             'fallback from a failed capacity read.')
+
+
+def dimension(name, limit, used, requested, exceeded, shortfall=None,
+              cpu_load_1=None, expected_demand=None):
+    """One CapacityDimensionDetailDict as the guard's event carries it."""
+    detail = {
+        'dimension': name,
+        'limit': limit,
+        'used': used,
+        'requested': requested,
+        'exceeded': exceeded,
+    }
+    if shortfall is not None:
+        detail['shortfall'] = shortfall
+    if cpu_load_1 is not None:
+        detail['cpu_load_1'] = cpu_load_1
+    if expected_demand is not None:
+        detail['expected_demand'] = expected_demand
+    return detail
+
+
+def denial_event(failing_stage='node', dimensions=None, enforce=True):
+    record = {
+        'message': 'instance placement denied',
+        'extra': {
+            'node': NODE_ONE,
+            'failing_stage': failing_stage,
+            'dimensions': dimensions if dimensions is not None else [],
+            'enforce': enforce,
+        },
+    }
+    return ['1756000000000000000', json.dumps(record)]
+
+
+def claim_event(namespace='ci-namespace', claim_dimensions=None):
+    record = {
+        'message': 'placement admitted over namespace capacity claim',
+        'extra': {
+            'node': NODE_ONE,
+            'namespace': namespace,
+            'claim_dimensions': claim_dimensions or [],
+        },
+    }
+    return ['1756000000000000000', json.dumps(record)]
+
+
+class GuardCensusTestCase(HeadroomReportTestCase):
+    """The capacity guard's own refusals, below the stage layer.
+
+    The stage census stops above the guard, so a run in which every
+    stage passed and the guard then refused every candidate reads as a
+    clean run with no refusals -- which is the shape of issue 3772 and
+    the reason this census exists.
+    """
+
+    def test_a_clean_stage_census_with_guard_refusals_is_not_clean(self):
+        census = self._census([
+            census_event('schedule at stage sufficient_idle_cpu'),
+            denial_event(dimensions=[
+                dimension('cpus', 6.0, 1.0, 1.0, False),
+                dimension('demand', 1.5, 2.9, 0.6, True,
+                          cpu_load_1=2.4, expected_demand=0.5)]),
+            denial_event(dimensions=[
+                dimension('demand', 1.5, 2.9, 0.6, True,
+                          cpu_load_1=2.4, expected_demand=0.5)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'Placements refused by the guard: 2', output,
+            'A run whose every scheduler stage passed and whose guard then '
+            'refused every candidate still read as a clean run, which is '
+            'exactly the 3772 shape this census was added to see.')
+        self.assertIn('Guard refusals: YES', output)
+        self.assertIn(
+            'Refusal warning: no capacity-stage drops', output,
+            'The guard refusals were folded into the stage census warning, '
+            'so a reader can no longer tell which instrument saw what.')
+
+    def test_a_claim_exceedance_is_never_counted_as_a_refusal(self):
+        """An admitted placement over an advisory claim is not a refusal.
+
+        CLAIM_ENFORCEMENT_HARD is False on purpose so exceedances are
+        observed before they are refused. Counting one as a refusal would
+        manufacture refusals on a cluster which did what it was asked.
+        """
+        census = self._census([
+            claim_event(claim_dimensions=[
+                dimension('cpus', 1.0, 1.0, 1.0, True, shortfall=1.0)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('Placements refused by the guard: 0', output)
+        self.assertIn('Claim exceedances (ADMITTED, never refused): 1', output)
+        self.assertIn(
+            'ci-namespace', output,
+            'The namespace whose claim was exceeded was not reported, so the '
+            'calibration signal D9 asks for names no claim to calibrate.')
+        self.assertNotIn(
+            'Guard refusals: YES', output,
+            'A claim exceedance was reported as a refusal. It is an ADMITTED '
+            'placement; advisory mode did what the operator asked.')
+
+    def test_an_unknown_stage_and_dimension_are_tallied_not_dropped(self):
+        """The same no-hardcoded-list rule the stage census follows (D10)."""
+        census = self._census([
+            denial_event(failing_stage='a_guard_stage_from_next_year',
+                         dimensions=[
+                             dimension('quantum_flux', 1.0, 9.0, 1.0, True)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'a_guard_stage_from_next_year', output,
+            'A failing_stage this tool has not been told about was dropped, '
+            'so the census is filtered by a hardcoded list and drifts the '
+            'first time the guard gains a stage.')
+        self.assertIn('quantum_flux', output)
+        self.assertIn('Counted but unrecognised', output)
+
+    def test_no_guard_events_is_unknown_rather_than_zero(self):
+        """The collector's filter decides whether there is anything to count.
+
+        A census whose LogQL query selects only the stage messages holds
+        no guard event whatever the guard did, and printing zero there
+        would be the same dangerous reading as printing zero for a census
+        which was never collected at all.
+        """
+        census = self._census([
+            census_event('schedule at stage sufficient_idle_cpu'),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('NO CAPACITY GUARD EVENTS IN THIS CENSUS', output)
+        self.assertIn('Guard refusals: NOT COLLECTED', output)
+        self.assertIn(
+            'instance placement denied', output,
+            'The report did not name the message the census filter has to '
+            'match, so a reader cannot tell the query from the cluster.')
+
+    def test_a_malformed_guard_event_is_counted_not_fatal(self):
+        """D15 again: nothing about an event shape may fail the job."""
+        broken = ['1756000000000000000', json.dumps({
+            'message': 'instance placement denied', 'extra': 'not a dict'})]
+        census = self._census([broken])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(
+            0, code, 'A guard event whose extra was not a dict made the '
+                     'report exit non-zero (D15).')
+        self.assertIn('Placements refused by the guard: 1', output)
+        self.assertIn('carried no usable dimensions list', output)
+
+    def test_the_demand_split_reads_the_comparison_the_guard_made(self):
+        """The demand clause does not charge the incoming placement.
+
+        Since phase 4a the demand guard compares cpu_load_1 plus
+        expected_demand against the limit and leaves `requested` out, so
+        a split which added `requested` would report a comparison the
+        guard never made -- and would call an estimator defect a busy
+        node.
+        """
+        census = self._census([
+            # Measured load is inside the limit; the feedforward estimate
+            # is what carries the sum over it.
+            denial_event(dimensions=[
+                dimension('demand', 2.0, 2.5, 4.0, True,
+                          cpu_load_1=1.0, expected_demand=1.5)]),
+            # Measured load alone is already over.
+            denial_event(dimensions=[
+                dimension('demand', 2.0, 3.5, 4.0, True,
+                          cpu_load_1=3.0, expected_demand=0.5)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            '    1  measured CPU load alone was already over the limit',
+            output)
+        self.assertIn(
+            '    1  the D13 feedforward estimate is what carried it over',
+            output,
+            'The demand split counted `requested` into the comparison, which '
+            'the guard does not since phase 4a, so an estimator defect reads '
+            'as a node which was genuinely busy.')
+
+    def test_a_reported_shortfall_is_printed_and_never_recomputed(self):
+        """G3 puts the definition of shortfall server side, in one place."""
+        census = self._census([
+            denial_event(dimensions=[
+                dimension('cpus', 4.0, 4.0, 1.0, True, shortfall=1.0)]),
+            denial_event(dimensions=[
+                dimension('cpus', 4.0, 6.0, 1.0, True, shortfall=3.0)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('cpus         3.000', output)
+
+    def test_a_series_without_shortfalls_says_so_rather_than_zero(self):
+        census = self._census([
+            denial_event(dimensions=[dimension('cpus', 4.0, 4.0, 1.0, True)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'No refused dimension carried a shortfall field', output,
+            'A census predating the shortfall field reported a shortfall of '
+            'zero, which reads as a refusal that was not actually over.')
+
+    def test_a_claim_shortfall_is_not_reported_as_a_refusal_shortfall(self):
+        """The two shortfalls answer different questions.
+
+        A refusal's shortfall is how far short of the ledger a create
+        which did not happen fell. A claim's is how far past a declared
+        footprint an ADMITTED placement went. Printing the second under
+        the first heading invents a refusal on a dimension nothing
+        refused, which is the conflation the whole census is built to
+        avoid.
+        """
+        census = self._census([
+            denial_event(dimensions=[
+                dimension('demand', 1.5, 2.9, 0.6, True,
+                          cpu_load_1=2.4, expected_demand=0.5)]),
+            claim_event(claim_dimensions=[
+                dimension('cpus', 1.0, 0.0, 2.0, True, shortfall=1.0)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'No refused dimension carried a shortfall field', output,
+            'The claim exceedance supplied a shortfall for a dimension no '
+            'refusal exceeded, and it was printed as a refusal shortfall.')
+        self.assertIn('Worst amount over the claim', output)
+        self.assertEqual(
+            1, output.count('cpus         1.000'),
+            'The claim shortfall appears twice, so it is being printed under '
+            'both headings rather than only the claim one.')
+
+    def test_an_empty_dimensions_list_is_not_a_malformed_event(self):
+        """A readable but empty list is a different fact from an unreadable one."""
+        census = self._census([denial_event(dimensions=[])])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('carried a readable but EMPTY dimensions list', output)
+        self.assertNotIn('carried no usable dimensions list', output)
+
+    def test_an_unenforced_denial_is_counted_apart(self):
+        """A ground-truth writer's denial refuses nothing a caller asked for."""
+        census = self._census([
+            denial_event(dimensions=[dimension('cpus', 4.0, 4.0, 1.0, True)],
+                         enforce=False),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('1 of those had enforce=false', output)
+        self.assertIn('The ledger refused 1 placement, of which 0', output)

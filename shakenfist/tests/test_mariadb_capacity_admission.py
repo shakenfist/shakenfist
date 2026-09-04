@@ -1198,8 +1198,28 @@ class SnapshotIsolationInvariantTestCase(_PlacementMixin,
         self._run(router)
         self.assertTrue(any('FROM object_references' in text
                             for text in router.autocommit))
-        self.assertEqual([], [text for text in router.transactional
-                              if text.startswith('SELECT')])
+        # The invariant is that no read establishes a read view before
+        # the first guarded UPDATE, not that the transaction never
+        # reads: the post-release counter read below is a read after our
+        # own writes, which is the same thing admission does.
+        self._assert_no_read_before_the_first_write(router)
+        self.assertEqual(
+            [], [text for text in router.transactional
+                 if text.startswith('SELECT')
+                 and 'FROM object_references' in text])
+
+    def test_the_post_release_counter_read_is_allowed_after_our_writes(self):
+        # The release half of the counter read, and safe for the same
+        # reason as the admission half: the capacity row it reads is
+        # locked by the decrement this transaction already issued.
+        self._call = self._release
+        router = _PlacementRouter(claim=None, reference_nodes=[NODE1])
+        self._run(router)
+        self._assert_no_read_before_the_first_write(router)
+        self.assertTrue(
+            any(text.startswith('SELECT')
+                and 'FROM scheduler_node_capacity' in text
+                for text in router.transactional))
 
     def test_the_post_admit_counter_read_is_allowed_after_our_writes(self):
         # Reads after our own writes are safe: those rows are locked by
@@ -1381,6 +1401,49 @@ class DimensionDetailTestCase(base.ShakenFistTestCase):
         self.assertNotIn('cpu_load_1', detail)
         self.assertNotIn('expected_demand', detail)
 
+    def test_shortfall_is_floored_at_zero_when_it_fits(self):
+        # used + requested (46 + 4 = 50) is under the limit (100), so
+        # there is no shortfall -- and, critically, not a negative one:
+        # a signed value here would be headroom, which the three other
+        # fields already let a reader derive.
+        detail = mariadb._capacity_dimension('cpus', 100.0, 46.0, 4.0)
+        self.assertFalse(detail['exceeded'])
+        self.assertEqual(0.0, detail['shortfall'])
+
+    def test_shortfall_is_the_amount_over_the_limit(self):
+        # used + requested (46 + 4 = 50) is 2 over the limit (48).
+        detail = mariadb._capacity_dimension('cpus', 48.0, 46.0, 4.0)
+        self.assertTrue(detail['exceeded'])
+        self.assertEqual(2.0, detail['shortfall'])
+
+    def test_shortfall_never_disagrees_with_exceeded(self):
+        # One dimension that fits (shortfall 0.0) and one that does not
+        # (a positive shortfall), exercised together so a reader can
+        # never see 'exceeded': False alongside a nonzero shortfall or
+        # vice versa.
+        fits = mariadb._capacity_dimension('memory_mb', 16384.0, 4096.0,
+                                           4096.0)
+        over = mariadb._capacity_dimension('cpus', 16.0, 15.0, 4.0)
+        self.assertFalse(fits['exceeded'])
+        self.assertEqual(0.0, fits['shortfall'])
+        self.assertTrue(over['exceeded'])
+        self.assertEqual(3.0, over['shortfall'])
+
+    def test_shortfall_on_an_uncharged_dimension_ignores_requested(self):
+        # The demand dimension's exceeded test is used > limit, not
+        # used + requested > limit (phase 4a), and shortfall has to
+        # track the same effective-used value or the two fields would
+        # disagree about which dimension is over.
+        detail = mariadb._capacity_dimension(
+            'demand', 12.0, 12.5, 10.0, charged=False)
+        self.assertTrue(detail['exceeded'])
+        self.assertEqual(0.5, detail['shortfall'])
+
+        detail = mariadb._capacity_dimension(
+            'demand', 12.0, 11.0, 10.0, charged=False)
+        self.assertFalse(detail['exceeded'])
+        self.assertEqual(0.0, detail['shortfall'])
+
 
 class ServicerRoundTripTestCase(base.ShakenFistTestCase):
     """The result dicts survive the trip through the proto and back.
@@ -1396,23 +1459,28 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         'node_used_cpus': 10, 'node_used_memory_mb': 10240,
         'node_used_disk_gb': 53, 'node_expected_demand': 18.5,
         'claim_over_limit': False, 'claim_dimensions': [],
+        # An unclaimed namespace charges the cluster singleton, so there
+        # is no claim to name and the empty string is what says so.
+        'claim_uuid': '',
     }
     DENIED = {
         'success': True, 'error': '', 'admitted': False, 'unguarded': False,
         'clamped': False, 'failing_stage': 'node',
         'dimensions': [
             {'dimension': 'cpus', 'limit': 48.0, 'used': 46.0,
-             'requested': 4.0, 'exceeded': True},
+             'requested': 4.0, 'exceeded': True, 'shortfall': 2.0},
             # The demand breakdown keys (issue 3913) ride along; the
             # cpus dimension above must come back without them, which
             # the dict-equality assertions check exactly.
             {'dimension': 'demand', 'limit': 12.0, 'used': 12.5,
-             'requested': 10.0, 'exceeded': True,
+             'requested': 10.0, 'exceeded': True, 'shortfall': 0.5,
              'cpu_load_1': 4.0, 'expected_demand': 8.5},
         ],
         'node_used_cpus': 0, 'node_used_memory_mb': 0,
         'node_used_disk_gb': 0, 'node_expected_demand': 0.0,
         'claim_over_limit': False, 'claim_dimensions': [],
+        # A denial rolled its transaction back, so nothing was charged.
+        'claim_uuid': '',
     }
     OVER_CLAIM = {
         'success': True, 'error': '', 'admitted': True, 'unguarded': False,
@@ -1422,8 +1490,11 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         'claim_over_limit': True,
         'claim_dimensions': [
             {'dimension': 'cpus', 'limit': 8.0, 'used': 6.0,
-             'requested': 4.0, 'exceeded': True},
+             'requested': 4.0, 'exceeded': True, 'shortfall': 2.0},
         ],
+        # Which claim was charged, so the namespace-side audit event can
+        # name it after the claim itself has been deleted and recreated.
+        'claim_uuid': str(CLAIM1),
     }
 
     def _servicer(self):
@@ -1472,12 +1543,35 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         reply = database_pb2.AdmitInstancePlacementReply(
             success=True, admitted=False, failing_stage='node')
         reply.dimensions.add(dimension='demand', limit=12.0, used=12.5,
-                             requested=10.0, exceeded=True)
+                             requested=10.0, exceeded=True, shortfall=0.5)
         unpacked, _ = self._unpack(reply)
         self.assertEqual(
             [{'dimension': 'demand', 'limit': 12.0, 'used': 12.5,
-              'requested': 10.0, 'exceeded': True}],
+              'requested': 10.0, 'exceeded': True, 'shortfall': 0.5}],
             unpacked['dimensions'])
+        # Same window, same reasoning for claim_uuid: proto3's default
+        # for an unset string is empty, which is exactly what "no claim
+        # was charged" reads as, so an old server cannot fabricate one.
+        self.assertEqual('', unpacked['claim_uuid'])
+
+    def test_a_reply_without_a_shortfall_reads_as_absent_not_zero(self):
+        # The same window again, and the one field where the proto3
+        # default is actively misleading: a dimension flagged exceeded
+        # cannot honestly carry a shortfall of zero, because zero means
+        # it was not over. An sf-database predating the field must
+        # therefore unpack with no shortfall key at all -- which is what
+        # ci_headroom_report.py reads to say "this series predates the
+        # field" rather than printing 0.000 under a refusal.
+        reply = database_pb2.AdmitInstancePlacementReply(
+            success=True, admitted=False, failing_stage='node')
+        reply.dimensions.add(dimension='cpus', limit=8.0, used=6.0,
+                             requested=4.0, exceeded=True)
+        unpacked, _ = self._unpack(reply)
+        self.assertEqual(
+            [{'dimension': 'cpus', 'limit': 8.0, 'used': 6.0,
+              'requested': 4.0, 'exceeded': True}],
+            unpacked['dimensions'])
+        self.assertNotIn('shortfall', unpacked['dimensions'][0])
 
     def test_over_claim_round_trip_preserves_the_advisory_detail(self):
         # An admitted placement carrying advisory over-limit detail: the
@@ -1516,7 +1610,9 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
 
     def test_release_round_trip(self):
         released = {'success': True, 'error': '', 'released': True,
-                    'clamped': True}
+                    'clamped': True, 'counters_node_uuid': str(NODE1),
+                    'node_used_cpus': 6, 'node_used_memory_mb': 8192,
+                    'node_used_disk_gb': 40, 'node_expected_demand': 1.5}
         request = database_pb2.ReleaseInstancePlacementRequest(
             instance_uuid=str(INST1), namespace='ci-1', cpus=4,
             memory_mb=4096, disk_gb=20)
@@ -1649,16 +1745,22 @@ class PublicRoutingTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._use_database_service',
                 return_value=True)
     def test_get_capacity_routes_to_grpc(self, _use, mock_grpc):
-        mock_grpc.return_value = []
-        self.assertEqual([], mariadb.get_scheduler_node_capacity())
+        mock_grpc.return_value = mariadb.SchedulerNodeCapacityRead(
+            rows=[], degraded=False)
+        self.assertEqual(
+            mariadb.SchedulerNodeCapacityRead(rows=[], degraded=False),
+            mariadb.get_scheduler_node_capacity())
         mock_grpc.assert_called_once_with()
 
     @mock.patch('shakenfist.mariadb._direct_get_scheduler_node_capacity')
     @mock.patch('shakenfist.mariadb._use_database_service',
                 return_value=False)
     def test_get_capacity_routes_to_direct(self, _use, mock_direct):
-        mock_direct.return_value = []
-        self.assertEqual([], mariadb.get_scheduler_node_capacity())
+        mock_direct.return_value = mariadb.SchedulerNodeCapacityRead(
+            rows=[], degraded=False)
+        self.assertEqual(
+            mariadb.SchedulerNodeCapacityRead(rows=[], degraded=False),
+            mariadb.get_scheduler_node_capacity())
         mock_direct.assert_called_once_with()
 
 
@@ -1695,8 +1797,9 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
             return mariadb._direct_get_scheduler_node_capacity(), conn
 
     def test_every_column_is_read_and_typed(self):
-        rows, conn = self._run_direct(rows=[_capacity_row()])
-        self.assertEqual([self.EXPECTED], rows)
+        read, conn = self._run_direct(rows=[_capacity_row()])
+        self.assertEqual([self.EXPECTED], read.rows)
+        self.assertFalse(read.degraded)
         text, _ = _compiled(conn.execute.call_args.args[0])
         self.assertTrue(text.startswith('SELECT'))
         self.assertIn('FROM scheduler_node_capacity', text)
@@ -1704,15 +1807,23 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
         self.assertNotIn('WHERE', text)
 
     def test_an_empty_table_reads_as_no_rows(self):
-        rows, _ = self._run_direct(rows=[])
-        self.assertEqual([], rows)
+        # And is *not* degraded: a cluster the reconciler has not
+        # reached yet reads this way on every schedule, so a caller
+        # which treated emptiness as a failure would cry wolf on every
+        # create there.
+        read, _ = self._run_direct(rows=[])
+        self.assertEqual([], read.rows)
+        self.assertFalse(read.degraded)
 
     def test_a_database_error_reads_as_no_rows(self):
         # A node with no row is charged nothing and guarded by nothing,
         # so an unreadable table degrades to "nothing is counted" rather
-        # than to an exception out of an admin endpoint.
-        rows, _ = self._run_direct(error=_operational_error(2006))
-        self.assertEqual([], rows)
+        # than to an exception out of an admin endpoint. The swallow
+        # stays; the flag beside it is how a caller tells this outcome
+        # from the empty table above.
+        read, _ = self._run_direct(error=_operational_error(2006))
+        self.assertEqual([], read.rows)
+        self.assertTrue(read.degraded)
 
     def _servicer(self):
         servicer = database_main.DatabaseService.__new__(
@@ -1723,7 +1834,8 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
     def test_round_trip_through_the_rpc(self):
         with mock.patch(
                 'shakenfist.mariadb._direct_get_scheduler_node_capacity',
-                return_value=[self.EXPECTED]):
+                return_value=mariadb.SchedulerNodeCapacityRead(
+                    rows=[self.EXPECTED], degraded=False)):
             reply = self._servicer().GetSchedulerNodeCapacity(
                 database_pb2.GetSchedulerNodeCapacityRequest(),
                 mock.MagicMock())
@@ -1733,7 +1845,44 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
                 mock.patch('shakenfist.mariadb._grpc_call',
                            return_value=reply):
             unpacked = mariadb._grpc_get_scheduler_node_capacity()
-        self.assertEqual([self.EXPECTED], unpacked)
+        self.assertEqual([self.EXPECTED], unpacked.rows)
+        self.assertFalse(unpacked.degraded)
+
+    def test_a_failed_rpc_reads_as_degraded(self):
+        # The swallow at the client end is deliberate (issue 3586's
+        # watchdog window), so the read still returns rather than
+        # raising -- but it now says the counters were not read, which
+        # is what the scheduler publishes against the instance.
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch(
+                    'shakenfist.mariadb._grpc_call',
+                    side_effect=exceptions.DatabaseUnavailable('nope')):
+            read = mariadb._grpc_get_scheduler_node_capacity()
+        self.assertEqual([], read.rows)
+        self.assertTrue(read.degraded)
+
+    def test_a_degraded_daemon_read_crosses_the_wire(self):
+        # Every daemon except sf-database reaches this table over gRPC,
+        # so a MariaDB-side failure inside the database tier has to be
+        # forwarded or it arrives at the scheduler as an empty table --
+        # which is a normal state (P7) and would be read as one.
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_scheduler_node_capacity',
+                return_value=mariadb.SchedulerNodeCapacityRead(
+                    rows=[], degraded=True)):
+            reply = self._servicer().GetSchedulerNodeCapacity(
+                database_pb2.GetSchedulerNodeCapacityRequest(),
+                mock.MagicMock())
+        self.assertTrue(reply.degraded)
+
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            unpacked = mariadb._grpc_get_scheduler_node_capacity()
+        self.assertEqual([], unpacked.rows)
+        self.assertTrue(unpacked.degraded)
 
     def test_the_capacity_read_uses_the_bounded_budget(self):
         # This read sits in front of the admission RPC on the create hot
@@ -1758,6 +1907,10 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
                 database_pb2.GetSchedulerNodeCapacityRequest(),
                 mock.MagicMock())
         self.assertEqual(0, len(reply.rows))
+        # An exception escaping the direct read is the same outcome as a
+        # read which reported itself degraded, and must not be delivered
+        # as a table which is merely empty.
+        self.assertTrue(reply.degraded)
 
     def test_the_rpc_has_a_prometheus_counter(self):
         with mock.patch.object(database_main.daemon.WorkerPoolDaemon,

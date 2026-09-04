@@ -31,6 +31,31 @@ cloud sitting half empty for an hour. Folding them into one number would
 hide which of the two produced it, so the series section and the census
 section stand apart and the band verdict names both inputs.
 
+The same reasoning adds a third section rather than widening the second.
+The stage census reads the scheduler's stage events and stops above the
+capacity guard, so a run in which every stage passed and the guard then
+refused every candidate reads here as a clean run with no refusals --
+which is precisely the shape of issue 3772. The guard census counts
+'instance placement denied' (instance.py) by failing_stage and by which
+dimension was exceeded, under its own heading, because a stage drop and a
+guard denial are events about different things: a stage drop removed one
+candidate node from a list which may still have had others, a denial is
+the ledger refusing the write. A number made by adding them answers
+neither question.
+
+For the same reason 'placement admitted over namespace capacity claim' is
+counted third and never as a refusal. Advisory claim mode admits that
+placement deliberately -- CLAIM_ENFORCEMENT_HARD is False for a release
+precisely so exceedances are observed before they are refused -- so it is
+the system doing what the operator asked, and it is reported because it
+is the calibration signal D9 asks for, not because anything went wrong.
+Counting it as a refusal would manufacture refusals on a healthy cluster.
+
+Like the stage census, both new tallies count every string they observe
+rather than a list held here: a failing_stage or a dimension name this
+tool has never been told about is counted, printed and flagged as
+unrecognised, never dropped.
+
 What the numbers mean:
 
 * **Committed vCPU** is max(cpu_measured, cpu_committed), because that is
@@ -49,15 +74,18 @@ What the numbers mean:
   ram_max minus ram_available is what the instances actually hold. A node
   publishing no ram_max has no memory ledger at all and is counted, not
   divided by.
-* **Ledger unreadable is not idle.** The capacity read swallows failure --
-  mariadb.get_scheduler_node_capacity() returns an empty list when the table
-  is unreadable as well as when it is empty, and _capacity_by_node() hands
-  that straight on -- which makes every cpu_committed zero and every
-  cpu_committed_row_present false at once. A sample in that state is
-  excluded from the committed CPU figures and reported, rather than averaged
-  in as a cluster doing nothing. Note that an unreadable table and one the
-  reconciler has never populated are indistinguishable from here; both are
-  worth knowing and neither is an idle cluster.
+* **Ledger unreadable is not idle.** A failed capacity read makes every
+  cpu_committed zero and every cpu_committed_row_present false at once, which
+  from the payload alone looks exactly like a cluster doing nothing. The
+  server now tells the two apart -- mariadb.get_scheduler_node_capacity()
+  returns rows and a separate degraded flag, the database daemon forwards its
+  own read failure on that flag, and the scheduler events "schedule could not
+  read the capacity counters" when it is set -- but the sampled series this
+  report reads carries no such flag, so from here an unreadable table and one
+  the reconciler has never populated are still indistinguishable. A sample in
+  that state is therefore excluded from the committed CPU figures and
+  reported rather than averaged in; the scheduler event is where the
+  difference is visible, and both states are worth knowing whichever it was.
 * **A node missing from per_node has four possible meanings**, which is why
   the probe records the roster beside every sample: not a hypervisor,
   metrics older than 120s, a queue over UNREASONABLE_QUEUE_LENGTH, or gone.
@@ -134,6 +162,45 @@ CAPACITY_STAGE_NOTES = collections.OrderedDict([
 MISSING_DATA_REASON = 'no memory_max in node metrics'
 
 NO_REASON = '(no reason recorded)'
+
+# The capacity guard's own two audit messages, below the stage layer the
+# constants above match. Matched on the message for the same reason the
+# stage events are: the shipped JSON's 'message' is the event's message,
+# because pylogrus merges the caller's fields over the record last.
+#
+# The two are read in one pass over the census file and tallied in two
+# separate places, which is the whole point: 'instance placement denied' is
+# the ledger refusing a write, and 'placement admitted over namespace
+# capacity claim' is a placement which was ADMITTED, over an advisory claim
+# the operator set. The second is never added to the first.
+GUARD_DENIED_MESSAGE = 'instance placement denied'
+CLAIM_OVER_LIMIT_MESSAGE = 'placement admitted over namespace capacity claim'
+
+# The stages _direct_admit_instance_placement() can fail at, used only to
+# annotate rows -- never to filter what is tallied. An unrecognised stage
+# is counted and flagged, exactly as an unrecognised scheduler stage is.
+GUARD_STAGE_NOTES = collections.OrderedDict([
+    ('node', "the node's own capacity counters"),
+    ('cluster', 'the cluster-wide capacity singleton'),
+    ('claim', "the namespace's capacity claim"),
+])
+
+# Likewise for dimensions. 'demand' is called out because it is the one
+# dimension which is not a count of anything allocated: it is the D13
+# feedforward estimate added to measured CPU load, so a refusal on demand
+# alone is a rate prediction and not a cloud which ran out of room.
+GUARD_DIMENSION_NOTES = collections.OrderedDict([
+    ('cpus', 'allocated vCPU'),
+    ('memory_mb', 'allocated memory'),
+    ('disk_gb', 'allocated disk'),
+    ('demand', 'measured CPU load plus the D13 feedforward estimate -- '
+               'NOT an allocation'),
+])
+
+UNKNOWN_STAGE = '(no failing_stage recorded)'
+UNKNOWN_DIMENSION = '(unnamed dimension)'
+NO_DIMENSIONS = '(no dimensions recorded)'
+UNKNOWN_NAMESPACE = '(no namespace recorded)'
 
 # How a node in the roster but missing from a sample's per_node is
 # classified. summarize_resources() omits non-hypervisors, nodes whose
@@ -444,6 +511,235 @@ class StageTally:
         return self.dropped - self.reasons.get(MISSING_DATA_REASON, 0)
 
 
+class GuardCensus:
+    """What the capacity guard refused, counted apart from the stage census.
+
+    Read out of the same file in the same pass, and kept in its own object
+    so that no count here can be added to a stage count by accident. The
+    two measure different events: a stage drop removed one candidate node
+    from a list which may still have had others and is often a healthy
+    run's normal noise, while a denial is the ledger refusing the write
+    for a node the scheduler had already chosen.
+
+    The claim tally is a third thing again, and the one most easily
+    misread: a claim exceedance is an ADMITTED placement. Advisory mode
+    exists so exceedances are observed before they are refused, so it is
+    never a refusal and never enters ``denials``.
+    """
+
+    def __init__(self):
+        self.denials = 0
+        self.malformed = 0
+
+        # Every tally below is keyed by the string observed in the event,
+        # never by a list held in this file, so a stage or a dimension
+        # added to the guard after this tool was written is counted and
+        # printed rather than dropped.
+        self.stages = collections.Counter()
+        self.exceeded = collections.Counter()
+        self.sole_exceedance = collections.Counter()
+        self.stage_dimensions = collections.defaultdict(collections.Counter)
+        self.unenforced = 0
+        self.empty_dimensions = 0
+        self.nothing_exceeded = 0
+
+        # The demand dimension carries the two terms whose sum is `used`
+        # (issue 3913), which is the difference between a node that was
+        # genuinely busy and an estimator that thought it would be.
+        self.demand_measured_alone = 0
+        self.demand_estimate_tipped = 0
+        self.demand_unsplit = 0
+
+        # Populated only where the event carries a shortfall. The value is
+        # deliberately not computed here when it is absent: G3 puts the
+        # definition of shortfall in one place, server side, so that two
+        # consumers cannot disagree about its sign convention.
+        #
+        # Two dicts, for the same reason the rest of this class keeps the
+        # claim tallies apart from the refusal ones: a claim exceedance is
+        # an admitted placement, so its shortfall says how far past a
+        # declared footprint a namespace went, not how far short of the
+        # ledger a refused create fell. One dict would print the second
+        # number under the first heading.
+        self.shortfalls = {}
+        self.claim_shortfalls = {}
+
+        self.claims = 0
+        self.claim_malformed = 0
+        self.claim_namespaces = collections.Counter()
+        self.claim_exceeded = collections.Counter()
+
+    @property
+    def observed(self):
+        """Whether this census carried any guard event at all.
+
+        Zero guard events in a census which did carry stage events is a
+        statement about the query, not about the cluster: the collector's
+        LogQL filter selects the stage messages only. The report says so
+        rather than printing a zero which reads as "nothing was refused".
+        """
+        return bool(self.denials or self.claims or self.malformed
+                    or self.claim_malformed)
+
+    @property
+    def unrecognised_stages(self):
+        # The placeholders this file writes for a missing value are not
+        # unrecognised stages: they are this tool saying the event did not
+        # carry one, and they are already flagged in the table.
+        return sorted(s for s in self.stages
+                      if s not in GUARD_STAGE_NOTES and s != UNKNOWN_STAGE)
+
+    @property
+    def unrecognised_dimensions(self):
+        names = set(self.exceeded) | set(self.claim_exceeded)
+        return sorted(n for n in names
+                      if n not in GUARD_DIMENSION_NOTES and n != UNKNOWN_DIMENSION)
+
+    def _dimensions_of(self, extra, key):
+        """The exceeded dimension names in one event, and their details.
+
+        Returns (names, details, well_formed). Anything which is not the
+        shape this tool expects makes well_formed False and is counted as
+        malformed by the caller, rather than being silently read as an
+        event with no exceeded dimensions -- which would look exactly like
+        a denial nobody can explain.
+        """
+        if not isinstance(extra, dict):
+            return [], [], False
+        dimensions = extra.get(key)
+        if dimensions is None:
+            return [], [], False
+        if not isinstance(dimensions, list):
+            return [], [], False
+
+        names = []
+        details = []
+        for entry in dimensions:
+            if not isinstance(entry, dict):
+                continue
+            details.append(entry)
+            if entry.get('exceeded') is not True:
+                continue
+            name = entry.get('dimension')
+            names.append(name if isinstance(name, str) and name
+                         else UNKNOWN_DIMENSION)
+        return names, details, True
+
+    def _note_shortfall(self, into, entry, name):
+        shortfall = numeric(entry.get('shortfall'))
+        if shortfall is None:
+            return
+        if name not in into or shortfall > into[name]:
+            into[name] = shortfall
+
+    def _note_demand_split(self, entry):
+        """Which term of the demand dimension carried it past the limit.
+
+        The demand clause is the one dimension which does not charge the
+        incoming placement (phase 4a): it compares cpu_load_1 plus
+        expected_demand against the limit and leaves `requested` out of
+        the comparison entirely, which is what makes it satisfiable at
+        every node size. So the split is read the same way the guard
+        made it -- measured load alone already exceeds the limit, or the
+        D13 feedforward estimate is what carried the sum over it. The
+        second is an estimator finding rather than a cluster which ran
+        out of CPU, and issue 3913 added the two terms to the event for
+        exactly this reading. `requested` is deliberately not used here,
+        because using it would report a comparison the guard never made.
+        """
+        load = numeric(entry.get('cpu_load_1'))
+        estimate = numeric(entry.get('expected_demand'))
+        limit = numeric(entry.get('limit'))
+        if load is None or estimate is None or limit is None:
+            self.demand_unsplit += 1
+            return
+        if load > limit:
+            self.demand_measured_alone += 1
+        else:
+            self.demand_estimate_tipped += 1
+
+    def observe_denial(self, extra):
+        self.denials += 1
+        stage = extra.get('failing_stage') if isinstance(extra, dict) else None
+        stage_label = stage if isinstance(stage, str) and stage else UNKNOWN_STAGE
+        self.stages[stage_label] += 1
+
+        if isinstance(extra, dict) and extra.get('enforce') is False:
+            # A ground-truth writer's denial, which does not refuse a
+            # create: the cleaner and the startup reconciliation record
+            # where a domain already is. Counted apart so it cannot be
+            # read as a user-visible refusal.
+            self.unenforced += 1
+
+        names, details, well_formed = self._dimensions_of(extra, 'dimensions')
+        if not well_formed:
+            self.malformed += 1
+            return
+
+        for entry in details:
+            if entry.get('exceeded') is not True:
+                continue
+            name = entry.get('dimension')
+            name = name if isinstance(name, str) and name else UNKNOWN_DIMENSION
+            self._note_shortfall(self.shortfalls, entry, name)
+            if name == 'demand':
+                self._note_demand_split(entry)
+
+        if not details:
+            # A dimensions list this tool could read, which was empty. A
+            # different fact from the one below -- there was nothing to
+            # mark exceeded, rather than something which was not marked --
+            # and a different fact again from malformed, which is a shape
+            # this tool did not recognise at all.
+            self.empty_dimensions += 1
+        if not names:
+            # The guard refused and marked nothing exceeded. Worth seeing:
+            # it is either a guard this tool does not understand or an
+            # event shape which has moved.
+            self.nothing_exceeded += 1
+            self.stage_dimensions[stage_label][NO_DIMENSIONS] += 1
+            return
+
+        for name in set(names):
+            self.exceeded[name] += 1
+            self.stage_dimensions[stage_label][name] += 1
+        if len(set(names)) == 1:
+            self.sole_exceedance[names[0]] += 1
+
+    def observe_claim(self, extra):
+        self.claims += 1
+        namespace = extra.get('namespace') if isinstance(extra, dict) else None
+        self.claim_namespaces[
+            namespace if isinstance(namespace, str) and namespace
+            else UNKNOWN_NAMESPACE] += 1
+
+        names, details, well_formed = self._dimensions_of(
+            extra, 'claim_dimensions')
+        if not well_formed:
+            self.claim_malformed += 1
+            return
+        for entry in details:
+            if entry.get('exceeded') is not True:
+                continue
+            name = entry.get('dimension')
+            self._note_shortfall(
+                self.claim_shortfalls, entry,
+                name if isinstance(name, str) and name
+                else UNKNOWN_DIMENSION)
+        for name in set(names):
+            self.claim_exceeded[name] += 1
+
+    def observe(self, message, extra):
+        """Tally one record if it is a guard event. Returns whether it was."""
+        if message == GUARD_DENIED_MESSAGE:
+            self.observe_denial(extra)
+            return True
+        if message == CLAIM_OVER_LIMIT_MESSAGE:
+            self.observe_claim(extra)
+            return True
+        return False
+
+
 class Census:
     """A refusal census, or an honest account of why there isn't one."""
 
@@ -454,6 +750,8 @@ class Census:
         self.stages = collections.OrderedDict()
         self.records = 0
         self.matched = 0
+        self.guard_matched = 0
+        self.guard = GuardCensus()
         self.unparseable_lines = 0
         self.limit = None
 
@@ -603,8 +901,14 @@ def read_census(path, limit=None):
                 continue
 
             census.records += 1
-            stage, aborted = stage_of(record.get('message'))
+            message = record.get('message')
+            stage, aborted = stage_of(message)
             if stage is None:
+                # Below the stage layer: the guard's own events, tallied
+                # into their own object so nothing here can end up added
+                # to a stage count.
+                if census.guard.observe(message, record.get('extra')):
+                    census.guard_matched += 1
                 continue
             census.matched += 1
             extra = record.get('extra')
@@ -968,8 +1272,9 @@ def print_census(census):
 
     print('  File:              %s' % census.path)
     print('  Log records read:  %d (%d were schedule stage events, '
-          '%d %s unparseable)'
-          % (census.records, census.matched, census.unparseable_lines,
+          '%d were capacity guard events, %d %s unparseable)'
+          % (census.records, census.matched, census.guard_matched,
+             census.unparseable_lines,
              plural(census.unparseable_lines, 'line')))
     if census.truncated:
         print('  CENSUS MAY BE TRUNCATED: the query returned %d entries and was'
@@ -1025,6 +1330,181 @@ def print_census(census):
         print('  missing data rather than a shortage of memory, and it is')
         print('  excluded from every shortage count in this report. Counting it')
         print('  would read a stale metrics row as evidence the cloud is small.')
+
+
+def print_guard_census(census):
+    """The capacity guard's refusals, under their own heading.
+
+    Deliberately a separate section from the stage census above rather
+    than more rows in it. The stage census is about candidate nodes being
+    dropped from a list; this is about the ledger refusing the write for
+    the node which survived that list. A run can have none of the first
+    and a hundred of the second, and that run is exactly the one this
+    section exists to make visible.
+    """
+    guard = census.guard
+    print_heading('Capacity guard census')
+    if census.status == 'not requested':
+        print('  NO CENSUS WAS SUPPLIED (--census was not given), so nothing is')
+        print('  known about what the capacity guard did. Not zero refusals.')
+        return
+    if not census.available:
+        print('  NO CENSUS IS AVAILABLE: %s (%s)' % (census.status, census.detail))
+        print('  Read as "unknown", never as zero guard refusals.')
+        return
+
+    if not guard.observed:
+        print('  NO CAPACITY GUARD EVENTS IN THIS CENSUS.')
+        print('  Read that as a fact about the query before reading it as a')
+        print('  fact about the cluster: the census is collected with a LogQL')
+        print('  filter, and if that filter selects only the scheduler stage')
+        print('  messages then a guard which refused every candidate leaves')
+        print('  nothing here to count. The filter must also match')
+        print('  %r' % GUARD_DENIED_MESSAGE)
+        print('  and %r' % CLAIM_OVER_LIMIT_MESSAGE)
+        print('  for this section to mean anything at all.')
+        if census.matched:
+            print('  This census DID carry %d schedule stage %s, so the log'
+                  % (census.matched, plural(census.matched, 'event')))
+            print('  shipping path was healthy and the filter is the difference.')
+        return
+
+    print('  Placements refused by the guard: %d' % guard.denials)
+    if guard.unenforced:
+        print('  %d of those had enforce=false: a ground-truth writer (the'
+              % guard.unenforced)
+        print('  cleaner, or startup reconciliation) recording where a domain')
+        print('  already is. Those refuse nothing a user asked for.')
+    if guard.malformed:
+        print('  %d %s carried no usable dimensions list and %s counted here'
+              % (guard.malformed, plural(guard.malformed, 'event'),
+                 plural(guard.malformed, 'is', 'are')))
+        print('  but explain nothing. That is an event shape this tool does')
+        print('  not understand, not a cluster fact.')
+    if guard.empty_dimensions:
+        print('  %d %s carried a readable but EMPTY dimensions list, which is'
+              % (guard.empty_dimensions,
+                 plural(guard.empty_dimensions, 'event')))
+        print('  a guard which refused without saying against what. Counted')
+        print('  apart from the malformed events above, whose shape this tool')
+        print('  could not read at all.')
+
+    if guard.stages:
+        rows = []
+        for stage, count in sorted(guard.stages.items(),
+                                   key=lambda kv: (-kv[1], kv[0])):
+            if stage == UNKNOWN_STAGE:
+                note = 'the event carried no failing_stage'
+            else:
+                note = GUARD_STAGE_NOTES.get(
+                    stage, 'not a stage this report knows; counted anyway')
+            rows.append([stage, str(count), note])
+        print()
+        print('  Refusals by failing stage:')
+        print_table(['stage', 'refusals', 'what it guards'], rows, indent='    ')
+
+    if guard.exceeded or guard.nothing_exceeded:
+        rows = []
+        for dimension, count in sorted(guard.exceeded.items(),
+                                       key=lambda kv: (-kv[1], kv[0])):
+            if dimension == UNKNOWN_DIMENSION:
+                note = 'the event named no dimension'
+            else:
+                note = GUARD_DIMENSION_NOTES.get(
+                    dimension,
+                    'not a dimension this report knows; counted anyway')
+            rows.append([dimension, str(count),
+                         str(guard.sole_exceedance.get(dimension, 0)), note])
+        if guard.nothing_exceeded:
+            rows.append([NO_DIMENSIONS, str(guard.nothing_exceeded), '0',
+                         'the guard refused and marked nothing exceeded'])
+        print()
+        print('  Refusals by exceeded dimension. A refusal exceeding two')
+        print('  dimensions is counted once under each, so the column sums to')
+        print('  more than the refusal count; "alone" is the subset where that')
+        print('  dimension was the only one exceeded.')
+        print_table(['dimension', 'refusals', 'alone', 'what it is'], rows,
+                    indent='    ')
+
+    if len(guard.stages) > 1:
+        print()
+        print('  Exceeded dimensions by stage:')
+        for stage in sorted(guard.stage_dimensions):
+            names = guard.stage_dimensions[stage]
+            print('    %s: %s' % (stage, ', '.join(
+                '%s x%d' % (name, count)
+                for name, count in sorted(names.items(),
+                                          key=lambda kv: (-kv[1], kv[0])))))
+
+    demand_total = (guard.demand_measured_alone + guard.demand_estimate_tipped
+                    + guard.demand_unsplit)
+    if demand_total:
+        print()
+        print('  Of the %d %s exceeding the demand dimension:'
+              % (demand_total, plural(demand_total, 'refusal')))
+        print('    %5d  measured CPU load alone was already over the limit'
+              % guard.demand_measured_alone)
+        print('    %5d  the D13 feedforward estimate is what carried it over'
+              % guard.demand_estimate_tipped)
+        if guard.demand_unsplit:
+            print('    %5d  no cpu_load_1 / expected_demand split recorded'
+                  % guard.demand_unsplit)
+        print('  Demand is not an allocation, so a refusal here is a rate')
+        print('  prediction rather than a cloud which ran out of room, and the')
+        print('  second line is an estimator finding rather than a sizing one.')
+
+    if guard.shortfalls:
+        print()
+        print('  Worst shortfall seen per dimension among these REFUSALS, as')
+        print('  the event reported it. The server computes it where the guard')
+        print('  made the comparison, floored at zero, so nothing here')
+        print('  recomputes it and no two readers can disagree about its sign:')
+        for dimension in sorted(guard.shortfalls):
+            print('    %-12s %s' % (dimension, fmt(guard.shortfalls[dimension], 3)))
+    elif guard.denials:
+        print()
+        print('  No refused dimension carried a shortfall field. That is a')
+        print('  series written by a build predating it, not a shortfall of')
+        print('  zero; the three numbers it is derived from are in the events.')
+
+    for unrecognised, what in ((guard.unrecognised_stages, 'stage'),
+                               (guard.unrecognised_dimensions, 'dimension')):
+        if unrecognised:
+            print()
+            print('  Counted but unrecognised %s: %s'
+                  % (plural(len(unrecognised), what),
+                     ', '.join(unrecognised)))
+
+    print()
+    print('  Claim exceedances (ADMITTED, never refused): %d' % guard.claims)
+    if not guard.claims:
+        print('    No placement drew a namespace past a capacity claim, or no')
+        print('    namespace in this cluster has one.')
+        return
+    print('    These placements SUCCEEDED. CLAIM_ENFORCEMENT_HARD is False, so')
+    print('    advisory mode admits over a claim on purpose and this is the')
+    print('    system doing what the operator asked. It is the signal a')
+    print('    declared footprint needs revising (D9), and it is never added')
+    print('    to the refusal count above.')
+    if guard.claim_malformed:
+        print('    %d carried no usable claim_dimensions list.'
+              % guard.claim_malformed)
+    rows = [[namespace, str(count)]
+            for namespace, count in guard.claim_namespaces.most_common()]
+    print_table(['namespace', 'admitted over claim'], rows, indent='    ')
+    if guard.claim_exceeded:
+        print('    Claim dimensions exceeded: %s' % ', '.join(
+            '%s x%d' % (name, count)
+            for name, count in sorted(guard.claim_exceeded.items(),
+                                      key=lambda kv: (-kv[1], kv[0]))))
+    if guard.claim_shortfalls:
+        print('    Worst amount over the claim, per dimension, as the event')
+        print('    reported it. This is how far past a declared footprint a')
+        print('    namespace went on an ADMITTED placement, and it is not the')
+        print('    refusal shortfall above:')
+        for dimension in sorted(guard.claim_shortfalls):
+            print('      %-12s %s'
+                  % (dimension, fmt(guard.claim_shortfalls[dimension], 3)))
 
 
 def print_verdict(cpu_fractions, census, series):
@@ -1083,6 +1563,36 @@ def print_verdict(cpu_fractions, census, series):
         print('  either way, because nothing here knows whether they are')
         print('  capacity stages -- a scheduler stage added since this tool')
         print('  was written lands here.')
+    # Stated as its own line rather than folded into the warning above,
+    # because the two are different evidence: a stage drop is a candidate
+    # node removed from a list, a guard refusal is a create which did not
+    # happen. A run with zero of the first and many of the second is the
+    # #3772 shape, and it is the reading this line exists to prevent.
+    guard = census.guard
+    if not guard.observed:
+        print('  Guard refusals: NOT COLLECTED in this census (see the capacity')
+        print('  guard section). Unknown, not zero.')
+    elif guard.denials:
+        print('  Guard refusals: YES. The ledger refused %d %s, of which %d'
+              % (guard.denials, plural(guard.denials, 'placement'),
+                 guard.denials - guard.unenforced))
+        print('  refused something a caller asked for. Whatever the ratio above')
+        print('  says, a refused placement is a create which did not happen.')
+        sole_demand = guard.sole_exceedance.get('demand', 0)
+        if sole_demand:
+            print('  %d of them %s refused on the demand dimension ALONE, with'
+                  % (sole_demand, plural(sole_demand, 'was', 'were')))
+            print('  every allocated dimension inside its limit. That is not a')
+            print('  cloud which ran out of room; see the split above.')
+    else:
+        print('  Guard refusals: none in the census window.')
+    if guard.claims:
+        print('  %d %s admitted OVER a namespace capacity claim. Advisory mode'
+              % (guard.claims, plural(guard.claims, 'placement was',
+                                      'placements were')))
+        print('  did what the operator asked; this is calibration data, not a')
+        print('  failure, and it is no part of the refusal counts above.')
+
     if census.truncated:
         print('  The census may have been truncated, so every count above is a')
         print('  lower bound. Absence of a warning is not evidence of absence.')
@@ -1112,6 +1622,7 @@ def report(args):
         print('  a fact about the instrument, not about the cluster.')
 
     print_census(census)
+    print_guard_census(census)
     print_verdict(cpu_fractions, census, series)
     print()
 
@@ -1126,8 +1637,11 @@ def main(argv=None):
     parser.add_argument(
         '--census', default=None,
         help=('Path to a Loki query_range response holding the run scheduler '
-              'stage events. Optional: the report says so explicitly when it '
-              'is absent, rather than printing zero refusals.'))
+              'stage events, and ideally the capacity guard events beside '
+              'them -- a filter which selects only the stage messages leaves '
+              'the guard census with nothing to count, which the report says '
+              'out loud. Optional: the report says so explicitly when it is '
+              'absent, rather than printing zero refusals.'))
     parser.add_argument(
         '--label', default=None,
         help='A label for the run, printed at the top (typically the topology).')

@@ -333,7 +333,15 @@ API_CAPABILITIES = {
         # are phase 9 of PLAN-scheduler-reservations (client-python
         # issue 364); the server-side advertisement is an obligation
         # regardless of whether a client has caught up yet.
-        'namespace-claims'],
+        'namespace-claims',
+        # namespace-events and namespace-claim-events are the two
+        # per-object events endpoints this family serves. They are
+        # advertised separately because they are separate reads: a
+        # claim's events die with the claim, so what a namespace's
+        # capacity did over time is only ever complete on the
+        # namespace, and a client calibrating a claim needs to know it
+        # can ask for both.
+        'namespace-events', 'namespace-claim-events'],
     'blobs': [
         'blob-metadata', 'blob-search-by-hash', 'blob-data-limit',
         'blob-hash-sha1', 'blob-hash-sha256', 'blob-hash-xxh128',
@@ -475,6 +483,8 @@ api.add_resource(api_auth.AuthEndpoint, '/auth')
 api.add_resource(api_auth.AuthNamespacesEndpoint, '/auth/namespaces')
 api.add_resource(api_auth.AuthNamespaceEndpoint,
                  '/auth/namespaces/<namespace>')
+api.add_resource(api_auth.AuthNamespaceEventsEndpoint,
+                 '/auth/namespaces/<namespace>/events')
 api.add_resource(api_auth.AuthIssuersEndpoint, '/auth/issuers')
 api.add_resource(api_auth.AuthIssuerEndpoint,
                  '/auth/issuers/<issuer_name>')
@@ -491,6 +501,8 @@ api.add_resource(api_auth.AuthNamespaceClaimsEndpoint,
                  '/auth/namespaces/<namespace>/claims')
 api.add_resource(api_auth.AuthNamespaceClaimEndpoint,
                  '/auth/namespaces/<namespace>/claims/<claim_ref>')
+api.add_resource(api_auth.AuthNamespaceClaimEventsEndpoint,
+                 '/auth/namespaces/<namespace>/claims/<claim_ref>/events')
 api.add_resource(api_auth.AuthMetadatasEndpoint,
                  '/auth/namespaces/<namespace>/metadata')
 api.add_resource(api_auth.AuthMetadataEndpoint,

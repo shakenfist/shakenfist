@@ -419,16 +419,34 @@ placement crossed the line:
 placement admitted over namespace capacity claim
 ```
 
-It is emitted at warning level and carries `node`, `namespace` and
-`claim_dimensions` -- one entry per dimension that is over, giving the
+It is emitted at warning level and carries `node`, `namespace`, `claim`
+-- the uuid of the claim the placement was charged against -- and
+`claim_dimensions`, one entry per dimension that is over, giving the
 claim's limit, what the claim held before this placement, and this
 placement's own allocation. `sf-client instance events <instance>` is
 where to find it, and a search of the cluster's logs for that message is
-how to answer "is anything over its claim". It is deliberately distinct
+how to answer "is anything over its claim".
+
+The same facts are also recorded against the **namespace**, with the
+placement's instance uuid added, because a claim's own events die with
+the claim and growing a claim by delete-and-create is how many operators
+do it. `claim` is what says which claim a namespace-trail event was
+against once more than one has existed. It is deliberately distinct
 from `placement recorded despite exceeding capacity guard`, which is a
 different event about a different thing: that one says a ground-truth
 writer was forced past a *node's* guard, this one says a placement was
 charged to its *namespace's* claim and the claim is now over.
+
+Both trails are readable over REST, admin-gated like the claim verbs
+themselves since `sf-client` has no events verb for either yet:
+`GET /auth/namespaces/<namespace>/claims/<claim_ref>/events` for the
+claim's own events while it still exists, and
+`GET /auth/namespaces/<namespace>/events` for the namespace's. **An
+operator calibrating a claim should read the namespace's events, not
+the claim's** -- a claim's own events are removed by `hard_delete()`,
+so the exceedance history that made the case for growing a claim
+would vanish the moment an operator deletes and recreates it, which
+is exactly how many operators grow a claim today.
 
 Because a create that exceeds a claim looks exactly like a create in a
 namespace with no claim at all, the event is the only observable
@@ -718,6 +736,19 @@ tells the whole story:
   compared against the hard maximum; for RAM it includes the
   reservation subtracted, or the committed memory compared against
   the counters' limit.
+- `schedule could not read the capacity counters` appears only when
+  the read of `scheduler_node_capacity` itself failed, and says the
+  CPU and RAM pre-filters ran on the live measurements alone for this
+  decision. It covers both places the read can fail: this daemon's own
+  gRPC call, when the database service is unreachable or the bounded
+  gRPC budget expires, and the query `sf-database` runs against
+  MariaDB, which the reply reports back on its `degraded` field. It is
+  *not* emitted for an empty table: a cluster the reconciler has not
+  reached yet has no rows at all, which is normal and admits
+  unguarded. Admission is unchanged either way, so this marks a
+  decision made with less information rather than a decision made
+  differently. Seeing it repeatedly points at the database tier rather
+  than at the scheduler.
 - `schedule at stage affinity_constraints` is the hard constraint
   filter, with a `dropped` map naming which of `require_with_tag` or
   `require_without_tag` ejected each node. It is absent when no hard

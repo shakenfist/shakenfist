@@ -359,7 +359,7 @@ table entirely (decision D8).
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | In progress |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete |
-| 7. Diagnostic-mode rejection logging | PLAN-scheduler-reservations-phase-07-diagnostics.md | Not started |
+| 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
 
@@ -811,10 +811,39 @@ phase 6's decision budget, now against the corrected
 premise. Phase 4a fixes the clause, so phase 6 can measure
 3565 on a cluster where the spreader actually spreads.
 
-**Phase 7 — diagnostics.** Failure-path verbose diagnostic
-against the same snapshot, success-path drawdown events,
-ceiling-rejection events (D9). Confirm CI triage tooling
-reads the new events.
+**Phase 7 — capacity diagnostics.** Failure-path verbose
+diagnostic against the same snapshot, success-path drawdown
+events, ceiling-rejection events (D9). Confirm CI triage
+tooling reads the new events.
+
+*Corrected by the phase 7 survey (2026-09-03):* the paragraph
+above describes work which phases 3, 4, 4a and 6 had already
+done, each shipping the diagnostics for its own behaviour
+because a guard nobody can see the reasoning of is not
+reviewable. The failure-path diagnostic exists at more depth
+than D9 asked for (`scheduler.py:520-541` publishes a
+structured per-node `dropped` map for every stage;
+`instance.py:1253-1260` carries `failing_stage` and a
+per-dimension detail below the guard). The drawdown event
+exists (`instance.py:1284-1298`) though its release
+counterpart carries only a node name. The ceiling-rejection
+event exists (`instance.py:1145-1176`) though it lacks D9's
+`shortfall` and is recorded on the instance. And the CI
+triage tooling already reads the stage events -- built by
+`PLAN-ci-cloud-sizing` phase 1, not by this plan -- but stops
+above the guard, so a run in which every stage passed and the
+guard refused everything reads as clean.
+
+What the survey found actually missing is narrower and was
+not visible from this stub: neither namespaces nor claims
+have a REST events endpoint at all, so the claim accounting
+D9 calls "the signal a workflow's declared footprint needs
+revision" is written where nobody can read it -- including
+phase 4c, whose observation record gates phase 5. The phase
+is renamed accordingly; there is no diagnostic *mode* in the
+tree and the phase plan's G1 decides there should not be one.
+Detail in
+[PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md).
 
 **Phase 8 — documentation.** Operator guide for claims and
 capacity (including the two service classes and the

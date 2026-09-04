@@ -467,6 +467,62 @@ def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None,
     return key_name
 
 
+namespace_events_example = """[
+    ...,
+    {
+        "duration": null,
+        "extra": {
+            "claim": "0b2b4f76-0a1b-4d0f-8b3f-6f1a2c4d5e6f",
+            "clamped": false,
+            "returned_cpus": 40,
+            "returned_disk_gb": 2000,
+            "returned_memory_mb": 81920
+        },
+        "fqdn": "sf-1",
+        "message": "namespace claim deleted, capacity returned",
+        "timestamp": 1755300000.0,
+        "type": "audit"
+    },
+    ...
+]"""
+
+
+class AuthNamespaceEventsEndpoint(api_base.Resource):
+    # Cluster administrators only, and deliberately not the namespace's
+    # own owner. A namespace's event trail names the instances, nodes
+    # and other namespaces its capacity accounting involved, so serving
+    # it to the namespace itself would widen what a tenant can learn
+    # about the cluster. Whether an owner may read their own
+    # namespace's events is a real request to argue on its own merits,
+    # and is recorded as future work by G2 of
+    # docs/plans/PLAN-scheduler-reservations-phase-07-diagnostics.md.
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Get namespace event information.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('event_type', 'body', 'string', 'The type of event to return.', False),
+            ('limit', 'body', 'integer',
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
+        ],
+        [(200, 'Event information about a single namespace.',
+          namespace_events_example),
+         (401, 'The caller is not a cluster administrator.', None),
+         (404, 'Namespace not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @api_base.log_token_use
+    def get(self, namespace=None, event_type=None, limit=100,
+            namespace_from_db=None):
+        # A namespace is keyed by its name rather than a uuid, and
+        # Namespace.uuid returns that name, so this is the identifier
+        # every writer of a namespace event already passes.
+        return api_base.object_events_response(
+            'namespace', namespace_from_db.uuid, limit, event_type)
+
+
 class AuthNamespaceKeysEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Get the authentication keys for a namespace.',
@@ -1623,6 +1679,56 @@ class AuthNamespaceClaimEndpoint(api_base.Resource):
         view = claim_from_db.external_view()
         claim_from_db.hard_delete()
         return view
+
+
+claim_events_example = """[
+    ...,
+    {
+        "duration": null,
+        "extra": {
+            "limit_cpus": 40,
+            "limit_disk_gb": 2000,
+            "limit_memory_mb": 81920
+        },
+        "fqdn": "sf-1",
+        "message": "db record created",
+        "timestamp": 1755213600.0,
+        "type": "audit"
+    },
+    ...
+]"""
+
+
+class AuthNamespaceClaimEventsEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'auth', 'Get capacity claim event information.',
+        [
+            ('namespace', 'path', 'string', 'The namespace.', True),
+            ('claim_ref', 'path', 'uuid', 'The claim UUID.', True),
+            ('event_type', 'body', 'string', 'The type of event to return.', False),
+            ('limit', 'body', 'integer',
+             'The number of events to return, defaults to 100 and is '
+             'capped at 1000.', False, {'minimum': 1, 'maximum': 1000})
+        ],
+        [(200, 'Event information about a single capacity claim.',
+          claim_events_example),
+         (401, 'The caller is not a cluster administrator.', None),
+         (404, 'Namespace or claim not found.', None)],
+        requires_admin=True))
+    @api_base.caller_is_admin
+    @requires_namespace_ownership
+    @arg_is_namespace
+    @arg_is_claim_ref
+    @api_base.log_token_use
+    def get(self, namespace=None, claim_ref=None, event_type=None, limit=100,
+            namespace_from_db=None, claim_from_db=None):
+        # Only the events the claim itself still holds. A claim has no
+        # soft delete, and hard_delete() removes its events inside the
+        # transaction which returns its capacity -- which is why the
+        # deletion event is recorded against the namespace instead, and
+        # read through AuthNamespaceEventsEndpoint.
+        return api_base.object_events_response(
+            'namespace_claim', claim_from_db.uuid, limit, event_type)
 
 
 federated_example = """{

@@ -232,7 +232,7 @@ class Scheduler:
             'memory_reserved_mb', int(config.NODE_RAM_RESERVATION_GB * 1024))
 
     def _capacity_by_node(self):
-        """The materialised capacity counters, keyed by node uuid.
+        """The counters keyed by node uuid, and whether the read failed.
 
         Read fresh on every scheduling decision rather than cached
         beside the metrics: the counters move on every admission, and a
@@ -247,9 +247,15 @@ class Scheduler:
         refuses correctly, only the cheap pruning in front of it is
         lost -- but it is another reason this is not the admission
         decision.
+
+        Returns ``(capacity, degraded)``: an empty mapping means either
+        an unpopulated table or a failed read, and only the second value
+        says which. Callers unpack rather than index so the degraded
+        case is visible where the read is made -- a caller which does
+        not act on it discards it explicitly.
         """
-        return {row['node_uuid']: row
-                for row in mariadb.get_scheduler_node_capacity()}
+        read = mariadb.get_scheduler_node_capacity()
+        return ({row['node_uuid']: row for row in read.rows}, read.degraded)
 
     def _satisfies_hard_affinity(self, inst, node, memo,
                                  require_with, require_without):
@@ -641,7 +647,30 @@ class Scheduler:
             # Do we have enough idle CPU? This reads the capacity
             # counters as well as the metrics, because a node whose
             # ledger is full measures as idle until its instances boot.
-            capacity = self._capacity_by_node()
+            #
+            # A failed read is published before the stage runs, and only
+            # then: an empty-but-readable table is the ordinary state of
+            # a cluster the reconciler has not reached yet (P7), so
+            # eventing on emptiness would fire on every create there and
+            # say nothing. Nothing below behaves differently either way
+            # -- the counters this decision cannot see simply do not
+            # prune anything, and the guard still refuses correctly --
+            # so this records that the pre-filter was flying on
+            # measurement alone, which is otherwise invisible in the
+            # instance's event trail.
+            capacity, capacity_degraded = self._capacity_by_node()
+            if capacity_degraded:
+                add_event_multi(
+                    EVENT_TYPE_AUDIT, related_objects,
+                    'schedule could not read the capacity counters',
+                    extra={
+                        'candidates': candidates,
+                        'degraded_stages': ['sufficient_idle_cpu',
+                                            'sufficient_idle_memory'],
+                        'effect': ('capacity pre-filtering falls back to '
+                                   'measurement only; admission is '
+                                   'unchanged and still guarded'),
+                    })
             dropped = {}
             for c in list(candidates):
                 ok, reason = self._has_sufficient_cpu(
@@ -968,7 +997,12 @@ class Scheduler:
         # publishing a second, independently derived ledger beside the
         # real one is how the two come to disagree. This is the same
         # read the CPU pre-filter makes, through the same helper.
-        capacity = self._capacity_by_node()
+        #
+        # A degraded read is discarded here rather than acted on: this
+        # summary has no instance to record an event against, and a
+        # failed read leaves every node reporting as uncounted, which is
+        # exactly what it already did.
+        capacity, _ = self._capacity_by_node()
 
         # Only hypervisors with reasonable queue lengths are candidates
         resources = {

@@ -65,7 +65,7 @@ action is needed.
 
 ## Read path
 
-Five REST endpoints return events for each object type:
+Seven REST endpoints return events for each object type:
 
 | Endpoint | Object type |
 |----------|-------------|
@@ -74,6 +74,15 @@ Five REST endpoints return events for each object type:
 | `GET /networks/<ref>/events` | Network |
 | `GET /nodes/<node>/events` | Node |
 | `GET /blobs/<uuid>/events` | Blob |
+| `GET /auth/namespaces/<namespace>/events` | Namespace |
+| `GET /auth/namespaces/<namespace>/claims/<claim_ref>/events` | Namespace claim |
+
+The last two are admin-gated, unlike the first five: a namespace's
+event trail can name the instances, nodes and other namespaces its
+capacity accounting involved. See [Namespace capacity
+claims](scheduler.md#namespace-capacity-claims) for what the claim
+exceedance event carries and why calibrating a claim means reading
+the namespace's events rather than the claim's own.
 
 All endpoints accept an optional `limit` query parameter
 (default 100). The server enforces a hard cap of 1000 rows

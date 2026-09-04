@@ -148,9 +148,9 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
                                                schema.fields[name].validators))
 
         # The rule above is vacuous if nothing is bounded, so the count
-        # is pinned. Twenty seven, from two sources which both have to
-        # work: fourteen carrying an explicit constraints element (the
-        # five events `limit` caps, the two `key_ttl` ranges, the two
+        # is pinned. Twenty nine, from two sources which both have to
+        # work: sixteen carrying an explicit constraints element (the
+        # seven events `limit` caps, the two `key_ttl` ranges, the two
         # namespace claim `expires_in_seconds` minimums, and the five
         # agent operation timing parameters -- `deadline_seconds` on
         # all three creating endpoints plus `progress_timeout_seconds`
@@ -160,13 +160,17 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         # namespace claim limits. A change in either is meant to fail
         # here and be re-counted deliberately.
         #
+        # Seven events endpoints rather than five as of
+        # scheduler-reservations phase 7, which added the namespace and
+        # namespace claim ones.
+        #
         # The agent timing five are worth a note: their `minimum: 0` is
         # backed by a 400 in api_base.agent_operation_timing() rather
         # than by the coercion the events `limit` cap uses, so the
         # published bound is honest whatever API_VALIDATION_MODE is set
         # to. They compile into validators here as well, which is
         # belt and braces rather than the mechanism.
-        self.assertEqual(27, constrained)
+        self.assertEqual(29, constrained)
 
     def test_published_bounds_compile_into_validators(self):
         """The other direction: a bound which *is* declared must arrive.

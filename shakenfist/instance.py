@@ -48,6 +48,7 @@ from shakenfist.schema.operations.node_inst_snap_op \
     import snapshot as niso_snapshot
 from shakenfist.schema.operations.node_inst_snap_op \
     import model_tasks as niso_tasks
+from shakenfist import eventlog
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
 from shakenfist.network import network
@@ -1160,6 +1161,43 @@ class Instance(dbowo):
         find, and to calibrate a claim against, but not a failure. Phase
         5 turns the same condition into a refusal, which will be an error
         because then the create does not happen.
+
+        This instance's own event above is left exactly as it was (G2).
+        In addition, the same facts are recorded against the
+        *namespace*, following the pattern
+        ``NamespaceClaim.hard_delete()`` already established for its own
+        "namespace claim deleted, capacity returned" event
+        (``namespace_claim.py:415-420``): "what happened to my
+        namespace's capacity" is a question that outlives any one
+        instance's placement, so a calibration record an operator builds
+        from a namespace's events should not have to also enumerate
+        every instance that ever drew the claim down.
+
+        Both events carry the claim's own uuid in ``extra`` as
+        ``claim``, which the admission reply now returns
+        (``AdmitPlacementResult['claim_uuid']``): it is the uuid of the
+        claim the placement was actually charged against, read from
+        inside the admission transaction. A namespace holds only one
+        active claim at a time, so on its own the namespace name looks
+        like enough -- but an operator who grows a claim by
+        delete-and-create rather than update leaves a namespace trail
+        spanning several claims, and that is exactly the shape G2 exists
+        to make legible. Empty when nothing was charged, so a reader
+        tests for the name rather than for a value.
+
+        The instance uuid is carried on the namespace copy as well: what
+        the namespace's event trail cannot say on its own is *which
+        placement* went over, and it is what pairs the namespace event
+        with the instance's own.
+
+        The namespace copy suppresses its own Loki echo
+        (``suppress_event_logging=True``): the instance-side event above
+        is unsuppressed and is already the loud, find-it-in-the-log-
+        stream copy of this fact. This second write exists so the fact
+        is durably queryable from the namespace's own events, not to
+        double the alert volume for one occurrence -- the same reasoning
+        ``namespace_claim.py:415-420`` gives for suppressing its own
+        copy. Neither gate touches the authoritative MariaDB write.
         """
         self.log.with_fields({
             'node': location,
@@ -1172,8 +1210,19 @@ class Instance(dbowo):
             extra={
                 'node': location,
                 'namespace': self.namespace,
+                'claim': result['claim_uuid'],
                 'claim_dimensions': result['claim_dimensions']
             })
+        eventlog.add_event(
+            EVENT_TYPE_AUDIT, 'namespace', self.namespace,
+            'placement admitted over namespace capacity claim',
+            extra={
+                'instance': str(self.uuid),
+                'node': location,
+                'namespace': self.namespace,
+                'claim': result['claim_uuid'],
+                'claim_dimensions': result['claim_dimensions']
+            }, suppress_event_logging=True)
 
     def place_instance(self, location, enforce=True, enforce_demand=True):
         """Place this instance on a node, claiming its capacity to do so.
@@ -1281,6 +1330,14 @@ class Instance(dbowo):
             self.__attribute_memo = None
             self._log_attribute_mutation('placement', placement)
 
+            # The drawn-down amounts come from the same property the
+            # release path reports (G4), rather than from self.cpus and
+            # self.memory directly: it is the triple _admit_placement()
+            # handed the RPC, so the two halves of the ledger cannot
+            # disagree about what any of the three names mean. Disk in
+            # particular is the summed *virtual* size of the disk spec,
+            # which is not a static value a reader could recompute.
+            cpus, memory_mb, disk_gb = self._capacity_claim
             self.add_event(
                 EVENT_TYPE_AUDIT, 'instance placed',
                 extra={
@@ -1289,8 +1346,9 @@ class Instance(dbowo):
                     'placement_attempts': placement['placement_attempts'],
                     'enforce': enforce,
                     'enforce_demand': enforce_demand,
-                    'cpus': self.cpus,
-                    'memory_mb': self.memory,
+                    'cpus': cpus,
+                    'memory_mb': memory_mb,
+                    'disk_gb': disk_gb,
                     'node_used_cpus': result['node_used_cpus'],
                     'node_used_memory_mb': result['node_used_memory_mb'],
                     'node_used_disk_gb': result['node_used_disk_gb'],
@@ -1525,9 +1583,35 @@ class Instance(dbowo):
                 log_as_error=True)
 
         if result['released']:
+            # The other half of the placement ledger, in the vocabulary
+            # the 'instance placed' event above already uses (G4): what
+            # was given back, and what the node's counters stand at
+            # afterwards. Without them the ledger is auditable from
+            # events going up and not coming down.
+            #
+            # ``node`` falls back to the node the RPC actually released
+            # from, because the sweep in hard_delete() passes an empty
+            # node_uuid on purpose -- it knows the instance rather than
+            # its node -- and an event naming no node is unreadable. The
+            # counters are reported only when the reply named a node for
+            # them: an absent capacity row (P7) or a release spanning
+            # two nodes reports zeroes that would otherwise read as "the
+            # node now holds nothing".
+            extra = {
+                'node': node_uuid or result['counters_node_uuid'],
+                'cpus': cpus,
+                'memory_mb': memory_mb,
+                'disk_gb': disk_gb
+            }
+            if result['counters_node_uuid']:
+                extra.update({
+                    'node_used_cpus': result['node_used_cpus'],
+                    'node_used_memory_mb': result['node_used_memory_mb'],
+                    'node_used_disk_gb': result['node_used_disk_gb'],
+                    'node_expected_demand': result['node_expected_demand']
+                })
             self.add_event(
-                EVENT_TYPE_AUDIT, 'instance placement released',
-                extra={'node': node_uuid})
+                EVENT_TYPE_AUDIT, 'instance placement released', extra=extra)
 
         return result
 
