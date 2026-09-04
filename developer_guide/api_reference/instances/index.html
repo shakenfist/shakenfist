@@ -13182,6 +13182,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../operator_guide/agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../operator_guide/artifacts/" class="md-nav__link">
         
   
@@ -14390,11 +14418,17 @@ progress, so a timeout there could never fire; only <code>deadline_seconds</code
 is meaningful.</p>
 <div class="admonition note">
 <p class="admonition-title">What happens when a budget runs out</p>
-<p>An operation which exhausts either budget moves to <code>expired</code>, a
-terminal state distinct from <code>error</code>. <code>error</code> means the operation
-itself failed; <code>expired</code> means a budget you set ran out, and the
-state's message says which. Nothing is retried and no further
-command in the operation runs.</p>
+<p>An operation which exhausts either budget, and for which no retry is
+possible (see below), moves to <code>expired</code>, a terminal state distinct
+from <code>error</code>. <code>error</code> means the operation itself failed; <code>expired</code>
+means a budget you set ran out, and the state's message says which.
+A wall-clock deadline running out is always final -- there is no
+time left for a further attempt to deliver anything in -- but a
+progress-timeout stall may be retried a bounded number of times
+before landing in <code>expired</code>; see
+<a href="../../../operator_guide/agent_operations/#retry-and-the-executor-reaper">Agent Operations</a>
+in the operator guide for the retry rules and the node-local reaper
+that backs them up.</p>
 <p>Three places enforce this, so an abandoned operation is retired
 wherever it happens to be sitting: when it reaches the head of the
 instance's queue, during preflight (either side of any blob copy),

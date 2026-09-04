@@ -13055,6 +13055,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operator_guide/agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
@@ -14339,9 +14367,9 @@ the slot at all.</p>
 </tr>
 <tr>
 <td>7</td>
-<td></td>
-<td>Not started</td>
-<td>Docs (operator + developer guides, and the <code>v07-v08</code> release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in <code>shakenfist_ci</code>; make the suite's agent-operation await loops fail fast on terminal states, and narrow <code>base.AGENT_OPERATION_FAILURES</code> to a plain <code>AgentOperationFailed</code> reference now that both client generations no longer need tolerating (audit finding: they spin on <code>!= 'complete'</code>, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note <code>docs/developer_guide/state_machine.md</code> is <strong>not</strong> this phase's: it is a rendering of <code>state_targets</code>, so phase 4 updated it when it added <code>expired</code> rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge</td>
+<td><a href="../PLAN-agent-operation-deadlines-phase-07-docs-and-ci/">PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md</a></td>
+<td>In progress</td>
+<td>Documentation and CI coverage. Survey corrections applied at source, because this row was written before phases 3 to 6 executed and was wrong in four places. (a) The documentation was <strong>not</strong> deferred from phase 3: <code>cf094551b</code> wrote both the API reference at <code>docs/developer_guide/api_reference/instances.md:657-710</code> and the release note section at <code>docs/release_notes/v07-v08.md:731-782</code>. What is missing is phase 5 (retry, attempts and the reaper), phase 6 (the CLI flags and the <code>AgentCommandError</code> to <code>AgentOperationFailed</code> change), and an operator-guide page for agent operations, of which there is none. (b) <code>base.AGENT_OPERATION_FAILURES</code> must <strong>not</strong> narrow to a plain <code>AgentOperationFailed</code> reference: the <code>getattr()</code> shim goes, but the tuple stays and gains <code>AgentAwaitTimeout</code>, because <code>await_agent_command()</code> raises three unrelated exceptions and the two catch sites are <code>_await_instance_ready</code>'s retry loop, which wants all of them. Only the two <code>test_get_missing_file</code> assertions narrow. (c) There is a <strong>third</strong> event-renewed await, <code>_await_objects_ready</code>, which backs the network, artifact and blob readiness helpers and so sits on nearly every test in the suite; #3770 is not fixed without it. (d) Commit <code>a0cc243ad</code> fixed the shared-clock flake in <code>guest_ci_tests/test_agentops.py</code> only, and the identical <code>smoke_ci_tests</code> copy -- the suite that runs on every pull request -- still has it. Note <code>docs/developer_guide/state_machine.md</code> is <strong>not</strong> this phase's: it is a rendering of <code>state_targets</code>, so phase 4 updated it when it added <code>expired</code> rather than leaving the tree self-contradictory for three phases, and phase 5 added its one further edge</td>
 </tr>
 <tr>
 <td>8</td>
@@ -14363,8 +14391,8 @@ slot is actually freed).</p>
 <h3 id="the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770">The CI suite's own awaits have the bug this plan fixes (#3770)<a class="headerlink" href="#the-ci-suites-own-awaits-have-the-bug-this-plan-fixes-3770" title="Permanent link">&para;</a></h3>
 <p>Found during merge CI triage of PR #3764 and verified against the
 tree. <code>_await_agent_state</code>
-(<code>shakenfist/deploy/shakenfist_ci/base.py:436</code>) looks like a
-500-second deadline and is not one:</p>
+(<code>shakenfist/deploy/shakenfist_ci/base.py:522</code>, <code>:436</code> when this was
+written) looks like a 500-second deadline and is not one:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">time_since_last_progress</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">while</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">time_since_last_progress</span> <span class="o">&lt;</span> <span class="mi">500</span><span class="p">:</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">...</span>
@@ -14377,11 +14405,21 @@ tree. <code>_await_agent_state</code>
 <em>any</em> type, so an instance going nowhere while still emitting events
 on any sub-500s cadence renews the window forever. The variable is
 named for progress; nothing in the query restricts it to progress.
-<code>_await_instance_create</code> (<code>base.py:471</code>) is the identical
-construction with a 180-second window. In run 31856630647 this cost
-the Guests job its entire 60-minute budget: two agent-awaiting tests
-never completed, and because the step was killed rather than failed,
-stestr wrote no results and the job named no failing test at all.</p>
+<code>_await_instance_create</code> (<code>base.py:557</code>, <code>:471</code> when this was written)
+is the identical construction with a 180-second window. In run
+31856630647 this cost the Guests job its entire 60-minute budget: two
+agent-awaiting tests never completed, and because the step was killed
+rather than failed, stestr wrote no results and the job named no
+failing test at all.</p>
+<p>Phase 7's survey found a third loop the audit missed:
+<code>_await_objects_ready</code> (<code>base.py:706</code>) renews a 300-second window the
+same way, and backs <code>_await_networks_ready</code>, <code>_await_artifacts_ready</code>
+and <code>_await_blobs_ready</code>, so it sits on nearly every test in the
+suite. Fixing only the two named above would leave the bug class in
+place. The mechanism is also now confirmed rather than inferred:
+<code>node_inst_op</code> (<code>shakenfist/operations/node_inst_op.py:169</code>) writes an
+<code>EVENT_TYPE_USAGE</code> event against every instance on a timer, so a
+stalled instance renews its own deadline forever.</p>
 <p>This is the same two-knob confusion the plan resolves server-side --
 a progress window is not a deadline -- so phase 7 fixes it the same
 way: keep the event-renewed progress window, add an absolute ceiling
@@ -14422,9 +14460,11 @@ client-python's <code>develop</code> and client-python's CI builds the server
 from this repository's <code>develop</code>. The deadlock is broken by
 <code>base.AGENT_OPERATION_FAILURES</code>, a tuple which accepts either
 exception and resolves the new one through <code>getattr()</code> so it still
-imports against an old client. Phase 7 narrows it to a plain
-reference once the client change has merged and the ordering
-constraint is gone.</p>
+imports against an old client. Phase 7 removes the <code>getattr()</code> -- but
+not the tuple, which its survey found must instead grow to name all
+three exceptions <code>await_agent_command()</code> can raise, since the two
+catch sites want breadth and only the two <code>test_get_missing_file</code>
+assertions want the narrow reference.</p>
 
 
 

@@ -13061,6 +13061,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../artifacts/" class="md-nav__link">
         
   
@@ -16245,10 +16273,12 @@ outlives either moves to the terminal <code>expired</code> state, checked at
 dequeue, during preflight and in the sidechannel executor. A NULL
 <code>deadline</code> has no request receipt time to anchor its default against,
 so it is anchored on the current state's transition time instead, which
-means a legacy row's budget restarts at each transition. <code>attempts</code> and
-<code>last_progress</code> are recorded but not yet consumed; the retry bound and
-the node-local reaper which reads them arrive with the rest of
-<code>docs/plans/PLAN-agent-operation-deadlines.md</code>.</p>
+means a legacy row's budget restarts at each transition. <code>attempts</code>
+counts dispatches against <code>AGENT_OPERATION_MAX_ATTEMPTS</code> and
+<code>last_progress</code> backs the progress timeout; both are read by the retry
+decision and by the node-local executor reaper. See
+<a href="../agent_operations/">Agent Operations</a> for what an operator sees as a
+result of any of this.</p>
 <p>Namespace keys used to be anonymous entries inside that row's <code>keys</code>
 JSON dict. They are now objects in their own right, so that a key can
 carry an expiry, be listed, reaped, and (in a later release) scoped.

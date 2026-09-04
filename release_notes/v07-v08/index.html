@@ -12055,6 +12055,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Agent operations are bounded by a deadline, not a fixed backstop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#retry-and-the-executor-reaper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry and the executor reaper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-client-deadline-and-a-faster-failure-on-a-terminal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The client: --deadline and a faster failure on a terminal state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -13379,6 +13407,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operator_guide/agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operator_guide/artifacts/" class="md-nav__link">
         
   
@@ -14093,6 +14149,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Agent operations are bounded by a deadline, not a fixed backstop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#retry-and-the-executor-reaper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry and the executor reaper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-client-deadline-and-a-faster-failure-on-a-terminal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The client: --deadline and a faster failure on a terminal state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -14886,6 +14970,55 @@ previously only emitted an event and left the executor waiting, so the
 operation ended in whatever the 900 second backstop made of it. Clients
 which distinguish the two terminal states get a more useful answer, and
 get it sooner.</p>
+<h3 id="retry-and-the-executor-reaper">Retry and the executor reaper<a class="headerlink" href="#retry-and-the-executor-reaper" title="Permanent link">&para;</a></h3>
+<p>An operation that stalls in <code>executing</code> -- runs out of
+<code>progress_timeout_seconds</code> with nothing wrong except a lack of forward
+progress -- is no longer necessarily abandoned. If the operation is
+retryable (an <code>agent/get</code> or <code>agent/put</code>; an <code>agent/execute</code> never is,
+because re-running a command from the start would repeat a side effect
+the agent cannot take back), its deadline has not passed, and it has
+not already been dispatched <code>AGENT_OPERATION_MAX_ATTEMPTS</code> times
+(default 3, counting the first attempt), the operation goes back to the
+<em>head</em> of its instance's queue for another attempt instead of ending in
+<code>expired</code>. Each retry re-runs the operation's command list from the
+start, so partial results from an abandoned attempt are discarded
+before it runs again.</p>
+<p>What this looks like to an operator: a transfer that previously would
+have ended in <code>expired</code> after one stalled attempt may now recover on
+its own, at the cost of taking longer overall. Once the attempt cap is
+reached, or the operation's wall-clock deadline has passed, it still
+ends in <code>expired</code> exactly as before -- retry narrows the set of stalls
+that reach a terminal state, it does not remove the terminal states
+themselves.</p>
+<p>A related but separate change: a node-local reaper in the sidechannel
+daemon now recovers agent operations whose executor died or never
+started -- most visibly across a daemon restart, where an operation
+left <code>executing</code> with no process behind it would previously have
+blocked its instance's queue until something else noticed. The reaper
+also catches an executor that wedges before it ever reaches its own
+budget checks (before connecting to the agent), once that operation's
+wall-clock deadline has passed. It runs automatically; no operator
+action is required, but see
+<a href="../../operator_guide/agent_operations/">Agent Operations</a> for what it
+recovers and what it deliberately cannot.</p>
+<h3 id="the-client-deadline-and-a-faster-failure-on-a-terminal-state">The client: <code>--deadline</code> and a faster failure on a terminal state<a class="headerlink" href="#the-client-deadline-and-a-faster-failure-on-a-terminal-state" title="Permanent link">&para;</a></h3>
+<p><code>sf-client instance execute</code>, <code>upload</code> and <code>download</code> gained a
+<code>--deadline</code> option, and <code>upload</code> and <code>download</code> also gained
+<code>--progress-timeout</code> (<code>execute</code> did not, for the same reason the server
+refuses a <code>progress_timeout_seconds</code> on <code>agent/execute</code>: it could never
+fire). These map straight onto the request parameters described above.</p>
+<p>The client also changed how it reacts to a terminal operation state.
+Previously, if an agent operation reached <code>expired</code> or <code>error</code> while
+the client was polling for it to finish, the client kept polling until
+its own timeout and then raised <code>AgentCommandError</code>. It now recognises
+a terminal state immediately and raises <code>AgentOperationFailed</code> instead,
+without waiting out the rest of its timeout. Anything catching
+<code>AgentCommandError</code> to mean "the operation did not succeed" needs to
+catch <code>AgentOperationFailed</code> as well, or catch both.</p>
+<p>Both changes are gated on the server advertising the
+<code>agentoperation-deadlines</code> capability, so an old client against a new
+cluster and a new client against an old cluster both keep behaving as
+they did before this release.</p>
 
 
 
