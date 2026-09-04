@@ -13891,7 +13891,7 @@ previously-dead PIDs. Their rows are migrated into the fresh-pid
 spool so the drainer picks them up automatically. No operator
 action is needed.</p>
 <h2 id="read-path">Read path<a class="headerlink" href="#read-path" title="Permanent link">&para;</a></h2>
-<p>Five REST endpoints return events for each object type:</p>
+<p>Seven REST endpoints return events for each object type:</p>
 <table>
 <thead>
 <tr>
@@ -13920,8 +13920,22 @@ action is needed.</p>
 <td><code>GET /blobs/&lt;uuid&gt;/events</code></td>
 <td>Blob</td>
 </tr>
+<tr>
+<td><code>GET /auth/namespaces/&lt;namespace&gt;/events</code></td>
+<td>Namespace</td>
+</tr>
+<tr>
+<td><code>GET /auth/namespaces/&lt;namespace&gt;/claims/&lt;claim_ref&gt;/events</code></td>
+<td>Namespace claim</td>
+</tr>
 </tbody>
 </table>
+<p>The last two are admin-gated, unlike the first five: a namespace's
+event trail can name the instances, nodes and other namespaces its
+capacity accounting involved. See <a href="../scheduler/#namespace-capacity-claims">Namespace capacity
+claims</a> for what the claim
+exceedance event carries and why calibrating a claim means reading
+the namespace's events rather than the claim's own.</p>
 <p>All endpoints accept an optional <code>limit</code> query parameter
 (default 100). The server enforces a hard cap of 1000 rows
 per request; a <code>limit</code> of 0 or any negative value is treated

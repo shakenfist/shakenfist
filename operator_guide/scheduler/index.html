@@ -14396,16 +14396,32 @@ people:</p>
 placement crossed the line:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>placement admitted over namespace capacity claim
 </code></pre></div>
-<p>It is emitted at warning level and carries <code>node</code>, <code>namespace</code> and
-<code>claim_dimensions</code> -- one entry per dimension that is over, giving the
+<p>It is emitted at warning level and carries <code>node</code>, <code>namespace</code>, <code>claim</code>
+-- the uuid of the claim the placement was charged against -- and
+<code>claim_dimensions</code>, one entry per dimension that is over, giving the
 claim's limit, what the claim held before this placement, and this
 placement's own allocation. <code>sf-client instance events &lt;instance&gt;</code> is
 where to find it, and a search of the cluster's logs for that message is
-how to answer "is anything over its claim". It is deliberately distinct
+how to answer "is anything over its claim".</p>
+<p>The same facts are also recorded against the <strong>namespace</strong>, with the
+placement's instance uuid added, because a claim's own events die with
+the claim and growing a claim by delete-and-create is how many operators
+do it. <code>claim</code> is what says which claim a namespace-trail event was
+against once more than one has existed. It is deliberately distinct
 from <code>placement recorded despite exceeding capacity guard</code>, which is a
 different event about a different thing: that one says a ground-truth
 writer was forced past a <em>node's</em> guard, this one says a placement was
 charged to its <em>namespace's</em> claim and the claim is now over.</p>
+<p>Both trails are readable over REST, admin-gated like the claim verbs
+themselves since <code>sf-client</code> has no events verb for either yet:
+<code>GET /auth/namespaces/&lt;namespace&gt;/claims/&lt;claim_ref&gt;/events</code> for the
+claim's own events while it still exists, and
+<code>GET /auth/namespaces/&lt;namespace&gt;/events</code> for the namespace's. <strong>An
+operator calibrating a claim should read the namespace's events, not
+the claim's</strong> -- a claim's own events are removed by <code>hard_delete()</code>,
+so the exceedance history that made the case for growing a claim
+would vanish the moment an operator deletes and recreates it, which
+is exactly how many operators grow a claim today.</p>
 <p>Because a create that exceeds a claim looks exactly like a create in a
 namespace with no claim at all, the event is the only observable
 difference between advisory mode working and advisory mode being absent.
@@ -14714,6 +14730,19 @@ tells the whole story:</p>
   compared against the hard maximum; for RAM it includes the
   reservation subtracted, or the committed memory compared against
   the counters' limit.</li>
+<li><code>schedule could not read the capacity counters</code> appears only when
+  the read of <code>scheduler_node_capacity</code> itself failed, and says the
+  CPU and RAM pre-filters ran on the live measurements alone for this
+  decision. It covers both places the read can fail: this daemon's own
+  gRPC call, when the database service is unreachable or the bounded
+  gRPC budget expires, and the query <code>sf-database</code> runs against
+  MariaDB, which the reply reports back on its <code>degraded</code> field. It is
+  <em>not</em> emitted for an empty table: a cluster the reconciler has not
+  reached yet has no rows at all, which is normal and admits
+  unguarded. Admission is unchanged either way, so this marks a
+  decision made with less information rather than a decision made
+  differently. Seeing it repeatedly points at the database tier rather
+  than at the scheduler.</li>
 <li><code>schedule at stage affinity_constraints</code> is the hard constraint
   filter, with a <code>dropped</code> map naming which of <code>require_with_tag</code> or
   <code>require_without_tag</code> ejected each node. It is absent when no hard

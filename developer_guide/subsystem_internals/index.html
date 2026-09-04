@@ -13733,6 +13733,22 @@ estimator defect. The proto fields are <code>optional</code> so a reply from an
 older <code>sf-database</code> reads as "no breakdown available" rather than a
 breakdown of zeroes; the three allocation dimensions never carry the
 keys.</p>
+<p>Every dimension detail also carries <code>shortfall</code>
+(<code>_capacity_dimension()</code>, phase 7): <code>max(0.0, effective_used -
+limit)</code>, where <code>effective_used</code> is <code>used + requested</code> on a charged
+dimension and <code>used</code> alone on the uncharged demand dimension -- the
+same <code>effective_used</code> the <code>exceeded</code> flag above compares against
+<code>limit</code>, so the two fields never disagree about which dimensions are
+over. Floored rather than signed, because a negative shortfall is
+headroom the three reported numbers already let a reader derive, and
+a field meaning "shortfall" in one row and "spare" in another is
+worse than absent. It is reported, never tested against a guard
+decision. Its proto field is <code>optional</code> for the same reason the
+demand breakdown's are: zero is a value a shortfall cannot honestly
+take on a dimension flagged <code>exceeded</code>, so a reply from an older
+<code>sf-database</code> must read as "not reported" rather than as a refusal
+which was not actually over. Absence, not zero, is what a consumer
+checks.</p>
 <p>There used to be a second ledger here: <code>Scheduler._committed_vcpus()</code>,
 a Python walk over each candidate's <code>INSTANCE_LOCATION</code> rows added as
 a stopgap for the CPU stage (issue 3498). It was deleted by the same
@@ -13867,7 +13883,12 @@ bargain the branch probe strikes.</p>
   we hold the lock on, which the invariant permits — and returned in
   <code>claim_over_limit</code> / <code>claim_dimensions</code>, deliberately separate from
   <code>failing_stage</code> and <code>dimensions</code>, which both mean "this was refused".
-  <code>Instance._event_claim_over_limit()</code> turns them into the audit event.
+  <code>Instance._event_claim_over_limit()</code> turns them into the audit
+  events -- one on the instance and, since phase 7 (G2), the same
+  facts again on the namespace, because a claim's own events die
+  with the claim and the namespace is where the calibration history
+  needs to survive one. See <a href="../../operator_guide/scheduler/#namespace-capacity-claims">Namespace capacity
+  claims</a>.
   Read-back rather than the probe-then-force idiom beside it because
   probe-then-force would make every create in a claimed namespace pay a
   probe round trip, and the namespaces that want claims are the ones

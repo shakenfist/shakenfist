@@ -14140,9 +14140,9 @@ table entirely (decision D8).</p>
 <td>Complete</td>
 </tr>
 <tr>
-<td>7. Diagnostic-mode rejection logging</td>
-<td>PLAN-scheduler-reservations-phase-07-diagnostics.md</td>
-<td>Not started</td>
+<td>7. Capacity diagnostics</td>
+<td><a href="../PLAN-scheduler-reservations-phase-07-diagnostics/">PLAN-scheduler-reservations-phase-07-diagnostics.md</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>8. Documentation and operator guide</td>
@@ -14572,10 +14572,37 @@ Establish which mechanism is operating <strong>before</strong> spending
 phase 6's decision budget, now against the corrected
 premise. Phase 4a fixes the clause, so phase 6 can measure
 3565 on a cluster where the spreader actually spreads.</p>
-<p><strong>Phase 7 — diagnostics.</strong> Failure-path verbose diagnostic
-against the same snapshot, success-path drawdown events,
-ceiling-rejection events (D9). Confirm CI triage tooling
-reads the new events.</p>
+<p><strong>Phase 7 — capacity diagnostics.</strong> Failure-path verbose
+diagnostic against the same snapshot, success-path drawdown
+events, ceiling-rejection events (D9). Confirm CI triage
+tooling reads the new events.</p>
+<p><em>Corrected by the phase 7 survey (2026-09-03):</em> the paragraph
+above describes work which phases 3, 4, 4a and 6 had already
+done, each shipping the diagnostics for its own behaviour
+because a guard nobody can see the reasoning of is not
+reviewable. The failure-path diagnostic exists at more depth
+than D9 asked for (<code>scheduler.py:520-541</code> publishes a
+structured per-node <code>dropped</code> map for every stage;
+<code>instance.py:1253-1260</code> carries <code>failing_stage</code> and a
+per-dimension detail below the guard). The drawdown event
+exists (<code>instance.py:1284-1298</code>) though its release
+counterpart carries only a node name. The ceiling-rejection
+event exists (<code>instance.py:1145-1176</code>) though it lacks D9's
+<code>shortfall</code> and is recorded on the instance. And the CI
+triage tooling already reads the stage events -- built by
+<code>PLAN-ci-cloud-sizing</code> phase 1, not by this plan -- but stops
+above the guard, so a run in which every stage passed and the
+guard refused everything reads as clean.</p>
+<p>What the survey found actually missing is narrower and was
+not visible from this stub: neither namespaces nor claims
+have a REST events endpoint at all, so the claim accounting
+D9 calls "the signal a workflow's declared footprint needs
+revision" is written where nobody can read it -- including
+phase 4c, whose observation record gates phase 5. The phase
+is renamed accordingly; there is no diagnostic <em>mode</em> in the
+tree and the phase plan's G1 decides there should not be one.
+Detail in
+<a href="../PLAN-scheduler-reservations-phase-07-diagnostics/">PLAN-scheduler-reservations-phase-07-diagnostics.md</a>.</p>
 <p><strong>Phase 8 — documentation.</strong> Operator guide for claims and
 capacity (including the two service classes and the
 reconciler), developer-guide write-up of the guarded-UPDATE
