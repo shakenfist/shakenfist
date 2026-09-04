@@ -13771,8 +13771,8 @@ at the repo root).</p>
 <tr>
 <td>2026-05-10</td>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix/">Fuzz autofix workflow</a></td>
-<td>Workflow that triaged fuzzer-discovered crashes and proposed fixes; phase 1 proved the loop end to end (run 33297854229 opened PR #533), and phase 2's push audit then recommended retiring it -- 60 runs produced one pull request, the stager's safety boundary did not hold and could be rewritten by what it constrained, and the crash <em>reporting</em> half is kept while fixes go back to interactive sessions</td>
-<td>In progress</td>
+<td>Built a workflow that triaged fuzzer-discovered crashes and proposed fixes, then measured it and withdrew it: 60 runs produced one pull request, the stager's safety boundary did not hold and could be rewritten by what it constrained, and its orchestration could not be tested. The machinery is deleted; the crash <em>reporting</em> half is kept, and fixes go back to interactive sessions</td>
+<td>Complete</td>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">1: trailer and end-to-end proof</a>, <a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">2: push audit and retirement</a></td>
 </tr>
 <tr>

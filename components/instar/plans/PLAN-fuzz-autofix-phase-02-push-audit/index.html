@@ -14221,6 +14221,41 @@ which are carried to Future work.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="result">Result<a class="headerlink" href="#result" title="Permanent link">&para;</a></h2>
+<p>Steps 1 to 4 landed as <code>93eefb8</code> (#541). Steps 5 and 6, both gated on
+the operator, landed in the follow-up pull request that carries this
+section.</p>
+<p><strong>Step 5.</strong> The inventory before acting: <code>autofix-failed</code> was on 28
+issues -- one open (#492) and 27 closed -- and <code>autofix-complex</code> and
+<code>autofix-attempted</code> were on nothing at all, confirming the master
+plan's note that the complexity guardrails never fired. No pull
+request carried any of the three. All three labels were deleted from
+the repository, which strips them from every issue in one action;</p>
+<h1 id="492-now-carries-only-security-audit">492 now carries only <code>security-audit</code>.<a class="headerlink" href="#492-now-carries-only-security-audit" title="Permanent link">&para;</a></h1>
+<p><strong>Step 6.</strong> The operator's call on the status word was <code>Complete</code>:
+the plan ran to a definite, documented end, and the retirement is the
+conclusion the evidence supported rather than a decision to stop
+partway. What was abandoned is the machinery, not the plan. The
+master plan is rewritten as a record of something built, run,
+measured and withdrawn -- the <em>Detailed plan</em>, <em>CI workflow
+structure</em> and <em>Success criteria</em> sections, which were a
+reproduction-quality specification for deleted code, are condensed
+into a <em>What was built</em> summary that names <code>2fcf75e</code> and points at
+git history, and the <em>Diagnosis</em> section keeps its line numbers with
+an explicit note that they are as the file stood before #509 and
+resolve nowhere now.</p>
+<p>The four surviving findings from Decision 7 are in the master plan's
+Future work with the lines they occupy <strong>today</strong>, not the lines the
+audit recorded: the blank-line squash moved to
+<code>test-drift-fix.yml:521</code>, and the log-fetch conflation to
+<code>:167-183</code>, posting at <code>:247</code>. The concurrency finding is restated
+for the pair that actually remains -- <code>test-drift-fix.yml:69-71</code> and
+<code>pr-re-review.yml:93-95</code>, both on <code>[self-hosted, claude-code]</code> -- now
+that <code>fuzz-autofix.yml</code> is not one of the three. A fifth, the
+<code>$GITHUB_OUTPUT</code> delimiter habit, is carried alongside them.</p>
+<p>Issues #529 and #534 describe defects in deleted code and are still
+open. They are recorded under <em>Lapsed with the retirement</em> rather
+than closed, because closing them is a separate call.</p>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <p>Falsifiable, in order:</p>
 <ol>

@@ -14235,7 +14235,7 @@ the single version in the root <code>Cargo.toml</code> is the only place
 a release bump has to happen.</p>
 <p>Dependencies between workspace crates must declare <strong>both</strong> a
 path and a version:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">shakenfist-spice-renderer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"../shakenfist-spice-renderer"</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"0.1.7"</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">shakenfist-spice-renderer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"../shakenfist-spice-renderer"</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"X.Y.Z"</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <p>The path wins for local builds, so day-to-day development sees
 the working tree rather than a published crate. The version is
@@ -14370,6 +14370,12 @@ proxy for the msvc builds in the merge tier: it catches <code>cfg(windows)</code
 and windows-sys breakage, while msvc-specific and link-time breakage
 still surface only in the merge tier.</p>
 <h2 id="key-dependencies">Key dependencies<a class="headerlink" href="#key-dependencies" title="Permanent link">&para;</a></h2>
+<p>This is an inventory of what each dependency is <em>for</em>, not of which
+version is in use. Versions are deliberately absent: the manifests are
+the only place a version is true, a copy here goes stale at the next
+bump, and a stale copy reads as a claim that the older version is still
+supported. Run <code>cargo tree</code> or read the <code>Cargo.toml</code> that declares the
+dependency.</p>
 <ul>
 <li><strong>eframe/egui</strong> - Immediate mode GUI</li>
 <li><strong>tokio</strong> - Async runtime</li>
@@ -14386,15 +14392,21 @@ still surface only in the merge tier.</p>
 <li><strong>nusb</strong> - USB device access (pure Rust, no libusb)</li>
 <li><strong>dav-server</strong> - WebDAV server (RFC 4918, LocalFs backend)</li>
 <li><strong>hyper</strong> - HTTP/1.1 framing for WebDAV byte-stream transport</li>
-<li><strong>webrtc = "0.20.2"</strong> - DTLS/SRTP/ICE/SCTP/STUN stack for
+<li><strong>webrtc</strong> - DTLS/SRTP/ICE/SCTP/STUN stack for
   <code>shakenfist-spice-webrtc</code> (browser-bridge crate); an async
-  shim over the sans-io <code>rtc = "0.20.2"</code> core, which is a
-  direct dependency in its own right because webrtc's public
-  API takes <code>rtc</code> types it does not re-export. <code>if-addrs</code>
+  shim over the sans-io <code>rtc</code> core, which is a direct
+  dependency in its own right because webrtc's public API
+  takes <code>rtc</code> types it does not re-export. <code>if-addrs</code>
   enumerates host interfaces to pick UDP bind addresses, and
   <code>async-trait</code> is required to implement
-  <code>PeerConnectionEventHandler</code>.</li>
-<li><strong>opus = "0.3"</strong> - libopus bindings for the synthetic Opus
+  <code>PeerConnectionEventHandler</code>. The version floor on <code>webrtc</code>
+  and <code>rtc</code> is a correctness contract rather than a routine
+  pin — the control datachannel is negotiated out of band, and
+  only releases from the floor onwards honour that request.
+  The floor and the reason for it are recorded together in
+  <code>shakenfist-spice-webrtc/Cargo.toml</code>; do not lower it. See
+  <a href="/components/ryll/web-mode-internals/">web-mode-internals.md</a>.</li>
+<li><strong>opus</strong> - libopus bindings for the synthetic Opus
   pump in the webrtc crate; <code>audiopus_sys</code> builds libopus from
   source in the devcontainer</li>
 <li><strong>ctrlc</strong> - Cross-platform Ctrl+C handling for graceful shutdown</li>
