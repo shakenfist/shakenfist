@@ -864,7 +864,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 reserved_at=request.reservation.reserved_at,
                 comment=request.reservation.comment or None
             )
-            success = mariadb._direct_reserve_address(reservation)
+            success = mariadb._direct_reserve_address(
+                reservation, evict_halo=request.evict_halo)
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReserveAddress failed', e)
