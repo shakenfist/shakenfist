@@ -211,6 +211,127 @@ class SfInstanceDiskDirtinessTestCase(base.ShakenFistTestCase):
         self.assertTrue(dirty)
 
 
+class SfInstanceParameterDirtinessTestCase(base.ShakenFistTestCase):
+    """Every parameter compares against the key the API actually reports.
+
+    Issue 4061: the parameter was spelled secureboot and compared
+    against existing['secureboot'], but the API reports secure_boot, so
+    any explicit value -- including one matching the server exactly --
+    was perpetually dirty and the instance was replaced on every run.
+    The parameter has since been renamed to the API's name, leaving
+    cpu/cpus and ram/memory as the only surviving mappings; the
+    round-trip below covers the whole comparable family so a new
+    mismatch cannot regress quietly.
+    """
+
+    # Every documented parameter which participates in the dirtiness
+    # comparison, as (parameter name, API field name, value as passed,
+    # value as the API reports it, a different value). video and
+    # placement are deliberately absent: their API representations
+    # differ in shape from the parameter (a dict and a node attribute
+    # respectively), which is the same class of defect but not this
+    # fix -- see issue 4061's discussion.
+    ROUND_TRIP = [
+        ('ssh_key', 'ssh_key', 'ssh-rsa AAAA', 'ssh-rsa AAAA', 'ssh-rsa BBBB'),
+        ('user_data', 'user_data', 'dXNlcg==', 'dXNlcg==', 'b3RoZXI='),
+        ('nvram_template', 'nvram_template', 'tpl-one', 'tpl-one', 'tpl-two'),
+        ('configdrive', 'configdrive', 'openstack-disk', 'openstack-disk',
+         'none'),
+        ('side_channels', 'side_channels', ['sf-agent'], ['sf-agent'],
+         ['sf-agent2']),
+        ('uefi', 'uefi', True, True, False),
+        ('secure_boot', 'secure_boot', True, True, False),
+    ]
+
+    def _existing(self, **kwargs):
+        existing = {
+            'name': 'test',
+            'cpus': 1,
+            'memory': 1024,
+            'interfaces': [],
+            'disk_spec': []
+        }
+        existing.update(kwargs)
+        return existing
+
+    def _params(self, **kwargs):
+        params = {
+            'name': 'test',
+            'cpu': 1,
+            'ram': 1024
+        }
+        params.update(kwargs)
+        return params
+
+    def _check(self, existing, params):
+        log = []
+        dirty, _, instance_kwargs = sf_instance._check_instance(
+            mock.MagicMock(), existing, params, log)
+        return dirty, instance_kwargs, log
+
+    def test_matching_values_are_clean(self):
+        # The exact signature from issue 4061 is secure_boot=False against
+        # a server reporting secure_boot=False, but every parameter in the
+        # family has to round-trip: an instance which matches its request
+        # must never be replaced.
+        params = {}
+        existing_extras = {}
+        for param_name, existing_name, requested, reported, _ in \
+                self.ROUND_TRIP:
+            params[param_name] = requested
+            existing_extras[existing_name] = reported
+        dirty, _, log = self._check(
+            self._existing(**existing_extras), self._params(**params))
+        self.assertFalse(dirty, log)
+
+    def test_explicit_false_booleans_match_the_server_default(self):
+        # The value most callers write, and the one issue 4061 reported:
+        # the server defaults both booleans to False and reports them.
+        dirty, _, log = self._check(
+            self._existing(uefi=False, secure_boot=False),
+            self._params(uefi=False, secure_boot=False))
+        self.assertFalse(dirty, log)
+
+    def test_differing_values_are_dirty(self):
+        for param_name, existing_name, _, reported, different in \
+                self.ROUND_TRIP:
+            dirty, _, _ = self._check(
+                self._existing(**{existing_name: reported}),
+                self._params(**{param_name: different}))
+            self.assertTrue(dirty, '%s should be dirty' % param_name)
+
+    def test_unset_parameters_are_not_compared(self):
+        # An unset parameter means "no preference": the server value must
+        # not make the instance dirty.
+        existing_extras = {}
+        for _, existing_name, _, reported, _ in self.ROUND_TRIP:
+            existing_extras[existing_name] = reported
+        dirty, _, log = self._check(
+            self._existing(**existing_extras), self._params())
+        self.assertFalse(dirty, log)
+
+    def test_unset_parameters_are_not_passed(self):
+        # A clean check returns no kwargs at all, so force dirtiness with
+        # a cpu change: even then, unset optional parameters must not be
+        # passed to create_instance(), so the server applies its default.
+        dirty, instance_kwargs, _ = self._check(
+            self._existing(), self._params(cpu=2))
+        self.assertTrue(dirty)
+        for param_name, existing_name, _, _, _ in self.ROUND_TRIP:
+            self.assertNotIn(param_name, instance_kwargs)
+            self.assertNotIn(existing_name, instance_kwargs)
+
+    def test_booleans_are_passed_under_the_api_names(self):
+        # The create_instance() kwarg has always been secure_boot, whatever
+        # the parameter was called; renaming the parameter must not change
+        # what is passed, and the old spelling must not reappear.
+        _, instance_kwargs, _ = self._check(
+            self._existing(), self._params(uefi=True, secure_boot=True))
+        self.assertEqual(True, instance_kwargs.get('secure_boot'))
+        self.assertEqual(True, instance_kwargs.get('uefi'))
+        self.assertNotIn('secureboot', instance_kwargs)
+
+
 class _Succeeded(SystemExit):
     """The module called exit_json()."""
 
@@ -236,7 +357,7 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
         'networkspecs': None, 'ssh_key': None, 'user_data': None,
         'placement': None, 'video': None, 'nvram_template': None,
         'configdrive': None, 'side_channels': None, 'uefi': None,
-        'secureboot': None, 'metadata': None, 'state': 'present',
+        'secure_boot': None, 'metadata': None, 'state': 'present',
         'api_url': 'http://localhost:13000', 'namespace': 'ns',
         'key': 'notreallyakey',
     }

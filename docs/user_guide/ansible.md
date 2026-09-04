@@ -211,7 +211,7 @@ Delete a network:
 | configdrive<br/>*string* | The config drive style to use. |
 | side_channels<br/>*list of strings* | A list of side channel names to expose to the instance. |
 | uefi<br/>*boolean* | Whether to boot the instance with UEFI firmware. |
-| secureboot<br/>*boolean* | Whether to enable UEFI secure boot for the instance (implies UEFI). |
+| secure_boot<br/>*boolean* | Whether to enable UEFI secure boot for the instance (implies UEFI). |
 | metadata<br/>*dictionary* | Metadata key-value pairs to set on the instance. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
 | uuid<br/>*string* | The UUID for the instance. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
