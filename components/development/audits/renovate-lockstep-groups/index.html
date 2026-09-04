@@ -1433,6 +1433,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ci-review-automation/" class="md-nav__link">
         
   
@@ -2841,6 +2869,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -6862,6 +6918,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -13799,8 +13883,31 @@ are accepted, along with the deprecated <code>matchPackagePatterns</code>:</p>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="p">]</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">}</span>
 </code></pre></div>
-<p>A <code>!</code>-prefixed entry excludes, and is honoured: a rule matching
-<code>/oslo/</code> while excluding <code>oslo.config</code> does not cover the family.</p>
+<p>A <code>!</code>-prefixed entry excludes, and is honoured wherever it sits in the
+list, because Renovate drops a package matched by any negated entry
+regardless of order: a rule matching <code>/oslo/</code> while excluding
+<code>oslo.config</code> does not cover the family, written either way round.</p>
+<p>The deprecated spellings are read too -- <code>matchPackagePatterns</code>,
+<code>excludePackageNames</code>, <code>excludePackagePatterns</code>, the <code>Prefixes</code> and
+<code>Dep</code> variants of each, and the ancient <code>packageNames</code> and
+<code>packagePatterns</code> -- because Renovate reads them. It migrates a
+configuration into <code>matchPackageNames</code> and <code>matchDepNames</code> before it
+validates or applies it, so <code>excludePackageNames</code> is a <code>!</code> entry by
+the time any package is matched. This criterion migrates them the same
+way rather than growing a branch per spelling. A list holding only
+exclusions constrains nothing positively and covers every member bar
+the ones it names, which is again how Renovate reads it, and the two
+matchers are separate conditions a package must satisfy together, so a
+rule setting both covers the intersection.</p>
+<p>A rule with no package matcher at all covers nothing. Either it is
+narrowed only by a matcher this criterion does not read --
+<code>matchManagers</code>, <code>matchDatasources</code>, <code>matchFileNames</code> -- and whether
+it reaches these packages depends on a manager the audit does not
+model; or it carries no selector whatsoever, which Renovate rejects as
+a configuration error rather than applying to every package, so it
+groups nothing at all. No repository in the fleet groups a lockstep
+family either way; if one starts to, the failure says which family is
+ungrouped and the rule can be given an explicit <code>matchPackageNames</code>.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <p>Per-project compliance for this criterion is regenerated
 every morning by the consistency audit: see

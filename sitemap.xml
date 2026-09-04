@@ -269,6 +269,10 @@
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/scope-coverage/</loc>
+         <lastmod>2026-09-04</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/secret-handling/</loc>
          <lastmod>2026-09-04</lastmod>
     </url>
@@ -338,6 +342,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-review-coverage/</loc>
+         <lastmod>2026-09-04</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-scope-coverage/</loc>
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>
@@ -893,6 +901,10 @@
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/</loc>
+         <lastmod>2026-09-04</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-fuzz-autofix/</loc>
          <lastmod>2026-09-04</lastmod>
     </url>
@@ -1394,6 +1406,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/</loc>
+         <lastmod>2026-09-04</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/</loc>
          <lastmod>2026-09-04</lastmod>
     </url>
     <url>

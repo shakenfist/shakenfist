@@ -1429,6 +1429,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -2724,6 +2752,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -6835,6 +6891,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -13686,6 +13770,15 @@
 
 
 <h1 id="automated-fuzzer-bug-fix-workflow">Automated fuzzer bug fix workflow<a class="headerlink" href="#automated-fuzzer-bug-fix-workflow" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Retired.</strong> The workflow described below no longer exists. A
+push audit found its safety boundary unsound and untestable, and
+it was removed rather than repaired -- see
+<a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">phase 2</a> for the
+measurement and the reasoning. Everything past this line is
+written in the present tense about a workflow that has been
+deleted, and is kept as history until this plan is closed out.</p>
+</blockquote>
 <h2 id="status-in-progress">Status: In progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
 <p>The workflow is built, scheduled, and running daily. It had <strong>never
 produced a pull request</strong>, which was a bug in the workflow rather than
@@ -13815,12 +13908,12 @@ audit that ends every master plan.</p>
 <td>1. Derived trailers and an end-to-end proof</td>
 <td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/">PLAN-fuzz-autofix-phase-01-closeout.md</a></td>
 <td>Complete</td>
-<td><code>b6b67a8</code> (#520), <code>931b5a9</code> (#530)</td>
+<td><code>b6b67a8</code> (#520), <code>931b5a9</code> (#530), <code>7b4e860</code> (#535)</td>
 </tr>
 <tr>
-<td>2. Push audit</td>
-<td><code>PLAN-fuzz-autofix-phase-02-push-audit.md</code> (not yet written)</td>
-<td>Not started</td>
+<td>2. Push audit, and the retirement it recommended</td>
+<td><a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">PLAN-fuzz-autofix-phase-02-push-audit.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 </tbody>
@@ -13831,18 +13924,47 @@ the earlier phases' merge ranges, because <code>git diff develop...HEAD</code> i
 empty once they have landed. Phase 1 landed across three pull requests
 rather than one -- #520 built the helper and switched the automations
 to it, #530 gave the workflow its test data and corrected this plan's
-account of verification, and the close-out pull request that records
-the result adds its own merge commit to that cell when it lands.
-Phase 2's cell is empty because it has not started.</p>
-<h3 id="2-push-audit">2. Push audit<a class="headerlink" href="#2-push-audit" title="Permanent link">&para;</a></h3>
-<p>This phase runs <code>PUSH-AUDIT.md</code> over this plan's accumulated
-diff against <code>develop</code> — every phase's work together, not phase 1's
-diff alone, because the workflow, the stager and its tests were built
-across separate branches and what they did to each other is only
-visible in the sum. Findings land as their own pull request against
-<code>develop</code>, and this plan is not complete until each one is fixed or
-declined in writing here, with the reason. If the audit finds nothing,
-that gets recorded in one sentence and the plan closes.</p>
+account of verification, and #535 recorded the result of the
+end-to-end run. Phase 2's cell fills when its own pull request lands.</p>
+<p>The column only covers the two phases the table tracks. Most of this
+plan's work predates the table and was recorded in the sections above
+rather than as merge commits, so phase 2 had to reconstruct that part
+of the scope from the merge history; the reconstruction is a table in
+<a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">PLAN-fuzz-autofix-phase-02-push-audit.md</a>
+under <em>What the survey found</em>, and it is the authority on what the
+audit reads.</p>
+<h3 id="2-push-audit-and-the-retirement-it-recommended">2. Push audit, and the retirement it recommended<a class="headerlink" href="#2-push-audit-and-the-retirement-it-recommended" title="Permanent link">&para;</a></h3>
+<p>This phase ran <code>PUSH-AUDIT.md</code> over the plan's accumulated work --
+every phase together, because the workflow, the stager and its tests
+were built across separate branches and what they did to each other
+is only visible in the sum. There was no single range to audit, so the
+scope was reconstructed commit by commit; that reconstruction, and
+everything the audit found, is in
+<a href="/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/">PLAN-fuzz-autofix-phase-02-push-audit.md</a>.</p>
+<p><strong>The audit's verdict is that the workflow should be removed rather
+than repaired, and the phase removes it.</strong> The reasoning is set out in
+full in the phase plan under <em>The verdict</em>; in short, the loop ran 60
+times and produced one pull request, the safety boundary the stager
+exists to provide does not actually hold, the boundary can be
+rewritten by the process it constrains, the orchestration that needs
+the most trust is the part no test can reach, and the one fix the loop
+did produce drew its value from the human review it received rather
+than from the fix it generated. The fair counter-argument -- that the
+workflow has only been functional since #530 merged on 2026-08-30, so
+the sample is one -- is recorded there too.</p>
+<p>The fuzzers' <em>reporting</em> half stays. Crashes and divergences still
+become GitHub issues automatically through
+<code>tools/ci/report-fuzz-crash.sh</code>; they are now fixed by hand, which is
+how 29 of the 30 closed <code>security-audit</code> issues were fixed anyway.</p>
+<p>Planning the phase also found three bugs in the runbook's own wave 1
+inline-script check, all in <code>tools/audit/wave1.sh</code>: it printed <code>NR</code>
+where it meant <code>FNR</code>, so every line number it reported for any
+workflow but the alphabetically first was past that file's end; its
+<code>head -20</code> hid the hits for this plan's second workflow entirely; and
+it stopped counting a <code>run:</code> block at the block's first blank line,
+undercounting <code>fuzz-autofix.yml</code> at 4 blocks where there were 16. All
+three are fixed, because an audit cannot be run honestly through an
+instrument known to be lying.</p>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant

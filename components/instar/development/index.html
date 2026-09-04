@@ -1429,6 +1429,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -2724,6 +2752,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -6988,6 +7044,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -14702,7 +14786,6 @@ so issues are automatically closed when the PR merges.</p>
 <li><code>.github/workflows/test-drift-fix.yml</code> - Scheduled/on-demand test maintenance</li>
 <li><code>.github/workflows/differential-fuzz.yml</code> - On-demand differential fuzzing (instar vs qemu-img + libyal)</li>
 <li><code>.github/workflows/coverage-fuzz.yml</code> - Coverage-guided fuzzing of parser crates (nightly + PR)</li>
-<li><code>.github/workflows/fuzz-autofix.yml</code> - Automated fuzzer bug fix (daily Claude Code, 30-turn limit)</li>
 <li><code>.github/workflows/rust-nightly-bump.yml</code> - Weekly devcontainer Rust nightly pin bump (see "Toolchain pinning" above)</li>
 <li><code>.github/workflows/codeql-analysis.yml</code> - CodeQL static analysis (push/PR to develop, plus weekly cron)</li>
 <li><code>.github/workflows/supply-chain.yml</code> - gitleaks secret scanning on debian-13 (PR/push, plus weekly cron)</li>
@@ -14729,10 +14812,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <li><code>tools/ci/test-report-fuzz-crash.sh</code>, <code>tools/ci/test-pick-fuzz-artifact.sh</code> - Tests for those two; run them after any change (the <code>ci-tooling</code> CI job does)</li>
 <li><code>tools/ci/check-glibc-floor.sh</code> - Fails if the built <code>instar</code> binary needs a glibc above the published floor (<code>GLIBC_2.31</code>, Debian 11; see <code>docs/installation.md</code>). Runs immediately after <code>make instar</code> in both <code>build-and-test</code> and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and <code>src/.devcontainer/build/Dockerfile</code> must stay on <code>debian:bullseye</code></li>
 <li><code>tools/ci/test-check-glibc-floor.sh</code> - Tests for that check; the <code>ci-tooling</code> CI job runs it</li>
-<li><code>tools/ci/stage-autofix-changes.sh</code> - Stages the tracked edits a Claude Code autofix run left in the working tree, before the steps that judge whether a fix exists read the index, and refuses the attempt (exit 3) if it created a file that cannot be staged safely. Called from <code>fuzz-autofix.yml</code>; see "Automated bug fixes" in <code>docs/testing.md</code></li>
-<li><code>tools/ci/test-stage-autofix-changes.sh</code> - Tests for that stager; the <code>ci-tooling</code> CI job runs it</li>
-<li><code>tools/ci/autofix-artifact-patterns.sh</code> - Sourced, not executed: the editor leftovers and build output that are not part of a fix</li>
-<li><code>tools/ci/claude-result.sh</code> - Reads the JSONL stream a <code>claude -p --output-format stream-json --verbose</code> run leaves behind; <code>--text</code> reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), <code>--trailer</code> emits the <code>Assisted-By:</code>/<code>Co-Authored-By:</code> pair naming the model the run actually resolved to. Called from <code>fuzz-autofix.yml</code> and <code>test-drift-fix.yml</code>; see "Automated bug fixes" in <code>docs/testing.md</code></li>
+<li><code>tools/ci/claude-result.sh</code> - Reads the JSONL stream a <code>claude -p --output-format stream-json --verbose</code> run leaves behind; <code>--text</code> reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), <code>--trailer</code> emits the <code>Assisted-By:</code>/<code>Co-Authored-By:</code> pair naming the model the run actually resolved to. Called from <code>test-drift-fix.yml</code></li>
 <li><code>tools/ci/test-claude-result.sh</code> - Tests for that helper; the <code>ci-tooling</code> CI job runs it</li>
 </ul>
 

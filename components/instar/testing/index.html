@@ -1429,6 +1429,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -2724,6 +2752,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -4359,10 +4415,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#automated-bug-fixes" class="md-nav__link">
+  <a href="#fixing-fuzzer-findings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Automated bug fixes
+        Fixing fuzzer findings
       
     </span>
   </a>
@@ -7386,6 +7442,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -14687,10 +14771,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#automated-bug-fixes" class="md-nav__link">
+  <a href="#fixing-fuzzer-findings" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Automated bug fixes
+        Fixing fuzzer findings
       
     </span>
   </a>
@@ -16154,12 +16238,12 @@ of silently broken nightlies:</p>
   falls back to the tail.</li>
 <li><strong>The same crash is not refiled every night.</strong> Since the run no longer
   stops at the first crash, a recurring crash would otherwise file one
-  issue per target per night, and <code>fuzz-autofix.yml</code> only drains one
-  issue per day. An open <code>security-audit</code> issue whose title matches the
-  target <em>and</em> whose body carries the same <code>dedup_key</code> gets a comment
-  instead of a duplicate. A lookup that fails falls through to filing,
-  because a duplicate issue is a much smaller problem than an unreported
-  crash; <code>--no-dedup</code> forces that behaviour by hand.</li>
+  issue per target per night, and the <code>security-audit</code> queue is worked
+  through by hand. An open <code>security-audit</code> issue whose title matches
+  the target <em>and</em> whose body carries the same <code>dedup_key</code> gets a
+  comment instead of a duplicate. A lookup that fails falls through to
+  filing, because a duplicate issue is a much smaller problem than an
+  unreported crash; <code>--no-dedup</code> forces that behaviour by hand.</li>
 </ul>
 <p>The signature is the first <code>panicked at</code>/<code>SUMMARY:</code> line <em>and the line
 after it</em>: Rust prints the location and the message separately, and
@@ -16196,11 +16280,11 @@ artifact to check what an issue would say, without filing anything:</p>
 <p><code>tools/ci/test-report-fuzz-crash.sh</code> exercises the reporter against
 synthetic logs — the 370KB single line, raw mutated bytes, a missing
 log, a missing crash file, and the dedup decisions with a stubbed <code>gh</code>
-— and asserts the emitted body still satisfies the field predicate
-<code>fuzz-autofix.yml</code> validates against. Its fixture reproduces the
-<em>layout</em> of a real libFuzzer log, not just its content, because an
-earlier ten-line fixture let a tail-anchored excerpt look correct while
-on a real log it captured 28 stack frames and no panic.</p>
+— and asserts the emitted body still carries the fields a triager
+needs first. Its fixture reproduces the <em>layout</em> of a real libFuzzer
+log, not just its content, because an earlier ten-line fixture let a
+tail-anchored excerpt look correct while on a real log it captured 28
+stack frames and no panic.</p>
 <p>Both suites run on pull requests in the <code>ci-tooling</code> job, and need only
 bash and <code>jq</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>tools/ci/test-report-fuzz-crash.sh
@@ -16234,59 +16318,14 @@ writes a <code>slow-unit-</code> file for any input over 10s (its default
 <code>-report_slow_units</code>). Since these targets run against 4MB inputs, a
 slow unit can easily be sitting in the directory when a real timeout
 arrives, and the reported reproducer would then be the wrong file.</p>
-<h3 id="automated-bug-fixes">Automated bug fixes<a class="headerlink" href="#automated-bug-fixes" title="Permanent link">&para;</a></h3>
-<p>The CI workflow (<code>.github/workflows/fuzz-autofix.yml</code>) runs daily
-at 06:00 UTC and picks up open <code>security-audit</code> issues. It invokes
-Claude Code (30-turn limit) to diagnose and fix the crash, then
-verifies the fix by rebuilding and running core tests. Two attempts
-per issue; failed issues are labelled <code>autofix-failed</code> for human
-attention. Complexity guardrails prevent runaway fixes (max 3 files,
-no cross-crate changes, no new dependencies).</p>
-<p>CI stages Claude's work, not Claude: <code>tools/ci/stage-autofix-changes.sh</code>
-runs immediately after each attempt and stages every tracked
-modification. That matters because every gate downstream -- the
-complexity count, the rebuild decision, the "did anything change"
-check -- reads the index rather than the working tree. Between 2026-04
-and 2026-08 the staging ran only in the create-PR step, downstream of
-those gates, so 28 issues were attempted, every one reported "No
-changes staged by Claude" with the fix sitting unstaged in the working
-tree, and no PR was ever opened. If an autofix report shows an empty
-<code>=== Staged Changes ===</code> block, that now means Claude changed nothing
--- not that it forgot to stage.</p>
-<p>It stages tracked modifications and nothing else. A file the attempt
-<em>created</em> is refused, by name, and the run stops with the issue left
-labelled <code>autofix-failed</code> for a human: a new source file, a fixture
-<code>.gitignore</code> hides (git omits ignored paths from the untracked listing
-entirely, so these otherwise vanish without a trace -- <code>**/*.bin</code> is
-ignored and is exactly what a crash fixture gets called), or an edit
-under <code>.github/workflows/</code>, which cannot be pushed with the token CI
-holds. Staging those instead would mean classifying them, and a wrong
-guess ships a branch that does not compile behind a pull request
-saying "Build succeeded", because the verify build runs against the
-working tree where the file is present. A wrong refusal costs a look
-at an issue that was already going to get one. The script's header
-records an earlier revision that tried the classification and the
-sequence of defects it produced.</p>
-<p>The commit trailer names the model the CLI actually resolved to,
-rather than a hardcoded string: <code>tools/ci/claude-result.sh --trailer</code>
-derives it from the run's own JSON stream, reading the resolved model
-and its context window out of the final result line's <code>.modelUsage</code>.
-A run whose stream could not be read -- a killed process, a pre-flight
-CLI refusal -- falls back to an unqualified <code>Co-Authored-By: Claude</code>.
-The same derivation backs the trailers <code>test-drift-fix.yml</code> commits,
-so neither it nor <code>fuzz-autofix.yml</code> writes a model name down: when the
-CLI resolves to something new, the trailers follow it with no edit at
-all. The two had previously drifted to different stale names.</p>
-<p>Telling a file the attempt created from build output that was already
-there needs a before picture, and each attempt gets its own.
-<code>pre-run-ignored.txt</code> is taken after <code>Build instar</code> and before attempt
-1. <code>Prepare retry</code> then deletes the paths named in
-<code>stager-refused-1.txt</code> -- its <code>git clean -fd</code> has no <code>-x</code>, so an
-ignored file attempt 1 created would otherwise survive and refuse
-attempt 2 whatever attempt 2 did -- and snapshots again into
-<code>pre-retry-ignored.txt</code>, which attempt 2 is judged against. A single
-baseline would judge attempt 2 against a tree from before the verify
-build and the full test run, and refuse it for their output.</p>
+<h3 id="fixing-fuzzer-findings">Fixing fuzzer findings<a class="headerlink" href="#fixing-fuzzer-findings" title="Permanent link">&para;</a></h3>
+<p>Fuzzer crashes and differential divergences become <code>security-audit</code>
+GitHub issues automatically (<code>tools/ci/report-fuzz-crash.sh</code>, called
+from <code>coverage-fuzz.yml</code> and <code>differential-fuzz.yml</code>). They are fixed
+by hand in interactive sessions. A workflow once attempted the fix
+itself; it was retired after an audit found its safety boundary
+unsound. See <code>docs/plans/PLAN-fuzz-autofix.md</code> for the history
+and the reasoning.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/instar/format-coverage/">Format Coverage</a> - Comparison with oslo.utils format_inspector</li>

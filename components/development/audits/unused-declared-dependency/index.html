@@ -1433,6 +1433,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ci-review-automation/" class="md-nav__link">
         
   
@@ -2841,6 +2869,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -6862,6 +6918,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -13779,9 +13863,10 @@ September 2026.</p>
 <p>Plenty of dependencies are legitimately installed and never imported: a
 command-line tool invoked as a subprocess, a database driver selected
 by connection string, a gunicorn worker class named in a config file, a
-transitive package pinned directly to hold a version floor. The
-criterion cannot tell those from a dead line, so it asks for the reason
-to be written down where the dependency is declared:</p>
+transitive package pinned directly to hold a version floor, a plugin
+reached through <code>importlib.import_module()</code> rather than an <code>import</code>
+statement. The criterion cannot tell those from a dead line, so it asks
+for the reason to be written down where the dependency is declared:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="c1"># not-imported: uv -- invoked as a subprocess by the image fetcher</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="s2">"uv&gt;=0.8.0"</span><span class="p">,</span>
@@ -13796,6 +13881,12 @@ actually needs: whether the dependency can go is a question about how
 it is used, and by the time anyone asks, whoever knew has forgotten.</p>
 <p>The annotation sits beside <code># never-pin:</code>, which
 <code>tools/pin-indirect-dependencies.sh</code> reads from the same array.</p>
+<p>Both markers, and the line numbers a finding cites, need the array
+written one dependency per line. That is what the reconciler writes and
+what every repository in the fleet has, but a manifest with
+<code>dependencies = ["a", "b"]</code> on a single line still gets a correct
+verdict -- the names come from the TOML parse -- with the finding
+naming the canonical spelling and no line number.</p>
 <h2 id="how-a-dependency-is-matched-to-an-import">How a dependency is matched to an import<a class="headerlink" href="#how-a-dependency-is-matched-to-an-import" title="Permanent link">&para;</a></h2>
 <p>The audit runs against checkouts it does not install, and the module a
 wheel unpacks is recorded in the wheel rather than in its name. So the
@@ -13804,7 +13895,10 @@ turned into <code>_</code>, and the name with a <code>python</code> or <code>py<
 that <code>PyYAML</code> finds <code>yaml</code> and <code>python-magic</code> finds <code>magic</code>.
 <code>IMPORT_NAME_ALIASES</code> in <code>scripts/audit/checks/packaging.py</code> carries
 the rest -- <code>protobuf</code> to <code>google</code>, <code>grpcio</code> to <code>grpc</code>, <code>mysqlclient</code>
-to <code>MySQLdb</code>.</p>
+to <code>MySQLdb</code>. It also carries a handful of common names no repository
+declares yet, <code>Pillow</code> to <code>PIL</code> among them: an entry costs a line,
+while its absence costs the first repository to add one an issue
+asking it to justify a dependency nobody doubted.</p>
 <p>Deriving generously is deliberate. A spurious candidate can only make a
 dependency look used, and this criterion files an issue when one looks
 unused: a false pass costs a finding that the next sweep gets anyway,
@@ -13820,10 +13914,11 @@ plugin and a Rust proxy alongside the package itself.</p>
 <p>Comments and string literals are masked before imports are read. A
 commented-out import is the precise shape this criterion exists to
 find, so counting one as a use would report the deadest dependency in
-the tree as the one still in use. <code>build/</code>, <code>dist/</code>, <code>cover/</code>, <code>.tox/</code>,
-<code>.venv/</code> and <code>node_modules/</code> are not read: a copy of the source is what
-makes a deleted import look alive, and shakenfist's <code>.tox</code> holds 23,286
-Python files against the 502 it wrote.</p>
+the tree as the one still in use. <code>.git/</code>, <code>.tox/</code>, <code>.venv/</code>, <code>venv/</code>,
+<code>.eggs/</code>, <code>build/</code>, <code>dist/</code>, <code>cover/</code>, <code>node_modules/</code> and
+<code>__pycache__/</code> are not read: a copy of the source is what makes a
+deleted import look alive, and shakenfist's <code>.tox</code> holds 23,286 Python
+files against the 502 it wrote.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <p>Per-project compliance for this criterion is regenerated
 every morning by the consistency audit: see

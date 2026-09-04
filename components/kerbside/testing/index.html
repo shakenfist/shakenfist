@@ -1429,6 +1429,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -2724,6 +2752,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -7050,6 +7106,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -14222,6 +14306,11 @@ change.</p>
 <td>neither (advisory)</td>
 </tr>
 <tr>
+<td><code>mermaid-lint.yml</code></td>
+<td>pull_request, path-filtered to <code>**.md</code> excluding <code>REVIEWS.md</code>; workflow_dispatch</td>
+<td>neither (advisory)</td>
+</tr>
+<tr>
 <td><code>dev-proxy-wheel.yml</code></td>
 <td>push to develop, path-filtered to the proxy binary's inputs; workflow_dispatch (dry-run by default)</td>
 <td>neither</td>
@@ -14255,9 +14344,38 @@ tier; what never runs against the merged tree is <code>clippy</code> and
 <code>cargo test</code>, which is an accepted gap.</p>
 <p>The direct-qemu lane also runs nightly, because the merge queue
 does not re-run it against the merged tree.</p>
-<p><code>demo-compose.yml</code> is the only lane that needs a container
-runtime, and the runner image does not have one, so it installs
-Docker Engine itself via <code>tools/demo/install-docker.sh</code> — from
+<p><code>mermaid-lint.yml</code> renders every tracked markdown file that
+contains a mermaid fence and fails on any diagram that does not
+parse. It exists because mermaid fails at render time rather than
+at commit time: a syntax error commits cleanly, passes every other
+linter here, and then shows an error box on GitHub and nothing at
+all on the mkdocs sites. It lints the whole corpus rather than the
+changed files, because a mermaid version bump can break a diagram
+no diff touches. The script and the workflow are byte-identical
+copies of <code>templates/mermaid-lint/</code> in <code>shakenfist/development</code>,
+pinned mermaid-cli tag included; sync from there rather than
+editing either in place, so drift shows up as a diff. Rendering
+runs through puppeteer and needs a browser, hence a container,
+hence the only job here on <code>debian-12-docker</code> — a label that must
+also appear in <code>.github/actionlint.yaml</code> or actionlint fails on
+the workflow.</p>
+<p>It is advisory, and <strong>must not be made a required status check</strong>.
+It is path-filtered to markdown, and a path-filtered workflow that
+the ruleset requires never reports on a pull request that touches
+no markdown, blocking that pull request forever — the same trap
+the <code>check_paths</code> filter jobs exist to avoid, and the one
+<code>tools/check-required-checks.sh</code> catches after the fact. Adding
+<code>merge_group:</code> to its triggers is no better: <code>paths</code> is not
+supported on that event, so every merge would spin a virtual
+machine to re-lint diagrams the pull request already linted. If
+the lane ever needs to gate, the way to do it is to give a job
+the gate already covers a docker-capable runner and add
+<code>tools/mermaid-lint.sh</code> there as a step.</p>
+<p><code>demo-compose.yml</code> and <code>mermaid-lint.yml</code> are the two lanes that
+need a container runtime, and they get one in different ways.
+<code>demo-compose.yml</code> runs on <code>debian-12</code>, whose image does not have
+one, so it installs Docker Engine itself via
+<code>tools/demo/install-docker.sh</code> — from
 Docker's own apt repository, because Debian 12 ships neither a
 new enough engine nor a <code>docker compose</code> v2 plugin at all. The
 script is idempotent, so adding docker to the runner image would

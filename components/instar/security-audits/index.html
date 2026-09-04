@@ -1429,6 +1429,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -2724,6 +2752,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -7315,6 +7371,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -15572,8 +15656,9 @@ hand-crafted minimal valid inputs for each format.</p>
 <li>Corpus seeding: <code>scripts/extract-fuzz-corpus.py</code></li>
 <li>Corpus storage: <code>instar-testdata/custom/fuzz-corpus/</code></li>
 <li>Crash reporting: automatic GitHub Issue filing with <code>security-audit</code> label</li>
-<li>Automated fixes: <code>.github/workflows/fuzz-autofix.yml</code> (daily at 06:00 UTC,
-  Claude Code with 30-turn limit, two attempts per issue)</li>
+<li>Fixes: by hand, in interactive sessions. An earlier workflow attempted
+  this automatically; it was retired after an audit found its safety
+  boundary unsound (see <code>docs/plans/PLAN-fuzz-autofix.md</code>).</li>
 </ul>
 <h3 id="findings">Findings<a class="headerlink" href="#findings" title="Permanent link">&para;</a></h3>
 <p>The campaign runs nightly and its findings are tracked as GitHub

@@ -1429,6 +1429,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: audit scope against the organisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
@@ -2724,6 +2752,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation
   
 
     
@@ -4472,17 +4528,6 @@
     <span class="md-ellipsis">
       
         Step 13: scripts/differential-fuzz.py -- Differential fuzzing
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-14-githubworkflowsfuzz-autofixyml-automated-bug-fixes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 14: .github/workflows/fuzz-autofix.yml -- Automated bug fixes
       
     </span>
   </a>
@@ -7124,6 +7169,34 @@
     
   
     Consistency audit phase 4: review scope and session scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistency audit phase 5: diagram discipline and mermaid linting
   
 
     
@@ -14215,17 +14288,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#step-14-githubworkflowsfuzz-autofixyml-automated-bug-fixes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 14: .github/workflows/fuzz-autofix.yml -- Automated bug fixes
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -14722,27 +14784,6 @@ and compares instar output against <code>qemu-img</code> (and optionally libyal 
 This is complementary to coverage-guided fuzzing: differential fuzzing
 explores valid image space, while coverage fuzzing explores malformed input
 space.</p>
-<h3 id="step-14-githubworkflowsfuzz-autofixyml-automated-bug-fixes">Step 14: <code>.github/workflows/fuzz-autofix.yml</code> -- Automated bug fixes<a class="headerlink" href="#step-14-githubworkflowsfuzz-autofixyml-automated-bug-fixes" title="Permanent link">&para;</a></h3>
-<p><strong>What you will find:</strong> A CI workflow that closes the loop on fuzzer
-findings. It picks up open <code>security-audit</code> issues (filed by the coverage
-and differential fuzzers), invokes Claude Code to diagnose and fix the
-crash, verifies the fix by rebuilding and running tests, and creates a PR.</p>
-<p><strong>What to pay attention to:</strong></p>
-<ul>
-<li>
-<p>Two fix attempts per issue. The second attempt receives the diff and
-  failure output from the first as additional context.</p>
-</li>
-<li>
-<p>Complexity guardrails: 30-turn limit, max 3 source files changed, no
-  cross-crate changes, no new dependencies. Issues that exceed these
-  limits are labelled <code>autofix-complex</code> for human attention.</p>
-</li>
-<li>
-<p>The workflow uses <code>--body-file</code> for issue comments and PR bodies to
-  avoid YAML escaping issues with markdown in shell heredocs.</p>
-</li>
-</ul>
 <hr />
 <h2 id="summary-the-complete-data-flow">Summary: The Complete Data Flow<a class="headerlink" href="#summary-the-complete-data-flow" title="Permanent link">&para;</a></h2>
 <p>To trace a single <code>instar info image.qcow2</code> from start to finish:</p>
