@@ -448,6 +448,47 @@ which are carried to Future work.
 | `report-fuzz-crash.sh`'s structured body loses its reason for existing and is later "simplified" back to prose by someone who reads only the deleted-contract comments. | Step 3's brief requires the comments to state the format's *current* justification rather than merely deleting the stale one. |
 | Deleting labels or editing issues is outward-facing and irreversible in a way file edits are not. | Step 5 reports first and acts only on confirmation. |
 
+## Result
+
+Steps 1 to 4 landed as `93eefb8` (#541). Steps 5 and 6, both gated on
+the operator, landed in the follow-up pull request that carries this
+section.
+
+**Step 5.** The inventory before acting: `autofix-failed` was on 28
+issues -- one open (#492) and 27 closed -- and `autofix-complex` and
+`autofix-attempted` were on nothing at all, confirming the master
+plan's note that the complexity guardrails never fired. No pull
+request carried any of the three. All three labels were deleted from
+the repository, which strips them from every issue in one action;
+#492 now carries only `security-audit`.
+
+**Step 6.** The operator's call on the status word was `Complete`:
+the plan ran to a definite, documented end, and the retirement is the
+conclusion the evidence supported rather than a decision to stop
+partway. What was abandoned is the machinery, not the plan. The
+master plan is rewritten as a record of something built, run,
+measured and withdrawn -- the *Detailed plan*, *CI workflow
+structure* and *Success criteria* sections, which were a
+reproduction-quality specification for deleted code, are condensed
+into a *What was built* summary that names `2fcf75e` and points at
+git history, and the *Diagnosis* section keeps its line numbers with
+an explicit note that they are as the file stood before #509 and
+resolve nowhere now.
+
+The four surviving findings from Decision 7 are in the master plan's
+Future work with the lines they occupy **today**, not the lines the
+audit recorded: the blank-line squash moved to
+`test-drift-fix.yml:521`, and the log-fetch conflation to
+`:167-183`, posting at `:247`. The concurrency finding is restated
+for the pair that actually remains -- `test-drift-fix.yml:69-71` and
+`pr-re-review.yml:93-95`, both on `[self-hosted, claude-code]` -- now
+that `fuzz-autofix.yml` is not one of the three. A fifth, the
+`$GITHUB_OUTPUT` delimiter habit, is carried alongside them.
+
+Issues #529 and #534 describe defects in deleted code and are still
+open. They are recorded under *Lapsed with the retirement* rather
+than closed, because closing them is a separate call.
+
 ## Definition of done
 
 Falsifiable, in order:

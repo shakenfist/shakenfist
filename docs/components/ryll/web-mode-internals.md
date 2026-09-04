@@ -245,9 +245,10 @@ cursor overlay updates. `send_control(&[u8])` and `control_rx()`
 are the public API.
 
 The channel is negotiated **out of band**: both ends create their
-own end on a fixed SCTP stream id — `CONTROL_DC_STREAM_ID` (0) in
+own end on a fixed SCTP stream id — `CONTROL_DC_STREAM_ID` in
 `shakenfist-spice-webrtc/src/bridge.rs`, and the matching
-`negotiated: true, id: 0` in `ryll/src/web/assets/app.js`. Neither
+`negotiated: true` and `id:` in `ryll/src/web/assets/app.js`, which
+is the one place that value is true. Neither
 side announces the channel in band, so no DCEP open is sent, no
 `ondatachannel` fires, and both ends address the same stream by
 construction. The remote peer's messages surface on our *own*
@@ -266,7 +267,48 @@ the assignment, and anything relying on that collision broke.
 
 The `on_data_channel` path (pumped as `"remote-dc"`) is therefore
 dead in normal operation. What is left for it is a datachannel the
-peer opens in band, which ryll's own client never does.
+peer opens in band, which ryll's own client never does — and which
+would need a different stream id if it ever did. Parity does not
+constrain an externally negotiated id, but collision does:
+in-band allocation on the DTLS client's side starts at 0 and counts
+up in evens, and the bridge is the DTLS client here — the browser
+offers `a=setup:actpass` and webrtc-rs, answering, picks `active`,
+which `bridge_answers_as_dtls_client` asserts against the answer
+SDP. `CONTROL_DC_STREAM_ID` sits inside that range, so the next
+`create_data_channel` added to the bridge lands on top of the
+control channel. Anything that starts opening channels in band has
+to keep clear of `CONTROL_DC_STREAM_ID`, or that constant has to
+move, and `app.js`'s `id:` with it.
+
+`send_control` writes *binary* frames, so `app.js` sets
+`dc.binaryType = 'arraybuffer'` explicitly. The W3C default is
+`'blob'`, and a Blob fails the synchronous `TextDecoder` decode in
+`onmessage`, where the surrounding `catch` swallows it. Chromium has
+always defaulted to `'arraybuffer'` in defiance of the spec, so
+omitting the line works there and drops every server-to-browser
+control message in Firefox — mouse mode, cursor shape, cursor
+position, `no-video-codec` — with nothing in either log to say so.
+
+Because the pairing is one number agreed in two languages, no
+runtime check can catch a drift between them — the Rust tests use
+`CONTROL_DC_STREAM_ID` on both ends and would stay green. The
+`app_js_pins_control_channel_pairing` test in
+`ryll/src/web/server.rs` asserts that the served `app.js` still
+carries `negotiated: true`, `ordered: true`,
+`dc.binaryType = 'arraybuffer'`, and the id and label the constants
+name, so a JS-side edit that breaks the pairing fails there rather
+than in production.
+
+The other half — that the *stack* still honours the request — cannot
+be asserted directly, because `webrtc`'s `DataChannel` trait exposes
+only an internal handle and never gained the `stream_id()` accessor
+`rtc::RTCDataChannel` has. It is caught behaviourally instead:
+`loopback_video_audio_datachannel` fails on the ping/pong, because a
+stack that ignored `negotiated` would put the two ends on different
+streams. Since a bare round-trip timeout says nothing about why, the
+test also installs an `on_data_channel` hook — an in-band channel
+announces itself with a DCEP open, so the hook firing names the cause
+in the failure message, and is asserted never to fire.
 
 #### Message framing
 
@@ -484,7 +526,7 @@ relying on session-init being slower than the code that follows it.
 `ryll/src/web/cursor.rs` — subscribes to the renderer's
 broadcast `ChannelEvent` stream and watches for `CursorImage`
 and `CursorPos` events (the same events the egui frontend
-consumes). Cursor shapes are encoded as PNG (`base64 = "0.22"`
+consumes). Cursor shapes are encoded as PNG (with `base64`
 for the data-URL wrapper) and sent as JSON over the control
 datachannel. The browser shell decodes the data-URL, updates
 an `<img>` overlay element, and repositions it to follow cursor

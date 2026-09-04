@@ -134,7 +134,7 @@ Dependencies between workspace crates must declare **both** a
 path and a version:
 
 ```toml
-shakenfist-spice-renderer = { path = "../shakenfist-spice-renderer", version = "0.1.7" }
+shakenfist-spice-renderer = { path = "../shakenfist-spice-renderer", version = "X.Y.Z" }
 ```
 
 The path wins for local builds, so day-to-day development sees
@@ -292,6 +292,13 @@ still surface only in the merge tier.
 
 ## Key dependencies
 
+This is an inventory of what each dependency is *for*, not of which
+version is in use. Versions are deliberately absent: the manifests are
+the only place a version is true, a copy here goes stale at the next
+bump, and a stale copy reads as a claim that the older version is still
+supported. Run `cargo tree` or read the `Cargo.toml` that declares the
+dependency.
+
 - **eframe/egui** - Immediate mode GUI
 - **tokio** - Async runtime
 - **tokio-rustls** - TLS support
@@ -307,15 +314,21 @@ still surface only in the merge tier.
 - **nusb** - USB device access (pure Rust, no libusb)
 - **dav-server** - WebDAV server (RFC 4918, LocalFs backend)
 - **hyper** - HTTP/1.1 framing for WebDAV byte-stream transport
-- **webrtc = "0.20.2"** - DTLS/SRTP/ICE/SCTP/STUN stack for
+- **webrtc** - DTLS/SRTP/ICE/SCTP/STUN stack for
   `shakenfist-spice-webrtc` (browser-bridge crate); an async
-  shim over the sans-io `rtc = "0.20.2"` core, which is a
-  direct dependency in its own right because webrtc's public
-  API takes `rtc` types it does not re-export. `if-addrs`
+  shim over the sans-io `rtc` core, which is a direct
+  dependency in its own right because webrtc's public API
+  takes `rtc` types it does not re-export. `if-addrs`
   enumerates host interfaces to pick UDP bind addresses, and
   `async-trait` is required to implement
-  `PeerConnectionEventHandler`.
-- **opus = "0.3"** - libopus bindings for the synthetic Opus
+  `PeerConnectionEventHandler`. The version floor on `webrtc`
+  and `rtc` is a correctness contract rather than a routine
+  pin — the control datachannel is negotiated out of band, and
+  only releases from the floor onwards honour that request.
+  The floor and the reason for it are recorded together in
+  `shakenfist-spice-webrtc/Cargo.toml`; do not lower it. See
+  [web-mode-internals.md](/components/ryll/web-mode-internals/).
+- **opus** - libopus bindings for the synthetic Opus
   pump in the webrtc crate; `audiopus_sys` builds libopus from
   source in the devcontainer
 - **ctrlc** - Cross-platform Ctrl+C handling for graceful shutdown
