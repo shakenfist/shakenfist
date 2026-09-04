@@ -63,6 +63,17 @@ dependencies = [
     "semver==3.0.4",                      # bsd
     "SQLAlchemy==2.0.52",                 # mit
 
+    # Imported directly, rather than reached through whichever package
+    # happens to require them today, so what keeps them installed is a
+    # declaration and not a transitive pin the reconciler could drop.
+    # logship.py imports pylogrus (which arrives via
+    # shakenfist-utilities), tools/render-review.py imports jsonschema
+    # (via flasgger) and tools/build-collection.py imports packaging
+    # (via the oslo stack).
+    "jsonschema==4.26.0",                 # mit
+    "packaging==26.3",                    # apache2
+    "pylogrus==0.4.0",                    # mit
+
     "greenlet==3.5.5",                    # mit
     "gevent==26.8.0",                     # mit
     "gunicorn[gevent]==26.2.0",           # mit
@@ -131,7 +142,6 @@ dependencies = [
     "iso8601==2.1.0",
     "itsdangerous==2.2.0",
     "jsonschema-specifications==2025.9.1",
-    "jsonschema==4.26.0",
     "MarkupSafe==3.0.3",
     "mistune==3.3.4",
     "netaddr==1.3.0",
@@ -139,9 +149,7 @@ dependencies = [
     "oslo.config==10.7.0",
     "oslo.i18n==6.9.0",
     "oslo.utils==10.2.0",
-    "packaging==26.3",
     "pycparser==3.0",
-    "pylogrus==0.4.0",
     "pyparsing==3.3.2",
     "python-dotenv==1.2.3",
     "pytz==2026.3.post1",
