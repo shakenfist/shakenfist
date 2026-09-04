@@ -264,6 +264,21 @@ def _make_client(module):
             msg='Could not configure the Shaken Fist client: %s' % e, meta=None, log=[])
 
 
+def _fail_api_error(module, log, action, error):
+    """Fail through fail_json() so the accumulated log survives.
+
+    The log carries the dirtiness reasoning -- the only record of why the
+    module decided to replace an instance. An APIException allowed to
+    escape run_module() crashes the module and discards that log, which
+    is exactly when it is most needed: a create failure is usually the
+    consequence of a dirtiness decision the operator did not expect
+    (issue 4060).
+    """
+    msg = '%s: %s' % (action, error)
+    log.append(msg)
+    module.fail_json(msg=msg, meta=None, log=log)
+
+
 def _check_instance(client, existing, params, log):
     # Faithful port of client-python's commandline/ansible.py _check_instance.
     # Builds the create_instance() args and kwargs and determines whether the
@@ -578,12 +593,17 @@ def run_module():
             i = client.get_instance(identifier, namespace=namespace)
         except apiclient.ResourceNotFoundException:
             i = {}
+        except apiclient.APIException as e:
+            _fail_api_error(module, log, 'Fetching the existing instance failed', e)
 
         try:
             needs_replacement, instance_args, instance_kwargs = \
                 _check_instance(client, i, module.params, log)
         except InstanceCreationException as e:
             module.fail_json(msg=str(e), meta=None, log=log)
+        except apiclient.APIException as e:
+            _fail_api_error(
+                module, log, 'Comparing against the existing instance failed', e)
 
         if module.check_mode:
             module.exit_json(
@@ -599,7 +619,12 @@ def run_module():
         operation_started = time.monotonic()
         if needs_replacement:
             if i:
-                remaining = _delete_and_wait(client, log, identifier, namespace)
+                try:
+                    remaining = _delete_and_wait(
+                        client, log, identifier, namespace)
+                except apiclient.APIException as e:
+                    _fail_api_error(
+                        module, log, 'Instance deletion for update failed', e)
                 if remaining and remaining.get('state') != 'deleted':
                     log.append('Repeated attempts at deletion failed')
                     module.fail_json(
@@ -647,7 +672,10 @@ def run_module():
                            'the create will wait and what it spends is '
                            'deducted from the await budget instead')
 
-            i = client.create_instance(*instance_args, **instance_kwargs)
+            try:
+                i = client.create_instance(*instance_args, **instance_kwargs)
+            except apiclient.APIException as e:
+                _fail_api_error(module, log, 'Instance creation failed', e)
 
         if not module.params.get('await'):
             log.append('Not awaiting instance')
@@ -680,8 +708,11 @@ def run_module():
                 log.append(msg)
                 module.fail_json(msg=msg, meta=None, log=log)
 
-        module.exit_json(
-            changed=needs_replacement, meta=client.get_instance(i['uuid']), log=log)
+        try:
+            meta = client.get_instance(i['uuid'])
+        except apiclient.APIException as e:
+            _fail_api_error(module, log, 'Fetching the created instance failed', e)
+        module.exit_json(changed=needs_replacement, meta=meta, log=log)
 
     # state == 'absent'
     try:
@@ -689,11 +720,16 @@ def run_module():
     except apiclient.ResourceNotFoundException:
         log.append('Instance not found')
         module.exit_json(changed=False, meta=None, log=log)
+    except apiclient.APIException as e:
+        _fail_api_error(module, log, 'Fetching the existing instance failed', e)
 
     if module.check_mode:
         module.exit_json(changed=True, meta=None, log=log)
 
-    remaining = _delete_and_wait(client, log, identifier, namespace)
+    try:
+        remaining = _delete_and_wait(client, log, identifier, namespace)
+    except apiclient.APIException as e:
+        _fail_api_error(module, log, 'Instance deletion failed', e)
     if remaining is None:
         log.append('Deleted')
         module.exit_json(changed=True, meta=None, log=log)
