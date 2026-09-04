@@ -1,5 +1,13 @@
 # Automated fuzzer bug fix workflow
 
+> **Retired.** The workflow described below no longer exists. A
+> push audit found its safety boundary unsound and untestable, and
+> it was removed rather than repaired -- see
+> [phase 2](/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/) for the
+> measurement and the reasoning. Everything past this line is
+> written in the present tense about a workflow that has been
+> deleted, and is kept as history until this plan is closed out.
+
 ## Status: In progress
 
 The workflow is built, scheduled, and running daily. It had **never
@@ -132,8 +140,8 @@ audit that ends every master plan.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | Complete | `b6b67a8` (#520), `931b5a9` (#530) |
-| 2. Push audit | `PLAN-fuzz-autofix-phase-02-push-audit.md` (not yet written) | Not started | |
+| 1. Derived trailers and an end-to-end proof | [PLAN-fuzz-autofix-phase-01-closeout.md](/components/instar/plans/PLAN-fuzz-autofix-phase-01-closeout/) | Complete | `b6b67a8` (#520), `931b5a9` (#530), `7b4e860` (#535) |
+| 2. Push audit, and the retirement it recommended | [PLAN-fuzz-autofix-phase-02-push-audit.md](/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/) | In progress | |
 
 The `Merged` column is the one `PLAN-TEMPLATE.md` requires of a plan
 carrying a push audit phase: phase 2 runs the audit over the union of
@@ -141,20 +149,53 @@ the earlier phases' merge ranges, because `git diff develop...HEAD` is
 empty once they have landed. Phase 1 landed across three pull requests
 rather than one -- #520 built the helper and switched the automations
 to it, #530 gave the workflow its test data and corrected this plan's
-account of verification, and the close-out pull request that records
-the result adds its own merge commit to that cell when it lands.
-Phase 2's cell is empty because it has not started.
+account of verification, and #535 recorded the result of the
+end-to-end run. Phase 2's cell fills when its own pull request lands.
 
-### 2. Push audit
+The column only covers the two phases the table tracks. Most of this
+plan's work predates the table and was recorded in the sections above
+rather than as merge commits, so phase 2 had to reconstruct that part
+of the scope from the merge history; the reconstruction is a table in
+[PLAN-fuzz-autofix-phase-02-push-audit.md](/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/)
+under *What the survey found*, and it is the authority on what the
+audit reads.
 
-This phase runs `PUSH-AUDIT.md` over this plan's accumulated
-diff against `develop` — every phase's work together, not phase 1's
-diff alone, because the workflow, the stager and its tests were built
-across separate branches and what they did to each other is only
-visible in the sum. Findings land as their own pull request against
-`develop`, and this plan is not complete until each one is fixed or
-declined in writing here, with the reason. If the audit finds nothing,
-that gets recorded in one sentence and the plan closes.
+### 2. Push audit, and the retirement it recommended
+
+This phase ran `PUSH-AUDIT.md` over the plan's accumulated work --
+every phase together, because the workflow, the stager and its tests
+were built across separate branches and what they did to each other
+is only visible in the sum. There was no single range to audit, so the
+scope was reconstructed commit by commit; that reconstruction, and
+everything the audit found, is in
+[PLAN-fuzz-autofix-phase-02-push-audit.md](/components/instar/plans/PLAN-fuzz-autofix-phase-02-push-audit/).
+
+**The audit's verdict is that the workflow should be removed rather
+than repaired, and the phase removes it.** The reasoning is set out in
+full in the phase plan under *The verdict*; in short, the loop ran 60
+times and produced one pull request, the safety boundary the stager
+exists to provide does not actually hold, the boundary can be
+rewritten by the process it constrains, the orchestration that needs
+the most trust is the part no test can reach, and the one fix the loop
+did produce drew its value from the human review it received rather
+than from the fix it generated. The fair counter-argument -- that the
+workflow has only been functional since #530 merged on 2026-08-30, so
+the sample is one -- is recorded there too.
+
+The fuzzers' *reporting* half stays. Crashes and divergences still
+become GitHub issues automatically through
+`tools/ci/report-fuzz-crash.sh`; they are now fixed by hand, which is
+how 29 of the 30 closed `security-audit` issues were fixed anyway.
+
+Planning the phase also found three bugs in the runbook's own wave 1
+inline-script check, all in `tools/audit/wave1.sh`: it printed `NR`
+where it meant `FNR`, so every line number it reported for any
+workflow but the alphabetically first was past that file's end; its
+`head -20` hid the hits for this plan's second workflow entirely; and
+it stopped counting a `run:` block at the block's first blank line,
+undercounting `fuzz-autofix.yml` at 4 blocks where there were 16. All
+three are fixed, because an audit cannot be run honestly through an
+instrument known to be lying.
 
 ## Prompt
 

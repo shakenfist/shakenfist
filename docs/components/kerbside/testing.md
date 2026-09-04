@@ -76,6 +76,7 @@ change.
 | `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `rust.yml` | push and pull_request, path-filtered to `rust/**` and the proto | neither (advisory) |
 | `demo-compose.yml` | push and pull_request, path-filtered to `demo/**`, `tools/demo/**`, the migrations, `pyproject.toml` and `docs/installation.md` | neither (advisory) |
+| `mermaid-lint.yml` | pull_request, path-filtered to `**.md` excluding `REVIEWS.md`; workflow_dispatch | neither (advisory) |
 | `dev-proxy-wheel.yml` | push to develop, path-filtered to the proxy binary's inputs; workflow_dispatch (dry-run by default) | neither |
 | `codeql-analysis.yml` | push, pull_request, weekly | neither |
 | `prune-reviews.yml` | push to develop | neither |
@@ -91,9 +92,40 @@ tier; what never runs against the merged tree is `clippy` and
 The direct-qemu lane also runs nightly, because the merge queue
 does not re-run it against the merged tree.
 
-`demo-compose.yml` is the only lane that needs a container
-runtime, and the runner image does not have one, so it installs
-Docker Engine itself via `tools/demo/install-docker.sh` — from
+`mermaid-lint.yml` renders every tracked markdown file that
+contains a mermaid fence and fails on any diagram that does not
+parse. It exists because mermaid fails at render time rather than
+at commit time: a syntax error commits cleanly, passes every other
+linter here, and then shows an error box on GitHub and nothing at
+all on the mkdocs sites. It lints the whole corpus rather than the
+changed files, because a mermaid version bump can break a diagram
+no diff touches. The script and the workflow are byte-identical
+copies of `templates/mermaid-lint/` in `shakenfist/development`,
+pinned mermaid-cli tag included; sync from there rather than
+editing either in place, so drift shows up as a diff. Rendering
+runs through puppeteer and needs a browser, hence a container,
+hence the only job here on `debian-12-docker` — a label that must
+also appear in `.github/actionlint.yaml` or actionlint fails on
+the workflow.
+
+It is advisory, and **must not be made a required status check**.
+It is path-filtered to markdown, and a path-filtered workflow that
+the ruleset requires never reports on a pull request that touches
+no markdown, blocking that pull request forever — the same trap
+the `check_paths` filter jobs exist to avoid, and the one
+`tools/check-required-checks.sh` catches after the fact. Adding
+`merge_group:` to its triggers is no better: `paths` is not
+supported on that event, so every merge would spin a virtual
+machine to re-lint diagrams the pull request already linted. If
+the lane ever needs to gate, the way to do it is to give a job
+the gate already covers a docker-capable runner and add
+`tools/mermaid-lint.sh` there as a step.
+
+`demo-compose.yml` and `mermaid-lint.yml` are the two lanes that
+need a container runtime, and they get one in different ways.
+`demo-compose.yml` runs on `debian-12`, whose image does not have
+one, so it installs Docker Engine itself via
+`tools/demo/install-docker.sh` — from
 Docker's own apt repository, because Debian 12 ships neither a
 new enough engine nor a `docker compose` v2 plugin at all. The
 script is idempotent, so adding docker to the runner image would

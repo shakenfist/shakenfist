@@ -104,6 +104,7 @@ nav:
             - "Release Automation": components/development/release-automation.md
             - Audits:
                 - "Audit: AGENTS.md / ARCHITECTURE.md structure": components/development/audits/llm-doc-structure.md
+                - "Audit: audit scope against the organisation": components/development/audits/scope-coverage.md
                 - "Audit: CI review automation and developer automation": components/development/audits/ci-review-automation.md
                 - "Audit: Console script logging setup": components/development/audits/console-logging.md
                 - "Audit: Credential handling and leak detection": components/development/audits/secret-handling.md
@@ -150,6 +151,7 @@ nav:
             - Plans:
                 - "Plans index": components/development/plans/index.md
                 - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
+                - "Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation": components/development/plans/PLAN-scope-coverage.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
                 - "Plan: restructure the audit scripts into a package of check classes": components/development/plans/PLAN-audit-scripts-restructure.md
@@ -283,6 +285,7 @@ nav:
                 - "Consistency audit phase 2: retire the comment addresser": components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser.md
                 - "Consistency audit phase 3: skillsaw CI detection, upstream": components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection.md
                 - "Consistency audit phase 4: review scope and session scaffolding": components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage.md
+                - "Consistency audit phase 5: diagram discipline and mermaid linting": components/kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline.md
                 - "Convert the kerbside admin UI to sfui": components/kerbside/plans/PLAN-sfui-conversion.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md

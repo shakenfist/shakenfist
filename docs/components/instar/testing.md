@@ -1199,12 +1199,12 @@ of silently broken nightlies:
   falls back to the tail.
 - **The same crash is not refiled every night.** Since the run no longer
   stops at the first crash, a recurring crash would otherwise file one
-  issue per target per night, and `fuzz-autofix.yml` only drains one
-  issue per day. An open `security-audit` issue whose title matches the
-  target *and* whose body carries the same `dedup_key` gets a comment
-  instead of a duplicate. A lookup that fails falls through to filing,
-  because a duplicate issue is a much smaller problem than an unreported
-  crash; `--no-dedup` forces that behaviour by hand.
+  issue per target per night, and the `security-audit` queue is worked
+  through by hand. An open `security-audit` issue whose title matches
+  the target *and* whose body carries the same `dedup_key` gets a
+  comment instead of a duplicate. A lookup that fails falls through to
+  filing, because a duplicate issue is a much smaller problem than an
+  unreported crash; `--no-dedup` forces that behaviour by hand.
 
 The signature is the first `panicked at`/`SUMMARY:` line *and the line
 after it*: Rust prints the location and the message separately, and
@@ -1247,11 +1247,11 @@ tools/ci/report-fuzz-crash.sh fuzz_rebase_planners \
 `tools/ci/test-report-fuzz-crash.sh` exercises the reporter against
 synthetic logs — the 370KB single line, raw mutated bytes, a missing
 log, a missing crash file, and the dedup decisions with a stubbed `gh`
-— and asserts the emitted body still satisfies the field predicate
-`fuzz-autofix.yml` validates against. Its fixture reproduces the
-*layout* of a real libFuzzer log, not just its content, because an
-earlier ten-line fixture let a tail-anchored excerpt look correct while
-on a real log it captured 28 stack frames and no panic.
+— and asserts the emitted body still carries the fields a triager
+needs first. Its fixture reproduces the *layout* of a real libFuzzer
+log, not just its content, because an earlier ten-line fixture let a
+tail-anchored excerpt look correct while on a real log it captured 28
+stack frames and no panic.
 
 Both suites run on pull requests in the `ci-tooling` job, and need only
 bash and `jq`:
@@ -1294,64 +1294,15 @@ writes a `slow-unit-` file for any input over 10s (its default
 slow unit can easily be sitting in the directory when a real timeout
 arrives, and the reported reproducer would then be the wrong file.
 
-### Automated bug fixes
+### Fixing fuzzer findings
 
-The CI workflow (`.github/workflows/fuzz-autofix.yml`) runs daily
-at 06:00 UTC and picks up open `security-audit` issues. It invokes
-Claude Code (30-turn limit) to diagnose and fix the crash, then
-verifies the fix by rebuilding and running core tests. Two attempts
-per issue; failed issues are labelled `autofix-failed` for human
-attention. Complexity guardrails prevent runaway fixes (max 3 files,
-no cross-crate changes, no new dependencies).
-
-CI stages Claude's work, not Claude: `tools/ci/stage-autofix-changes.sh`
-runs immediately after each attempt and stages every tracked
-modification. That matters because every gate downstream -- the
-complexity count, the rebuild decision, the "did anything change"
-check -- reads the index rather than the working tree. Between 2026-04
-and 2026-08 the staging ran only in the create-PR step, downstream of
-those gates, so 28 issues were attempted, every one reported "No
-changes staged by Claude" with the fix sitting unstaged in the working
-tree, and no PR was ever opened. If an autofix report shows an empty
-`=== Staged Changes ===` block, that now means Claude changed nothing
--- not that it forgot to stage.
-
-It stages tracked modifications and nothing else. A file the attempt
-*created* is refused, by name, and the run stops with the issue left
-labelled `autofix-failed` for a human: a new source file, a fixture
-`.gitignore` hides (git omits ignored paths from the untracked listing
-entirely, so these otherwise vanish without a trace -- `**/*.bin` is
-ignored and is exactly what a crash fixture gets called), or an edit
-under `.github/workflows/`, which cannot be pushed with the token CI
-holds. Staging those instead would mean classifying them, and a wrong
-guess ships a branch that does not compile behind a pull request
-saying "Build succeeded", because the verify build runs against the
-working tree where the file is present. A wrong refusal costs a look
-at an issue that was already going to get one. The script's header
-records an earlier revision that tried the classification and the
-sequence of defects it produced.
-
-The commit trailer names the model the CLI actually resolved to,
-rather than a hardcoded string: `tools/ci/claude-result.sh --trailer`
-derives it from the run's own JSON stream, reading the resolved model
-and its context window out of the final result line's `.modelUsage`.
-A run whose stream could not be read -- a killed process, a pre-flight
-CLI refusal -- falls back to an unqualified `Co-Authored-By: Claude`.
-The same derivation backs the trailers `test-drift-fix.yml` commits,
-so neither it nor `fuzz-autofix.yml` writes a model name down: when the
-CLI resolves to something new, the trailers follow it with no edit at
-all. The two had previously drifted to different stale names.
-
-Telling a file the attempt created from build output that was already
-there needs a before picture, and each attempt gets its own.
-`pre-run-ignored.txt` is taken after `Build instar` and before attempt
-1. `Prepare retry` then deletes the paths named in
-`stager-refused-1.txt` -- its `git clean -fd` has no `-x`, so an
-ignored file attempt 1 created would otherwise survive and refuse
-attempt 2 whatever attempt 2 did -- and snapshots again into
-`pre-retry-ignored.txt`, which attempt 2 is judged against. A single
-baseline would judge attempt 2 against a tree from before the verify
-build and the full test run, and refuse it for their output.
+Fuzzer crashes and differential divergences become `security-audit`
+GitHub issues automatically (`tools/ci/report-fuzz-crash.sh`, called
+from `coverage-fuzz.yml` and `differential-fuzz.yml`). They are fixed
+by hand in interactive sessions. A workflow once attempted the fix
+itself; it was retired after an audit found its safety boundary
+unsound. See `docs/plans/PLAN-fuzz-autofix.md` for the history
+and the reasoning.
 
 ## Related Documentation
 

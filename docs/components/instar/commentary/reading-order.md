@@ -461,25 +461,6 @@ This is complementary to coverage-guided fuzzing: differential fuzzing
 explores valid image space, while coverage fuzzing explores malformed input
 space.
 
-### Step 14: `.github/workflows/fuzz-autofix.yml` -- Automated bug fixes
-
-**What you will find:** A CI workflow that closes the loop on fuzzer
-findings. It picks up open `security-audit` issues (filed by the coverage
-and differential fuzzers), invokes Claude Code to diagnose and fix the
-crash, verifies the fix by rebuilding and running tests, and creates a PR.
-
-**What to pay attention to:**
-
-- Two fix attempts per issue. The second attempt receives the diff and
-  failure output from the first as additional context.
-
-- Complexity guardrails: 30-turn limit, max 3 source files changed, no
-  cross-crate changes, no new dependencies. Issues that exceed these
-  limits are labelled `autofix-complex` for human attention.
-
-- The workflow uses `--body-file` for issue comments and PR bodies to
-  avoid YAML escaping issues with markdown in shell heredocs.
-
 ---
 
 ## Summary: The Complete Data Flow
