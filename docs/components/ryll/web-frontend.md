@@ -393,6 +393,26 @@ which the web frontend does not implement yet; installing
 getting you client mode. Moving your pointer back to the middle of
 the window and continuing is the workaround.
 
+### Firefox: no cursor, and mouse mode never changes (fixed)
+
+On releases before this fix, Firefox showed the guest video and
+accepted input, but no cursor overlay ever appeared, the mouse mode
+never switched to client (absolute), and the "no H.264 codec" panel
+never rendered. Chrome and Chromium were unaffected.
+
+Every one of those is a message the server pushes down the control
+datachannel, and `app.js` was reading them without setting
+`binaryType` on the channel. The W3C default is `'blob'`, which
+fails the decode in the message handler; Chromium defaults to
+`'arraybuffer'` in defiance of the spec, which is why only Firefox
+saw it. Nothing appeared in either the browser console or ryll's
+log — the failure was swallowed silently.
+
+The fix is in the served `app.js`, so an already-open tab keeps the
+broken copy until it is hard-reloaded (Ctrl-Shift-R). Input from
+browser to server always worked, so the session looks alive
+throughout.
+
 ### No audio, video works
 
 **Likely causes:**
