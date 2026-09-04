@@ -26,25 +26,30 @@ TRACE_PATH = '/srv/ci/traces'
 CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 
 
-# An agent operation which ends in a terminal state other than "complete"
-# reaches the caller as one of these. Historically the client had no way to
-# say "this operation definitively failed": every await loop spun out its
-# whole budget and then raised AgentCommandError, so that is what the suite
-# caught and asserted. client-python#380 (agent operation deadlines phase 6)
-# teaches those loops to recognise a terminal state on the first poll and
-# raise the new, more precise AgentOperationFailed instead.
+# await_agent_command() and await_agent_fetch() can raise three unrelated
+# exceptions, sharing no base class beyond Exception, so this tuple has to
+# enumerate them:
 #
-# Both client versions are in circulation while that lands: this repository's
-# CI builds the client from client-python's develop, and client-python's CI
-# builds the server from this repository's develop, so neither side can
-# switch first. Accepting either exception is what breaks that deadlock. The
-# getattr() is what makes an old client work -- AgentOperationFailed simply
-# does not exist there -- and can be narrowed to a plain reference once the
-# client change has merged. Phase 7 owns that cleanup, along with the rest of
-# this suite's await work.
+# - AgentOperationFailed -- the operation reached a terminal failure state.
+#   Raised from _await_agentop() in the client.
+# - AgentAwaitTimeout -- the operation never completed within the caller's
+#   own budget.
+# - AgentCommandError -- the operation completed but the result is unusable:
+#   no results, unexpected stderr, or no stdout/content blob.
+#
+# This tuple exists for catching, not asserting. Its two consumers, the
+# cloud-init retry loop and its debug-gathering loop in
+# _await_instance_ready() below, both mean "this attempt gave us no usable
+# answer, retry" -- so it is deliberately not narrowed to AgentOperationFailed
+# alone, even though client-python#380 has now merged and the getattr() shim
+# that used to accommodate an older client (which lacked AgentOperationFailed
+# entirely) is gone. Narrowing it would let a health check whose command
+# writes to stderr escape the retry on its first attempt. Assertion sites
+# want the opposite and use AgentOperationFailed directly.
 AGENT_OPERATION_FAILURES = (
     apiclient.AgentCommandError,
-    getattr(apiclient, 'AgentOperationFailed', apiclient.AgentCommandError))
+    apiclient.AgentOperationFailed,
+    apiclient.AgentAwaitTimeout)
 
 
 # Some functional assertions need to observe real host state (network
@@ -532,6 +537,104 @@ class BaseTestCase(testtools.TestCase):
             time.sleep(5)
         self.fail(f'Failed to delete instance after 5 minutes {instance_uuid}')
 
+    # The event types which mean an object actually moved forward, used to
+    # renew the progress windows in the awaits below.
+    #
+    # Issue 3770: those windows used to be renewed from the most recent event
+    # of *any* type, which makes them not a bound at all. node_inst_op
+    # (shakenfist/operations/node_inst_op.py) writes an EVENT_TYPE_USAGE event
+    # against every instance on a timer, so an instance going nowhere renewed
+    # its own window forever. In run 31856630647 that consumed the entire 60
+    # minute Guests job budget, and because the step was killed rather than
+    # failed stestr wrote no results and the job named no failing test.
+    #
+    # The set below was checked against what is actually written, rather than
+    # assumed from the vocabulary in shakenfist/constants.py:
+    #
+    # - mutate covers every phase boundary of everything waited on here.
+    #   _state_update() ends in _log_attribute_mutation() (baseobject.py), so
+    #   a state change is always a mutate, as is every attribute write --
+    #   including the agent_state transitions the sidechannel daemon makes.
+    # - status covers the slow parts: image and blob fetch percentages
+    #   (blob.py, images.py) and 'connected to agent'.
+    # - audit is in the set because networks need it. Between a network
+    #   reaching initial and reaching created, the only events on the network
+    #   object are audit ('creating network on hypervisor' and friends in
+    #   network/bridged_vxlan_network.py); with status and mutate alone a
+    #   network create is covered only by its two bracketing state changes.
+    # - usage is the timer channel that caused this bug. resources and health
+    #   are written only against nodes, and prune and historic are never
+    #   written at all, so excluding all four costs nothing.
+    #
+    # This is a filter, not a proof. Two known writers still emit a
+    # progress-typed event on a timer while nothing progresses: blob.py's
+    # 'waiting for existing download to complete' audit every 10 seconds
+    # while another node holds a partial, and the network maintain daemon
+    # re-emitting 'network not ok' status every 30 seconds. That is the
+    # argument for the ceilings below rather than an argument for a narrower
+    # set -- no event filter can distinguish a wait that is progressing from
+    # one that is only being talked about.
+    PROGRESS_EVENT_TYPES = ('audit', 'mutate', 'status')
+
+    # Read a handful of events per poll rather than exactly one, so that a
+    # burst of periodic events cannot hide the progress event behind it.
+    #
+    # Deliberately not a server side event_type filter, which would be the
+    # obvious way to do this: the client's event getters take a single
+    # event_type string, so narrowing to three types means three HTTP
+    # requests per poll per object, and this suite's events polling rate is
+    # already high enough that load_budget.py excludes it from the database
+    # load budget by hand. Tripling it to save a list comprehension is a bad
+    # trade.
+    PROGRESS_EVENT_LIMIT = 10
+
+    def _renew_progress(self, event_callback, reference, last_event,
+                        time_since_last_progress):
+        """Renew a progress window from an object's most recent events.
+
+        Returns the most recent event of any type -- which is what a timeout
+        message should report, because it is what tells a human what the
+        object was actually doing -- and the renewed progress timestamp.
+        """
+        events = event_callback(reference, limit=self.PROGRESS_EVENT_LIMIT)
+        if not events:
+            return last_event, time_since_last_progress
+
+        # Events arrive newest first, so the first match is the newest event
+        # which represents progress.
+        for event in events:
+            if event.get('event_type') in self.PROGRESS_EVENT_TYPES:
+                # Never move the window backwards. A progress event older
+                # than the last renewal is not new progress.
+                time_since_last_progress = max(
+                    time_since_last_progress, event['timestamp'])
+                break
+
+        return events[0], time_since_last_progress
+
+    def _await_expired(self, start_time, time_since_last_progress,
+                       progress_timeout, ceiling):
+        """Describe which bound on an await has been exceeded, if either.
+
+        A progress window is not a deadline. It is renewed by activity, so on
+        its own it bounds nothing; the ceiling is measured from the start of
+        the await, is renewed by nothing, and is what converts a stalled wait
+        from a silently consumed CI budget into a diagnosable test failure.
+        The two are reported distinctly so a reader of a CI log can tell which
+        one fired. Returns None while both bounds still hold.
+        """
+        now = time.time()
+        if now - time_since_last_progress > progress_timeout:
+            return f'has seen no progress in {progress_timeout} seconds'
+        if now - start_time > ceiling:
+            return f'did not finish within {ceiling} seconds overall'
+        return None
+
+    # An instance has to be created, boot, and have its in-guest agent report
+    # in, so the window here is generous and the ceiling more so.
+    AGENT_STATE_PROGRESS_TIMEOUT = 500
+    AGENT_STATE_CEILING = 1800
+
     def _await_agent_state(self, instance_uuid, ready=True):
         # Wait the instance to be created and enter the desired agent running state
         if ready:
@@ -540,8 +643,9 @@ class BaseTestCase(testtools.TestCase):
             desired = 'not ready'
 
         last_event = None
-        time_since_last_progress = time.time()
-        while time.time() - time_since_last_progress < 500:
+        start_time = time.time()
+        time_since_last_progress = start_time
+        while True:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
                 raise StartException(
@@ -551,27 +655,37 @@ class BaseTestCase(testtools.TestCase):
             if i['agent_state'] and i['agent_state'].startswith(desired):
                 return
 
-            events = self.system_client.get_instance_events(
-                instance_uuid, limit=1)
-            if events:
-                last_event = events[0]
-                time_since_last_progress = last_event['timestamp']
+            last_event, time_since_last_progress = self._renew_progress(
+                self.system_client.get_instance_events, instance_uuid,
+                last_event, time_since_last_progress)
 
             time.sleep(5)
+
+            expiry = self._await_expired(
+                start_time, time_since_last_progress,
+                self.AGENT_STATE_PROGRESS_TIMEOUT, self.AGENT_STATE_CEILING)
+            if expiry:
+                break
 
         cd = self.system_client.get_console_data(instance_uuid)
         cd = '\n'.join(cd.split('\n')[-10:])
         raise TimeoutException(
             f'Instance {instance_uuid} failed to start and enter the agent '
-            f'{desired} state and has seen no progress in 5 minutes. Agent '
-            f'state is {i["agent_state"]} and the last recorded event was '
+            f'{desired} state, and {expiry}. Agent state is '
+            f'{i["agent_state"]} and the last recorded event was '
             f'{last_event}. Last console lines were:\n\n{cd}\n...END...')
+
+    # Instance creation is the scheduler, the image fetch and libvirt define
+    # path only, not boot, so both bounds are tighter than the agent ones.
+    INSTANCE_CREATE_PROGRESS_TIMEOUT = 180
+    INSTANCE_CREATE_CEILING = 900
 
     def _await_instance_create(self, instance_uuid):
         # Wait for the instance to be created
         last_event = None
-        time_since_last_progress = time.time()
-        while time.time() - time_since_last_progress < 180:
+        start_time = time.time()
+        time_since_last_progress = start_time
+        while True:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
                 raise StartException(
@@ -593,19 +707,23 @@ class BaseTestCase(testtools.TestCase):
                     f'console ports: {ports}')
                 return
 
-            events = self.system_client.get_instance_events(
-                instance_uuid, limit=1)
-            if events:
-                last_event = events[0]
-                time_since_last_progress = last_event['timestamp']
+            last_event, time_since_last_progress = self._renew_progress(
+                self.system_client.get_instance_events, instance_uuid,
+                last_event, time_since_last_progress)
 
             time.sleep(5)
 
+            expiry = self._await_expired(
+                start_time, time_since_last_progress,
+                self.INSTANCE_CREATE_PROGRESS_TIMEOUT,
+                self.INSTANCE_CREATE_CEILING)
+            if expiry:
+                break
+
         raise TimeoutException(
             f'Instance {instance_uuid} failed to start and enter the created '
-            f'state and has seen no progress in 3 minutes. Instance '
-            f'state is {i["state"]} and the last recorded event was '
-            f'{last_event}.')
+            f'state, and {expiry}. Instance state is {i["state"]} and the '
+            f'last recorded event was {last_event}.')
 
     def _await_instance_event(
             self, instance_uuid, operation, message=None, after=None):
@@ -716,12 +834,19 @@ class BaseTestCase(testtools.TestCase):
             'After time %s, image %s had no event type "%s" (waited 5 mins)'
             % (after, image_uuid, operation))
 
+    # This backs the network, artifact and blob readiness helpers, so it is on
+    # the path of nearly every test in the suite. A blob can be replicating a
+    # large image, hence the generous ceiling.
+    OBJECTS_READY_PROGRESS_TIMEOUT = 300
+    OBJECTS_READY_CEILING = 1800
+
     def _await_objects_ready(self, get_callback, event_callback, items):
         waiting_for = list(enumerate(items))
         results = [None] * len(items)
 
         last_event = None
-        time_since_last_progress = time.time()
+        start_time = time.time()
+        time_since_last_progress = start_time
         while waiting_for:
             for idx, item in copy.copy(waiting_for):
                 try:
@@ -731,10 +856,10 @@ class BaseTestCase(testtools.TestCase):
                         results[idx] = n
                         time_since_last_progress = time.time()
                     else:
-                        events = event_callback(item, limit=1)
-                        if events:
-                            last_event = events[0]
-                            time_since_last_progress = last_event['timestamp']
+                        last_event, time_since_last_progress = (
+                            self._renew_progress(
+                                event_callback, item, last_event,
+                                time_since_last_progress))
 
                 except apiclient.ResourceNotFoundException:
                     # Its likely this exception can be removed once PR #1314 (or
@@ -746,16 +871,20 @@ class BaseTestCase(testtools.TestCase):
             if waiting_for:
                 time.sleep(5)
 
-            if waiting_for and time.time() - time_since_last_progress > 300:
-                remaining = []
-                for _, item in waiting_for:
-                    remaining.append(item)
-                remaining_string = ', '.join(remaining)
+                expiry = self._await_expired(
+                    start_time, time_since_last_progress,
+                    self.OBJECTS_READY_PROGRESS_TIMEOUT,
+                    self.OBJECTS_READY_CEILING)
+                if expiry:
+                    remaining = []
+                    for _, item in waiting_for:
+                        remaining.append(item)
+                    remaining_string = ', '.join(remaining)
 
-                raise TimeoutException(
-                    f'Items {remaining_string} never became ready, and no '
-                    f'progress has been made in at least five minutes. The last  '
-                    f'recorded event was {last_event}.')
+                    raise TimeoutException(
+                        f'Items {remaining_string} never became ready: the '
+                        f'wait {expiry}. The last recorded event was '
+                        f'{last_event}.')
 
         return results
 
@@ -1011,6 +1140,54 @@ class BaseNamespacedTestCase(BaseTestCase):
                       % remaining_networks)
 
         self._remove_namespace(self.namespace)
+
+    def _await_agentop_complete(self, instance_uuid, aop, timeout,
+                                description='agent operation'):
+        # Poll a single agent operation to completion with its own independent
+        # timeout window. Previously test_instance_put_and_get_blob shared one
+        # start_time across three sequential operations, so the last and
+        # heaviest of them (get-file, which reads, hashes and uploads a blob
+        # back to the cluster) was left only whatever budget the earlier
+        # operations had not already consumed. Under under-cloud contention
+        # that remainder collapsed and get-file "timed out" while still
+        # legitimately executing -- the intermittent merge-queue flake.
+        #
+        # Hoisted here from guest_ci_tests/test_agentops.py in agent
+        # operation deadlines phase 7: a0cc243ad fixed this bug in that
+        # file's copy of test_instance_put_and_get_blob but never in the
+        # smoke suite's near-identical copy, which runs on every pull
+        # request and kept the flake alive. A shared implementation is what
+        # stops a fix from half-landing again. This is also where the
+        # terminal-state check lives -- an operation which reaches expired
+        # or error now fails immediately instead of burning the rest of its
+        # window and then reporting a bare timeout.
+        #
+        # It sits on BaseNamespacedTestCase rather than beside _await_command
+        # on BaseTestCase because it polls as self.test_client, which only
+        # the namespaced class creates. Polling as the system client instead
+        # would work -- it is admin -- but it would be a different assertion
+        # about what a namespaced caller can see, which is not this step's
+        # to make.
+        start_time = time.time()
+        while aop['state'] != 'complete':
+            if aop['state'] in self.AGENT_OPERATION_FAILED_STATES:
+                self._raise_agent_operation_failure(
+                    instance_uuid, description, aop,
+                    f"agent operation {aop['uuid']} for {description} "
+                    f"finished in state {aop['state']} instead of "
+                    'completing')
+
+            if time.time() - start_time > timeout:
+                self._raise_agent_operation_failure(
+                    instance_uuid, description, aop,
+                    f"agent operation {aop['uuid']} for {description} was "
+                    f"still in state {aop['state']} after {timeout} "
+                    'seconds')
+
+            time.sleep(5)
+            aop = self.test_client.get_agent_operation(aop['uuid'])
+
+        return aop
 
 
 class TestDistroBoots(BaseNamespacedTestCase):

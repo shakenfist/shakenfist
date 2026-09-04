@@ -1159,10 +1159,12 @@ outlives either moves to the terminal `expired` state, checked at
 dequeue, during preflight and in the sidechannel executor. A NULL
 `deadline` has no request receipt time to anchor its default against,
 so it is anchored on the current state's transition time instead, which
-means a legacy row's budget restarts at each transition. `attempts` and
-`last_progress` are recorded but not yet consumed; the retry bound and
-the node-local reaper which reads them arrive with the rest of
-`docs/plans/PLAN-agent-operation-deadlines.md`.
+means a legacy row's budget restarts at each transition. `attempts`
+counts dispatches against `AGENT_OPERATION_MAX_ATTEMPTS` and
+`last_progress` backs the progress timeout; both are read by the retry
+decision and by the node-local executor reaper. See
+[Agent Operations](agent_operations.md) for what an operator sees as a
+result of any of this.
 
 Namespace keys used to be anonymous entries inside that row's `keys`
 JSON dict. They are now objects in their own right, so that a key can

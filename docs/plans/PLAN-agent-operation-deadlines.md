@@ -614,7 +614,7 @@ the slot at all.
 | 4 | [PLAN-agent-operation-deadlines-phase-04-enforcement.md](PLAN-agent-operation-deadlines-phase-04-enforcement.md) | Complete | Enforcement: dequeue expiry, preflight expiry, executor deadline + progress timeout, `observe_progress()` hooks; remove `AGENT_OPERATION_EXECUTION_TIMEOUT`; the `expired` state with its audit-enumerated obligations (`state_targets`, `FINAL_OBJECT_STATES`, guarded error writes, command-abort check). Survey corrections applied at source: every address in decision 1 was refreshed after phase 1's refactor, the reaper is phase 5's rather than this phase's, and preflight is a fourth enforcement point the design sketch never listed. The phase plan also decides that an expiry records its reason as a state message and an audit event rather than as `.error`, which the `error` setter refuses from a non-`error` state |
 | 5 | [PLAN-agent-operation-deadlines-phase-05-retry.md](PLAN-agent-operation-deadlines-phase-05-retry.md) | Complete | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; the node-local reaper, covering a dead executor thread, no executor at all after a daemon restart, and a live executor wedged in the pre-connection wait. Survey corrections applied at source: decision 5's address for `reap_instance_executors()`, that retryability is evaluated over the whole command list rather than the command in flight, and that partial-result cleanup has a registered-blob case the design sketch did not cover. The phase plan also decides that the terminal-only pop and the reaper must land in one commit, because the pop rule alone turns a daemon restart from a leak into a wedge |
 | 6 | `PLAN-agent-operation-deadlines-phase-06-client.md` (in shakenfist/client-python, branch `agent-operation-deadlines-phase-06-client`) | Complete | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast). The plan file lives in the client repository because the code does, following the `PLAN-vdi-console-tokens.md` precedent; a relative link cannot cross repositories, so it is named here rather than linked. Survey corrections applied at source: the new parameters need a capability token before a client can send them safely, which phase 3 did not add and phase 6 does. The phase plan also decides to repair `await_agent_fetch()`'s three hardcoded timeout windows, which make its `timeout` argument a lie, because the phase rewrites those same loops |
-| 7 | | Not started | Docs (operator + developer guides, and the `v07-v08` release note for the deadline parameters and config options -- deferred from phase 3 so it is written once, after enforcement exists), functional CI coverage in `shakenfist_ci`; make the suite's agent-operation await loops fail fast on terminal states, and narrow `base.AGENT_OPERATION_FAILURES` to a plain `AgentOperationFailed` reference now that both client generations no longer need tolerating (audit finding: they spin on `!= 'complete'`, one with no timeout at all); and give the CI base class's instance and agent-state awaits an absolute ceiling as well as a progress window (#3770 — see below). Note `docs/developer_guide/state_machine.md` is **not** this phase's: it is a rendering of `state_targets`, so phase 4 updated it when it added `expired` rather than leaving the tree self-contradictory for three phases, and phase 5 adds its one further edge |
+| 7 | [PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md](PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md) | In progress | Documentation and CI coverage. Survey corrections applied at source, because this row was written before phases 3 to 6 executed and was wrong in four places. (a) The documentation was **not** deferred from phase 3: `cf094551b` wrote both the API reference at `docs/developer_guide/api_reference/instances.md:657-710` and the release note section at `docs/release_notes/v07-v08.md:731-782`. What is missing is phase 5 (retry, attempts and the reaper), phase 6 (the CLI flags and the `AgentCommandError` to `AgentOperationFailed` change), and an operator-guide page for agent operations, of which there is none. (b) `base.AGENT_OPERATION_FAILURES` must **not** narrow to a plain `AgentOperationFailed` reference: the `getattr()` shim goes, but the tuple stays and gains `AgentAwaitTimeout`, because `await_agent_command()` raises three unrelated exceptions and the two catch sites are `_await_instance_ready`'s retry loop, which wants all of them. Only the two `test_get_missing_file` assertions narrow. (c) There is a **third** event-renewed await, `_await_objects_ready`, which backs the network, artifact and blob readiness helpers and so sits on nearly every test in the suite; #3770 is not fixed without it. (d) Commit `a0cc243ad` fixed the shared-clock flake in `guest_ci_tests/test_agentops.py` only, and the identical `smoke_ci_tests` copy -- the suite that runs on every pull request -- still has it. Note `docs/developer_guide/state_machine.md` is **not** this phase's: it is a rendering of `state_targets`, so phase 4 updated it when it added `expired` rather than leaving the tree self-contradictory for three phases, and phase 5 added its one further edge |
 | 8 | | Not started | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
 Each phase gets its own detailed plan file before implementation.
@@ -631,8 +631,8 @@ slot is actually freed).
 
 Found during merge CI triage of PR #3764 and verified against the
 tree. `_await_agent_state`
-(`shakenfist/deploy/shakenfist_ci/base.py:436`) looks like a
-500-second deadline and is not one:
+(`shakenfist/deploy/shakenfist_ci/base.py:522`, `:436` when this was
+written) looks like a 500-second deadline and is not one:
 
 ```python
 time_since_last_progress = time.time()
@@ -648,11 +648,22 @@ while time.time() - time_since_last_progress < 500:
 *any* type, so an instance going nowhere while still emitting events
 on any sub-500s cadence renews the window forever. The variable is
 named for progress; nothing in the query restricts it to progress.
-`_await_instance_create` (`base.py:471`) is the identical
-construction with a 180-second window. In run 31856630647 this cost
-the Guests job its entire 60-minute budget: two agent-awaiting tests
-never completed, and because the step was killed rather than failed,
-stestr wrote no results and the job named no failing test at all.
+`_await_instance_create` (`base.py:557`, `:471` when this was written)
+is the identical construction with a 180-second window. In run
+31856630647 this cost the Guests job its entire 60-minute budget: two
+agent-awaiting tests never completed, and because the step was killed
+rather than failed, stestr wrote no results and the job named no
+failing test at all.
+
+Phase 7's survey found a third loop the audit missed:
+`_await_objects_ready` (`base.py:706`) renews a 300-second window the
+same way, and backs `_await_networks_ready`, `_await_artifacts_ready`
+and `_await_blobs_ready`, so it sits on nearly every test in the
+suite. Fixing only the two named above would leave the bug class in
+place. The mechanism is also now confirmed rather than inferred:
+`node_inst_op` (`shakenfist/operations/node_inst_op.py:169`) writes an
+`EVENT_TYPE_USAGE` event against every instance on a timer, so a
+stalled instance renews its own deadline forever.
 
 This is the same two-knob confusion the plan resolves server-side --
 a progress window is not a deadline -- so phase 7 fixes it the same
@@ -697,6 +708,8 @@ client-python's `develop` and client-python's CI builds the server
 from this repository's `develop`. The deadlock is broken by
 `base.AGENT_OPERATION_FAILURES`, a tuple which accepts either
 exception and resolves the new one through `getattr()` so it still
-imports against an old client. Phase 7 narrows it to a plain
-reference once the client change has merged and the ordering
-constraint is gone.
+imports against an old client. Phase 7 removes the `getattr()` -- but
+not the tuple, which its survey found must instead grow to name all
+three exceptions `await_agent_command()` can raise, since the two
+catch sites want breadth and only the two `test_get_missing_file`
+assertions want the narrow reference.

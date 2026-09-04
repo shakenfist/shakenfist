@@ -5,6 +5,7 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestAgentOperations(base.BaseNamespacedTestCase):
@@ -22,25 +23,6 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             content.text_content(json.dumps(self.net_one, indent=4,
                                             sort_keys=True)))
         self._await_networks_ready([self.net_one['uuid']])
-
-    def _await_agentop_complete(self, instance_uuid, aop, timeout):
-        # Poll a single agent operation to completion with its own independent
-        # timeout window. Previously test_instance_put_and_get_blob shared one
-        # start_time across three sequential operations, so the last and
-        # heaviest of them (get-file, which reads, hashes and uploads a blob
-        # back to the cluster) was left only whatever budget the earlier
-        # operations had not already consumed. Under under-cloud contention
-        # that remainder collapsed and get-file "timed out" while still
-        # legitimately executing -- the intermittent merge-queue flake.
-        start_time = time.time()
-        while aop['state'] != 'complete':
-            if time.time() - start_time > timeout:
-                console_data = self.test_client.get_console_data(instance_uuid)
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
-        return aop
 
     def test_instance_execute_small(self):
         inst = self.test_client.create_instance(
@@ -62,15 +44,8 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         # Execute a command
-        start_time = time.time()
         aop = self.test_client.instance_execute(inst['uuid'], 'whoami')
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 30:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(inst['uuid'], aop, 30, 'whoami')
 
         self.assertTrue(
             '0' in aop['results'],
@@ -103,18 +78,12 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
         # Execute a command
-        start_time = time.time()
         aop = self.test_client.instance_execute(
             inst['uuid'], 'cat /var/log/syslog')
 
         # Wait for the operation to complete
-        while aop['state'] != 'complete':
-            if time.time() - start_time > 30:
-                console_data = self.test_client.get_console_data(inst['uuid'])
-                self.fail(
-                    f'Timeout for agentop: {aop}\n\nConsole: {console_data}')
-            time.sleep(5)
-            aop = self.test_client.get_agent_operation(aop['uuid'])
+        aop = self._await_agentop_complete(
+            inst['uuid'], aop, 30, 'cat /var/log/syslog')
 
         self.assertTrue(
             '0' in aop['results'],
@@ -157,17 +126,8 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # Request that the agent copy the file to the instance
         op = self.test_client.instance_put_blob(
             inst['uuid'], input_blob, '/tmp/fibonacci.py', 'ugo+rx')
-
-        start_time = time.time()
-        while time.time() - start_time < 120:
-            if op['state'] == 'complete':
-                break
-            time.sleep(5)
-            op = self.test_client.get_agent_operation(op['uuid'])
-
-        if op['state'] != 'complete':
-            self.fail('Agent put operation %s did not complete in 120 seconds (%s)'
-                      % (op['uuid'], op['state']))
+        op = self._await_agentop_complete(
+            inst['uuid'], op, 120, 'put fibonacci.py')
 
         # Request that the agent execute the file
         _, data = self.test_client.await_agent_command(
@@ -230,12 +190,13 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
         aop = self.test_client.instance_put_blob(
             inst['uuid'], blob_uuid, '/tmp/foo', 'ugo+r')
-        aop = self._await_agentop_complete(inst['uuid'], aop, 60)
+        aop = self._await_agentop_complete(inst['uuid'], aop, 60, 'put /tmp/foo')
 
         # Now ensure the data arrived correctly
         aop = self.test_client.instance_execute(
             inst['uuid'], 'sha512sum /tmp/foo')
-        aop = self._await_agentop_complete(inst['uuid'], aop, 60)
+        aop = self._await_agentop_complete(
+            inst['uuid'], aop, 60, 'sha512sum /tmp/foo')
 
         remote_hash = aop['results']['0']['stdout'].split(' ')[0]
         self.assertEqual(
@@ -247,7 +208,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         # agent reads the file, hashes it and uploads it back as a new blob),
         # so it gets a more generous independent budget.
         aop = self.test_client.instance_get(inst['uuid'], '/tmp/foo')
-        aop = self._await_agentop_complete(inst['uuid'], aop, 120)
+        aop = self._await_agentop_complete(inst['uuid'], aop, 120, 'get /tmp/foo')
 
         self.assertTrue(
             '0' in aop['results'],
@@ -312,7 +273,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
         # Run a fetch command which should fail
         self.assertRaises(
-            base.AGENT_OPERATION_FAILURES, self.test_client.await_agent_fetch,
+            apiclient.AgentOperationFailed, self.test_client.await_agent_fetch,
             inst['uuid'], '/tmp/nosuch')
 
     def test_interface_plug_and_exec_dhcp(self):

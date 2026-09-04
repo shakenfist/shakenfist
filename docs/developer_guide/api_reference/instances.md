@@ -694,11 +694,17 @@ is meaningful.
 
 !!! note "What happens when a budget runs out"
 
-    An operation which exhausts either budget moves to `expired`, a
-    terminal state distinct from `error`. `error` means the operation
-    itself failed; `expired` means a budget you set ran out, and the
-    state's message says which. Nothing is retried and no further
-    command in the operation runs.
+    An operation which exhausts either budget, and for which no retry is
+    possible (see below), moves to `expired`, a terminal state distinct
+    from `error`. `error` means the operation itself failed; `expired`
+    means a budget you set ran out, and the state's message says which.
+    A wall-clock deadline running out is always final -- there is no
+    time left for a further attempt to deliver anything in -- but a
+    progress-timeout stall may be retried a bounded number of times
+    before landing in `expired`; see
+    [Agent Operations](../../operator_guide/agent_operations.md#retry-and-the-executor-reaper)
+    in the operator guide for the retry rules and the node-local reaper
+    that backs them up.
 
     Three places enforce this, so an abandoned operation is retired
     wherever it happens to be sitting: when it reaches the head of the
