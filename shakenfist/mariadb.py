@@ -5630,8 +5630,37 @@ def _direct_get_events_count() -> int:
 # millions of rows.
 _PRUNE_BATCH_SIZE = 10000
 
+# Wall-clock budget for one _direct_prune_events() sweep. The sweep's
+# runtime scales with table size rather than orphan count, so on a big
+# cluster it can outrun any fixed RPC deadline; issue 4034 measured
+# sfcbr's sweep needing roughly twice its old 300s deadline every
+# night, so the client abandoned a sweep which then completed anyway.
+# The stages instead stop cleanly between batches once this budget is
+# spent and the orphan walk resumes from a persisted cursor at the
+# next daily sweep, which keeps the reply inside the client's deadline
+# whatever the table size. PRUNE_EVENTS_RPC_TIMEOUT below adds the
+# headroom for the final in-flight batch and the reply itself.
+PRUNE_EVENTS_TIME_BUDGET = 1500.0
 
-def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
+# cluster_config key persisting the orphan sweep's position between
+# sweeps (the same keyspace the scheduled-task last-run stamps use).
+_PRUNE_ORPHAN_CURSOR_KEY = 'EVENTS_PRUNE_ORPHAN_CURSOR'
+
+
+def _load_orphan_prune_cursor() -> str:
+    """Return the persisted orphan-sweep cursor, or '' if none."""
+    value = _direct_get_all_cluster_config().get(_PRUNE_ORPHAN_CURSOR_KEY, '')
+    return value if isinstance(value, str) else ''
+
+
+def _save_orphan_prune_cursor(cursor: str) -> None:
+    """Persist the orphan-sweep cursor for the next daily sweep."""
+    _direct_set_cluster_config(_PRUNE_ORPHAN_CURSOR_KEY, cursor)
+
+
+def _direct_prune_events_by_type(
+        event_type: str, max_age: float,
+        deadline: Optional[float] = None) -> int:
     """Prune event_objects rows for one event_type older than max_age.
 
     Stage A of the daily events prune sweep. Each batch first finds up
@@ -5661,6 +5690,9 @@ def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
             'resources', 'prune', 'historic'.
         max_age: Maximum age in seconds. Rows with
             ``events.timestamp < now - max_age`` are pruned.
+        deadline: Optional time.time() value after which no further
+            batches are started (issue 4034); rows left behind are
+            picked up by the next daily sweep.
 
     Returns:
         Total number of event_objects rows deleted.
@@ -5684,6 +5716,8 @@ def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
 
     try:
         while True:
+            if deadline is not None and time.time() >= deadline:
+                break
             with engine.connect() as conn:
                 rows = conn.execute(select_stmt, {
                     'event_type': event_type,
@@ -5709,7 +5743,8 @@ def _direct_prune_events_by_type(event_type: str, max_age: float) -> int:
         return total
 
 
-def _direct_prune_api_request_events(max_age: float) -> int:
+def _direct_prune_api_request_events(
+        max_age: float, deadline: Optional[float] = None) -> int:
     """Prune event_objects rows whose object_type is 'api-request'.
 
     Stage B of the daily events prune sweep. Regardless of the parent
@@ -5729,6 +5764,8 @@ def _direct_prune_api_request_events(max_age: float) -> int:
     Args:
         max_age: Maximum age in seconds. Rows whose referenced event
             has ``timestamp < now - max_age`` are pruned.
+        deadline: Optional time.time() value after which no further
+            batches are started (issue 4034).
 
     Returns:
         Total number of event_objects rows deleted.
@@ -5750,6 +5787,8 @@ def _direct_prune_api_request_events(max_age: float) -> int:
 
     try:
         while True:
+            if deadline is not None and time.time() >= deadline:
+                break
             with engine.connect() as conn:
                 rows = conn.execute(select_stmt, {
                     'cutoff': cutoff,
@@ -5771,7 +5810,7 @@ def _direct_prune_api_request_events(max_age: float) -> int:
         return total
 
 
-def _direct_prune_orphan_events() -> int:
+def _direct_prune_orphan_events(deadline: Optional[float] = None) -> int:
     """Prune events rows no longer referenced by any event_objects row.
 
     Stage C of the daily events prune sweep. After stages A and B
@@ -5789,12 +5828,28 @@ def _direct_prune_orphan_events() -> int:
     tables and misread as an orphan. Batched and
     OperationalError-tolerant like the other stages.
 
+    The walk's runtime scales with the size of the events PK rather
+    than the orphan count, so a fixed per-sweep deadline would become
+    a table size limit (issue 4034): restarting from the table head
+    every day would spend the whole budget rescanning already-clean
+    ranges. The cursor is therefore a ring position persisted in
+    cluster_config: each sweep resumes where the last one stopped,
+    wraps to the head on reaching the end, and finishes after at most
+    one full circle or when the deadline expires, persisting its
+    position either way.
+
+    Args:
+        deadline: Optional time.time() value after which no further
+            batches are started.
+
     Returns:
         Total number of events rows deleted.
     """
     engine = _get_engine()
     total = 0
-    cursor = ''
+    start = _load_orphan_prune_cursor()
+    cursor = start
+    wrapped = False
 
     select_stmt = sa.text('''
         SELECT e.event_uuid FROM events e
@@ -5809,13 +5864,23 @@ def _direct_prune_orphan_events() -> int:
 
     try:
         while True:
+            if deadline is not None and time.time() >= deadline:
+                break
             with engine.connect() as conn:
                 rows = conn.execute(select_stmt, {
                     'cursor': cursor,
                     'batch': _PRUNE_BATCH_SIZE,
                 }).fetchall()
                 if not rows:
-                    break
+                    if wrapped or start == '':
+                        # A walk from the head reaching the end is a full
+                        # circle already; a wrapped pass reaching the end
+                        # means the region up to the start point held no
+                        # further orphans.
+                        break
+                    cursor = ''
+                    wrapped = True
+                    continue
                 cursor = rows[-1].event_uuid
                 result = conn.execute(delete_stmt, {
                     'event_uuids': [row.event_uuid for row in rows],
@@ -5825,10 +5890,12 @@ def _direct_prune_orphan_events() -> int:
             if rowcount > 0:
                 ORPHAN_EVENTS_PRUNED.inc(rowcount)
                 total += rowcount
-        return total
+            if wrapped and cursor >= start:
+                break
     except OperationalError as e:
         LOG.warning(f'MariaDB prune_orphan_events failed: {e}')
-        return total
+    _save_orphan_prune_cursor(cursor)
+    return total
 
 
 # The seven configured event_types whose retention is governed by
@@ -5856,11 +5923,18 @@ def _direct_prune_events() -> int:
     still run. The per-stage breakdown is logged at info; the sum is
     returned for the daily summary line on the cluster maintainer.
 
+    The whole sweep runs under a shared PRUNE_EVENTS_TIME_BUDGET
+    wall-clock deadline so the PruneEvents reply always reaches the
+    gRPC client before its deadline, however big the tables are
+    (issue 4034). Work a sweep did not get to resumes at the next
+    daily sweep.
+
     Returns:
         Total number of rows deleted across all stages
         (event_objects rows from stages A and B plus events rows
         from stage C).
     """
+    deadline = time.time() + PRUNE_EVENTS_TIME_BUDGET
     total = 0
     per_stage: dict[str, int] = {}
 
@@ -5868,22 +5942,29 @@ def _direct_prune_events() -> int:
         max_age = getattr(config, f'MAX_{evtype.upper()}_EVENT_AGE')
         if max_age == -1:
             continue
-        deleted = _direct_prune_events_by_type(evtype, float(max_age))
+        deleted = _direct_prune_events_by_type(
+            evtype, float(max_age), deadline=deadline)
         per_stage[evtype] = deleted
         total += deleted
 
     api_max_age = config.MAX_API_REQUEST_EVENT_AGE
     if api_max_age != -1:
-        deleted = _direct_prune_api_request_events(float(api_max_age))
+        deleted = _direct_prune_api_request_events(
+            float(api_max_age), deadline=deadline)
         per_stage['api-request'] = deleted
         total += deleted
 
-    orphan_deleted = _direct_prune_orphan_events()
+    orphan_deleted = _direct_prune_orphan_events(deadline=deadline)
     per_stage['orphan'] = orphan_deleted
     total += orphan_deleted
 
     breakdown = ', '.join(f'{k}={v}' for k, v in per_stage.items())
     LOG.info(f'Events prune sweep deleted {total} rows ({breakdown}).')
+    if time.time() >= deadline:
+        LOG.info(
+            f'Events prune sweep exhausted its '
+            f'{PRUNE_EVENTS_TIME_BUDGET:.0f}s budget; remaining work '
+            'resumes at the next daily sweep.')
     return total
 
 
@@ -6076,11 +6157,17 @@ def record_event_batch(events: list[EventRecord]) -> bool:
     return _direct_record_event_batch(events)
 
 
-PRUNE_EVENTS_RPC_TIMEOUT = 300.0
+# The server bounds its own sweep at PRUNE_EVENTS_TIME_BUDGET and stops
+# between batches, so under this deadline the client only ever times out
+# on a genuinely wedged server rather than abandoning a healthy sweep as
+# a phantom failure (issue 4034). The headroom on top of the budget
+# covers the server's final in-flight batch (~20s measured on sfcbr,
+# generously padded for a struggling database) plus the reply itself.
+PRUNE_EVENTS_RPC_TIMEOUT = PRUNE_EVENTS_TIME_BUDGET + 300.0
 
 # How long to block on the in-flight prune future between watchdog pets.
 # Bypassing _grpc_call() also bypasses the pet its retry loop performs
-# (issue 3789), and PRUNE_EVENTS_RPC_TIMEOUT equals sf-cluster's
+# (issue 3789), and PRUNE_EVENTS_RPC_TIMEOUT exceeds sf-cluster's
 # WatchdogSec, so a prune left to block unpetted to its deadline
 # guarantees a SIGABRT of the elected cluster maintainer (issue 3919).
 PRUNE_EVENTS_PET_INTERVAL = 10.0
@@ -6092,9 +6179,10 @@ def _grpc_prune_events() -> int:
     The prune is a once-a-day call that may legitimately take minutes,
     so we bypass the standard ``_grpc_call`` retry helper (which uses
     the short ``GRPC_TIMEOUT``) and issue the RPC as a future with a
-    generous 5-minute deadline, petting the systemd watchdog every
-    ``PRUNE_EVENTS_PET_INTERVAL`` seconds while it is in flight (see
-    the comment on that constant).
+    deadline sized above the server's own sweep budget (see the
+    comment on ``PRUNE_EVENTS_RPC_TIMEOUT``), petting the systemd
+    watchdog every ``PRUNE_EVENTS_PET_INTERVAL`` seconds while it is
+    in flight (see the comment on that constant).
 
     A failure raises rather than returning zero: a return value from
     this function always means the sweep ran, so the caller can tell
