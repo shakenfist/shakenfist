@@ -13993,6 +13993,14 @@ The prune runs in three stages:</p>
    no longer referenced by any <code>event_objects</code> row. This is the
    step that actually deletes the event content.</li>
 </ol>
+<p>The whole sweep runs under a 25 minute wall-clock budget so
+that its reply always reaches the cluster maintainer before the
+RPC deadline, however large the tables have grown. A sweep
+which exhausts the budget stops cleanly between batches and
+logs that it did so; the orphan sweep persists its position
+(the <code>EVENTS_PRUNE_ORPHAN_CURSOR</code> key in <code>cluster_config</code>) and
+resumes from there at the next daily sweep, so an oversized day
+delays completion rather than losing work.</p>
 <h3 id="retention-configuration">Retention configuration<a class="headerlink" href="#retention-configuration" title="Permanent link">&para;</a></h3>
 <p>Retention ages are in seconds. The defaults below are the
 cluster-wide defaults; override any of them in <code>/etc/sf/config</code>
