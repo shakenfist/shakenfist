@@ -13524,6 +13524,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#running-commands-from-the-functional-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running commands from the functional suite
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running commands from the functional suite">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#credentials-go-through-the-environment-not-argv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credentials go through the environment, not argv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#node-exec-commands-have-a-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node-exec commands have a timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ci-headroom-instrumentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13960,6 +13999,49 @@ because it checked this repository's install path and took the conductor's
 from another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.</p>
+<h2 id="running-commands-from-the-functional-suite">Running commands from the functional suite<a class="headerlink" href="#running-commands-from-the-functional-suite" title="Permanent link">&para;</a></h2>
+<p><code>shakenfist_ci/process.py</code> is how the functional suite shells out. It is
+<code>subprocess.run()</code> with an acceptable-exit-code list, and it replaced
+<code>oslo_concurrency.processutils.execute()</code> -- which the harness was importing
+without declaring, and which nothing else in this repository used.</p>
+<p>Three things about it are load-bearing, and are the reason it is a module
+rather than ten inline <code>subprocess</code> calls:</p>
+<ul>
+<li><strong>Output is returned unstripped, and decoded with <code>os.fsdecode</code>.</strong> Callers
+  split on newlines and parse JSON, so a trailing newline is data. <code>ip</code>, <code>ssh</code>
+  and the client run against real hosts and occasionally emit a byte that is
+  not UTF-8; <code>fsdecode</code> maps it to a surrogate instead of losing the test to a
+  <code>UnicodeDecodeError</code>.</li>
+<li><strong>stdin is <code>/dev/null</code>.</strong> <code>ssh</code> reads stdin, and a command that inherited
+  the test runner's would block rather than fail.</li>
+<li><strong><code>ProcessTimeoutError</code> subclasses <code>ProcessExecutionError</code>.</strong> A node that
+  accepts an ssh connection and then wedges is exactly as untestable as one
+  that refuses it, so <code>_require_node_exec()</code> skips on both without being
+  taught the difference.</li>
+</ul>
+<h3 id="credentials-go-through-the-environment-not-argv">Credentials go through the environment, not argv<a class="headerlink" href="#credentials-go-through-the-environment-not-argv" title="Permanent link">&para;</a></h3>
+<p><code>_exec()</code> in the command-line tests writes every command it runs to stderr,
+and the harness prints it again on failure. So the namespace key reaches
+<code>sf-client</code> as <code>SHAKENFIST_KEY</code> in the child's environment -- along with
+<code>SHAKENFIST_NAMESPACE</code> and <code>SHAKENFIST_API_URL</code>, which the client has honoured
+since v0.2.5 -- and never appears on a command line at all.</p>
+<p><code>process.mask_secrets()</code> exists as well, and rewrites the value of
+<code>--key</code>-shaped flags to <code>***</code> before a command or its output goes into an
+exception. It is a backstop and not the protection. Name-based redaction is
+the technique this repository already abandoned once in the API layer, for the
+reason recorded under "Credential-carrying routes are not logged, not
+redacted" in <code>coding_rules.md</code>: it silently starts leaking the day somebody
+adds a name it has not heard of. It cannot match a short option, a positional
+secret, or a flag nobody thought of. Keep the credential out of the string.</p>
+<h3 id="node-exec-commands-have-a-timeout">Node-exec commands have a timeout<a class="headerlink" href="#node-exec-commands-have-a-timeout" title="Permanent link">&para;</a></h3>
+<p><code>_node_exec()</code> passes <code>SF_CI_NODE_EXEC_TIMEOUT</code> (seconds, default 300) to
+every command it runs, local or over ssh. These are introspection commands --
+<code>ip</code>, <code>iptables</code>, <code>virsh</code> -- so one of them taking minutes means the node is
+wedged, which is a state a test may well have just put it in. ssh's
+<code>ConnectTimeout=10</code> bounds the TCP connect only, and does nothing for a session
+that connects and then stops responding; without this the job would stall
+until the CI runner's own timeout killed it, with no indication of which test
+was to blame.</p>
 <h2 id="ci-headroom-instrumentation">CI headroom instrumentation<a class="headerlink" href="#ci-headroom-instrumentation" title="Permanent link">&para;</a></h2>
 <p>Phase 1 of <code>docs/plans/PLAN-ci-cloud-sizing.md</code> (see
 <code>docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</code> for the
