@@ -39,13 +39,10 @@
       ]
     },
     {
-      "description": "Group oslo updates together. The OpenStack oslo libraries are released in lockstep and share internal interfaces, so they must update together",
+      "description": "Group oslo updates together. The OpenStack oslo libraries are released in lockstep and share internal interfaces, so they must update together. The pattern matches the family rather than listing today's members, so a fifth oslo library arriving as a transitive pin is grouped without anyone having to notice",
       "groupName": "oslo",
       "matchPackageNames": [
-        "oslo.concurrency",
-        "oslo.config",
-        "oslo.i18n",
-        "oslo.utils"
+        "/^oslo\\./"
       ]
     },
     {
