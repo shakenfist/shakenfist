@@ -395,8 +395,15 @@ def _netdesc_allocate_address(inst, netdesc, order):
                 inst.add_event(
                     EVENT_TYPE_AUDIT, 'allocated ip address', extra=netdesc)
             else:
+                # An explicit address may take over a deletion-halo
+                # reservation: the halo protects against surprising random
+                # reallocation, which is not what a caller asking for this
+                # exact address is exposed to. Without this, deleting and
+                # immediately recreating an instance at a static address
+                # 409s for the whole halo period (issue 4059).
                 if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
-                                      ReservationType.INSTANCE, ''):
+                                      ReservationType.INSTANCE, '',
+                                      evict_halo=True):
                     inst.enqueue_delete_due_error(
                         'failed to reserve an IP on network %s'
                         % netdesc['network_uuid'])

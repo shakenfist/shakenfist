@@ -829,6 +829,7 @@ message IPAMReservationData {
 
 message ReserveAddressRequest {
   IPAMReservationData reservation = 1;
+  bool evict_halo = 2;  // Take over an existing deletion-halo reservation
 }
 
 message ReleaseAddressRequest {
