@@ -50,9 +50,10 @@ Nothing else in the fleet's graph is close. The next largest node,
 Plenty of dependencies are legitimately installed and never imported: a
 command-line tool invoked as a subprocess, a database driver selected
 by connection string, a gunicorn worker class named in a config file, a
-transitive package pinned directly to hold a version floor. The
-criterion cannot tell those from a dead line, so it asks for the reason
-to be written down where the dependency is declared:
+transitive package pinned directly to hold a version floor, a plugin
+reached through `importlib.import_module()` rather than an `import`
+statement. The criterion cannot tell those from a dead line, so it asks
+for the reason to be written down where the dependency is declared:
 
 ```toml
 dependencies = [
@@ -72,6 +73,13 @@ it is used, and by the time anyone asks, whoever knew has forgotten.
 The annotation sits beside `# never-pin:`, which
 `tools/pin-indirect-dependencies.sh` reads from the same array.
 
+Both markers, and the line numbers a finding cites, need the array
+written one dependency per line. That is what the reconciler writes and
+what every repository in the fleet has, but a manifest with
+`dependencies = ["a", "b"]` on a single line still gets a correct
+verdict -- the names come from the TOML parse -- with the finding
+naming the canonical spelling and no line number.
+
 ## How a dependency is matched to an import
 
 The audit runs against checkouts it does not install, and the module a
@@ -81,7 +89,10 @@ turned into `_`, and the name with a `python` or `py` affix removed, so
 that `PyYAML` finds `yaml` and `python-magic` finds `magic`.
 `IMPORT_NAME_ALIASES` in `scripts/audit/checks/packaging.py` carries
 the rest -- `protobuf` to `google`, `grpcio` to `grpc`, `mysqlclient`
-to `MySQLdb`.
+to `MySQLdb`. It also carries a handful of common names no repository
+declares yet, `Pillow` to `PIL` among them: an entry costs a line,
+while its absence costs the first repository to add one an issue
+asking it to justify a dependency nobody doubted.
 
 Deriving generously is deliberate. A spurious candidate can only make a
 dependency look used, and this criterion files an issue when one looks
@@ -100,10 +111,11 @@ plugin and a Rust proxy alongside the package itself.
 Comments and string literals are masked before imports are read. A
 commented-out import is the precise shape this criterion exists to
 find, so counting one as a use would report the deadest dependency in
-the tree as the one still in use. `build/`, `dist/`, `cover/`, `.tox/`,
-`.venv/` and `node_modules/` are not read: a copy of the source is what
-makes a deleted import look alive, and shakenfist's `.tox` holds 23,286
-Python files against the 502 it wrote.
+the tree as the one still in use. `.git/`, `.tox/`, `.venv/`, `venv/`,
+`.eggs/`, `build/`, `dist/`, `cover/`, `node_modules/` and
+`__pycache__/` are not read: a copy of the source is what makes a
+deleted import look alive, and shakenfist's `.tox` holds 23,286 Python
+files against the 502 it wrote.
 
 ## Projects
 

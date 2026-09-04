@@ -775,7 +775,6 @@ Each review item has an `action` field:
 - `.github/workflows/test-drift-fix.yml` - Scheduled/on-demand test maintenance
 - `.github/workflows/differential-fuzz.yml` - On-demand differential fuzzing (instar vs qemu-img + libyal)
 - `.github/workflows/coverage-fuzz.yml` - Coverage-guided fuzzing of parser crates (nightly + PR)
-- `.github/workflows/fuzz-autofix.yml` - Automated fuzzer bug fix (daily Claude Code, 30-turn limit)
 - `.github/workflows/rust-nightly-bump.yml` - Weekly devcontainer Rust nightly pin bump (see "Toolchain pinning" above)
 - `.github/workflows/codeql-analysis.yml` - CodeQL static analysis (push/PR to develop, plus weekly cron)
 - `.github/workflows/supply-chain.yml` - gitleaks secret scanning on debian-13 (PR/push, plus weekly cron)
@@ -804,8 +803,5 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/ci/test-report-fuzz-crash.sh`, `tools/ci/test-pick-fuzz-artifact.sh` - Tests for those two; run them after any change (the `ci-tooling` CI job does)
 - `tools/ci/check-glibc-floor.sh` - Fails if the built `instar` binary needs a glibc above the published floor (`GLIBC_2.31`, Debian 11; see `docs/installation.md`). Runs immediately after `make instar` in both `build-and-test` and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and `src/.devcontainer/build/Dockerfile` must stay on `debian:bullseye`
 - `tools/ci/test-check-glibc-floor.sh` - Tests for that check; the `ci-tooling` CI job runs it
-- `tools/ci/stage-autofix-changes.sh` - Stages the tracked edits a Claude Code autofix run left in the working tree, before the steps that judge whether a fix exists read the index, and refuses the attempt (exit 3) if it created a file that cannot be staged safely. Called from `fuzz-autofix.yml`; see "Automated bug fixes" in `docs/testing.md`
-- `tools/ci/test-stage-autofix-changes.sh` - Tests for that stager; the `ci-tooling` CI job runs it
-- `tools/ci/autofix-artifact-patterns.sh` - Sourced, not executed: the editor leftovers and build output that are not part of a fix
-- `tools/ci/claude-result.sh` - Reads the JSONL stream a `claude -p --output-format stream-json --verbose` run leaves behind; `--text` reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), `--trailer` emits the `Assisted-By:`/`Co-Authored-By:` pair naming the model the run actually resolved to. Called from `fuzz-autofix.yml` and `test-drift-fix.yml`; see "Automated bug fixes" in `docs/testing.md`
+- `tools/ci/claude-result.sh` - Reads the JSONL stream a `claude -p --output-format stream-json --verbose` run leaves behind; `--text` reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), `--trailer` emits the `Assisted-By:`/`Co-Authored-By:` pair naming the model the run actually resolved to. Called from `test-drift-fix.yml`
 - `tools/ci/test-claude-result.sh` - Tests for that helper; the `ci-tooling` CI job runs it

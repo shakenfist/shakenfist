@@ -500,8 +500,9 @@ hand-crafted minimal valid inputs for each format.
 - Corpus seeding: `scripts/extract-fuzz-corpus.py`
 - Corpus storage: `instar-testdata/custom/fuzz-corpus/`
 - Crash reporting: automatic GitHub Issue filing with `security-audit` label
-- Automated fixes: `.github/workflows/fuzz-autofix.yml` (daily at 06:00 UTC,
-  Claude Code with 30-turn limit, two attempts per issue)
+- Fixes: by hand, in interactive sessions. An earlier workflow attempted
+  this automatically; it was retired after an audit found its safety
+  boundary unsound (see `docs/plans/PLAN-fuzz-autofix.md`).
 
 ### Findings
 

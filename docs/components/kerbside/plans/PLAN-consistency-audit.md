@@ -245,7 +245,7 @@ to forcing it.
 | 2. Retire the comment addresser | [PLAN-consistency-audit-phase-02-retire-addresser.md](/components/kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/) | Complete | 5f3c80c |
 | 3. Skillsaw CI detection, upstream | [PLAN-consistency-audit-phase-03-skillsaw-detection.md](/components/kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/) | Complete | 16e6173 |
 | 4. Review scope and session scaffolding | [PLAN-consistency-audit-phase-04-review-coverage.md](/components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/) | Complete | ade2788 |
-| 5. Diagram discipline and mermaid linting | PLAN-consistency-audit-phase-05-diagram-discipline.md | Not started | |
+| 5. Diagram discipline and mermaid linting | [PLAN-consistency-audit-phase-05-diagram-discipline.md](/components/kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/) | In progress | |
 | 6. Push audit | PLAN-consistency-audit-phase-06-push-audit.md | Not started | |
 
 Phase sketches (to be expanded into per-phase plans):
@@ -331,10 +331,15 @@ claims did not survive contact with the tree.
   development clone with none set cannot parse gitsign's
   x509 signature and reports `N` for a valid one. Testing
   the commit object instead (`git cat-file commit <sha> |
-  grep '^gpgsig'`) finds **30 signed** mark-adding commits,
-  continuously since 2026-08-14, alongside 37 correctly
-  unsigned bot prunes. Three marks from before that date
-  are unsigned. The real question the phase had to settle
+  grep '^gpgsig'`) finds **29 signed** mark-adding commits,
+  continuously since 2026-08-14, alongside 46 unsigned
+  commits touching the same files -- 38 bot prunes, which
+  are correctly unsigned, and eight others. Three marks
+  from before that date are unsigned. *The count read 30
+  until 2026-09-03; the extra was `37c11de`, a merge
+  carrying GitHub's web-flow PGP signature rather than a
+  gitsign attestation, which is why the command excludes
+  merges.* The real question the phase had to settle
   was which clone holds the configuration, not whether
   anyone had ever run it.
 
@@ -349,10 +354,14 @@ in-scope count from 192 to 227 and the backlog from 77 to
 112, which is the honest number and a worse-looking one.
 
 **Phase 5 -- diagram discipline and mermaid linting.**
-Resolves #370 and #381, both of which arrived on 2026-08-29
-while phase 2 was in flight, when `shakenfist/development`
-added a `diagram-discipline` shared block and an accompanying
-`mermaid-lint-ci` audit. Copy the `diagram-discipline` block
+Resolves #370 and #381. *The dates in this sketch were
+wrong and were corrected on 2026-09-03:* #370 was filed
+**2026-08-26** and is not a new issue at all, but the
+pre-push audit issue phase 1 already worked on, refiled
+against a criterion that has since grown a block; #381 was
+filed **2026-08-30**. Both follow `shakenfist/development`
+adding a `diagram-discipline` shared block and an
+accompanying `mermaid-lint-ci` audit. Copy the `diagram-discipline` block
 verbatim into `PUSH-AUDIT.md`, and copy
 `templates/mermaid-lint/` to give the repository a
 `tools/mermaid-lint.sh` and a workflow that runs it. Note that
@@ -362,6 +371,22 @@ the audit does not refresh an open issue's body. Its only live
 finding is the missing `diagram-discipline` block. These two
 issues are one upstream change and are deliberately kept in one
 phase rather than split to clear a failure count sooner.
+
+*Surveyed 2026-09-03.* The sketch is right in substance and
+the phase is a pure adoption: all nine diagram-bearing files
+already render, measured by running the upstream linter
+against develop, so nothing has to be converted or fixed
+behind the new lane. `diagram-format` already passes for the
+same reason. Two facts the sketch does not mention decide how
+the phase is built. The lane needs a docker daemon, and
+kerbside's only lint job runs on a `static` runner that has
+none, so the shipped path-filtered workflow is taken rather
+than folded into the gate -- and it stays advisory, because a
+path-filtered workflow that a ruleset requires never reports
+on a pull request it skips and blocks it forever. The new
+`debian-12-docker` runner label must also be added to
+`.github/actionlint.yaml`, which otherwise fails on the
+workflow.
 
 **Phase 6 -- push audit.** Work through `PUSH-AUDIT.md` over
 the accumulated diff of phases 1, 2 and 4 against `develop`

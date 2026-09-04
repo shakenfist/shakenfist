@@ -175,5 +175,3 @@ Which projects have which of these is measured every morning rather
 than listed here, because a hand-maintained table of fleet state goes
 stale silently: see the `ci-review-automation` section of
 [the compliance page](/components/development/audits/compliance/#ci-review-automation).
-Note that imago is not in the audit matrix, so it is the one project
-carrying this automation which the audit will never report on.
