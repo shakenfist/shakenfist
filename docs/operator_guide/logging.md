@@ -79,6 +79,7 @@ collection) or directly as `SHAKENFIST_*` config:
 | `LOKI_BASE_URL` | `''` | Base URL of your Loki, e.g. `http://loki:3100`. Empty disables the shipper. |
 | `LOKI_TENANT` | `''` | Value sent as the `X-Scope-OrgID` header for multi-tenant Loki. Empty omits the header. |
 | `LOKI_AUTH_HEADER` | `''` | Opaque `Authorization` header value (e.g. `Bearer <token>`). Empty sends none. Treat as a secret. |
+| `LOKI_MAX_LINE_AGE` | `518400` (6 days) | Maximum age in seconds of a spooled line the drainer will still ship; older rows are discarded at drain time. Keep below your Loki's `reject_old_samples_max_age` (default one week). |
 | `LOG_EVENTS_TO_LOKI` | `True` | Whether the per-event `Added event` log line is emitted to the log stream. Never affects the authoritative MariaDB event write (see [Events vs logs](#events-vs-logs)). |
 
 ### Tenant
@@ -137,9 +138,14 @@ disk-backed sqlite spool at:
   crash. On startup the spool recovers orphan files left by
   previously-dead PIDs.
 - **Backpressure.** A background drainer thread batches lines and
-  POSTs them to Loki's `/loki/api/v1/push`. On failure the batch
-  stays in the spool and is retried with exponential backoff; a
-  brief Loki outage loses nothing.
+  POSTs them to Loki's `/loki/api/v1/push`. On a transient failure
+  (timeout, connection error, 429, 5xx) the batch stays in the
+  spool and is retried with exponential backoff; a brief Loki
+  outage loses nothing. A permanent rejection (any other 4xx, for
+  example Loki's `reject_old_samples`) drops the batch and moves
+  on, so one unacceptable line can never wedge the queue behind
+  it. Rows older than `LOKI_MAX_LINE_AGE` are discarded before
+  pushing for the same reason.
 - **Drop, don't block.** If the spool exceeds its high-water mark
   (a sustained outage), new lines are dropped — with a counter
   increment and a warning — rather than blocking the daemon. Only
@@ -154,8 +160,10 @@ metrics endpoint:
 |--------|---------|
 | `logship_spool_depth` | Lines currently pending in the local spool. |
 | `logship_spool_dropped_total` | Lines dropped at the high-water mark. |
-| `logship_push_total{result=...}` | Loki push attempts by outcome. |
+| `logship_push_total{result=...}` | Loki push attempts by outcome (`success`, `failure`, `rejected`). |
 | `logship_push_seconds` | Loki push request latency. |
+| `logship_expired_lines_total` | Lines discarded at drain time for exceeding `LOKI_MAX_LINE_AGE`. |
+| `logship_rejected_lines_total` | Lines dropped because Loki permanently rejected their batch. |
 
 ## API request validation findings
 
@@ -315,7 +323,8 @@ directly on the eventlog spool/drainer:
   drop-and-count over a high-water mark; orphan recovery).
 - `shakenfist/logship_drainer.py` — a background thread that batches spooled
   lines and POSTs them to Loki's `/loki/api/v1/push` with exponential backoff,
-  retaining failed batches for retry.
+  retaining transiently-failed batches for retry and dropping
+  permanently-rejected or over-age ones so they cannot wedge the queue.
 - `shakenfist/logship.py` — a `logging.Handler` that JSON-formats each record
   into the spool, plus `start()`, which (in Loki mode) attaches the handler to
   the root logger and removes the library's per-module syslog handlers so logs
