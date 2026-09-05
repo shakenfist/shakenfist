@@ -1443,6 +1443,534 @@ relevant code: `shakenfist/config.py:230-320`,
 `reap_instance_executors`, `expire_if_out_of_budget`), and the diff of
 `91d565a05` and `2e19bb1ea`.
 
+### Cross-repository contract
+
+Step 8g of `PLAN-agent-operation-deadlines-phase-08-push-audit.md`, per
+decision 3. Read-only in both repositories; nothing was edited or committed
+in either. Server tree is the worktree
+`/srv/kasm_profiles/mikal/vscode/src/shakenfist/shakenfist-wt-aod-08`
+(branch `agent-operation-deadlines-phase-08-push-audit`); client tree is
+`/srv/kasm_profiles/mikal/vscode/src/shakenfist/client-python` at `develop`.
+
+Result: **1 blocking, 7 advisory.**
+
+#### What was actually read
+
+**Client repository (`client-python`)**
+
+* `git diff 4557100^1 4557100 --stat`, then the full diff of
+  `shakenfist_client/apiclient.py`, `shakenfist_client/commandline/instance.py`
+  and `shakenfist_client/main.py`.
+* Resulting tree: `shakenfist_client/apiclient.py` lines 121-135
+  (`AgentAwaitTimeout`, `AgentCommandError`, `AgentOperationFailed`), 195-203
+  (`_is_error_state`, `TERMINAL_AGENT_OPERATION_STATES`), 303-313
+  (`_collect_capabilities`, `check_capability`), 1276-1330 (`_await_agentop`),
+  1327-1372 (`_add_agentop_timing`, `_remaining_agentop_budget`), 1380-1408
+  (`_agent_failure_context`, `_enriched_agent_failure`), 1409-1454 (the three
+  creating helpers), 1704-1734 (`await_agent_ready`), 1735-1828
+  (`await_agent_command`), 1830-1876 (`await_agent_fetch`).
+* `shakenfist_client/commandline/instance.py` lines 28-50
+  (`_warn_if_timing_unsupported`) and 826-930 (the three verbs and their
+  options).
+* `shakenfist_client/main.py` lines 113-178 (`GroupCatchExceptions`).
+* `docs/plans/PLAN-agent-operation-deadlines-phase-06-client.md` in full,
+  including both *Corrections applied in review* sections and *Future work*.
+* `AGENTS.md` (lines 95-125), `ARCHITECTURE.md:86`, `CLAUDE.md:90-120`,
+  `README.md`, `docs/` listing.
+* Greps: `AgentCommandError|AgentOperationFailed|AgentAwaitTimeout` across
+  `*.py` and `*.md`; `except.*Agent` across `*.py`; `expired` across
+  `shakenfist_client/`; `/agent/` across `apiclient.py`;
+  `get_agent_operation|_await_agentop|'state'\]` across `apiclient.py`.
+* Test inventory only (not line-by-line):
+  `shakenfist_client/tests/test_client_apiclient.py` (the terminal-state
+  parameterisation at `:1193-1198`, `TERMINAL_FAILURE_STATES = ('error',
+  'expired', 'deleted')`), `test_client_main.py:255-270`,
+  `test_client_commandline_instance.py`.
+* Executed `click.INT` negative-value probe in a scratch script (not in the
+  repository) to confirm CLI parsing behaviour.
+
+**Server repository (`shakenfist-wt-aod-08`)**
+
+* `docs/plans/PLAN-agent-operation-deadlines-phase-08-push-audit.md` in full;
+  the *Future work* section of
+  `docs/plans/PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md`.
+* `shakenfist/external_api/base.py:227-327` (`agent_operation_timing`,
+  `_timing_seconds`), `:1205-1245` (`log_request`'s body merge).
+* `shakenfist/external_api/instance.py:80-94` (the two shared parameter
+  descriptions), `:1810-1860` (put), `:1895-1935` (get), `:1955-1995`
+  (execute).
+* `shakenfist/external_api/app.py:296-397` (`ConditionalCapability`,
+  `API_CAPABILITIES`, `advertised_capabilities`, `render_capabilities`,
+  `Root`).
+* `shakenfist/config.py:240-315` (the three constants).
+* `shakenfist/operations/agentoperation.py:25-90` (`STATE_EXPIRED`,
+  `TERMINAL_STATES`, `state_targets`), `:187-214` (`external_view`),
+  `:320-370` (`expire`, `fail`).
+* `shakenfist/baseobject.py:629-657` (`error` property and setter),
+  `:690-707` (`_external_view`).
+* `shakenfist/deploy/shakenfist_ci/base.py:28-52`
+  (`AGENT_OPERATION_FAILURES`), `:475-525` (both `except` sites).
+* `docs/operator_guide/agent_operations.md:85-125`;
+  `docs/release_notes/v07-v08.md:730-840`.
+* Greps: the three exception names across `*.py` and `*.md`;
+  `await_agent_command(|await_agent_fetch(` across `shakenfist/`;
+  `deadline_seconds|progress_timeout_seconds` across
+  `external_api/instance.py`.
+* Also grepped `client-python-k3s/`, `sfui/` and `client-python-ova/` for the
+  three exception names — **no hits**, so those two named downstream consumers
+  carry no `except` clause that phase 6 could have narrowed.
+
+---
+
+#### Question 1 — can the client produce a `deadline_seconds` the server 400s?
+
+**The two numbers.** The server publishes `{'minimum': 0}` on
+`deadline_seconds` and `progress_timeout_seconds` at
+`shakenfist/external_api/instance.py:1823, 1826, 1904, 1906, 1963`. There is
+**no published maximum**, so no upper bound can be violated. The 400 guard is
+`_timing_seconds()` at `shakenfist/external_api/base.py:284-326` and rejects
+exactly four things: a JSON boolean (`:299`), a non-numeric (`:303`), a
+non-finite float — `inf`/`NaN` (`:317`), and a negative (`:322`).
+
+**The derived path cannot reach any of those.** Every derived value comes from
+`Client._remaining_agentop_budget()`
+(`client-python/shakenfist_client/apiclient.py:1358-1372`):
+
+```python
+return max(1, round(timeout - (time.time() - start_time)))
+```
+
+`round()` on a float returns an `int`, and `max(1, ...)` floors it at 1. So:
+
+* Very large `timeout` — an int of any magnitude; `float()` of it is finite
+  and positive. Accepted.
+* `timeout=0` — `max(1, round(-elapsed))` is `1`. Accepted (and the operation
+  gets a 1-second server deadline, which is the documented intent of the
+  floor).
+* `timeout` negative — same, `1`. Accepted.
+* Rounding vs truncation — `round()` (banker's rounding), never `int()`
+  truncation, so no value can be pushed below the floor. Both `await_agent_command`
+  (`:1749`) and `await_agent_fetch` (`:1837`) are the only two call sites.
+* `_await_agentop` derives nothing at all. Decision 3 of the phase-6 plan was
+  reversed in review (`Corrections applied in review`, first bullet): the
+  async-strategy-derived deadline was removed and `_add_agentop_timing()`
+  (`:1327-1356`) now sends only what a caller passed. So the CLI's default
+  (`pause`, 60 s) does **not** become a `deadline_seconds` — this is the
+  hazard the phase-6 review already caught, and it is genuinely gone.
+
+The only non-derived hazard is the CLI, below (**CR-2**).
+
+**Finding CR-2 — `click.INT` accepts a negative `--deadline`, and for
+`instance upload` the 400 arrives after the transfer.** *Advisory. Fix in
+`client-python`.*
+
+`client-python/shakenfist_client/commandline/instance.py:826, 832, 872, 912,
+917` all declare `type=click.INT, default=None` with no range. Verified by
+running click: both `--deadline=-5` and `--deadline -5` parse to `-5`
+(exit code 0). The value is passed straight through
+`_add_agentop_timing()`'s `is not None` test onto the wire, and the server
+returns `400 deadline_seconds must not be negative`, surfaced by
+`main.py:118` as `Malformed Request: ...` with exit 1.
+
+Concrete scenario:
+`sf-client instance upload --deadline=-1 myinst ./4GB.qcow2 /tmp/x`.
+`instance_upload()` (`:837`) calls `_warn_if_timing_unsupported()` first —
+which the second phase-6 review round deliberately moved *above* the transfer
+so a user is not told too late — then uploads the whole artifact
+(`:845-861`), and only then calls `instance_put_blob()` (`:864`), which
+400s. The user has paid for a 4 GB transfer to learn about a typo the client
+could have caught before argument parsing finished. The published
+specification says `minimum: 0`; `click.IntRange(min=0)` is the one-line fix
+and it makes the client honour the bound it can already see.
+
+Note also that the CLI help text (`:827-831` etc.) says "0 disables this
+budget" but never says the value must be non-negative, so nothing warns the
+user off.
+
+**Not findings, but recorded.** `_remaining_agentop_budget(start, float('inf'))`
+raises `OverflowError` from `round()` rather than sending anything, and
+`timeout=None` raises `TypeError`. Neither is reachable: both call sites take
+`timeout` from a signature defaulting to `120` and no caller in either tree
+passes `None` or a non-finite value. Worth knowing only because PR #369's
+`create_instance(timeout=None)` convention makes `None` a plausible thing for
+a future caller to try here.
+
+---
+
+#### Question 2 — does the client handle every terminal state?
+
+**Yes, exactly, including `expired`.**
+
+Authority: `shakenfist/operations/agentoperation.py:41-43` —
+`TERMINAL_STATES = (STATE_COMPLETE, STATE_ERROR, STATE_EXPIRED, STATE_DELETED)`.
+The `state_targets` map at `:56-75` confirms `expired` is reachable from
+`initial`, `preflight`, `queued` and `executing`, and that only `deleted`
+follows any of the four.
+
+Client: `TERMINAL_AGENT_OPERATION_STATES = frozenset({'complete', 'error',
+'expired', 'deleted'})` at `apiclient.py:202`, with a comment naming the
+server module as the authority and saying the duplication is deliberate. Set
+equality holds.
+
+**Fail-fast is real and single-sourced.** `_await_agentop()`
+(`apiclient.py:1300-1305`) tests membership on the *first* poll, before any
+`time.sleep(1)`, and raises `AgentOperationFailed` for the three non-`complete`
+members. Critically, the second review round deleted the outer
+"wait for the operation to be complete" loops from both `await_agent_command`
+and `await_agent_fetch` (see the diff hunks at old `:1583-1590` and
+`:1653-1658`), so `grep -n "get_agent_operation\|_await_agentop"` shows
+`_await_agentop()` at `:1301-1325` is now the **only** place in the client
+that polls an agent operation's state. There is no second loop that could
+still poll to a full timeout. That is client-python#363 genuinely fixed, and
+`expired` is covered by the same code path as `error`, not bolted on beside it.
+
+Test coverage confirms it rather than assuming: `test_client_apiclient.py:1198`
+parameterises `TERMINAL_FAILURE_STATES = ('error', 'expired', 'deleted')` and
+`:1193` names #363 in the docstring. `expired` is not a special case in either
+the code or the tests.
+
+**Finding CR-4 — the results and blob loops can still be entered already
+expired, and then report the wrong thing.** *Advisory. Fix in `client-python`.*
+
+`apiclient.py:1782` (`await_agent_command`), `:1856` and `:1869`
+(`await_agent_fetch`) all bound themselves by `while time.time() - start_time
+< timeout` against the *same* `start_time` that `_remaining_agentop_budget()`
+already spent. `_await_agentop()`'s own deadline is `time.time() + remaining`
+computed **after** the POST returns, and `round()` can round the remaining
+budget up by half a second, so `_await_agentop()` may legitimately still be
+polling at `start_time + timeout + POST-latency + 0.5`.
+
+Concrete scenario: `await_agent_command(uuid, cmd, timeout=120)` where
+`await_agent_ready()` returns at 118 s (its own loops break after a 5-second
+sleep, so it can succeed at up to `timeout + 5`). `remaining` is 2. The
+operation completes at 119.8 s. `_await_agentop()` returns it with `state ==
+'complete'` but `results` not yet written. The results loop at `:1782`
+evaluates `119.9 - 0 < 120` — true once, sleeps 5, then false — or, if
+`await_agent_ready` overshot, zero iterations. The caller then hits
+`raise AgentCommandError('operation returned no results')` at `:1791`, which
+says the operation produced nothing when what actually happened is that the
+caller's budget ran out. This is the residue of survey finding 5 / step 6d:
+the hardcoded `120`/`60`/`60` literals are gone, but the shared clock that
+made them wrong is still shared. `AgentAwaitTimeout` is the honest exception
+here, and the CI suite's `AGENT_OPERATION_FAILURES` catches both so nothing is
+currently mis-retried — this is a diagnosis problem, not a control-flow one.
+
+**Not a finding, recorded.** `_await_agentop()` calls `get_agent_operation()`
+at `:1325` with no handling for a `ResourceNotFoundException`. Phase 4 put
+`expired` in `FINAL_OBJECT_STATES`, so an expired operation is swept for hard
+deletion — but only after `CLEANER_DELAY`, by which time the client has long
+since seen the `expired` state and raised. Not reachable in practice.
+
+---
+
+#### Question 3 — do the CLI flags name the units the server documents?
+
+**Yes. No mismatch found.**
+
+Server: `DEADLINE_SECONDS_DESCRIPTION`
+(`shakenfist/external_api/instance.py:80-86`) and
+`PROGRESS_TIMEOUT_SECONDS_DESCRIPTION` (`:88-93`) both say seconds, both say
+what `0` means, both name the config default by constant name and value
+(600 / 30).
+
+Client: `--deadline` (`commandline/instance.py:826, 872, 912`) — "The wall
+clock budget **in seconds** ... 0 disables this budget. Omit to use the server
+default." `--progress-timeout` (`:832, 917`) — "The number of **seconds** of no
+progress ... 0 disables this budget." Both go on the wire as
+`deadline_seconds` / `progress_timeout_seconds` (`:864-865`, `:880`,
+`:926-927`), which is the same unit and the same sentinel semantics.
+
+The `--deadline` / `deadline_seconds` name difference is cosmetic: the flag's
+first help clause names the unit. `instance upload`'s help correctly scopes
+the budget to the agent operation ("once the upload of the artifact to the
+cluster is complete") — which matches the server, since the deadline is
+anchored at the `/agent/put` request, after the artifact upload. The
+asymmetry holds: `execute` has `--deadline` only
+(`:872-878`, no `--progress-timeout`), `instance_execute()` has no
+`progress_timeout_seconds` kwarg and hard-codes `None` into
+`_add_agentop_timing()` (`apiclient.py:1433`), matching the server's refusal
+at `instance.py:1982-1983`.
+
+**Finding CR-8 — the CLI help omits that queue and preflight time count
+against the deadline.** *Advisory. Fix in `client-python`.*
+
+Server (`instance.py:81-83`): "How many seconds after this request is
+received the operation may continue to be dispatched or execute. **Queue time
+and any preflight work count against it.**" Client help (`commandline/instance.py:827,
+873, 913`): "The wall clock budget in seconds for the in-guest agent operation
+which executes the command." A user reading only `--help` will size the flag
+against execution time. On a busy hypervisor with a queued instance
+executor, `--deadline 30` on a command that takes 5 seconds can still expire
+before it is ever dispatched. One clause added to the help text closes it.
+
+---
+
+#### Question 4 — do the exception names mean the same thing on both sides?
+
+**The mapping.** Server condition → client exception:
+
+| Server outcome | Client exception | Raised at |
+|---|---|---|
+| operation reaches `error` (agent reported failure, `fail()`) | `AgentOperationFailed`, `op_view['state'] == 'error'` | `apiclient.py:1303` |
+| operation reaches `expired` (`expire()`, either budget) | `AgentOperationFailed`, `op_view['state'] == 'expired'` | `apiclient.py:1303` |
+| operation reaches `deleted` | `AgentOperationFailed`, `op_view['state'] == 'deleted'` | `apiclient.py:1303` |
+| operation still in flight when the *client's* budget runs out | `AgentAwaitTimeout` | `apiclient.py:1773`, `:1851` |
+| operation completed but the result is unusable (no results, unexpected stderr, no stdout/content blob) | `AgentCommandError` | `apiclient.py:1791, 1797, 1805, 1821, 1863, 1865` |
+
+The mapping is documented in three places, all of them in the **server**
+repository: `shakenfist/deploy/shakenfist_ci/base.py:29-48` (the best
+statement of it, and correct), `docs/operator_guide/agent_operations.md:99-104`,
+and `docs/release_notes/v07-v08.md:825-831`. It is documented nowhere in
+`client-python` outside `AGENTS.md`/`CLAUDE.md`, which are agent instructions,
+not caller documentation — see **CR-6**.
+
+**`except` clauses in both trees.** Greps for the three names across `*.py`:
+
+* Server: three `except` sites total. `shakenfist_ci/base.py:487` and `:516`
+  both catch `AGENT_OPERATION_FAILURES`, which at `:49-52` is the full triple
+  `(AgentCommandError, AgentOperationFailed, AgentAwaitTimeout)` with a
+  comment (`:41-48`) explaining that it is for catching, not asserting, and
+  why it is deliberately not narrowed. Phase 7's regression is repaired and
+  the comment prevents its recurrence. The two assertion sites
+  (`smoke_ci_tests/test_agentops.py:265`,
+  `guest_ci_tests/test_agentops.py:276`) correctly use
+  `AgentOperationFailed` alone. **Nothing narrower than intended found.**
+* Client: three `except` sites. `main.py:163` catches
+  `AgentOperationFailed` in `GroupCatchExceptions` (so a terminal state is an
+  error message and exit 1, not a traceback);
+  `apiclient.py:1754` and `:1842` catch it internally to re-raise through
+  `_enriched_agent_failure()`. **Nothing narrower than intended found.**
+* `client-python-k3s`, `sfui`, `client-python-ova`: zero hits for any of the
+  three names, so the phase-6 plan's named third-party consumer carries no
+  affected `except`.
+
+**Can a caller distinguish `expired` from a plain failure?** Yes, at the
+granularity question 4 asks for, but only through a dict subscript.
+
+**Finding CR-6 — `AgentOperationFailed` exposes the state only as
+`e.op_view['state']`, which one path degrades to the string `'unknown'`, and
+the client repository documents none of it.** *Advisory. Fix in
+`client-python`.*
+
+`AgentOperationFailed.__init__` (`apiclient.py:132-135`) stores `op_uuid` and
+`op_view` but no `state`. A caller wanting "retry `expired`, do not retry
+`error`" must write `e.op_view.get('state')`. Both enriching call sites
+(`:1755-1761`, `:1843-1845`) substitute `{'uuid': e.op_uuid, 'state':
+'unknown'}` when `op_view` is falsy, so a defensive caller must also handle
+`'unknown'` — a value no server state machine can produce. A `state` property
+on the exception would make the discriminator part of the API instead of part
+of a payload.
+
+Compounding it: `client-python`'s `AGENTS.md:121-125` still says "There is
+deliberately no `docs/` page for the timing model yet. Phase 7 of the master
+plan writes it once, for the server and client halves together." Phase 7 has
+merged (`4a122bcd3`) — and wrote that page in the **server** repository. A
+library caller of `shakenfist_client` therefore has `--help` text and nothing
+else; `client-python/docs/` contains only `namespace-claims.md`,
+`vdi-console.md` and `plans/`. The forward reference is now stale in a way
+that reads as "still to come" when it is in fact "done, elsewhere".
+
+**Finding CR-5 — *which* budget expired an operation is unreachable through
+the API, so no client can tell a wall-clock expiry from a progress-timeout
+expiry.** *Advisory. Fix in `shakenfist`.*
+
+`expire()` (`shakenfist/operations/agentoperation.py:320-349`) records the
+reason as the state row's message. `AgentOperation.external_view()` (`:187-214`)
+returns `error_message = self.error`, and `baseobject.error`
+(`shakenfist/baseobject.py:629-638`) returns `None` unless the state value
+ends in `error` — `expired` does not. `_external_view()`
+(`baseobject.py:690-707`) renders `State` to its value string via
+`BaseExternalView`, dropping the message. So for an expired operation the
+external view carries `state='expired'` and `error_message=None`, and the
+reason exists only in the instance's event log.
+
+`docs/operator_guide/agent_operations.md:92-99` states this honestly. But
+`docs/release_notes/v07-v08.md:753` tells a reader "`expired` means a budget
+ran out, **and the state's message says which**" without saying that message
+is not on the wire — which is exactly the sentence an integrator would read
+before writing the discriminator they cannot write. A retry policy that wants
+to widen `progress_timeout_seconds` on a stall but not on a genuine
+deadline overrun cannot be written against today's API.
+
+---
+
+#### Question 5 — version skew and the capability token
+
+**Does the client consult the token? Yes, on every path that can send the new
+parameters.**
+
+`_add_agentop_timing()` (`apiclient.py:1348-1356`) returns early — sending
+neither key — unless `self.check_capability('agentoperation-deadlines')`. All
+three creating helpers route through it and there is no other POST to an
+`/agent/` endpoint in the client: `grep -n "/agent/" apiclient.py` returns
+exactly `:1420` (put), `:1437` (execute), `:1452` (get), and each builds its
+`data` dict through `_add_agentop_timing()` immediately before the POST. The
+token is advertised unconditionally (a plain string, not a
+`ConditionalCapability`) in the `instances` family at
+`shakenfist/external_api/app.py:372`, with a comment naming precisely which
+parameter goes on which endpoint. The token is **not** advertisement nobody
+reads.
+
+**New client, old server.** `check_capability()` is a substring test against
+`self.root_html` (`apiclient.py:310-312`), so an old server's root page
+contains no such token and nothing is sent — behaviour identical to
+pre-phase-6. This matters because `log_request()`
+(`shakenfist/external_api/base.py:1222-1231`) merges the JSON body into
+handler kwargs unconditionally, so an undeclared `deadline_seconds` reaching
+an old handler is a hard failure, not an ignored field. The gate is load-bearing
+and it is correctly placed. The CLI additionally warns on stderr when the
+*user typed a flag* the server cannot accept
+(`commandline/instance.py:28-50`), while the library stays silent — which is
+right, because `await_agent_command()` passes a deadline on every call and
+must keep working against an old cluster.
+
+**Old client, new server.** The old client sends nothing and gets the server
+defaults. This is where the release note is wrong — see **CR-1**.
+
+**Finding CR-1 — the release note's compatibility guarantee is false in both
+directions, and contradicts a bolded paragraph 74 lines above it in the same
+section.** *Blocking. Fix in `shakenfist`.*
+
+`docs/release_notes/v07-v08.md:832-836`:
+
+> Both changes are gated on the server advertising the
+> `agentoperation-deadlines` capability, so an old client against a new
+> cluster and a new client against an old cluster both keep behaving as they
+> did before this release.
+
+Both halves are untrue.
+
+*An old client against a new cluster does not keep behaving as before.* An
+old client sends no parameters, so `agent_operation_timing()`
+(`shakenfist/external_api/base.py:266-279`) applies
+`AGENT_OPERATION_DEFAULT_DEADLINE` (600 s, `config.py:240`) and, for `put`
+and `get`, `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` (30 s, `config.py:259`)
+— replacing a hardcoded 900-second backstop and *no* progress timeout at all.
+The same document says so at `:758-765`: "**The effective default is tighter
+than the behaviour it replaces.** Where a welcomed operation previously had
+900 seconds of execution, it now has 600 seconds counted from request
+receipt". Issue #3995 is the demonstrated consequence: a legitimate 471 MiB
+`get-file` expired because the guest answered the stat in 20 ms and then sent
+nothing for 30 s. A reader who reaches `:832` first concludes there is
+nothing to do and does not raise the constant.
+
+*The fail-fast change is not gated at all.* Decision 7 of
+`client-python/docs/plans/PLAN-agent-operation-deadlines-phase-06-client.md`
+says so explicitly ("The fail-fast change (decision 5) is *not* gated"), and
+the code agrees: `_await_agentop()`'s terminal-state test
+(`apiclient.py:1301-1305`) has no `check_capability()` anywhere near it.
+A new client against a pre-phase-3 server that produces `error` or `deleted`
+raises `AgentOperationFailed` today where it previously polled to its own
+timeout and raised `AgentCommandError` (fetch) or `AgentAwaitTimeout`
+(execute).
+
+Concrete scenario: an operator upgrades `sf-client` ahead of the cluster,
+reads `:832`, and leaves an in-house wrapper's
+`except apiclient.AgentCommandError:` retry unchanged. The first `agent/get`
+whose file does not exist now escapes the retry as an uncaught
+`AgentOperationFailed`. That is the *identical* failure mode phase 7's own
+Future work records against `base.AGENT_OPERATION_FAILURES` — "changing which
+exception a client raises silently narrows every `except` tuple downstream
+that was written against the old one" — and this sentence tells downstream
+consumers not to look.
+
+Graded blocking rather than advisory because it is a false compatibility
+guarantee currently on `develop`, in the one document a downstream integrator
+reads to decide whether they must change code, about a hazard that has
+already caused one silent regression inside this repository. The fix is a
+paragraph rewrite in `docs/release_notes/v07-v08.md` — trivial, and therefore
+within step 8h's "fix blocking findings here" mandate. Recommended
+replacement content: the parameter-*sending* half is gated; the fail-fast
+half is not and is a deliberate behaviour change (already stated correctly at
+`:825-831`); and old clients do inherit the tighter defaults, cross-referencing
+`:758-765`.
+
+**Finding CR-3 — `await_agent_fetch()` propagates a deadline but never a
+progress timeout, so every fetch is pinned to the server's 30-second default
+regardless of the caller's budget.** *Advisory. Fix in `client-python`.*
+
+`await_agent_fetch()` (`apiclient.py:1830-1845`) calls
+`instance_get(instance_uuid, path, deadline_seconds=remaining,
+await_seconds=remaining)`. `instance_get()` accepts
+`progress_timeout_seconds` (`:1441-1443`) but the helper never passes one and
+exposes no way for a caller to. `await_agent_command()` is the same shape,
+though harmless there — `agent/execute` is not progress-capable and the server
+stores `0.0` for it (`instance.py:1982-1983`).
+
+Concrete scenario, which is #3995: `await_agent_fetch(uuid,
+'/tmp/471MiB.img', timeout=600)`. The client asks for a 600-second wall-clock
+budget and gets one. The guest stats the file in 20 ms, then spends 30+
+seconds producing the first chunk; the executor's progress check fires on the
+server's 30-second default and the operation goes to `expired`. The caller
+asked for ten minutes and was killed at thirty seconds by a budget it was
+given no way to name. Adding `progress_timeout_seconds=None` to the signature
+and passing it through — the pattern the three creating helpers already
+follow — restores the caller's control without touching the default.
+
+This is *not* the same as retuning `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT`,
+which decision 7 of this phase puts out of scope. It is the missing lever that
+would let CI (or any caller with a known-large transfer) opt out per call while
+the measurement #3995 asks for is still pending.
+
+**Finding CR-7 — the capability is cached once per `Client` and can be stale
+across a rolling API upgrade.** *Advisory. Fix in `shakenfist` (or accepted).*
+
+`_collect_capabilities()` (`apiclient.py:305-308`) fetches the root page once,
+in the constructor, and `check_capability()` substring-matches the cached
+text. Behind a load balancer during a rolling upgrade, a client can read the
+root page from an upgraded worker, see `agentoperation-deadlines`, and then
+POST `deadline_seconds` to a worker that has not restarted yet — where
+`log_request()`'s `kwargs.update(j)` (`base.py:1231`) puts an undeclared kwarg
+in front of a handler that has no such parameter. This is a property of the
+capability mechanism generally rather than of phase 6, and the exposure window
+is one deploy, but phase 6 is the first feature to depend on the token for
+request *validity* rather than for a graceful degradation, which is what
+raises it above noise. Listing it so it is a decision rather than an oversight.
+
+---
+
+#### Summary of findings
+
+| Id | Grade | Repository | File | Question |
+|----|-------|-----------|------|----------|
+| CR-1 | **blocking** | `shakenfist` | `docs/release_notes/v07-v08.md:832-836` | 5 |
+| CR-2 | advisory | `client-python` | `shakenfist_client/commandline/instance.py:826, 832, 872, 912, 917` | 1 |
+| CR-3 | advisory | `client-python` | `shakenfist_client/apiclient.py:1830-1845` | 1 / 5 |
+| CR-4 | advisory | `client-python` | `shakenfist_client/apiclient.py:1782, 1856, 1869` | 2 |
+| CR-5 | advisory | `shakenfist` | `shakenfist/operations/agentoperation.py:187-214`, `shakenfist/baseobject.py:629-638` | 4 |
+| CR-6 | advisory | `client-python` | `shakenfist_client/apiclient.py:129-135`, `AGENTS.md:121-125` | 4 |
+| CR-7 | advisory | `shakenfist` | `shakenfist/external_api/base.py:1222-1231` (with `client-python/shakenfist_client/apiclient.py:305-312`) | 5 |
+| CR-8 | advisory | `client-python` | `shakenfist_client/commandline/instance.py:827, 873, 913` | 3 |
+
+No GitHub issues were filed; per the step brief the operator files them.
+Five findings would be filed against `client-python` (CR-2, CR-3, CR-4, CR-6,
+CR-8) and three against `shakenfist` (CR-1, CR-5, CR-7).
+
+#### Clean headings
+
+Stated explicitly per decision 9, each alongside what was examined:
+
+* **Terminal-state coverage is exact.** `TERMINAL_AGENT_OPERATION_STATES`
+  (`apiclient.py:202`) equals `AgentOperation.TERMINAL_STATES`
+  (`agentoperation.py:41-43`); `state_targets` (`:56-75`) reaches no fifth
+  terminal state. `expired` is handled by the same branch as `error`, on the
+  first poll, and is parameterised in the client's tests
+  (`test_client_apiclient.py:1198`).
+* **No `except` clause in either tree is narrower than intended.** All six
+  sites read (server `shakenfist_ci/base.py:487, 516`; client `main.py:163`,
+  `apiclient.py:1754, 1842`), plus the two assertion sites and the
+  `AGENT_OPERATION_FAILURES` tuple at `base.py:49-52`. Phase 7's regression is
+  repaired and commented against recurrence. `client-python-k3s`, `sfui` and
+  `client-python-ova` contain none of the three names.
+* **Units agree.** `deadline_seconds`/`progress_timeout_seconds` (server
+  `instance.py:80-93`) and `--deadline`/`--progress-timeout` (client
+  `commandline/instance.py:826-834, 872-877, 912-921`) are both seconds, with
+  the same `0` sentinel and the same "omit for the server default" rule; the
+  `execute`-has-no-progress-timeout asymmetry holds on both sides.
+* **The capability gate is real, correctly placed, and consulted on every
+  path.** Three `/agent/` POSTs, three `_add_agentop_timing()` calls, one
+  `check_capability()` inside it.
+
 ## Future work
 
 Recorded here at planning time; step 8h adds to it.
