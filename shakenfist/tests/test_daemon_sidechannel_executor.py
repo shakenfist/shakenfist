@@ -245,11 +245,13 @@ class RequestAllThreadsExitTestCase(base.ShakenFistTestCase):
     abort file, so the monitors loop stopped every executor as a side
     effect. Separating the files (which the reaper needs, or its abort
     for a wedged executor also stops the monitor) removed that
-    accident, and what it was masking is #3931: _request_thread_exit()
-    joins and deletes out of self.monitors whichever dictionary the
-    entry came from, so it raises KeyError once the monitors loop has
-    already removed an entry, with no try/except at the call site.
-    Signalling up front is what makes shutdown independent of that.
+    accident, and exposed #3931: _request_thread_exit() used to join
+    and delete out of self.monitors whichever dictionary the entry
+    came from, so it raised KeyError once the monitors loop had
+    already removed one. b915cb018 fixed that by passing the owning
+    dictionary in, and these tests no longer exercise it -- what they
+    assert is the property which makes shutdown independent of any
+    join at all: every thread is signalled before any is joined.
     """
 
     class _ShutdownMonitor:
@@ -262,12 +264,11 @@ class RequestAllThreadsExitTestCase(base.ShakenFistTestCase):
             self.executors = {}
             for uuid in instances:
                 # The monitor threads stop promptly, so the monitors
-                # loop deletes their entries. That is what arms
-                # #3931: the executors loop then reaches into
-                # self.monitors for an entry which is gone. Without
-                # it this fixture would never reproduce the bug,
-                # because a monitor which is still alive is not
-                # deleted and the KeyError never happens.
+                # loop deletes their entries before the executors loop
+                # runs. That ordering is what used to arm #3931, and
+                # it is kept because it is also the ordinary shutdown
+                # shape: by the time executors are torn down their
+                # monitors are usually already gone.
                 monitor_thread = mock.Mock()
                 monitor_thread.is_alive.return_value = False
                 self.monitors[uuid] = {

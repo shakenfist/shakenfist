@@ -20,7 +20,11 @@ class _FakeThread:
 
     ident mirrors threading.Thread.ident: None until the thread has
     actually been started, and an integer afterwards. It defaults to
-    started, since that is what every record here but one models.
+    started, since that is what most records here model.
+
+    join() raises the way a real thread does when it has not been
+    started, so a guard which is present but placed after the join
+    fails these tests rather than passing them.
     """
 
     def __init__(self, alive_answers, ident=1):
@@ -34,7 +38,13 @@ class _FakeThread:
         return self.alive_answers[0]
 
     def join(self, timeout=None):
+        if self.ident is None:
+            raise RuntimeError('cannot join thread before it is started')
         self.join_calls.append(timeout)
+
+    def start(self):
+        """Model a thread which has now been started."""
+        self.ident = 1
 
 
 def _thread_record(instance_uuid, alive_answers, ident=1):
@@ -154,6 +164,25 @@ class SidechannelShutdownTestCase(base.ShakenFistTestCase):
         self.assertIn(
             mock.call('/no/such/abort-i1', 'from _request_thread_exit'),
             self.set_abort_path.call_args_list)
+
+    def test_an_unstarted_thread_is_collected_on_a_later_pass(self):
+        # The guard returns without deleting the record, so
+        # _wait_for_all_threads_exit()'s "while self.monitors or
+        # self.executors" loop depends on a later pass finding the
+        # thread started. That holds by construction in
+        # start_instance_executor(), which registers and starts in
+        # adjacent statements and deletes the entry if start() raises,
+        # but the invariant lives in a comment and nothing asserted it.
+        m = self._make_daemon()
+        m.executors['i1'] = _thread_record('i1', [False], ident=None)
+
+        m._request_all_threads_exit()
+        self.assertIn('i1', m.executors)
+
+        m.executors['i1']['thread'].start()
+        m._request_all_threads_exit()
+
+        self.assertEqual({}, m.executors)
 
     def test_a_missing_record_is_a_noop(self):
         # The monitor loop can delete an entry between the snapshot and

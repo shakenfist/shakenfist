@@ -1247,14 +1247,13 @@ exactly -- `expired` is documented, and the mermaid diagram's four
 `--> expired` edges (`initial`, `preflight`, `queued`, `executing`) plus the
 `executing --> queued` retry edge reproduce the dict verbatim.
 
-One caveat worth surfacing: F6 itself says the doc "carries all **five**
-`--> expired` edges." Both the code and the doc have **four**, not five
-(`None` does not target `expired`; only `initial`, `preflight`, `queued`,
-`executing` do). This is a miscount in the phase-8 plan's own survey text,
-not a doc/code mismatch -- the doc and code agree with each other, just not
-with F6's count. **Advisory** — worth a one-word fix in the plan
-(`docs/plans/PLAN-agent-operation-deadlines-phase-08-push-audit.md:~F6`)
-so a future reader doesn't recount and find a ghost discrepancy.
+One caveat, since fixed: as originally surveyed, F6 said the doc "carries
+all **five** `--> expired` edges." Both the code and the doc have **four**
+(`None` does not target `expired`; only `initial`, `preflight`, `queued` and
+`executing` do), so the miscount was in this plan's own survey text rather
+than a doc/code mismatch -- the doc and the code agreed with each other all
+along. Recorded as advisory finding A3 and corrected in F6 by step 8h, so
+F6 now reads four. Nothing remains to reconcile.
 
 #### 1. Single-sourcing of the three constants
 
@@ -2488,6 +2487,29 @@ promising compatibility that a deliberate ungating had already broken.
 Neither is a coding error. Both are the cost of writing documentation
 and tests against a plan that is still moving, and both were invisible
 until somebody read the phases together.
+
+## Review follow-ups
+
+The automated review on PR #4078 raised one action item and four
+suggestions. All five were taken; none changed a finding's grade or
+disposition.
+
+| Item | What it said | What was done |
+|------|--------------|---------------|
+| 4 (action) | The 2c section still quoted F6 as saying "five" after step 8h corrected F6 to "four", so it flagged a discrepancy which no longer existed | The caveat is rewritten in the past tense and says the correction has landed |
+| 1 | `docs/plans/index.md` read `Complete` with nothing in the row saying the mechanism shipped with an open defect of its own making, so a reader scanning the index saw only a finished plan | The Intent cell now names #4074 and points at the master plan's Known defects section. The disposition itself is unchanged; the reviewer explicitly did not ask for that |
+| 2 | `_FakeThread.join()` returned regardless of `ident`, so the guard test would also have passed if a later edit moved the guard *below* the join -- the exact ordering mistake it exists to catch | `join()` now raises `RuntimeError` the way a real unstarted thread does. Verified: moving the guard below the join fails two tests, where before it would have failed none |
+| 3 | Nothing asserted that the record the guard leaves behind is collected on a later pass, so a broken invariant would hang shutdown rather than crash it | Added `test_an_unstarted_thread_is_collected_on_a_later_pass`, which drives two passes with the thread starting in between and asserts the dictionary empties |
+| 5 | `RequestAllThreadsExitTestCase`'s docstring and its fixture comment still described #3931 in the present tense, after the `except KeyError` crutch was removed | Both rewritten in the past tense, naming `b915cb018` as the fix. This is the same stale-statement class as blocking findings B2 and B3, which is worth noting: the audit fixed two instances of it and left a third behind in the same file it was editing |
+
+Item 5 is the one worth dwelling on. The audit's own closing section
+named "statements which were true when written and became false when a
+later phase landed" as the shape of both blocking findings. Step 8h
+then removed the `try`/`except KeyError` those docstrings describe and
+did not update the docstrings, creating a fresh instance of the defect
+it had just finished writing about. The lesson is not that the prose
+was missed; it is that removing a workaround and correcting the prose
+which explains it are one change, not two.
 
 ## Future work
 
