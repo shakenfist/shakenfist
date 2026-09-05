@@ -89,6 +89,12 @@
     # assertion is the regression coverage for issue 3669 (the module used to
     # treat that server populated key as a specification change and recreate
     # the instance).
+    #
+    # This is the first scenario in the suite to touch debian:11, so this
+    # create pays a cold ~407 MiB internet fetch inside its await budget. On
+    # a slow uplink that fetch alone has been observed to take 578 seconds
+    # (issue 4000), which leaves the default 600 second await_timeout with no
+    # headroom, so give this create a larger budget.
     - name: Create a test instance that uses those networks
       sf_instance:
         name: "ansibleci-004"
@@ -105,6 +111,7 @@
           - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
         state: present
         await: true
+        await_timeout: 1200
       register: ci_instance
 
     - name: Assert the instance is new

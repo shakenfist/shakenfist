@@ -332,6 +332,10 @@ class Monitor(daemon.Daemon):
                 # blobs that haven't been registered yet - they get a 300s
                 # grace period from creation time instead of appearing unused
                 # since epoch (which caused race conditions during downloads).
+                # For fetches which outlive that grace period, http_fetch()
+                # refreshes last_used as a heartbeat while data is flowing
+                # (issue 4000), so reaching here with a stale last_used means
+                # the fetcher is dead or stalled, not merely slow.
                 last_used = b.last_used or b.fetched_at
                 age = time.time() - last_used
                 if age > 300:
