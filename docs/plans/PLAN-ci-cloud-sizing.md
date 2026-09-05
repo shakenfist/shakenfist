@@ -621,7 +621,7 @@ read-reliability defect to file.
 What the window does expose is the other side of the same fact: for
 those 135 to 210 seconds the admission guard does not exist, which is
 where the 18 refusal payloads that fired with `capacity_row_present`
-false come from, and which is the defect drafted in *Bugs fixed
+false come from, and which is #4087, recorded in *Bugs fixed
 during this work* below. Step 2g should confirm the classification
 prospectively once D19's flag is running -- `capacity_degraded`
 should read false throughout the prefix -- but that is a
@@ -1377,9 +1377,9 @@ sure none of them is closed by accident:
   Phase 2 wants to compare the live ledger derivation against the
   reconciled `cluster_capacity` figure; if they disagree, this is
   why it is hard to tell which is wrong.
-- **Unguarded placements in a cluster's first minutes** (*drafted
-  by phase 2 step 2f, not yet filed -- there is no issue number for
-  this yet*). `scheduler_node_capacity` has no rows until the
+- **Unguarded placements in a cluster's first minutes**
+  (**#4087**, filed by phase 2 step 2f).
+  `scheduler_node_capacity` has no rows until the
   reconciler's first pass, which `schedule.every(5).minutes` puts
   five minutes after the cluster daemon starts, so for a measured
   135 to 210 seconds of every one of the 204 job-runs in the
@@ -1392,8 +1392,7 @@ sure none of them is closed by accident:
   the mechanism behind *A node can record twice its own ledger*
   above, it is not a breach of the guarded UPDATE, and **growing
   the cloud would mask it rather than fix it**, which is exactly
-  what phase 3 exists to prevent. Draft text is held outside the
-  repository by step 2f; the operator files it.
+  what phase 3 exists to prevent.
 
 ### Back brief
 

@@ -237,8 +237,8 @@ would mask rather than fix**, which is precisely the outcome phase
 expected:** it occurs in 18 of 85,563 node-samples, inside 2 of 204
 job-runs, and one of those two job-runs *passed*. At one percent it
 cannot explain the tier's failure rate and does not. It remains a
-genuine invariant violation for 2f to file, and it remains a defect
-a bigger cloud would mask -- but the framing below, written before
+genuine invariant violation, filed by step 2f as **#4087**, and it
+remains a defect a bigger cloud would mask -- but the framing below, written before
 the window was harvested, overstated it. See *What the baseline
 measured*.
 
@@ -606,7 +606,7 @@ run 33948911843 peaked at 2.0 and failed. Three of the eighteen
 samples measured exactly zero. The brief expected this might be the
 single most decision-relevant number in the dataset; at one percent
 of job-runs it cannot explain a 76% tier failure rate, and it is
-not. It remains a genuine invariant violation for step 2f to file,
+not. It remains a genuine invariant violation, filed as **#4087**,
 and it remains a defect that a bigger cloud would mask.
 
 **What refused, measured from the raw bundles.** Not from the
