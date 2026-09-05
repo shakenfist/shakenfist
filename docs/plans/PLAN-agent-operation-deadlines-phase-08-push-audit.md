@@ -1443,6 +1443,463 @@ relevant code: `shakenfist/config.py:230-320`,
 `reap_instance_executors`, `expire_if_out_of_budget`), and the diff of
 `91d565a05` and `2e19bb1ea`.
 
+### 2d. Security review
+
+Baseline: `git diff <M>^1 <M>` for `f21d5da3a`, `cb9e10bba`, `08807c83f`,
+`291054e98`, `185de6b32`, `4afa29476`, `864608276`, `4a122bcd3`, plus
+`2341ae0c4`, `2e19bb1ea`, `91d565a05`. Read in the tree at `c810ca958` in
+worktree `shakenfist-wt-aod-08`.
+
+**Result: 1 blocking, 3 advisory, 1 informational.** The blocking finding is
+the executor-slot question the phase plan flagged as the highest-value one,
+and the phase plan's own criterion ("if the new parameters reintroduce it as
+a *client-requestable* condition, that is a blocking finding") is met.
+
+---
+
+#### Authorisation and input validation
+
+**Nothing found.** What was examined, and the specific line that makes each
+safe:
+
+*Parameter declarations.* `shakenfist/external_api/instance.py:1822-1826`
+(agent/put), `1903-1907` (agent/get), `1962-1963` (agent/execute). All five
+declarations are six-element tuples: `location='body'` (correct — these
+arrive in the JSON body, which `log_request` merges into kwargs at
+`shakenfist/external_api/base.py:1231`), `type='number'` (a valid
+`api_base.ARGTYPES` token), `required=False`, and a constraints dict
+`{'minimum': 0}` whose key is in `api_base.CONSTRAINT_KEYS`
+(`base.py:~325`). Every kwarg each handler accepts is declared:
+`post(self, instance_ref, blob_uuid, path, mode, deadline_seconds,
+progress_timeout_seconds, instance_from_db)` — `instance_from_db` is
+decorator-injected and correctly undeclared. `swagger_helper()` validates all
+of this at import time, so a malformed declaration would stop sf-api.
+
+*`STRUCTURED_PARAMETERS`.* All five entries present at
+`shakenfist/tests/external_api/test_openapi_spec.py:139-149`, each
+`{'type': 'number', 'minimum': 0}`, matching the declarations exactly. The
+table's completeness check (`test_openapi_spec.py:336-361`) is derived from
+the published specification, so a missing entry would fail CI.
+
+*Does the 400 guard back the published bound?* Yes. The published bound is
+`minimum: 0` and nothing else, and `_timing_seconds()`
+(`shakenfist/external_api/base.py:280-317`) enforces exactly that at
+`base.py:314-316` (`if seconds < 0: return 400`). This matters because the
+compiled-schema layer in `shakenfist/external_api/validation.py` is
+explicitly warn-only (module docstring line 5: "Nothing here rejects
+anything"), so `_timing_seconds()` is the *only* thing enforcing the
+published bound. It does. No `maximum` is published and none is enforced —
+consistent, but see A-1.
+
+*Hostile values.* Traced each against `_timing_seconds()`:
+
+| Sent | Result |
+|---|---|
+| `"abc"`, `[]`, `{}` | `float()` raises `ValueError`/`TypeError` → 400 (`base.py:295-298`) |
+| `true` | explicit bool guard → 400 (`base.py:289-292`); without it `isinstance(True, int)` would have made it 1.0 |
+| `Infinity`, `NaN` (bare JSON literals, which `json.loads` accepts) | `math.isfinite()` → 400 (`base.py:310-312`). Verified `json.loads('{"a": Infinity}')` does yield `inf`, so the guard is load-bearing, not theoretical |
+| `-1` | `< 0` → 400 |
+| `"1"*100000` | `float()` yields `inf` → caught by the same `isfinite` guard |
+| `1e308` | **accepted** — see A-1 |
+
+*`time.time() + deadline_seconds` overflow.* Cannot produce `inf`: `inf` and
+`NaN` never reach the addition (rejected above), and I verified empirically
+that `1.7976931348623157e308 + time.time()` stays finite (the addend is ~16
+orders of magnitude below the ULP). The stored value reaches the `deadline`
+DOUBLE column intact and `deadline_passed()`
+(`shakenfist/operations/agentoperation.py:302-309`) simply compares against
+it. No overflow, no exception, no NULL confusion.
+
+*Cross-namespace influence.* None. All three endpoints are gated by
+`@api_base.requires_instance_ownership` (`base.py`, the
+`request_namespace() not in [i.namespace, 'system']` → 404 check), and the
+operation is created with `instance_from_db.namespace` — the *instance's*
+namespace, not the caller's — at `instance.py:1878`, `1938`, `1998`. Neither
+timing parameter names or references any object, so neither can be used to
+address an operation the caller does not already own. The execute endpoint
+additionally requires the `execute` verb scope (`instance.py:1949`).
+
+*The capability token (`4afa29476`).* It is **purely advertisement** and
+gates nothing server-side: the whole change is one string appended to
+`API_CAPABILITIES['instances']` in `shakenfist/external_api/app.py:325-333`.
+That is correct rather than a gap — its documented job is to let a *new
+client* discover the parameters exist before sending them to an *old server*,
+where `log_request`'s unconditional kwargs merge would turn an unknown body
+key into a `TypeError` → 400 (`base.py:1313-1314`). It is a compatibility
+signal, not an authorisation control, and nothing in the server treats it as
+one.
+
+*Undeclared `progress_timeout_seconds` on agent/execute.* Sending it returns
+400 via the `TypeError` handler at `base.py:1313`, which matches the
+published 400 description at `instance.py:1965-1967`. The published spec and
+the server agree.
+
+---
+
+#### Denial of service
+
+##### D-1 (**blocking**): nothing bounds a client-requested no-deadline operation, and the reaper cannot recover the slot it parks
+
+**Files:** `shakenfist/daemons/sidechannel/main.py:960-1060`
+(`expire_if_out_of_budget`), `:1625-1751` (`_resolve_stuck_queue_head`),
+`:1292-1300` (the socket loop's only unconditional exit),
+`shakenfist/external_api/base.py:266-281` (the `0` sentinel surviving the API
+layer), `shakenfist/operations/agentoperation.py:288-292` and `:310-320`
+(`effective_deadline` / `effective_progress_timeout` returning `None`).
+
+**Exploitation.** A caller with ordinary write+execute scope on a namespace,
+against an instance they own:
+
+```
+POST /instances/<uuid>/agent/execute
+{"command_line": "sleep 31536000", "deadline_seconds": 0}
+```
+
+One request. Trace of what happens:
+
+1. `agent_operation_timing(0, None, progress_capable=False)` —
+   `base.py:266-272` deliberately does **not** shift the explicit `0` onto
+   the clock, so `deadline` is stored as `0.0`; `progress_timeout` is stored
+   as `0.0` because execute is not progress-capable (`base.py:274-279`).
+2. `effective_deadline()` returns `None` on the `self.deadline == 0.0` test
+   (`agentoperation.py:288-289`), so `deadline_passed()` is `False` forever.
+3. `effective_progress_timeout()` returns `None` on the same sentinel test
+   (`agentoperation.py:312-313`), so `expire_if_out_of_budget()` returns at
+   `main.py:1039-1040` (`if window is None: return False`).
+4. In `_execute_inner`'s loop (`main.py:1293`), the 30-second welcome
+   deadline (`main.py:1298-1304`) is already satisfied, and the guest agent's
+   ping replies refresh `self.last_data` every 2 s, so `recv()` never returns
+   empty. The loop is `while daemon.check_abort_path(...)` — the **only**
+   remaining exit is the abort file.
+5. `_dispatch_loop` skips the instance while `instance_uuid in
+   self.executors` (`main.py:1846-1847`), so no later operation on that
+   instance is ever dispatched.
+6. The node-local reaper cannot help. `_resolve_stuck_queue_head` has exactly
+   three cases: case one requires `not executor` (`main.py:1693`) — there
+   *is* a live executor; cases two and three both hinge on
+   `agentop.deadline_passed(state=state)` at `main.py:1722`, which is `False`
+   by construction, so it takes case three and returns "leave it entirely
+   alone". Its own docstring says so at `main.py:1641-1645`: *"an operation
+   created with `deadline_seconds=0` asked for no wall-clock budget, so a
+   live executor wedged before it connects holds that instance's executor
+   slot with nothing able to prove it is stuck."*
+
+**Why this is blocking rather than a documented trade-off.** `291054e98`
+deleted `AGENT_OPERATION_EXECUTION_TIMEOUT = 900` from
+`shakenfist/daemons/sidechannel/main.py` (confirmed against
+`291054e98^1:main.py:56` and `:750-763`). That constant was **unconditional
+and not client-influenceable**, and its own comment named the exact scenario
+above: *"a welcomed agent that then never finishes the operation ... the loop
+spins forever with the operation stuck EXECUTING, because pings keep the
+socket alive so no other deadline fires. See issue #3516."* This plan
+replaced a backstop nobody could switch off with a budget the caller chooses,
+including choosing none. There is no `AGENT_OPERATION_MAX_DEADLINE` — grep
+confirms `AGENT_OPERATION_DEFAULT_DEADLINE` is a *default*, not a ceiling
+(`shakenfist/config.py:240`), and its own description states the consequence
+plainly: *"A client may pass an explicit deadline_seconds of 0 to ask for no
+wall-clock deadline at all, in which case nothing bounds the operation."* An
+operator has no configuration knob that caps this.
+
+**Honest scoping of the blast radius**, so the grade can be argued with:
+
+* It is **not cross-tenant privilege**. `requires_instance_ownership` confines
+  the parked slot to an instance in the caller's own namespace, so the queue
+  starvation is self-inflicted. A `system` caller wanting to run an agent
+  operation against that instance would be blocked, but `system` can delete
+  the instance.
+* The shared-resource cost on the hypervisor is one OS thread, one vsock
+  socket and one (thread-local) gRPC channel to the database tier per parked
+  instance, held indefinitely. It is bounded by the tenant's instance count on
+  that node, and every instance already costs a monitor thread, so the
+  incremental cost is modest — but the thread-local database channel is a
+  shared-tier resource (cf. the known sfcbr gateway connection ceiling) held
+  by a client-chosen duration.
+* Daemon shutdown is **not** affected: `_request_all_threads_exit`
+  (`main.py:1775-1777`) sets the abort file for every executor, and the socket
+  loop's 1 s `recv` timeout means a parked executor exits within ~1 s. I
+  checked this specifically because an unbounded loop is the obvious way to
+  blow `TimeoutStopSec`; it does not.
+
+**Recommended fix (for the operator's decision, per the plan's step-8h gate).**
+Two independent pieces, either of which closes it:
+
+1. An operator-settable ceiling — `AGENT_OPERATION_MAX_DEADLINE` — clamped or
+   400-rejected in `_timing_seconds()`, published as `maximum` on all five
+   declarations so the specification still describes what the server backs.
+   `0` then means "the ceiling", not "nothing".
+2. Restore an unconditional executor backstop in `_execute_inner`, derived
+   from the ceiling rather than from the operation, so that a `0` deadline
+   remains a *tenant* affordance without removing the *operator's* last
+   resort. This is the piece that actually re-closes #3516.
+
+##### A-1 (**advisory**): `1e308` is a second, undocumented spelling of "no deadline" that evades the sentinel
+
+**Files:** `shakenfist/external_api/base.py:305-312`,
+`shakenfist/operations/agentoperation.py:288-292`, `:311-315`.
+
+`_timing_seconds()`'s comment justifies rejecting infinity because it *"would
+produce an infinite absolute deadline — which has the same effect as the 0
+sentinel but does not look like it"*. That reasoning is right and the guard is
+incomplete: `deadline_seconds=1e308` is finite, passes `math.isfinite()`,
+passes `>= 0`, is stored in the DOUBLE column, and makes
+`time.time() > deadline` false for the life of the universe. Same for
+`progress_timeout_seconds=1e308` at `main.py:1042`.
+
+**Scenario.** A caller sends `{"command_line": "...", "deadline_seconds":
+1e308}`. The operation is functionally identical to `deadline_seconds=0`, but
+`effective_deadline()`'s `== 0.0` test (`agentoperation.py:288`) is the only
+thing in the tree that recognises "no deadline", so this operation reports a
+deadline, and an operator grepping for `deadline = 0` or auditing the
+documented sentinel will not find it. It also defeats the mitigation in D-1's
+option 1 unless that option enforces a `maximum` rather than only special-
+casing `0`.
+
+**Fix:** the `maximum` from D-1 option 1 subsumes this. If D-1 is declined,
+this should still get a sanity ceiling (anything above, say, one year is not
+a duration a caller can mean).
+
+##### A-2 (**advisory**): `AGENT_OPERATION_MAX_ATTEMPTS` does not multiply cost — verified, no finding
+
+Checked because the brief asked. `resolve_abandoned_operation`
+(`main.py:559-562`) refuses to retry once `agentop.deadline_passed()`, *before*
+it consults the attempt counter, so total work for an operation with a real
+deadline is bounded by the deadline and not by attempts × deadline. The one
+exception is documented in `effective_deadline()`'s docstring
+(`agentoperation.py:266-277`): a **NULL** deadline (a row written by an API
+server predating phase 3) re-anchors on each state transition, so its real
+ceiling is `AGENT_OPERATION_MAX_ATTEMPTS × AGENT_OPERATION_DEFAULT_DEADLINE`
+= 30 minutes rather than 10. That is a rolling-upgrade property only, is
+explicitly reasoned about at source, and is bounded. Not a finding.
+`AGENT_OPERATION_MAX_ATTEMPTS` carries `ge=1` (`config.py:303`), which
+prevents the `0` misconfiguration that would silently disable retry while
+logging "after 1 attempts".
+
+---
+
+#### Concurrency and the field mask
+
+##### Field mask: every site passes one — verified exhaustively
+
+Enumerated all call sites of `update_agent_operation_attributes` outside
+tests:
+
+| Site | Mask |
+|---|---|
+| `agentoperation.py:422` (`record_attempt`) | `fields=['attempts']` |
+| `agentoperation.py:438` (`add_result`) | `fields=['results']` |
+| `agentoperation.py:468` (`clear_results`) | `fields=['results']` |
+| `agentoperation.py:487` (`record_progress`) | `fields=['last_progress']` |
+
+There are no others in production code. **The reaper writes neither
+`last_progress` nor `attempts`** — `_resolve_stuck_queue_head` and
+`resolve_abandoned_operation` only *read* `agentop.attempts`
+(`main.py:564`) and write state, so there is no unmasked write on the reaper
+path. Two structural properties make this hard to regress:
+`update_agent_operation_attributes` declares `fields` with **no default**
+(`mariadb.py:19424-19426`), so a caller must name it; and the public wrapper
+validates the mask *before* dispatch (`mariadb.py:19446`) so a bad field name
+raises `ValueError` on the gRPC path too rather than becoming a discarded
+`StatusReply`. The single writer of `attempts` is
+`_dispatch_next_command` (`main.py:1259`), which runs only in the one
+executor thread the per-instance invariant permits, so its read-increment-
+write cannot lose an update to itself.
+
+##### The `last_progress` throttle cannot cause a false stall
+
+**The reaper does not read `last_progress` at all.** I grepped every
+non-test reader: the persisted value is consumed *only* by
+`external_view()` (`agentoperation.py:201`) and the `last_progress`
+property (`:401`). `_resolve_stuck_queue_head` never touches it. The progress
+timeout is measured against the in-memory `self._last_progress`
+(`main.py:1042`), which `observe_progress()` moves on **every** call
+(`main.py:1115`) before the `PROGRESS_PERSIST_INTERVAL` throttle at
+`:1117-1118`. So the throttle governs a value nothing enforces against, and
+the enforced value is unthrottled. It can neither manufacture a false stall
+nor miss a real one. `observe_progress()`'s persist is additionally wrapped in
+a bare `except` (`main.py:1125-1130`) so a `DatabaseUnavailable` cannot fail
+an in-flight transfer — and the stamp only advances on success, so a failed
+write retries next call rather than being suppressed for a whole interval.
+
+##### A-3 (**advisory**): a narrow requeue-then-expire window between the executor's `finally` and the reaper
+
+**Files:** `shakenfist/daemons/sidechannel/main.py:663-690` (the `finally`),
+`:1722-1745` (reaper case two).
+
+The reaper (dispatcher thread) and the executor (its own thread) can both call
+`resolve_abandoned_operation` on the same operation. Most interleavings are
+closed by construction, and I want to name what closes them because it is
+what makes the rest safe:
+
+* **The reaper never requeues while an executor thread lives.** Case one
+  requires `not executor` (`main.py:1693`); case two always reaches
+  `resolve_abandoned_operation` with the deadline already passed, and that
+  function's second guard (`main.py:559`) turns a passed deadline into a
+  terminal outcome rather than a requeue. So there is no path on which the
+  reaper returns an operation to `QUEUED` under a running executor.
+* **A requeued operation cannot be double-dispatched.** `_dispatch_loop`
+  skips instances present in `self.executors` (`main.py:1846`), and the entry
+  is only removed by `reap_instance_executors` after `is_alive()` is false —
+  i.e. after the `finally` has completed.
+* **The reaper's `set_abort_path` cannot stray onto a later executor.** The
+  sweep's `clear_abort_path` (`main.py:1592`) and the reaper's
+  `set_abort_path` (`main.py:1747`) both run in the dispatcher thread, as does
+  `start_instance_executor`'s constructor-time clear, so they serialise.
+
+What remains: the executor's `finally` can requeue (`EXECUTING → QUEUED`) at
+the same moment the reaper is between its `state` read at `main.py:1685` and
+its `deadline_passed` test at `:1722`. If the deadline lapses inside that
+window, the reaper expires an operation that has just been requeued. The
+transition is legal (`queued → expired` is in `state_targets`,
+`agentoperation.py:64-67`) and the outcome is correct — the deadline really
+did pass — so the cost is one wasted attempt and one `clear_results()` whose
+event says results were cleared for a retry that never ran. **Failure mode:
+confusing audit trail, not lost state.** Advisory; no fix proposed beyond
+noting it, since closing it would require a lock on a path deliberately
+designed not to take one.
+
+---
+
+#### SQL injection
+
+**Nothing found.** Examined every `sa.text(` and every string-built statement
+added across the twelve merges (`git diff M^1 M -- '*.py' | grep -E
+'sa\.text\(|execute\(f|SELECT |INSERT |UPDATE |DELETE FROM'`). Only two
+merges produce hits:
+
+* `cb9e10bba`, `shakenfist/mariadb.py` (the
+  `agent_operation_attributes` migration): `sa.text(f'ALTER TABLE
+  {table_name} ADD COLUMN IF NOT EXISTS {column}')`. Both interpolands are
+  module-local literals — `table_name` from the migration function's own
+  constant and `column` from a hard-coded two-element tuple
+  `('last_progress DOUBLE NULL', 'attempts BIGINT NOT NULL DEFAULT 0')`. No
+  request data reaches it, and it matches the existing migration idiom in the
+  file. DDL cannot be parameterised anyway.
+* `cb9e10bba`, `shakenfist/tests/test_mariadb_agent_operations_live.py`:
+  `DROP TABLE` / `INSERT INTO` with `sa.text` — test fixtures over constant
+  table names.
+
+Every runtime accessor added or extended by phases 1 and 2 is SQLAlchemy
+Core: `_direct_update_agent_operation_attributes` (`mariadb.py:19125-19150`)
+builds `sa.update(table).where(table.c.uuid == data.uuid).values(**...)`,
+`_direct_create_agent_operation` / `_direct_get_agent_operation` likewise.
+Column *names* are the one attacker-adjacent input here, since they arrive as
+a `fields` list which crosses gRPC (`daemons/database/main.py:4508` passes
+`fields=list(request.fields)` straight through). They are validated against a
+fixed allowlist in `_agent_operation_attributes_column_values`
+(`mariadb.py:19118-19123`), which raises `ValueError` on anything outside
+`{results, last_progress, attempts}` — so an attacker on the database tier's
+gRPC port cannot use the mask to name an arbitrary column, and the handler's
+`except Exception` turns the `ValueError` into `StatusReply(success=False)`
+rather than a crash.
+
+---
+
+#### Information disclosure
+
+##### The expiry messages themselves are clean
+
+Enumerated every reason string this plan introduced and traced what composes
+them. None interpolates guest data:
+
+* `'the operation deadline passed while queued'` (`instance.py:2666`)
+* `'the operation deadline passed before preflight'` /
+  `'... during preflight'` (`operations/node_aop_op.py:105`, `:124`)
+* `'the operation deadline passed while executing'` (`main.py:1019`)
+* `f'no progress from the agent for {window:g} seconds'` (`main.py:1057`) —
+  `window` is the caller's own number, formatted as a float into a JSON
+  `extra` field; no injection surface
+* `'sidechannel executor exited before the operation completed'`
+  (`main.py:679`)
+* `'no sidechannel executor was running for this operation'` (`main.py:1717`)
+* `'the sidechannel executor was wedged and made no progress'`
+  (`main.py:1743`)
+* `resolve_abandoned_operation`'s three suffixes (`main.py:557`, `:561`,
+  `:565`) and its `'agent operation requeued for retry'` event, whose `extra`
+  carries only `reason`, `attempts`, `max_attempts` (`main.py:582-591`)
+
+The `'operation expired'` audit event (`agentoperation.py:337-341`) carries
+only `{'reason': reason}` from that list.
+
+##### The events that *do* carry guest paths and command lines are pre-existing
+
+`'executing agent command'` with `extra = copy.copy(cmd)`
+(`main.py:1224-1228`) carries `commandline` / `path`, and the API's
+`'queued agent command ...'` events carry the whole `commands` list
+(`instance.py:1882-1884` etc.). Both predate this plan —
+`git log -S` dates them to 2023 (`7adf02894`, `f5a1f2db1`) and 2025
+(`0ec8cc748`). Not introduced here, and in any case those events are recorded
+against objects in the instance's own namespace, i.e. readable by the party
+that supplied the path.
+
+##### A-4 (**advisory**): a guest-controlled error string is written into a 255-character state message
+
+**File:** `shakenfist/daemons/sidechannel/main.py:722-723` (new in
+`291054e98`), consumed at `shakenfist/mariadb.py:1361`.
+
+`SideChannelExecutorJob._handle_command_error` calls
+`self.agentop.fail(f'agent reported a command error:
+{reply.command_error.error}')`. `reply.command_error.error` is an unbounded
+protobuf string from the in-guest agent — i.e. from software the tenant
+controls. `fail()` routes it to `_state_update(..., message=...)`
+(`agentoperation.py:369`), which writes it to `object_states.message`, a
+`sa.String(255)` column (`mariadb.py:1361`) with no truncation anywhere on
+the path (`_direct_set_state`, `mariadb.py:4018-4028`, passes
+`state.message` through unmodified).
+
+**Scenario.** A tenant runs a modified `sf-agent` that answers any command
+with a 4 KiB `command_error.error`. In MariaDB strict mode the insert raises
+error 1406, which surfaces as SQLAlchemy `DataError` — *not* the
+`OperationalError` `_direct_set_state` catches at `mariadb.py:4042`. On the
+gRPC path the database daemon's handler catches it and returns
+`success=False`, `set_state` returns `False`, and `_state_update` raises
+`RuntimeError` (`baseobject.py:611-615`) out of the executor thread. That
+propagates through `_execute_inner` (whose only `except` is
+`socket.timeout`) to `SideChannelExecutorJob.execute()`'s `finally`
+(`main.py:667`), which finds the operation still `EXECUTING` and resolves it
+with its own short, safe message.
+
+**Impact is diagnostic, not availability**: the executor exits cleanly and the
+slot is freed, but the caller is told "sidechannel executor exited before the
+operation completed" instead of what the agent actually said, and the raw
+guest string has already been written unbounded to the journal via
+`super()._handle_command_error()`'s event and log line. There is no
+cross-namespace disclosure — the operation, the instance and their events all
+live in the tenant's own namespace.
+
+**Fix:** truncate at the boundary, e.g.
+`reply.command_error.error[:180]` before interpolation, so the composed
+message fits 255 characters. Cheap and local.
+
+##### Informational: `last_progress` is persisted but read by nothing
+
+`record_progress()` writes it on a 10 s throttle for the whole life of every
+progress-capable operation, and its own docstring
+(`main.py:1108-1111`) says the write "exists for a future node-local reaper".
+Phase 5 shipped that reaper and it does not consult the column — the only
+reader in the tree is `external_view()`. Not a security finding; recorded
+because it is a per-operation database write with no current consumer, and
+because a future reaper that *did* consult it would inherit the throttle
+question this heading just answered in the negative.
+
+---
+
+#### Shell, subprocess and credentials
+
+**Nothing found.** `git diff M^1 M -- '*.py' | grep -E
+'subprocess\.|os\.system|shell=True|eval\(|exec\(|pickle|yaml\.load\('`
+returns empty across all eleven code-bearing merges. The credential grep
+(`password|secret|jwt|token|api_key|private_key`) returns three hits, all
+benign: two prose comments (`cb9e10bba` line 1023, `4afa29476` lines 12-16)
+and one test helper building an `Authorization: Bearer` header from a token
+the test itself just minted (`08807c83f`, `test_openapi_spec.py`-adjacent
+test module). No new value is logged, persisted to an event, or returned in an
+API response.
+
+The one filesystem write on the new paths is `_abandon_get_file_transfer`
+(`main.py:1063-1097`), which unlinks
+`blob.Blob.filepath(self._blob_uuid) + '.partial'` — a server-minted UUID, not
+a guest-supplied name — and swallows `OSError`. No path traversal surface.
+
 ### Cross-repository contract
 
 Step 8g of `PLAN-agent-operation-deadlines-phase-08-push-audit.md`, per
