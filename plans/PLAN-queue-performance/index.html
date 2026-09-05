@@ -13883,7 +13883,7 @@ multi-column key that would let per-node tasks coalesce properly.</p>
 <tr>
 <td>11. Multi-column coalescing key</td>
 <td><a href="../PLAN-queue-performance-phase-11-multi-column-key/">PLAN-queue-performance-phase-11-multi-column-key.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -15088,34 +15088,81 @@ half-hour chunks, and points at <code>count_over_time</code> for totals. Anyone
 repeating this measurement should check that no chunk comes back at
 the ceiling.</p>
 <h2 id="what-step-11-measured">What step 11 measured<a class="headerlink" href="#what-step-11-measured" title="Permanent link">&para;</a></h2>
-<p><strong>Nothing yet.</strong> This section is a placeholder, not a gap in
-transcription -- step 11h, the <code>sfcbr</code> re-measurement, is deferred
-until the merged build has run there for at least 24 hours (it had
-not, as of this close-out), and no other window has been captured
-with the wider key deployed. Do not read the absence of numbers here
-as "no effect measured"; it is "not measured".</p>
-<p>The only real numbers available are the pre-change baseline from the
-phase 11 plan's survey finding 1, gathered <em>before</em> any of this
-phase's code existed and included here only as the yardstick step 11h
-measures against:</p>
+<p>Two equal 19 hour <code>sfcbr</code> windows either side of the deployment on
+2026-09-03, cut at a sharp changeover: the last event carrying the old
+<code>not_cluster_wide</code> outcome is 01:19:01 UTC and the first carrying
+<code>key_cannot_distinguish_queue</code> is 01:23:29 UTC, with nothing after it
+on the old build. Windows were selected by Loki's ingestion timestamp,
+not by the records' own <code>ts</code> field, which on <code>sfcbr</code> is local time
+carrying a <code>Z</code> suffix and reads ten hours ahead -- the trap step 10
+withdrew a finding to, and one which showed itself again here. Both
+windows were paged in 38 half-hour chunks with no chunk holding the
+5,000 line ceiling, and reconciled against <code>count_over_time</code>.</p>
 <ul>
-<li><strong><code>sfcbr</code></strong>, six hours, 4,653 <code>execution duration</code> events, 1,510 of
-  them <code>net_op</code>. The fold <code>ran</code> 263 times and folded 4 siblings. 581
-  were refused outright by the (then single-column) per-node-queue
-  guard -- read as an upper bound on what a per-node fold could
-  reach, not a count of foldable work, since an operation with no
-  coalescible task at all lands in the same bucket. On the per-node
-  <code>network</code> family lane, 573 of 919 operations (62%) dequeued
-  alongside at least one sibling, which is the ceiling the wider key
-  is trying to close on.</li>
+<li>
+<p><strong>The guard the phase existed to remove is gone.</strong> <code>net_op</code>
+  operations refused by the per-node-queue guard went from 2,243 in
+  the pre-change window to <strong>zero</strong> in the post-change one. The fold
+  went from running only on the cluster-wide lane (832 times) to
+  running 2,146 times, of which 1,524 are on per-node network queues
+  which could not run one at all before.</p>
+</li>
+<li>
+<p><strong>Those 1,524 per-node folds collapsed nothing.</strong> Zero siblings. The
+  four siblings folded in the post-change window are all on the
+  cluster-wide <code>networknode-clusteroperation-user_facing_high_io</code>
+  lane, which folded six in the window before. The enqueue-side dedup
+  did not quietly absorb the work either: 210 reuses before, 196
+  after.</p>
+</li>
+<li>
+<p><strong>The 62% ceiling in the phase plan's survey finding 1 was a much
+  looser bound than it read as.</strong> Arriving in the same dispatcher
+  batch is not sharing a coalescing key. <code>Network.ensure_mesh</code> fans
+  one operation per node out for <em>one</em> network, so a node's queue
+  fills with mesh operations for several different networks, no two
+  sharing a <code>network_uuid</code>. A fold needs the same network reconciled
+  twice while the first is still queued, and <code>sfcbr</code> does not do that.
+  This is the "measured win is small" risk in the phase plan landing
+  exactly as written -- it landed at zero.</p>
+</li>
+<li>
+<p><strong>The mechanism is not broken, which is a different claim and was
+  checked separately.</strong> The same code path folded four on the
+  cluster-wide lane in this window, and
+  <code>test_per_node_mesh_work_is_coalesced</code> asserts a per-node fold and a
+  correct mesh after it on every merge. A fold which never runs and a
+  fold which matches nothing are separate columns in
+  <code>tools/queue-wait-report.py</code> precisely so this could be told apart
+  without another #3878.</p>
+</li>
+<li>
+<p><strong>Decision 6 stands: no new index.</strong> The fold's median cost is what
+  an index would move and it did not move -- 3.6 ms before, 4.1 ms
+  after, against step 9's 3.7 ms, and uniform at 3.8--4.5 ms across
+  all 13 queues issuing folds, including six per-node network queues
+  which were not fold sites before. The tail did move (folds over 100
+  ms went from 3 to 29; the maximum from 143.3 ms to 785.2 ms) but it
+  belongs to one node rather than to the key: 22 of the 29 are on the
+  busiest node's two queues, and five of the other six per-node queues
+  never exceeded 100 ms.</p>
+</li>
+<li>
+<p><strong>No lock waits and no deadlocks</strong>, which is what the #4007 review
+  asked for beyond duration: zero <code>Deadlock found</code>, zero <code>Lock wait
+  timeout</code> and zero <code>OperationalError</code> in either window. Partial, and
+  the limit is worth keeping attached to the claim -- this is the
+  daemon log surface, not <code>SHOW ENGINE INNODB STATUS</code> or
+  <code>information_schema</code>, which were unreachable from the workstation
+  the measurement ran from.</p>
+</li>
 </ul>
-<p>When step 11h runs, this section should report, against that
-baseline: the <code>net_op</code> fold outcome counts before and after with the
-wider key deployed, how many siblings the per-node fold actually
-collapses, and whether <code>claim_coalescible_siblings</code>'s duration
-distribution moved -- which is what decision 6's no-new-index call
-turns on. See the phase 11 plan's Results section for the build
-itself and the two mid-phase corrections found while landing it.</p>
+<p>The phase's throughput case is therefore unproven on this workload and
+the plan said in advance that it did not rest on throughput: two of
+the three guards existed only because the key could not tell nodes
+apart, and that special case is gone. See the phase 11 plan's Results
+section for the full tables, the build itself, and the two mid-phase
+corrections found while landing it.</p>
 <h2 id="audit-findings-step-6">Audit findings (step 6)<a class="headerlink" href="#audit-findings-step-6" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

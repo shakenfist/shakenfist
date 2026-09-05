@@ -13692,6 +13692,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#the-enqueue-side-dedup-will-not-adopt-a-slower-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The enqueue-side dedup will not adopt a slower lane
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#both-guards-are-key-aware-and-family-aware" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14140,6 +14151,30 @@ coalescing the cluster does the moment the key grew a second column
 <p>The enqueue-side dedup is the cheaper of the two -- the row never
 gets inserted -- but the worker-side fold is the safety net for the
 race where two concurrent callers both lose the lookup.</p>
+<h3 id="the-enqueue-side-dedup-will-not-adopt-a-slower-lane">The enqueue-side dedup will not adopt a slower lane<a class="headerlink" href="#the-enqueue-side-dedup-will-not-adopt-a-slower-lane" title="Permanent link">&para;</a></h3>
+<p>Reuse is one-sided. <code>create_and_enqueue</code> passes
+<code>find_existing_coalescible_op</code> the list of priorities it is willing
+to adopt, which is every <code>PRIORITY</code> at least as urgent as its own.
+Adopting a <em>more</em> urgent pending op costs the caller nothing: the
+work runs sooner than it asked for. Adopting a less urgent one means
+adopting its queue -- the name is <code>{target}-{family}-{priority}</code> --
+so the caller sitting in <code>raise_for_error()</code>, and any <code>runs_after</code>
+dependency hanging off the returned op, wait out the slower lane's
+queue-sit tail instead of their own.</p>
+<p>That overlap is not hypothetical for either coalescible task with
+more than one enqueue site. <code>Network.ensure_mesh</code> enqueues
+<code>network_ensure_mesh</code> at <code>user_facing</code> while the network maintainer
+enqueues the same task, for the same network and node, at
+<code>background</code> -- and it does so precisely when <code>is_mesh_okay()</code>
+reports drift, which is the state a network is in immediately after
+an instance starts elsewhere on it. <code>create_on_network_node</code> and the
+maintainer straddle <code>user_facing</code>/<code>background</code> for
+<code>network_apply_create_network_node</code> in the same way, and have done
+since before the mesh task became coalescible.</p>
+<p>The worker-side fold needs no equivalent rule. It runs at dispatch,
+on an operation which has already been dequeued, so a survivor at any
+priority is about to do the work immediately; the queue a folded
+sibling was sitting on no longer matters.</p>
 <h3 id="both-guards-are-key-aware-and-family-aware">Both guards are key-aware <em>and</em> family-aware<a class="headerlink" href="#both-guards-are-key-aware-and-family-aware" title="Permanent link">&para;</a></h3>
 <p><code>cluster_operations</code> has no queue column, so the key is the only
 thing either primitive's SQL can use to confine a fold to the
@@ -14179,6 +14214,28 @@ model already carries both columns) stays out of
   was the recorded outcome for every build before the key became
   multi-column.</li>
 </ul>
+<p>Two further outcomes exist so that a fold which did not happen is
+never reported as one which happened and matched nothing -- the
+reading that let #3878 sit undetected for three months:</p>
+<ul>
+<li><code>key_column_missing</code>: a key column which is not an attribute of the
+  operation class at all. That is a mis-declaration, and it is a
+  different thing from a column which is present and <code>None</code>. <code>None</code>
+  binds <code>IS NULL</code>, which is how a cluster-wide NetOp folds only the
+  other cluster-wide operations on its network. A column the class
+  does not have is NULL on every row too, so binding <code>IS NULL</code> for it
+  would quietly degenerate the key to whichever columns did resolve --
+  for a NetOp, back to the network alone, which is the cross-node fold
+  this design exists to prevent. The fold therefore tests <code>hasattr</code>
+  and skips, rather than reading the value with a default.</li>
+<li><code>coalescing_unavailable</code>: the database service answered
+  <code>UNIMPLEMENTED</code>, meaning a rolling upgrade against an <code>sf-database</code>
+  predating the V2 RPCs. The wrappers raise
+  <code>exceptions.CoalescingUnavailable</code> for this rather than returning
+  the same "nothing matched" they return on every other failure, so an
+  operator can watch the upgrade window open and close in the same
+  table as everything else instead of grepping daemon logs.</li>
+</ul>
 <h3 id="the-v2-grpc-methods">The V2 gRPC methods<a class="headerlink" href="#the-v2-grpc-methods" title="Permanent link">&para;</a></h3>
 <p><code>ClaimCoalescibleSiblingsV2</code> and <code>FindExistingCoalescibleOpV2</code> take a
 <code>repeated CoalescibleKeyPair keys</code> in place of the V1 RPCs' scalar
@@ -14191,8 +14248,14 @@ wider key exists to prevent. An old server answers a V2 call with
 <code>UNIMPLEMENTED</code>, and the client treats that as "coalescing
 unavailable" and skips the fold rather than falling back to V1 -- a
 loud, temporary loss of an optimisation instead of a quiet
-correctness failure. The V1 RPCs are unchanged and stay for one
-release.</p>
+correctness failure. "Loud" means the <code>coalescing_unavailable</code>
+outcome above, not merely a log line. The V1 RPCs are unchanged and
+stay for one release.</p>
+<p><code>FindExistingCoalescibleOpV2</code> additionally carries <code>repeated string
+priorities</code>, the priority filter described above. Unlike a key
+column, an old V2 server ignoring that field is only a lost
+optimisation -- it deduplicates the way the code did before the
+field existed -- so it travels as a field rather than needing a V3.</p>
 
 
 

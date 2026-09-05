@@ -14155,7 +14155,7 @@ is approved.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td><strong>Deferred until <code>sfcbr</code> has run the merged build for at least 24 hours.</strong> Re-run <code>tools/queue-wait-report.py</code> over a window of at least 24 hours and record, in this plan's Results and in the master plan's "What step 11 measured": the <code>net_op</code> fold outcome counts before and after, how many siblings the per-node fold actually collapses, and whether the fold's duration distribution moved with the wider key (decision 6's index question turns on this). Compare against the six hour pre-change baseline in survey finding 1. Two traps this plan has already paid for: <code>sfcbr</code> stamps local time with a <code>Z</code> suffix so a window read off the log records is ten hours out from the window Loki was asked for (phase 10 withdrew a whole finding to this), and every window must be fetch-verified against <code>count_over_time</code> with no chunk sitting at Loki's 5000 line ceiling.</td>
+<td><strong>Deferred until <code>sfcbr</code> has run the merged build for at least 24 hours.</strong> Re-run <code>tools/queue-wait-report.py</code> over a window of at least 24 hours and record, in this plan's Results and in the master plan's "What step 11 measured": the <code>net_op</code> fold outcome counts before and after, how many siblings the per-node fold actually collapses, and whether the fold's duration distribution moved with the wider key (decision 6's index question turns on this). Also read <code>SHOW ENGINE INNODB STATUS</code> / <code>information_schema</code> for lock waits and deadlocks on <code>cluster_operations</code>: cross-node fold contention is a failure mode the pre-change baseline could not have contained, and duration alone cannot close decision 6 -- see the note in Results. Compare against the six hour pre-change baseline in survey finding 1. Two traps this plan has already paid for: <code>sfcbr</code> stamps local time with a <code>Z</code> suffix so a window read off the log records is ten hours out from the window Loki was asked for (phase 10 withdrew a whole finding to this), and every window must be fetch-verified against <code>count_over_time</code> with no chunk sitting at Loki's 5000 line ceiling.</td>
 </tr>
 </tbody>
 </table>
@@ -14260,7 +14260,9 @@ is approved.</p>
 <li>A successor issue exists for the <code>sf-queues</code> half of #3884, naming
   the two-worker race in decision 5 concretely enough to be actioned
   without re-deriving it, and #3884 carries a comment recording survey
-  findings 2, 3 and 6.</li>
+  findings 2, 3 and 6. Both done: the successor is #4017, and the
+  comment is
+  <a href="https://github.com/shakenfist/shakenfist/issues/3884#issuecomment-5499964712">https://github.com/shakenfist/shakenfist/issues/3884#issuecomment-5499964712</a>.</li>
 <li><code>pre-commit run --all-files</code> is clean, and proto stubs were
   regenerated with <code>tox -e genprotos</code> and committed.</li>
 <li>Step 11h has recorded measured numbers, or this plan says explicitly
@@ -14285,8 +14287,7 @@ expensive to redo:</p>
   means unwinding both.</li>
 </ul>
 <h2 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h2>
-<p>Steps 11a-11g are done. Step 11h (the <code>sfcbr</code> re-measurement) is
-outstanding -- see below.</p>
+<p>Steps 11a-11h are done. The phase is complete.</p>
 <p><strong>What was built.</strong> The coalescing key generalised from a single
 <code>(column, value)</code> pair to a tuple of them
 (<code>coalescible_key_columns</code>), read by both the enqueue-side dedup and
@@ -14364,20 +14365,155 @@ than failing loudly, which is the worse of the two failure modes for
 a test double. Found and fixed in <code>a597dc127</code>, in the same commit
 that turned mesh folding on, because that is the step whose
 verification depended on the mock behaving correctly.</p>
-<p><strong>Step 11h is outstanding.</strong> It requires <code>sfcbr</code> to have run the
-merged build for at least 24 hours, which had not yet happened when
-this close-out step ran. The only real numbers available are still
-the pre-change baseline from survey finding 1 (a six hour <code>sfcbr</code>
-window, before any of this phase's code existed): 1,510 <code>net_op</code>
-samples, the fold ran 263 times and folded 4 siblings, 581 were
-refused by the per-node-queue guard, and on the per-node <code>network</code>
-family lane 573 of 919 operations (62%) dequeued alongside at least
-one sibling -- the ceiling on what a per-node fold could collapse.
-Whether the wider key actually reaches that ceiling, and whether the
-fold's duration distribution moved enough to revisit decision 6's
-no-new-index call, is unmeasured. Nothing in this Results section
-should be read as reporting a post-change number; there isn't one
-yet.</p>
+<p><strong>Step 11h measured <code>sfcbr</code> on 2026-09-03</strong>, over two equal 19 hour
+windows either side of the deployment, and the result is a negative
+one: the phase did exactly what it set out to do structurally, and
+bought no measurable throughput at all.</p>
+<p>The build reached <code>sfcbr</code> at 01:23 UTC on 2026-09-03 -- the last
+event carrying the old <code>not_cluster_wide</code> outcome is 01:19:01 and the
+first carrying <code>key_cannot_distinguish_queue</code> is 01:23:29, with no
+stragglers after it, so the changeover is sharp enough to cut on.
+Windows were selected by Loki's own ingestion timestamp rather than by
+the <code>ts</code> field in the records, and that mattered: the slow folds in
+the post-change window carry record stamps reading <code>2026-09-04T00:xx</code>
+inside a window which ends at 20:24 UTC, which is the <code>Z</code>-suffixed
+local time trap phase 10 withdrew a finding to. Both windows were
+paged in 38 half-hour chunks; no chunk came back holding the 5,000
+line ceiling, and the fetched line counts were checked against
+<code>count_over_time</code> (post: 12,597 fetched, 12,597 counted; pre: 15,748
+fetched, 15,749 counted, the one line being a chunk-boundary
+straddle). Each window is build-pure: the pre-change window carries
+2,243 <code>not_cluster_wide</code> events and no <code>key_cannot_distinguish_queue</code>,
+the post-change window neither.</p>
+<p><strong><code>net_op</code> fold outcomes, 19 hours before and 19 hours after.</strong> The
+<code>not_cluster_wide</code> column is reported under its new name, which is
+what <code>tools/queue-wait-report.py</code>'s <code>RETIRED_COALESCE_OUTCOMES</code> map is
+for.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pre-change</th>
+<th>post-change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>net_op</code> samples</td>
+<td>5,201</td>
+<td>3,692</td>
+</tr>
+<tr>
+<td><code>ran</code></td>
+<td>832</td>
+<td>2,146</td>
+</tr>
+<tr>
+<td><code>batch_size_one</code></td>
+<td>1,937</td>
+<td>1,374</td>
+</tr>
+<tr>
+<td><code>key_cannot_distinguish_queue</code></td>
+<td><strong>2,243</strong></td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td><code>no_coalescible_tasks</code></td>
+<td>189</td>
+<td>172</td>
+</tr>
+<tr>
+<td>siblings folded</td>
+<td>6</td>
+<td>4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The guard is gone and the fold now runs; it just has nothing to
+fold.</strong> The refusal the phase existed to remove went from 2,243 in 19
+hours to zero, and the fold went from running only on the cluster-wide
+lane to running 2,146 times including 1,524 times on per-node network
+queues. Those 1,524 per-node folds collapsed <strong>zero</strong> siblings. All
+four folds in the window are on
+<code>networknode-clusteroperation-user_facing_high_io</code>, the cluster-wide
+lane which already worked before this phase and which folded six in
+the comparable window before it. The enqueue-side dedup did not absorb
+the work either -- it fired 210 times before and 196 times after, flat
+-- so this is not the fold's work having moved one stage earlier.</p>
+<p><strong>Survey finding 1's ceiling did not convert, and the reason is that
+it was measuring the wrong co-occurrence.</strong> That finding read 573 of
+919 per-node network operations (62%) dequeued alongside at least one
+sibling as the ceiling on what a per-node fold could collapse, and
+flagged it as an upper bound rather than a count. It is a much looser
+bound than it looks. Arriving in the same dispatcher batch is not the
+same as sharing a coalescing key: <code>Network.ensure_mesh</code> fans one
+operation per participating node out for <em>one</em> network, so a node's
+queue accumulates mesh operations for as many different networks as
+are being reconciled at that moment, and no two of those share a
+<code>network_uuid</code>. A fold needs two operations pending for the same
+<code>(network_uuid, node_uuid)</code> at once, which needs one network to be
+reconciled twice while the first reconciliation is still queued.
+<code>sfcbr</code>'s workload evidently does not do that.</p>
+<p>That last sentence is the most likely explanation and not a measured
+fact -- the <code>execution duration</code> event does not carry <code>network_uuid</code>,
+so the stream cannot distinguish "the batch held different networks"
+from "the siblings were no longer <code>queued</code>" or "the siblings were
+multi-task". Settling it needs <code>network_uuid</code> on that event, or a
+count of distinct networks per dispatcher batch. What <em>is</em> measured is
+that the mechanism works when the contention exists: the same
+generalised code path folded four siblings on the cluster-wide lane in
+this window, and <code>test_per_node_mesh_work_is_coalesced</code> asserts a
+per-node fold and a correct mesh afterwards on every merge. This is
+not #3878 repeating -- a fold which is switched off and a fold which
+matches nothing are different columns here precisely so this could be
+told apart, and the <code>ran</code> count says the SQL was issued 1,524 times.</p>
+<p><strong>Decision 6 stands: still no new index.</strong> The fold's median cost did
+not move, and that is the number an index would have moved. It was 3.6
+ms before and 4.1 ms after, against phase 9's 3.7 ms, and it is
+uniform at 3.8--4.5 ms across every one of the 13 queues which issued
+a fold -- including the six per-node network queues which did not
+exist as fold sites before this phase. A wider key which had made the
+scan more expensive would have raised the median everywhere; it raised
+it nowhere.</p>
+<p>The tail did move, and the review of #4007 was right to ask for it to
+be looked at rather than taken on the duration summary. Folds over 100
+ms went from 3 in 19 hours (0.36% of 832) to 29 (1.35% of 2,146), and
+the maximum from 143.3 ms to 785.2 ms. But the tail is one node's, not
+the key's: 22 of those 29 are on <code>7ce66641</code>'s two queues (19 on
+<code>user_facing</code>, 3 on <code>background</code>), which is also the busiest fold site
+in the cluster at 689 folds against 221 for the next. Five of the
+other six per-node network queues never produced a fold over 100 ms at
+all, with maxima between 8.3 ms and 82.3 ms. A composite
+<code>(network_uuid, node_uuid)</code> index reduces scan cost, and there is no
+scan-cost signal to reduce; it would not touch a tail which is
+concentrated on the single most loaded node.</p>
+<p><strong>No lock waits and no deadlocks.</strong> The specific mechanism the review
+raised -- <code>SELECT ... FOR UPDATE</code> range-scanning
+<code>ix_cluster_ops_network</code> under REPEATABLE READ, taking next-key locks
+on rows whose <code>node_uuid</code> does not match, so per-node folds for one
+network on different hosts serialise or deadlock against each other --
+produced nothing in either window: zero <code>Deadlock found</code>, zero <code>Lock
+wait timeout</code>, zero <code>OperationalError</code> across the whole cluster's log
+stream, before or after. That is a real answer but a partial one, and
+the limit is worth stating rather than glossing: it is the daemon log
+surface, not <code>SHOW ENGINE INNODB STATUS</code> or <code>information_schema</code>,
+which could not be read because the workstation this ran from has
+neither a shell on the database host nor a route to port 3306. A lock
+wait short enough to be absorbed without an error would be invisible
+to it -- though it would have shown up in the median, which did not
+move.</p>
+<p><strong>Was the phase worth landing?</strong> On throughput, on this workload, no:
+it added 1,524 database round trips per 19 hours which each collapse
+nothing, for a median cost of 4 ms. On everything else, yes, and the
+plan said so in advance -- the phase is not justified on throughput
+alone. Two of the three guards existed only because the key could not
+tell nodes apart, and the code no longer contains a special case whose
+correctness depended on an invariant nobody was checking. The
+throughput case now rests on a workload where one network is
+reconciled repeatedly while a reconciliation is already queued, which
+<code>sfcbr</code> is not; whether any real deployment is, is a question this
+measurement cannot answer and should not pretend to.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>The <code>sf-queues</code> half of #3884 remains deferred</strong>, per decision 5.
@@ -14399,20 +14535,44 @@ yet.</p>
   real pieces of work with a blast radius beyond coalescing, and
   should be scoped and decided on their own merits.</li>
 </ul>
-<p>A successor issue naming this race concretely was intended to exist
-  by the end of this step (this plan's Definition of done, and the
-  <code>InvalidCoalescibleEnqueue</code> error message in
-  <code>shakenfist/schema/operations/net_op.py</code> already promise one), but
-  filing GitHub issues and posting comments turned out to be outside
-  what this close-out session's tooling permissions allow. The
-  content above is written to be filed as-is; #3884 also still needs
-  the comment recording survey findings 2, 3 and 6 that the plan's
-  "Corrections made at source" section called for. Both are one <code>gh</code>
-  command each and are left for the operator or a session with the
-  right permissions to run.</p>
+<p>This is filed as <strong>#4017</strong>, which states the race above concretely
+  and names both ways out. The <code>InvalidCoalescibleEnqueue</code> message in
+  <code>shakenfist/schema/operations/net_op.py</code> cites that number rather
+  than promising an issue in the abstract. #3884 also carries the
+  comment recording survey findings 2, 3 and 6 that the plan's
+  "Corrections made at source" section called for.</p>
 <ul>
-<li><strong>Step 11h</strong>, the <code>sfcbr</code> re-measurement described above, once the
-  merged build has run for at least 24 hours.</li>
+<li>
+<p><strong>Does the per-node fold earn its round trips?</strong> Step 11h measured
+  1,524 per-node folds in 19 hours which collapsed nothing, at a 4 ms
+  median each. That is cheap enough to be nobody's problem today, and
+  the fold is correct and tested, so the answer is not obviously
+  "remove it". But it is currently pure cost on this workload, and the
+  honest position is that the throughput case is unproven rather than
+  disproven -- <code>sfcbr</code> never reconciles one network twice while the
+  first reconciliation is still queued, and a deployment which
+  restores many instances onto one network at once might. Worth
+  revisiting if a second cluster is ever measured, and worth
+  remembering before this fold is cited as a working example.</p>
+</li>
+<li>
+<p><strong>The event stream cannot say why the fold matched nothing.</strong>
+  <code>execution duration</code> carries <code>coalesce_folded</code> but not
+  <code>network_uuid</code>, so "the batch held different networks" cannot be
+  distinguished from "the siblings were no longer queued" or "the
+  siblings were multi-task". The first is much the most likely given
+  how <code>ensure_mesh</code> fans out, but it is a hypothesis. Adding
+  <code>network_uuid</code> to the event, or counting distinct networks per
+  dispatcher batch, would settle it and would cost one field.</p>
+</li>
+<li>
+<p><strong>The fold's tail is one node's.</strong> 22 of the 29 folds over 100 ms in
+  step 11h's window are on <code>7ce66641</code>'s two queues, which is also the
+  busiest fold site in the cluster. That is consistent with the load
+  concentration #3813 describes rather than with anything this phase
+  did, and it is recorded here only so the next person to read the
+  post-change p99 does not attribute it to the wider key.</p>
+</li>
 </ul>
 
 
