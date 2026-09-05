@@ -8,9 +8,17 @@ describing whether a merge queue failure was the pull request's fault. Three
 things then need doing to it, and each is here rather than in
 tools/merge-ci-triage.sh because each has edge cases worth testing:
 
+    merge-triage.py envelope <repository> <run json> <output> [triage run url]
     merge-triage.py extract <response> <envelope> <output>
+    merge-triage.py fallback <envelope> <output> <error>
     merge-triage.py render <triage> <output>
     merge-triage.py validate <triage>
+
+**envelope** builds the facts half of the document out of what GitHub said
+about the run, including picking the pull request number out of the merge
+group ref. It is here rather than in the shell because the ref shapes worth
+getting right -- a base branch with a slash in it, a ref that is not a queue
+ref at all -- are worth a test each, and jq is a poor place to keep them.
 
 **extract** pulls the object out of the model's captured stdout and merges it
 into an envelope the workflow built from GitHub's own data. The envelope always
@@ -33,12 +41,19 @@ markdown with the JSON embedded in a collapsed details section, exactly as the
 automated reviewer does it, so the verdict can be read back out of the comment
 by machine as well as fetched from the run's artifact.
 
+**fallback** writes the no-verdict document directly, for the paths in
+tools/merge-ci-triage.sh which fail before a model is ever run. The promise
+made to consumers is that a triage which happened is always visible as a
+document, and a triage that fell over reading the run is exactly the case
+where that matters.
+
 **validate** checks a document against tools/merge-triage-schema.json.
 """
 
 import datetime
 import json
 import os
+import re
 import sys
 
 
@@ -62,6 +77,19 @@ MODEL_FIELDS = [
     'failure_signature', 'recommendation', 'tracking_issue',
     'tracking_issue_action', 'evidence'
 ]
+
+# gh-readonly-queue/<base>/pr-<number>-<sha>. The base branch is greedy
+# because it may itself contain slashes (release/1.0), and the pull request
+# number is the last "pr-<digits>-" before the merge commit sha.
+QUEUE_REF_RE = re.compile(
+    r'^gh-readonly-queue/(?P<base>.+)/pr-(?P<number>\d+)-(?P<sha>[0-9a-fA-F]+)$')
+
+# Markup that would break the comment the document is embedded in: a fence
+# ends the ```json block a consumer reads the verdict out of, and a stray
+# </details> ends the collapsed section early. Both also stop
+# neutralise-pr-body.sh defusing mentions on every line after them, because it
+# tracks fenced regions. Model text is not trusted to avoid either.
+UNSAFE_MARKUP_RE = re.compile(r'```+|</?details\s*>', re.IGNORECASE)
 
 VERDICTS = ['pr_caused', 'systemic', 'ambiguous', 'unknown']
 RECOMMENDATIONS = ['requeue', 'fix_first', 'investigate']
@@ -101,22 +129,47 @@ RECOMMENDATION_TEXT = {
 }
 
 
-def _find_json_object(text):
-    """Return the last complete JSON object in text, or None.
+# How far back from the end of the response the unfenced scan looks. The
+# prompt asks for the verdict as the last thing emitted, and a response can
+# quote a hundred kilobytes of log above it; trying a decode from every brace
+# in all of that is quadratic work to find something the prompt says is at the
+# bottom.
+UNFENCED_SCAN_BYTES = 65536
 
-    Candidate start positions are tried newest first because a model which
-    illustrates the format before filling it in emits the real answer last.
-    raw_decode() stops at the end of the first complete value, so trailing
-    prose after the object, and a closing code fence, are both tolerated.
+FENCED_BLOCK_RE = re.compile(r'```(?:json)?\s*\n(.*?)\n\s*```', re.DOTALL)
+
+
+def _looks_like_verdict(value):
+    return isinstance(value, dict) and any(field in value for field in MODEL_FIELDS)
+
+
+def _find_json_object(text):
+    """Return the last usable JSON object in text, or None.
+
+    Fenced blocks are tried first, and both searches run newest first: a model
+    which illustrates the format before filling it in emits the real answer
+    last. Failing that the tail of the response is scanned for a bare object,
+    because models drop the fence often enough that requiring it would throw
+    away good verdicts. raw_decode() stops at the end of the first complete
+    value, so trailing prose after the object is tolerated.
     """
-    decoder = json.JSONDecoder()
-    starts = [i for i, char in enumerate(text) if char == '{']
-    for start in reversed(starts):
+    for block in reversed(FENCED_BLOCK_RE.findall(text)):
         try:
-            value, _ = decoder.raw_decode(text[start:])
+            value = json.loads(block)
         except ValueError:
             continue
-        if isinstance(value, dict) and any(field in value for field in MODEL_FIELDS):
+        if _looks_like_verdict(value):
+            return value
+
+    decoder = json.JSONDecoder()
+    tail = text[-UNFENCED_SCAN_BYTES:]
+    starts = [i for i, char in enumerate(tail) if char == '{']
+    for start in reversed(starts):
+        try:
+            value, _ = decoder.raw_decode(tail[start:])
+        except ValueError:
+            continue
+        if _looks_like_verdict(value):
             return value
     return None
 
@@ -138,6 +191,20 @@ def _coerce_str(value):
     if isinstance(value, str):
         return value.strip() or None
     return str(value)
+
+
+def _safe_prose(value):
+    """Model prose with the markup that would break its own container removed.
+
+    The document is published inside a fenced block inside a <details> section
+    of a pull request comment, and the promise that a consumer can read the
+    verdict back out of that comment rests on both surviving. A summary
+    carrying a fence or a </details> ends them early. See UNSAFE_MARKUP_RE.
+    """
+    text = _coerce_str(value)
+    if text is None:
+        return None
+    return _coerce_str(UNSAFE_MARKUP_RE.sub(' ', text))
 
 
 def _clean_model_fields(raw):
@@ -167,7 +234,7 @@ def _clean_model_fields(raw):
     cleaned['recommendation'] = recommendation
 
     for field in ['summary', 'failing_job', 'failing_step', 'failure_signature']:
-        cleaned[field] = _coerce_str(raw.get(field))
+        cleaned[field] = _safe_prose(raw.get(field))
 
     cleaned['tracking_issue'] = _coerce_int(raw.get('tracking_issue'))
 
@@ -175,14 +242,18 @@ def _clean_model_fields(raw):
     if action is not None:
         action = action.lower()
     if action not in ISSUE_ACTIONS:
-        action = 'commented' if cleaned['tracking_issue'] else 'none'
+        # 'none' rather than a guess of 'commented': the consumer is told that
+        # an action of commented means the occurrence really was recorded, and
+        # the verification step downstream can only take that claim away, not
+        # discover one. Guessing a write happened is the wrong direction.
+        action = 'none'
     cleaned['tracking_issue_action'] = action
 
     evidence = raw.get('evidence')
     if isinstance(evidence, list):
-        cleaned['evidence'] = [_coerce_str(item) for item in evidence if _coerce_str(item)]
-    elif _coerce_str(evidence):
-        cleaned['evidence'] = [_coerce_str(evidence)]
+        cleaned['evidence'] = [_safe_prose(item) for item in evidence if _safe_prose(item)]
+    elif _safe_prose(evidence):
+        cleaned['evidence'] = [_safe_prose(evidence)]
     else:
         cleaned['evidence'] = []
 
@@ -213,6 +284,65 @@ def _envelope_defaults(envelope):
     envelope.setdefault('triaged_at',
                         datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat())
     return envelope
+
+
+def parse_queue_ref(ref):
+    """Merge group ref -> (base branch, pull request number).
+
+    Returns (None, None) for anything that is not a merge queue ref, which is
+    survivable: triage still runs and the verdict simply has no pull request
+    to attach itself to.
+    """
+    match = QUEUE_REF_RE.match(ref or '')
+    if not match:
+        return None, None
+    return match.group('base'), int(match.group('number'))
+
+
+def do_envelope(repository, run_path, output_path, triage_run_url=''):
+    """Build the facts half of the document from what GitHub said."""
+    with open(run_path) as f:
+        run = json.load(f)
+
+    run_id = run.get('databaseId')
+    if not isinstance(run_id, int) or isinstance(run_id, bool):
+        sys.stderr.write('merge-triage: run json carries no numeric databaseId\n')
+        return 1
+
+    head_branch = run.get('headBranch') or ''
+    base_branch, pull_request = parse_queue_ref(head_branch)
+    if pull_request is None:
+        sys.stderr.write(
+            'merge-triage: no pull request number in ref %r\n' % head_branch)
+
+    attempt = run.get('attempt')
+    envelope = {
+        'repository': repository,
+        'run_id': run_id,
+        'run_url': run.get('url') or '',
+        'run_attempt': attempt if isinstance(attempt, int) else 1,
+        'head_branch': head_branch,
+        'head_sha': run.get('headSha') or '',
+        'base_branch': base_branch,
+        'pull_request': pull_request,
+        'triage_run_url': triage_run_url or None
+    }
+
+    with open(output_path, 'w') as f:
+        json.dump(_envelope_defaults(envelope), f, indent=2, sort_keys=True)
+        f.write('\n')
+    return 0
+
+
+def do_fallback(envelope_path, output_path, error):
+    """Write the no-verdict document for a triage that never reached a model."""
+    with open(envelope_path) as f:
+        envelope = _envelope_defaults(json.load(f))
+
+    with open(output_path, 'w') as f:
+        json.dump(_fallback(envelope, error), f, indent=2, sort_keys=True)
+        f.write('\n')
+    return 0
 
 
 def do_extract(response_path, envelope_path, output_path):
@@ -340,7 +470,7 @@ def render_markdown(document):
         lines.append('')
 
     lines.append('This verdict is automated and is not a substitute for reading the run. '
-                 'The triage skill it follows is documented in `docs/developer_guide/ci.md`.')
+                 'The procedure it follows is described in `docs/developer_guide/ci.md`.')
     lines.append('')
     lines.append('<details>')
     lines.append('<summary>Machine-readable triage data (for automation)</summary>')
@@ -370,8 +500,12 @@ def main(argv):
     command = argv[1]
     args = argv[2:]
 
+    if command == 'envelope' and len(args) in (3, 4):
+        return do_envelope(*args)
     if command == 'extract' and len(args) == 3:
         return do_extract(*args)
+    if command == 'fallback' and len(args) == 3:
+        return do_fallback(*args)
     if command == 'render' and len(args) == 2:
         return do_render(*args)
     if command == 'validate' and len(args) == 1:

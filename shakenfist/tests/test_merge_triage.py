@@ -46,6 +46,17 @@ ENVELOPE = {
     'triage_run_url': 'https://github.com/shakenfist/shakenfist/actions/runs/12346'
 }
 
+# What "gh run view --json ..." returns for the failed merge group run.
+RUN = {
+    'databaseId': 12345,
+    'event': 'merge_group',
+    'conclusion': 'failure',
+    'headBranch': 'gh-readonly-queue/develop/pr-4067-abcdef0',
+    'headSha': 'abcdef0',
+    'url': 'https://github.com/shakenfist/shakenfist/actions/runs/12345',
+    'attempt': 1,
+}
+
 VERDICT = {
     'verdict': 'systemic',
     'confidence': 'high',
@@ -105,6 +116,36 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
             self.assertEqual(0, proc.returncode, proc.stderr)
             with open(rendered) as f:
                 return f.read()
+
+    def _envelope(self, run, repository='shakenfist/shakenfist', triage_run_url=''):
+        """Run the envelope builder over a gh run view document."""
+        with tempfile.TemporaryDirectory() as tempdir:
+            run_path = os.path.join(tempdir, 'run.json')
+            output_path = os.path.join(tempdir, 'envelope.json')
+            with open(run_path, 'w') as f:
+                json.dump(run, f)
+
+            proc = subprocess.run(
+                [sys.executable, SCRIPT, 'envelope', repository, run_path,
+                 output_path, triage_run_url],
+                capture_output=True, text=True)
+            if not os.path.exists(output_path):
+                return proc.returncode, None
+            with open(output_path) as f:
+                return proc.returncode, json.load(f)
+
+    def _fallback(self, envelope, error):
+        with tempfile.TemporaryDirectory() as tempdir:
+            envelope_path = os.path.join(tempdir, 'envelope.json')
+            output_path = os.path.join(tempdir, 'triage.json')
+            with open(envelope_path, 'w') as f:
+                json.dump(envelope, f)
+            proc = subprocess.run(
+                [sys.executable, SCRIPT, 'fallback', envelope_path, output_path, error],
+                capture_output=True, text=True)
+            self.assertEqual(0, proc.returncode, proc.stderr)
+            with open(output_path) as f:
+                return json.load(f)
 
     def test_script_is_executable(self):
         self.assertTrue(os.access(SCRIPT, os.X_OK))
@@ -220,3 +261,107 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
                                                    recommendation='requeue',
                                                    schema_version=1,
                                                    triaged_at='2026-09-05T00:00:00+00:00')))
+
+    def test_envelope_is_built_from_the_run(self):
+        code, envelope = self._envelope(RUN, triage_run_url='https://example.com/t')
+        self.assertEqual(0, code)
+        self.assertEqual('shakenfist/shakenfist', envelope['repository'])
+        self.assertEqual(12345, envelope['run_id'])
+        self.assertEqual('develop', envelope['base_branch'])
+        self.assertEqual(4067, envelope['pull_request'])
+        self.assertEqual(1, envelope['schema_version'])
+        self.assertEqual('https://example.com/t', envelope['triage_run_url'])
+
+    def test_a_base_branch_containing_a_slash_is_parsed(self):
+        # release/1.0 is a legal base branch, and the ref then has three
+        # slashes before the pr- segment rather than two.
+        code, envelope = self._envelope(dict(
+            RUN, headBranch='gh-readonly-queue/release/1.0/pr-12-9f8e7d6'))
+        self.assertEqual(0, code)
+        self.assertEqual('release/1.0', envelope['base_branch'])
+        self.assertEqual(12, envelope['pull_request'])
+
+    def test_an_unparseable_ref_still_yields_an_envelope(self):
+        # Survivable: triage runs, the verdict simply has no pull request to
+        # attach itself to, and the conductor sees a document either way.
+        code, envelope = self._envelope(dict(RUN, headBranch='refs/heads/develop'))
+        self.assertEqual(0, code)
+        self.assertIsNone(envelope['pull_request'])
+        self.assertIsNone(envelope['base_branch'])
+
+    def test_a_run_with_no_numeric_id_is_refused(self):
+        code, _ = self._envelope(dict(RUN, databaseId='not a number'))
+        self.assertEqual(1, code)
+
+    def test_the_fallback_document_validates(self):
+        # The path taken when a run cannot be read at all, which is exactly
+        # when a consumer most needs to see that triage ran and failed.
+        code, envelope = self._envelope(RUN)
+        self.assertEqual(0, code)
+        document = self._fallback(envelope, 'The run could not be read.')
+        self.assertEqual('unknown', document['verdict'])
+        self.assertEqual('investigate', document['recommendation'])
+        self.assertEqual('The run could not be read.', document['error'])
+        self.assertEqual(4067, document['pull_request'])
+        self.assertEqual(0, self._validate(document))
+
+    def test_a_verdict_without_a_summary_still_validates(self):
+        # A model that gives a verdict and no prose has still given a verdict.
+        # Discarding it at the validation gate would throw away a successful
+        # triage over a missing sentence.
+        verdict = dict(VERDICT)
+        del verdict['summary']
+        code, document = self._extract('```json\n%s\n```' % json.dumps(verdict))
+        self.assertEqual(0, code)
+        self.assertEqual('systemic', document['verdict'])
+        self.assertIsNone(document['summary'])
+        self.assertEqual(0, self._validate(document))
+
+    def test_a_verdict_without_a_confidence_still_validates(self):
+        verdict = dict(VERDICT)
+        del verdict['confidence']
+        code, document = self._extract('```json\n%s\n```' % json.dumps(verdict))
+        self.assertEqual(0, code)
+        self.assertNotIn('confidence', document)
+        self.assertEqual(0, self._validate(document))
+
+    def test_an_unstated_issue_action_is_not_assumed_to_be_a_comment(self):
+        # The consumer is told that "commented" means the occurrence really
+        # was recorded. Guessing that a write happened is the wrong direction
+        # to guess in: verification downstream can only take the claim away.
+        verdict = dict(VERDICT)
+        del verdict['tracking_issue_action']
+        code, document = self._extract('```json\n%s\n```' % json.dumps(verdict))
+        self.assertEqual(0, code)
+        self.assertEqual('none', document['tracking_issue_action'])
+
+    def test_markup_that_would_break_the_comment_is_stripped(self):
+        # The published contract is that a consumer can read the document back
+        # out of the last json block in the comment. A summary carrying a fence
+        # or a </details> ends the block early -- and it also stops
+        # neutralise-pr-body.sh defusing mentions, because that tracks fenced
+        # regions, so this is a security control as well as a formatting one.
+        code, document = self._extract('```json\n%s\n```' % json.dumps(dict(
+            VERDICT,
+            summary='It failed ``` here </details> and again ```json',
+            evidence=['</DETAILS> in the evidence too'])))
+        self.assertEqual(0, code)
+        self.assertNotIn('```', document['summary'])
+        self.assertNotIn('</details>', document['summary'].lower())
+        self.assertNotIn('</details>', document['evidence'][0].lower())
+
+        rendered = self._render(document)
+        embedded = rendered.split('```json\n')[-1].split('```')[0]
+        self.assertEqual(document, json.loads(embedded))
+        # And the details section still closes exactly once.
+        self.assertEqual(1, rendered.lower().count('</details>'))
+
+    def test_a_fenced_verdict_beats_a_bare_object_in_the_prose(self):
+        # The prompt asks for a fenced block, so a fenced one is the answer
+        # even when the model also wrote an object into its prose above.
+        bare = dict(VERDICT, verdict='pr_caused', summary='thinking aloud')
+        code, document = self._extract(
+            'Maybe %s\n\nFinal answer:\n```json\n%s\n```\n'
+            % (json.dumps(bare), json.dumps(VERDICT)))
+        self.assertEqual(0, code)
+        self.assertEqual('systemic', document['verdict'])

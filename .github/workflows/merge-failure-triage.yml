@@ -3,8 +3,10 @@
 # When "Functional tests" fails on a merge_group event, GitHub ejects the pull
 # request from the merge queue and somebody has to work out whether the pull
 # request was at fault or whether the cluster fell over again. This automates
-# that first pass: it follows the merge-ci-triage skill, posts a verdict on the
-# pull request, and records a systemic failure against its tracking issue.
+# that first pass: it finds the first failing step, classifies the failure as
+# caused by the pull request or systemic, records a systemic failure against
+# its tracking issue, and posts a verdict on the pull request. The procedure it
+# follows is described in docs/developer_guide/ci.md.
 #
 # WHY workflow_run AND NOT A JOB IN functional-tests.yml:
 # The obvious implementation is a job in the merge group run itself, gated on
@@ -29,9 +31,15 @@
 #   is deliberately never given the merge group's code. The checkout is the
 #   default branch; the failed run is read through gh, never executed.
 # - The model does read logs and a pull request diff, which are untrusted
-#   input. Its GitHub reach is bounded by the token permissions below: it can
-#   comment on issues and pull requests and nothing else. It cannot push, and
-#   the workflow does not check out or run any of the code it is triaging.
+#   input, with GH_TOKEN in its environment. Be accurate about what that token
+#   allows: issues:write can close, reopen and label issues and edit or delete
+#   anybody's comment; pull-requests:write can close a pull request and rewrite
+#   its title and body. What it cannot do is push code, alter workflows, or
+#   read secrets, and this workflow never checks out or executes the code it is
+#   triaging. The prompt's "do not close anything" is a prompt-level
+#   constraint, not a token-level one; the bound that actually holds is the
+#   permissions block below. The residual risk is accepted because merge group
+#   content has already passed review.
 # - The comment body is model output and goes through
 #   tools/neutralise-pr-body.sh before posting, so an @mention or an
 #   issue-closing keyword cannot fire on publication.
@@ -70,7 +78,11 @@ on:
         default: false
         type: boolean
 
+# actions:read is not optional: naming any scope sets every unnamed one to
+# none, and every piece of evidence this workflow gathers -- the run, its jobs,
+# its failed step logs, the sibling merge group runs -- is an Actions API read.
 permissions:
+  actions: read
   contents: read
   issues: write
   pull-requests: write

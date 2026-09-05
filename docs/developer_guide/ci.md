@@ -567,10 +567,18 @@ When `Functional tests` fails on a `merge_group` event, GitHub ejects the pull
 request from the merge queue and somebody has to decide whether the pull
 request broke something or whether the test cloud fell over again.
 `merge-failure-triage.yml` does that first pass automatically, following the
-same steps a maintainer follows by hand with the `merge-ci-triage` skill: find
-the first failing step, classify the failure, record a systemic failure against
-its tracking issue, and recommend re-queueing or fixing first. The verdict is
-posted as a comment on the ejected pull request.
+same steps a maintainer follows by hand: find the first failing step (later
+failures are usually cascade), classify the failure as caused by the pull
+request or systemic, search for an existing tracking issue and record the
+occurrence on it — or file one — and recommend re-queueing or fixing first. The
+verdict is posted as a comment on the ejected pull request.
+
+Merge groups here launch several nested test clusters at once, so merge CI is
+far more sensitive to under-cloud capacity than pull request CI is, and
+historically most merge failures have been environmental rather than code
+regressions. That prior is in the prompt, which is why the evidence rules below
+matter: a model given no evidence and that prior will happily conclude
+"systemic, re-queue".
 
 Most of the work is in `tools/merge-ci-triage.sh`, which gathers the evidence,
 runs the model, and publishes the result; `tools/merge-triage.py` parses,
@@ -585,9 +593,13 @@ failure the queue ejects the pull request and tears down the
 sits in exactly that window. Moving the triage into an earlier *step* of
 `can_merge` avoids the race but holds the merge queue open while a model reads
 logs. A job reachable on `merge_group` would also fall under the
-[merge-group-cancellation](/components/development/audits/merge-group-cancellation/)
+[merge-group-cancellation](https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md)
 audit, whose correct behaviour — be cancelled when a newer merge group
 supersedes you — is the opposite of what a triage job wants.
+
+The workflow's `permissions:` block names `actions: read`, which is not
+optional: naming any scope at all sets every unnamed scope to `none`, and every
+piece of evidence the triage gathers is an Actions API read.
 
 `workflow_run` runs after the merge group run has finished, on the default
 branch, in the base repository context, and none of that can cancel it. The
@@ -621,10 +633,20 @@ fields that matter to a consumer are:
 
 Three properties of that document are worth knowing before consuming it:
 
-- **A document is always written.** A model that answers in prose, or produces
-  no usable verdict, yields `verdict: unknown` with an `error` explaining why,
-  never a missing file. A missing document is indistinguishable from a triage
-  that never ran; an `unknown` one is not.
+- **A document is always written.** A model that answers in prose, a run that
+  cannot be read, a document that fails its own schema — each yields
+  `verdict: unknown` with an `error` explaining why, never a missing file. The
+  guarantee is kept by an `EXIT` trap over an envelope written before anything
+  can fail, so it holds for the paths that fall over early too. A missing
+  document is indistinguishable from a triage that never ran; an `unknown` one
+  is not. The single exception is a run that was not a failed merge group run
+  at all: nothing was triaged, so there is nothing to publish a verdict about.
+- **No evidence means no verdict.** If neither the failed job list nor the
+  failed step logs can be read, no model is run: the document says so and the
+  verdict is `unknown`. Anything else that could not be gathered — the sibling
+  runs, the pull request diff — is named in `evidence`, so a verdict always
+  carries its own caveats rather than reading as though the model saw
+  everything.
 - **The envelope is not model output.** The repository, run id and pull request
   number are written from what GitHub said and overwrite whatever the model put
   in those fields, so a verdict cannot be filed against the wrong failure. Only
@@ -635,7 +657,8 @@ Three properties of that document are worth knowing before consuming it:
   `tracking_issue` as evidence the occurrence really was recorded — but only
   when `tracking_issue_action` is `commented` or `created`. With an action of
   `none` the number is a reference the triage found useful and nothing was
-  written to it, which is what a dry run produces.
+  written to it. A dry run forces `none` unconditionally, whatever the model
+  reports, because nothing was written to GitHub on that path.
 
 Re-triaging the same run does not double-post: the comment carries an invisible
 `<!-- merge-triage run:<id> -->` marker which a later run recognises.

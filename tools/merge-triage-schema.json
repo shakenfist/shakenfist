@@ -70,8 +70,8 @@
       "description": "How firmly the evidence supports the verdict"
     },
     "summary": {
-      "type": "string",
-      "description": "One paragraph statement of what failed and why the verdict is what it is"
+      "type": ["string", "null"],
+      "description": "One paragraph statement of what failed and why the verdict is what it is. Null when the model gave a verdict without one, which is not a reason to discard the verdict."
     },
     "failing_job": {
       "type": ["string", "null"],
