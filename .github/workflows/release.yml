@@ -187,13 +187,26 @@ jobs:
       contents: write
 
     steps:
+      # Both halves of this matter. A bare download-artifact decides
+      # the destination itself, which is not where "files: dist/*"
+      # looks, and action-gh-release treats a glob matching nothing as
+      # a warning -- so the job went green having attached no files.
+      # It looked intermittent rather than broken because these jobs
+      # share a persistent runner pool: when the release landed on the
+      # same runner as the build it globbed the build's leftover
+      # dist/, which is also to say it published files nothing had
+      # verified. Name the artifact, name the path, and fail loudly.
       - name: Download artifacts
         uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           files: dist/*
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
