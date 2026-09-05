@@ -3002,11 +3002,14 @@ class MockMariaDB():
     def _decrement_node_capacity(self, node_uuid, cpus, memory_mb, disk_gb):
         """Floored decrement of one node's counters, as the RPC does (P6).
 
-        Returns True if any dimension had to be clamped at zero, which
-        means the ledger and ground truth had already diverged.
+        Returns the clamp detail dict if any dimension had to be clamped
+        at zero -- which means the ledger and ground truth had already
+        diverged -- or None on a clean decrement, exactly as the real
+        _floored_node_decrement() reports it (issue 4050).
         """
         row = self.node_capacity.get(str(node_uuid))
-        return self._decrement_capacity_row(row, cpus, memory_mb, disk_gb)
+        return self._decrement_capacity_row(
+            row, str(node_uuid), cpus, memory_mb, disk_gb)
 
     def _decrement_namespace_claim(self, namespace, cpus, memory_mb, disk_gb):
         """Floored decrement of a namespace's claim, as the RPC does (P6).
@@ -3016,26 +3019,33 @@ class MockMariaDB():
         which this mock does not model.
         """
         row = self._claim_for_namespace(namespace)
-        return self._decrement_capacity_row(row, cpus, memory_mb, disk_gb)
+        return self._decrement_capacity_row(
+            row, 'namespace_claim', cpus, memory_mb, disk_gb)
 
-    def _decrement_capacity_row(self, row, cpus, memory_mb, disk_gb):
+    def _decrement_capacity_row(self, row, counter, cpus, memory_mb, disk_gb):
         """Floored decrement of one row's used_* counters.
 
-        Returns True if any dimension had to be clamped at zero, which
-        means the ledger and ground truth had already diverged.
+        Returns the clamp detail dict -- naming the counter and the
+        per-dimension shortfall the clamp erased, as the real floored
+        decrements do -- if any dimension had to be clamped at zero, or
+        None on a clean decrement.
         """
         if row is None:
-            return False
-        clamped = False
+            return None
+        detail = None
+        shortfalls = {}
         for field, amount in (('used_cpus', cpus),
                               ('used_memory_mb', memory_mb),
                               ('used_disk_gb', disk_gb)):
+            shortfalls['shortfall_' + field[len('used_'):]] = max(
+                0, amount - row[field])
             if row[field] < amount:
-                clamped = True
                 row[field] = 0
             else:
                 row[field] -= amount
-        return clamped
+        if any(shortfalls.values()):
+            detail = dict(counter=counter, **shortfalls)
+        return detail
 
     def _mariadb_admit_instance_placement(
             self, instance_uuid, namespace, node_uuid, cpus, memory_mb,
@@ -3088,7 +3098,8 @@ class MockMariaDB():
         """
         result = {
             'success': True, 'error': '', 'admitted': False,
-            'unguarded': False, 'clamped': False, 'failing_stage': '',
+            'unguarded': False, 'clamped': False, 'clamps': [],
+            'failing_stage': '',
             'dimensions': [], 'node_used_cpus': 0,
             'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
             'node_expected_demand': 0.0, 'claim_over_limit': False,
@@ -3190,8 +3201,11 @@ class MockMariaDB():
             row['expected_demand'] += demand_add
 
         if is_move:
-            result['clamped'] = self._decrement_node_capacity(
+            clamp_detail = self._decrement_node_capacity(
                 old_node_uuid, cpus, memory_mb, disk_gb)
+            if clamp_detail is not None:
+                result['clamped'] = True
+                result['clamps'].append(clamp_detail)
 
         attrs.placement = json.loads(placement_json)
 
@@ -3230,7 +3244,7 @@ class MockMariaDB():
         """
         result = {
             'success': True, 'error': '', 'released': False, 'clamped': False,
-            'counters_node_uuid': '', 'node_used_cpus': 0,
+            'clamps': [], 'counters_node_uuid': '', 'node_used_cpus': 0,
             'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
             'node_expected_demand': 0.0}
 
@@ -3251,14 +3265,19 @@ class MockMariaDB():
         # nodes hold a reference for it, so it is credited back once too
         # -- the real implementation says the same, in the same order
         # (namespace, then nodes).
-        if self._decrement_namespace_claim(
-                namespace, cpus, memory_mb, disk_gb):
+        clamp_detail = self._decrement_namespace_claim(
+            namespace, cpus, memory_mb, disk_gb)
+        if clamp_detail is not None:
             result['clamped'] = True
+            result['clamps'].append(clamp_detail)
 
         decremented = []
         for node in sorted(set(nodes)):
-            if self._decrement_node_capacity(node, cpus, memory_mb, disk_gb):
+            clamp_detail = self._decrement_node_capacity(
+                node, cpus, memory_mb, disk_gb)
+            if clamp_detail is not None:
                 result['clamped'] = True
+                result['clamps'].append(clamp_detail)
             if self.node_capacity.get(str(node)) is not None:
                 decremented.append(node)
 

@@ -2385,6 +2385,62 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertFalse(self._event_echoes_as_error(
             add_event, 'capacity counter clamped at zero'))
 
+    #
+    # Issue 4050: the clamp events must say which counter drifted and by
+    # how much, per dimension, or three occurrences on one node over two
+    # days read as three unrelated booleans nobody can act on.
+    #
+
+    def _clamp_event_extra(self, add_event):
+        calls = [c for c in add_event.call_args_list
+                 if c.args[1] == 'capacity counter clamped at zero']
+        self.assertEqual(1, len(calls))
+        return calls[0].kwargs['extra']
+
+    def test_a_release_clamp_event_names_the_drifted_counter(self):
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+
+        # Only the cpu counter drifted: the event must name this node
+        # and that dimension, with the observed shortfall, and report
+        # the two clean dimensions as zero.
+        row['used_cpus'] = 0
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst._delete_globally()
+        extra = self._clamp_event_extra(add_event)
+        self.assertEqual([{
+            'counter': self.node2,
+            'shortfall_cpus': 2,
+            'shortfall_memory_mb': 0,
+            'shortfall_disk_gb': 0}], extra['clamps'])
+
+    def test_a_move_clamp_event_names_the_old_node(self):
+        old = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node3, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+
+        old['used_cpus'] = 0
+        old['used_memory_mb'] = 0
+        old['used_disk_gb'] = 0
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node3)
+        extra = self._clamp_event_extra(add_event)
+        # The counter that drifted is the *old* node's, not the target
+        # the event's node field names.
+        self.assertEqual([{
+            'counter': self.node2,
+            'shortfall_cpus': 2,
+            'shortfall_memory_mb': 2048,
+            'shortfall_disk_gb': 8}], extra['clamps'])
+
     def test_a_failed_placement_write_echoes_as_an_error(self):
         failure = {
             'success': False, 'error': 'database unavailable',

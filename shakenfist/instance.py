@@ -1369,13 +1369,19 @@ class Instance(dbowo):
                 # A counter would have gone negative releasing the old
                 # node's share, which means the ledger and ground truth
                 # had already diverged. The reconciler repairs it.
+                # 'clamps' names the counter(s) that drifted and by how
+                # much per dimension; empty means an sf-database
+                # predating the detail, not that nothing drifted
+                # (issue 4050).
                 self.log.with_fields({
                     'node': location,
-                    'previous_node': old_location}).warning(
+                    'previous_node': old_location,
+                    'clamps': result['clamps']}).warning(
                         'Capacity counter clamped at zero during placement')
                 self.add_event(
                     EVENT_TYPE_AUDIT, 'capacity counter clamped at zero',
-                    extra={'node': location, 'previous_node': old_location})
+                    extra={'node': location, 'previous_node': old_location,
+                           'clamps': result['clamps']})
 
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
                              artifact_event=None):
@@ -1573,12 +1579,22 @@ class Instance(dbowo):
         if result['clamped']:
             # A counter would have gone negative, so the ledger and
             # ground truth had already diverged. The reconciler repairs
-            # it within a pass; record that it happened.
-            self.log.with_fields({'node': node_uuid}).warning(
-                'Capacity counter clamped at zero during placement release')
+            # it within a pass; record that it happened, and what:
+            # 'clamps' names each counter that drifted -- the namespace
+            # claim, the cluster unclaimed sums, or a node uuid, which
+            # need not be the node_uuid argument -- with the observed
+            # per-dimension shortfall. Empty means an sf-database
+            # predating the detail, not that nothing drifted
+            # (issue 4050).
+            self.log.with_fields({
+                'node': node_uuid,
+                'clamps': result['clamps']}).warning(
+                    'Capacity counter clamped at zero during placement '
+                    'release')
             self.add_event(
                 EVENT_TYPE_AUDIT, 'capacity counter clamped at zero',
-                extra={'node': node_uuid, 'released': result['released']})
+                extra={'node': node_uuid, 'released': result['released'],
+                       'clamps': result['clamps']})
 
         if result['released']:
             # The other half of the placement ledger, in the vocabulary
