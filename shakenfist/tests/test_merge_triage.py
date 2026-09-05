@@ -290,6 +290,20 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
         self.assertIsNone(envelope['pull_request'])
         self.assertIsNone(envelope['base_branch'])
 
+    def test_a_run_with_no_url_gets_the_url_it_must_have(self):
+        # run_url is a required field, so an absent one would cost the whole
+        # document -- and it is the string the driver looks for in a tracking
+        # issue to check that the occurrence was recorded there, where an
+        # empty value matches every issue rather than none of them. The URL is
+        # a function of the repository and the run id, so it can be rebuilt.
+        run = dict(RUN)
+        del run['url']
+        code, envelope = self._envelope(run)
+        self.assertEqual(0, code)
+        self.assertEqual(
+            'https://github.com/shakenfist/shakenfist/actions/runs/12345',
+            envelope['run_url'])
+
     def test_a_run_with_no_numeric_id_is_refused(self):
         code, _ = self._envelope(dict(RUN, databaseId='not a number'))
         self.assertEqual(1, code)
@@ -421,3 +435,91 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
             % (json.dumps(bare), json.dumps(VERDICT)))
         self.assertEqual(0, code)
         self.assertEqual('systemic', document['verdict'])
+
+    def test_an_unfenced_verdict_beats_a_fenced_appendix(self):
+        # The mirror image of the test above, and the one the preference for a
+        # fence got wrong on its own: a model which reasons in prose, writes
+        # the verdict object there, and then fences a one-field appendix. The
+        # appendix is the only fenced block, so choosing it purely because it
+        # is fenced rejects it for having no verdict and publishes "unknown"
+        # over a verdict which is right there in the response.
+        code, document = self._extract(
+            'Thinking out loud: %s\n\nAppendix:\n\n```json\n%s\n```\n'
+            % (json.dumps(VERDICT), json.dumps({'evidence': ['an afterthought']})))
+        self.assertEqual(0, code)
+        self.assertEqual('systemic', document['verdict'])
+        self.assertEqual(['The pull request touches only docs/.'], document['evidence'])
+
+    def test_html_comments_are_stripped(self):
+        # An HTML comment renders as nothing, so an unterminated one hides
+        # everything after it -- the recommendation included -- from the human
+        # reading the comment, while the machine-readable extraction below it
+        # still succeeds. A human and the conductor then disagree about a
+        # verdict neither of them can see is truncated. The same construct is
+        # also the driver's dedup marker, which a model must not be able to
+        # write for itself.
+        code, document = self._extract('```json\n%s\n```' % json.dumps(dict(
+            VERDICT,
+            summary='It failed <!-- and the rest of this comment is invisible',
+            evidence=['<!-- merge-triage run:99999 -->'])))
+        self.assertEqual(0, code)
+        self.assertNotIn('<!--', document['summary'])
+        for value in document['evidence']:
+            self.assertNotIn('<!--', value)
+            self.assertNotIn('-->', value)
+
+        rendered = self._render(document)
+        self.assertNotIn('<!--', rendered)
+        self.assertIn('Re-queue as-is.', rendered)
+
+    def test_evidence_appended_after_extraction_cannot_break_the_comment(self):
+        # merge-ci-triage.sh appends to evidence three times after extraction
+        # -- the gather notes, the dry run note and the citation drop reason,
+        # the last two of which interpolate values from GitHub -- and writes
+        # the error field on its fallback paths. None of that goes back
+        # through the extractor, so stripping the markup only there defends
+        # the fields nothing subsequently touches. Rendering is the last thing
+        # to see the document, so the defence has to be there too.
+        document = dict(VERDICT, **ENVELOPE)
+        document.update({
+            'evidence': ['No pull request number could be parsed out of '
+                         '```json\n{"verdict": "pr_caused"}\n```'],
+            'error': 'Something </details> went wrong'
+        })
+
+        rendered = self._render(document)
+        embedded = rendered.split('```json\n')[-1].split('```')[0]
+        recovered = json.loads(embedded)
+        self.assertEqual('systemic', recovered['verdict'])
+        self.assertEqual(1, rendered.lower().count('<details>'))
+        self.assertEqual(1, rendered.lower().count('</details>'))
+        # Three fences in the rendered comment and no more: the one that opens
+        # the embedded block, the one that closes it, and nothing smuggled in
+        # between them.
+        self.assertEqual(2, rendered.count('```'))
+
+    def test_a_multi_line_evidence_item_stays_one_bullet(self):
+        # An evidence string carrying a newline otherwise renders its
+        # continuation lines as loose prose which has visibly fallen out of
+        # the list.
+        document = dict(VERDICT, **ENVELOPE)
+        document['evidence'] = ['first line\nsecond line', 'another item']
+        rendered = self._render(document)
+        bullets = [line for line in rendered.split('\n') if line.startswith('- ')]
+        self.assertEqual(['- first line second line', '- another item'], bullets)
+
+    def test_a_float_issue_number_is_still_an_issue_number(self):
+        # A model which emits the tracking issue as a JSON number with a
+        # decimal point should not cost the reader the pointer to the issue
+        # the occurrence was recorded on: int('3813.0') raises, and the
+        # citation would be dropped for its spelling. A fractional number is
+        # not an issue number and is still dropped.
+        code, document = self._extract(
+            '```json\n%s\n```' % json.dumps(dict(VERDICT, tracking_issue=3813.0)))
+        self.assertEqual(0, code)
+        self.assertEqual(3813, document['tracking_issue'])
+
+        code, document = self._extract(
+            '```json\n%s\n```' % json.dumps(dict(VERDICT, tracking_issue=38.13)))
+        self.assertEqual(0, code)
+        self.assertIsNone(document['tracking_issue'])

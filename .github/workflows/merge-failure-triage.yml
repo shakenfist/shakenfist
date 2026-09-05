@@ -42,7 +42,12 @@
 #   content has already passed review.
 # - The comment body is model output and goes through
 #   tools/neutralise-pr-body.sh before posting, so an @mention or an
-#   issue-closing keyword cannot fire on publication.
+#   issue-closing keyword cannot fire on publication. Publication is gated on
+#   that succeeding: the neutraliser rewrites the file in place and the driver
+#   does not run under "set -e", so an unchecked failure would leave the
+#   un-neutralised body exactly where the comment step reads it from. A triage
+#   nobody sees is the smaller problem, and the verdict is in the artifact
+#   either way.
 # - The model runs with --dangerously-skip-permissions and the checkout as its
 #   working directory, so everything this job executes is staged into
 #   runner.temp first: the triage driver, the verdict extractor, its schema,
@@ -169,5 +174,10 @@ jobs:
             ${{ runner.temp }}/merge-triage/triage.json
             ${{ runner.temp }}/merge-triage/response.txt
             ${{ runner.temp }}/merge-triage/prompt.txt
+            ${{ runner.temp }}/merge-triage/triage.invalid.json
+          # triage.invalid.json only exists when the document failed our own
+          # schema, which is a bug in this tooling rather than a triage
+          # outcome -- and the discarded document is the only evidence of it.
+          # Absent on every normal run, which "warn" tolerates.
           if-no-files-found: warn
           retention-days: 30

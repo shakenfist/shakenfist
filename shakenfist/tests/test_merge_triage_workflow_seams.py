@@ -111,6 +111,12 @@ class MergeTriageWorkflowSeamsTestCase(base.ShakenFistTestCase):
         self.assertIn('%s/triage.json' % OUTPUT_DIR, paths,
                       'the verdict document is not uploaded, and '
                       'if-no-files-found is warn, so this fails silently.')
+        # Only written when the document failed our own schema, which is a
+        # bug in this tooling rather than a triage outcome. Leaving it behind
+        # on the runner discards the only evidence of that bug.
+        self.assertIn('%s/triage.invalid.json' % OUTPUT_DIR, paths,
+                      'a document which failed its own schema is not '
+                      'uploaded, so the bug that produced it is unreadable.')
         for path in paths:
             self.assertTrue(
                 path.startswith(OUTPUT_DIR + '/'),
@@ -136,12 +142,25 @@ class MergeTriageWorkflowSeamsTestCase(base.ShakenFistTestCase):
     def test_the_comment_body_is_neutralised_by_the_shell(self):
         # The workflow does not post the comment itself, so the seam that
         # matters is in the driver: model prose reaches "gh pr comment" only
-        # through neutralise-pr-body.sh.
+        # through neutralise-pr-body.sh, and only if that succeeded. The
+        # driver runs without "set -e", so an unchecked call here fails open
+        # -- it leaves the un-neutralised body exactly where the comment step
+        # reads it from. test_merge_ci_triage_shell.py tests the behaviour by
+        # running the driver with a neutraliser that fails; this pins the
+        # ordering, which that test cannot see.
         with open(os.path.join(self.root, 'tools', 'merge-ci-triage.sh')) as f:
             script = f.read()
-        neutralise = script.index('neutralise-pr-body.sh')
-        comment = script.index('gh pr comment')
+        # The invocations, not the prose about them: both are named in
+        # comments above the code that runs them.
+        neutralise = re.search(
+            r'(?m)^if ! "\$\{TOOLS_DIR\}/neutralise-pr-body\.sh"', script)
+        comment = re.search(r'(?m)^gh pr comment ', script)
+        self.assertIsNotNone(
+            neutralise,
+            'the neutralisation result is discarded, so a failure inside it '
+            'publishes the un-neutralised body.')
+        self.assertIsNotNone(comment, 'the driver no longer posts a comment')
         self.assertLess(
-            neutralise, comment,
+            neutralise.start(), comment.start(),
             'the comment body is posted before it is neutralised, so an '
             '@mention or an issue-closing keyword fires on publication.')

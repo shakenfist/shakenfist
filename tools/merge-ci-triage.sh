@@ -164,7 +164,6 @@ fi
 run_event=$(jq -r '.event // ""' "${OUTPUT_DIR}/run.json")
 run_conclusion=$(jq -r '.conclusion // ""' "${OUTPUT_DIR}/run.json")
 head_branch=$(jq -r '.headBranch // ""' "${OUTPUT_DIR}/run.json")
-run_url=$(jq -r '.url // ""' "${OUTPUT_DIR}/run.json")
 run_attempt=$(jq -r '.attempt // 1' "${OUTPUT_DIR}/run.json")
 
 echo "merge-ci-triage: ${REPO} run ${RUN_ID} (${run_event}, ${run_conclusion}) on ${head_branch}"
@@ -187,6 +186,14 @@ fi
 
 base_branch=$(jq -r '.base_branch // ""' "${ENVELOPE_JSON}")
 pr_number=$(jq -r '.pull_request // ""' "${ENVELOPE_JSON}")
+
+# From the envelope rather than from run.json, so that the URL in the prompt
+# and the URL the citation check greps for are the one the document publishes.
+# The envelope builder substitutes the URL the run must have when GitHub gave
+# none, which matters here more than it looks: "grep -qF ''" matches every
+# non-empty input, so an empty pattern below would not fail the citation
+# check, it would pass it against any issue in the repository.
+run_url=$(jq -r '.run_url // ""' "${ENVELOPE_JSON}")
 
 # ---------------------------------------------------------------------------
 # Gather the evidence
@@ -234,9 +241,10 @@ if [ "${log_bytes}" -le $((LOG_HEAD_BYTES + LOG_TAIL_BYTES)) ]; then
 else
     {
         head -c "${LOG_HEAD_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt"
-        printf '\n\n[... %s bytes elided by triage: this is the first %s and the last %s bytes of the failed step logs ...]\n\n' \
-            "$((log_bytes - LOG_HEAD_BYTES - LOG_TAIL_BYTES))" \
-            "${LOG_HEAD_BYTES}" "${LOG_TAIL_BYTES}"
+        printf '\n\n[... %s bytes elided by triage: this is the first %s ' \
+            "$((log_bytes - LOG_HEAD_BYTES - LOG_TAIL_BYTES))" "${LOG_HEAD_BYTES}"
+        printf 'and the last %s bytes of the failed step logs ...]\n\n' \
+            "${LOG_TAIL_BYTES}"
         tail -c "${LOG_TAIL_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt"
     } > "${OUTPUT_DIR}/failed-logs.txt"
 fi
@@ -512,9 +520,18 @@ if [ -n "${tracking_issue}" ]; then
 
         # The run URL rather than the bare id: the digits of a run id turn up
         # in unrelated URLs on a long issue, and the prompt asks for the URL.
-        if ! printf '%s\n%s\n' "${issue_body}" "${issue_comments}" \
+        if [ -z "${run_url}" ]; then
+            # Unreachable while the envelope builder substitutes a URL, and
+            # the document would not have validated without one either. Kept
+            # because the alternative to failing closed here is a grep for the
+            # empty string, which reports every issue as carrying the
+            # reference rather than none of them.
+            drop_reason="Triage cited issue #${tracking_issue}, but this run's URL is unknown"
+            drop_reason="${drop_reason}, so the claim that the occurrence was recorded there could not be checked."
+        elif ! printf '%s\n%s\n' "${issue_body}" "${issue_comments}" \
                 | grep -qF "${run_url}"; then
-            drop_reason="Triage said it recorded this occurrence on issue #${tracking_issue}, but nothing there references ${run_url}. The issue is kept as a reference only."
+            drop_reason="Triage said it recorded this occurrence on issue #${tracking_issue}, but nothing"
+            drop_reason="${drop_reason} there references ${run_url}. The issue is kept as a reference only."
         fi
     fi
 
@@ -579,7 +596,17 @@ mv "${OUTPUT_DIR}/comment.body.md" "${OUTPUT_DIR}/comment.md"
 # taken back should not rest on the model having complied. The markup which
 # would break the comment's own structure is already gone, stripped by
 # merge-triage.py before the document was written.
-"${TOOLS_DIR}/neutralise-pr-body.sh" "${OUTPUT_DIR}/comment.md"
+#
+# Nothing is posted if this fails. It rewrites the file in place through a
+# temporary copy, so a failure anywhere inside it leaves the original,
+# un-neutralised body exactly where "gh pr comment" would read it from -- and
+# this script runs without "set -e". A triage nobody sees is a smaller problem
+# than a triage which fires an @mention or an issue-closing keyword on
+# publication, which is the whole reason the neutralisation is here.
+if ! "${TOOLS_DIR}/neutralise-pr-body.sh" "${OUTPUT_DIR}/comment.md"; then
+    echo "merge-ci-triage: the comment body could not be neutralised, not posting it" >&2
+    exit 1
+fi
 
 if [ "${DRY_RUN}" = "true" ]; then
     echo "merge-ci-triage: dry run, not commenting on the pull request"
@@ -591,8 +618,13 @@ if [ -z "${pr_number}" ]; then
     exit "${exit_status}"
 fi
 
-if gh pr view "${pr_number}" --repo "${REPO}" --json comments \
-        --jq '[.comments[].body] | join("\n")' 2>/dev/null \
+# Paged, and through the issues API rather than "gh pr view --json comments":
+# the GraphQL layer behind that caps a pull request at its first hundred
+# comments, so on a long-lived pull request the earlier marker falls off the
+# end and a re-delivered workflow_run posts a second copy of the same verdict.
+# The citation check above pages for the same reason.
+if gh api --paginate "repos/${REPO}/issues/${pr_number}/comments" \
+        --jq '.[].body' 2>/dev/null \
         | grep -qF "${marker}"; then
     echo "merge-ci-triage: run ${RUN_ID} has already been triaged on #${pr_number}"
     exit "${exit_status}"

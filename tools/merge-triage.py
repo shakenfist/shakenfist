@@ -95,7 +95,14 @@ QUEUE_REF_RE = re.compile(
 # enough: ~~~ is a GitHub fence too, and a details tag may carry attributes
 # (<details open>) or whitespace before the close. Match the tag by name and
 # swallow to the closing angle bracket.
-UNSAFE_MARKUP_RE = re.compile(r'```+|~~~+|</?details\b[^>]*>', re.IGNORECASE)
+#
+# An HTML comment delimiter is in here for a third reason. It renders as
+# nothing, so an unterminated <!-- in a summary hides the rest of the comment
+# -- the recommendation included -- from a human while the machine-readable
+# extraction still succeeds, which is the worst shape a disagreement between
+# those two readers can take. It is also the dedup marker the driver writes,
+# and a marker that can be forged is not a marker.
+UNSAFE_MARKUP_RE = re.compile(r'```+|~~~+|</?details\b[^>]*>|<!--|-->', re.IGNORECASE)
 
 # Characters that break a markdown table cell. The facts table puts model
 # prose in single cells, several of them inside an inline code span, so an
@@ -183,9 +190,17 @@ def _find_json_object(text):
     away good verdicts. raw_decode() stops at the end of the first complete
     value, so trailing prose after the object is tolerated.
 
-    The unfenced scan is only reached when no fenced block held a candidate,
+    The unfenced scan is skipped when a fenced block already held a verdict,
     because it is the expensive half: a decode attempt from every brace in the
-    tail of a response which may quote a hundred kilobytes of log.
+    tail of a response which may quote a hundred kilobytes of log. It is not
+    enough for a fenced block to be merely schema-shaped, though. A model
+    which writes the verdict as bare prose and then a fenced appendix --
+    {"evidence": [...]} -- would otherwise have the appendix chosen, rejected
+    by the cleaning step for having no verdict, and a triage which actually
+    succeeded published as "unknown". That is the same failure
+    _pick_verdict() exists to prevent, with the two objects in different
+    formats, so the preference for a verdict has to outrank the preference
+    for a fence.
     """
     fenced = []
     for block in reversed(FENCED_BLOCK_RE.findall(text)):
@@ -197,7 +212,7 @@ def _find_json_object(text):
             fenced.append(value)
 
     chosen = _pick_verdict(fenced)
-    if chosen is not None:
+    if chosen is not None and 'verdict' in chosen:
         return chosen
 
     decoder = json.JSONDecoder()
@@ -211,7 +226,15 @@ def _find_json_object(text):
             continue
         if _looks_like_verdict(value):
             unfenced.append(value)
-    return _pick_verdict(unfenced)
+
+    scanned = _pick_verdict(unfenced)
+    if scanned is not None and 'verdict' in scanned:
+        return scanned
+    # Neither format held a verdict. The fenced candidate is still the better
+    # guess -- it is the format the prompt asked for -- and letting it through
+    # keeps the "no usable verdict field" error, which names what went wrong,
+    # rather than the "no JSON verdict object" one, which does not.
+    return chosen if chosen is not None else scanned
 
 
 def _coerce_int(value):
@@ -219,6 +242,13 @@ def _coerce_int(value):
         return None
     if isinstance(value, int):
         return value
+    # A whole number written with a decimal point is still an issue number.
+    # int('3813.0') raises, and dropping the citation over the spelling loses
+    # the reader the pointer to the issue the occurrence was recorded on --
+    # the one thing the verification downstream cannot reconstruct. A
+    # fractional value is not an issue number and is dropped.
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
     try:
         return int(str(value).lstrip('#'))
     except (TypeError, ValueError):
@@ -258,6 +288,38 @@ def _table_cell(value):
     """
     return TABLE_WHITESPACE_RE.sub(' ', str(value)).strip().replace(
         '|', r'\|').replace('`', "'")
+
+
+# The prose fields, as opposed to the envelope. These are what the model wrote
+# and what the driver appends to, so they are the fields _safe_document()
+# re-sanitises. The envelope fields are deliberately not in here: a consumer
+# compares repository, run id and pull request against the failure it is
+# reading, and rewriting one of those to make a comment render better would
+# break the one promise the envelope makes.
+PROSE_FIELDS = ['summary', 'failing_job', 'failing_step', 'failure_signature', 'error']
+
+
+def _safe_document(document):
+    """A copy of document with the prose re-run through _safe_prose().
+
+    _clean_model_fields() already did this to everything the model wrote, but
+    the document is mutated afterwards: merge-ci-triage.sh appends to
+    `evidence` three times -- the gather notes, the dry run note and the
+    citation drop reason -- and writes the `error` field on the fallback
+    paths, none of which goes back through extraction. A fence appended there
+    would end the ```json block the machine-readable half lives in, so the
+    defence belongs at the point of rendering, which is the last thing to
+    touch the document, rather than only at the point of extraction, which is
+    not.
+    """
+    safe = dict(document)
+    for field in PROSE_FIELDS:
+        if safe.get(field) is not None:
+            safe[field] = _safe_prose(safe[field])
+    evidence = safe.get('evidence')
+    if isinstance(evidence, list):
+        safe['evidence'] = [item for item in (_safe_prose(i) for i in evidence) if item]
+    return safe
 
 
 def _clean_model_fields(raw):
@@ -366,10 +428,18 @@ def do_envelope(repository, run_path, output_path, triage_run_url=''):
             'merge-triage: no pull request number in ref %r\n' % head_branch)
 
     attempt = run.get('attempt')
+
+    # The URL GitHub gave us, or the one it would have given us. It is a
+    # required field of the schema, so an absent one costs the whole document
+    # -- and it is also the string the driver looks for in a tracking issue
+    # to check that the occurrence really was recorded there, where an empty
+    # value would match everything rather than nothing.
+    run_url = run.get('url') or 'https://github.com/%s/actions/runs/%d' % (repository, run_id)
+
     envelope = {
         'repository': repository,
         'run_id': run_id,
-        'run_url': run.get('url') or '',
+        'run_url': run_url,
         'run_attempt': attempt if isinstance(attempt, int) else 1,
         'head_branch': head_branch,
         'head_sha': run.get('headSha') or '',
@@ -470,6 +540,11 @@ def do_validate(path):
 
 
 def render_markdown(document):
+    # Both halves of the comment are rendered from the sanitised copy, because
+    # the embedded JSON is as breakable as the prose above it: json.dumps()
+    # escapes a newline and a quote but not a backtick, so an unsanitised
+    # fence in a string value ends the block a consumer parses.
+    document = _safe_document(document)
     verdict = document.get('verdict', 'unknown')
     lines = ['## Automated merge CI triage', '']
     lines.append('**%s**' % VERDICT_HEADLINE.get(verdict, VERDICT_HEADLINE['unknown']))
@@ -507,7 +582,10 @@ def render_markdown(document):
         lines.append('### Evidence')
         lines.append('')
         for item in evidence:
-            lines.append('- %s' % item)
+            # One bullet per item, whatever the item does with newlines: a
+            # multi-line evidence string otherwise renders its continuation
+            # lines as loose prose that has visibly fallen out of the list.
+            lines.append('- %s' % TABLE_WHITESPACE_RE.sub(' ', str(item)).strip())
         lines.append('')
 
     lines.append('### Recommendation')

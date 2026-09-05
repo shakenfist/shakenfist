@@ -641,6 +641,9 @@ Four properties of that document are worth knowing before consuming it:
   document is indistinguishable from a triage that never ran; an `unknown` one
   is not. The single exception is a run that was not a failed merge group run
   at all: nothing was triaged, so there is nothing to publish a verdict about.
+  A document that failed the schema is uploaded alongside the replacement as
+  `triage.invalid.json`, since that is a bug in the tooling rather than a
+  triage outcome and the discarded document is the only evidence of it.
 - **No evidence means no verdict.** If neither the failed job list nor the
   failed step logs can be read, no model is run: the document says so and the
   verdict is `unknown`. Anything else that could not be gathered — the sibling
@@ -665,6 +668,12 @@ Four properties of that document are worth knowing before consuming it:
   `none` unconditionally, whatever the model reports, because nothing was
   written to GitHub on that path; the verification still runs against what the
   model *claimed*, so that path is exercised outside production too.
+
+The comment is only posted if the body could be neutralised —
+`tools/neutralise-pr-body.sh` rewrites it in place, and a failure inside it
+would otherwise leave the un-neutralised model prose where `gh pr comment`
+reads it from. A triage nobody sees is a smaller problem than one that fires an
+@mention on publication, and the verdict is still in the artifact.
 
 An `unknown` verdict is posted on the pull request like any other. It is a thin
 comment, but the alternative is silence, and silence on an ejected pull request
