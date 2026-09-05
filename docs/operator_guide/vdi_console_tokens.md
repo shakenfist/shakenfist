@@ -106,6 +106,13 @@ configuration name ends in `_KEY`, `sf-ctl show-config` redacts it by
 default; never pass `--show-secrets` where the output could be logged, and
 never print or event private key material.
 
+The row is also excluded from the cluster configuration Shaken Fist exports
+into each daemon's environment at startup. Only `cluster_config` rows which
+name a declared configuration option are exported, so the signing key is read
+from the database by the one module that needs it rather than sitting in
+every daemon's `/proc/<pid>/environ` on every node. Nothing an operator does
+turns that off.
+
 The key is **not** created automatically: it must be provisioned explicitly
 before the first console is opened. Until it exists, the `vdiconsoleproxy`
 endpoint returns HTTP 500 naming the command to run below — minting never

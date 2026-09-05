@@ -203,7 +203,11 @@ The private signing key lives in a single `cluster_config` row,
 row holds a newest-first, two-key window of Ed25519 keypairs; rotation
 (`sf-ctl rotate-kerbside-signing-key`) prepends a fresh key and trims to two,
 so tokens signed by the previous key stay verifiable until the next rotation.
-`shakenfist/util/vdi_tokens.py` is the only module that parses the row.
+`shakenfist/util/vdi_tokens.py` is the only module that parses the row, and
+reads it through `mariadb.get_cluster_config()`:
+`config.load_cluster_config()` exports a `cluster_config` row into the daemon
+environment only when it names a declared `SFConfig` field, so the private
+key never enters any process's environment.
 Per-node `spice_server_cert_subject` (published by `shakenfist/node.py`) is
 consumed by Kerbside as the enforced backend `host_subject`. See the
 [VDI console tokens operator guide](../operator_guide/vdi_console_tokens.md)
