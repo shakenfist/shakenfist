@@ -39,11 +39,18 @@ def _load_sf_instance():
     client.__path__ = []
     apiclient = types.ModuleType('shakenfist_client.apiclient')
 
-    class _ResourceNotFoundException(Exception):
+    # Mirror the real hierarchy: ResourceNotFoundException subclasses
+    # APIException, so exception clause ordering in the module (the
+    # specific not-found handling before the generic API failure
+    # handling) is exercised the same way it runs in production.
+    class _APIException(Exception):
+        ...
+
+    class _ResourceNotFoundException(_APIException):
         ...
 
     apiclient.ResourceNotFoundException = _ResourceNotFoundException
-    apiclient.APIException = Exception
+    apiclient.APIException = _APIException
     apiclient.Client = mock.MagicMock()
     client.apiclient = apiclient
     stubs['shakenfist_client'] = client
@@ -476,6 +483,166 @@ class SfInstanceDeleteBoundTestCase(base.ShakenFistTestCase):
         # deletion operations against an instance that is already stuck
         # is the failure mode a non-blocking retrying loop would have.
         self.assertEqual(1, client.delete_instance.call_count)
+
+
+class SfInstanceAPIErrorLogTestCase(base.ShakenFistTestCase):
+    """An API failure must fail through fail_json() with the log.
+
+    Issue 4060: the log carries the dirtiness reasoning -- the only
+    record of why the module decided to destroy and recreate an
+    instance. The create and delete calls were unguarded, so an
+    APIException escaped to ansible as a bare module crash and the log
+    was discarded at exactly the moment it became useful: a create
+    failure is usually the consequence of a dirtiness decision the
+    operator did not expect.
+    """
+
+    PARAMS = {
+        'name': 'test', 'uuid': None, 'cpu': 1, 'ram': 1024,
+        'disks': ['8@cirros'], 'diskspecs': None, 'networks': None,
+        'networkspecs': None, 'ssh_key': None, 'user_data': None,
+        'placement': None, 'video': None, 'nvram_template': None,
+        'configdrive': None, 'side_channels': None, 'uefi': None,
+        'secureboot': None, 'metadata': None, 'state': 'present',
+        'await': False, 'await_timeout': 600,
+        'api_url': 'http://localhost:13000', 'namespace': 'ns',
+        'key': 'notreallyakey',
+    }
+
+    # Dirty on cpu alone, so every present-path test's log carries a
+    # 'Instance dirty: cpu has changed' line -- the evidence the module
+    # must not discard.
+    EXISTING_DIRTY = {
+        'uuid': 'notreallyauuid', 'name': 'test', 'cpus': 2,
+        'memory': 1024, 'namespace': 'ns', 'interfaces': [],
+        'disk_spec': [
+            {'base': 'cirros', 'bus': None, 'size': 8, 'type': 'disk'}
+        ],
+    }
+
+    def _run(self, client, state='present', expect_failure=True):
+        params = dict(self.PARAMS)
+        params['state'] = state
+
+        module = mock.MagicMock()
+        module.params = params
+        module.check_mode = False
+        module.exit_json.side_effect = _Succeeded
+        module.fail_json.side_effect = _Failed
+
+        # One simulated second per clock read and free sleeps, so the
+        # deletion poll in _delete_and_wait() costs no real time.
+        clock = itertools.count()
+        with mock.patch.object(
+                sf_instance, 'AnsibleModule', return_value=module), \
+                mock.patch.object(
+                    sf_instance, '_make_client', return_value=client), \
+                mock.patch.object(
+                    sf_instance.time, 'monotonic',
+                    side_effect=lambda: next(clock)), \
+                mock.patch.object(sf_instance.time, 'sleep'):
+            self.assertRaises(
+                _Failed if expect_failure else _Succeeded,
+                sf_instance.run_module)
+
+        return module
+
+    def _msg_and_log(self, module):
+        kwargs = module.fail_json.call_args[1]
+        return kwargs['msg'], kwargs['log']
+
+    def test_a_failed_create_reports_the_dirtiness_log(self):
+        # The exact shape from the issue: a replacement was decided, the
+        # old instance deleted, and then the create 409ed. The log must
+        # arrive with the failure, carrying the reasoning.
+        client = mock.MagicMock()
+        client.get_instance.side_effect = [
+            self.EXISTING_DIRTY, {'state': 'deleted'}]
+        client.create_instance.side_effect = \
+            sf_instance.apiclient.APIException('address 10.0.2.2 in use')
+
+        msg, log = self._msg_and_log(self._run(client))
+        self.assertEqual(
+            'Instance creation failed: address 10.0.2.2 in use', msg)
+        self.assertIn('Instance dirty: cpu has changed from 2 to 1', log)
+        self.assertIn(msg, log)
+
+    def test_a_failed_delete_for_update_reports_the_dirtiness_log(self):
+        client = mock.MagicMock()
+        client.get_instance.side_effect = [self.EXISTING_DIRTY]
+        client.delete_instance.side_effect = \
+            sf_instance.apiclient.APIException('boom')
+
+        module = self._run(client)
+        msg, log = self._msg_and_log(module)
+        self.assertEqual('Instance deletion for update failed: boom', msg)
+        self.assertIn('Instance dirty: cpu has changed from 2 to 1', log)
+        client.create_instance.assert_not_called()
+
+    def test_a_failed_interface_read_reports_the_dirtiness_log(self):
+        existing = dict(self.EXISTING_DIRTY)
+        existing['interfaces'] = [{'uuid': 'notreallyanifaceuuid'}]
+        client = mock.MagicMock()
+        client.get_instance.side_effect = [existing]
+        client.get_interface.side_effect = \
+            sf_instance.apiclient.APIException('boom')
+
+        msg, log = self._msg_and_log(self._run(client))
+        self.assertEqual(
+            'Comparing against the existing instance failed: boom', msg)
+        self.assertIn('Instance dirty: cpu has changed from 2 to 1', log)
+
+    def test_a_failed_existing_lookup_reports_the_log(self):
+        client = mock.MagicMock()
+        client.get_instance.side_effect = \
+            sf_instance.apiclient.APIException('boom')
+
+        msg, log = self._msg_and_log(self._run(client))
+        self.assertEqual('Fetching the existing instance failed: boom', msg)
+        self.assertIn('Will use identifier test', log)
+
+    def test_a_failed_post_create_fetch_reports_the_log(self):
+        client = mock.MagicMock()
+        client.get_instance.side_effect = [
+            sf_instance.apiclient.ResourceNotFoundException(),
+            sf_instance.apiclient.APIException('boom')]
+        client.create_instance.return_value = {
+            'uuid': 'notreallyauuid', 'state': 'created'}
+
+        msg, log = self._msg_and_log(self._run(client))
+        self.assertEqual('Fetching the created instance failed: boom', msg)
+        self.assertIn('Not awaiting instance', log)
+
+    def test_an_absent_delete_failure_reports_the_log(self):
+        client = mock.MagicMock()
+        client.get_instance.side_effect = [self.EXISTING_DIRTY]
+        client.delete_instance.side_effect = \
+            sf_instance.apiclient.APIException('boom')
+
+        msg, log = self._msg_and_log(self._run(client, state='absent'))
+        self.assertEqual('Instance deletion failed: boom', msg)
+        self.assertIn('Attempt deletion...', log)
+
+    def test_an_absent_lookup_failure_reports_the_log(self):
+        client = mock.MagicMock()
+        client.get_instance.side_effect = \
+            sf_instance.apiclient.APIException('boom')
+
+        msg, _ = self._msg_and_log(self._run(client, state='absent'))
+        self.assertEqual('Fetching the existing instance failed: boom', msg)
+
+    def test_not_found_is_still_not_an_api_failure(self):
+        # ResourceNotFoundException subclasses APIException in the real
+        # client, so clause ordering matters: not-found must keep taking
+        # its specific handler (a clean "nothing to delete") rather than
+        # failing the task through the new generic guard.
+        client = mock.MagicMock()
+        client.get_instance.side_effect = \
+            sf_instance.apiclient.ResourceNotFoundException()
+
+        module = self._run(client, state='absent', expect_failure=False)
+        module.fail_json.assert_not_called()
+        self.assertFalse(module.exit_json.call_args[1]['changed'])
 
 
 class SfInstanceCreateTimeoutDetectionTestCase(base.ShakenFistTestCase):
