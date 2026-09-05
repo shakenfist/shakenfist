@@ -781,7 +781,10 @@ class AdmitMoveTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertIn('used_cpus=', decrement)
 
     def test_floored_decrement_clamps_and_says_so(self):
-        router = _PlacementRouter(rowcounts={'node_decrement': 0})
+        router = _PlacementRouter(rowcounts={'node_decrement': 0},
+                                  node_row=_capacity_row(
+                                      used_cpus=1, used_memory_mb=1024,
+                                      used_disk_gb=5))
         result = self._run(router)
 
         self.assertTrue(result['admitted'])
@@ -790,6 +793,20 @@ class AdmitMoveTestCase(_PlacementMixin, base.ShakenFistTestCase):
                   if 'greatest' in text.lower()]
         self.assertEqual(1, len(clamps))
         self.assertIn('greatest', clamps[0].lower())
+        # It is the *old* node's counters a move can clamp, and the
+        # detail names it -- not the move's target (issue 4050).
+        self.assertEqual([{
+            'counter': str(NODE1),
+            'shortfall_cpus': 3,
+            'shortfall_memory_mb': 3072,
+            'shortfall_disk_gb': 15}], result['clamps'])
+
+    def test_a_clean_move_reports_no_clamp_detail(self):
+        router = _PlacementRouter()
+        result = self._run(router)
+        self.assertTrue(result['admitted'])
+        self.assertFalse(result['clamped'])
+        self.assertEqual([], result['clamps'])
 
     def test_absent_old_node_row_is_not_a_clamp(self):
         # P7's fail-open again: no row at all is not the same condition
@@ -1050,16 +1067,44 @@ class ReleaseTestCase(_PlacementMixin, base.ShakenFistTestCase):
 
     def test_clamped_node_decrement_is_reported(self):
         router = _PlacementRouter(claim=None, reference_nodes=[NODE1],
-                                  rowcounts={'node_decrement': 0})
+                                  rowcounts={'node_decrement': 0},
+                                  node_row=_capacity_row(
+                                      used_cpus=1, used_memory_mb=1024,
+                                      used_disk_gb=5))
         result = self._run(router)
         self.assertTrue(result['released'])
         self.assertTrue(result['clamped'])
+        # The detail says which counter drifted -- the node whose row
+        # clamped, which the caller's node_uuid argument need not name
+        # -- and by how much per dimension (issue 4050).
+        self.assertEqual([{
+            'counter': str(NODE1),
+            'shortfall_cpus': 3,
+            'shortfall_memory_mb': 3072,
+            'shortfall_disk_gb': 15}], result['clamps'])
 
     def test_clamped_namespace_decrement_is_reported(self):
         router = _PlacementRouter(claim=None, reference_nodes=[NODE1],
-                                  rowcounts={'namespace_decrement': 0})
+                                  rowcounts={'namespace_decrement': 0},
+                                  cluster_row=_cluster_row(
+                                      unclaimed_used_cpus=1))
         result = self._run(router)
         self.assertTrue(result['clamped'])
+        # An unclaimed namespace's release decrements the cluster
+        # singleton's unclaimed sums, and the detail names that counter
+        # rather than any node.
+        self.assertEqual([{
+            'counter': 'cluster_unclaimed',
+            'shortfall_cpus': 3,
+            'shortfall_memory_mb': 0,
+            'shortfall_disk_gb': 0}], result['clamps'])
+
+    def test_a_clean_release_reports_no_clamp_detail(self):
+        router = _PlacementRouter(claim=None, reference_nodes=[NODE1])
+        result = self._run(router)
+        self.assertTrue(result['released'])
+        self.assertFalse(result['clamped'])
+        self.assertEqual([], result['clamps'])
 
     def test_duplicate_placements_release_every_node_once(self):
         router = _PlacementRouter(claim=None,
@@ -1242,35 +1287,60 @@ class SnapshotIsolationInvariantTestCase(_PlacementMixin,
 class FlooredDecrementTestCase(base.ShakenFistTestCase):
     """_floored_node_decrement's three outcomes (P6)."""
 
-    def _run(self, guarded_rowcount, clamp_rowcount):
+    def _run(self, guarded_rowcount, clamp_rowcount, row='default'):
+        # The clamp path is guarded UPDATE (miss), pre-clamp SELECT,
+        # clamp UPDATE; the ordinary path never reaches the SELECT.
+        if row == 'default':
+            row = _capacity_row(used_cpus=1, used_memory_mb=1024,
+                                used_disk_gb=5)
         conn = mock.MagicMock()
-        results = []
-        for rowcount in (guarded_rowcount, clamp_rowcount):
-            result = mock.MagicMock()
-            result.rowcount = rowcount
-            results.append(result)
-        conn.execute.side_effect = results
+        guarded = mock.MagicMock()
+        guarded.rowcount = guarded_rowcount
+        select = mock.MagicMock()
+        select.first.return_value = row
+        clamp = mock.MagicMock()
+        clamp.rowcount = clamp_rowcount
+        conn.execute.side_effect = [guarded, select, clamp]
         return mariadb._floored_node_decrement(conn, NODE1, 4, 4096, 20), conn
 
     def test_guarded_decrement_wins_the_ordinary_case(self):
-        (touched, clamped), conn = self._run(1, 1)
+        (touched, clamp_detail), conn = self._run(1, 1)
         self.assertTrue(touched)
-        self.assertFalse(clamped)
-        # The clamp statement was never issued.
+        self.assertIsNone(clamp_detail)
+        # Neither the pre-clamp read nor the clamp statement was issued.
         self.assertEqual(1, conn.execute.call_count)
 
     def test_guard_miss_clamps_at_zero(self):
-        (touched, clamped), conn = self._run(0, 1)
+        (touched, clamp_detail), conn = self._run(0, 1)
         self.assertTrue(touched)
-        self.assertTrue(clamped)
-        self.assertEqual(2, conn.execute.call_count)
-        text, _ = _compiled(conn.execute.call_args_list[1].args[0])
+        self.assertEqual(3, conn.execute.call_count)
+        text, _ = _compiled(conn.execute.call_args_list[2].args[0])
         self.assertIn('greatest', text.lower())
+        # The detail names this node and carries the observed drift --
+        # released minus the pre-clamp counters, floored at zero -- not
+        # the release's own allocation (issue 4050).
+        self.assertEqual({
+            'counter': str(NODE1),
+            'shortfall_cpus': 3,
+            'shortfall_memory_mb': 3072,
+            'shortfall_disk_gb': 15}, clamp_detail)
+
+    def test_clean_dimensions_report_a_zero_shortfall(self):
+        # Only memory drifted: the other two subtract cleanly and say
+        # so, rather than reporting the whole released allocation.
+        (_, clamp_detail), _ = self._run(
+            0, 1, row=_capacity_row(used_cpus=6, used_memory_mb=1024,
+                                    used_disk_gb=33))
+        self.assertEqual({
+            'counter': str(NODE1),
+            'shortfall_cpus': 0,
+            'shortfall_memory_mb': 3072,
+            'shortfall_disk_gb': 0}, clamp_detail)
 
     def test_absent_row_is_neither_touched_nor_clamped(self):
-        (touched, clamped), _ = self._run(0, 0)
+        (touched, clamp_detail), _ = self._run(0, 0, row=None)
         self.assertFalse(touched)
-        self.assertFalse(clamped)
+        self.assertIsNone(clamp_detail)
 
     def test_guarded_form_tests_used_against_the_release(self):
         (_, _), conn = self._run(1, 1)
@@ -1455,7 +1525,13 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
 
     ADMITTED = {
         'success': True, 'error': '', 'admitted': True, 'unguarded': False,
-        'clamped': True, 'failing_stage': '', 'dimensions': [],
+        'clamped': True,
+        # A move whose old-node decrement clamped: the detail behind the
+        # boolean, which is what the caller's audit event records
+        # (issue 4050).
+        'clamps': [{'counter': str(NODE2), 'shortfall_cpus': 2,
+                    'shortfall_memory_mb': 0, 'shortfall_disk_gb': 7}],
+        'failing_stage': '', 'dimensions': [],
         'node_used_cpus': 10, 'node_used_memory_mb': 10240,
         'node_used_disk_gb': 53, 'node_expected_demand': 18.5,
         'claim_over_limit': False, 'claim_dimensions': [],
@@ -1465,7 +1541,7 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
     }
     DENIED = {
         'success': True, 'error': '', 'admitted': False, 'unguarded': False,
-        'clamped': False, 'failing_stage': 'node',
+        'clamped': False, 'clamps': [], 'failing_stage': 'node',
         'dimensions': [
             {'dimension': 'cpus', 'limit': 48.0, 'used': 46.0,
              'requested': 4.0, 'exceeded': True, 'shortfall': 2.0},
@@ -1484,7 +1560,8 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
     }
     OVER_CLAIM = {
         'success': True, 'error': '', 'admitted': True, 'unguarded': False,
-        'clamped': False, 'failing_stage': '', 'dimensions': [],
+        'clamped': False, 'clamps': [], 'failing_stage': '',
+        'dimensions': [],
         'node_used_cpus': 10, 'node_used_memory_mb': 10240,
         'node_used_disk_gb': 53, 'node_expected_demand': 18.5,
         'claim_over_limit': True,
@@ -1610,7 +1687,20 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
 
     def test_release_round_trip(self):
         released = {'success': True, 'error': '', 'released': True,
-                    'clamped': True, 'counters_node_uuid': str(NODE1),
+                    'clamped': True,
+                    # Two counters drifted at once -- the cluster's
+                    # unclaimed sums and a node's row -- which is
+                    # exactly the ambiguity the bare boolean could not
+                    # express (issue 4050).
+                    'clamps': [
+                        {'counter': 'cluster_unclaimed',
+                         'shortfall_cpus': 4, 'shortfall_memory_mb': 0,
+                         'shortfall_disk_gb': 0},
+                        {'counter': str(NODE1), 'shortfall_cpus': 0,
+                         'shortfall_memory_mb': 2048,
+                         'shortfall_disk_gb': 20},
+                    ],
+                    'counters_node_uuid': str(NODE1),
                     'node_used_cpus': 6, 'node_used_memory_mb': 8192,
                     'node_used_disk_gb': 40, 'node_expected_demand': 1.5}
         request = database_pb2.ReleaseInstancePlacementRequest(
@@ -1630,6 +1720,23 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
             unpacked = mariadb._grpc_release_instance_placement(
                 str(INST1), 'ci-1', '', 4, 4096, 20)
         self.assertEqual(released, unpacked)
+
+    def test_a_reply_without_clamp_detail_reads_as_not_reported(self):
+        # Mixed-version window: an sf-database predating the clamps
+        # field can still say clamped=True, and that must unpack as an
+        # empty detail list -- "not reported" -- rather than failing or
+        # inventing a counter (issue 4050).
+        reply = database_pb2.ReleaseInstancePlacementReply(
+            success=True, released=True, clamped=True)
+        stub = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=stub), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            unpacked = mariadb._grpc_release_instance_placement(
+                str(INST1), 'ci-1', '', 4, 4096, 20)
+        self.assertTrue(unpacked['clamped'])
+        self.assertEqual([], unpacked['clamps'])
 
     def test_servicer_swallows_an_unexpected_exception(self):
         request = database_pb2.AdmitInstancePlacementRequest(

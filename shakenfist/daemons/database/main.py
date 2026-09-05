@@ -2729,6 +2729,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # over-claim placement was admitted (D5/D16).
             for dimension in result['claim_dimensions']:
                 reply.claim_dimensions.add(**dimension)
+            for clamp in result['clamps']:
+                reply.clamps.add(**clamp)
             return reply
         except Exception as e:
             util_exceptions.ignore_exception(
@@ -2747,7 +2749,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             result = mariadb._direct_release_instance_placement(
                 request.instance_uuid, request.namespace, request.node_uuid,
                 request.cpus, request.memory_mb, request.disk_gb)
-            return database_pb2.ReleaseInstancePlacementReply(
+            reply = database_pb2.ReleaseInstancePlacementReply(
                 success=result['success'],
                 error=result['error'],
                 released=result['released'],
@@ -2757,6 +2759,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 node_used_memory_mb=result['node_used_memory_mb'],
                 node_used_disk_gb=result['node_used_disk_gb'],
                 node_expected_demand=result['node_expected_demand'])
+            for clamp in result['clamps']:
+                reply.clamps.add(**clamp)
+            return reply
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database ReleaseInstancePlacement failed', e)

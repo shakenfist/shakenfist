@@ -845,6 +845,14 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         result = self._admit(self.node_b, old_node=str(self.node_a))
         self.assertTrue(result['admitted'], result['error'])
         self.assertTrue(result['clamped'])
+        # The detail names the old node and the observed drift -- how
+        # far each counter was below the released allocation, read
+        # before the clamp erased it (issue 4050).
+        self.assertEqual([{
+            'counter': str(self.node_a),
+            'shortfall_cpus': 3,
+            'shortfall_memory_mb': 4095,
+            'shortfall_disk_gb': 39}], result['clamps'])
         node_a = self._capacity(self.node_a)
         self.assertEqual(0, node_a.used_cpus)
         self.assertEqual(0, node_a.used_memory_mb)
@@ -923,6 +931,15 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         result = self._release()
         self.assertTrue(result['released'])
         self.assertTrue(result['clamped'])
+        # Only node_b's row clamped: the cluster's unclaimed sums
+        # covered the release, so they are not in the detail -- which is
+        # the "which counter drifted?" question the bare boolean could
+        # not answer (issue 4050).
+        self.assertEqual([{
+            'counter': str(self.node_b),
+            'shortfall_cpus': 4,
+            'shortfall_memory_mb': 4096,
+            'shortfall_disk_gb': 40}], result['clamps'])
         node_b = self._capacity(self.node_b)
         self.assertEqual(0, node_b.used_cpus)
         self.assertEqual(0, node_b.used_memory_mb)

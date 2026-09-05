@@ -9404,6 +9404,47 @@ class CapacityDimensionDetail(_message.Message):
 Global___CapacityDimensionDetail: _TypeAlias = CapacityDimensionDetail  # noqa: Y015
 
 @_typing.final
+class CapacityClampDetail(_message.Message):
+    """One counter a floored decrement had to clamp at zero (P6): the ledger
+    held less than the allocation being released, so the two had already
+    diverged. counter names which ledger row -- 'namespace_claim',
+    'cluster_unclaimed', or the dashed uuid of a scheduler_node_capacity
+    row -- and the three shortfalls are the observed drift per dimension:
+    max(0, released - pre_clamp_used), read inside the transaction before
+    the clamp erased it. A zero shortfall means that dimension subtracted
+    cleanly and another one did not. These records exist only for
+    counters which actually clamped, so a reply carrying clamped=true and
+    no clamps is one from an sf-database predating this message: read it
+    as "detail not reported", never as "nothing drifted".
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    COUNTER_FIELD_NUMBER: _builtins.int
+    SHORTFALL_CPUS_FIELD_NUMBER: _builtins.int
+    SHORTFALL_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    SHORTFALL_DISK_GB_FIELD_NUMBER: _builtins.int
+    counter: _builtins.str
+    shortfall_cpus: _builtins.int
+    shortfall_memory_mb: _builtins.int
+    shortfall_disk_gb: _builtins.int
+    def __init__(
+        self,
+        *,
+        counter: _builtins.str = ...,
+        shortfall_cpus: _builtins.int = ...,
+        shortfall_memory_mb: _builtins.int = ...,
+        shortfall_disk_gb: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["counter", b"counter", "shortfall_cpus", b"shortfall_cpus", "shortfall_disk_gb", b"shortfall_disk_gb", "shortfall_memory_mb", b"shortfall_memory_mb"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CapacityClampDetail: _TypeAlias = CapacityClampDetail  # noqa: Y015
+
+@_typing.final
 class AdmitInstancePlacementReply(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
@@ -9421,6 +9462,7 @@ class AdmitInstancePlacementReply(_message.Message):
     CLAIM_OVER_LIMIT_FIELD_NUMBER: _builtins.int
     CLAIM_DIMENSIONS_FIELD_NUMBER: _builtins.int
     CLAIM_UUID_FIELD_NUMBER: _builtins.int
+    CLAMPS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -9475,6 +9517,13 @@ class AdmitInstancePlacementReply(_message.Message):
     def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
     @_builtins.property
     def claim_dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
+    @_builtins.property
+    def clamps(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityClampDetail]:
+        """Which counter(s) clamped behind the clamped flag above, and by how
+        much (issue 4050). On this reply the only possible clamp site is
+        the old node's decrement during a move.
+        """
+
     def __init__(
         self,
         *,
@@ -9492,10 +9541,11 @@ class AdmitInstancePlacementReply(_message.Message):
         claim_over_limit: _builtins.bool = ...,
         claim_dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
         claim_uuid: _builtins.str = ...,
+        clamps: _abc.Iterable[Global___CapacityClampDetail] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "claim_uuid", b"claim_uuid", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "claim_uuid", b"claim_uuid", "clamped", b"clamped", "clamps", b"clamps", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -9553,6 +9603,7 @@ class ReleaseInstancePlacementReply(_message.Message):
     NODE_USED_DISK_GB_FIELD_NUMBER: _builtins.int
     NODE_EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
     COUNTERS_NODE_UUID_FIELD_NUMBER: _builtins.int
+    CLAMPS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     released: _builtins.bool
@@ -9585,6 +9636,14 @@ class ReleaseInstancePlacementReply(_message.Message):
     node_expected_demand: _builtins.float
     counters_node_uuid: _builtins.str
     """Dashed uuid form, or empty"""
+    @_builtins.property
+    def clamps(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityClampDetail]:
+        """Which counter(s) clamped behind the clamped flag above, and by how
+        much (issue 4050). The clamped boolean alone ORs together the
+        namespace side and every node this release touched, which is why
+        the audit event it fed could not say what actually drifted.
+        """
+
     def __init__(
         self,
         *,
@@ -9597,10 +9656,11 @@ class ReleaseInstancePlacementReply(_message.Message):
         node_used_disk_gb: _builtins.int = ...,
         node_expected_demand: _builtins.float = ...,
         counters_node_uuid: _builtins.str = ...,
+        clamps: _abc.Iterable[Global___CapacityClampDetail] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "counters_node_uuid", b"counters_node_uuid", "error", b"error", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "released", b"released", "success", b"success"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "clamps", b"clamps", "counters_node_uuid", b"counters_node_uuid", "error", b"error", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "released", b"released", "success", b"success"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

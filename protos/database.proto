@@ -2811,6 +2811,24 @@ message CapacityDimensionDetail {
   optional double shortfall = 8;
 }
 
+// One counter a floored decrement had to clamp at zero (P6): the ledger
+// held less than the allocation being released, so the two had already
+// diverged. counter names which ledger row -- 'namespace_claim',
+// 'cluster_unclaimed', or the dashed uuid of a scheduler_node_capacity
+// row -- and the three shortfalls are the observed drift per dimension:
+// max(0, released - pre_clamp_used), read inside the transaction before
+// the clamp erased it. A zero shortfall means that dimension subtracted
+// cleanly and another one did not. These records exist only for
+// counters which actually clamped, so a reply carrying clamped=true and
+// no clamps is one from an sf-database predating this message: read it
+// as "detail not reported", never as "nothing drifted".
+message CapacityClampDetail {
+  string counter = 1;
+  int64 shortfall_cpus = 2;
+  int64 shortfall_memory_mb = 3;
+  int64 shortfall_disk_gb = 4;
+}
+
 message AdmitInstancePlacementReply {
   bool success = 1;       // The RPC ran; false means an error, see error
   string error = 2;
@@ -2856,6 +2874,10 @@ message AdmitInstancePlacementReply {
   // for absence, so a reply from an sf-database predating this field
   // reads as "not reported" rather than as a real value.
   string claim_uuid = 14;   // Dashed uuid form, or empty
+  // Which counter(s) clamped behind the clamped flag above, and by how
+  // much (issue 4050). On this reply the only possible clamp site is
+  // the old node's decrement during a move.
+  repeated CapacityClampDetail clamps = 15;
 }
 
 message ReleaseInstancePlacementRequest {
@@ -2899,6 +2921,11 @@ message ReleaseInstancePlacementReply {
   int64 node_used_disk_gb = 7;
   double node_expected_demand = 8;
   string counters_node_uuid = 9;   // Dashed uuid form, or empty
+  // Which counter(s) clamped behind the clamped flag above, and by how
+  // much (issue 4050). The clamped boolean alone ORs together the
+  // namespace side and every node this release touched, which is why
+  // the audit event it fed could not say what actually drifted.
+  repeated CapacityClampDetail clamps = 10;
 }
 
 message GetSchedulerNodeCapacityRequest {}
