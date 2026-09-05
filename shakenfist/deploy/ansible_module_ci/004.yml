@@ -80,6 +80,14 @@
         that: not ci_network_b['failed']
         fail_msg: "failed should be false in {{ ci_network_b }}"
 
+    # NOTE(mikal): uefi and secure_boot are set explicitly, to the values the
+    # server would have defaulted to anyway, because the idempotency assertion
+    # below is the regression coverage for issue 4061: the module used to name
+    # this parameter secureboot and compare it against a key the API never
+    # returns (the API reports secure_boot), so any explicit value -- even one
+    # matching the server -- was perpetually dirty and the instance was
+    # replaced on every run.
+    #
     # NOTE(mikal): we await this instance so that the debian:11 image is a
     # fully resolved artifact in this (non-system) namespace by the time we
     # return. Scenario 005 then creates an instance as system, which resolves
@@ -109,6 +117,8 @@
           - "{{ ci_network_a['meta']['uuid'] }}"
         networkspecs:
           - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
+        uefi: false
+        secure_boot: false
         state: present
         await: true
         await_timeout: 1200
@@ -153,6 +163,8 @@
           - "{{ ci_network_a['meta']['uuid'] }}"
         networkspecs:
           - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
+        uefi: false
+        secure_boot: false
         state: present
       register: ci_instance
 

@@ -107,7 +107,7 @@ options:
     description: Whether to boot the instance with UEFI.
     required: false
     type: bool
-  secureboot:
+  secure_boot:
     description: Whether to enable secure boot (implies UEFI).
     required: false
     type: bool
@@ -486,15 +486,22 @@ def _check_instance(client, existing, params, log):
             dirty = True
         instance_kwargs[key] = values
 
-    # Optional boolean values.
-    for key in ['uefi', 'secureboot']:
+    # Optional boolean values. These parameters are named for the API
+    # fields they compare against and the create_instance() kwargs they
+    # become, so no name mapping is required. That was not always true:
+    # this parameter was once spelled secureboot while the API reported
+    # secure_boot, and the comparison read the parameter name, so an
+    # explicit value -- even one matching the server exactly -- found
+    # nothing to compare against, was perpetually dirty, and replaced the
+    # instance on every run (issue 4061). Name new parameters for the API
+    # field rather than adding a mapping here.
+    for key in ['uefi', 'secure_boot']:
         if params.get(key) is not None:
             value = bool(params[key])
             if existing.get(key) != value:
                 log.append('Instance dirty: %s has changed' % key)
                 dirty = True
-            kwarg = 'secure_boot' if key == 'secureboot' else key
-            instance_kwargs[kwarg] = value
+            instance_kwargs[key] = value
 
     # Metadata is a dict.
     metadata = {}
@@ -559,7 +566,7 @@ def run_module():
         'configdrive': {'required': False, 'type': 'str'},
         'side_channels': {'required': False, 'type': 'list', 'elements': 'str'},
         'uefi': {'required': False, 'type': 'bool'},
-        'secureboot': {'required': False, 'type': 'bool'},
+        'secure_boot': {'required': False, 'type': 'bool'},
         'metadata': {'required': False, 'type': 'dict'},
         'await': {'required': False, 'type': 'bool', 'default': False},
         'await_timeout': {'required': False, 'type': 'int', 'default': 600},
