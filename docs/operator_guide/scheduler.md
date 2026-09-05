@@ -374,6 +374,19 @@ it against the live-derived `cpu_hard_max` and see the two ledgers
 disagree; a node with no capacity row reports `cpu_limit` as `None`
 rather than falling back to `cpu_hard_max`.
 
+Those per-node fields cannot, on their own, tell you *why* a node is
+uncounted. An empty read of the capacity table looks identical whether
+the table is genuinely unpopulated -- a cluster the reconciler has not
+reached yet -- or the read failed and the error was swallowed. The
+response therefore also carries `capacity_degraded` in its `total`
+block, forwarded from the same flag the scheduling path acts on. Read
+it before reading anything else: when it is true, every node's
+`cpu_committed` is zero and every `cpu_limit` is `None` for a reason
+that has nothing to do with the cluster's actual load, and the CPU
+pre-filter was equally blind for that moment. A sampler that treated
+such a response as evidence of an idle cluster would conclude the
+cluster is oversized precisely when its database is unwell.
+
 ## Namespace capacity claims
 
 A **capacity claim** is a namespace's reservation of aggregate cluster
