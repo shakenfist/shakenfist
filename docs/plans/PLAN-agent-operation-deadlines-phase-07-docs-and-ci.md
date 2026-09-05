@@ -508,12 +508,16 @@ read substitutes for a run against a real cluster.
       `docs/release_notes/v07-v08.md:744` agree (600 seconds and 30
       seconds, in all three).
 - [x] `pre-commit run --all-files` exits zero.
-- [ ] CI has run green on the branch, including the smoke suite, and
+- [x] CI has run green on the branch, including the smoke suite, and
       the new deadline tests appear in its results rather than being
-      skipped. **Not satisfied.** The branch has not been pushed, and
-      the functional suite needs a real cluster that this closeout does
-      not have access to. This is what gates the merge; see What
-      remains.
+      skipped. Satisfied by run
+      [33802668130](https://github.com/shakenfist/shakenfist/actions/runs/33802668130),
+      whose `Smoke tests (collection)` job reports all four as `... ok`:
+      `test_default_deadline_is_published` (166.69s),
+      `test_expiry_frees_the_executor_slot` (176.77s),
+      `test_silent_execute_survives_the_progress_timeout` (227.14s) and
+      `test_queued_operation_expires_on_its_deadline` (163.33s). None
+      was skipped. PR #4053 merged as `4a122bcd3` on 2026-09-04.
 
 ## Review follow-ups
 
@@ -527,17 +531,22 @@ constructs, and leaving it on `BaseTestCase` would have been a latent
 
 ## What remains
 
-The code and documentation are done and reviewed: five commits, 7a
-through 7e, landed everything the step plan describes, and this
-closeout has independently re-run every Definition of done check that
-does not need a cluster. What is left is the one that does: a green CI
-run on this branch, including the smoke suite, with the four tests in
+Nothing. The code and documentation were done and reviewed by five
+commits, 7a through 7e, and the closeout re-ran every Definition of
+done check that does not need a cluster. The one that does -- a green
+CI run including the smoke suite, with the four tests in
 `test_agentop_deadlines.py` appearing in the results rather than being
-skipped. The branch has not been pushed yet. Phase 7's status in
-`PLAN-agent-operation-deadlines.md`'s Execution table stays `In
-progress`, and the plan's row in `docs/plans/index.md` stays at `7 of
-9`, until that run happens; both flip to `Complete` and `8 of 9` once
-it does.
+skipped -- was satisfied by run 33802668130, and PR #4053 merged as
+`4a122bcd3` on 2026-09-04.
+
+The section above previously said the branch had not been pushed and
+that the statuses would stay at `In progress` and `7 of 9` until it
+was. Step 7f, which was to make that flip, never ran; the phase 8
+planning commit made it instead, so phase 7 now reads `Complete` in
+`PLAN-agent-operation-deadlines.md`'s Execution table and the plan's
+row in `docs/plans/index.md` reads `8 of 9`. See
+[PLAN-agent-operation-deadlines-phase-08-push-audit.md](PLAN-agent-operation-deadlines-phase-08-push-audit.md),
+finding F1.
 
 ## Future work
 
