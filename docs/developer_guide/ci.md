@@ -22,6 +22,7 @@ Every workflow in `.github/workflows/`:
 | `pr-fix-tests.yml` | Fix test failures on bot command | `@shakenfist-bot please attempt to fix` |
 | `test-drift-fix.yml` | Unit test fixer (called by `pr-fix-tests.yml`) | workflow_call, workflow_dispatch |
 | `issue-fix.yml` | Triage open issues, propose a fix as a draft PR | workflow_dispatch |
+| `merge-failure-triage.yml` | Triage a failed merge queue run: PR-caused or systemic, record the occurrence, post a verdict | workflow_run (a failed `Functional tests` merge group run), workflow_dispatch |
 | `scheduled-tests.yml` | Longer-running test sweep (schedule currently disabled) | workflow_dispatch |
 | `publish-website.yml` | Publish the mkdocs site | Push to `develop`, manual |
 | `refresh-website.yml` | Trigger a GitHub Pages rebuild | Daily schedule, manual |
@@ -399,6 +400,10 @@ The CI uses a two-stage merge queue pattern (see [this blog post](https://boinko
 in branch protection. `Can merge` is evaluated by the merge queue itself, not as
 a required check.
 
+A failed `Can merge` ejects the pull request from the queue, and
+[merge failure triage](#merge-failure-triage) then classifies the failure
+automatically.
+
 ### Superseded merge groups are cancelled
 
 Every job that can run in the queue and holds a scarce runner carries a
@@ -520,7 +525,8 @@ carries a comment.
 ## Automated CI Jobs
 
 `functional-tests.yml` carries three jobs which act on the pull request
-themselves rather than only reporting on it.
+themselves rather than only reporting on it. A fourth piece of automation,
+merge failure triage, is a separate workflow for the reasons given below.
 
 ### Automated Delinter
 
@@ -554,6 +560,150 @@ has already reviewed.
 
 The reviewer produces structured JSON reviews, creates GitHub issues for
 actionable items, and embeds the JSON in the PR comment for automation.
+
+### Merge failure triage
+
+When `Functional tests` fails on a `merge_group` event, GitHub ejects the pull
+request from the merge queue and somebody has to decide whether the pull
+request broke something or whether the test cloud fell over again.
+`merge-failure-triage.yml` does that first pass automatically, following the
+same steps a maintainer follows by hand: find the first failing step (later
+failures are usually cascade), classify the failure as caused by the pull
+request or systemic, search for an existing tracking issue and record the
+occurrence on it — or file one — and recommend re-queueing or fixing first. The
+verdict is posted as a comment on the ejected pull request.
+
+Merge groups here launch several nested test clusters at once, so merge CI is
+far more sensitive to under-cloud capacity than pull request CI is, and
+historically most merge failures have been environmental rather than code
+regressions. That prior is in the prompt, which is why the evidence rules below
+matter: a model given no evidence and that prior will happily conclude
+"systemic, re-queue".
+
+Most of the work is in `tools/merge-ci-triage.sh`, which gathers the evidence,
+runs the model, and publishes the result; `tools/merge-triage.py` parses,
+validates and renders the verdict.
+
+#### Why it is a separate workflow
+
+The obvious implementation is another job in `functional-tests.yml`, gated on
+`can_merge` having failed. It races the queue: once `Can merge` reports its
+failure the queue ejects the pull request and tears down the
+`gh-readonly-queue` ref the run is on, and a triage job which takes minutes
+sits in exactly that window. Moving the triage into an earlier *step* of
+`can_merge` avoids the race but holds the merge queue open while a model reads
+logs. A job reachable on `merge_group` would also fall under the
+[merge-group-cancellation](https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md)
+audit, whose correct behaviour — be cancelled when a newer merge group
+supersedes you — is the opposite of what a triage job wants.
+
+The workflow's `permissions:` block names `actions: read`, which is not
+optional: naming any scope at all sets every unnamed scope to `none`, and every
+piece of evidence the triage gathers is an Actions API read.
+
+`workflow_run` runs after the merge group run has finished, on the default
+branch, in the base repository context, and none of that can cancel it. The
+trigger carries a `branches: ['gh-readonly-queue/**']` filter so the workflow is
+only invoked for merge group runs; without it every pull request run of the
+test suite would create a skipped run here. `workflow_run` has no conclusion
+filter, so the "did it actually fail?" half of the gate is the job's `if:`.
+
+The workflow never checks out or runs the code it is triaging. It reads the
+failed run through `gh` and checks out the default branch, which is what makes
+a writable token safe in a workflow that reads a pull request diff.
+
+#### The verdict document
+
+Each triage produces one JSON document matching
+`tools/merge-triage-schema.json`. It is published twice: as the
+`merge-triage-<run id>` build artifact, and embedded in a collapsed `<details>`
+section of the pull request comment, the same way the automated reviewer embeds
+its review. The private-ci conductor consumes these to track which merge
+failures have been triaged and which of them blamed the pull request, so the
+fields that matter to a consumer are:
+
+| Field | Meaning |
+|-------|---------|
+| `verdict` | `pr_caused`, `systemic`, `ambiguous`, or `unknown` |
+| `recommendation` | `requeue`, `fix_first`, or `investigate` |
+| `failure_signature` | Short stable string for grouping recurrences |
+| `tracking_issue` | Issue recording a systemic failure, or null |
+| `tracking_issue_action` | `commented`, `created`, or `none` |
+| `run_id`, `pull_request` | What was triaged |
+
+Four properties of that document are worth knowing before consuming it:
+
+- **A document is always written.** A model that answers in prose, a run that
+  cannot be read, a document that fails its own schema — each yields
+  `verdict: unknown` with an `error` explaining why, never a missing file. The
+  guarantee is kept by an `EXIT` trap over an envelope written before anything
+  can fail, so it holds for the paths that fall over early too. A missing
+  document is indistinguishable from a triage that never ran; an `unknown` one
+  is not. The single exception is a run that was not a failed merge group run
+  at all: nothing was triaged, so there is nothing to publish a verdict about.
+  A document that failed the schema is uploaded alongside the replacement as
+  `triage.invalid.json`, since that is a bug in the tooling rather than a
+  triage outcome and the discarded document is the only evidence of it.
+- **No evidence means no verdict.** If neither the failed job list nor the
+  failed step logs can be read, no model is run: the document says so and the
+  verdict is `unknown`. Anything else that could not be gathered — the sibling
+  runs, the pull request diff — is named in `evidence`, so a verdict always
+  carries its own caveats rather than reading as though the model saw
+  everything.
+- **The envelope is not model output.** The repository, run id and pull request
+  number are written from what GitHub said and overwrite whatever the model put
+  in those fields, so a verdict cannot be filed against the wrong failure. Only
+  the fields in `MODEL_FIELDS` are taken from the response at all.
+- **A cited tracking issue has been checked.** A consumer can treat a non-null
+  `tracking_issue` as evidence the occurrence really was recorded — but only
+  when `tracking_issue_action` is `commented` or `created`, and those two are
+  the claims that get verified. The issue has to exist and the issue or one of
+  its comments has to carry the failed run's URL; a claim that does not check
+  out is downgraded to an action of `none`, keeping the number as a reference
+  and losing only the assertion, with the reason appended to `evidence`. An
+  issue that cannot be read at all is dropped outright, number and all. A
+  citation whose action is already `none` is not checked for the run URL —
+  nothing was written to it, so it will not reference this run, and checking
+  anyway would drop every reference-only citation ever made. A dry run forces
+  `none` unconditionally, whatever the model reports, because nothing was
+  written to GitHub on that path; the verification still runs against what the
+  model *claimed*, so that path is exercised outside production too.
+
+The comment is only posted if the body could be neutralised —
+`tools/neutralise-pr-body.sh` rewrites it in place, and a failure inside it
+would otherwise leave the un-neutralised model prose where `gh pr comment`
+reads it from. A triage nobody sees is a smaller problem than one that fires an
+@mention on publication, and the verdict is still in the artifact.
+
+An `unknown` verdict is posted on the pull request like any other. It is a thin
+comment, but the alternative is silence, and silence on an ejected pull request
+reads as "triage never ran" — the same ambiguity the always-write-a-document
+rule exists to remove, moved from the artifact to the thread. The comment names
+why triage reached nothing, which is what tells a maintainer whether to look at
+the failed run or at this workflow.
+
+Re-triaging the same run does not double-post: the comment carries an invisible
+`<!-- merge-triage run:<id> -->` marker which a later run recognises.
+
+#### What the model can and cannot touch
+
+The model runs with `--dangerously-skip-permissions` and the checkout as its
+working directory, so the job stages everything it executes into `runner.temp`
+before the model starts: `merge-ci-triage.sh` itself, `merge-triage.py`, its
+schema, `neutralise-pr-body.sh` and `claude-model-fallback.sh`. `issue-fix.yml`
+stages the same set for the same two reasons. Bash reads a script lazily as it
+executes, so an edit to the running driver would corrupt it mid-run; and the
+extractor and the neutraliser run *after* the model has exited, so reading them
+from the workspace would mean parsing and defusing model output with a copy the
+model could have rewritten. With the staging in place a workspace write has no
+effect at all — the checkout is discarded with the runner and is never pushed.
+
+The failed step logs are cut to a byte budget before they reach the prompt, and
+both ends are kept with the tail given the larger share. Keeping only the head
+is the obvious implementation and it is wrong here: a single Ansible
+cluster-build step routinely exceeds the whole budget in progress output, and
+the message saying what actually broke is the last thing it emits. The elision
+is marked inline with the number of bytes dropped.
 
 ### Developer Automation (Bot Commands)
 
