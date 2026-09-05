@@ -113,7 +113,11 @@ A cluster-wide fraction averages a full node against an empty one
 and reports the mean as headroom. That is the statistic D3's band
 is currently written against. This is the evidential basis for D21,
 and it is the most decision-relevant thing the instrument has said
-so far.
+so far. **Step 2d defended it across the window** -- the per-node
+maximum exceeds the cluster-wide figure by a median of 2.25x -- with
+one correction: the statistic *saturates*, pinning in 100% of tier
+job-runs, so it discriminates nothing at the top and phase 5 must
+read it as a goal rather than an alarm.
 
 **3. Roughly 8% of samples are discarded, and nothing can say
 why.** Both runs report a `LEDGER UNREADABLE` block: 10 of 131
@@ -228,6 +232,15 @@ exactly, arrived at from the capacity counters rather than from
 real exhaustion -- and it is a defect that **growing the cloud
 would mask rather than fix**, which is precisely the outcome phase
 3 exists to prevent.
+
+**Resolved by step 2d, and more narrowly than this finding
+expected:** it occurs in 18 of 85,563 node-samples, inside 2 of 204
+job-runs, and one of those two job-runs *passed*. At one percent it
+cannot explain the tier's failure rate and does not. It remains a
+genuine invariant violation for 2f to file, and it remains a defect
+a bigger cloud would mask -- but the framing below, written before
+the window was harvested, overstated it. See *What the baseline
+measured*.
 
 This phase does not chase it: steps 2d and 2f own it, and it is
 recorded here so that it cannot be lost. What 2d must establish is
@@ -485,6 +498,177 @@ were made in the planning commit, per the note under *What the
 survey found*. Note also that phase 1's row was still `Not started`
 in both status tables when this phase was planned, despite its work
 having merged on 2026-08-29; that is corrected in the same commit.
+
+## What the baseline measured
+
+Recorded here so this plan stands on its own. The full write-up is
+the master plan's *Situation* section; the dataset is
+[`docs/plans/data/ci-cloud-sizing-baseline/`](data/ci-cloud-sizing-baseline/README.md).
+Step 2d ran the harvest on 2026-09-05.
+
+**The sample.** 66 `merge_group` runs enumerated; 55 banked a
+functional cluster bundle (eleven did not -- three cancelled, eight
+skipped by `Check paths`); 52 banked probe output. **217 records,
+204 with a usable committed-CPU series**, over
+2026-08-30T07:48:03Z to 2026-09-05T07:15:07Z. The effective window
+starts at 07:48 rather than midnight because the three earliest runs
+of 2026-08-30 predate the `shakenfist/actions` change that starts the
+probe -- D16's "since 2026-08-30" was a day too generous by about
+eight hours. The window is stationary: splitting each job in half
+shifts nothing (smallest p = 0.08).
+
+**Committed vCPU, cluster-wide, per job-run.**
+
+| Job | Topology | n | median p90 fraction | max p90 fraction |
+|-----|----------|---|---------------------|------------------|
+| Guests | `slim-primary` | 51 | 0.296 | 0.370 |
+| Debian 12 cluster | `slim-primary` | 52 | 0.333 | 0.444 |
+| Ubuntu 24.04 cluster | `slim-primary` | 51 | 0.333 | 0.519 |
+| Debian 12 tier | `slim-tier` | 50 | 0.750 | 1.000 |
+
+`slim-primary` (n=154) never exceeded 0.519; `slim-tier` (n=50)
+never fell below 0.500. The three `slim-primary` suites differ from
+each other far less than from the tier, which is the answer D17 was
+written to make askable: the gap is the shape, not the suite.
+
+**D21 is defended, with a correction.** The per-node maximum
+exceeds the cluster-wide figure by a median ratio of 2.25x (n=204).
+A node reached its own ledger in **65%** of `slim-primary`
+job-runs and **100%** of `slim-tier` ones; a node sat at its ledger
+for ninety percent of the run in 48% and 100% respectively. The
+pinned-node pattern from survey finding 2 holds across the window,
+disproportionately on the 3 vCPU network node (44% of its
+node-job-runs, against 10% for the 6 vCPU nodes). **The
+correction** is that the per-node maximum is *saturated*: it is at
+its ceiling in most passing runs too, so it discriminates nothing
+at the top of its range and phase 5 must read it as a goal rather
+than an alarm.
+
+**The correlation is a partial null, and it is computed over four
+jobs.** `Debian 12 cluster`, `Ubuntu 24.04 cluster`, `Guests` and
+`Debian 12 tier` only. `Node lifecycle` -- the best performer in
+the master plan's failure table at 94% over this same window -- is
+uninstrumented and absent, so nothing here spans that table.
+Pooled, failing job-runs are much fuller (median p90 fraction 0.667
+against 0.333, p < 0.001), but that comparison is confounded: three
+jobs share a topology and the fourth is both the fullest and the
+worst. **Within each job, utilisation separates pass from fail not
+at all** (p = 0.27, 0.59, 0.92, 0.74 for the cluster-wide p90
+fraction; smallest p = 0.09 for the per-node maximum). What does
+separate them, in every job, is whether the scheduler ran out of
+candidates: a `sufficient_idle_cpu` **abort** occurred in 49 of 204
+job-runs, and **44 of those 49 failed (90%)** against 23 of 155
+(15%) without one. The plan's central claim survives as "the cloud
+running out fails the job" and does not survive as "how full the
+cloud gets predicts whether the job fails".
+
+**The refusal census, four stages kept apart.** Every capacity
+refusal in the window was at `sufficient_idle_cpu`: 676 drops and
+14 aborts on `slim-primary`, 1,189 drops and 65 aborts on
+`slim-tier`, all 1,865 with the reason `would exceed hard max
+CPUs`. `sufficient_idle_memory` dropped 0 in 23,091 evaluations,
+`sufficient_free_disk` (disk *space*) 0 in 23,091, and
+`sufficient_idle_disk` (disk *bandwidth*, which sizing cannot
+address at all) 0 in 22,977. The `is_hypervisor` drops (7,326 on
+`slim-primary`, none on the tier) are structural, not scarcity.
+
+**D5 narrows.** Memory is not a binding admission dimension:
+nothing, anywhere, in 23,091 evaluations. Its rationale -- one
+observed refusal -- does not survive the window. Its *operative*
+clause does, and now has numbers: the memory ledger is
+`memory_max x RAM_OVERCOMMIT_RATIO` at a ratio of 3.0, so the
+comfortable-looking fractions of ledger (p90 median 0.125 on
+`slim-primary`, 0.216 on the tier) correspond to committed vRAM at
+**43-76% of a `slim-primary` node's physical RAM and 67-101% of a
+tier node's**. Per-node RAM is not headroom to reclaim.
+
+**D7 is closed at zero.** Of 85,563 node-samples whose ledger was
+readable, **zero** fell back to `cpu_hard_max` and **zero** had no
+ledger at all. The cluster ledger read exactly 27.0 in all 154
+`slim-primary` job-runs and exactly 12.0 in all 50 `slim-tier`
+ones, never moving within a run.
+
+**Survey finding 8 is real, and rare -- which corrects the step 2d
+brief.** A capacity row above its own limit appeared in **18 of
+85,563** ledgered node-samples (0.021%), all inside **2 of 204**
+job-runs (1.0%), both `Debian 12 tier`. Run 33752413862 held node
+`750651c4` at a committed p90 of 6.0 against a fixed limit of 3.0 (a
+fraction of 2.0, peaking at 2.33) for most of the run **and passed**;
+run 33948911843 peaked at 2.0 and failed. Three of the eighteen
+samples measured exactly zero. The brief expected this might be the
+single most decision-relevant number in the dataset; at one percent
+of job-runs it cannot explain a 76% tier failure rate, and it is
+not. It remains a genuine invariant violation for step 2f to file,
+and it remains a defect that a bigger cloud would mask.
+
+**What refused, measured from the raw bundles.** Not from the
+committed records, which do not carry the fields. Summed committed
+vCPU is only **1.04x** summed measured vCPU over 85,563 node-samples,
+and of 1,965 classifiable `sufficient_idle_cpu` refusals only
+**30.6%** would have been admitted on the measurement alone. So the
+capacity counters are not on their own the thing that refuses:
+nearly seven refusals in ten would have happened from the
+running-domain count. Both are compared against the same
+`cpu_schedulable x CPU_OVERCOMMIT_RATIO`, so widening a node
+relieves both -- the master plan's conclusion is unchanged, its
+mechanism is sharper. In 15.1% of refusals the node measured
+exactly zero running vCPU.
+
+**Band bounds.** Cluster-wide upper bound **0.70 defended**: no
+`slim-primary` job-run reached it in 154, and 37 of 50 tier
+job-runs exceeded it. Cluster-wide lower bound **0.35 kept, with a
+question for phase 5**: 104 of 154 `slim-primary` job-runs are
+below it, which is the correct finding but a useless per-run alarm,
+so phase 5 must decide whether that bound is evaluated per run or
+against a job's median across a window. Per-node upper bound
+**0.85 proposed**, on the strongest separation in the dataset:
+job-runs with no capacity refusal at all (n=44) exceed 0.85 in 1
+case, job-runs with at least one (n=160) exceed it in 123. No
+per-node lower bound is proposable -- the statistic is saturated.
+
+**Two things the window does not know, and neither is zero.**
+Capacity guard refusals were never collected (D20) -- `guard.state`
+is `not_collected` on all 204 summarised records. And 2,276 of
+21,517 usable samples (10.6%, present in every single job-run) had
+every capacity row read as absent at once and are excluded from
+every committed-CPU figure; whether that is a failed read or an
+unpopulated table needs D19's flag, which only exists
+prospectively. Suggestively, 18 of the 1,965 refusal payloads fired
+with `capacity_row_present` false -- the pre-filter refusing from
+the measurement alone while blind to the ledger -- which is
+material for step 2f.
+
+**An error in the master plan that the data caught.** Its
+*Situation* section said the sampled `slim-primary` failures
+"contain no such refusal at all" as the tier's. They do: the CPU
+stage dropped 676 candidates in 110 of 154 `slim-primary`
+job-runs and aborted outright in 14. `slim-primary` refuses work
+routinely and simply has other hypervisors to fall through to.
+Corrected in place.
+
+**Two errors in this plan that the data caught.**
+
+* D17 says "the master plan's failure table spans six jobs". It
+  spanned **five**: `Ansible modules` was never in it, although a
+  merge run does build six clouds. The table has been rebuilt over
+  the baseline window with all six rows and an *instrumented*
+  column, so the confusion cannot recur. The substantive point --
+  that the harvest covers four of them and not `Node lifecycle` --
+  is unaffected.
+* D16's window "since 2026-08-30" is about eight hours too
+  generous: the probe's `shakenfist/actions` half landed between
+  03:15 and 07:48 that morning, so the three earliest merge runs of
+  the day banked bundles with no `traces/` output. The harvest
+  records them as absent rather than dropping them, which is
+  exactly what step 2c was briefed to do, so the error cost nothing
+  but is worth knowing before a future `--since` is chosen.
+
+One smaller observation, recorded rather than acted on: the harvest
+writes `summary: null` when a bundle has no series, which discards a
+census that was present and readable in twelve of those thirteen
+records (about 100 `sufficient_idle_cpu` drops). Nothing in this
+phase needs them, and changing it would change the record schema, so
+it is left alone.
 
 ## Risks and mitigations
 
