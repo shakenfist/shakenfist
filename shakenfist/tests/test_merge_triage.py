@@ -19,6 +19,7 @@ a field arrives in nearly but not quite the right shape.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -341,20 +342,75 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
         # or a </details> ends the block early -- and it also stops
         # neutralise-pr-body.sh defusing mentions, because that tracks fenced
         # regions, so this is a security control as well as a formatting one.
+        #
+        # Every spelling of both delimiters, because the narrow forms were not
+        # enough: ~~~ is a GitHub fence too, and a details tag may carry
+        # attributes or whitespace. An unmatched <details open> is as damaging
+        # as an unmatched close -- the real section's closing tag closes the
+        # injected one and the machine-readable section is left hanging open.
         code, document = self._extract('```json\n%s\n```' % json.dumps(dict(
             VERDICT,
             summary='It failed ``` here </details> and again ```json',
-            evidence=['</DETAILS> in the evidence too'])))
+            failing_job='<details open> and ~~~ and <DETAILS >',
+            evidence=['</DETAILS > in the evidence too', '~~~ and a tilde fence'])))
         self.assertEqual(0, code)
         self.assertNotIn('```', document['summary'])
         self.assertNotIn('</details>', document['summary'].lower())
-        self.assertNotIn('</details>', document['evidence'][0].lower())
+        for value in [document['failing_job']] + document['evidence']:
+            self.assertNotIn('~~~', value)
+            self.assertNotIn('<details', value.lower())
+            self.assertNotIn('</details', value.lower())
 
         rendered = self._render(document)
         embedded = rendered.split('```json\n')[-1].split('```')[0]
         self.assertEqual(document, json.loads(embedded))
-        # And the details section still closes exactly once.
+        # And the details section opens and closes exactly once. Counting only
+        # the closes would miss an injected open.
+        self.assertEqual(1, rendered.lower().count('<details>'))
         self.assertEqual(1, rendered.lower().count('</details>'))
+        self.assertEqual(1, rendered.lower().count('<details'))
+
+    def test_a_field_with_a_newline_or_a_pipe_does_not_break_the_table(self):
+        # failing_job, failing_step, failure_signature and confidence are
+        # rendered as single cells of the facts table, three of them inside an
+        # inline code span. A newline splits the row, a pipe adds a column and
+        # a backtick ends the span. The embedded JSON is unaffected either way
+        # -- json.dumps escapes all three -- so this is about the half of the
+        # comment a human reads.
+        code, document = self._extract('```json\n%s\n```' % json.dumps(dict(
+            VERDICT,
+            failing_job='job\nname | with pipe',
+            failing_step='step with a `backtick`',
+            failure_signature='sig | with | pipes')))
+        self.assertEqual(0, code)
+
+        rendered = self._render(document)
+        table = [line for line in rendered.split('\n') if line.startswith('| ')]
+        for row in table:
+            # Two columns, so three pipes: the pair of delimiters plus the one
+            # in the middle. Any unescaped pipe from the model shows up here.
+            self.assertEqual(
+                3, len(re.findall(r'(?<!\\)\|', row)),
+                'row has come apart: %r' % row)
+        self.assertIn('job name \\| with pipe', rendered)
+        # The document itself keeps what the model said.
+        self.assertEqual('job\nname | with pipe', document['failing_job'])
+        embedded = rendered.split('```json\n')[-1].split('```')[0]
+        self.assertEqual(document, json.loads(embedded))
+
+    def test_a_trailing_appendix_does_not_beat_the_verdict(self):
+        # Both searches run newest first, so a model which emits the verdict
+        # and then a trailing block of one field -- an evidence list, a
+        # signature it thought of afterwards -- would have the appendix chosen,
+        # rejected for having no verdict, and the whole triage published as
+        # "unknown" despite a perfectly good verdict being right there.
+        code, document = self._extract(
+            'Here is my verdict:\n\n```json\n%s\n```\n\n'
+            'And the evidence again:\n\n```json\n%s\n```\n'
+            % (json.dumps(VERDICT), json.dumps({'evidence': ['an afterthought']})))
+        self.assertEqual(0, code)
+        self.assertEqual('systemic', document['verdict'])
+        self.assertEqual(['The pull request touches only docs/.'], document['evidence'])
 
     def test_a_fenced_verdict_beats_a_bare_object_in_the_prose(self):
         # The prompt asks for a fenced block, so a fenced one is the answer

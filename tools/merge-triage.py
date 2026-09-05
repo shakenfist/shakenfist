@@ -86,10 +86,24 @@ QUEUE_REF_RE = re.compile(
 
 # Markup that would break the comment the document is embedded in: a fence
 # ends the ```json block a consumer reads the verdict out of, and a stray
-# </details> ends the collapsed section early. Both also stop
+# details tag ends the collapsed section early -- or opens a second one the
+# real closing tag then closes, leaving the section unclosed. Both also stop
 # neutralise-pr-body.sh defusing mentions on every line after them, because it
 # tracks fenced regions. Model text is not trusted to avoid either.
-UNSAFE_MARKUP_RE = re.compile(r'```+|</?details\s*>', re.IGNORECASE)
+#
+# Both delimiters have more than one spelling and the narrow forms were not
+# enough: ~~~ is a GitHub fence too, and a details tag may carry attributes
+# (<details open>) or whitespace before the close. Match the tag by name and
+# swallow to the closing angle bracket.
+UNSAFE_MARKUP_RE = re.compile(r'```+|~~~+|</?details\b[^>]*>', re.IGNORECASE)
+
+# Characters that break a markdown table cell. The facts table puts model
+# prose in single cells, several of them inside an inline code span, so an
+# embedded newline splits the row, a pipe adds a column, and a backtick ends
+# the span. Only the human-readable half is affected -- json.dumps escapes all
+# three for the embedded document -- but a table which has come apart is how a
+# reader decides the whole comment is untrustworthy.
+TABLE_WHITESPACE_RE = re.compile(r'\s+')
 
 VERDICTS = ['pr_caused', 'systemic', 'ambiguous', 'unknown']
 RECOMMENDATIONS = ['requeue', 'fix_first', 'investigate']
@@ -143,6 +157,22 @@ def _looks_like_verdict(value):
     return isinstance(value, dict) and any(field in value for field in MODEL_FIELDS)
 
 
+def _pick_verdict(candidates):
+    """The best of several candidate objects, in newest-first order.
+
+    An object carrying a `verdict` key beats one that merely has some other
+    field of the schema in it. Without that preference a model which emits the
+    verdict and then a trailing appendix -- {"evidence": [...]}, or a bare
+    {"failure_signature": "..."} -- has the appendix chosen, the cleaning step
+    then rejects it for having no verdict, and a triage which actually
+    succeeded is published as "unknown".
+    """
+    for value in candidates:
+        if 'verdict' in value:
+            return value
+    return candidates[0] if candidates else None
+
+
 def _find_json_object(text):
     """Return the last usable JSON object in text, or None.
 
@@ -152,26 +182,36 @@ def _find_json_object(text):
     because models drop the fence often enough that requiring it would throw
     away good verdicts. raw_decode() stops at the end of the first complete
     value, so trailing prose after the object is tolerated.
+
+    The unfenced scan is only reached when no fenced block held a candidate,
+    because it is the expensive half: a decode attempt from every brace in the
+    tail of a response which may quote a hundred kilobytes of log.
     """
+    fenced = []
     for block in reversed(FENCED_BLOCK_RE.findall(text)):
         try:
             value = json.loads(block)
         except ValueError:
             continue
         if _looks_like_verdict(value):
-            return value
+            fenced.append(value)
+
+    chosen = _pick_verdict(fenced)
+    if chosen is not None:
+        return chosen
 
     decoder = json.JSONDecoder()
     tail = text[-UNFENCED_SCAN_BYTES:]
     starts = [i for i, char in enumerate(tail) if char == '{']
+    unfenced = []
     for start in reversed(starts):
         try:
             value, _ = decoder.raw_decode(tail[start:])
         except ValueError:
             continue
         if _looks_like_verdict(value):
-            return value
-    return None
+            unfenced.append(value)
+    return _pick_verdict(unfenced)
 
 
 def _coerce_int(value):
@@ -205,6 +245,19 @@ def _safe_prose(value):
     if text is None:
         return None
     return _coerce_str(UNSAFE_MARKUP_RE.sub(' ', text))
+
+
+def _table_cell(value):
+    """Model prose flattened into something a markdown table cell survives.
+
+    Applied at render time rather than in _safe_prose, because the escaping is
+    a property of where the text is being put rather than of the text: the
+    same value goes into the embedded JSON unmangled, and the summary
+    paragraph above the table needs its pipes and backticks left alone. See
+    TABLE_WHITESPACE_RE.
+    """
+    return TABLE_WHITESPACE_RE.sub(' ', str(value)).strip().replace(
+        '|', r'\|').replace('`', "'")
 
 
 def _clean_model_fields(raw):
@@ -250,12 +303,9 @@ def _clean_model_fields(raw):
     cleaned['tracking_issue_action'] = action
 
     evidence = raw.get('evidence')
-    if isinstance(evidence, list):
-        cleaned['evidence'] = [_safe_prose(item) for item in evidence if _safe_prose(item)]
-    elif _safe_prose(evidence):
-        cleaned['evidence'] = [_safe_prose(evidence)]
-    else:
-        cleaned['evidence'] = []
+    if not isinstance(evidence, list):
+        evidence = [evidence]
+    cleaned['evidence'] = [item for item in (_safe_prose(i) for i in evidence) if item]
 
     return cleaned
 
@@ -433,13 +483,13 @@ def render_markdown(document):
     if document.get('run_url'):
         facts.append('| Failed run | %s |' % document['run_url'])
     if document.get('failing_job'):
-        facts.append('| First failing job | `%s` |' % document['failing_job'])
+        facts.append('| First failing job | `%s` |' % _table_cell(document['failing_job']))
     if document.get('failing_step'):
-        facts.append('| First failing step | `%s` |' % document['failing_step'])
+        facts.append('| First failing step | `%s` |' % _table_cell(document['failing_step']))
     if document.get('failure_signature'):
-        facts.append('| Signature | `%s` |' % document['failure_signature'])
+        facts.append('| Signature | `%s` |' % _table_cell(document['failure_signature']))
     if document.get('confidence'):
-        facts.append('| Confidence | %s |' % document['confidence'])
+        facts.append('| Confidence | %s |' % _table_cell(document['confidence']))
     if document.get('tracking_issue'):
         facts.append('| Tracking issue | #%d (%s) |' % (
             document['tracking_issue'],

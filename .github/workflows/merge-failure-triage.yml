@@ -43,6 +43,16 @@
 # - The comment body is model output and goes through
 #   tools/neutralise-pr-body.sh before posting, so an @mention or an
 #   issue-closing keyword cannot fire on publication.
+# - The model runs with --dangerously-skip-permissions and the checkout as its
+#   working directory, so everything this job executes is staged into
+#   runner.temp first: the triage driver, the verdict extractor, its schema,
+#   the neutraliser and the model wrapper. issue-fix.yml stages the same set
+#   for the same reason. Two hazards, one fix -- bash reads a script lazily as
+#   it executes, so an edit to the running driver mid-run corrupts it; and the
+#   extractor and neutraliser run *after* the model, so reading them from the
+#   workspace would mean parsing and defusing model output with a copy the
+#   model could have rewritten. The residual effect of a workspace write is
+#   then nil: the checkout is discarded with the runner and is never pushed.
 #
 # NOTES:
 # - The verdict is uploaded as a build artifact and embedded in the pull
@@ -129,12 +139,26 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Before the model runs, and out of its reach. See the security note.
+      - name: Stage the triage tools outside the workspace
+        env:
+          STAGE_DIR: ${{ runner.temp }}/merge-triage-tools
+        run: |
+          mkdir -p "${STAGE_DIR}"
+          cp tools/merge-ci-triage.sh tools/merge-triage.py \
+             tools/merge-triage-schema.json tools/claude-model-fallback.sh \
+             tools/neutralise-pr-body.sh "${STAGE_DIR}/"
+          chmod +x "${STAGE_DIR}"/*.sh "${STAGE_DIR}"/*.py
+
       - name: Triage the failure
         # runner.temp is not available in a job-level env block, so this one
         # lives here.
         env:
           OUTPUT_DIR: ${{ runner.temp }}/merge-triage
-        run: tools/merge-ci-triage.sh "${FAILED_RUN_ID}"
+        # From the staged copy, not from tools/: the script finds its helpers
+        # beside itself, so running it from the workspace would pull all of
+        # them back out of the tree the model can write to.
+        run: ${{ runner.temp }}/merge-triage-tools/merge-ci-triage.sh "${FAILED_RUN_ID}"
 
       - name: Publish the verdict
         if: always()

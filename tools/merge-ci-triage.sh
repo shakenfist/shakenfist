@@ -14,9 +14,11 @@
 # Environment:
 #   REPO            owner/repo to triage in (default: GITHUB_REPOSITORY)
 #   OUTPUT_DIR      where evidence, the prompt and triage.json are written
-#                   (default: a mktemp directory, printed on exit)
+#                   (default: a mktemp directory, printed at startup)
 #   MODELS          comma separated models to try, in preference order
 #   MAX_TURNS       turn cap for the triage run
+#   LOG_HEAD_BYTES  bytes of the failed step logs kept from the start
+#   LOG_TAIL_BYTES  bytes kept from the end, where the error message is
 #   DRY_RUN         "true" to classify without writing anything to GitHub
 #   TRIAGE_RUN_URL  URL of the run doing the triage, recorded in the verdict
 #   GH_TOKEN        token for gh, as usual. Needs actions:read to read the
@@ -45,12 +47,14 @@
 #   tools/merge-triage.py from what GitHub said, and overwrites whatever the
 #   model put in those fields.
 # - A tracking issue the model says it commented on has to exist, and the
-#   issue or one of its comments has to carry this run's URL. A verdict which
-#   cites an issue that does not mention the failure is downgraded to "no
-#   issue", because the conductor treats a cited issue as evidence the
-#   occurrence was recorded. The comments are paged through in full: a
-#   long-lived flake issue accumulates one comment per occurrence, and reading
-#   only the first page would false-drop the comment just written.
+#   issue or one of its comments has to carry this run's URL. A claim which
+#   does not check out is downgraded to an action of "none" -- the number
+#   survives as a reference, the assertion that the occurrence was recorded
+#   does not -- because the conductor reads "commented" or "created" as proof
+#   the occurrence was filed. An issue which cannot be read at all is dropped
+#   outright. The comments are paged through in full: a long-lived flake issue
+#   accumulates one comment per occurrence, and reading only the first page
+#   would false-drop the comment just written.
 # - Evidence that could not be gathered is recorded as such. A model handed an
 #   empty log and asked for a verdict will still produce one, and the prompt's
 #   own heuristics push an evidence-free run towards "systemic, re-queue" --
@@ -60,6 +64,16 @@
 # The pull request comment carries the same JSON in a collapsed details
 # section, mirroring the automated reviewer, so the verdict can be recovered
 # from the thread as well as from the run's artifact.
+#
+# WHERE THIS SCRIPT IS RUN FROM MATTERS. Everything it invokes -- the model
+# wrapper, merge-triage.py, its schema, neutralise-pr-body.sh -- is found
+# beside it, and the model runs with --dangerously-skip-permissions in a
+# checkout which contains a copy of every one of them. The workflow therefore
+# copies the whole set into runner.temp and runs this script from there, so a
+# model which edits tools/ edits nothing that will subsequently be executed --
+# including this script, which bash reads lazily as it goes. Run by hand from
+# a checkout the copies are the checkout's, which is fine because by hand
+# there is no untrusted step in between.
 
 set -uo pipefail
 
@@ -80,6 +94,16 @@ fi
 REPO="${REPO:-${GITHUB_REPOSITORY:-}}"
 if [ -z "${REPO}" ]; then
     echo "merge-ci-triage: REPO or GITHUB_REPOSITORY must be set" >&2
+    exit 2
+fi
+
+# For the same reason as the run id above: REPO is interpolated into the
+# bootstrap envelope, and a value carrying a quote or a backslash would make
+# that JSON unparseable -- which breaks the one path whose whole job is to
+# still produce a document when everything else has failed. github.repository
+# cannot do that, but this script documents itself as runnable by hand.
+if ! [[ "${REPO}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+    echo "merge-ci-triage: REPO must be owner/repo, got '${REPO}'" >&2
     exit 2
 fi
 
@@ -182,14 +206,40 @@ if ! gh run view "${RUN_ID}" --repo "${REPO}" --json jobs \
 fi
 
 # --log-failed is only the failed steps, which is the part worth reading, but
-# a cluster build can still emit megabytes of it. The cap is on bytes rather
-# than lines because one wrapped ansible line can be thousands of characters.
-# The exit status of this pipeline is deliberately ignored: head closes the
-# pipe once it has its bytes, which kills gh with SIGPIPE on any log longer
-# than the cap -- that is the successful case, not a failure. Whether anything
-# arrived is the question that matters, and the file answers it.
-gh run view "${RUN_ID}" --repo "${REPO}" --log-failed 2>/dev/null \
-    | head -c 120000 > "${OUTPUT_DIR}/failed-logs.txt" || true
+# a cluster build can still emit megabytes of it, so it is cut down to a
+# budget. The budget is in bytes rather than lines because one wrapped ansible
+# line can be thousands of characters.
+#
+# Both ends are kept, and the tail is the larger share. Keeping only the head
+# is the obvious implementation and it is wrong here: within a failed step the
+# message that says what actually broke is the last thing emitted, and a
+# single ansible cluster-build step routinely exceeds the whole budget in
+# progress output on its own. That is exactly the failure class this triage
+# sees most, so a head-only cut would hand the model the noise and elide the
+# diagnosis. The head is kept as well because the first failing task is what
+# says where in the build it got to.
+#
+# The full log is fetched to a file rather than piped through head, so that
+# the elision marker can state how much was dropped. gh's exit status is
+# ignored: whether anything arrived is the question that matters, and the file
+# answers it.
+LOG_HEAD_BYTES="${LOG_HEAD_BYTES:-40000}"
+LOG_TAIL_BYTES="${LOG_TAIL_BYTES:-80000}"
+
+gh run view "${RUN_ID}" --repo "${REPO}" --log-failed \
+    > "${OUTPUT_DIR}/failed-logs.full.txt" 2>/dev/null || true
+log_bytes=$(wc -c < "${OUTPUT_DIR}/failed-logs.full.txt")
+if [ "${log_bytes}" -le $((LOG_HEAD_BYTES + LOG_TAIL_BYTES)) ]; then
+    cp "${OUTPUT_DIR}/failed-logs.full.txt" "${OUTPUT_DIR}/failed-logs.txt"
+else
+    {
+        head -c "${LOG_HEAD_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt"
+        printf '\n\n[... %s bytes elided by triage: this is the first %s and the last %s bytes of the failed step logs ...]\n\n' \
+            "$((log_bytes - LOG_HEAD_BYTES - LOG_TAIL_BYTES))" \
+            "${LOG_HEAD_BYTES}" "${LOG_TAIL_BYTES}"
+        tail -c "${LOG_TAIL_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt"
+    } > "${OUTPUT_DIR}/failed-logs.txt"
+fi
 if [ ! -s "${OUTPUT_DIR}/failed-logs.txt" ]; then
     gather_notes+=('Triage could not read the logs of the failed steps; they may have aged out of retention.')
 fi
@@ -386,21 +436,30 @@ PROMPT_EOF
             "${OUTPUT_DIR}/response.txt" "${ENVELOPE_JSON}" "${TRIAGE_JSON}"; then
         echo "merge-ci-triage: triage produced no verdict, publishing the fallback document"
     fi
+fi
 
-    # Whatever could not be gathered travels with the verdict, so a reader is
-    # never left to assume the model saw everything.
-    if [ ${#gather_notes[@]} -gt 0 ]; then
-        printf '%s\n' "${gather_notes[@]}" | jq -R . | jq -s . \
-            > "${OUTPUT_DIR}/gather-notes.json"
-        jq --slurpfile notes "${OUTPUT_DIR}/gather-notes.json" \
-            '.evidence += $notes[0]' "${TRIAGE_JSON}" \
-            > "${TRIAGE_JSON}.notes" && mv "${TRIAGE_JSON}.notes" "${TRIAGE_JSON}"
-    fi
+# Whatever could not be gathered travels with the verdict, so a reader is never
+# left to assume the model saw everything. Outside the branch above, not inside
+# it: the run where nothing at all could be read is the run where a consumer
+# most needs to be told which pieces were missing, and that is precisely the
+# branch which does not run a model.
+if [ ${#gather_notes[@]} -gt 0 ]; then
+    printf '%s\n' "${gather_notes[@]}" | jq -R . | jq -s . \
+        > "${OUTPUT_DIR}/gather-notes.json"
+    jq --slurpfile notes "${OUTPUT_DIR}/gather-notes.json" \
+        '.evidence += $notes[0]' "${TRIAGE_JSON}" \
+        > "${TRIAGE_JSON}.notes" && mv "${TRIAGE_JSON}.notes" "${TRIAGE_JSON}"
 fi
 
 # ---------------------------------------------------------------------------
 # Check what the model said it did
 # ---------------------------------------------------------------------------
+
+# What the model said it did, read before a dry run overwrites it below. The
+# verification is about the claim, so it has to be the claim that is checked:
+# gating on the value left in the document would mean a dry run, which forces
+# "none", never exercised this path.
+claimed_action=$(jq -r '.tracking_issue_action // "none"' "${TRIAGE_JSON}")
 
 if [ "${DRY_RUN}" = "true" ]; then
     # Nothing was written to GitHub, whatever the model believes, and the
@@ -412,43 +471,71 @@ if [ "${DRY_RUN}" = "true" ]; then
         && mv "${TRIAGE_JSON}.dry" "${TRIAGE_JSON}"
 fi
 
-# Run whenever an issue is cited, not only when the document claims a write:
-# a dry run has already been forced to "none" above, and gating the check on
-# the action would mean the verification path was never exercised except in
-# production. What differs in a dry run is the consequence -- the note is
-# recorded, but the citation is left in place, because "the issue it would
-# have used" is the useful half of a dry run's output.
+# Two different things can be wrong with a citation, and they are not
+# interchangeable:
+#
+# - The issue cannot be read at all. Then the number is not even a useful
+#   pointer, and it goes.
+# - The issue exists but does not mention this run, and the model claimed to
+#   have written the occurrence there. The claim is what fails, not the
+#   citation: the action drops to "none" and the number stays, which is what
+#   "referenced only, nothing recorded" means and is strictly more useful to a
+#   reader than no number at all.
+#
+# A citation whose claimed action is already "none" is *not* checked for the
+# run URL. By definition nothing was written to it, so it will not reference
+# this run, and checking anyway would drop every reference-only citation ever
+# made -- making that documented state unreachable in production.
 tracking_issue=$(jq -r '.tracking_issue // empty' "${TRIAGE_JSON}")
 if [ -n "${tracking_issue}" ]; then
-    # The issue body plus every comment, paged in full. A tracking issue for a
-    # recurring flake carries one comment per occurrence, and a single page of
-    # them would stop short of the comment just written.
-    issue_text=$(
-        {
-            gh issue view "${tracking_issue}" --repo "${REPO}" --json body --jq '.body'
-            gh api --paginate "repos/${REPO}/issues/${tracking_issue}/comments" \
-                --jq '.[].body'
-        } 2>/dev/null)
-
+    drop_citation=false
     drop_reason=""
-    if [ -z "${issue_text}" ]; then
+
+    # Readability is the exit status, not the emptiness of the output. "gh api"
+    # prints the error body of a 404 on stdout, so an issue which does not
+    # exist yields plenty of text -- and a real issue may legitimately have an
+    # empty body. Testing the text would confuse the two in both directions.
+    if ! issue_body=$(gh issue view "${tracking_issue}" --repo "${REPO}" \
+            --json body --jq '.body' 2>/dev/null); then
+        drop_citation=true
         drop_reason="Triage cited issue #${tracking_issue}, which could not be read in ${REPO}."
-    elif ! echo "${issue_text}" | grep -qF "${run_url}"; then
+    elif [ "${claimed_action}" != "none" ]; then
+        # Every comment, paged in full, and only on the path that needs them: a
+        # tracking issue for a recurring flake carries one comment per
+        # occurrence, and a single page of them would stop short of the comment
+        # just written.
+        if ! issue_comments=$(gh api --paginate \
+                "repos/${REPO}/issues/${tracking_issue}/comments" \
+                --jq '.[].body' 2>/dev/null); then
+            issue_comments=""
+        fi
+
         # The run URL rather than the bare id: the digits of a run id turn up
         # in unrelated URLs on a long issue, and the prompt asks for the URL.
-        drop_reason="Triage cited issue #${tracking_issue}, but nothing there references ${run_url}."
+        if ! printf '%s\n%s\n' "${issue_body}" "${issue_comments}" \
+                | grep -qF "${run_url}"; then
+            drop_reason="Triage said it recorded this occurrence on issue #${tracking_issue}, but nothing there references ${run_url}. The issue is kept as a reference only."
+        fi
     fi
 
     if [ -n "${drop_reason}" ]; then
         echo "merge-ci-triage: ${drop_reason}"
         if [ "${DRY_RUN}" = "true" ]; then
+            # A dry run wrote nothing, so there is no claim to take away. The
+            # finding is still recorded: "the issue it would have used" is the
+            # useful half of a dry run's output.
             jq --arg reason "${drop_reason}" '.evidence += [$reason]' \
+                "${TRIAGE_JSON}" > "${TRIAGE_JSON}.checked" \
+                && mv "${TRIAGE_JSON}.checked" "${TRIAGE_JSON}"
+        elif [ "${drop_citation}" = "true" ]; then
+            jq --arg reason "${drop_reason}" \
+                '.tracking_issue = null | .tracking_issue_action = "none" |
+                 .evidence += [$reason]' \
                 "${TRIAGE_JSON}" > "${TRIAGE_JSON}.checked" \
                 && mv "${TRIAGE_JSON}.checked" "${TRIAGE_JSON}"
         else
             jq --arg reason "${drop_reason}" \
-                '.tracking_issue = null | .tracking_issue_action = "none" |
-                 .evidence += [$reason]' \
+                '.tracking_issue_action = "none" | .evidence += [$reason]' \
                 "${TRIAGE_JSON}" > "${TRIAGE_JSON}.checked" \
                 && mv "${TRIAGE_JSON}.checked" "${TRIAGE_JSON}"
         fi
@@ -511,6 +598,12 @@ if gh pr view "${pr_number}" --repo "${REPO}" --json comments \
     exit "${exit_status}"
 fi
 
+# An "unknown" verdict is posted like any other, deliberately. It is a thin
+# comment, but the alternative is silence, and silence on an ejected pull
+# request reads as "triage did not run" -- which is the same ambiguity the
+# always-write-a-document rule exists to remove, just moved from the artifact
+# to the thread. The comment names why triage reached nothing, which is what
+# tells a maintainer whether to look at the run or at this workflow.
 gh pr comment "${pr_number}" --repo "${REPO}" --body-file "${OUTPUT_DIR}/comment.md" \
     || echo "merge-ci-triage: could not comment on #${pr_number}" >&2
 

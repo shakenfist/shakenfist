@@ -631,7 +631,7 @@ fields that matter to a consumer are:
 | `tracking_issue_action` | `commented`, `created`, or `none` |
 | `run_id`, `pull_request` | What was triaged |
 
-Three properties of that document are worth knowing before consuming it:
+Four properties of that document are worth knowing before consuming it:
 
 - **A document is always written.** A model that answers in prose, a run that
   cannot be read, a document that fails its own schema — each yields
@@ -651,17 +651,50 @@ Three properties of that document are worth knowing before consuming it:
   number are written from what GitHub said and overwrite whatever the model put
   in those fields, so a verdict cannot be filed against the wrong failure. Only
   the fields in `MODEL_FIELDS` are taken from the response at all.
-- **A cited tracking issue has been checked.** The issue has to exist and has to
-  carry a reference to the failed run; a citation that does not is dropped, with
-  the reason appended to `evidence`. A consumer can treat a non-null
+- **A cited tracking issue has been checked.** A consumer can treat a non-null
   `tracking_issue` as evidence the occurrence really was recorded — but only
-  when `tracking_issue_action` is `commented` or `created`. With an action of
-  `none` the number is a reference the triage found useful and nothing was
-  written to it. A dry run forces `none` unconditionally, whatever the model
-  reports, because nothing was written to GitHub on that path.
+  when `tracking_issue_action` is `commented` or `created`, and those two are
+  the claims that get verified. The issue has to exist and the issue or one of
+  its comments has to carry the failed run's URL; a claim that does not check
+  out is downgraded to an action of `none`, keeping the number as a reference
+  and losing only the assertion, with the reason appended to `evidence`. An
+  issue that cannot be read at all is dropped outright, number and all. A
+  citation whose action is already `none` is not checked for the run URL —
+  nothing was written to it, so it will not reference this run, and checking
+  anyway would drop every reference-only citation ever made. A dry run forces
+  `none` unconditionally, whatever the model reports, because nothing was
+  written to GitHub on that path; the verification still runs against what the
+  model *claimed*, so that path is exercised outside production too.
+
+An `unknown` verdict is posted on the pull request like any other. It is a thin
+comment, but the alternative is silence, and silence on an ejected pull request
+reads as "triage never ran" — the same ambiguity the always-write-a-document
+rule exists to remove, moved from the artifact to the thread. The comment names
+why triage reached nothing, which is what tells a maintainer whether to look at
+the failed run or at this workflow.
 
 Re-triaging the same run does not double-post: the comment carries an invisible
 `<!-- merge-triage run:<id> -->` marker which a later run recognises.
+
+#### What the model can and cannot touch
+
+The model runs with `--dangerously-skip-permissions` and the checkout as its
+working directory, so the job stages everything it executes into `runner.temp`
+before the model starts: `merge-ci-triage.sh` itself, `merge-triage.py`, its
+schema, `neutralise-pr-body.sh` and `claude-model-fallback.sh`. `issue-fix.yml`
+stages the same set for the same two reasons. Bash reads a script lazily as it
+executes, so an edit to the running driver would corrupt it mid-run; and the
+extractor and the neutraliser run *after* the model has exited, so reading them
+from the workspace would mean parsing and defusing model output with a copy the
+model could have rewritten. With the staging in place a workspace write has no
+effect at all — the checkout is discarded with the runner and is never pushed.
+
+The failed step logs are cut to a byte budget before they reach the prompt, and
+both ends are kept with the tail given the larger share. Keeping only the head
+is the obvious implementation and it is wrong here: a single Ansible
+cluster-build step routinely exceeds the whole budget in progress output, and
+the message saying what actually broke is the last thing it emits. The elision
+is marked inline with the number of bytes dropped.
 
 ### Developer Automation (Bot Commands)
 
