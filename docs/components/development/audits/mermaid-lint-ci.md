@@ -23,8 +23,59 @@ with no space before the language. That is deliberately narrower than
 markdown allows, because it is what `mmdc` recognises -- a
 `~~~mermaid` block renders nothing and exits zero, so counting one
 would mark a repository covered for a diagram its linter never sees.
-`tools/mermaid-lint.sh` greps for the same shape, and a test asserts
-the two definitions stay together.
+
+The script draws the same line, and then goes further than the audit
+can: where the audit merely declines to count a fence `mmdc` cannot
+read, `tools/mermaid-lint.sh` refuses it. There are two such fences --
+a tilde-fenced block, and one written as ```` ``` mermaid ```` with a
+space before the language. GitHub renders both as diagrams even though
+`mmdc` reads nothing in either, so failing open would ship an unlinted
+diagram through the exact gap the linter exists to close, with the run
+printing "nothing to lint" and exiting zero -- a failure wearing the
+shape of a success. Instead the script names the file, the line and
+what to change and exits 1, alongside any parse errors from the same
+run; a refusal outranks the renderer's status, so a broken diagram is
+never reported under a failed image pull's 125.
+`MermaidLintScriptTest` in `scripts/tests/` pins that behaviour, and
+pins the audit's narrower answer next to it.
+
+The two therefore give deliberately different answers to the same
+input, and a repository whose only diagrams are tilde-fenced sees
+both: N/A here, red in the lane. That is the intended direction. The
+reason the audit does not count such a block was that counting one
+would call the repository covered for a diagram nothing renders;
+refusing the block removes the diagram rather than the coverage.
+
+The script classifies fences by tracking fence state rather than by
+matching lines, so a fence shown inside a longer fence is an example
+rather than a diagram -- otherwise a page documenting this rule would
+fail the repository that wrote it. Nesting is the only way to quote a
+fence: indented code blocks are deliberately not modelled, because
+four spaces before a fence is far more often a diagram inside a list
+item, which must still be linted, than a diagram being quoted. Prose
+is safe by a separate rule -- a backtick fence's info string may not
+contain a backtick, so a line opening with an inline code span is not
+a fence -- without which such a line would open one that never closes
+and hide every diagram below it.
+
+Blockquotes are the one place the two halves agree and both are
+wrong. Neither the regex nor the script looks past a leading `>`, so
+a diagram inside a blockquote is N/A here and skipped rather than
+refused there, while GitHub renders it and `mmdc` reports "No mermaid
+charts found" for the same file -- measured, not assumed. It is
+therefore the fail-open shape the tilde and spaced refusals exist to
+close, left open deliberately: because the two halves agree, no
+repository is called covered for a diagram nothing renders, and
+refusing a blockquoted fence means deciding what a fence nested
+inside a blockquoted fence is, which is a rule with its own blind
+spot. Blockquoted diagrams are vanishingly rare; a repository that
+grows one should promote it to the top level rather than wait for
+this to be modelled.
+
+The audit's regex is a line match and has no notion of nesting at
+all, which is a divergence with no consequence: a repository whose
+only ```` ```mermaid ```` fence is a nested example is asked for a
+linter that then finds nothing to lint, and passes.
 
 Repositories with no mermaid diagrams are N/A. This is a check on
 diagrams that exist, not a requirement that every project have some;

@@ -27,11 +27,26 @@ glob, an empty release is indistinguishable from a good one.
 
 The workflow can also be started by hand, which runs the build and the
 `twine check` as a smoke test and stops there. Everything from the tag
-signing down is confined to tag refs with
-`if: startsWith(github.ref, 'refs/tags/v')`. That guard is what makes
-the manual trigger safe to use: a dispatch arrives on a branch ref, and
-without it `sign-tag` would take `refs/heads/<branch>` for a tag name,
-force-push `refs/tags/refs/heads/<branch>`, and go on to publish.
+signing down is confined to a pushed tag with
+`if: github.event_name == 'push' && startsWith(github.ref,
+'refs/tags/v')`. Both clauses are needed: aimed at a branch, an
+unguarded `sign-tag` would take `refs/heads/<branch>` for a tag name and
+force-push `refs/tags/refs/heads/<branch>`; aimed at an existing tag, a
+ref-only guard would let the run re-sign and force-push that tag,
+rewriting a signed object someone may already have verified. Re-running
+a failed release still works, because "Re-run jobs" replays the original
+push event.
+
+These runners are persistent and `download-artifact` extracts into its
+target rather than replacing it, so a publishing job must not read a
+directory an earlier job may have left files in. The two jobs solve
+that differently. `publish-pypi` checks out, which cleans the workspace
+with `git clean -ffdx`, and works in `dist/` -- it has to, because
+`pypa/gh-action-pypi-publish` delegates to a Docker container action,
+and the container is given `RUNNER_TEMP` at `/github/runner_temp` while
+`${{ runner.temp }}` expands to the host path, which is not there.
+`github-release` runs a JavaScript action on the host, so it skips the
+checkout and downloads into the per-job `${{ runner.temp }}` instead.
 
 ```mermaid
 flowchart TB
