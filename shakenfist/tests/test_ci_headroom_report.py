@@ -1197,3 +1197,465 @@ class GuardCensusTestCase(HeadroomReportTestCase):
         self.assertEqual(0, code)
         self.assertIn('1 of those had enforce=false', output)
         self.assertIn('The ledger refused 1 placement, of which 0', output)
+
+
+def cells_under(output, heading, next_heading, first_cell):
+    """The cells of one table row, found by its first column.
+
+    The report's tables are whitespace aligned, so a row is read back by
+    splitting on whitespace. Deliberately re-derived here rather than asked
+    of the tool: a test which formats a row with the tool's own helpers and
+    then compares it to the tool's output proves only that the tool is
+    deterministic.
+    """
+    block = output.split(heading)[1].split(next_heading)[0]
+    for line in block.splitlines():
+        cells = line.split()
+        if cells and cells[0] == first_cell:
+            return cells
+    raise AssertionError('no row for %r under %r' % (first_cell, heading))
+
+
+def as_number(value, places=1):
+    return '-' if value is None else '%.*f' % (places, value)
+
+
+def as_ledger(low, high):
+    if low is None:
+        return '-'
+    if low == high:
+        return '%.1f' % low
+    return '%.1f-%.1f' % (low, high)
+
+
+def metric_cells(block):
+    """The six cells a metric block renders as, derived from the record alone."""
+    return [
+        str(block['n']),
+        as_number(block['p90']),
+        as_number(block['peak']),
+        as_ledger(block['ledger_min'], block['ledger_max']),
+        as_number(block['p90_fraction'], 3),
+        as_number(block['peak_fraction'], 3),
+    ]
+
+
+class SummaryRecordTestCase(HeadroomReportTestCase):
+    """The machine-readable record, and the prose rendered from it (D18).
+
+    Phase 2's harvest calls ``summary_record()`` over several hundred banked
+    bundles and phase 5's guardrail reads the ``--json`` file, so the
+    alternative -- both of them parsing the printed tables -- would make
+    every future change to a heading a silent break of the dataset. The
+    report now renders its prose from the record, and these tests exist to
+    keep that true: if a future change recomputes a figure in a printer
+    instead of reading it from the record, the two can drift, and the
+    numbers in the job log and in the baseline dataset would disagree while
+    both looked plausible.
+
+    The second thing covered here is the one the plan is most insistent
+    about. A census which was never collected must leave nulls in the
+    record, never zeros: "we did not look" and "nothing was refused" are
+    different findings, the second is the one the whole plan is hunting
+    for, and a zero in a dataset is indistinguishable from a measurement
+    (D20).
+    """
+
+    def _rich_series(self):
+        """A series with everything the awkward paths need.
+
+        A ledger which moves during the run, a node which never has a
+        capacity row, a sample whose capacity read failed for every node at
+        once, a node the roster explains as a non-hypervisor, and a failed
+        sample.
+        """
+        roster = [roster_entry(NODE_ONE, 'sf1'), roster_entry(NODE_TWO, 'sf2'),
+                  roster_entry(NODE_THREE, 'sf3', is_hypervisor=False)]
+        records = []
+        for i in range(11):
+            records.append(sample({
+                NODE_ONE: node_payload(
+                    cpu_measured=i, cpu_committed=i + 1, cpu_limit=10 + (i % 3),
+                    ram_available=24000 - 500 * i),
+                NODE_TWO: node_payload(
+                    cpu_measured=2, cpu_committed=0, cpu_limit=None,
+                    cpu_hard_max=6, ram_max=16000, ram_available=8000),
+            }, nodes=roster, sampled_at=1756000000.0 + 15 * i))
+        records.append(sample({
+            NODE_ONE: node_payload(cpu_measured=0, cpu_committed=0,
+                                   cpu_limit=None, row_present=False),
+            NODE_TWO: node_payload(cpu_measured=0, cpu_committed=0,
+                                   cpu_limit=None, row_present=False),
+        }, nodes=roster, sampled_at=1756000200.0))
+        records.append({'sampled_at': 1756000215.0, 'error': 'HTTP 503'})
+        return self._series(records)
+
+    def _rich_census(self):
+        return self._census([
+            census_event('schedule at stage sufficient_idle_cpu'),
+            census_event('schedule at stage sufficient_idle_cpu',
+                         dropped={NODE_ONE: {'reason': 'would exceed hard max CPUs'}}),
+            census_event('schedule has no candidates at stage '
+                         'sufficient_idle_cpu, aborting',
+                         dropped={NODE_TWO: {'reason': 'would exceed hard max CPUs'}}),
+            census_event('schedule at stage sufficient_idle_memory',
+                         dropped={NODE_ONE: {'reason': 'no memory_max in node metrics'}}),
+            denial_event(dimensions=[dimension('cpus', 6.0, 6.0, 2.0, True,
+                                               shortfall=2.0)]),
+        ])
+
+    def _record_and_output(self, *extra):
+        path = self._rich_series()
+        census = self._rich_census()
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, output = self._run('--series', path, '--census', census,
+                                 '--label', 'slim-primary', '--json', target,
+                                 *extra)
+        self.assertEqual(0, code)
+        with open(target) as f:
+            return json.load(f), output
+
+    def test_every_printed_figure_is_the_figure_in_the_record(self):
+        """The prose and the record cannot disagree, because both are the record.
+
+        This walks the printed tables and the printed scalars and checks
+        each against the record which produced them. A figure recomputed in
+        a printer rather than read from the record fails here -- which is
+        the drift D18 exists to make impossible, because the baseline in
+        the master plan and the numbers in the job log a reader checks it
+        against would then be different numbers.
+        """
+        record, output = self._record_and_output()
+
+        series = record['series']
+        self.assertIn(
+            '  Samples:           %d usable, %d failed (an "error" record), '
+            '%d unparseable line'
+            % (series['samples_usable'], series['samples_failed'],
+               series['unparseable_lines']), output,
+            'The sample counts in the record are not the sample counts in '
+            'the printed report.')
+        self.assertIn(
+            '  LEDGER UNREADABLE: %d of %d samples'
+            % (series['ledger_unreadable_samples'], series['samples_usable']),
+            output,
+            'The count of ledger-unreadable samples disagrees between the '
+            'record and the report. That count is how many samples are '
+            'excluded from every committed-CPU figure, so a reader who '
+            'trusts one and not the other is reading a different run.')
+
+        provenance = record['ledger_provenance']
+        for line, key in (
+                ('  Node-samples with a capacity row (cpu_limit):     %d',
+                 'node_samples_with_row'),
+                ('  Node-samples which fell back to cpu_hard_max:     %d',
+                 'node_samples_fallback'),
+                ('  Fallbacks inside ledger-unreadable samples:       %d',
+                 'node_samples_fallback_unreadable'),
+                ('  Node-samples with no CPU ledger at all:           %d',
+                 'node_samples_without_ledger')):
+            self.assertIn(line % provenance[key], output,
+                          'The D7 ledger provenance count %s is not the one '
+                          'printed. D7 is settled from these figures.' % key)
+
+        cluster = record['cluster']
+        cluster_block = (output.split('Cluster-wide headroom')[1]
+                         .split('Committed vCPU, per node')[0])
+        for prefix, key, why in (
+                ('  committed vCPU ', 'committed_cpu',
+                 'That row is the one D3\'s band verdict is read from.'),
+                ('  committed memory (MB) ', 'committed_memory_mb',
+                 'Whether memory ever binds is what decides phase 0\'s D5.')):
+            rows = [line for line in cluster_block.splitlines()
+                    if line.startswith(prefix)]
+            self.assertEqual(1, len(rows),
+                             'The cluster table has %d rows starting %r.'
+                             % (len(rows), prefix))
+            self.assertEqual(
+                metric_cells(cluster[key]),
+                rows[0].split()[len(prefix.split()):],
+                'The cluster-wide %s row does not match the record. %s'
+                % (key, why))
+
+        for node, blocks in record['per_node'].items():
+            self.assertEqual(
+                [node] + metric_cells(blocks['committed_cpu']),
+                cells_under(output, 'Committed vCPU, per node',
+                            'Committed memory (MB), per node', node),
+                'Node %s\'s committed vCPU row does not match the record. '
+                'The per-node figures are what D21 is argued from: a '
+                'cluster-wide fraction inside the band above a node pinned '
+                'at 1.000.' % node)
+            self.assertEqual(
+                [node] + metric_cells(blocks['committed_memory_mb']),
+                cells_under(output, 'Committed memory (MB), per node',
+                            'Nodes absent from per_node', node),
+                'Node %s\'s committed memory row does not match the record.'
+                % node)
+
+        for classification, entry in record['absences']['classifications'].items():
+            self.assertIn('%s %d' % (classification, entry['node_samples']),
+                          ' '.join(output.split()),
+                          'The absence classification %r is counted '
+                          'differently in the record and the report. A node '
+                          'missing from per_node has four possible meanings '
+                          'and only the count says how often it happened.'
+                          % classification)
+
+        census = record['census']
+        self.assertIn(
+            '  Log records read:  %d (%d were schedule stage events, '
+            '%d were capacity guard events'
+            % (census['records'], census['stage_events'],
+               census['guard_events']), output,
+            'The census record counts disagree with the printed ones.')
+        for stage, tally in census['stages'].items():
+            cells = cells_under(output, 'Refusal census', 'Capacity guard census',
+                                stage)
+            self.assertEqual(
+                [str(tally['events']), str(tally['aborts']),
+                 str(tally['dropped'])], cells[1:4],
+                'The census tally for stage %r does not match the record. '
+                'The per-stage refusal census is the corpus phase 3 checks '
+                'its inventory of signatures against.' % stage)
+
+        guard = record['guard']
+        self.assertIn('  Placements refused by the guard: %d' % guard['denials'],
+                      output,
+                      'The guard refusal count in the record is not the one '
+                      'printed. A guard denial is a create which did not '
+                      'happen, which is the #3772 shape.')
+
+        verdict = record['verdict']
+        self.assertIn(
+            '  p90 committed vCPU / ledger, cluster wide: %s'
+            % as_number(verdict['p90_cpu_fraction'], 3), output,
+            'The ratio the band verdict was reached from is not the ratio '
+            'printed beside it.')
+        self.assertIn('  Verdict: %s' % verdict['band'], output,
+                      'The band verdict in the record is not the verdict '
+                      'printed.')
+        self.assertEqual(
+            verdict['p90_cpu_fraction'],
+            record['cluster']['committed_cpu']['p90_fraction'],
+            'The verdict judged a different number from the one the '
+            'cluster-wide table publishes. There must be exactly one p90 '
+            'committed-vCPU fraction in this report.')
+
+    def test_an_absent_census_is_null_in_the_record_and_never_zero(self):
+        """A census nobody collected must not read as a run which refused nothing.
+
+        This is the misreading the whole plan is most exposed to. A zero in
+        a dataset is indistinguishable from a measurement, and the baseline
+        phase 2 publishes is read by phases 3, 4 and 5 -- so an uncollected
+        census which recorded itself as zero refusals would be evidence for
+        shrinking a cloud that had in fact been refusing creates (D20).
+        """
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, output = self._run('--series', path, '--json', target)
+        self.assertEqual(0, code)
+        with open(target) as f:
+            record = json.load(f)
+
+        census = record['census']
+        self.assertEqual('not requested', census['state'])
+        self.assertFalse(census['available'])
+        for key in ('records', 'stage_events', 'guard_events', 'stages',
+                    'capacity_shortage_drops', 'unclassified_shortage_drops',
+                    'disk_bandwidth_drops', 'missing_data_drops', 'truncated'):
+            self.assertIsNone(
+                census[key],
+                'census[%r] is %r rather than null for a census which was '
+                'never collected. Zero reads as a measurement.'
+                % (key, census[key]))
+
+        self.assertEqual(
+            'no_census', record['guard']['state'],
+            'The guard census state must say no census was supplied. Phase '
+            '5\'s guardrail reads this field to decide whether it may draw '
+            'any conclusion at all about refusals.')
+        self.assertIsNone(record['guard']['denials'])
+        self.assertIsNone(record['guard']['claims'])
+        self.assertIsNone(
+            record['verdict']['refusal_warning'],
+            'The refusal half of the band verdict must be unknown rather '
+            'than False when no census was read (D3).')
+        self.assertIn('NO CENSUS WAS SUPPLIED', output)
+
+    def test_a_census_carrying_no_guard_events_is_not_collected_not_zero(self):
+        """The retrospective window's blind spot, recorded as a blind spot.
+
+        Until D20 widens the collector's LogQL filter, every banked census
+        matches the scheduler's stage messages only, so it carries no guard
+        event whatever the guard did. That is a fact about the query before
+        it is a fact about the cluster, and the record has to say so.
+        """
+        census = self._census([
+            census_event('schedule at stage sufficient_idle_cpu')])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, _ = self._run('--series', path, '--census', census,
+                            '--json', target)
+        self.assertEqual(0, code)
+        with open(target) as f:
+            record = json.load(f)
+
+        self.assertEqual('read', record['census']['state'])
+        self.assertEqual(1, record['census']['stage_events'])
+        self.assertEqual(
+            'not_collected', record['guard']['state'],
+            'A census which carried stage events and no guard events must '
+            'record the guard census as not collected. Reporting zero '
+            'refusals here would be reporting the filter, not the cluster.')
+        self.assertIsNone(record['guard']['denials'])
+
+    def test_an_unreadable_census_is_unavailable_rather_than_empty(self):
+        """A broken log shipping path looks exactly like a cluster with room."""
+        census = self._write('census.json', 'this is not json')
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, _ = self._run('--series', path, '--census', census,
+                            '--json', target)
+        self.assertEqual(0, code)
+        with open(target) as f:
+            record = json.load(f)
+        self.assertEqual('unparseable', record['census']['state'])
+        self.assertIsNone(record['census']['capacity_shortage_drops'])
+        self.assertEqual('census_unavailable', record['guard']['state'])
+
+    def test_the_per_node_maximum_fraction_is_recorded(self):
+        """D21: the cluster-wide fraction averages a full node against an empty one.
+
+        The shape here is the one merge run 33944911413 actually recorded:
+        a cluster-wide p90 comfortably inside the provisional band while one
+        node sat pinned at its own ledger for the whole run. A band written
+        only cluster-wide calls that run healthy, which is the precise
+        failure this plan exists to stop making, so the per-node maximum is
+        a first-class figure in the record.
+        """
+        records = []
+        for i in range(10):
+            records.append(sample({
+                NODE_ONE: node_payload(cpu_measured=6, cpu_committed=6,
+                                       cpu_limit=6, cpu_hard_max=6),
+                NODE_TWO: node_payload(cpu_measured=0, cpu_committed=0,
+                                       cpu_limit=18, cpu_hard_max=18),
+            }, sampled_at=1756000000.0 + 15 * i))
+        path = self._series(records)
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, _ = self._run('--series', path, '--json', target)
+        self.assertEqual(0, code)
+        with open(target) as f:
+            record = json.load(f)
+
+        self.assertEqual(
+            0.25, record['cluster']['committed_cpu']['p90_fraction'],
+            'The cluster-wide fraction should be 6 committed over a 24 vCPU '
+            'ledger.')
+        self.assertEqual(
+            'OVERSIZED', record['verdict']['band'],
+            'Read cluster-wide this run is under the provisional lower '
+            'bound, which is exactly the reading D21 says is misleading.')
+        self.assertEqual(
+            {'n': 10, 'p90': 1.0, 'peak': 1.0},
+            record['per_node_max_cpu_fraction'],
+            'The per-node maximum committed fraction is missing or wrong. '
+            'One node was full for every sample of this run while the '
+            'cluster-wide figure read a quarter, and the scheduler admits '
+            'against one node\'s ledger at a time, never against the mean.')
+        self.assertEqual(
+            1.0, record['verdict']['per_node_max_p90_fraction'],
+            'The verdict must carry the per-node maximum beside the '
+            'cluster-wide ratio it judged.')
+        self.assertIsNone(
+            record['verdict']['per_node_band'],
+            'There is no per-node band verdict yet: D21 says the bounds come '
+            'from phase 2\'s harvest, and the provisional 0.35/0.70 are '
+            'bounds on the cluster-wide figure only.')
+
+    def test_the_ledger_is_recorded_as_the_range_it_moved_over(self):
+        """A ledger which changed mid-run is a finding, not something to average.
+
+        The reconciler rewriting a capacity row is the kind of event D7's
+        12-versus-10 discrepancy might turn out to be made of.
+        """
+        records = [
+            sample({NODE_ONE: node_payload(cpu_limit=10)},
+                   sampled_at=1756000000.0),
+            sample({NODE_ONE: node_payload(cpu_limit=12)},
+                   sampled_at=1756000015.0),
+        ]
+        path = self._series(records)
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, output = self._run('--series', path, '--json', target)
+        self.assertEqual(0, code)
+        with open(target) as f:
+            record = json.load(f)
+        block = record['per_node'][NODE_ONE]['committed_cpu']
+        self.assertEqual((10.0, 12.0), (block['ledger_min'], block['ledger_max']))
+        self.assertIn('10.0-12.0', output,
+                      'A ledger which moved must print as the range the '
+                      'record carries, not as one of its ends.')
+
+    def test_the_record_is_the_same_whether_it_is_written_or_returned(self):
+        """The harvest calls the function; the guardrail reads the file (D18).
+
+        Phase 2's harvest runs this over several hundred bundles locally, so
+        it calls summary_record() rather than shelling out. If the function
+        and the --json file could differ, the dataset and the guardrail
+        would be measuring different things.
+        """
+        path = self._rich_series()
+        census = self._rich_census()
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, _ = self._run('--series', path, '--census', census,
+                            '--label', 'slim-tier', '--json', target)
+        self.assertEqual(0, code)
+        with open(target) as f:
+            written = json.load(f)
+        returned = report.summary_record(path, census=census, label='slim-tier')
+        self.assertEqual(
+            json.loads(json.dumps(returned)), written,
+            'summary_record() and the --json file disagree, so the harvest '
+            'and phase 5\'s guardrail would read different numbers.')
+        self.assertEqual('slim-tier', written['label'])
+        self.assertEqual(report.RECORD_VERSION, written['record_version'])
+
+    def test_a_json_path_which_cannot_be_written_is_a_warning_not_a_failure(self):
+        """D15 holds for the output file as much as for the inputs.
+
+        A full disk or a missing directory must not fail the job, and must
+        not lose the printed report either -- the record is written after
+        the prose for exactly that reason.
+        """
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        target = os.path.join(self.tempdir, 'no-such-directory', 'summary.json')
+        code, output = self._run('--series', path, '--json', target)
+        self.assertEqual(
+            0, code,
+            'An unwritable --json path failed the job. An instrument which '
+            'can fail the run it is measuring changes what it measures '
+            '(D15).')
+        self.assertIn('WARNING: the summary record could not be written',
+                      output)
+        self.assertIn('Shaken Fist CI headroom report', output,
+                      'The printed report was lost when the record could not '
+                      'be written.')
+
+    def test_a_series_which_could_not_be_read_still_yields_a_record(self):
+        """The harvest must be able to record a job which produced nothing.
+
+        A bundle whose probe never started is a fact about the window --
+        phase 2 records it rather than dropping the run, because a
+        disappearing job would silently shrink n.
+        """
+        record = report.summary_record(
+            os.path.join(self.tempdir, 'does-not-exist.jsonl'))
+        self.assertIsNotNone(record['series']['read_error'])
+        self.assertEqual(0, record['series']['samples_usable'])
+        self.assertIsNone(
+            record['verdict']['band'],
+            'A run with no samples must have no band verdict rather than a '
+            'verdict computed from nothing.')
+        self.assertIsNone(record['cluster']['committed_cpu']['p90'])

@@ -109,10 +109,44 @@ rather than a shortage. A census which counted it as a memory refusal would
 read a stale metrics row as evidence the cloud is too small, which is the
 precise error this plan exists to avoid.
 
+One record, two consumers (D18). Everything printed below is computed once,
+into the plain dict summary_record() returns, and the prose is rendered from
+that dict rather than from the parsed objects beside it. Phase 2's harvest
+runs this tool's summary_record() over several hundred banked bundles and
+phase 5's guardrail will read the --json file, so the alternative -- both of
+them parsing the printed tables -- would make every future change to a
+heading or a column width a silent break of the dataset. Rendering the prose
+from the record instead means the number in the job log and the number in
+the dataset cannot disagree, which matters here because the whole plan turns
+on people trusting these figures. It also means this file has exactly one
+place where each figure is computed, so a reader checking the arithmetic
+checks it once.
+
+The record carries one statistic the prose does not print: the per-node
+maximum committed fraction (D21). For each sample it is the largest
+committed-over-ledger ratio any single node stood at, percentiled across the
+run beside the cluster-wide figure the band verdict uses. It exists because
+a cluster-wide fraction averages a full node against an empty one: a real
+merge run sat at a cluster-wide p90 of 0.407 while one node was pinned at
+1.000 for its whole duration and the scheduler refused twelve candidates at
+sufficient_idle_cpu. The scheduler does not admit against an average, so the
+average is the wrong number to size a cloud against. It is recorded rather
+than printed only because this step is bound to leave the printed report
+byte-identical, and D21's bounds do not exist until phase 2's harvest sets
+them; the phase which sets them is the phase which should print it.
+
+The record is a plain dict of standard-library types for the same reason the
+rest of this file is: it has to serialise under stock python3 on a runner.
+And writing it obeys D15 like everything else -- a --json path which cannot
+be written is a warning on stdout and an exit code of zero, never an
+exception, because a report tool which fails a build over its own output
+file is precisely the instrument changing what it measures.
+
 Usage:
 
     python3 tools/ci_headroom_report.py --series /srv/ci/traces/headroom.jsonl \\
-        --census /srv/ci/traces/headroom-census.json --label slim-primary
+        --census /srv/ci/traces/headroom-census.json --label slim-primary \\
+        --json /srv/ci/traces/headroom-summary.json
 """
 
 import argparse
@@ -129,6 +163,18 @@ import traceback
 # loud. Nothing gates on them in this phase (D15).
 BAND_LOWER = 0.35
 BAND_UPPER = 0.70
+
+# The shape of the dict summary_record() returns. Phase 2's harvest and phase
+# 5's guardrail both read it from files written by builds older than
+# themselves, so it is versioned: a consumer which cannot read version 2 can
+# say so rather than silently misreading a renamed field as an absent one.
+RECORD_VERSION = 1
+
+# Loki's own max_entries_limit_per_query, and the value
+# tools/ci_headroom_collect.sh in shakenfist/actions issues its query with. A
+# response holding exactly this many entries may have been cut short, which
+# is the one truncation Loki gives no signal for.
+DEFAULT_CENSUS_LIMIT = 5000
 
 # The two audit messages Scheduler._log_and_raise_on_error() emits, one per
 # stage, on every schedule rather than only on failures. Matching is on the
@@ -918,6 +964,503 @@ def read_census(path, limit=None):
     return census
 
 
+# The summary record (D18). Everything the report prints is computed here,
+# once, into a plain dict; the printers below render prose from that dict and
+# compute nothing of their own. Phase 2's harvest calls summary_record()
+# directly over several hundred banked bundles rather than shelling out to
+# this file, and phase 5's guardrail reads the --json file it writes.
+#
+# Two conventions run through all of it, and both exist to stop a reader --
+# human or program -- inferring a fact the measurement does not support.
+#
+# A figure which was not measured is None, never zero. An absent census is
+# the case this matters most for: "we did not look" and "nothing was
+# refused" are different findings and the second is the one the whole plan is
+# hunting for, so a census which was never collected leaves every count under
+# it null. The same applies to a ledger which was never visible and to a
+# percentile over an empty list.
+#
+# A ledger is recorded as the range it moved over rather than as an average,
+# because the reconciler rewriting a capacity row mid-run is exactly the kind
+# of event D7's 12-versus-10 discrepancy might turn out to be made of, and an
+# average would erase it.
+
+
+def ledger_bounds(values):
+    """The lowest and highest ledger observed, ignoring the ones which were not."""
+    present = [v for v in values if v is not None]
+    if not present:
+        return None, None
+    return min(present), max(present)
+
+
+def metric_block(values, fractions, ledgers):
+    """One measured quantity's block of the record.
+
+    The count, p90 and peak of the quantity itself; the ledger it was
+    measured against as a range; and the p90 and peak of the fraction of
+    that ledger. The fractions are computed per sample and percentiled
+    afterwards, never derived by dividing one percentile by another -- a
+    ratio of two percentiles is a number nothing ever stood at, and the
+    printed table says as much.
+    """
+    low, high = ledger_bounds(ledgers)
+    return collections.OrderedDict([
+        ('n', len(values)),
+        ('p90', percentile(values, 0.9)),
+        ('peak', max(values) if values else None),
+        ('ledger_min', low),
+        ('ledger_max', high),
+        ('p90_fraction', percentile(fractions, 0.9)),
+        ('peak_fraction', max(fractions) if fractions else None),
+    ])
+
+
+def cluster_cpu_fractions(series):
+    """The per-sample committed-over-ledger ratios the verdict is computed from.
+
+    Named rather than inlined because it is the one load-bearing input to
+    the band verdict, and because computing it must not require having
+    printed anything first.
+    """
+    fractions = []
+    for sample in series.usable_cpu_samples:
+        fraction = sample.cluster_cpu_fraction
+        if fraction is not None:
+            fractions.append(fraction)
+    return fractions
+
+
+def per_node_max_cpu_fractions(series):
+    """Per sample, the highest committed-over-ledger ratio any one node stood at.
+
+    D21. The cluster-wide fraction sums both sides over every ledgered node,
+    so it averages a full node against an empty one and reports the mean as
+    headroom -- on one real merge run, a cluster-wide p90 of 0.407 while a
+    node sat pinned at 1.000 for the whole run and twelve candidates were
+    refused at sufficient_idle_cpu. The scheduler admits against one node's
+    ledger at a time and never against the average, so this is the series a
+    per-node band bound is set from.
+
+    A node with no ledger contributes nothing here, exactly as it
+    contributes to neither side of the cluster-wide fraction: it has
+    committed vCPU and nothing to divide it by.
+    """
+    maxima = []
+    for sample in series.usable_cpu_samples:
+        fractions = [n.cpu_fraction for n in sample.nodes.values()
+                     if n.cpu_fraction is not None]
+        if fractions:
+            maxima.append(max(fractions))
+    return maxima
+
+
+def series_record(series):
+    """What was read out of the series file, and what could not be."""
+    stamps = [s.sampled_at for s in series.samples if s.sampled_at is not None]
+    reasons = collections.Counter(series.failed_samples)
+    record = collections.OrderedDict()
+    record['path'] = series.path
+    record['read_error'] = series.read_error
+    record['samples_usable'] = len(series.samples)
+    record['samples_failed'] = len(series.failed_samples)
+    record['unparseable_lines'] = series.unparseable_lines
+    record['unrecognised_lines'] = series.unrecognised_lines
+    record['total_lines'] = series.total_lines
+    # In most_common() order so a consumer and the printed report list the
+    # same errors first without either having to sort.
+    record['failed_sample_reasons'] = collections.OrderedDict(
+        reasons.most_common())
+    record['window_start'] = min(stamps) if stamps else None
+    record['window_end'] = max(stamps) if stamps else None
+    record['window_seconds'] = (max(stamps) - min(stamps)) if stamps else None
+    record['ledger_unreadable_samples'] = len(series.ledger_unreadable_samples)
+    record['sole_node_without_row_samples'] = sum(
+        1 for s in series.samples if s.sole_node_without_row)
+    return record
+
+
+def ledger_provenance_record(series):
+    """Where each node-sample's ledger came from (D7).
+
+    The count which fell back from the capacity row's cpu_limit to the
+    derived cpu_hard_max is a deliverable rather than a diagnostic aside:
+    D7 asks phase 2 to reconcile the two ledgers, and a run which is
+    entirely fallback answers that question differently from one which is
+    not. Fallbacks inside a ledger-unreadable sample are counted apart
+    because they are a failed capacity read wearing the fallback's clothes,
+    and D7 must read the second figure alone.
+
+    The memory-ledger count rides along here rather than in the per-node
+    block it is printed beside, because it is the same kind of fact about
+    the same node-samples: how many of them had no ledger to divide by.
+    """
+    record = collections.OrderedDict([
+        ('node_samples_with_row', 0),
+        ('node_samples_fallback', 0),
+        ('node_samples_fallback_unreadable', 0),
+        ('node_samples_without_ledger', 0),
+        ('node_samples_total', 0),
+        ('node_samples_without_memory_ledger', 0),
+    ])
+    for sample in series.samples:
+        unreadable = sample.ledger_unreadable
+        for node in sample.nodes.values():
+            if node.cpu_ledger is None:
+                record['node_samples_without_ledger'] += 1
+            elif node.cpu_ledger_from_fallback:
+                if unreadable:
+                    record['node_samples_fallback_unreadable'] += 1
+                else:
+                    record['node_samples_fallback'] += 1
+            else:
+                record['node_samples_with_row'] += 1
+            if node.memory_ledger_mb is None:
+                record['node_samples_without_memory_ledger'] += 1
+    record['node_samples_total'] = (
+        record['node_samples_with_row'] + record['node_samples_fallback']
+        + record['node_samples_fallback_unreadable']
+        + record['node_samples_without_ledger'])
+    return record
+
+
+def cluster_record(series):
+    """Committed vCPU and memory summed over the cluster, per sample.
+
+    The CPU figures are computed over the usable samples only: a sample
+    whose capacity read failed publishes zero committed vCPU on every node
+    at once, which averages in as an idle cluster. Memory comes from node
+    metrics and is unaffected, so it is computed over every sample.
+    """
+    usable = series.usable_cpu_samples
+    cpu = [s.cluster_committed_cpu for s in usable]
+    cpu_ledgers = [s.cluster_cpu_ledger for s in usable]
+
+    memory_samples = [s for s in series.samples
+                      if s.cluster_committed_memory_mb is not None]
+    memory = [s.cluster_committed_memory_mb for s in memory_samples]
+    memory_ledgers = [s.cluster_memory_ledger_mb for s in memory_samples]
+    memory_fractions = []
+    for sample in memory_samples:
+        ledger = sample.cluster_memory_ledger_mb
+        if ledger:
+            memory_fractions.append(sample.cluster_committed_memory_mb / ledger)
+
+    record = collections.OrderedDict()
+    record['committed_cpu'] = metric_block(
+        cpu, cluster_cpu_fractions(series), cpu_ledgers)
+    record['committed_memory_mb'] = metric_block(
+        memory, memory_fractions, memory_ledgers)
+    # Reported rather than folded in: a node with committed vCPU and no
+    # ledger at all is in neither side of the fraction above, and a reader
+    # who is not told that would read the fraction as covering the cluster.
+    record['nodes_without_cpu_ledger'] = sorted(
+        {n.node for s in usable for n in s.unledgered_nodes})
+    return record
+
+
+def per_node_record(series):
+    """The same figures again, per node, keyed by node uuid.
+
+    This is the block D21 exists because of, and the one a reader goes to
+    when the cluster-wide fraction looks comfortable. Each node carries its
+    own ledger, so "0.5 of what" is answerable without joining anything.
+    """
+    nodes = []
+    for sample in series.samples:
+        for node in sample.nodes:
+            if node not in nodes:
+                nodes.append(node)
+    nodes.sort()
+
+    usable = series.usable_cpu_samples
+    record = collections.OrderedDict()
+    for node in nodes:
+        cpu = []
+        cpu_fractions = []
+        cpu_ledgers = []
+        for sample in usable:
+            entry = sample.nodes.get(node)
+            if entry is None:
+                continue
+            cpu.append(entry.committed_cpu)
+            cpu_ledgers.append(entry.cpu_ledger)
+            if entry.cpu_fraction is not None:
+                cpu_fractions.append(entry.cpu_fraction)
+
+        memory = []
+        memory_fractions = []
+        memory_ledgers = []
+        for sample in series.samples:
+            entry = sample.nodes.get(node)
+            if entry is None or entry.memory_ledger_mb is None:
+                continue
+            memory.append(entry.committed_memory_mb)
+            memory_ledgers.append(entry.memory_ledger_mb)
+            if entry.memory_fraction is not None:
+                memory_fractions.append(entry.memory_fraction)
+
+        record[node] = collections.OrderedDict([
+            ('committed_cpu', metric_block(cpu, cpu_fractions, cpu_ledgers)),
+            ('committed_memory_mb',
+             metric_block(memory, memory_fractions, memory_ledgers)),
+        ])
+    return record
+
+
+def absence_record(series):
+    """Which rostered nodes per_node did not carry, and how far that is explained.
+
+    Nothing is dropped: what the roster cannot explain is recorded as
+    unexplained, because the alternative is inferring a cluster's size from
+    a sample which merely could not see the rest of it.
+    """
+    counts = collections.Counter()
+    by_class = collections.defaultdict(set)
+    for sample in series.samples:
+        for label, classification in sample.absences():
+            counts[classification] += 1
+            by_class[classification].add(label)
+
+    classifications = collections.OrderedDict()
+    for classification, count in counts.most_common():
+        classifications[classification] = collections.OrderedDict([
+            ('node_samples', count),
+            ('nodes', sorted(by_class[classification])),
+        ])
+
+    seen = [len(s.nodes) for s in series.samples]
+    return collections.OrderedDict([
+        ('classifications', classifications),
+        ('samples', len(seen)),
+        ('nodes_visible_min', min(seen) if seen else None),
+        ('nodes_visible_max', max(seen) if seen else None),
+    ])
+
+
+def census_record(census):
+    """The stage census, or an honest account of why there isn't one.
+
+    Every count is null unless the census was actually read. A census which
+    was never collected, or which failed to parse, must not read as a run in
+    which nothing was refused -- that is the finding this whole report
+    exists to make, and printing or recording a zero for it is how it would
+    be made falsely.
+    """
+    record = collections.OrderedDict()
+    record['state'] = census.status
+    record['available'] = census.available
+    record['detail'] = census.detail
+    record['path'] = census.path
+    record['limit'] = census.limit
+    if not census.available:
+        for key in ('records', 'stage_events', 'guard_events',
+                    'unparseable_lines', 'truncated', 'stages',
+                    'capacity_shortage_drops', 'unclassified_shortage_drops',
+                    'disk_bandwidth_drops', 'missing_data_drops'):
+            record[key] = None
+        return record
+
+    record['records'] = census.records
+    record['stage_events'] = census.matched
+    record['guard_events'] = census.guard_matched
+    record['unparseable_lines'] = census.unparseable_lines
+    record['truncated'] = census.truncated
+
+    stages = collections.OrderedDict()
+    for stage in sorted(census.stages):
+        tally = census.stages[stage]
+        stages[stage] = collections.OrderedDict([
+            ('events', tally.events),
+            ('aborts', tally.aborts),
+            ('dropped', tally.dropped),
+            ('shortage_drops', tally.shortage_drops),
+            ('reasons', collections.OrderedDict(tally.reasons.most_common())),
+        ])
+    record['stages'] = stages
+
+    record['capacity_shortage_drops'] = census.capacity_shortage_drops
+    record['unclassified_shortage_drops'] = census.unclassified_shortage_drops
+    record['disk_bandwidth_drops'] = census.disk_bandwidth_drops
+    record['missing_data_drops'] = census.missing_data_drops
+    return record
+
+
+def guard_record(census):
+    """What the capacity guard did, in its own block and never added to the above.
+
+    ``state`` is the field a consumer must read first, and it has four
+    values because there are four different things to know. ``no_census``
+    and ``census_unavailable`` mean nothing was looked at.
+    ``not_collected`` means the census was read and carried no guard event
+    at all, which -- until D20 widens the collector's LogQL filter -- is a
+    statement about the query rather than about the cluster, since the
+    filter selects only the scheduler's stage messages. Only ``collected``
+    carries counts, and in every other state they are null: a guard census
+    nobody collected must never be reported as zero refusals (D20).
+    """
+    guard = census.guard
+    if census.status == 'not requested':
+        state = 'no_census'
+    elif not census.available:
+        state = 'census_unavailable'
+    elif not guard.observed:
+        state = 'not_collected'
+    else:
+        state = 'collected'
+
+    record = collections.OrderedDict()
+    record['state'] = state
+    if state != 'collected':
+        record['denials'] = None
+        record['claims'] = None
+        return record
+
+    record['denials'] = guard.denials
+    record['unenforced'] = guard.unenforced
+    record['malformed'] = guard.malformed
+    record['empty_dimensions'] = guard.empty_dimensions
+    record['nothing_exceeded'] = guard.nothing_exceeded
+    record['stages'] = collections.OrderedDict(sorted(guard.stages.items()))
+    record['exceeded'] = collections.OrderedDict(sorted(guard.exceeded.items()))
+    record['sole_exceedance'] = collections.OrderedDict(
+        sorted(guard.sole_exceedance.items()))
+    record['stage_dimensions'] = collections.OrderedDict(
+        (stage, collections.OrderedDict(sorted(names.items())))
+        for stage, names in sorted(guard.stage_dimensions.items()))
+    record['demand_measured_alone'] = guard.demand_measured_alone
+    record['demand_estimate_tipped'] = guard.demand_estimate_tipped
+    record['demand_unsplit'] = guard.demand_unsplit
+    # Recorded where the event reported one and absent where it did not. A
+    # dimension with no shortfall field is a build predating it, not a
+    # shortfall of zero, and G3 keeps the definition server side so that two
+    # consumers cannot disagree about its sign.
+    record['shortfalls'] = collections.OrderedDict(sorted(guard.shortfalls.items()))
+    record['unrecognised_stages'] = guard.unrecognised_stages
+    record['unrecognised_dimensions'] = guard.unrecognised_dimensions
+
+    # An admitted placement, never a refusal: advisory claim mode exists so
+    # exceedances are observed before they are refused.
+    record['claims'] = guard.claims
+    record['claim_malformed'] = guard.claim_malformed
+    record['claim_namespaces'] = collections.OrderedDict(
+        guard.claim_namespaces.most_common())
+    record['claim_exceeded'] = collections.OrderedDict(
+        sorted(guard.claim_exceeded.items()))
+    record['claim_shortfalls'] = collections.OrderedDict(
+        sorted(guard.claim_shortfalls.items()))
+    return record
+
+
+def verdict_record(record):
+    """D3's band verdict, and the numbers it was reached from.
+
+    Every figure here is taken from the blocks already built above rather
+    than recomputed, so the verdict cannot disagree with the table a reader
+    checks it against.
+
+    ``refusal_warning`` is deliberately tri-state. Per D3 any capacity-stage
+    refusal is a warning on its own, independent of the ratio -- but a
+    census which was never read cannot say there were none, so it is null
+    rather than False.
+
+    The per-node maximum (D21) is carried unjudged. Its bounds do not exist
+    yet: phase 2's harvest sets them from the distribution, and the
+    provisional 0.35/0.70 below are bounds on the cluster-wide figure only.
+    """
+    ratio = record['cluster']['committed_cpu']['p90_fraction']
+    if ratio is None:
+        band = None
+    elif ratio < BAND_LOWER:
+        band = 'OVERSIZED'
+    elif ratio > BAND_UPPER:
+        band = 'OVERSUBSCRIBED'
+    else:
+        band = 'WITHIN BAND'
+
+    shortage = record['census']['capacity_shortage_drops']
+    per_node_max = record['per_node_max_cpu_fraction']
+    return collections.OrderedDict([
+        ('p90_cpu_fraction', ratio),
+        ('band', band),
+        ('band_lower', BAND_LOWER),
+        ('band_upper', BAND_UPPER),
+        ('band_provisional', True),
+        ('refusal_warning', None if shortage is None else bool(shortage)),
+        ('per_node_max_p90_fraction', per_node_max['p90']),
+        ('per_node_max_peak_fraction', per_node_max['peak']),
+        ('per_node_band', None),
+    ])
+
+
+def build_summary_record(series, census, label=None):
+    """Assemble the record from an already-parsed series and census.
+
+    Separate from summary_record() below so that a caller which already
+    holds the parsed objects -- a test, or a consumer reading a series from
+    somewhere other than a file -- does not have to write them back out to
+    disk to summarise them.
+    """
+    record = collections.OrderedDict()
+    record['record_version'] = RECORD_VERSION
+    record['label'] = label
+    record['series'] = series_record(series)
+    record['ledger_provenance'] = ledger_provenance_record(series)
+    record['cluster'] = cluster_record(series)
+    record['per_node'] = per_node_record(series)
+    maxima = per_node_max_cpu_fractions(series)
+    record['per_node_max_cpu_fraction'] = collections.OrderedDict([
+        ('n', len(maxima)),
+        ('p90', percentile(maxima, 0.9)),
+        ('peak', max(maxima) if maxima else None),
+    ])
+    record['absences'] = absence_record(series)
+    record['census'] = census_record(census)
+    record['guard'] = guard_record(census)
+    record['verdict'] = verdict_record(record)
+    return record
+
+
+def summary_record(series, census=None, label=None,
+                   census_limit=DEFAULT_CENSUS_LIMIT):
+    """Summarise one job's headroom series and refusal census as a plain dict.
+
+    ``series`` and ``census`` are paths, exactly as the four command line
+    arguments of the same names are, so that phase 2's harvest can point
+    this at two files it has just unpacked from a bundle and get back the
+    same record --json would have written. ``census`` may be None, which is
+    recorded as a census nobody collected rather than as one which found
+    nothing.
+
+    Everything is read once. The printed report is rendered from the record
+    this returns, so nothing downstream re-reads either file.
+    """
+    return build_summary_record(
+        read_series(series), read_census(census, limit=census_limit), label)
+
+
+def write_record(record, path):
+    """Write the record as one JSON object, or say why it could not be.
+
+    Never raises. D15 says nothing this instrument does may fail the job it
+    is measuring, and that has to hold for the output file as much as for
+    the input: a full disk, a directory which does not exist, or a value
+    which will not serialise is a warning on stdout and an exit code of
+    zero. The printed report has already been rendered by the time this
+    runs, so a failure here costs the reader nothing they can see.
+    """
+    try:
+        with open(path, 'w') as f:
+            json.dump(record, f, indent=2)
+            f.write('\n')
+    except (OSError, TypeError, ValueError) as e:
+        print('WARNING: the summary record could not be written to %s: %s'
+              % (path, e))
+        print('The report above is unaffected, and this is not an error: an')
+        print('instrument which can fail the job it measures changes what it')
+        print('is measuring (D15).')
+
+
 def plural(count, singular, plural_form=None):
     return singular if count == 1 else (plural_form or singular + 's')
 
@@ -934,19 +1477,20 @@ def fmt_fraction(value):
     return '%.3f' % value
 
 
-def fmt_ledger(values):
+def fmt_ledger_range(low, high):
     """Render a ledger which may have moved during the run.
 
     A ledger which changed mid-run is worth seeing rather than averaging:
     the reconciler rewriting a capacity row is exactly the kind of event
-    D7's 12-versus-10 discrepancy might turn out to be made of.
+    D7's 12-versus-10 discrepancy might turn out to be made of. The record
+    carries the two bounds; this renders them as one figure when they agree
+    and as a range when they do not.
     """
-    present = [v for v in values if v is not None]
-    if not present:
+    if low is None:
         return '-'
-    if min(present) == max(present):
-        return fmt(present[0])
-    return '%s-%s' % (fmt(min(present)), fmt(max(present)))
+    if low == high:
+        return fmt(low)
+    return '%s-%s' % (fmt(low), fmt(high))
 
 
 def fmt_time(value):
@@ -983,46 +1527,45 @@ def print_table(headings, rows, indent='  '):
         print(indent + ' '.join(line).rstrip())
 
 
-def print_series_summary(series):
+def print_series_summary(record):
+    series = record['series']
     print_heading('Series')
-    if series.read_error:
-        print('  The series file could not be read: %s' % series.read_error)
+    if series['read_error']:
+        print('  The series file could not be read: %s' % series['read_error'])
         print('  There is no headroom data for this run. This is not the same')
         print('  as a run which used no resources.')
         return
 
-    stamps = [s.sampled_at for s in series.samples if s.sampled_at is not None]
-    print('  File:              %s' % series.path)
+    print('  File:              %s' % series['path'])
     print('  Samples:           %d usable, %d failed (an "error" record), '
           '%d unparseable %s'
-          % (len(series.samples), len(series.failed_samples),
-             series.unparseable_lines,
-             plural(series.unparseable_lines, 'line')))
-    if series.unrecognised_lines:
+          % (series['samples_usable'], series['samples_failed'],
+             series['unparseable_lines'],
+             plural(series['unparseable_lines'], 'line')))
+    if series['unrecognised_lines']:
         print('  Unrecognised:      %d JSON objects carrying neither '
-              '"resources" nor "error"' % series.unrecognised_lines)
-    if stamps:
-        span = max(stamps) - min(stamps)
+              '"resources" nor "error"' % series['unrecognised_lines'])
+    if series['window_start'] is not None:
         print('  Window:            %s to %s (%.0f seconds)'
-              % (fmt_time(min(stamps)), fmt_time(max(stamps)), span))
+              % (fmt_time(series['window_start']),
+                 fmt_time(series['window_end']), series['window_seconds']))
     else:
         print('  Window:            unknown (no usable timestamps)')
 
-    if series.unparseable_lines:
+    if series['unparseable_lines']:
         print('  A line which does not parse is normally the last one: the')
         print('  poller is killed mid-write when a job is cancelled.')
 
-    if series.failed_samples:
-        reasons = collections.Counter(series.failed_samples)
+    if series['samples_failed']:
         print('  Failed samples, by error text:')
-        for text, count in reasons.most_common(5):
+        for text, count in list(series['failed_sample_reasons'].items())[:5]:
             print('    %4d  %s' % (count, text[:90]))
 
-    unreadable = series.ledger_unreadable_samples
+    unreadable = series['ledger_unreadable_samples']
     if unreadable:
         print('  LEDGER UNREADABLE: %d of %d samples had '
               'cpu_committed_row_present false'
-              % (len(unreadable), len(series.samples)))
+              % (unreadable, series['samples_usable']))
         print('    for every node at once. The capacity read returns an empty')
         print('    map for an unreadable table and for an empty one alike, so')
         print('    it means no counter was visible at all.')
@@ -1031,28 +1574,16 @@ def print_series_summary(series):
         print('    below. Memory is unaffected: it comes from node metrics.')
 
 
-def print_ledger_provenance(series):
+def print_ledger_provenance(record):
+    provenance = record['ledger_provenance']
+    from_row = provenance['node_samples_with_row']
+    fallback = provenance['node_samples_fallback']
+    fallback_unreadable = provenance['node_samples_fallback_unreadable']
+    missing = provenance['node_samples_without_ledger']
+    total = provenance['node_samples_total']
+    sole = record['series']['sole_node_without_row_samples']
+
     print_heading('Ledger provenance (D7)')
-    fallback = 0
-    fallback_unreadable = 0
-    from_row = 0
-    missing = 0
-    sole = 0
-    for sample in series.samples:
-        if sample.sole_node_without_row:
-            sole += 1
-        unreadable = sample.ledger_unreadable
-        for node in sample.nodes.values():
-            if node.cpu_ledger is None:
-                missing += 1
-            elif node.cpu_ledger_from_fallback:
-                if unreadable:
-                    fallback_unreadable += 1
-                else:
-                    fallback += 1
-            else:
-                from_row += 1
-    total = fallback + fallback_unreadable + from_row + missing
     print('  Node-samples with a capacity row (cpu_limit):     %d' % from_row)
     print('  Node-samples which fell back to cpu_hard_max:     %d' % fallback)
     print('  Fallbacks inside ledger-unreadable samples:       %d'
@@ -1080,63 +1611,29 @@ def print_ledger_provenance(series):
         print('  not, so the two ledgers can be compared directly here.')
 
 
-def cluster_cpu_fractions(series):
-    """The per-sample committed-over-ledger ratios the verdict is computed from.
-
-    Computed here rather than returned by print_cluster_table so the
-    verdict's one load-bearing input has a name, and so computing it does
-    not require having printed anything first.
-    """
-    fractions = []
-    for sample in series.usable_cpu_samples:
-        fraction = sample.cluster_cpu_fraction
-        if fraction is not None:
-            fractions.append(fraction)
-    return fractions
-
-
-def print_cluster_table(series):
+def print_cluster_table(record):
+    cluster = record['cluster']
     print_heading('Cluster-wide headroom')
-    usable = series.usable_cpu_samples
-    cpu = [s.cluster_committed_cpu for s in usable]
-    cpu_fractions = cluster_cpu_fractions(series)
-    unledgered = sorted({n.node for s in usable for n in s.unledgered_nodes})
-
-    memory_samples = [s for s in series.samples
-                      if s.cluster_committed_memory_mb is not None]
-    memory = [s.cluster_committed_memory_mb for s in memory_samples]
-    memory_fractions = []
-    for sample in memory_samples:
-        ledger = sample.cluster_memory_ledger_mb
-        if ledger:
-            memory_fractions.append(sample.cluster_committed_memory_mb / ledger)
-
-    rows = [
-        [
-            'committed vCPU',
-            str(len(cpu)),
-            fmt(percentile(cpu, 0.9)),
-            fmt(max(cpu) if cpu else None),
-            fmt_ledger([s.cluster_cpu_ledger for s in usable]),
-            fmt_fraction(percentile(cpu_fractions, 0.9)),
-            fmt_fraction(max(cpu_fractions) if cpu_fractions else None),
-        ],
-        [
-            'committed memory (MB)',
-            str(len(memory)),
-            fmt(percentile(memory, 0.9)),
-            fmt(max(memory) if memory else None),
-            fmt_ledger([s.cluster_memory_ledger_mb for s in memory_samples]),
-            fmt_fraction(percentile(memory_fractions, 0.9)),
-            fmt_fraction(max(memory_fractions) if memory_fractions else None),
-        ],
-    ]
+    rows = []
+    for heading, key in (('committed vCPU', 'committed_cpu'),
+                         ('committed memory (MB)', 'committed_memory_mb')):
+        block = cluster[key]
+        rows.append([
+            heading,
+            str(block['n']),
+            fmt(block['p90']),
+            fmt(block['peak']),
+            fmt_ledger_range(block['ledger_min'], block['ledger_max']),
+            fmt_fraction(block['p90_fraction']),
+            fmt_fraction(block['peak_fraction']),
+        ])
     print_table(
         ['', 'n', 'p90', 'peak', 'ledger', 'p90 frac', 'peak frac'], rows)
     print('  Fractions are computed per sample and then percentiled, so each')
     print('  one is a ratio something actually stood at. Both sides of the CPU')
     print('  fraction are summed over the nodes which have a ledger, so it')
     print('  cannot exceed 1.0 because a node was missing one.')
+    unledgered = cluster['nodes_without_cpu_ledger']
     if unledgered:
         print('  %d %s committed vCPU but no ledger, so %s excluded from the'
               % (len(unledgered),
@@ -1147,65 +1644,28 @@ def print_cluster_table(series):
             print('    %s' % node)
 
 
-def print_per_node_tables(series):
+def print_per_node_tables(record):
+    """The per-node tables, in the node order the record carries.
+
+    This is the section D21 was argued from: a cluster-wide fraction inside
+    the band, above one node's row reading 1.000 for the whole run.
+    """
     cpu_rows = []
     memory_rows = []
-    usable = series.usable_cpu_samples
-
-    nodes = []
-    for sample in series.samples:
-        for node in sample.nodes:
-            if node not in nodes:
-                nodes.append(node)
-    nodes.sort()
-
-    no_memory_ledger = 0
-    for node in nodes:
-        cpu = []
-        cpu_fractions = []
-        cpu_ledgers = []
-        for sample in usable:
-            entry = sample.nodes.get(node)
-            if entry is None:
+    for node, blocks in record['per_node'].items():
+        for key, rows in (('committed_cpu', cpu_rows),
+                          ('committed_memory_mb', memory_rows)):
+            block = blocks[key]
+            if not block['n']:
                 continue
-            cpu.append(entry.committed_cpu)
-            cpu_ledgers.append(entry.cpu_ledger)
-            if entry.cpu_fraction is not None:
-                cpu_fractions.append(entry.cpu_fraction)
-        if cpu:
-            cpu_rows.append([
+            rows.append([
                 node,
-                str(len(cpu)),
-                fmt(percentile(cpu, 0.9)),
-                fmt(max(cpu)),
-                fmt_ledger(cpu_ledgers),
-                fmt_fraction(percentile(cpu_fractions, 0.9)),
-                fmt_fraction(max(cpu_fractions) if cpu_fractions else None),
-            ])
-
-        memory = []
-        memory_fractions = []
-        memory_ledgers = []
-        for sample in series.samples:
-            entry = sample.nodes.get(node)
-            if entry is None:
-                continue
-            if entry.memory_ledger_mb is None:
-                no_memory_ledger += 1
-                continue
-            memory.append(entry.committed_memory_mb)
-            memory_ledgers.append(entry.memory_ledger_mb)
-            if entry.memory_fraction is not None:
-                memory_fractions.append(entry.memory_fraction)
-        if memory:
-            memory_rows.append([
-                node,
-                str(len(memory)),
-                fmt(percentile(memory, 0.9)),
-                fmt(max(memory)),
-                fmt_ledger(memory_ledgers),
-                fmt_fraction(percentile(memory_fractions, 0.9)),
-                fmt_fraction(max(memory_fractions) if memory_fractions else None),
+                str(block['n']),
+                fmt(block['p90']),
+                fmt(block['peak']),
+                fmt_ledger_range(block['ledger_min'], block['ledger_max']),
+                fmt_fraction(block['p90_fraction']),
+                fmt_fraction(block['peak_fraction']),
             ])
 
     headings = ['node', 'n', 'p90', 'peak', 'ledger', 'p90 frac', 'peak frac']
@@ -1213,31 +1673,28 @@ def print_per_node_tables(series):
     print_table(headings, cpu_rows)
     print_heading('Committed memory (MB), per node')
     print_table(headings, memory_rows)
+    no_memory_ledger = record['ledger_provenance'][
+        'node_samples_without_memory_ledger']
     if no_memory_ledger:
         print('  %d node-samples published no ram_max and therefore have no'
               % no_memory_ledger)
         print('  memory ledger. They are counted here and divided by nowhere.')
 
 
-def print_absences(series):
+def print_absences(record):
+    absences = record['absences']
     print_heading('Nodes absent from per_node')
-    counts = collections.Counter()
-    by_class = collections.defaultdict(set)
-    for sample in series.samples:
-        for label, classification in sample.absences():
-            counts[classification] += 1
-            by_class[classification].add(label)
-
-    if not counts:
+    classifications = absences['classifications']
+    if not classifications:
         print('  Every node in every roster appeared in that sample per_node.')
     else:
         rows = []
-        for classification, count in counts.most_common():
-            nodes = sorted(by_class[classification])
+        for classification, entry in classifications.items():
+            nodes = entry['nodes']
             shown = ', '.join(nodes[:3])
             if len(nodes) > 3:
                 shown += ', ... (%d nodes)' % len(nodes)
-            rows.append([classification, str(count), shown])
+            rows.append([classification, str(entry['node_samples']), shown])
         print_table(['classification', 'node-samples', 'nodes'], rows)
         print('  summarize_resources() omits a node which is not a hypervisor,')
         print('  whose metrics are over 120s old, or whose queue is over')
@@ -1245,83 +1702,87 @@ def print_absences(series):
         print('  first is answerable from the roster, so the rest are reported')
         print('  as unexplained rather than dropped.')
 
-    seen = [len(s.nodes) for s in series.samples]
-    if seen:
+    if absences['samples']:
         print('  Nodes visible in per_node: %d at fewest, %d at most, across '
-              '%d samples.' % (min(seen), max(seen), len(seen)))
+              '%d samples.' % (absences['nodes_visible_min'],
+                               absences['nodes_visible_max'],
+                               absences['samples']))
         print('  That is what the samples could see, which is not the same as')
         print('  how many hypervisors the cluster had.')
 
 
-def print_census(census):
+def print_census(record):
+    census = record['census']
     print_heading('Refusal census')
-    if census.status == 'not requested':
+    if census['state'] == 'not requested':
         print('  NO CENSUS WAS SUPPLIED (--census was not given).')
         print('  This is not "no refusals": nothing was looked at. A run whose')
         print('  refusals were never collected and a run which refused nothing')
         print('  are different findings, and this is the first.')
         return
-    if not census.available:
-        print('  NO CENSUS IS AVAILABLE: %s (%s)' % (census.status, census.detail))
-        print('  File: %s' % census.path)
+    if not census['available']:
+        print('  NO CENSUS IS AVAILABLE: %s (%s)'
+              % (census['state'], census['detail']))
+        print('  File: %s' % census['path'])
         print('  Read this as "unknown", never as zero refusals. The census')
         print('  depends on the log shipping path being healthy (D11), so a')
         print('  broken shipper looks exactly like a cluster with room to')
         print('  spare unless the difference is said out loud.')
         return
 
-    print('  File:              %s' % census.path)
+    print('  File:              %s' % census['path'])
     print('  Log records read:  %d (%d were schedule stage events, '
           '%d were capacity guard events, %d %s unparseable)'
-          % (census.records, census.matched, census.guard_matched,
-             census.unparseable_lines,
-             plural(census.unparseable_lines, 'line')))
-    if census.truncated:
+          % (census['records'], census['stage_events'], census['guard_events'],
+             census['unparseable_lines'],
+             plural(census['unparseable_lines'], 'line')))
+    if census['truncated']:
         print('  CENSUS MAY BE TRUNCATED: the query returned %d entries and was'
-              % census.records)
+              % census['records'])
         print('  allowed %d. Loki gives no signal that it cut a response short,'
-              % census.limit)
+              % census['limit'])
         print('  so treat every count below as a LOWER BOUND. An undercounted')
         print('  census reads as a cluster with room, which is backwards.')
 
-    if not census.stages:
+    stages = census['stages']
+    if not stages:
         print('  No schedule stage events at all. Either nothing was scheduled')
         print('  in the census window, or the query did not match. Both are')
         print('  worth checking before reading this as an idle cluster.')
         return
 
     rows = []
-    for stage, tally in sorted(census.stages.items(),
-                               key=lambda kv: (-kv[1].dropped, kv[0])):
+    for stage, tally in sorted(stages.items(),
+                               key=lambda kv: (-kv[1]['dropped'], kv[0])):
         note = CAPACITY_STAGE_NOTES.get(stage)
         if note is None:
             note = 'not a stage this report knows; counted anyway'
         rows.append([
-            stage, str(tally.events), str(tally.aborts), str(tally.dropped),
-            note])
+            stage, str(tally['events']), str(tally['aborts']),
+            str(tally['dropped']), note])
     print_table(['stage', 'events', 'aborts', 'dropped', 'kind'], rows)
     print('  Tallied by the stage string observed in the events, never by a')
     print('  list held here (D10), so a stage added or renamed in the')
     print('  scheduler still appears above.')
 
-    missing = [name for name in CAPACITY_STAGE_NOTES if name not in census.stages]
+    missing = [name for name in CAPACITY_STAGE_NOTES if name not in stages]
     if missing:
         print('  Capacity stages not observed at all in this census: %s'
               % ', '.join(missing))
 
     print()
     print('  Drop reasons, by stage:')
-    for stage, tally in sorted(census.stages.items()):
-        if not tally.reasons:
+    for stage, tally in sorted(stages.items(), key=lambda kv: kv[0]):
+        if not tally['reasons']:
             continue
         print('    %s:' % stage)
-        for reason, count in tally.reasons.most_common():
+        for reason, count in tally['reasons'].items():
             flag = ''
             if reason == MISSING_DATA_REASON:
                 flag = '   <-- MISSING DATA, not a shortage'
             print('      %5d  %s%s' % (count, reason, flag))
 
-    missing_data = census.missing_data_drops
+    missing_data = census['missing_data_drops']
     if missing_data:
         print()
         print('  %d %s carried the reason %r.'
@@ -1332,7 +1793,7 @@ def print_census(census):
         print('  would read a stale metrics row as evidence the cloud is small.')
 
 
-def print_guard_census(census):
+def print_guard_census(record):
     """The capacity guard's refusals, under their own heading.
 
     Deliberately a separate section from the stage census above rather
@@ -1342,18 +1803,20 @@ def print_guard_census(census):
     and a hundred of the second, and that run is exactly the one this
     section exists to make visible.
     """
-    guard = census.guard
+    census = record['census']
+    guard = record['guard']
     print_heading('Capacity guard census')
-    if census.status == 'not requested':
+    if guard['state'] == 'no_census':
         print('  NO CENSUS WAS SUPPLIED (--census was not given), so nothing is')
         print('  known about what the capacity guard did. Not zero refusals.')
         return
-    if not census.available:
-        print('  NO CENSUS IS AVAILABLE: %s (%s)' % (census.status, census.detail))
+    if guard['state'] == 'census_unavailable':
+        print('  NO CENSUS IS AVAILABLE: %s (%s)'
+              % (census['state'], census['detail']))
         print('  Read as "unknown", never as zero guard refusals.')
         return
 
-    if not guard.observed:
+    if guard['state'] == 'not_collected':
         print('  NO CAPACITY GUARD EVENTS IN THIS CENSUS.')
         print('  Read that as a fact about the query before reading it as a')
         print('  fact about the cluster: the census is collected with a LogQL')
@@ -1363,35 +1826,36 @@ def print_guard_census(census):
         print('  %r' % GUARD_DENIED_MESSAGE)
         print('  and %r' % CLAIM_OVER_LIMIT_MESSAGE)
         print('  for this section to mean anything at all.')
-        if census.matched:
+        if census['stage_events']:
             print('  This census DID carry %d schedule stage %s, so the log'
-                  % (census.matched, plural(census.matched, 'event')))
+                  % (census['stage_events'],
+                     plural(census['stage_events'], 'event')))
             print('  shipping path was healthy and the filter is the difference.')
         return
 
-    print('  Placements refused by the guard: %d' % guard.denials)
-    if guard.unenforced:
+    print('  Placements refused by the guard: %d' % guard['denials'])
+    if guard['unenforced']:
         print('  %d of those had enforce=false: a ground-truth writer (the'
-              % guard.unenforced)
+              % guard['unenforced'])
         print('  cleaner, or startup reconciliation) recording where a domain')
         print('  already is. Those refuse nothing a user asked for.')
-    if guard.malformed:
+    if guard['malformed']:
         print('  %d %s carried no usable dimensions list and %s counted here'
-              % (guard.malformed, plural(guard.malformed, 'event'),
-                 plural(guard.malformed, 'is', 'are')))
+              % (guard['malformed'], plural(guard['malformed'], 'event'),
+                 plural(guard['malformed'], 'is', 'are')))
         print('  but explain nothing. That is an event shape this tool does')
         print('  not understand, not a cluster fact.')
-    if guard.empty_dimensions:
+    if guard['empty_dimensions']:
         print('  %d %s carried a readable but EMPTY dimensions list, which is'
-              % (guard.empty_dimensions,
-                 plural(guard.empty_dimensions, 'event')))
+              % (guard['empty_dimensions'],
+                 plural(guard['empty_dimensions'], 'event')))
         print('  a guard which refused without saying against what. Counted')
         print('  apart from the malformed events above, whose shape this tool')
         print('  could not read at all.')
 
-    if guard.stages:
+    if guard['stages']:
         rows = []
-        for stage, count in sorted(guard.stages.items(),
+        for stage, count in sorted(guard['stages'].items(),
                                    key=lambda kv: (-kv[1], kv[0])):
             if stage == UNKNOWN_STAGE:
                 note = 'the event carried no failing_stage'
@@ -1403,9 +1867,9 @@ def print_guard_census(census):
         print('  Refusals by failing stage:')
         print_table(['stage', 'refusals', 'what it guards'], rows, indent='    ')
 
-    if guard.exceeded or guard.nothing_exceeded:
+    if guard['exceeded'] or guard['nothing_exceeded']:
         rows = []
-        for dimension, count in sorted(guard.exceeded.items(),
+        for dimension, count in sorted(guard['exceeded'].items(),
                                        key=lambda kv: (-kv[1], kv[0])):
             if dimension == UNKNOWN_DIMENSION:
                 note = 'the event named no dimension'
@@ -1414,9 +1878,9 @@ def print_guard_census(census):
                     dimension,
                     'not a dimension this report knows; counted anyway')
             rows.append([dimension, str(count),
-                         str(guard.sole_exceedance.get(dimension, 0)), note])
-        if guard.nothing_exceeded:
-            rows.append([NO_DIMENSIONS, str(guard.nothing_exceeded), '0',
+                         str(guard['sole_exceedance'].get(dimension, 0)), note])
+        if guard['nothing_exceeded']:
+            rows.append([NO_DIMENSIONS, str(guard['nothing_exceeded']), '0',
                          'the guard refused and marked nothing exceeded'])
         print()
         print('  Refusals by exceeded dimension. A refusal exceeding two')
@@ -1426,49 +1890,50 @@ def print_guard_census(census):
         print_table(['dimension', 'refusals', 'alone', 'what it is'], rows,
                     indent='    ')
 
-    if len(guard.stages) > 1:
+    if len(guard['stages']) > 1:
         print()
         print('  Exceeded dimensions by stage:')
-        for stage in sorted(guard.stage_dimensions):
-            names = guard.stage_dimensions[stage]
+        for stage in sorted(guard['stage_dimensions']):
+            names = guard['stage_dimensions'][stage]
             print('    %s: %s' % (stage, ', '.join(
                 '%s x%d' % (name, count)
                 for name, count in sorted(names.items(),
                                           key=lambda kv: (-kv[1], kv[0])))))
 
-    demand_total = (guard.demand_measured_alone + guard.demand_estimate_tipped
-                    + guard.demand_unsplit)
+    demand_total = (guard['demand_measured_alone']
+                    + guard['demand_estimate_tipped'] + guard['demand_unsplit'])
     if demand_total:
         print()
         print('  Of the %d %s exceeding the demand dimension:'
               % (demand_total, plural(demand_total, 'refusal')))
         print('    %5d  measured CPU load alone was already over the limit'
-              % guard.demand_measured_alone)
+              % guard['demand_measured_alone'])
         print('    %5d  the D13 feedforward estimate is what carried it over'
-              % guard.demand_estimate_tipped)
-        if guard.demand_unsplit:
+              % guard['demand_estimate_tipped'])
+        if guard['demand_unsplit']:
             print('    %5d  no cpu_load_1 / expected_demand split recorded'
-                  % guard.demand_unsplit)
+                  % guard['demand_unsplit'])
         print('  Demand is not an allocation, so a refusal here is a rate')
         print('  prediction rather than a cloud which ran out of room, and the')
         print('  second line is an estimator finding rather than a sizing one.')
 
-    if guard.shortfalls:
+    if guard['shortfalls']:
         print()
         print('  Worst shortfall seen per dimension among these REFUSALS, as')
         print('  the event reported it. The server computes it where the guard')
         print('  made the comparison, floored at zero, so nothing here')
         print('  recomputes it and no two readers can disagree about its sign:')
-        for dimension in sorted(guard.shortfalls):
-            print('    %-12s %s' % (dimension, fmt(guard.shortfalls[dimension], 3)))
-    elif guard.denials:
+        for dimension in sorted(guard['shortfalls']):
+            print('    %-12s %s'
+                  % (dimension, fmt(guard['shortfalls'][dimension], 3)))
+    elif guard['denials']:
         print()
         print('  No refused dimension carried a shortfall field. That is a')
         print('  series written by a build predating it, not a shortfall of')
         print('  zero; the three numbers it is derived from are in the events.')
 
-    for unrecognised, what in ((guard.unrecognised_stages, 'stage'),
-                               (guard.unrecognised_dimensions, 'dimension')):
+    for unrecognised, what in ((guard['unrecognised_stages'], 'stage'),
+                               (guard['unrecognised_dimensions'], 'dimension')):
         if unrecognised:
             print()
             print('  Counted but unrecognised %s: %s'
@@ -1476,8 +1941,8 @@ def print_guard_census(census):
                      ', '.join(unrecognised)))
 
     print()
-    print('  Claim exceedances (ADMITTED, never refused): %d' % guard.claims)
-    if not guard.claims:
+    print('  Claim exceedances (ADMITTED, never refused): %d' % guard['claims'])
+    if not guard['claims']:
         print('    No placement drew a namespace past a capacity claim, or no')
         print('    namespace in this cluster has one.')
         return
@@ -1486,48 +1951,52 @@ def print_guard_census(census):
     print('    system doing what the operator asked. It is the signal a')
     print('    declared footprint needs revising (D9), and it is never added')
     print('    to the refusal count above.')
-    if guard.claim_malformed:
+    if guard['claim_malformed']:
         print('    %d carried no usable claim_dimensions list.'
-              % guard.claim_malformed)
+              % guard['claim_malformed'])
     rows = [[namespace, str(count)]
-            for namespace, count in guard.claim_namespaces.most_common()]
+            for namespace, count in guard['claim_namespaces'].items()]
     print_table(['namespace', 'admitted over claim'], rows, indent='    ')
-    if guard.claim_exceeded:
+    if guard['claim_exceeded']:
         print('    Claim dimensions exceeded: %s' % ', '.join(
             '%s x%d' % (name, count)
-            for name, count in sorted(guard.claim_exceeded.items(),
+            for name, count in sorted(guard['claim_exceeded'].items(),
                                       key=lambda kv: (-kv[1], kv[0]))))
-    if guard.claim_shortfalls:
+    if guard['claim_shortfalls']:
         print('    Worst amount over the claim, per dimension, as the event')
         print('    reported it. This is how far past a declared footprint a')
         print('    namespace went on an ADMITTED placement, and it is not the')
         print('    refusal shortfall above:')
-        for dimension in sorted(guard.claim_shortfalls):
+        for dimension in sorted(guard['claim_shortfalls']):
             print('      %-12s %s'
-                  % (dimension, fmt(guard.claim_shortfalls[dimension], 3)))
+                  % (dimension, fmt(guard['claim_shortfalls'][dimension], 3)))
 
 
-def print_verdict(cpu_fractions, census, series):
+def print_verdict(record):
+    census = record['census']
+    guard = record['guard']
+    verdict = record['verdict']
     print_heading('D3 band verdict (PROVISIONAL bounds %.2f / %.2f)'
                   % (BAND_LOWER, BAND_UPPER))
-    ratio = percentile(cpu_fractions, 0.9)
+    ratio = verdict['p90_cpu_fraction']
     if ratio is None:
         print('  NO VERDICT: no sample produced a committed-vCPU-over-ledger')
         print('  ratio. With %d samples read and %d of them ledger-unreadable,'
-              % (len(series.samples), len(series.ledger_unreadable_samples)))
+              % (record['series']['samples_usable'],
+                 record['series']['ledger_unreadable_samples']))
         print('  there is nothing to compare against the band.')
     else:
         print('  p90 committed vCPU / ledger, cluster wide: %s'
               % fmt_fraction(ratio))
-        if ratio < BAND_LOWER:
-            verdict = ('OVERSIZED -- below the provisional lower bound of %.2f'
-                       % BAND_LOWER)
-        elif ratio > BAND_UPPER:
-            verdict = ('OVERSUBSCRIBED -- above the provisional upper bound of '
-                       '%.2f' % BAND_UPPER)
+        if verdict['band'] == 'OVERSIZED':
+            text = ('OVERSIZED -- below the provisional lower bound of %.2f'
+                    % BAND_LOWER)
+        elif verdict['band'] == 'OVERSUBSCRIBED':
+            text = ('OVERSUBSCRIBED -- above the provisional upper bound of '
+                    '%.2f' % BAND_UPPER)
         else:
-            verdict = 'WITHIN BAND'
-        print('  Verdict: %s' % verdict)
+            text = 'WITHIN BAND'
+        print('  Verdict: %s' % text)
 
     print('  These bounds are PROVISIONAL. Phase 0 set them without any')
     print('  distribution to check them against, and phase 2 replaces them or')
@@ -1535,30 +2004,30 @@ def print_verdict(cpu_fractions, census, series):
     print('  and prints the band, and phase 5 owns turning it into a guardrail.')
 
     print()
-    if not census.available:
+    if verdict['refusal_warning'] is None:
         print('  Refusal warning: UNKNOWN. Per D3 any capacity-stage refusal is')
         print('  a warning on its own, independent of the ratio above -- but no')
         print('  census was read, so that half of the verdict is missing.')
         return
-    shortage = census.capacity_shortage_drops
-    if shortage:
+    shortage = census['capacity_shortage_drops']
+    if verdict['refusal_warning']:
         print('  Refusal warning: YES. %d candidate %s at a capacity stage.'
               % (shortage, plural(shortage, 'drop')))
         print('  Per D3 that is a warning in its own right, whatever the ratio')
         print('  says: a poll every fifteen seconds cannot see a refusal, which')
         print('  begins and ends between samples.')
-        if census.disk_bandwidth_drops:
+        if census['disk_bandwidth_drops']:
             print('  %d of them are at sufficient_idle_disk, which is disk'
-                  % census.disk_bandwidth_drops)
+                  % census['disk_bandwidth_drops'])
             print('  BANDWIDTH -- a rate predicate no amount of extra hardware')
             print('  in the same shape would fix. Do not read those as a case')
             print('  for a bigger cloud.')
     else:
         print('  Refusal warning: no capacity-stage drops in the census window.')
-    if census.unclassified_shortage_drops:
+    if census['unclassified_shortage_drops']:
         print('  %d further %s at stages this report does not classify (see the'
-              % (census.unclassified_shortage_drops,
-                 plural(census.unclassified_shortage_drops, 'drop')))
+              % (census['unclassified_shortage_drops'],
+                 plural(census['unclassified_shortage_drops'], 'drop')))
         print('  census table above). They are not counted in the warning')
         print('  either way, because nothing here knows whether they are')
         print('  capacity stages -- a scheduler stage added since this tool')
@@ -1568,17 +2037,16 @@ def print_verdict(cpu_fractions, census, series):
     # node removed from a list, a guard refusal is a create which did not
     # happen. A run with zero of the first and many of the second is the
     # #3772 shape, and it is the reading this line exists to prevent.
-    guard = census.guard
-    if not guard.observed:
+    if guard['state'] != 'collected':
         print('  Guard refusals: NOT COLLECTED in this census (see the capacity')
         print('  guard section). Unknown, not zero.')
-    elif guard.denials:
+    elif guard['denials']:
         print('  Guard refusals: YES. The ledger refused %d %s, of which %d'
-              % (guard.denials, plural(guard.denials, 'placement'),
-                 guard.denials - guard.unenforced))
+              % (guard['denials'], plural(guard['denials'], 'placement'),
+                 guard['denials'] - guard['unenforced']))
         print('  refused something a caller asked for. Whatever the ratio above')
         print('  says, a refused placement is a create which did not happen.')
-        sole_demand = guard.sole_exceedance.get('demand', 0)
+        sole_demand = guard['sole_exceedance'].get('demand', 0)
         if sole_demand:
             print('  %d of them %s refused on the demand dimension ALONE, with'
                   % (sole_demand, plural(sole_demand, 'was', 'were')))
@@ -1586,45 +2054,59 @@ def print_verdict(cpu_fractions, census, series):
             print('  cloud which ran out of room; see the split above.')
     else:
         print('  Guard refusals: none in the census window.')
-    if guard.claims:
+    if guard['state'] == 'collected' and guard['claims']:
         print('  %d %s admitted OVER a namespace capacity claim. Advisory mode'
-              % (guard.claims, plural(guard.claims, 'placement was',
-                                      'placements were')))
+              % (guard['claims'], plural(guard['claims'], 'placement was',
+                                         'placements were')))
         print('  did what the operator asked; this is calibration data, not a')
         print('  failure, and it is no part of the refusal counts above.')
 
-    if census.truncated:
+    if census['truncated']:
         print('  The census may have been truncated, so every count above is a')
         print('  lower bound. Absence of a warning is not evidence of absence.')
 
 
-def report(args):
+def print_report(record):
+    """Render the whole report from the record, and nothing but the record.
+
+    Every figure printed here is read out of the dict rather than computed,
+    so the job log and the --json file cannot disagree (D18). The sections
+    which are not printed for an empty series are skipped on the record's
+    own sample count for the same reason.
+    """
     title = 'Shaken Fist CI headroom report'
     print(title)
     print('=' * len(title))
-    if args.label:
-        print('Label:  %s' % args.label)
+    if record['label']:
+        print('Label:  %s' % record['label'])
 
-    series = read_series(args.series)
-    census = read_census(args.census, limit=args.census_limit)
-
-    print_series_summary(series)
-    if series.samples:
-        print_ledger_provenance(series)
-        print_cluster_table(series)
-        cpu_fractions = cluster_cpu_fractions(series)
-        print_per_node_tables(series)
-        print_absences(series)
+    print_series_summary(record)
+    if record['series']['samples_usable']:
+        print_ledger_provenance(record)
+        print_cluster_table(record)
+        print_per_node_tables(record)
+        print_absences(record)
     else:
-        cpu_fractions = []
         print()
         print('  No usable samples, so there is no headroom to report. That is')
         print('  a fact about the instrument, not about the cluster.')
 
-    print_census(census)
-    print_guard_census(census)
-    print_verdict(cpu_fractions, census, series)
+    print_census(record)
+    print_guard_census(record)
+    print_verdict(record)
     print()
+
+
+def report(args):
+    record = summary_record(args.series, census=args.census, label=args.label,
+                            census_limit=args.census_limit)
+    print_report(record)
+    if args.json:
+        # Deliberately silent on success. The printed report must read
+        # identically whether or not a summary record was also written, so
+        # that a reader comparing a job log from before --json was wired up
+        # against one from after sees no difference at all.
+        write_record(record, args.json)
 
 
 def main(argv=None):
@@ -1646,7 +2128,16 @@ def main(argv=None):
         '--label', default=None,
         help='A label for the run, printed at the top (typically the topology).')
     parser.add_argument(
-        '--census-limit', type=int, default=5000,
+        '--json', default=None,
+        help=('Write the machine-readable summary record to this path, as one '
+              'JSON object (D18). The printed report above is rendered from '
+              'the same record, so the two cannot disagree; phase 2\'s '
+              'harvest and phase 5\'s guardrail read this rather than parsing '
+              'the prose. A path which cannot be written is a warning, never '
+              'an error: nothing this instrument does may fail the job it is '
+              'measuring (D15).'))
+    parser.add_argument(
+        '--census-limit', type=int, default=DEFAULT_CENSUS_LIMIT,
         help=('The entry limit the census query was issued with. A response '
               'holding exactly this many entries is reported as possibly '
               'truncated, because Loki gives no other signal that it cut one '

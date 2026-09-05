@@ -396,9 +396,26 @@ check the arithmetic instead of trusting it -- and the bundles it
 came from expire in 90 days.
 
 **Size constraint:** the dataset is the per-job summary records, not
-the raw series. Roughly 400 records of a few hundred bytes each is
-a file of low hundreds of kilobytes, which is reasonable to commit.
-The raw series stays in the bundles and is not committed.
+the raw series. The raw series stays in the bundles and is not
+committed.
+
+**Corrected after this plan was committed.** This paragraph
+originally guessed "a few hundred bytes each... low hundreds of
+kilobytes". A real record, measured by running the step 2b tool
+over a real bundle from merge run 33944911413, is **3,675 bytes
+compact and 5,381 indented** -- an order of magnitude out. With
+D17's corrected job count that is 66 runs x 4 jobs x 3.7 KB, or
+roughly 950 KB compact and 1.4 MB indented, and the window grows
+with every merge run before step 2d executes.
+
+So: the harvest output is serialised **compact**
+(`separators=(',', ':')`), one record per line, and the budget is
+**2 MB** rather than the one megabyte the definition of done
+originally demanded. If it exceeds that, prune before relaxing it
+again -- the bulk is `absences.classifications[].nodes` and the
+guard block, and the node lists are the part a re-analysis is least
+likely to need. A single job's `--json` output keeps `indent=2`,
+because that one is read by a human.
 
 ## Step plan
 
@@ -480,7 +497,10 @@ Falsifiable, in order:
    than raising.
 5. `docs/plans/data/ci-cloud-sizing-baseline/` holds the harvested
    records and a README naming the window, the tool, and the
-   command that reproduces it. The directory is under one megabyte.
+   command that reproduces it. The records are serialised compact,
+   one per line, and the directory is under **2 MB** -- a bound
+   corrected from one megabyte once a real record was measured at
+   3.7 KB rather than the few hundred bytes D22 originally guessed.
 6. Every figure in the master plan's *Situation* section is
    traceable to a record in that dataset or to a cited issue. No
    figure in it is described as hand-collected.
