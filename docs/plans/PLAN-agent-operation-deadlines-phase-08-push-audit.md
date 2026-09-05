@@ -410,6 +410,267 @@ them.
 * `docs/plans/index.md` reads `9 of 9` and `Complete` for this plan,
   and no phase in the Execution table reads `In progress`.
 
+## Findings
+
+### Wave 1
+
+Run in worktree `/srv/kasm_profiles/mikal/vscode/src/shakenfist/shakenfist-wt-aod-08`,
+branch `agent-operation-deadlines-phase-08-push-audit`, working tree clean at
+`1d4c9972a` (the step 8a commit) throughout.
+
+#### pre-commit
+
+Command: `pre-commit run --all-files`
+
+```
+Lint GitHub Actions workflows............................................Passed
+Lint Ansible playbooks...................................................Passed
+Style check with flake8..................................................Passed
+Run unit tests...........................................................Passed
+Check from_db_by_ref namespace scoping...................................Passed
+Check endpoints authenticate by default..................................Passed
+Check API parameter locations are derivable..............................Passed
+Check documentation links and anchors resolve............................Passed
+Check plan statuses and index arithmetic agree...........................Passed
+Type check with mypy.....................................................Passed
+```
+
+All ten hooks passed, including the unit-test and mypy hooks. No decision-5
+fallback was needed: there is nothing to check against this plan's file list
+because nothing failed.
+
+#### tox
+
+Command: `tox` (bare invocation; `tox.ini`'s `envlist = py3,flake8,cover`, so
+this ran exactly those three environments — `genprotos` is not in the default
+list and was run separately below).
+
+```
+py3: OK (138.36=setup[7.35]+cmd[0.34,130.12,0.55] seconds)
+flake8: OK (21.32=setup[21.32]+cmd[0.00] seconds)
+cover: OK (87.19=setup[20.47]+cmd[0.06,59.52,0.30,4.99,1.85] seconds)
+congratulations :) (246.93 seconds)
+```
+
+`cover`'s tail:
+```
+-----------------------------------------------------------------------------------------------
+TOTAL                                                         37492  15148   8864    919    59%
+```
+
+Total wall time 246.93s, comfortably inside a 10-minute budget. `py3` output
+contained a large volume of expected `WARNING:shakenfist.external_api.app:
+Failed to resolve node UUID in API worker` and `TypeError: Object of type UUID
+is not JSON serializable` traceback noise from tests that deliberately drive
+API error paths (visible mid-run in the streamed output); none of it
+correlated with a test outcome other than `ok`. All three environments
+reported `OK`; no failure to check against decision 5.
+
+#### Proto freshness
+
+`protos/database.proto` is in the baseline (phases 1 and 2 add the
+`deadline`/`progress_timeout` fields and the `fields` mask on
+`UpdateAgentOperationAttributesRequest`), so per the plan this was checked
+explicitly.
+
+Command: `tox -e genprotos` (run only after `tox` above finished, to avoid a
+concurrent regeneration of checked-in files racing the `py3` test run against
+the same tree).
+
+```
+  genprotos: OK (23.31=setup[22.98]+cmd[0.33] seconds)
+  congratulations :) (23.36 seconds)
+```
+
+Then: `git diff --exit-code shakenfist/protos` → exit code `0` (no output).
+`git status --short` immediately after was also empty.
+
+**Result: the checked-in stubs are fresh.** `shakenfist/protos/database_pb2.py`
+and `.pyi` (and every other generated file) exactly match what
+`tox -e genprotos` produces from the current `.proto` sources and Python enum
+definitions. No revert was needed since nothing changed.
+
+#### Style greps
+
+Run against each of the twelve merges as `git diff M^1 M -- '*.py' | grep ...`
+(the pushdown grep additionally piped through `grep -v '# nopushdown:'`).
+`shakenfist/protos/database_pb2.py` and `shakenfist/protos/database_pb2.pyi`
+were excluded from the long-line grep only (via `':!shakenfist/protos/database_pb2.py' ':!shakenfist/protos/database_pb2.pyi'`
+pathspecs), since they are generated and their long lines are not findings;
+the other three greps only ever look for specific tokens (`print(`, `etcd`,
+`mariadb.get_all_*(`) that generated protobuf code does not contain, so no
+exclusion was needed for those.
+
+Merges checked: `87bbffcf4 f21d5da3a cb9e10bba 08807c83f 291054e98 185de6b32
+4afa29476 864608276 4a122bcd3 2341ae0c4 2e19bb1ea 91d565a05`.
+
+**Lines over 120 characters (excluding generated protos).** Without the
+exclusion, exactly one hit appeared in each of `f21d5da3a` and `cb9e10bba`
+(1 each); verified with a small Python check that both are the single
+`DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(...)` line in
+`shakenfist/protos/database_pb2.py`:
+
+```
+f21d5da3a 1 {'b/shakenfist/protos/database_pb2.py'}
+cb9e10bba 1 {'b/shakenfist/protos/database_pb2.py'}
+```
+
+With the generated-file exclusion applied, all twelve merges returned empty.
+**Result: no over-120-character lines in non-generated Python across the
+baseline.**
+
+**Stray `print(`.** All twelve merges returned empty. **Nothing found.**
+
+**New `etcd` references.** All twelve merges returned empty. **Nothing
+found** — expected, since this codebase's MariaDB migration long predates
+this plan.
+
+**Pushdown violations (`mariadb.get_all_[a-z_]+(` untagged with
+`# nopushdown:`).** All twelve merges returned empty:
+
+```
+=== 87bbffcf4 === (empty)
+=== f21d5da3a === (empty)
+=== cb9e10bba === (empty)
+=== 08807c83f === (empty)
+=== 291054e98 === (empty)
+=== 185de6b32 === (empty)
+=== 4afa29476 === (empty)
+=== 864608276 === (empty)
+=== 4a122bcd3 === (empty)
+=== 2341ae0c4 === (empty)
+=== 2e19bb1ea === (empty)
+=== 91d565a05 === (empty)
+```
+
+**F6's pushdown claim is CONFIRMED**, not assumed: the grep was actually run
+against every one of the twelve merges (not just spot-checked), and every
+one came back empty. No new-bulk-scan pushdown violation exists anywhere in
+this plan's footprint.
+
+#### Style conformance (judgment)
+
+Examined the non-generated Python touched by all twelve merges (file lists
+obtained via `git diff --name-only M^1 M -- '*.py' ':!shakenfist/protos/database_pb2.py' ':!shakenfist/protos/database_pb2.pyi'`
+per merge; `87bbffcf4` touches no Python).
+
+**Import ordering / all-imports-at-top.** `git diff M^1 M -- '*.py' | grep -nE
+'^\+\s+(import |from .* import )'` (indented import lines = late imports)
+returned empty across all eleven code-bearing merges. Spot-checked the added
+top-level imports in `shakenfist/external_api/base.py` (`08807c83f`):
+`math` and `time` were inserted alphabetically into the existing stdlib
+block (`copy, functools, json, math, re, sys, time, traceback`), correctly
+ahead of the `typing` imports and the `shakenfist.*` block. Test-file imports
+(e.g. `shakenfist.tests.test_mariadb_agent_operations.py` in `cb9e10bba`)
+consistently group stdlib (`os`, `unittest`, `uuid`), then third-party
+(`sqlalchemy`), then `shakenfist.*`. **Nothing found** — no late imports, no
+misordered groups.
+
+**Logging pattern.** `git diff M^1 M -- '*.py' | grep -nE
+'^\+.*(logging\.getLogger|import logging)'` returned empty across all
+eleven merges — no new module introduces a raw `logging` logger bypassing
+`shakenfist_utilities.logs`. `shakenfist/deploy/shakenfist_ci/base.py` does
+call `logging.getLogger()` at line 22, but `git diff M^1 M -- .../base.py |
+grep -nE '^\+.*(LOG|logging)'` is empty for the three merges that touch that
+file (`291054e98`, `864608276`, `4a122bcd3`) — the line predates this plan
+and none of this plan's diffs added or touched it. `record_attempt()`,
+`record_progress()`, `add_result()` and `clear_results()` in
+`shakenfist/operations/agentoperation.py` (added/extended by `f21d5da3a`,
+`291054e98`, `185de6b32`) use the existing `self._attributes()` /
+`mariadb.update_agent_operation_attributes()` calls and `add_event()`, not
+ad-hoc prints or logging — consistent with the module's pre-existing
+`LOG, _ = logs.setup(__name__)` / `.with_fields()` pattern. **Nothing
+found.**
+
+**Quote style (single for strings, double for docstrings, no triple-single).**
+`git diff M^1 M -- '*.py' | grep -nE "^\+.*'''"` returned empty across all
+eleven merges — **no triple-single-quoted strings added anywhere.** A
+heuristic double-quote grep (`^\+[^+]*"[a-zA-Z0-9_]+"`, excluding `"""`)
+turned up two categories, both benign: (1) `08807c83f` matches are inside a
+`"""{...}"""`-delimited JSON example literal (`agentoperation_get_example`
+style block) where the double quotes are JSON syntax, not Python string
+delimiters; (2) `cb9e10bba`'s one hit is a comment containing the quoted
+word `"unset"`, not a string literal. **No quote-style violations found.**
+
+**120-char wrapping.** Covered by the style-grep section above — confirmed
+zero non-generated over-120-char lines across all twelve merges.
+
+**Three-layer MariaDB pattern + Monitor counter registration.** No new gRPC
+method was added anywhere in the baseline:
+`git diff M^1 M -- shakenfist/daemons/database/main.py | grep -nE
+'^\+\s+def [A-Za-z]'` is empty for all eleven merges, and no diff touches
+anything matching `monitor|counter|prometheus` in that file. Both phases'
+`mariadb.py` changes are *extensions* of existing three-layer functions,
+not new ones: `f21d5da3a` adds the `fields` mask parameter and a new
+`_agent_operation_attributes_column_values()` helper, threading it correctly
+through `_direct_update_agent_operation_attributes`,
+`_grpc_update_agent_operation_attributes` and the public
+`update_agent_operation_attributes` wrapper (verified by reading the diff:
+all three layers were touched together in `f21d5da3a`). `cb9e10bba` adds the
+`deadline`/`progress_timeout`/`last_progress`/`attempts` columns to
+`_direct_create_agent_operation`, `_direct_get_agent_operation`,
+`_direct_create_agent_operation_attributes`,
+`_direct_get_agent_operation_attributes`,
+`_agent_operation_attributes_column_values`,
+`_grpc_create_agent_operation`, `_grpc_get_agent_operation`,
+`_grpc_create_agent_operation_attributes`,
+`_grpc_get_agent_operation_attributes` and
+`_grpc_update_agent_operation_attributes` — every direct-layer function that
+gained a column also gained the matching gRPC-layer change in the same
+merge. Since no new counter-bearing RPC was introduced, there is nothing to
+register in the database daemon's Monitor operations list, and none was
+added. **Nothing found — pattern held on both merges that touched
+`mariadb.py`.**
+
+**Field-mask discipline (unmasked writes).** All four production call sites
+of `mariadb.update_agent_operation_attributes()` outside tests
+(`shakenfist/operations/agentoperation.py:422,438,468,487`) pass an explicit
+non-empty `fields=` list (`['attempts']`, `['results']` x2,
+`['last_progress']`); none passes `fields=None`. `record_attempt()` and
+`record_progress()`'s docstrings both explicitly justify the mask by name
+(collision with `add_result()`'s read-merge-write on the same `results`
+column). **Nothing found** — matches the coding-rules invariant in
+`CLAUDE.md`'s Common Pitfalls #3.
+
+**Field rename / unit-change discipline (`deadline` vs `progress_timeout`).**
+Read `shakenfist/schema/agentoperation_data.py` and
+`agentoperation_attributes.py` (added in `cb9e10bba`) in full. `deadline` is
+explicitly documented, in both the class docstring and an inline comment, as
+"the absolute unix timestamp after which this operation must not be
+dispatched" with an explicit note that it is "of order 1.7e9" so `0.0` reads
+unambiguously as a sentinel rather than a real value. `progress_timeout` is
+documented as "seconds without forward progress which are fatal to the
+operation" — a duration, never conflated with the absolute timestamp. At the
+API layer (`08807c83f`, `shakenfist/external_api/instance.py`), both
+parameters are named with an explicit `_seconds` suffix
+(`deadline_seconds`, `progress_timeout_seconds`) precisely because the
+stored `deadline` is *not* itself a seconds value — `agent_operation_timing()`
+in `shakenfist/external_api/base.py` converts the request's
+`deadline_seconds` (a duration relative to receipt) into the stored
+`deadline` (`time.time() + deadline_seconds`, an absolute timestamp) inside
+one documented conversion point, and `progress_timeout_seconds` passes
+through unchanged into the duration-typed `progress_timeout` column. No
+site was found where the two are used interchangeably or where a duration
+is written into `deadline` or vice versa. **No unit-blurring found** — this
+is the one area the audit brief called out by name, and it holds.
+
+#### Wave 1 result
+
+pre-commit: **passed**, all 10 hooks. tox: **passed**, `py3`/`flake8`/`cover`
+all `OK`, 246.93s. Proto freshness: **fresh** — `tox -e genprotos` followed
+by `git diff --exit-code shakenfist/protos` exited 0, tree remained clean
+throughout (no revert needed). Style greps: **clean** across all twelve
+merges for all four checks; F6's "no pushdown violation exists" claim is
+**confirmed by direct execution**, not assumed. Style-conformance judgment:
+**no violations found** across import ordering, logging pattern, quote
+style, line length, the three-layer MariaDB pattern (with no new
+counter-registration gap, since no new RPC was added), the field-mask
+discipline, and the `deadline`/`progress_timeout` unit distinction.
+
+**Wave 1 passes outright — no decision-5 fallback was invoked, because
+nothing failed.** No blocking findings. No advisory findings. Wave 2 (steps
+8c-8g) can proceed on this baseline without qualification.
+
 ## Future work
 
 Recorded here at planning time; step 8h adds to it.
