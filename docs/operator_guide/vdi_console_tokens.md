@@ -210,6 +210,19 @@ See the
 [Kerbside console sources page](/components/kerbside/console-sources/) for
 the proxy-side view.
 
+There is a second way to publish nothing, and it is easier to hit on your
+own PKI than on the one the deployer builds: Shaken Fist can only render a
+subject whose every attribute has a SPICE host-subject short name (`C`,
+`ST`, `L`, `O`, `OU`, `CN`, `DC`, `emailAddress`). A subject qualified with
+anything else — a `serialNumber`, a custom OID — cannot be rendered exactly,
+and a partial rendering would wrongly reject the backend, so the node
+publishes nothing and enforcement is disabled for it. If your CA issues such
+subjects this happens on every node at once. It is not silent: each node
+logs a warning naming the offending attribute and its OID once per daemon
+start, so grep your logs for `no SPICE host-subject short name` if
+`spice_server_cert_subject` is unexpectedly absent from a node in
+`GET /nodes`.
+
 ## Related pages
 
 * [Consoles (user guide)](/user_guide/consoles/) — how a user opens a

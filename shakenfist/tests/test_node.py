@@ -1307,6 +1307,12 @@ def _make_spice_cert(name_attrs):
 class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
     """Tests for reading the SPICE server certificate subject."""
 
+    def setUp(self):
+        super().setUp()
+        # The warn-once set is module state which outlives a test.
+        node_module._SPICE_SUBJECT_WARNED.clear()
+        self.addCleanup(node_module._SPICE_SUBJECT_WARNED.clear)
+
     def _subject_for(self, name_attrs):
         pem = _make_spice_cert(name_attrs)
         with tempfile.NamedTemporaryFile(
@@ -1348,6 +1354,48 @@ class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
         ])
         self.assertIsNone(subject)
 
+    def test_unnameable_attribute_warns_once_and_names_the_oid(self):
+        # Returning None fails open -- pinning is silently disabled for
+        # this node, and on an operator's own PKI that can be every node
+        # at once. It used to do that with no log line, so there was
+        # nothing to discover it by. The warning must name the offending
+        # attribute, and must not repeat: observe_this_node() calls this
+        # every 15 seconds from both sentinel daemons.
+        attrs = [
+            (NameOID.COMMON_NAME, 'hv1'),
+            (NameOID.SERIAL_NUMBER, '12345'),
+        ]
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for(attrs))
+            self.assertIsNone(self._subject_for(attrs))
+            self.assertIsNone(self._subject_for(attrs))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(1, len(warnings))
+        message = warnings[0][0][0]
+        self.assertIn('serialNumber', message)
+        self.assertIn(NameOID.SERIAL_NUMBER.dotted_string, message)
+
+        # ...and the structured fields carry it too, since that is what
+        # a Loki query filters on.
+        fields = mock_log.with_fields.call_args_list[0][0][0]
+        self.assertEqual(
+            NameOID.SERIAL_NUMBER.dotted_string, fields['oid'])
+
+    def test_a_second_distinct_problem_still_warns(self):
+        # Throttling is per reason, not a single global flag, so a
+        # different unrenderable attribute is still reported.
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for([
+                (NameOID.COMMON_NAME, 'hv1'),
+                (NameOID.SERIAL_NUMBER, '12345')]))
+            self.assertIsNone(self._subject_for([
+                (NameOID.COMMON_NAME, 'hv1'),
+                (NameOID.DN_QUALIFIER, 'q')]))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(2, len(warnings))
+
     def test_missing_certificate_returns_none(self):
         with mock.patch(
                 'shakenfist.node.SPICE_SERVER_CERT_PATH',
@@ -1362,3 +1410,36 @@ class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
         self.addCleanup(os.unlink, path)
         with mock.patch('shakenfist.node.SPICE_SERVER_CERT_PATH', path):
             self.assertIsNone(node_module.read_spice_server_cert_subject())
+
+    def test_a_damaged_certificate_warns_only_once(self):
+        # A damaged certificate is a permanent condition, and
+        # observe_this_node() reads it every 15 seconds from each of the
+        # two sentinel daemons -- eight warnings a minute, forever, all
+        # of them shipped to Loki, for one node an operator has already
+        # been told about.
+        with tempfile.NamedTemporaryFile(
+                suffix='.pem', delete=False) as f:
+            f.write(b'not a certificate')
+            path = f.name
+        self.addCleanup(os.unlink, path)
+
+        with mock.patch('shakenfist.node.SPICE_SERVER_CERT_PATH', path):
+            with mock.patch('shakenfist.node.LOG') as mock_log:
+                for _ in range(5):
+                    self.assertIsNone(
+                        node_module.read_spice_server_cert_subject())
+
+        self.assertEqual(
+            1, len(mock_log.with_fields.return_value.warning.call_args_list))
+
+    def test_a_missing_certificate_never_warns(self):
+        # The common case: a node which runs no SPICE instances has no
+        # such certificate and that is not a problem. Unchanged.
+        with mock.patch(
+                'shakenfist.node.SPICE_SERVER_CERT_PATH',
+                '/nonexistent/server-cert.pem'):
+            with mock.patch('shakenfist.node.LOG') as mock_log:
+                self.assertIsNone(
+                    node_module.read_spice_server_cert_subject())
+
+        mock_log.with_fields.return_value.warning.assert_not_called()

@@ -53,6 +53,33 @@ _SPICE_SUBJECT_SHORT_NAMES = {
 }
 
 
+# Distinct reasons we have already warned about while reading this
+# node's SPICE certificate subject, so a permanent condition is not
+# re-reported forever.
+#
+# observe_this_node() calls read_spice_server_cert_subject() every 15
+# seconds and both sentinel daemons run it, so an unthrottled warning
+# here is eight identical lines a minute for the life of the node --
+# and every one of them is shipped to Loki. The causes below are all
+# permanent until an operator intervenes (a certificate is reissued, a
+# file is repaired), so the first occurrence is the whole signal and
+# the repeats are noise which buries it.
+#
+# Keyed by reason rather than being a single flag, so a second,
+# different problem still gets its own line. Process-local: a daemon
+# restart deliberately re-reports, which is when an operator is most
+# likely to be looking.
+_SPICE_SUBJECT_WARNED: set[str] = set()
+
+
+def _warn_spice_subject_once(reason: str, fields: dict, message: str) -> None:
+    """Log a SPICE subject warning the first time each reason occurs."""
+    if reason in _SPICE_SUBJECT_WARNED:
+        return
+    _SPICE_SUBJECT_WARNED.add(reason)
+    LOG.with_fields(fields).warning(message)
+
+
 def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
     """Render a certificate subject as a SPICE host-subject string.
 
@@ -65,14 +92,44 @@ def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
     value we cannot render, since that would make an exact, matchable
     rendering impossible (and a partial one would wrongly reject the
     backend).
+
+    Returning None fails open: spice_server_cert_subject becomes None,
+    kerbside's scrape sets host_subject to None, and the proxy will
+    accept any node in the cluster as any other hypervisor, because
+    every hypervisor's certificate is signed by the same cluster CA.
+    That is the documented design choice (see
+    docs/operator_guide/vdi_console_tokens.md) -- an unrenderable
+    subject must not take consoles away -- but it used to happen with
+    no log line at all, so an operator had no way to discover it. On a
+    PKI which qualifies subjects with an organisation, a serialNumber
+    or a custom OID this fires on every node at once, silently
+    disabling pinning cluster-wide. Hence the warning; the behaviour
+    is unchanged.
     """
     parts = []
     for attr in cert.subject:
         short = _SPICE_SUBJECT_SHORT_NAMES.get(attr.oid)
         if short is None:
+            oid = attr.oid.dotted_string
+            _warn_spice_subject_once(
+                'unnameable:%s' % oid,
+                {'path': SPICE_SERVER_CERT_PATH, 'oid': oid,
+                 'attribute': getattr(attr.oid, '_name', None)},
+                'SPICE certificate subject carries attribute %s (%s), '
+                'which has no SPICE host-subject short name. Host-subject '
+                'pinning is disabled for this node.'
+                % (getattr(attr.oid, '_name', None) or 'unknown', oid))
             return None
         value = attr.value
         if not isinstance(value, str):
+            oid = attr.oid.dotted_string
+            _warn_spice_subject_once(
+                'unrenderable:%s' % oid,
+                {'path': SPICE_SERVER_CERT_PATH, 'oid': oid,
+                 'attribute': short},
+                'SPICE certificate subject attribute %s (%s) is not a '
+                'string and cannot be rendered. Host-subject pinning is '
+                'disabled for this node.' % (short, oid))
             return None
         escaped = value.replace('\\', '\\\\').replace(',', '\\,')
         parts.append('%s=%s' % (short, escaped))
@@ -86,6 +143,10 @@ def read_spice_server_cert_subject() -> Optional[str]:
     unparseable certificate yields None, which leaves host-subject
     enforcement disabled for this backend rather than failing the
     node's observation loop.
+
+    A missing file is the normal case on a node which runs no SPICE
+    instances and stays silent. Anything else warns once per process
+    per failure kind -- see _SPICE_SUBJECT_WARNED for why once.
     """
     try:
         with open(SPICE_SERVER_CERT_PATH, 'rb') as f:
@@ -93,7 +154,9 @@ def read_spice_server_cert_subject() -> Optional[str]:
     except FileNotFoundError:
         return None
     except Exception as e:
-        LOG.with_fields({'path': SPICE_SERVER_CERT_PATH}).warning(
+        _warn_spice_subject_once(
+            'read:%s' % type(e).__name__,
+            {'path': SPICE_SERVER_CERT_PATH},
             'Could not read SPICE server certificate: %s' % e)
         return None
     return _spice_host_subject_from_cert(cert)
