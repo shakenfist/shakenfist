@@ -138,6 +138,35 @@ jobs:
       attestations: write
 
     steps:
+      # This job works in the checked-out workspace, while
+      # publish-collection and github-release below download into
+      # runner.temp. The asymmetry is not an oversight:
+      # gh-action-pypi-publish is a composite action that delegates to
+      # a Docker container action, and the container does not see the
+      # runner's paths at the places the workflow expressions name.
+      # From a release run:
+      #
+      #   docker run --workdir /github/workspace \
+      #     -v ".../_work/_temp":"/github/runner_temp" \
+      #     -v ".../_work/<repo>/<repo>":"/github/workspace"
+      #
+      # RUNNER_TEMP is mounted, but at /github/runner_temp, whereas
+      # "${{ runner.temp }}" expands to the host path on the left --
+      # which does not exist inside the container. The same goes for
+      # github.workspace. So every path this job hands the publish
+      # action has to be relative to the workspace, which is the one
+      # spelling that is correct on both sides of the mount. The
+      # action needs a real workspace regardless, since it writes its
+      # container trampoline into .github/.tmp/ before running it.
+      #
+      # Checking out is what makes that workspace safe to use. This
+      # pool is persistent and a job which skips checkout inherits
+      # whatever the last job left behind, but checkout cleans with
+      # "git clean -ffdx", which removes a stale gitignored dist/ --
+      # the same guarantee runner.temp buys the other jobs.
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
       - name: Download distribution artifacts
         uses: actions/download-artifact@v8
         with:
@@ -151,6 +180,8 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
 
   publish-collection:
     name: Publish ansible collection to Galaxy
@@ -159,11 +190,19 @@ jobs:
     environment: release
 
     steps:
+      # Unlike publish-pypi above, this job does not check out, and
+      # does not need to: its only consumer is an ansible-galaxy
+      # "run:" step executing on the host, not a container action, so
+      # it reads an absolute path happily. Downloading into the
+      # per-job runner.temp is then the cheaper way to get a directory
+      # nothing else has written to, without paying for a checkout to
+      # clean one -- so the publish command below has to be pointed at
+      # the same place.
       - name: Download collection artifact
         uses: actions/download-artifact@v8
         with:
           name: collection
-          path: dist-collection/
+          path: ${{ runner.temp }}/dist-collection/
 
       - name: Install ansible-core
         run: |
@@ -175,7 +214,7 @@ jobs:
       - name: Publish to Ansible Galaxy
         run: |
           publish-venv/bin/ansible-galaxy collection publish \
-              dist-collection/*.tar.gz \
+              ${{ runner.temp }}/dist-collection/*.tar.gz \
               --api-key "${{ secrets.ANSIBLE_GALAXY_TOKEN }}"
 
   github-release:
@@ -187,13 +226,28 @@ jobs:
       contents: write
 
     steps:
+      # As in publish-collection, and unlike publish-pypi: no
+      # checkout, because action-gh-release is a JavaScript action
+      # running on the host and reads an absolute path happily.
+      # Downloading into the per-job runner.temp is then the cheaper
+      # way to get a directory nothing else has written to, without
+      # paying for a checkout to clean one.
+      #
+      # fail_on_unmatched_files is the other half -- action-gh-release
+      # treats a glob that matches nothing as a warning, so without it
+      # a release that attached no files at all still reported
+      # success.
       - name: Download artifacts
         uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: ${{ runner.temp }}/dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          files: dist/*
+          files: ${{ runner.temp }}/dist/*
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
