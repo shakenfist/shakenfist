@@ -102,13 +102,22 @@ Both ledgers were confirmed against real scheduler audit events
 captured in CI job logs, not derived on paper: `slim-primary`
 publishes one node with `cpu_schedulable: 1` and four with
 `cpu_schedulable: 2`; `slim-tier` publishes two with `1` and one
-with `2`. The reconciled figure disagrees: issue #3907 records the
-`cluster_capacity` singleton reporting the tier's total as `limit
-10`, and no candidate explanation produces 10 from 12 (dropping a
-node without a capacity row subtracts 3 or 6, not 2). The tier's
-ledger is therefore quoted here as "12 by derivation, 10 by
-observation" and asserted as neither; phase 2 reconciles them
-(phase 0, D7).
+with `2`.
+
+This document previously recorded the tier's ledger as "12 by
+derivation, 10 by observation", on the strength of issue #3907
+reporting the `cluster_capacity` singleton at `limit 10`. **That
+discrepancy no longer exists and the tier's ledger is 12.** The
+phase 2 survey found both halves agreeing: phase 1's headroom
+series reports a cluster ledger of exactly 12.0 with per-node
+limits of 3, 6 and 3, across 399 node-samples carrying a real
+capacity row and zero fallbacks to `cpu_hard_max`; and #3907,
+closed COMPLETED on 2026-08-27, quotes the singleton itself
+refusing a claim with `cpus (limit 12, used 9, requested 4)`.
+Phase 0's D7 is closed by that evidence. Phase 2 confirms the
+fallback count across its whole window rather than re-litigating
+the figure, because a node without a capacity row would change
+what the ledger column means.
 
 ### The three-node topology is demonstrably too small
 
@@ -390,8 +399,8 @@ those are corrected here as well.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete |
-| 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Not started |
-| 2. Baseline measurement window: the peak-demand distribution that has never existed | PLAN-ci-cloud-sizing-phase-02-baseline.md | Not started |
+| 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete |
+| 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | In progress |
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md | Not started |
 | 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started |
@@ -440,15 +449,36 @@ real CI run to prove.
 
 ### Phase 2 -- Baseline measurement window
 
-Leave phase 1 running for an agreed number of merge runs, then
-publish the distribution: what peak utilisation actually is per
+Publish the distribution: what peak utilisation actually is per
 job, on both topologies, and how it correlates with the failures.
 This is the number that has never existed, and it is what turns
 the candidate shapes above into a decision.
 
-Expect it to also answer open question 5 (whether memory refusals
-are real) and to confirm or correct the tier's reconciled ledger
-against the live derivation.
+This section previously described phase 2 as leaving phase 1
+running for an agreed number of merge runs and waiting. **The
+waiting is already done.** The phase 2 survey counted 66
+`merge_group` runs of `functional-tests.yml` banked since the
+census fix merged on 2026-08-30, each carrying five cluster
+bundles, all still inside the 90 day artifact retention. Phase 2
+harvests them retrospectively (phase 2, D16) rather than opening a
+new window, because waiting adds weeks and no information while
+the early part of the window expires.
+
+Two things the phase 1 output already changes about what phase 2
+must look for. The cluster-wide committed fraction and the
+*per-node maximum* can disagree by a factor of two -- one sampled
+`slim-primary` run sat at a cluster-wide p90 of 0.407 with one node
+pinned at 1.000 and twelve real `sufficient_idle_cpu` refusals --
+so D3's band gains a per-node component (phase 2, D21). And open
+question 5's expected answer has flipped: memory recorded zero
+drops and a p90 of 0.14-0.20 of ledger in both sampled runs, so
+phase 2 is testing whether D5 should be *narrowed*, not whether it
+holds.
+
+The tier's ledger question (D7) is closed by evidence already in
+hand -- see the Situation section above -- so phase 2 confirms the
+fallback count across its window rather than reconciling two
+figures.
 
 ### Phase 3 -- Explicit saturation coverage
 
