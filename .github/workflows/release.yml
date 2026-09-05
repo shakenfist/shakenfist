@@ -84,9 +84,15 @@ jobs:
           name: collection
           path: dist-collection/
 
+  # The four publishing jobs are guarded so that a workflow_dispatch
+  # run (which arrives with a refs/heads/* ref) only exercises the
+  # build and twine check. Without the guard, sign-tag would compute a
+  # tag name of the literal string "refs/heads/<branch>" and force-push
+  # a garbage refs/tags/refs/heads/<branch> ref.
   sign-tag:
     name: Sign release tag with Sigstore
     needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, debian-12, s]
     environment: release
 
@@ -130,6 +136,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: [build, sign-tag]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, static]
     environment: release
 
@@ -155,6 +162,7 @@ jobs:
   publish-collection:
     name: Publish ansible collection to Galaxy
     needs: [build-collection, sign-tag]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, static]
     environment: release
 
@@ -181,6 +189,7 @@ jobs:
   github-release:
     name: Create GitHub Release
     needs: [build, sign-tag, publish-pypi]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, static]
 
     permissions:
