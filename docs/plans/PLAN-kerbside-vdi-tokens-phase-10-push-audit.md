@@ -438,5 +438,424 @@ Two gates, for steps that are cheap to propose and expensive to redo:
 
 ## Findings
 
-*(To be written by step 10i. Every heading names what it examined, per
-decision 8.)*
+Eight agents ran: wave 1 in both halves (10b, 10c), the four
+`PUSH-AUDIT.md` judgment headings (10d-10g), and the decision-4 seam
+lens (10h). Every heading below names what it examined, per decision 8.
+The audit did not find nothing.
+
+### Wave 1 (10b, 10c) — passed, with one pre-existing failure
+
+**shakenfist.** `pre-commit` green (10 hooks; `mypy` flaked once on a
+subprocess exec and passed clean on a rerun of the same env). `tox`
+green: 4318 tests, 4200 passed, 118 skipped, 0 failed. **Proto
+freshness applies here and passes**: `tox -e genprotos` followed by
+`git diff --exit-code shakenfist/protos` returns no diff, so the stubs
+on `develop` are byte-identical to what R1's `protos/database.proto`
+generates. Style greps run against R1-R6 individually: no long lines in
+hand-written code (the only two hits are the serialized
+`FileDescriptor` line in generated `database_pb2.py`), no stray
+`print(`, no new `etcd` references, no new `mariadb.get_all_*(`. One
+new `# noqa`, in `client/ctl.py`, inside an existing block of five that
+all carry it for a documented reason.
+
+**client-python.** `pre-commit` green; 208 tests pass. `tox -e cover`
+fails because `tox.ini` sets `--source client` while the package is
+`shakenfist_client`; `git blame` dates that line to 2020-08-12, seven
+years before this plan. Reported, not a stop, per decision 6.
+
+**kerbside.** `pre-commit` green (10 hooks); `tox -e py3,flake8` green,
+264 tests.
+
+**ryll — the phase-3 contract verified by running it.** `pip install
+ryll` into a fresh venv chose
+`ryll-0.1.7-py3-none-manylinux_2_28_x86_64.whl`, landed a 60MB ELF
+`pie executable` on the venv's PATH (not a launcher stub -- `strings`
+found no fetch-on-first-run vocabulary), and `ryll --version` exits 0
+printing `ryll 0.1.7 (unknown)`. `pip install 'shakenfist-client[vdi]'`
+resolved the same wheel through the `vdi` extra. The published artefact
+is what the plan said it would be.
+
+### The blocking finding
+
+**F-B1. A failed signing-key fetch deletes the Shaken Fist source's
+entire console inventory.** BLOCKING. kerbside; found by 10d, verified
+by the management session, fixed in kerbside branch
+`sf-source-console-deletion-fix`.
+
+`ShakenFistSource.__init__` fetched signing keys inside a broad
+`except`, and on any failure set `self.errored = True` and returned.
+`main._parse_sources` then `continue`s **before** the scrape loop -- and
+that loop is the only thing that removes entries from `extra_consoles`.
+The cleanup after the loop runs unconditionally, exempting only
+`source_type[source] == 'openstack'`, so every one of that source's
+consoles was passed to `remove_console()` with a "Console no longer
+available" audit event.
+
+So an optional feature's fetch failure destroyed the source's core
+function, including kerbside's own `/console/direct/...` and
+`/console/proxy/...` routes, which have nothing to do with tokens.
+
+Two triggers, both likely on an upgrade. Shaken Fist's
+`/admin/vditokenpubkey` returns **404** until an operator runs `sf-ctl
+ensure-kerbside-signing-key`, and nothing creates the key lazily; the
+client maps 404 to `ResourceNotFoundException`, which the broad
+`except` caught. Separately, `shakenfist-client` is deliberately not a
+runtime dependency (the `>=0.8.3` floor lives only in the `test`
+extra), so a pre-0.8.3 client raises `AttributeError` into the same
+handler.
+
+**This is the third defect from the one configuration no phase ever
+tested** -- Kerbside integration not configured -- after #4003 and
+#4009, and the first that destroys data. The plan's own *Post-completion
+defects* section named that gap; this is the evidence it was wider than
+two bugs in one repository.
+
+The fix degrades the optional feature instead: the key fetch no longer
+errors the source, a 404 or `AttributeError` logs at info as a normal
+state, and genuine faults still warn. Verified by the management
+session rather than taken on report -- reinstating `self.errored = True;
+return` fails exactly six tests and nothing else; restored, 279 pass.
+
+### 2a, code quality (10d)
+
+Examined R1, R4-R10 across three repositories: `mariadb.py`'s v4
+migration and the whole `node_attributes` field path,
+`protos/database.proto`, `daemons/database/main.py`,
+`schema/node_attributes.py`, `node.py`, both console endpoints in
+`external_api/instance.py`, the `ConditionalCapability` machinery in
+`external_api/app.py`, all 268 lines of `util/vdi_tokens.py`,
+`external_api/admin.py`, `client/ctl.py`, the R6 collection files, and
+in kerbside all of `sf_token.py`, `sources/shakenfist.py`, `SfToken`,
+`NovaToken` and `ConsolesProxyVirtViewer` in `api.py`, the new `db.py`
+tables and the alembic revision.
+
+**The field-mask and schema question -- clean, and it was the right
+thing to check.** The v4 migration is `ALTER TABLE ... ADD COLUMN IF
+NOT EXISTS`, structurally identical to the v3 step above it, and
+idempotent on both the create and upgrade paths. There is exactly one
+production writer of `spice_server_cert_subject`,
+`Node.observe_this_node()`, and it **added the field to the existing
+explicit `fields=[...]` mask** rather than dropping it; the only other
+writer is a test helper, which also passes a mask. The new column is in
+`_node_attributes_column_values()`'s `all_values`, so it is both
+maskable and validated by the unknown-field check. `CLAUDE.md` records
+that unmasked writes caused two production CI flakes; this change did
+not repeat them.
+
+The cached-FK-list rule does not fire (the one new field is a scalar
+`Optional[str]`). No new `get_all_*` call sites, and no judgment-level
+pushdown cases. Comment proportion: eight blocks over the threshold,
+all eight judged to earn their length.
+
+Beyond the blocking finding, four advisories, all filed:
+`add_sf_token_jti` is a check-then-act whose comment claims a
+primary-key guard it does not implement (kerbside#409); the node-map
+miss is still a silent debug-level skip, so #201's *shape* survives its
+own fix (kerbside#410); the proxy `.vv` construction now exists in
+three copies and has already drifted (kerbside#411); the two Shaken
+Fist console endpoints disagree on their preconditions, so the direct
+one returns 200 with `port=None` for a non-`created` instance
+(shakenfist#4094).
+
+### 2b, test coverage (10e)
+
+Examined every test module the ranges added or changed across three
+repositories, plus the CI configuration that decides which of them run.
+
+**The decision-3 scepticism paid off, on a different assertion than the
+plan predicted.** `cluster_ci_tests/test_vdi_console_file.py`'s `host`
+assertion is genuine: `known_addresses` comes from a real
+`get_nodes()` call against the live cluster, so it is cross-checked
+against a second real API response rather than a fixture, and the UUID
+regression would fail it. Its **`type` assertion was hollow**: the test
+creates its instance with `video` unset, and the server then defaults
+`vdi` to `'spice'`, so the `startswith('spice')` collapse is a no-op
+for it. Deleting that line entirely left the test passing. Fixed in
+this phase's PR with a test that creates `vdi='spiceconcurrent'` and
+asserts the internal enum never reaches the viewer -- mutation-verified
+by the management session: with the collapse removed the new assertion
+fails `'spice' != 'spiceconcurrent'`, and the pre-existing test still
+passes, which is precisely the gap.
+
+**The #201 fixture is genuinely fixed.** `_node()` now carries
+`uuid='node-uuid-1'` distinct from `fqdn='n1'`, where the old fixture
+had no UUID field at all, and one test asserts the hypervisor is *not*
+the UUID. The bug cannot recur through it.
+
+**kerbside's verification matrix is strong and is in the right place.**
+Expiry, wrong audience, unknown kid, and a forged signature under the
+same `kid` using a genuinely unrelated Ed25519 keypair -- all against
+real JWTs through the real `jwt.decode` path. Replay is enforced at the
+API layer with a jti that is deliberately *not* burned on a
+console-not-yet-scraped 404, so a legitimate retry succeeds. This is
+better than replay coverage on the minting side would have been.
+
+Two coverage gaps filed: `refresh_all_signing_keys()` has zero direct
+coverage despite per-source failure isolation being its stated reason
+for existing (folded into shakenfist#4097's seam package), and the
+mint path's functional coverage never executes in this repository's CI
+(shakenfist#4093).
+
+### 2c, documentation (10f)
+
+Examined every documentation file the ranges touched across four
+repositories, plus the current state of `AGENTS.md`, `ARCHITECTURE.md`,
+`CLAUDE.md` and `README.md` in each.
+
+**The cross-page consistency check came back genuinely clean.** Every
+fact -- algorithm, TTL, claim set, audience string, mint-path error
+codes, exchange URL shape, `KERBSIDE_URL` semantics, capability
+meaning -- is stated consistently everywhere it appears, in all four
+repositories. Shaken Fist and kerbside each independently warn about
+the `KERBSIDE_URL` / `SF_CONSOLE_TOKEN_AUDIENCE` naming collision. One
+honest nuance: no page states an HTTP status code for the *exchange*
+path, so that row is "nothing to disagree about" rather than "agree".
+
+**The phase-11 fixes reached the documentation.** No page in any
+repository still describes the `.vv` `host` as a hostname or the
+capability as unconditional. The operator guide's "not yet automated by
+the collection" line refers to deploying Kerbside itself -- the
+deliberately deferred phase -- and the same page documents #4024's
+`kerbside_url` variable two paragraphs later.
+
+**Three README-discipline violations shipped, and all three were fixed
+by later unrelated work** before this audit's baseline: client-python's
+38-line section (`c9ea800`), kerbside's CI-lane paragraph (`49058af`),
+ryll's install troubleshooting (`2f5891e`). R1's `AGENTS.md` and
+`ARCHITECTURE.md` growth was likewise cleaned up by the consistency
+commit `f9117ca3d`. Under decision 1's net-state rule these are
+historical, not open -- recorded so a later reader does not rediscover
+them. Two live remnants that `f9117ca3d` missed were fixed in this
+phase's PR.
+
+No plan-phase references leaked into any repository's `docs/` for this
+feature.
+
+### 2d, security (10g)
+
+Examined key custody end to end, both console endpoints and the whole
+decorator stack that authenticates them, the claim set on both the
+signing and the trusting side, the pubkey endpoint, the `host_subject`
+mechanism through Shaken Fist, kerbside, the Rust proxy and ryll's
+verifier, ryll's release workflow and the published wheel's ELF
+headers, and the usual SQL/shell/input/secret/timeout sweep.
+
+**The mint gate is clean, and it was attacked rather than read.** Six
+cross-namespace routes were tried -- another namespace's UUID, a
+`namespace` key in the body, an `instance_ref` body override, a name
+collision, metadata, and a deleted-then-recreated instance -- and all
+six are rejected. `@redirect_instance_request` is correctly absent and
+its sibling endpoint 60 lines above has it, so the contrast is visible
+at the decoration site. One correction to the plan's own text:
+`@verify_token` is not written on the method, because
+`Resource.method_decorators` applies authentication to every resource
+method outside every per-method decorator. That is *stronger* than what
+the plan described -- a hand-written decorator can be forgotten; this
+cannot.
+
+**The central claim-set question is satisfied.** Kerbside reads no
+backend address, port or hostname from the JWT: the verifier returns
+exactly `{source, sub, jti, exp}`, and every address in the returned
+`.vv` comes from kerbside's own configuration and the scraped console
+row. `aud`, `exp` and `alg` are all checked, `alg` twice. The replay
+cache is a MariaDB table with `jti` as primary key, reaped every 60
+seconds, and rows can only be added by a caller holding a legitimately
+minted token.
+
+**ryll's supply chain is in good shape**: PyPI publication is via OIDC
+Trusted Publishers with no long-lived token anywhere in the workflow,
+and build provenance is attested with `actions/attest-build-provenance`
+and verifiable by a consumer. The dlopen and glibc-floor claims in
+`pyproject.toml` were verified empirically against the published wheel
+and both hold.
+
+Findings, by disposition:
+
+* **F8, high -- ryll's SPICE TLS verifier trusted the public WebPKI and
+  discarded hostname checking.** `client.rs` seeded the root store with
+  the full Mozilla root set *unconditionally*, including when the `.vv`
+  supplied an inline cluster CA, and accepted `NotValidForName`. For a
+  backend with no pinned subject the only surviving check was "chains
+  to some root", so an on-path attacker with any publicly-issued
+  certificate could terminate the SPICE session -- full keyboard, mouse
+  and framebuffer access to the guest. This code predates the plan and
+  is outside R11, but it is the mechanism the plan's entire
+  `host_subject` story rests on, which is why the brief sent an agent
+  to read it. **Fixed** in ryll branch `spice-tls-trust-anchors`: a
+  custom CA now *replaces* the public roots rather than adding to them,
+  and the name-mismatch acceptance is gated on a custom CA being
+  present. `check_subject`'s `None` short-circuit is deliberately
+  unchanged -- that fail-open is Shaken Fist's documented decision and
+  reversing it here would break every deployment with no published
+  subject. Honest limit, recorded by the implementer: no test signs a
+  leaf under a real public root, which is impossible offline, so two
+  tests stand in for the end-to-end claim.
+* **F5, medium -- unauthenticated unbounded write at `/sf-console.vv`.**
+  Every pre-verification rejection wrote an `audit_events` row, on an
+  endpoint that is by design internet-facing and unauthenticated, and
+  nothing anywhere reaps that table (kerbside has exactly three
+  reapers and none covers it). A single host looping `curl` fills it at
+  tens of millions of rows a day, degrading `get_consoles()` and
+  eventually taking down console access including the operator
+  break-glass path. **Fixed** in the same kerbside branch: pre-
+  verification rejections log only; the post-verification rejections
+  that have real attribution still audit, which is what the plan's
+  success criteria require.
+* **F1, medium -- the cluster signing key was exported into every
+  daemon's environment.** `load_cluster_config()` copies *every*
+  `cluster_config` row into `os.environ`, with no filter to declared
+  `SFConfig` fields, in every Shaken Fist process on every node -- and
+  privexec passes `env=None`, so its children inherit it and expose it
+  in `/proc/<pid>/environ`. The row holds the unencrypted Ed25519
+  private PEM, so code execution as any daemon user on any node yielded
+  the ability to forge a console token for any instance, undetectably
+  (kerbside verifies offline by design). **Fixed** in this phase's PR:
+  a row reaches the environment only if it is a declared `SFConfig`
+  field, or does not match `SECRET_CONFIG_KEY_RE`. The ordering
+  matters and is commented -- `AUTH_SECRET_SEED` matches the secret
+  pattern via `_SEED$` but *is* declared and must keep being exported,
+  so a naive "do not export secrets" filter would break authentication
+  cluster-wide. Verified by the management session:
+  `AUTH_SECRET_SEED` → exported, `KERBSIDE_JWT_SIGNING_KEY` → not.
+* **F9, medium -- `host_subject` fails open, silently.** Every link
+  degrades to "no pin" rather than refusing:
+  `_spice_host_subject_from_cert` returns `None` if the subject holds
+  any attribute outside its eight-name map -- plausible cluster-wide on
+  an operator's own PKI -- with no log at all, and kerbside then
+  publishes the console unpinned. **Three agents converged on this
+  independently** (10e KB-5, 10h finding 3, 10g F9), from coverage,
+  seam and security directions. The Shaken Fist half is **fixed** in
+  this phase's PR: a throttled warning naming the unrenderable OID, so
+  the cause is discoverable. The fail-open itself is unchanged --
+  documented and deliberate. The kerbside half (assert in the e2e lane
+  that a scraped console carries a subject; four lines) is
+  shakenfist#4097 item 1.
+* **F11, medium -- the JWT is passed to the viewer in argv**, readable
+  through `/proc/<pid>/cmdline` on any multi-user host. Filed as
+  client-python#392; the fix needs a coordinated ryll change.
+* **F2, F3, F4, F6, F7, F10, low/informational.** Filed as
+  shakenfist#4094, #4095, #4096, kerbside#409 and ryll#357. F6 (the
+  bearer token in a URL query parameter) is a consequence of `ryll
+  --url` and is recorded rather than fixed; the mitigation is
+  single-use plus a 300-second TTL.
+
+Out of scope but recorded so it is not lost: `kerbside/main.py` logs
+the old and new values of a changed source `password` -- a Shaken Fist
+namespace key -- at INFO. `git log -S` places it in kerbside's initial
+commit, so it belongs to neither this plan nor these ranges.
+
+### The seam lens (10h, decision 4)
+
+Examined every value that crosses a repository boundary in this
+feature, tracing each to its writer and reader by file and line, and
+graded 30-odd seams covered / fixture-only / uncovered.
+
+**The lens justified itself.** The three seams where this plan's three
+shipped defects lived are all now covered, and by good mechanisms:
+`inst['node']` by the phase-9 e2e lane (which is what caught #201 on
+its first run), the `.vv` `host` by `test_vdi_console_file.py`
+(cross-checked against a second real API response), and the capability
+token by `test_capability_advertisement_matches_configuration` (which
+never skips). Most JWT and scrape seams are genuinely covered by the
+phase-9 lane -- the only mechanism in the four repositories that reads
+a real message from a peer. That lane is the strongest thing this plan
+built.
+
+What is not covered, and why it matters:
+
+* Shaken Fist signs `iss`, `sf:namespace` and `iat`; kerbside requires
+  only `['sub', 'jti', 'exp', 'aud']` and reads none of the three. They
+  are asserted only by the always-skipped test. Three claims in a
+  security token that no consumer validates.
+* `alg`, `active_kid` and `created` in the pubkey document are read by
+  nobody, and client-python's fixture names the field `pem` where the
+  server sends `public_pem` -- direct evidence that nothing on the
+  reader side is pinned to the real shape.
+* Nothing anywhere feeds a Shaken Fist-generated `.vv` to ryll or to
+  virt-viewer. `type=` -- the exact key #4009 got wrong -- has no
+  reader-side check in any repository. `ryll --url`, the CLI's primary
+  path, is run by nobody.
+* The e2e lane installs the *released* client, so client-python
+  `develop` is on no cross-repo lane at all.
+* The `kerbside_url` ansible variable #4024 added has never been read
+  by a running `sf-api`; the lane provisions through `sf-ctl
+  set-config` instead.
+* The audience byte-identity is enforced by prose in three documents
+  and by nothing executable.
+* The host-subject grammar is two independently hand-written tables of
+  the same eight OpenSSL short names. They agree today and both fail
+  closed, so this is robustness, not security.
+
+Also found: client-python's fixtures assert `expires_at` as an ISO
+string where the server emits an int epoch, and one uses a path that
+does not exist. Three wrong facts in one file, none detectable, in the
+same configuration that let #4009 and #201 ship.
+
+All of this is shakenfist#4097 and client-python#393, with the cheapest
+fix costed per item. Four changes -- totalling well under a hundred
+lines, all inside CI machinery that already exists -- close the
+majority.
+
+## Disposition
+
+| Finding | Grade | Disposition |
+|---------|-------|-------------|
+| F-B1 console deletion on key-fetch failure | Blocking | Fixed, kerbside `sf-source-console-deletion-fix` |
+| F8 ryll SPICE TLS trust anchors | High | Fixed, ryll `spice-tls-trust-anchors` |
+| F5 unauthenticated `audit_events` write | Medium | Fixed, kerbside `sf-source-console-deletion-fix` |
+| F1 signing key in every daemon's environ | Medium | Fixed, this PR |
+| F9 `host_subject` fails open silently | Medium | SF half fixed, this PR; kerbside half shakenfist#4097 |
+| SF-2 `.vv` type collapse uncovered | Advisory | Fixed, this PR (mutation-verified) |
+| Two false claims in this plan | Advisory | Fixed, this PR |
+| `ARCHITECTURE.md` / `subsystem_internals.md` duplication | Advisory | Fixed, this PR |
+| F11 JWT in argv | Medium | Filed, client-python#392 |
+| SF-1 mint coverage never runs in CI | Advisory | Filed, shakenfist#4093 |
+| Console endpoint precondition asymmetry, F3 | Advisory | Filed, shakenfist#4094 |
+| F2 race comment, `KeyError` paths, late import | Advisory | Filed, shakenfist#4095 |
+| F7 full `cluster_config` read per call | Advisory | Filed, shakenfist#4096 |
+| Seam coverage package | Advisory | Filed, shakenfist#4097 |
+| F4 check-then-act, jti before failable ops | Advisory | Filed, kerbside#409 |
+| Silent node-map skip (#201's shape) | Advisory | Filed, kerbside#410 |
+| Triplicated proxy `.vv` construction | Advisory | Filed, kerbside#411 |
+| Client fallback, capability probe, fixtures | Advisory | Filed, client-python#393 |
+| F10 `--skip-auditwheel` platform tag | Advisory | Filed, ryll#357 |
+| client-python `tox -e cover` misconfiguration | Advisory | Pre-existing since 2020, out of scope, recorded |
+| kerbside logs source password at INFO | Advisory | Out of range, recorded above |
+
+No blocking finding remains open. F8 is fixed on a branch in the
+repository that owns it.
+
+### Spot-checks
+
+Per decision 8 and the risk register, the management session verified
+findings against the tree rather than accepting the reports. Confirmed:
+F1's unfiltered `os.environ` export on both branches of
+`load_cluster_config()`; F5's three reapers and the absence of a fourth
+for `audit_events`; the client-python fixture's ISO-string `expires_at`
+against the server's int epoch; the `video` default that makes the
+`.vv` type assertion hollow; and both halves of the blocking finding's
+call path (`errored` set in `__init__`, and the unconditional cleanup
+that only exempts `openstack`).
+
+Two fixes were mutation-tested by the management session rather than
+trusted: reinstating the blocking bug fails exactly six kerbside tests
+and nothing else, and removing the `.vv` type collapse fails the new
+assertion with `'spice' != 'spiceconcurrent'` while the pre-existing
+test still passes.
+
+### What this phase says about the plan
+
+The audit found a blocking, destructive defect that eight pull-request
+reviews across four repositories did not, and it found it in the *same*
+untested configuration that produced #4003 and #4009. The plan's own
+*Post-completion defects* section called that "the one combination no
+phase ever tested". It was not two bugs; it was a class, and it spans
+repositories.
+
+The seam lens (decision 4) is the heading that found it, and the one no
+`PUSH-AUDIT.md` heading covers. The recommendation for future
+cross-repository plans is that the lens becomes a standing heading
+rather than a per-plan invention: for every value crossing a repository
+boundary, name the test on the reading side that would fail if the
+writing side changed it, and treat "none" as a finding in its own
+right.

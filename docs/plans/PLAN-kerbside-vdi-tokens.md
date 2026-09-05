@@ -381,7 +381,7 @@ Recommendations are recorded inline.
 | 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete |
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete |
 | 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete |
-| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | In progress |
+| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | Complete |
 | 11. Close out the post-completion defects (#4003, #4009) | shakenfist | See *Post-completion defects* below | Complete |
 
 The table above names plan files rather than pull requests, which
@@ -611,6 +611,28 @@ request, and the plan is not complete until each is resolved
 or declined in writing here. If the audit finds nothing, that
 is recorded in one sentence.
 
+**What it found.** Not nothing. One blocking defect, in
+kerbside: a failed VDI signing-key fetch errored the Shaken
+Fist console source, and an errored source is skipped before
+the scrape loop that would have kept its consoles alive -- so
+the unconditional cleanup afterwards deleted the source's
+entire console inventory, breaking the direct and proxy
+console routes that have nothing to do with tokens. It
+triggers against any cluster that has not run `sf-ctl
+ensure-kerbside-signing-key`, which makes it the **third**
+defect from the one configuration no phase ever tested (after
+#4003 and #4009), and the first that destroys data. Also one
+high-severity finding in ryll's SPICE TLS verifier, which
+trusted the public WebPKI root set even when a `.vv` supplied
+a private cluster CA -- the mechanism this plan's whole
+`host_subject` story depends on. Both are fixed, along with
+three medium security findings and the audit's own discovery
+that the `.vv` type-collapse regression test could not fail.
+Fourteen advisory findings were filed as issues across the
+four repositories. Full detail, with what each heading
+examined and the management session's spot-checks and
+mutation tests, is in the phase plan's *Findings* section.
+
 ### Phase 11: Close out the post-completion defects
 
 Phases 1-9 all closed, and the feature works on a cluster that
@@ -758,12 +780,17 @@ We will know this plan is complete when:
   static/oVirt sources.
 * CI proves the end-to-end flow (kerbside SF lane) and the
   minting authorisation gate (SF cluster_ci), and the
-  pre-push checks pass in all four repos. **PARTIALLY MET** —
-  the two lanes exist and the Kerbside-*less* gap that let
-  #4003 and #4009 ship is now covered by
-  `cluster_ci_tests/test_vdi_console_file.py`. The remaining
-  half is the pre-push audit, which is phase 10 and is in
-  progress.
+  pre-push checks pass in all four repos. **Met**, with a
+  caveat worth carrying forward: the two lanes exist, the
+  Kerbside-*less* gap that let #4003 and #4009 ship is covered
+  by `cluster_ci_tests/test_vdi_console_file.py`, and the
+  pre-push audit ran in phase 10 and passed wave 1 in all four
+  repositories. The caveat is that phase 10's seam lens found
+  the mint path's own functional coverage never executes in
+  Shaken Fist's CI (#4093), and that several values crossing
+  repository boundaries are asserted only by hand-written
+  fixtures on both sides (#4097). CI proves the flow; it does
+  not yet prove the contract.
 * Documentation in all four repos reflects the feature, and
   the plan index status tables are current.
 
