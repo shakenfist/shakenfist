@@ -14615,6 +14615,13 @@ own is refreshed exactly as it always was.</p>
   implementations shipped in the <code>shakenfist.shakenfist</code> collection; update
   playbooks to reference them by their fully qualified names (for example
   <code>shakenfist.shakenfist.sf_instance</code>) or via a <code>collections:</code> entry.</li>
+<li>The <code>sf_instance</code> module's <code>secureboot</code> parameter has been renamed to
+  <code>secure_boot</code>, matching the REST API field, the python client keyword and
+  the module's own naming of every other multi-word parameter. The old
+  spelling was never usable in practice: because the module compared it
+  against a key the API does not report, setting it at all -- even to the
+  value the server would have chosen anyway -- made the instance look
+  changed and replaced it on every run.</li>
 <li>The deployer no longer configures rsyslog forwarding to a central node
   (there is no primary node to forward to). Structured logs are shipped to
   the Loki endpoint you configure instead -- see the
