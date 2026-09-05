@@ -114,6 +114,71 @@ class IPAMTestCase(base.ShakenFistTestCase):
                               ReservationType.FLOATING, ''))
         self.assertEqual(False, ipm.is_free('192.168.1.42'))
 
+    def test_reserve_evict_halo(self):
+        # Regression coverage for issue 4059: an explicit address request
+        # must be able to take over a deletion-halo reservation, so that
+        # deleting and immediately recreating an instance at a static
+        # address works. A random allocation must not.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
+        self.assertTrue(ipm.release('192.168.1.10'))
+        self.assertEqual(
+            ReservationType.DELETION_HALO,
+            ipm.get_reservation('192.168.1.10').reservation_type)
+
+        # Without evict_halo the halo still blocks the address
+        self.assertFalse(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
+
+        # With evict_halo the reservation takes the halo over
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, '', evict_halo=True))
+        reservation = ipm.get_reservation('192.168.1.10')
+        self.assertEqual(ReservationType.INSTANCE,
+                         reservation.reservation_type)
+        self.assertEqual(TEST_USER_UUID, str(reservation.user_uuid))
+
+    def test_reserve_evict_halo_never_takes_real_reservation(self):
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
+        self.assertFalse(
+            ipm.reserve('192.168.1.10',
+                        (ObjectType.INSTANCE, str(uuid.uuid4())),
+                        ReservationType.INSTANCE, '', evict_halo=True))
+        self.assertEqual(
+            TEST_USER_UUID,
+            str(ipm.get_reservation('192.168.1.10').user_uuid))
+
+    def test_reserve_evict_halo_in_memory(self):
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24',
+                            in_memory_only=True)
+
+        # An in-memory release deletes the reservation rather than haloing
+        # it, so build the halo directly to exercise the takeover path.
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', None,
+                        ReservationType.DELETION_HALO, ''))
+        self.assertFalse(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, '', evict_halo=True))
+        self.assertEqual(
+            ReservationType.INSTANCE,
+            ipm.get_reservation('192.168.1.10').reservation_type)
+
     def test_get_free_random_ip(self):
         ipam_uuid = str(uuid.uuid4())
         ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '10.0.0.0/22')

@@ -1551,7 +1551,10 @@ allocation. This provides:
   conditions when multiple nodes try to allocate the same address
 - **Efficient queries**: Indexes on ipam_uuid and address for fast lookups
 - **Deletion halo**: Supports the deletion-halo pattern where recently released
-  addresses are temporarily unavailable to prevent reuse conflicts
+  addresses are temporarily unavailable to prevent reuse conflicts. The halo
+  only guards against *random* reallocation: a reservation explicitly
+  requesting a haloed address (for example an instance create with a static
+  `address=`) atomically takes the halo over
 
 ### The ipam_reservations Table
 

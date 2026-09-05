@@ -208,7 +208,16 @@ class IPAM(dbo):
 
     def reserve(self, address: Optional[str],
                 user: Optional[Union[tuple[ObjectType, str], str]],
-                reservation_type: ReservationType, comment: str) -> bool:
+                reservation_type: ReservationType, comment: str,
+                evict_halo: bool = False) -> bool:
+        """Reserve a specific address.
+
+        The deletion halo exists to stop a recently-released address being
+        surprisingly reallocated at *random*. A caller reserving an address
+        the user explicitly asked for may pass evict_halo=True to atomically
+        take over a deletion-halo reservation; a real reservation is never
+        taken over.
+        """
         if not address:
             raise exceptions.InvalidIPAMAddress(
                 f'{address} is not a valid address')
@@ -234,12 +243,15 @@ class IPAM(dbo):
         self.release_haloed(config.IP_DELETION_HALO_DURATION)
 
         if self._in_memory_only:
-            if address in self.__in_memory_store:
+            existing = self.__in_memory_store.get(address)
+            if existing and not (
+                    evict_halo and
+                    existing.reservation_type == ReservationType.DELETION_HALO):
                 return False
             self.__in_memory_store[address] = reservation
             return True
 
-        if not mariadb.reserve_address(reservation):
+        if not mariadb.reserve_address(reservation, evict_halo=evict_halo):
             return False
         self.add_event(
             EVENT_TYPE_AUDIT, 'reserved address',

@@ -1516,16 +1516,20 @@ class ReserveAddressRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     RESERVATION_FIELD_NUMBER: _builtins.int
+    EVICT_HALO_FIELD_NUMBER: _builtins.int
+    evict_halo: _builtins.bool
+    """Take over an existing deletion-halo reservation"""
     @_builtins.property
     def reservation(self) -> Global___IPAMReservationData: ...
     def __init__(
         self,
         *,
         reservation: Global___IPAMReservationData | None = ...,
+        evict_halo: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["reservation", b"reservation"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["reservation", b"reservation"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["evict_halo", b"evict_halo", "reservation", b"reservation"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
