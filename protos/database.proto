@@ -2222,15 +2222,17 @@ message DeleteAgentOperationRequest {
 // These store mutable AgentOperation attributes (results from executed
 // commands).
 
-// last_progress uses proto3 field presence for the same reason as the
-// static values above: absent means SQL NULL, which here means no
-// forward progress has been observed yet. attempts is not optional
-// because the column is not nullable.
+// last_progress and expiry_reason use proto3 field presence for the
+// same reason as the static values above: absent means SQL NULL, which
+// here means no forward progress has been observed yet / the operation
+// has not expired. attempts is not optional because the column is not
+// nullable.
 message AgentOperationAttributesProto {
   string uuid = 1;                  // References agent_operations.uuid
   string results_json = 2;          // JSON-encoded {index: result_dict}
   optional double last_progress = 3; // Epoch seconds; absent = none observed
   int64 attempts = 4;               // Dispatch counter for the retry bound
+  optional string expiry_reason = 5; // 'deadline' or 'progress'; absent = not expired
 }
 
 message CreateAgentOperationAttributesRequest {

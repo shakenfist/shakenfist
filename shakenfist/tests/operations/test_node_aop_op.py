@@ -28,6 +28,7 @@ class _FakeAgentOp:
         self.commands = commands
         self.failure_reason = None
         self.expired_reason = None
+        self.expired_budget = None
         if isinstance(deadline_passed, bool):
             self._deadline_passed = [deadline_passed] * 10
         else:
@@ -47,11 +48,14 @@ class _FakeAgentOp:
     def deadline_passed(self):
         return self._deadline_passed.pop(0)
 
-    def expire(self, reason):
+    def expire(self, reason, budget):
+        if budget not in AgentOperation.EXPIRY_REASONS:
+            raise ValueError(f'unknown expiry budget: {budget}')
         if self.state.value in self.TERMINAL_STATES:
             return
         self.state = AgentOperation.STATE_EXPIRED
         self.expired_reason = reason
+        self.expired_budget = budget
 
     def fail(self, message):
         if self.state.value in self.TERMINAL_STATES:
@@ -99,6 +103,8 @@ class PreflightDeadlineTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'the operation deadline passed before preflight',
             aop.expired_reason)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE, aop.expired_budget)
 
     def test_expired_during_the_blob_copy(self):
         # Not expired on entry, expired by the time ensure_local()
@@ -117,6 +123,8 @@ class PreflightDeadlineTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'the operation deadline passed during preflight',
             aop.expired_reason)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE, aop.expired_budget)
 
     def test_within_the_deadline_reaches_queued(self):
         aop = _FakeAgentOp(

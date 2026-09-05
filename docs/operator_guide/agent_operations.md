@@ -103,14 +103,21 @@ distinct terminal state. The distinction matters operationally:
 failure, the command was unrecognised); `expired` means a budget the
 caller (or the server default) set simply ran out.
 
-*Which* budget expired an operation is not on the operation's own
-external view -- it is in the state row's message, which is not
-surfaced as a separate field. The reliable place to read it is the
-instance's event log: `expire()` always writes an audit event against
-both the operation and the instance recording the reason, and because
-an expired operation is swept for hard deletion once the cleaner's
-delay elapses (the same as a completed one), the instance's copy of
-that event is the one that survives to be read later. When
+*Which* budget expired an operation is the `expiry_reason` field on
+the operation's external view: `deadline` for the wall clock,
+`progress` for the progress timeout, and null while the operation has
+not expired. The two want different responses -- a `deadline` expiry
+on a big transfer is answered by asking for a longer deadline, while a
+`progress` expiry means the guest agent stalled and a bigger deadline
+does not help -- and the field is enumerated exactly so a client can
+branch on it. The prose *reason* (which enforcement point noticed, and
+when) is in the state row's message, which is not surfaced as a
+separate field; the reliable place to read it is the instance's event
+log. `expire()` always writes an audit event against both the
+operation and the instance recording the reason and the budget, and
+because an expired operation is swept for hard deletion once the
+cleaner's delay elapses (the same as a completed one), the instance's
+copy of that event is the one that survives to be read later. When
 `instance execute`/`upload`/`download` on a current client hits a
 terminal state, it now raises `AgentOperationFailed` immediately
 rather than continuing to poll -- see the client behaviour note in the

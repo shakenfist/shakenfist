@@ -2672,7 +2672,8 @@ class Instance(dbowo):
                         # for any more, and consider the next entry in
                         # the same pass.
                         agentop.expire(
-                            'the operation deadline passed while queued')
+                            'the operation deadline passed while queued',
+                            AgentOperation.EXPIRY_REASON_DEADLINE)
                         queue.pop(0)
                         changed = True
                         continue

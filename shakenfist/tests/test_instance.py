@@ -878,6 +878,8 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual(AgentOperation.STATE_EXPIRED, op1.state.value)
         self.assertEqual(
             'the operation deadline passed while queued', op1.state.message)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE, op1.expiry_reason)
 
     def test_next_expires_consecutive_expired_heads(self):
         op1 = self._make_agentop(
@@ -956,7 +958,8 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
         # is popped by the ordinary terminal state rule.
         op1 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
         op2 = self._make_agentop(state=AgentOperation.STATE_QUEUED)
-        op1.expire('expired somewhere else')
+        op1.expire('expired somewhere else',
+                   AgentOperation.EXPIRY_REASON_DEADLINE)
 
         self.assertEqual(
             str(op2.uuid), str(self.inst.agent_operation_next().uuid))
@@ -1110,6 +1113,7 @@ class AgentOperationDeadlineTestCase(base.ShakenFistTestCase):
         self.assertEqual(30.0, view['progress_timeout'])
         self.assertIsNone(view['last_progress'])
         self.assertEqual(0, view['attempts'])
+        self.assertIsNone(view['expiry_reason'])
         self.assertEqual({}, view['results'])
 
     def test_attributes_survive_a_lost_get_or_create_race(self):

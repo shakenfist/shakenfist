@@ -5,7 +5,10 @@ operations to run on that instance. These operations consist of a series of comm
 which are executed in return, with results for each being gathered as they execute.
 
 An operation also carries timing fields: `deadline` and `progress_timeout` are the
-caller's intent, and `last_progress` and `attempts` are the server's bookkeeping.
+caller's intent, and `last_progress`, `attempts` and `expiry_reason` are the
+server's bookkeeping. `expiry_reason` is `null` unless the operation reached the
+`expired` state, and then names the budget that ran out -- `deadline` or
+`progress` -- so a client can branch on it without parsing the audit events.
 `deadline` is an absolute unix timestamp, computed when the API server received the
 creating request; `progress_timeout` is a count of seconds, and reads `0` on an
 operation like the one below whose commands cannot report progress. Both are set
@@ -54,6 +57,7 @@ agent operations for a given instance, refer to the [instances API documentation
             }
         ],
         "deadline": 1787428090.5,
+        "expiry_reason": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
         "last_progress": null,
         "metadata": {},

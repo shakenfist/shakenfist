@@ -4557,6 +4557,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             last_progress=(d.last_progress
                            if d.HasField('last_progress') else None),
             attempts=d.attempts,
+            expiry_reason=(d.expiry_reason
+                           if d.HasField('expiry_reason') else None),
         )
 
     def _agentop_attrs_to_proto(
@@ -4568,7 +4570,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             uuid=str(data.uuid),
             results_json=json.dumps(data.results),
             last_progress=data.last_progress,
-            attempts=data.attempts)
+            attempts=data.attempts,
+            expiry_reason=data.expiry_reason)
 
     # Artifact Operations (MariaDB)
     def CreateArtifact(

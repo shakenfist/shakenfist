@@ -214,7 +214,8 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
                       AgentOperation.STATE_QUEUED,
                       AgentOperation.STATE_EXECUTING):
             op = self._make_agentop(state=state)
-            op.expire('budget exhausted in %s' % state)
+            op.expire('budget exhausted in %s' % state,
+                      AgentOperation.EXPIRY_REASON_DEADLINE)
             self.assertEqual(AgentOperation.STATE_EXPIRED, op.state.value)
             self.assertEqual(
                 'budget exhausted in %s' % state, op.state.message)
@@ -224,18 +225,22 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         # an expire() which tried to record its reason there would
         # raise. The reason lives on the state instead.
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
-        op.expire('no progress')
+        op.expire('no progress', AgentOperation.EXPIRY_REASON_PROGRESS)
         self.assertIsNone(op.error)
 
     def test_expire_from_a_terminal_state_is_a_noop(self):
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
         op.state = AgentOperation.STATE_COMPLETE
-        op.expire('too late')
+        op.expire('too late', AgentOperation.EXPIRY_REASON_DEADLINE)
         self.assertEqual(AgentOperation.STATE_COMPLETE, op.state.value)
+
+        # The no-op must be complete: an operation which did not expire
+        # must not read back as though it had.
+        self.assertIsNone(op.expiry_reason)
 
     def test_expired_may_be_deleted_but_not_errored(self):
         op = self._make_agentop(state=AgentOperation.STATE_QUEUED)
-        op.expire('gone')
+        op.expire('gone', AgentOperation.EXPIRY_REASON_DEADLINE)
         self.assertRaises(
             exceptions.InvalidStateException,
             setattr, op, 'state', dbo.STATE_ERROR)
@@ -251,7 +256,7 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         with mock.patch(
                 'shakenfist.operations.agentoperation.add_event_multi'
         ) as mock_event:
-            op.expire('no progress')
+            op.expire('no progress', AgentOperation.EXPIRY_REASON_PROGRESS)
 
         mock_event.assert_called_once()
         args = mock_event.call_args.args
@@ -261,7 +266,68 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
              (ObjectType.INSTANCE, self.instance_uuid)], args[1])
         self.assertEqual('operation expired', args[2])
         self.assertEqual(
-            {'reason': 'no progress'}, mock_event.call_args.kwargs['extra'])
+            {'reason': 'no progress',
+             'budget': AgentOperation.EXPIRY_REASON_PROGRESS},
+            mock_event.call_args.kwargs['extra'])
+
+    # expiry_reason (issue #4075): the enumerated fact a client can
+    # branch on, where the state message is prose.
+    def _view(self, op):
+        # The reference grouping in external_view() reads the caller's
+        # namespace out of a JWT, so it needs a request context these
+        # tests have no interest in standing up; the same shape as
+        # test_instance.py's helper.
+        with mock.patch(
+                'shakenfist.operations.agentoperation.'
+                'references_to_grouped_dict', return_value={}):
+            return op.external_view()
+
+    def test_expire_records_which_budget_on_the_external_view(self):
+        for budget in AgentOperation.EXPIRY_REASONS:
+            op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+            op.expire(f'the {budget} budget ran out', budget)
+            self.assertEqual(budget, op.expiry_reason)
+            self.assertEqual(budget, self._view(op)['expiry_reason'])
+
+    def test_expiry_reason_is_none_until_expiry(self):
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        self.assertIsNone(op.expiry_reason)
+        self.assertIsNone(self._view(op)['expiry_reason'])
+
+    def test_fail_does_not_record_an_expiry_reason(self):
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        op.fail('it broke')
+        self.assertIsNone(op.expiry_reason)
+        self.assertIsNone(self._view(op)['expiry_reason'])
+
+    def test_expire_refuses_prose_as_a_budget(self):
+        # The field is enumerated so a client can branch on it; free
+        # text sneaking in through a future call site would quietly
+        # break every such client.
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        self.assertRaises(
+            ValueError, op.expire, 'reason', 'the deadline passed')
+        self.assertEqual(AgentOperation.STATE_EXECUTING, op.state.value)
+
+    def test_expire_writes_a_masked_expiry_reason(self):
+        # An unmasked write would push a stale snapshot of the results
+        # column over a concurrent add_result(), exactly as
+        # record_progress()'s docstring warns.
+        op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
+        with mock.patch(
+                'shakenfist.operations.agentoperation.mariadb'
+                '.update_agent_operation_attributes') as mock_update:
+            with mock.patch(
+                    'shakenfist.operations.agentoperation.add_event_multi'):
+                op.expire('deadline passed',
+                          AgentOperation.EXPIRY_REASON_DEADLINE)
+
+        mock_update.assert_called_once()
+        self.assertEqual(
+            ['expiry_reason'], mock_update.call_args.kwargs['fields'])
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE,
+            mock_update.call_args.args[0].expiry_reason)
 
     # fail()
     def test_fail_records_the_message_on_the_state(self):
@@ -280,7 +346,7 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         # Without the terminal state guard this raises
         # InvalidStateException, because expired has no edge to error.
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
-        op.expire('deadline passed')
+        op.expire('deadline passed', AgentOperation.EXPIRY_REASON_DEADLINE)
         op.fail('and then something else went wrong')
         self.assertEqual(AgentOperation.STATE_EXPIRED, op.state.value)
 
@@ -309,7 +375,7 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         # leak the moment anything records a reference from an agent
         # operation.
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
-        op.expire('deadline passed')
+        op.expire('deadline passed', AgentOperation.EXPIRY_REASON_DEADLINE)
 
         with mock.patch(
                 'shakenfist.operations.agentoperation.mariadb'

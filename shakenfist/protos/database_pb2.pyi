@@ -7220,10 +7220,11 @@ class AgentOperationAttributesProto(_message.Message):
     These store mutable AgentOperation attributes (results from executed
     commands).
 
-    last_progress uses proto3 field presence for the same reason as the
-    static values above: absent means SQL NULL, which here means no
-    forward progress has been observed yet. attempts is not optional
-    because the column is not nullable.
+    last_progress and expiry_reason use proto3 field presence for the
+    same reason as the static values above: absent means SQL NULL, which
+    here means no forward progress has been observed yet / the operation
+    has not expired. attempts is not optional because the column is not
+    nullable.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -7232,6 +7233,7 @@ class AgentOperationAttributesProto(_message.Message):
     RESULTS_JSON_FIELD_NUMBER: _builtins.int
     LAST_PROGRESS_FIELD_NUMBER: _builtins.int
     ATTEMPTS_FIELD_NUMBER: _builtins.int
+    EXPIRY_REASON_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """References agent_operations.uuid"""
     results_json: _builtins.str
@@ -7240,6 +7242,8 @@ class AgentOperationAttributesProto(_message.Message):
     """Epoch seconds; absent = none observed"""
     attempts: _builtins.int
     """Dispatch counter for the retry bound"""
+    expiry_reason: _builtins.str
+    """'deadline' or 'progress'; absent = not expired"""
     def __init__(
         self,
         *,
@@ -7247,13 +7251,19 @@ class AgentOperationAttributesProto(_message.Message):
         results_json: _builtins.str = ...,
         last_progress: _builtins.float | None = ...,
         attempts: _builtins.int = ...,
+        expiry_reason: _builtins.str | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress", "last_progress", b"last_progress"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress", "attempts", b"attempts", "last_progress", b"last_progress", "results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_expiry_reason", b"_expiry_reason", "_last_progress", b"_last_progress", "attempts", b"attempts", "expiry_reason", b"expiry_reason", "last_progress", b"last_progress", "results_json", b"results_json", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    _WhichOneofReturnType__expiry_reason: _TypeAlias = _typing.Literal["expiry_reason"]  # noqa: Y015
+    _WhichOneofArgType__expiry_reason: _TypeAlias = _typing.Literal["_expiry_reason", b"_expiry_reason"]  # noqa: Y015
     _WhichOneofReturnType__last_progress: _TypeAlias = _typing.Literal["last_progress"]  # noqa: Y015
     _WhichOneofArgType__last_progress: _TypeAlias = _typing.Literal["_last_progress", b"_last_progress"]  # noqa: Y015
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__expiry_reason) -> _WhichOneofReturnType__expiry_reason | None: ...
+    @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__last_progress) -> _WhichOneofReturnType__last_progress | None: ...
 
 Global___AgentOperationAttributesProto: _TypeAlias = AgentOperationAttributesProto  # noqa: Y015

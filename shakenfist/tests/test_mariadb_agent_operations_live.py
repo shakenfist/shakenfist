@@ -51,10 +51,14 @@ TEST_TABLES = [
     'schema_versions',
 ]
 
-# The columns this migration adds, by the table they belong to.
+# The columns this migration adds, by the table they belong to. The
+# attributes table gained last_progress and attempts at v3 and
+# expiry_reason at v4; one ALTER block serves both steps, so a full
+# rewind to v2 covers all three.
 NEW_COLUMNS = {
     'agent_operations': ['deadline', 'progress_timeout'],
-    'agent_operation_attributes': ['last_progress', 'attempts'],
+    'agent_operation_attributes': ['last_progress', 'attempts',
+                                   'expiry_reason'],
 }
 
 
@@ -220,11 +224,44 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         self.assertTrue(
             self._column_is_nullable(
                 'agent_operation_attributes', 'last_progress'))
+        self.assertTrue(
+            self._column_is_nullable(
+                'agent_operation_attributes', 'expiry_reason'))
         # attempts is the one column with no "unknown" state, so a
         # reader never has to write "attempts or 0".
         self.assertFalse(
             self._column_is_nullable(
                 'agent_operation_attributes', 'attempts'))
+
+    def test_migration_from_v3_adds_only_expiry_reason(self):
+        # The upgrade path a real deployment already at v3 takes: the
+        # two v3 ALTERs re-run as IF NOT EXISTS no-ops and only
+        # expiry_reason is new.
+        aop_uuid = uuid4()
+        self._rewind()
+        self._migrate()
+        self._insert_legacy_rows(aop_uuid)
+
+        with self.engine.connect() as conn:
+            conn.execute(sa.text(
+                'ALTER TABLE agent_operation_attributes '
+                'DROP COLUMN expiry_reason'))
+            conn.commit()
+        mariadb._set_table_version(
+            self.engine, 'agent_operation_attributes', 3)
+
+        _, attrs = self._migrate()
+        self.assertTrue(attrs['migrated'])
+        self.assertEqual(mariadb.AGENT_OPERATION_ATTRIBUTES_VERSION,
+                         attrs['end_version'])
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                sa.text('SELECT results, expiry_reason '
+                        'FROM agent_operation_attributes '
+                        'WHERE uuid = :uuid'),
+                {'uuid': aop_uuid.hex}).first()
+        self.assertIsNotNone(row)
+        self.assertIsNone(row[1])
 
     def test_migration_is_idempotent(self):
         self._rewind()
@@ -268,6 +305,9 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         self.assertTrue(
             self._column_is_nullable(
                 'agent_operation_attributes', 'last_progress'))
+        self.assertTrue(
+            self._column_is_nullable(
+                'agent_operation_attributes', 'expiry_reason'))
         self.assertFalse(
             self._column_is_nullable(
                 'agent_operation_attributes', 'attempts'))
@@ -381,6 +421,7 @@ class AgentOperationDirectAccessLiveTestCase(base.ShakenFistTestCase):
         out = mariadb._direct_get_agent_operation_attributes(aop_uuid)
         self.assertIsNone(out.last_progress)
         self.assertEqual(0, out.attempts)
+        self.assertIsNone(out.expiry_reason)
 
         # Write only last_progress. A masked update must leave the
         # other columns exactly as they were, which is what stops a
@@ -388,13 +429,22 @@ class AgentOperationDirectAccessLiveTestCase(base.ShakenFistTestCase):
         out.last_progress = 1787427490.5
         out.attempts = 7
         out.results = {}
+        out.expiry_reason = 'deadline'
         self.assertTrue(mariadb._direct_update_agent_operation_attributes(
             out, fields=['last_progress']))
 
         reread = mariadb._direct_get_agent_operation_attributes(aop_uuid)
         self.assertEqual(1787427490.5, reread.last_progress)
         self.assertEqual(0, reread.attempts)
+        self.assertIsNone(reread.expiry_reason)
         self.assertEqual({'0': {'status': 0}}, reread.results)
+
+        # And the expiry_reason mask expire() uses writes only that.
+        self.assertTrue(mariadb._direct_update_agent_operation_attributes(
+            out, fields=['expiry_reason']))
+        reread = mariadb._direct_get_agent_operation_attributes(aop_uuid)
+        self.assertEqual('deadline', reread.expiry_reason)
+        self.assertEqual(0, reread.attempts)
 
     def test_unknown_uuid_returns_none(self):
         self.assertIsNone(mariadb._direct_get_agent_operation(
