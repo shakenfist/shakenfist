@@ -56,8 +56,14 @@ The full flag surface is reported by `instar create --help`.
 | raw    | (host-only)            | No       | byte-equivalent (file size + zero-fill) |
 | qcow2  | n/a                    | Yes      | info-equivalent (modulo refcount_bits, compat, zstd) |
 | vmdk   | monolithicSparse, streamOptimized | Yes | info-equivalent |
-| vpc    | dynamic, fixed         | Yes      | info-equivalent (modulo CHS virtual_size rounding) |
-| vhdx   | dynamic                | Yes      | info-equivalent (modulo default block_size when unspecified) |
+| vpc    | dynamic, fixed         | No       | info-equivalent (modulo CHS virtual_size rounding) |
+| vhdx   | dynamic                | No       | info-equivalent (modulo default block_size when unspecified) |
+
+A "No" in the *Backing?* column means the format cannot be created
+*as a child*: `-b` / `-o backing_file` is rejected. Any of these
+formats may still be used as the **parent** of a qcow2 or vmdk
+child, which is what `tests/test_create.py`'s `test_vhdx_as_backing`
+exercises.
 
 The "info-equivalence" contract is verified by the cross-version baseline
 matrix in `instar-testdata/expected-outputs/create-info-json/` across 80
@@ -125,19 +131,29 @@ the subformat. instar exposes `--grain-size` as an independent flag.
 
 Honoured:
 - `size`, `subformat` (dynamic|fixed)
-- `backing_file`, `backing_fmt`
 
 Accepted but no size effect:
 - `force_size`
+
+Rejected (future work):
+- `backing_file`, `backing_fmt` — a VHD child with a parent is a
+  *differencing* disk (`disk_type=4` plus the dynamic header's
+  parent locator table), which `plan_vhd` refuses with
+  `BackingFileUnsupported`. See [Future work](#future-work).
 
 ### vhdx
 
 Honoured:
 - `size`, `block_size` (1 MiB..256 MiB power of two)
-- `backing_file`, `backing_fmt`
 
 Accepted but no size effect:
 - `log_size`
+
+Rejected (future work):
+- `backing_file`, `backing_fmt` — a VHDX child with a parent needs
+  the `HasParent` file-parameter bit and a populated parent locator
+  metadata item, which `plan_vhdx` refuses with
+  `BackingFileUnsupported`. See [Future work](#future-work).
 
 ### raw
 
@@ -149,6 +165,10 @@ Rejected:
 - Any backing-file key (raw doesn't support backing)
 
 ## Backing-file semantics
+
+This section describes `create` for the two target formats that
+accept a backing file: qcow2 and vmdk. vpc and vhdx reject one
+(see above), and raw has no way to record one.
 
 The user-typed path is embedded verbatim into the new image's metadata,
 matching qemu-img: a relative path stays relative; an absolute path
@@ -221,6 +241,11 @@ through `instar check` and match `qemu-img` (instar #365).
 - Preallocation for vmdk / vpc / vhdx (each format needs its own
   BAT-population pattern plus the same host `apply_preallocation`
   post-pass that qcow2 already uses).
+- Differencing VHD (`disk_type=4` + parent locators) and
+  differencing VHDX (`HasParent` + parent locator metadata item) as
+  create targets, so `-b` works for vpc and vhdx. qemu-img creates
+  neither ("Backing file not supported for file format 'vpc'"), so
+  this is an instar-only capability with no qemu-img oracle.
 - Multi-file VMDK subformats (`monolithicFlat`, `twoGbMaxExtentSparse`,
   `twoGbMaxExtentFlat`) — needs multi-output-device support in the
   call table.
