@@ -818,6 +818,34 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.assertEqual(16, node2['cpu_limit'])
         self.assertEqual(16.0 - 5, node2['cpu_available'])
 
+    def test_summarize_resources_publishes_capacity_degraded_on_a_failed_read(self):
+        # A failed read (D19) is not acted on here -- there is no
+        # instance to event against -- but the CI headroom probe (and
+        # any other repeat sampler of this endpoint) has exactly the
+        # pre-filter's problem: an empty ``capacity`` mapping is
+        # indistinguishable from a genuinely unpopulated table unless
+        # something in the response says which. This pins that the
+        # flag reaches the response body rather than being discarded
+        # the way the pre-filter's own read is.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.node_capacity_read_degraded = True
+
+        resources = scheduler.Scheduler().summarize_resources()
+        self.assertTrue(resources['total']['capacity_degraded'])
+
+    def test_summarize_resources_reports_capacity_degraded_false_when_readable(self):
+        # The counterpart to the case above: a readable table -- whether
+        # populated or empty (P7) -- publishes the flag as False, so a
+        # reader can trust a False here to mean the read genuinely
+        # succeeded rather than the field simply being absent.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            used_cpus=5)
+
+        resources = scheduler.Scheduler().summarize_resources()
+        self.assertFalse(resources['total']['capacity_degraded'])
+
     def test_summarize_resources_reports_a_node_with_no_row(self):
         # A node the reconciler has not sized yet (P7) is guarded by
         # nothing, so it is charged nothing -- but the response says
