@@ -971,6 +971,265 @@ command-list ownership rule, the four timing-budget checks, the MariaDB
 three-layer pattern and RPC registration, REST-to-executor duplication,
 and the comment-proportion candidates — came back clean.
 
+### 2b. Test review
+
+Baseline: `git diff M^1 M` for each of `f21d5da3a`, `cb9e10bba`,
+`08807c83f`, `291054e98`, `185de6b32`, `4afa29476`, `864608276`,
+`4a122bcd3`, `2341ae0c4`, `2e19bb1ea`, `91d565a05`. Wave 1 result
+(pre-commit + `tox`: py3, flake8, cover) already confirmed passing by
+step 8b; not re-run here.
+
+Files read in full or by targeted section: `shakenfist/tests/
+test_daemon_sidechannel_executor.py` (1946 lines, all classes),
+`test_daemon_sidechannel_shutdown.py`, `test_agent_operation_expiry.py`,
+`test_agent_operation_retry.py`, `test_instance_static_value_ownership.py`,
+`test_mariadb_agent_operations.py`, `test_mariadb_agent_operations_live.py`,
+`test_instance.py` (agent-operation sections, lines ~759-1110),
+`shakenfist/tests/operations/test_node_aop_op.py`,
+`shakenfist/tests/external_api/test_agent_operation_timing.py`,
+`test_agent_operation_parameters.py`,
+`shakenfist/deploy/shakenfist_ci/smoke_ci_tests/test_agentop_deadlines.py`,
+plus production `shakenfist/operations/node_aop_op.py`,
+`shakenfist/external_api/base.py`, `shakenfist/external_api/instance.py`,
+`shakenfist/daemons/sidechannel/main.py` (diff-relevant sections) and
+`shakenfist/operations/agentoperation.py`. Git history was walked with
+`git show <rev>:<path>` to read test files as they stood immediately
+before each fix.
+
+#### 1. The counterfactual question
+
+**#3970 (`2e19bb1ea`) — command-list aliasing.**
+
+Read `shakenfist/tests/test_daemon_sidechannel_executor.py` at
+`2e19bb1ea^1` (before the fix). Every test that touches
+`SideChannelExecutorJob.commands` builds the job with
+`SideChannelExecutorJob.__new__(...)` and then hand-assigns
+`job.commands = list(commands)` directly (e.g. the pre-fix
+`ExecutorTerminalStateGuardTestCase._make_executor`,
+`ExecutorBudgetTestCase._make_executor`,
+`ExecutorDispatchTerminalGuardTestCase._make_executor`). None of them
+ever went through the real `__init__`, which is exactly where
+`self.commands = agentop.commands` created the alias. The shape of
+assertion that would have caught it is an identity check taken through
+the real constructor: build a job with `SideChannelExecutorJob(inst,
+agentop)` and assert `job.commands is not agentop.commands`, then
+dispatch through it and assert `agentop.commands` is unchanged. No such
+test existed pre-fix.
+
+The fix itself adds exactly that shape, in three places, and it is the
+right shape, not just a pin: `AgentOperationCommandListTestCase` in
+`test_agent_operation_retry.py:146-215` (added by `2e19bb1ea`) asserts
+`assertIsNot(data.commands, first['commands'])` and that mutating one
+reader's list leaves a sibling and the cached model untouched;
+`ExecutorCommandListOwnershipTestCase` in
+`test_daemon_sidechannel_executor.py:1208-1262` builds a
+`SideChannelExecutorJob` through its real constructor and asserts
+`assertIsNot(job.commands, job.agentop.commands)`, then dispatches and
+asserts the operation's own list is untouched
+(`test_a_dispatched_get_file_is_still_retryable` even re-checks
+`operation_is_retryable()` at the exact point the regression fired);
+`test_instance_static_value_ownership.py` mirrors the same identity
+check for `Instance._static_values_to_dict()`'s three container fields.
+These are invariant assertions (identity/independence), not
+value-pinning, so a regression of the alias would fail them again.
+**Grade: informational / confirmed adequate.**
+
+**#3931 (`2341ae0c4`) — executor teardown `KeyError`.**
+
+Read `shakenfist/tests/test_daemon_sidechannel_executor.py` at
+`2341ae0c4^1`: `grep -n "^class "` over that revision returns no class
+for `_request_thread_exit` or `_request_all_threads_exit` at all — the
+shutdown path had **zero** test coverage before the fix, not merely the
+wrong shape. `test_daemon_sidechannel_shutdown.py` is new in this same
+merge and is the first test of that method. Its shape is right:
+`test_executor_without_monitor_does_not_keyerror` builds a reaper-style
+fixture with an executor entry and no matching monitor entry and calls
+the un-mocked real method, which is precisely the condition that raised
+`KeyError`; `test_executor_shutdown_leaves_the_monitor_alone` and
+`test_shutdown_waits_for_executors` extend it. **Grade: informational /
+confirmed adequate for the new file.**
+
+However, a related test added *after* the fix landed still tolerates
+the exact defect class it is nominally about, and is worth flagging on
+its own:
+
+- `shakenfist/tests/test_daemon_sidechannel_executor.py:287-306`
+  (`test_every_thread_is_signalled`) and `:308-330`
+  (`test_signalling_happens_before_any_join`), in class
+  `RequestAllThreadsExitTestCase`. Both wrap the call to
+  `mon._request_all_threads_exit()` in `try: ... except KeyError: pass`
+  with the comment "#3931, which lives in `_request_thread_exit()` and
+  is fixed separately." `git log -S"class RequestAllThreadsExitTestCase"`
+  shows this class was added in commit `93ada39c2`, dated 2026-08-29 —
+  one day *after* `2341ae0c4` (2026-08-28) had already fixed #3931 on
+  `develop`, and the branch's merge-base with `develop` (`52b4a9447`,
+  2026-08-30) postdates the fix as well. So this is not a test written
+  under the bug and later stranded — it was written with the fix
+  already on the branch, and still defensively swallows the exact
+  exception the fix removed. **Grade: blocking.** What goes undetected:
+  if `_request_thread_exit()` ever regresses to reading the wrong dict
+  again (the precise shape of #3931), these two tests will not fail —
+  they will silently take the `except KeyError: pass` branch and keep
+  asserting only on the *signalling*, which happens before the point
+  where the KeyError was raised. `test_daemon_sidechannel_shutdown.py`
+  is a smaller, more targeted regression test for the same defect and
+  does not have this problem, but its existence does not make the
+  `except KeyError` in this file harmless — it means a second
+  regression-catching site currently masks the very failure it names in
+  its own docstring. Fix: call the un-swallowed method and let a
+  `KeyError` fail the test, or drop the `try/except` now that the fix
+  is a permanent part of the tree.
+
+#### 2. Behaviour versus implementation
+
+- `shakenfist/tests/test_daemon_sidechannel_executor.py:1116-1117`
+  (`test_a_failure_to_unlink_is_not_fatal`): asserts
+  `job.log.with_fields.return_value.warning.assert_called_once()` in
+  addition to the behavioural assertion
+  (`self.assertIsNone(job._blob_partial_file)`). **Advisory.** Coupled
+  to the exact logging call chain (`log.with_fields(...).warning(...)`);
+  a refactor to a different logging call shape (e.g. `log.warning(...,
+  extra=...)`) breaks this test with no behavioural regression. The
+  state assertion on the same test already proves the failure was
+  tolerated, so the log assertion adds fragility without adding
+  detection power.
+- `shakenfist/tests/test_daemon_sidechannel_executor.py:296,327`
+  (the `except KeyError: pass` pattern discussed above) is also an
+  implementation-adjacent smell in the opposite direction: rather than
+  asserting on an implementation detail, it structurally cannot detect
+  a regression in one. Already graded blocking above; listed here too
+  because it is the clearest instance of "assertion shape hides
+  behaviour" in the diff.
+- Exact state-message string assertions such as
+  `test_daemon_sidechannel_executor.py:673-679`
+  (`'no progress from the agent for 30 seconds, and the operation
+  cannot be safely retried'`) and the parallel strings in
+  `ExecutorRetryTestCase` (`test_daemon_sidechannel_executor.py:1312-
+  1391`) pin exact wording. **Advisory, not blocking** — these strings
+  are the operator-visible `object_states.message` value CLAUDE.md
+  asks the project to keep auditable, not a private log line, so
+  pinning them is closer to a documented contract than an
+  implementation detail. Still, a future wording tweak (e.g. adding
+  the attempt count in a different position) will break several tests
+  at once for a change with no behavioural content; grouping the
+  literal strings into shared constants (the way `ExecutorRetryTestCase`
+  already does with `STALL`/`EXIT`) would reduce the blast radius.
+- No instances found of assertions on private-attribute *names* purely
+  for their own sake (as opposed to the state they carry), on internal
+  helper call counts that aren't the behaviour under test, or on
+  unrelated-operation ordering. The `_last_progress`, `_blob_partial_file`,
+  `_deadline_anchor` attribute reads throughout `ExecutorBudgetTestCase`
+  and `ExecutorProgressPersistenceTestCase` are read via
+  `__new__`-constructed fixtures rather than the real constructor, which
+  is a common and accepted pattern in this file (documented inline,
+  e.g. `test_daemon_sidechannel_executor.py:502-503`), and the values
+  asserted are the actual budget/anchor state the production code
+  depends on, not incidental internals.
+
+#### 3. Adversarial cases
+
+| Case | Covered? | Where |
+|---|---|---|
+| Deadline already in the past at enqueue/dequeue | **Yes** | `test_instance.py:867` `test_next_expires_a_queued_head_past_its_deadline` uses `deadline=1.0` (1970), and the equivalent NULL-deadline-anchor case at `test_instance.py:916`. Functionally in `test_agentop_deadlines.py:191` `test_queued_operation_expires_on_its_deadline`. |
+| `deadline_seconds=0` (no-deadline sentinel) alone | **Yes** | `test_agent_operation_expiry.py:71` `test_explicit_zero_deadline_means_none`; `test_instance.py:905` `test_next_never_expires_an_explicit_zero_deadline`; `test_agent_operation_timing.py:75-99`. |
+| `deadline_seconds=0` **combined with** a disabled progress timeout, end-to-end through `expire_if_out_of_budget()` | **No** | `test_instance.py:1062` `test_zero_is_not_none` only checks the pair round-trips through the database; no test drives `SideChannelExecutorJob.expire_if_out_of_budget()` with both budgets simultaneously disabled to confirm it returns `False` forever (i.e. that nothing ever reclaims such a slot short of the reaper's thread-liveness check). This is the exact scenario the phase's own risk section (decision list, "Step 8f's denial-of-service question") flags as unresolved; a test review can only confirm the gap, not answer whether it is safe. |
+| Attempt bound reached exactly | **Yes** | `test_daemon_sidechannel_executor.py:1406-1450` (`test_an_executor_exit_retries_to_the_cap_and_then_errors`) loops exactly `config.AGENT_OPERATION_MAX_ATTEMPTS` times and asserts the state sequence `[QUEUED]*(cap-1) + [ERROR]`. |
+| Transition attempted from a terminal state | **Partial** | `complete` and `expired` are covered as *sources* refused into `queued`/`error` (`test_agent_operation_retry.py:68-76`, `test_agent_operation_expiry.py:175-183`; also `AgentOperationStateMachineTestCase.test_expired_is_terminal`, `test_agent_operation_expiry.py:287-294`). `error` and `deleted` as sources are asserted only at the `state_targets` dict-shape level (`state_targets[dbo.STATE_ERROR] == (dbo.STATE_DELETED,)`), never via a runtime `assertRaises(InvalidStateException, ...)` the way `complete`/`expired` are. **Advisory gap.** |
+| Reaper and executor racing on the same operation | **Yes (simulated ordering)** | `test_daemon_sidechannel_executor.py:1817-1848` (`test_a_wedged_live_executor_is_resolved_then_aborted`) explicitly asserts resolve-before-abort ordering via an instrumented `order` list, which is exactly the invariant the docstring says protects against the executor's own `finally` overwriting the reaper's verdict. Not a true concurrent-thread test (acceptable — none of the surrounding suite uses real threads for this either). |
+| Empty command list | **Yes** | `OperationRetryabilityTestCase.test_an_empty_list_is_not_retryable` (`test_daemon_sidechannel_executor.py:1288-1291`), with the comment explaining why `all([])` being vacuously true would otherwise wrongly mark it retryable. |
+| Concurrent deletion of the instance mid-operation | **No** | No test in any of the reviewed files sets `Instance.state` to `deleted` (or calls `hard_delete()` on the instance) while an `AgentOperation` is `executing`/`queued` against it. `test_agent_operation_expiry.py:244` `test_hard_delete_clears_object_references` covers the *operation's own* hard-delete cleanup, not the instance-disappears-underneath-it case. Every executor/dispatcher test that models "gone" models the *operation* reaching `deleted` (`test_a_deleted_operation_lets_the_loop_exit`, `test_daemon_sidechannel_executor.py:1166-1178`), never the instance. **Advisory gap** — worth a targeted unit test (fake instance `from_db()` returning `None` or raising mid-dispatch) even without a functional equivalent. |
+
+#### 4. Functional coverage gaps
+
+`shakenfist/deploy/shakenfist_ci/smoke_ci_tests/test_agentop_deadlines.py`'s
+four tests cover: the default deadline being published on an operation
+(`test_default_deadline_is_published`), a wall-clock expiry freeing the
+executor slot for a queued follower
+(`test_expiry_frees_the_executor_slot`), a silent (non-progress-capable)
+command surviving the progress timeout
+(`test_silent_execute_survives_the_progress_timeout`), and a queued
+head expiring on its own deadline before ever being dispatched
+(`test_queued_operation_expires_on_its_deadline`). None of the four
+dispatches a command more than once, so none reaches:
+
+- **Retry-to-completion** (a progress-capable command that stalls once,
+  requeues, and succeeds on a second attempt). Not present in
+  `smoke_ci_tests` or `cluster_ci_tests` (`grep` for `sidechannel` /
+  `agentop` across `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`
+  returns nothing). **Worth filing.** It does not require killing a
+  daemon or a wedged guest — only a guest-side command that is silent
+  for longer than the progress timeout on its first attempt and
+  responds normally after, which the CI guest images already support
+  the primitives for (the existing silent-execute test proves the
+  harness can already produce a controlled stall).
+- **The attempt bound reached functionally** (a command that stalls on
+  every attempt until `AGENT_OPERATION_MAX_ATTEMPTS` is exhausted and
+  the operation errors). **Worth filing**, same primitive as above
+  repeated `AGENT_OPERATION_MAX_ATTEMPTS` times, at a real but bounded
+  cost (roughly `progress_timeout * attempts` wall time per run) — not
+  free, but not impractical either.
+- **The node-local reaper's daemon-restart-drains-the-queue path**
+  (an operation left `executing` when the sidechannel daemon dies and
+  restarts, requiring the *next* daemon's reaper to notice the missing
+  executor thread and resolve it). **Genuinely impractical in this
+  suite as it stands**, not merely inconvenient: `test_health.py:13-16`
+  in this same `cluster_ci_tests` directory states the project's own
+  precedent explicitly — "restart sf-api and observe the 503 window
+  ... would require stopping a daemon in the shared CI cluster, which
+  is too invasive for a single test module," and defers that class of
+  assertion to unit coverage plus a documentation note. The reaper's
+  daemon-restart case has exactly the same shape and the same
+  objection applies; it is well covered at the unit level instead
+  (`ExecutorReaperTestCase.test_a_daemon_restart_drains_the_queue`,
+  `test_daemon_sidechannel_executor.py:1727-1751`).
+
+#### 5. Zero-coverage check
+
+- `shakenfist/daemons/sidechannel/main.py`: every function this plan's
+  merges added or materially changed has a corresponding test class
+  (`SideChannelExecutorJob.__init__` command copy, `expire_if_out_of_budget`,
+  `observe_progress`/persistence, `_dispatch_next_command`,
+  `_abort_commands_if_terminal`, `resolve_abandoned_operation`,
+  `operation_is_retryable`, `start_instance_executor`,
+  `reap_instance_executors`/`reap_instance_monitors`,
+  `_request_thread_exit`/`_request_all_threads_exit`). Nothing found
+  uncovered.
+- `shakenfist/operations/agentoperation.py`: `effective_deadline`,
+  `deadline_passed`, `effective_progress_timeout`, `expire`, `fail`,
+  `record_progress`, `record_attempt`, `clear_results` are all
+  exercised in `test_agent_operation_expiry.py` /
+  `test_agent_operation_retry.py`. Nothing found uncovered.
+- `shakenfist/instance.py`: the diffs in this plan's merges did not add
+  new top-level functions (confirmed via `git diff <M>^1 <M> --
+  shakenfist/instance.py | grep '^+.*def '` returning nothing for
+  `291054e98`/`185de6b32`); they changed `agent_operation_next()` and
+  `_static_values_to_dict()` in place, both covered
+  (`test_instance.py:867` onward; `test_instance_static_value_ownership.py`).
+- `shakenfist/external_api/`: `agent_operation_timing()` and its
+  `_timing_seconds()` helper in `external_api/base.py` are covered
+  exhaustively by `test_agent_operation_timing.py` (bool, NaN, inf,
+  negative, list, non-numeric all present). The three call sites in
+  `external_api/instance.py` (`InstanceAgentPutEndpoint`,
+  `InstanceAgentGetEndpoint`, and the execute endpoint) are covered by
+  `test_agent_operation_parameters.py`, including the "refused request
+  creates nothing" property
+  (`test_put_refuses_a_negative_deadline_before_looking_up_the_blob`).
+  The capability-token addition in `external_api/app.py` (`4afa29476`)
+  is covered only by `test_root.py`'s one-line update
+  (`git diff 4afa29476^1 4afa29476 -- shakenfist/tests/`); this repo's
+  own PUSH-AUDIT.md F1 confirms the capability is exercised functionally
+  by every `test_agentop_deadlines.py` test via
+  `check_capability('agentoperation-deadlines')`, so this is not a real
+  gap, just thin in isolation.
+
+Nothing else in the footprint (per the merge list in decision 1) was
+found with zero coverage.
+
+---
+
+**Wave 1**: confirmed already green by step 8b (`tox`: py3, flake8,
+cover all OK); not re-run here per the task instructions.
+
 ### 2c. Documentation review
 
 Baseline used: `git diff M^1 M` for each of the twelve merges named in
