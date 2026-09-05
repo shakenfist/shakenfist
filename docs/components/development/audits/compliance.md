@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-04T10:53:24.418963+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-05T10:11:43.218556+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -443,7 +443,7 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#356 |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
@@ -451,6 +451,7 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 
 Details for non-compliant projects:
 
+- **ryll** (Status): AGENTS.md is 307 lines / 2118 words (limits: 300 lines, 2500 words); move detail into docs/ and leave a summary and a link
 - **visual-digest-rust** (Status): AGENTS.md and ARCHITECTURE.md share the headings "feature flag matrix"; give each fact one home and link to it from the other file
 
 ## llm-tooling
@@ -626,9 +627,9 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 
 Details for non-compliant projects:
 
-- **divergulent** (Status): 2 of 2 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"), PLAN-patch-classification.md (no push audit phase; phase 6 is "6. BTS / upstream cross-reference"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md
+- **divergulent** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md
 - **occystrap** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-quay-label-search.md (no push audit phase; phase 5 is "5. Filter by tag age (since parameter)"); 1 plan(s) with no phases this check can read, not judged: PLAN-info-check.md
-- **shakenfist** (Status): 3 of 19 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-kerbside-vdi-tokens.md (push audit phase is not last, so phase 11 ("11. Close out the post-completion defects (#4003, #4009)") is unaudited; move the audit phase after it), PLAN-queue-performance.md (phase 8 is the push audit phase and is Complete, but phases up to 11 ("11. Multi-column coalescing key") come after it; if that work landed after the audit ran, append a new push audit phase rather than moving the finished one); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
+- **shakenfist** (Status): 2 of 18 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-kerbside-vdi-tokens.md (push audit phase is not last, so phase 11 ("11. Close out the post-completion defects (#4003, #4009)") is unaudited; move the audit phase after it); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
 ## plan-index
@@ -743,7 +744,7 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#79 |
+| divergulent | compliant | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -759,7 +760,6 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 
 Details for non-compliant projects:
 
-- **divergulent** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **occystrap** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **shakenfist** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **uncalibrated-sextant** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
@@ -777,7 +777,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#82 |
+| divergulent | compliant | - |
 | instar | non-compliant | shakenfist/instar#491 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -794,7 +794,6 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
-- **divergulent** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **instar** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
 - **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 - **ryll** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
@@ -930,25 +929,36 @@ Criterion: [release-process.md](/components/development/audits/release-process/)
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | N/A | - |
-| agent-python | compliant | - |
-| client-python | compliant | - |
-| client-python-k3s | compliant | - |
-| clingwrap | compliant | - |
+| agent-python | non-compliant | shakenfist/agent-python#135 |
+| client-python | non-compliant | shakenfist/client-python#391 |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#54 |
+| clingwrap | non-compliant | shakenfist/clingwrap#131 |
 | cloudgood | N/A | - |
 | development | N/A | - |
-| divergulent | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#106 |
 | instar | N/A | - |
-| kerbside | compliant | - |
+| kerbside | non-compliant | shakenfist/kerbside#408 |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | compliant | - |
-| occystrap | compliant | - |
+| occystrap | non-compliant | shakenfist/occystrap#132 |
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
-| shakenfist | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4082 |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
+
+Details for non-compliant projects:
+
+- **agent-python** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
+- **client-python** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
+- **client-python-k3s** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
+- **clingwrap** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
+- **divergulent** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
+- **kerbside** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
+- **occystrap** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
+- **shakenfist** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success; release.yml can be started by hand but its publishing jobs are not confined to tags: sign-tag, publish-pypi, publish-collection, github-release lack "if: startsWith(github.ref, 'refs/tags/v')", so a manual run on a branch force-pushes a "refs/tags/refs/heads/<branch>" tag and proceeds to publish
 
 ## renovate-lockstep-groups
 
@@ -1048,8 +1058,8 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 159 of 174 in-scope files reviewed at HEAD; 15 need review (threshold 5)
-- **kerbside** (Status): 121 of 229 in-scope files reviewed at HEAD; 108 need review (threshold 5)
+- **development** (Status): 153 of 174 in-scope files reviewed at HEAD; 21 need review (threshold 5)
+- **kerbside** (Status): 120 of 229 in-scope files reviewed at HEAD; 109 need review (threshold 5)
 - **ryll** (Status): 85 of 188 in-scope files reviewed at HEAD; 103 need review (threshold 5)
 
 ## review-scope-completeness
@@ -1190,7 +1200,7 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
-| divergulent | non-compliant | shakenfist/divergulent#81 |
+| divergulent | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -1206,7 +1216,6 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 
 Details for non-compliant projects:
 
-- **divergulent** (Status): 2 of 2 HTTP request handler class(es) do not sanitize header values: divergulent/tests/test_fetch.py:164 (ErrorHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through; divergulent/tests/test_fetch.py:37 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
 - **ryll** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tools/browser-offer-probe.py:68 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
 
 ## sfui-vendor
@@ -1306,8 +1315,8 @@ Details for non-compliant projects:
 - **agent-python** (Status): Declared but never imported: grpcio-status (pyproject.toml:29), grpcio-tools (pyproject.toml:30). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **client-python** (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
-- **kerbside** (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), flask-request-id-middleware (pyproject.toml:47), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
-- **shakenfist** (Status): Declared but never imported: chardet (pyproject.toml:101), clingwrap (pyproject.toml:37), flask-request-id-middleware (pyproject.toml:80), gevent (pyproject.toml:67), greenlet (pyproject.toml:66), grpcio-status (pyproject.toml:95), grpcio-tools (pyproject.toml:96), pbr (pyproject.toml:57), requests-toolbelt (pyproject.toml:100), urllib3 (pyproject.toml:102), uv (pyproject.toml:32). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **kerbside** (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **shakenfist** (Status): Declared but never imported: chardet (pyproject.toml:101), clingwrap (pyproject.toml:37), gevent (pyproject.toml:67), greenlet (pyproject.toml:66), grpcio-status (pyproject.toml:95), grpcio-tools (pyproject.toml:96), pbr (pyproject.toml:57), requests-toolbelt (pyproject.toml:100), urllib3 (pyproject.toml:102), uv (pyproject.toml:32). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 
 ## version-file-gitignore
 
