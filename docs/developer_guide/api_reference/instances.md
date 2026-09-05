@@ -709,7 +709,10 @@ is meaningful.
     An operation which exhausts either budget, and for which no retry is
     possible (see below), moves to `expired`, a terminal state distinct
     from `error`. `error` means the operation itself failed; `expired`
-    means a budget you set ran out, and the state's message says which.
+    means a budget you set ran out, and the operation's `expiry_reason`
+    field says which: `deadline` or `progress`. A `deadline` expiry is
+    answered by asking for a longer deadline; a `progress` expiry means
+    the agent stalled, which a bigger deadline does not fix.
     A wall-clock deadline running out is always final -- there is no
     time left for a further attempt to deliver anything in -- but a
     progress-timeout stall may be retried a bounded number of times
@@ -754,6 +757,7 @@ is meaningful.
             }
         ],
         "deadline": 1787428090.5,
+        "expiry_reason": null,
         "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
         "last_progress": null,
         "metadata": {},
@@ -884,6 +888,7 @@ Additionally, you can list the agent operations for a given instance.
                 }
             ],
             "deadline": 1787428090.5,
+            "expiry_reason": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
             "metadata": {},
@@ -911,6 +916,7 @@ Additionally, you can list the agent operations for a given instance.
                 }
             ],
             "deadline": 1787428090.5,
+            "expiry_reason": null,
             "instance_uuid": "a771fb13-aaad-4cb6-a86b-7ee51e7bacc6",
             "last_progress": null,
             "metadata": {},

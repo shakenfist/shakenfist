@@ -69,7 +69,7 @@ class AgentOperationRetryTestCase(base.ShakenFistTestCase):
 
     def test_expired_to_queued_is_not_permitted(self):
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
-        op.expire('deadline passed')
+        op.expire('deadline passed', AgentOperation.EXPIRY_REASON_DEADLINE)
         self.assertRaises(
             exceptions.InvalidStateException,
             setattr, op, 'state', AgentOperation.STATE_QUEUED)

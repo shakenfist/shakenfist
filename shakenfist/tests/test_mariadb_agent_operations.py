@@ -83,20 +83,24 @@ class AgentOperationProtoRoundTripTestCase(base.ShakenFistTestCase):
         self.assertIsNone(out.deadline)
         self.assertEqual(0.0, out.progress_timeout)
 
-    def _round_trip_attrs(self, last_progress, attempts):
+    def _round_trip_attrs(self, last_progress, attempts,
+                          expiry_reason=None):
         data = AgentOperationAttributesData(
             uuid=AOP_UUID,
             results={'0': {'status': 0}},
             last_progress=last_progress,
-            attempts=attempts)
+            attempts=attempts,
+            expiry_reason=expiry_reason)
         proto = self.service._agentop_attrs_to_proto(data)
         return proto, self.service._agentop_attrs_from_proto(proto)
 
     def test_attributes_none_stays_none(self):
         proto, out = self._round_trip_attrs(None, 0)
         self.assertFalse(proto.HasField('last_progress'))
+        self.assertFalse(proto.HasField('expiry_reason'))
         self.assertIsNone(out.last_progress)
         self.assertEqual(0, out.attempts)
+        self.assertIsNone(out.expiry_reason)
         self.assertEqual({'0': {'status': 0}}, out.results)
 
     def test_attributes_zero_progress_is_not_none(self):
@@ -106,9 +110,11 @@ class AgentOperationProtoRoundTripTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, out.attempts)
 
     def test_attributes_values_survive(self):
-        _, out = self._round_trip_attrs(1787427490.5, 2)
+        _, out = self._round_trip_attrs(1787427490.5, 2,
+                                        expiry_reason='deadline')
         self.assertEqual(1787427490.5, out.last_progress)
         self.assertEqual(2, out.attempts)
+        self.assertEqual('deadline', out.expiry_reason)
 
 
 class AgentOperationProtoDefaultsTestCase(base.ShakenFistTestCase):
@@ -141,6 +147,7 @@ class AgentOperationProtoDefaultsTestCase(base.ShakenFistTestCase):
         out = self.service._agentop_attrs_from_proto(proto)
         self.assertIsNone(out.last_progress)
         self.assertEqual(0, out.attempts)
+        self.assertIsNone(out.expiry_reason)
 
 
 class AgentOperationGrpcClientTestCase(base.ShakenFistTestCase):
@@ -211,17 +218,20 @@ class AgentOperationGrpcClientTestCase(base.ShakenFistTestCase):
             mariadb._grpc_create_agent_operation_attributes(data))
         proto = self.requests[0].data
         self.assertFalse(proto.HasField('last_progress'))
+        self.assertFalse(proto.HasField('expiry_reason'))
         self.assertEqual(0, proto.attempts)
 
     def test_attributes_get_reply_distinguishes_unset_from_zero(self):
         stored = AgentOperationAttributesData(
-            uuid=AOP_UUID, results={}, last_progress=0.0, attempts=4)
+            uuid=AOP_UUID, results={}, last_progress=0.0, attempts=4,
+            expiry_reason='progress')
         self.reply = mock.MagicMock(
             found=True,
             data=self.service._agentop_attrs_to_proto(stored))
         out = mariadb._grpc_get_agent_operation_attributes(AOP_UUID)
         self.assertEqual(0.0, out.last_progress)
         self.assertEqual(4, out.attempts)
+        self.assertEqual('progress', out.expiry_reason)
 
     def test_update_mask_survives_the_round_trip_to_the_direct_layer(self):
         # The direct path's mask is covered by the live suite and by

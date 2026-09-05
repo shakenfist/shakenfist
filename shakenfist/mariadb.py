@@ -419,7 +419,7 @@ NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
 IPAMS_VERSION = 2
 AGENT_OPERATIONS_VERSION = 3
-AGENT_OPERATION_ATTRIBUTES_VERSION = 3
+AGENT_OPERATION_ATTRIBUTES_VERSION = 4
 INSTANCES_VERSION = 3
 INSTANCE_ATTRIBUTES_VERSION = 3
 OBJECT_METADATA_VERSION = 3
@@ -18887,9 +18887,13 @@ def _ensure_agent_operation_attributes_schema(
         _set_table_version(engine, table_name, current_ver)
 
     if current_ver < AGENT_OPERATION_ATTRIBUTES_VERSION:
-        # Add the progress and retry bookkeeping columns.
-        # last_progress is nullable (NULL means no progress observed
-        # yet); attempts is not, and carries an explicit DEFAULT 0.
+        # Add the progress and retry bookkeeping columns (v3), and the
+        # expiry_reason discriminator (v4). One block serves both
+        # steps because every ALTER is IF NOT EXISTS: a v3 database
+        # re-runs the v3 additions as no-ops on its way to v4.
+        # last_progress and expiry_reason are nullable (NULL means no
+        # progress observed yet / the operation has not expired);
+        # attempts is not, and carries an explicit DEFAULT 0.
         # MariaDB would fill existing rows with the implicit type
         # default anyway, so the DEFAULT is not rescuing a failing
         # ALTER -- it is there so the value backfilled into existing
@@ -18902,7 +18906,7 @@ def _ensure_agent_operation_attributes_schema(
         LOG.info(
             f'Upgrading {table_name} table to version '
             f'{AGENT_OPERATION_ATTRIBUTES_VERSION} '
-            '(add progress and attempt columns)')
+            '(add progress, attempt and expiry reason columns)')
         #
         # As in _ensure_agent_operations_schema, a failing ALTER is
         # allowed to propagate rather than being logged and stepped
@@ -18911,7 +18915,8 @@ def _ensure_agent_operation_attributes_schema(
         # and can never be repaired by re-running the migration.
         with engine.connect() as conn:
             for column in ('last_progress DOUBLE NULL',
-                           'attempts BIGINT NOT NULL DEFAULT 0'):
+                           'attempts BIGINT NOT NULL DEFAULT 0',
+                           'expiry_reason VARCHAR(255) NULL'):
                 conn.execute(sa.text(
                     f'ALTER TABLE {table_name} '
                     f'ADD COLUMN IF NOT EXISTS {column}'))
@@ -19050,7 +19055,8 @@ def _direct_create_agent_operation_attributes(
                 uuid=data.uuid,
                 results=_json_dumps(data.results),
                 last_progress=data.last_progress,
-                attempts=data.attempts)
+                attempts=data.attempts,
+                expiry_reason=data.expiry_reason)
             conn.execute(stmt)
             conn.commit()
             return True
@@ -19089,6 +19095,7 @@ def _direct_get_agent_operation_attributes(
                 results=results if results else {},
                 last_progress=result.last_progress,
                 attempts=result.attempts,
+                expiry_reason=result.expiry_reason,
             )
     except OperationalError as e:
         LOG.warning(
@@ -19111,6 +19118,7 @@ def _agent_operation_attributes_column_values(
         'results': _json_dumps(data.results),
         'last_progress': data.last_progress,
         'attempts': data.attempts,
+        'expiry_reason': data.expiry_reason,
     }
     if not fields:
         return all_values
@@ -19252,7 +19260,8 @@ def _grpc_create_agent_operation_attributes(
                 uuid=str(data.uuid),
                 results_json=_json_dumps(data.results),
                 last_progress=data.last_progress,
-                attempts=data.attempts))
+                attempts=data.attempts,
+                expiry_reason=data.expiry_reason))
         reply = _grpc_call(stub.CreateAgentOperationAttributes, request)
         return bool(reply.success)
     except grpc.RpcError as e:
@@ -19281,6 +19290,8 @@ def _grpc_get_agent_operation_attributes(
             last_progress=(d.last_progress
                            if d.HasField('last_progress') else None),
             attempts=d.attempts,
+            expiry_reason=(d.expiry_reason
+                           if d.HasField('expiry_reason') else None),
         )
     except grpc.RpcError as e:
         LOG.error(
@@ -19304,7 +19315,8 @@ def _grpc_update_agent_operation_attributes(
                 uuid=str(data.uuid),
                 results_json=_json_dumps(data.results),
                 last_progress=data.last_progress,
-                attempts=data.attempts),
+                attempts=data.attempts,
+                expiry_reason=data.expiry_reason),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateAgentOperationAttributes, request)
         return bool(reply.success)

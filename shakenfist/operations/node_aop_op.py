@@ -102,7 +102,8 @@ class NodeAgentopOp(BaseClusterOperation):
             return
 
         if aop.deadline_passed():
-            aop.expire('the operation deadline passed before preflight')
+            aop.expire('the operation deadline passed before preflight',
+                       AgentOperation.EXPIRY_REASON_DEADLINE)
             return
 
         for command in aop.commands:
@@ -121,7 +122,8 @@ class NodeAgentopOp(BaseClusterOperation):
                 # explanation recorded anywhere.
                 if aop.deadline_passed():
                     aop.expire(
-                        'the operation deadline passed during preflight')
+                        'the operation deadline passed during preflight',
+                        AgentOperation.EXPIRY_REASON_DEADLINE)
                     return
 
                 # This agent operation could have been deleted while we copied

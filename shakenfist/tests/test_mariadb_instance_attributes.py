@@ -146,7 +146,8 @@ class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
     def test_no_mask_returns_every_column(self):
         values = mariadb._agent_operation_attributes_column_values(self.data)
         self.assertEqual(
-            {'results', 'last_progress', 'attempts'}, set(values))
+            {'results', 'last_progress', 'attempts', 'expiry_reason'},
+            set(values))
 
     def test_mask_limits_columns(self):
         values = mariadb._agent_operation_attributes_column_values(
@@ -168,6 +169,11 @@ class AgentOperationColumnValuesTestCase(base.ShakenFistTestCase):
             self.data, ['attempts'])
         self.assertEqual({'attempts'}, set(values))
         self.assertEqual(2, values['attempts'])
+
+        values = mariadb._agent_operation_attributes_column_values(
+            self.data, ['expiry_reason'])
+        self.assertEqual({'expiry_reason'}, set(values))
+        self.assertIsNone(values['expiry_reason'])
 
     def test_unknown_field_rejected(self):
         self.assertRaises(
