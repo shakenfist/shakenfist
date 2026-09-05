@@ -117,6 +117,54 @@ class AgentOperationTimingTestCase(base.ShakenFistTestCase):
         self.assertIsNone(error)
         self.assertEqual(5.0, progress_timeout)
 
+    def test_a_deadline_above_the_ceiling_is_refused(self):
+        # The operator ceiling is what the published maximum on
+        # deadline_seconds is backed by (issue #4074).
+        values, error = self._timing(
+            deadline_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)
+        self.assertIsNone(values)
+        self.assertIn('deadline_seconds', self._error(error))
+        self.assertIn('AGENT_OPERATION_MAX_DEADLINE', self._error(error))
+
+    def test_a_progress_timeout_above_the_ceiling_is_refused(self):
+        # The same ceiling bounds both parameters: with no wall-clock
+        # deadline, an enormous progress timeout parks the executor
+        # slot just as effectively as an enormous deadline would.
+        values, error = self._timing(
+            progress_timeout_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)
+        self.assertIsNone(values)
+        self.assertIn('progress_timeout_seconds', self._error(error))
+
+    def test_the_ceiling_itself_is_accepted(self):
+        # The bound is inclusive, matching the published maximum.
+        (deadline, progress_timeout), error = self._timing(
+            deadline_seconds=config.AGENT_OPERATION_MAX_DEADLINE,
+            progress_timeout_seconds=config.AGENT_OPERATION_MAX_DEADLINE)
+        self.assertIsNone(error)
+        self.assertEqual(NOW + config.AGENT_OPERATION_MAX_DEADLINE, deadline)
+        self.assertEqual(
+            float(config.AGENT_OPERATION_MAX_DEADLINE), progress_timeout)
+
+    def test_the_ceiling_reads_the_config_rather_than_a_literal(self):
+        with mock.patch.object(config, 'AGENT_OPERATION_MAX_DEADLINE', 50):
+            values, error = self._timing(deadline_seconds=51)
+            self.assertIsNone(values)
+            self.assertEqual(400, error.status_code)
+
+            (deadline, _), error = self._timing(deadline_seconds=50)
+            self.assertIsNone(error)
+            self.assertEqual(NOW + 50, deadline)
+
+    def test_the_zero_sentinel_passes_the_ceiling(self):
+        # 0 is a sentinel rather than a duration, and the enforcement
+        # side (AgentOperation.effective_deadline()) is what decides
+        # whether it really means unbounded, so the API must not refuse
+        # it however low the operator sets the ceiling.
+        (deadline, _), error = self._timing(
+            deadline_seconds=0, progress_timeout_seconds=30)
+        self.assertIsNone(error)
+        self.assertEqual(0.0, deadline)
+
     def test_negative_deadline_is_refused(self):
         values, error = self._timing(deadline_seconds=-1)
         self.assertIsNone(values)

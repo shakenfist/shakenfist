@@ -245,8 +245,8 @@ class SFConfig(BaseSettings):
             'to an absolute timestamp at request receipt, so queue time and '
             'preflight time both count against it. A client may pass an '
             'explicit deadline_seconds of 0 to ask for no wall-clock '
-            'deadline at all, in which case nothing bounds the '
-            'operation. Enforced in three places: an expired operation '
+            'deadline; then only the progress timeout, or failing that '
+            'AGENT_OPERATION_MAX_DEADLINE, bounds it. Enforced in three places: an expired operation '
             'is retired when the sidechannel daemon looks for work, '
             'when a preflight task promotes it to queued, and by the '
             'executor while it runs. An operation which runs out of '
@@ -315,6 +315,30 @@ class SFConfig(BaseSettings):
             'execute operation cannot do without repeating a side '
             'effect the agent cannot take back, so execute operations '
             'are never retried whatever this is set to.'
+        )
+    )
+    AGENT_OPERATION_MAX_DEADLINE: int = Field(
+        86400,
+        ge=1,
+        description=(
+            'The largest number of seconds a caller may pass as '
+            'deadline_seconds or progress_timeout_seconds when creating an '
+            'agent operation. A larger value is refused with a 400, and the '
+            'published API specification carries this as those parameters\' '
+            'maximum. It is also the backstop for an operation whose caller '
+            'disabled both budgets at once -- a deadline_seconds of 0 with '
+            'no live progress timeout, which every agent/execute created '
+            'with a deadline_seconds of 0 is -- because such an operation '
+            'would otherwise hold its instance\'s single agent executor '
+            'slot for as long as the guest command cared to run (issue '
+            '#4074): instead it is expired this many seconds after it last '
+            'changed state. A deadline_seconds of 0 alongside a live '
+            'progress timeout still means no wall-clock deadline at all, so '
+            'a very large transfer which keeps making progress is never '
+            'expired by this. Set it to at least '
+            'AGENT_OPERATION_DEFAULT_DEADLINE, or an omitted '
+            'deadline_seconds will be granted more time than an explicit '
+            'one may ask for.'
         )
     )
     FEDERATION_MAX_TOKEN_BYTES: int = Field(

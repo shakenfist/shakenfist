@@ -135,17 +135,24 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # builds reports progress, so the enforcement phase could never
         # consult one. api_base.agent_operation_timing() is what backs
         # these bounds, answering 400, rather than the coercion the
-        # events limit cap above relies on.
+        # events limit cap above relies on. The maximum is
+        # AGENT_OPERATION_MAX_DEADLINE (issue #4074), an operator
+        # settable ceiling published at whatever the deployment sets it
+        # to; 86400 here is its default, which is what an unconfigured
+        # test process generates the specification with.
         ('/instances/{instance_ref}/agent/put', 'post', 'deadline_seconds',
-         {'type': 'number', 'minimum': 0}),
+         {'type': 'number', 'minimum': 0, 'maximum': 86400}),
         ('/instances/{instance_ref}/agent/put', 'post',
-         'progress_timeout_seconds', {'type': 'number', 'minimum': 0}),
+         'progress_timeout_seconds',
+         {'type': 'number', 'minimum': 0, 'maximum': 86400}),
         ('/instances/{instance_ref}/agent/get', 'post', 'deadline_seconds',
-         {'type': 'number', 'minimum': 0}),
+         {'type': 'number', 'minimum': 0, 'maximum': 86400}),
         ('/instances/{instance_ref}/agent/get', 'post',
-         'progress_timeout_seconds', {'type': 'number', 'minimum': 0}),
+         'progress_timeout_seconds',
+         {'type': 'number', 'minimum': 0, 'maximum': 86400}),
         ('/instances/{instance_ref}/agent/execute', 'post',
-         'deadline_seconds', {'type': 'number', 'minimum': 0}),
+         'deadline_seconds',
+         {'type': 'number', 'minimum': 0, 'maximum': 86400}),
         ('/networks', 'post', 'netblock', {'type': 'string'}),
         ('/networks/{network_ref}/events', 'get', 'limit',
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),

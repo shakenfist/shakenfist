@@ -648,9 +648,10 @@ class SideChannelExecutorJob(SideChannelJob):
         self._last_progress_persisted = 0.0
         self._last_budget_check = 0.0
 
-        # The State a NULL deadline resolves its default against, read
-        # at most once for the life of this executor rather than on
-        # every budget check. See expire_if_out_of_budget().
+        # The State an anchored deadline (a NULL column's default, or
+        # the no-budgets-at-all backstop) resolves against, read at
+        # most once for the life of this executor rather than on every
+        # budget check. See expire_if_out_of_budget().
         self._deadline_anchor = None
 
         self.ready = False
@@ -1005,11 +1006,14 @@ class SideChannelExecutorJob(SideChannelJob):
         # is normally still queued, which makes the deadline this
         # enforces at most tighter than the per-read resolution it
         # replaces -- and it is the same anchor agent_operation_next()
-        # already checked against at dispatch. An operation with a
-        # stored deadline never reaches the read at all, and
-        # deadline_passed() does not read state when its own resolution
-        # short-circuits.
-        if self.agentop.deadline is None and self._deadline_anchor is None:
+        # already checked against at dispatch. An operation which needs
+        # no anchor -- a stored deadline, or the 0.0 sentinel licensed
+        # by a live progress timeout -- never reaches the read at all,
+        # and deadline_passed() does not read state when its own
+        # resolution short-circuits. The both-budgets-disabled backstop
+        # (issue #4074) anchors here too.
+        if (self._deadline_anchor is None
+                and self.agentop.deadline_needs_state_anchor()):
             self._deadline_anchor = self.agentop.state
         if self.agentop.deadline_passed(state=self._deadline_anchor):
             self.log.error(
@@ -1639,10 +1643,15 @@ class Monitor(daemon.Daemon):
         was executing when its monitor died waits for the monitor to be
         restarted (which happens within 30 seconds while the instance
         still has an agent channel, and never once it does not). And an
-        operation created with deadline_seconds=0 asked for no
-        wall-clock budget, so a live executor wedged before it connects
-        holds that instance's executor slot with nothing able to prove
-        it is stuck.
+        operation created with deadline_seconds=0 alongside a live
+        progress timeout asked for no wall-clock budget, so a live
+        executor wedged before it connects holds that instance's
+        executor slot with nothing able to prove it is stuck. That
+        second hole used to include operations with no budget at all,
+        wedged or healthily running a guest command forever (issue
+        #4074); effective_deadline() now bounds those with the
+        AGENT_OPERATION_MAX_DEADLINE backstop, so case two below
+        eventually resolves them.
         """
         # The monitor management loop can remove entries while the
         # dispatcher iterates its snapshot, so fetch defensively.

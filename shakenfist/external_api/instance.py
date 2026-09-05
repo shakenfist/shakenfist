@@ -81,16 +81,21 @@ DEADLINE_SECONDS_DESCRIPTION = (
     'How many seconds after this request is received the operation '
     'may continue to be dispatched or execute. Queue time and any '
     'preflight work count against it. 0 means no wall-clock '
-    'deadline at all. Omitting this applies the server default, '
-    'AGENT_OPERATION_DEFAULT_DEADLINE, which is 600 seconds unless '
-    'the operator has changed it.')
+    'deadline at all, although an operation whose progress timeout '
+    'is also disabled -- which includes every agent/execute -- is '
+    'still expired AGENT_OPERATION_MAX_DEADLINE seconds after it '
+    'last changed state. The published maximum is that same '
+    'operator ceiling, 86400 seconds unless changed. Omitting this '
+    'applies the server default, AGENT_OPERATION_DEFAULT_DEADLINE, '
+    'which is 600 seconds unless the operator has changed it.')
 
 PROGRESS_TIMEOUT_SECONDS_DESCRIPTION = (
     'How many seconds without forward progress are fatal to this '
-    'operation. 0 disables the progress timeout. Omitting this '
-    'applies the server default, '
-    'AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 seconds '
-    'unless the operator has changed it.')
+    'operation. 0 disables the progress timeout. The published '
+    'maximum is the operator ceiling AGENT_OPERATION_MAX_DEADLINE, '
+    '86400 seconds unless changed. Omitting this applies the server '
+    'default, AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT, which is 30 '
+    'seconds unless the operator has changed it.')
 
 
 instance_get_example = """{
@@ -1820,10 +1825,11 @@ class InstanceAgentPutEndpoint(api_base.Resource):
             ('mode', 'body', 'string',
              'The mode of the file once written, in symbolic or numeric form.', True),
             ('deadline_seconds', 'body', 'number',
-             DEADLINE_SECONDS_DESCRIPTION, False, {'minimum': 0}),
+             DEADLINE_SECONDS_DESCRIPTION, False,
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE}),
             ('progress_timeout_seconds', 'body', 'number',
              PROGRESS_TIMEOUT_SECONDS_DESCRIPTION, False,
-             {'minimum': 0})
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance, or an invalid timing parameter.', None),
@@ -1901,10 +1907,11 @@ class InstanceAgentGetEndpoint(api_base.Resource):
             ('path', 'body', 'string',
              'The path to fetch the file from inside the instance.', True),
             ('deadline_seconds', 'body', 'number',
-             DEADLINE_SECONDS_DESCRIPTION, False, {'minimum': 0}),
+             DEADLINE_SECONDS_DESCRIPTION, False,
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE}),
             ('progress_timeout_seconds', 'body', 'number',
              PROGRESS_TIMEOUT_SECONDS_DESCRIPTION, False,
-             {'minimum': 0})
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance, or an invalid timing parameter.', None),
@@ -1960,7 +1967,8 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('command_line', 'body', 'string', 'The command to execute.', True),
             ('deadline_seconds', 'body', 'number',
-             DEADLINE_SECONDS_DESCRIPTION, False, {'minimum': 0})
+             DEADLINE_SECONDS_DESCRIPTION, False,
+             {'minimum': 0, 'maximum': config.AGENT_OPERATION_MAX_DEADLINE})
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance, an invalid timing parameter, or a '

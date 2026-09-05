@@ -31,6 +31,11 @@ from shakenfist_client import apiclient
 AGENT_OPERATION_DEFAULT_DEADLINE = 600
 AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT = 30
 
+# Mirror of AGENT_OPERATION_MAX_DEADLINE, the operator ceiling on both
+# timing parameters (issue #4074), for the same cannot-read-it-from-the-
+# cluster reason as the pair above.
+AGENT_OPERATION_MAX_DEADLINE = 86400
+
 # How far a freshly created operation's deadline may sit from where this
 # test's own clock says it should. The deadline is an absolute timestamp
 # stamped by whichever API node answered the request, so this window is
@@ -259,6 +264,18 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
             f'Agent operation deadline {aop["deadline"]} is not roughly '
             f'{AGENT_OPERATION_DEFAULT_DEADLINE} seconds from now: expected '
             f'between {earliest} and {latest}. The operation was: {aop}')
+
+        # A deadline above the operator ceiling is refused with a 400
+        # before anything is created (issue #4074). Piggybacked on this
+        # test rather than given its own, because the refusal happens
+        # after the agent readiness check and so needs a ready instance
+        # -- and booting one for a single expected 400 would double the
+        # suite's cost for no more coverage.
+        self.assertRaises(
+            apiclient.RequestMalformedException,
+            self.nonblocking_client.instance_execute,
+            inst['uuid'], 'whoami',
+            deadline_seconds=AGENT_OPERATION_MAX_DEADLINE + 1)
 
         self._await_agentop_complete(
             inst['uuid'], aop, AGENTOP_STATE_TIMEOUT, 'whoami')

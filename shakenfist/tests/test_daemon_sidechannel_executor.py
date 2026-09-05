@@ -528,6 +528,15 @@ class _BudgetAgentOp(_FakeAgentOp):
     def effective_progress_timeout(self):
         return self._progress_timeout
 
+    def deadline_needs_state_anchor(self):
+        # Mirrors the real resolution: a NULL deadline anchors its
+        # server default on a state read, as does the 0.0 sentinel
+        # with no live progress timeout (the issue #4074 backstop).
+        if self.deadline is None:
+            return True
+        return (self.deadline == 0.0
+                and self.effective_progress_timeout() is None)
+
 
 class _AnchorAgentOp(_BudgetAgentOp):
     """A budget fake which counts how often its state row is read.
@@ -648,6 +657,37 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, agentop.deadline_checks)
         self.assertEqual(0, agentop.state_reads)
         self.assertEqual([None, None, None], agentop.anchor_states)
+
+    def test_the_no_budget_backstop_reads_its_anchor_once(self):
+        # The issue #4074 backstop: a 0.0 deadline sentinel with no
+        # live progress timeout resolves AGENT_OPERATION_MAX_DEADLINE
+        # against the state row, exactly like a NULL deadline, and gets
+        # the same one-read anchor treatment for the same #4014 reason.
+        agentop = _AnchorAgentOp(deadline=0.0, progress_timeout=None,
+                                 deadline_passed=False)
+        job = self._make_executor(agentop, handler=_SilentHandler())
+
+        for offset in (0.0, 1.5, 3.0):
+            with mock.patch('time.time', return_value=self.NOW + offset):
+                self.assertFalse(job.expire_if_out_of_budget())
+
+        self.assertEqual(3, agentop.deadline_checks)
+        self.assertEqual(1, agentop.state_reads)
+        self.assertIsNotNone(agentop.anchor_states[0])
+
+    def test_the_licensed_sentinel_never_reads_an_anchor(self):
+        # A 0.0 deadline alongside a live progress timeout really has
+        # no wall-clock deadline, so there is nothing to anchor and the
+        # state row must not be read just in case.
+        agentop = _AnchorAgentOp(deadline=0.0, progress_timeout=30.0,
+                                 deadline_passed=False)
+        job = self._make_executor(agentop, handler=_SilentHandler())
+
+        with mock.patch('time.time', return_value=self.NOW):
+            self.assertFalse(job.expire_if_out_of_budget())
+
+        self.assertEqual(0, agentop.state_reads)
+        self.assertEqual([None], agentop.anchor_states)
 
     def test_passed_deadline_expires_and_stops(self):
         agentop = _BudgetAgentOp(deadline_passed=True)

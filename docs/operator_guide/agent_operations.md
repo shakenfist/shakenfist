@@ -58,6 +58,20 @@ omitting the parameter takes the default instead. See the API
 reference linked above for the full three-way distinction between
 omitted, zero and a positive value.
 
+Both parameters are bounded by **`AGENT_OPERATION_MAX_DEADLINE`**
+(default 86400 seconds -- one day, `shakenfist/config.py:320`), an
+operator ceiling published as their `maximum` in the API specification
+and refused with a 400 above it. The same ceiling is the backstop for
+an operation whose caller disabled both budgets at once, which every
+`agent/execute` created with `deadline_seconds=0` is: with no budget
+left anywhere, a single request could otherwise park an instance's
+only executor slot for as long as the guest command cared to run
+(issue 4074). Such an operation is expired
+`AGENT_OPERATION_MAX_DEADLINE` seconds after it last changed state. A
+`deadline_seconds` of `0` alongside a live progress timeout still
+means no wall-clock deadline at all, so a very large transfer which
+keeps making progress is never expired by the ceiling.
+
 ## Where the budgets are enforced
 
 Three points enforce these budgets, so an operation that has run out
@@ -165,9 +179,12 @@ three situations:
 The reaper is rate-limited to once every 30 seconds per instance, and
 cannot help in two situations by design: an instance with no live
 monitor (it waits for the monitor to restart instead, normally within
-30 seconds), and an operation created with `deadline_seconds=0` whose
-executor wedges before connecting -- with no wall-clock budget at all,
-there is no evidence available to declare it stuck.
+30 seconds), and an operation created with `deadline_seconds=0`
+alongside a live progress timeout whose executor wedges before
+connecting -- with no wall-clock budget, there is no evidence
+available to declare it stuck. (An operation with *both* budgets
+disabled is not in this hole: the `AGENT_OPERATION_MAX_DEADLINE`
+backstop gives it a wall-clock deadline the reaper can act on.)
 
 ## What to tune, and when
 
@@ -201,3 +218,9 @@ If that happens:
   recover but also lets a genuinely broken operation occupy an
   instance's executor slot for more attempts before it is finally
   retired.
+- **`AGENT_OPERATION_MAX_DEADLINE`** is the ceiling on what a caller
+  may request, and the backstop for an operation with no budgets at
+  all. Lower it if a day is more executor-slot parking than you are
+  willing to let one request buy; keep it at least
+  `AGENT_OPERATION_DEFAULT_DEADLINE`, or an omitted `deadline_seconds`
+  is granted more time than an explicit one may ask for.
