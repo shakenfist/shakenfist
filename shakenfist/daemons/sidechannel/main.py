@@ -1806,6 +1806,19 @@ class Monitor(daemon.Daemon):
         add_event(
             EVENT_TYPE_AUDIT, 'instance', instance_uuid,
             f'side channel {thread_type} instructed to exit')
+
+        # start_instance_executor() registers an executor before it
+        # starts the thread, on purpose, so there is a window in which
+        # this entry exists and join() would raise "cannot join thread
+        # before it is started". reap_instance_executors() tolerates
+        # the same window; this path has to as well, or a SIGTERM
+        # landing inside it takes the graceful shutdown down with a
+        # RuntimeError and leaves the remaining threads unsignalled.
+        # The abort file is already set above, so an unstarted thread
+        # exits as soon as it runs.
+        if t['thread'].ident is None:
+            return
+
         t['thread'].join(0.5)
 
         if not t['thread'].is_alive():

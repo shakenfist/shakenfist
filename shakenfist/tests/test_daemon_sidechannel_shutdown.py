@@ -17,10 +17,19 @@ class _FakeThread:
     alive_answers is consumed one entry per is_alive() call, with the
     last entry repeated forever, so a test can model a thread which is
     still running on the first shutdown pass and gone on the next.
+
+    ident mirrors threading.Thread.ident: None until the thread has
+    actually been started, and an integer afterwards. It defaults to
+    started, since that is what most records here model.
+
+    join() raises the way a real thread does when it has not been
+    started, so a guard which is present but placed after the join
+    fails these tests rather than passing them.
     """
 
-    def __init__(self, alive_answers):
+    def __init__(self, alive_answers, ident=1):
         self.alive_answers = list(alive_answers)
+        self.ident = ident
         self.join_calls = []
 
     def is_alive(self):
@@ -29,13 +38,19 @@ class _FakeThread:
         return self.alive_answers[0]
 
     def join(self, timeout=None):
+        if self.ident is None:
+            raise RuntimeError('cannot join thread before it is started')
         self.join_calls.append(timeout)
 
+    def start(self):
+        """Model a thread which has now been started."""
+        self.ident = 1
 
-def _thread_record(instance_uuid, alive_answers):
+
+def _thread_record(instance_uuid, alive_answers, ident=1):
     return {
         'object': _FakeJobObject(f'/no/such/abort-{instance_uuid}'),
-        'thread': _FakeThread(alive_answers),
+        'thread': _FakeThread(alive_answers, ident=ident),
         'instance_uuid': instance_uuid
     }
 
@@ -127,6 +142,47 @@ class SidechannelShutdownTestCase(base.ShakenFistTestCase):
              'side channel executor instructed to exit',
              'side channel executor finished'],
             messages)
+
+    def test_an_unstarted_thread_is_signalled_but_not_joined(self):
+        # start_instance_executor() registers an executor before it
+        # starts the thread, so a SIGTERM can arrive while the entry
+        # exists and the thread does not. join() raises RuntimeError on
+        # such a thread, which would abort the whole shutdown sequence
+        # and leave every remaining thread unsignalled.
+        m = self._make_daemon()
+        m.executors['i1'] = _thread_record('i1', [False], ident=None)
+        m.executors['i2'] = _thread_record('i2', [False])
+
+        m._request_all_threads_exit()
+
+        # The unstarted thread was told to stop and left in place for a
+        # later pass to collect, and the started one behind it was still
+        # reached.
+        self.assertEqual([], m.executors['i1']['thread'].join_calls)
+        self.assertIn('i1', m.executors)
+        self.assertNotIn('i2', m.executors)
+        self.assertIn(
+            mock.call('/no/such/abort-i1', 'from _request_thread_exit'),
+            self.set_abort_path.call_args_list)
+
+    def test_an_unstarted_thread_is_collected_on_a_later_pass(self):
+        # The guard returns without deleting the record, so
+        # _wait_for_all_threads_exit()'s "while self.monitors or
+        # self.executors" loop depends on a later pass finding the
+        # thread started. That holds by construction in
+        # start_instance_executor(), which registers and starts in
+        # adjacent statements and deletes the entry if start() raises,
+        # but the invariant lives in a comment and nothing asserted it.
+        m = self._make_daemon()
+        m.executors['i1'] = _thread_record('i1', [False], ident=None)
+
+        m._request_all_threads_exit()
+        self.assertIn('i1', m.executors)
+
+        m.executors['i1']['thread'].start()
+        m._request_all_threads_exit()
+
+        self.assertEqual({}, m.executors)
 
     def test_a_missing_record_is_a_noop(self):
         # The monitor loop can delete an entry between the snapshot and
