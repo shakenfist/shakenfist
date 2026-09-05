@@ -233,6 +233,7 @@ nav:
                 - "bench qcow2 refcount growth": components/instar/plans/PLAN-bench-refcount-growth.md
                 - "qcow2 write infrastructure": components/instar/plans/PLAN-qcow2-write-infrastructure.md
                 - "Format coverage expansion": components/instar/plans/PLAN-format-coverage.md
+                - "VHD and VHDX differencing output": components/instar/plans/PLAN-differencing.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md
