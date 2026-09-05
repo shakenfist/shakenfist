@@ -442,6 +442,34 @@ The enqueue-side dedup is the cheaper of the two -- the row never
 gets inserted -- but the worker-side fold is the safety net for the
 race where two concurrent callers both lose the lookup.
 
+### The enqueue-side dedup will not adopt a slower lane
+
+Reuse is one-sided. `create_and_enqueue` passes
+`find_existing_coalescible_op` the list of priorities it is willing
+to adopt, which is every `PRIORITY` at least as urgent as its own.
+Adopting a *more* urgent pending op costs the caller nothing: the
+work runs sooner than it asked for. Adopting a less urgent one means
+adopting its queue -- the name is `{target}-{family}-{priority}` --
+so the caller sitting in `raise_for_error()`, and any `runs_after`
+dependency hanging off the returned op, wait out the slower lane's
+queue-sit tail instead of their own.
+
+That overlap is not hypothetical for either coalescible task with
+more than one enqueue site. `Network.ensure_mesh` enqueues
+`network_ensure_mesh` at `user_facing` while the network maintainer
+enqueues the same task, for the same network and node, at
+`background` -- and it does so precisely when `is_mesh_okay()`
+reports drift, which is the state a network is in immediately after
+an instance starts elsewhere on it. `create_on_network_node` and the
+maintainer straddle `user_facing`/`background` for
+`network_apply_create_network_node` in the same way, and have done
+since before the mesh task became coalescible.
+
+The worker-side fold needs no equivalent rule. It runs at dispatch,
+on an operation which has already been dequeued, so a survivor at any
+priority is about to do the work immediately; the queue a folded
+sibling was sitting on no longer matters.
+
 ### Both guards are key-aware *and* family-aware
 
 `cluster_operations` has no queue column, so the key is the only
@@ -483,6 +511,28 @@ Both guards therefore test the family as well as the key:
   was the recorded outcome for every build before the key became
   multi-column.
 
+Two further outcomes exist so that a fold which did not happen is
+never reported as one which happened and matched nothing -- the
+reading that let #3878 sit undetected for three months:
+
+* `key_column_missing`: a key column which is not an attribute of the
+  operation class at all. That is a mis-declaration, and it is a
+  different thing from a column which is present and `None`. `None`
+  binds `IS NULL`, which is how a cluster-wide NetOp folds only the
+  other cluster-wide operations on its network. A column the class
+  does not have is NULL on every row too, so binding `IS NULL` for it
+  would quietly degenerate the key to whichever columns did resolve --
+  for a NetOp, back to the network alone, which is the cross-node fold
+  this design exists to prevent. The fold therefore tests `hasattr`
+  and skips, rather than reading the value with a default.
+* `coalescing_unavailable`: the database service answered
+  `UNIMPLEMENTED`, meaning a rolling upgrade against an `sf-database`
+  predating the V2 RPCs. The wrappers raise
+  `exceptions.CoalescingUnavailable` for this rather than returning
+  the same "nothing matched" they return on every other failure, so an
+  operator can watch the upgrade window open and close in the same
+  table as everything else instead of grepping daemon logs.
+
 ### The V2 gRPC methods
 
 `ClaimCoalescibleSiblingsV2` and `FindExistingCoalescibleOpV2` take a
@@ -496,5 +546,12 @@ wider key exists to prevent. An old server answers a V2 call with
 `UNIMPLEMENTED`, and the client treats that as "coalescing
 unavailable" and skips the fold rather than falling back to V1 -- a
 loud, temporary loss of an optimisation instead of a quiet
-correctness failure. The V1 RPCs are unchanged and stay for one
-release.
+correctness failure. "Loud" means the `coalescing_unavailable`
+outcome above, not merely a log line. The V1 RPCs are unchanged and
+stay for one release.
+
+`FindExistingCoalescibleOpV2` additionally carries `repeated string
+priorities`, the priority filter described above. Unlike a key
+column, an old V2 server ignoring that field is only a lost
+optimisation -- it deduplicates the way the code did before the
+field existed -- so it travels as a field rather than needing a V3.

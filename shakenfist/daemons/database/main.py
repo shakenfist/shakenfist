@@ -329,6 +329,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         indistinguishable from an unset field. That is a narrower key,
         not a missing one: it is how the cluster-wide operations, which
         carry no ``node_uuid``, fold only each other.
+
+        ``priorities`` restricts which pending ops may be reused, and
+        holds ``PRIORITY`` member names. An empty list means no
+        restriction, which is both the proto3 default and what a
+        server predating the field effectively applied.
         """
         try:
             self.monitor.counters['find_existing_coalescible_op_v2'].inc()
@@ -336,7 +341,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 request.operation_type,
                 [(k.column, None if k.is_null else k.uuid)
                  for k in request.keys],
-                request.task_name)
+                request.task_name,
+                list(request.priorities))
             return database_pb2.FindExistingCoalescibleOpReply(
                 op_uuid=uuid or '')
         except Exception as e:

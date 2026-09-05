@@ -1,6 +1,7 @@
 # Copyright 2026 Michael Still and contributors
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
 from shakenfist.operations.net_op import NetOp
@@ -476,6 +477,74 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'key_cannot_distinguish_queue', op.coalesce_outcome)
         self.assertIsNone(op.coalesce_seconds)
+
+    def test_outcome_records_that_coalescing_was_unavailable(self):
+        # A rolling upgrade against an sf-database predating the V2
+        # coalescing RPCs raises CoalescingUnavailable. The optimistic
+        # 'ran' has to be overwritten: a fold which never happened,
+        # reported as 'ran' with zero siblings folded, reads in
+        # queue-wait-report.py exactly like a fold which ran and
+        # matched nothing -- the ambiguity #3878 hid behind. The task
+        # itself must still be dispatched.
+        self.mock_claim.side_effect = exceptions.CoalescingUnavailable(
+            'not implemented by this database service')
+
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        op.execute()
+
+        self.assertEqual('coalescing_unavailable', op.coalesce_outcome)
+        self.assertEqual(0, op.coalesce_folded)
+        self.assertIsNotNone(op.coalesce_seconds)
+        op.dispatch_task.assert_called_once()
+
+    def test_a_key_column_the_operation_lacks_skips_the_fold(self):
+        # The fold used to build its key with getattr(self, column,
+        # None), which cannot raise: a column named in
+        # coalescible_key_columns but absent from the class bound
+        # IS NULL, and since it is NULL on every row too, the key
+        # degenerated to the columns which did resolve -- for a NetOp,
+        # back to the network alone, which is the phase 8 cross-node
+        # fold. Skip loudly instead, with an outcome of its own so a
+        # mis-declaration is visible as one.
+        op = self._make_net_op(
+            ['network_ensure_mesh'],
+            queue_name=f'{NODE_UUID}-network-user_facing',
+            node_uuid=NODE_UUID)
+        # The realistic mis-declaration: a column added to the tuple
+        # which the class does not carry, alongside the two that do.
+        # node_uuid stays in the key so this reaches the new guard
+        # rather than being stopped earlier by
+        # key_cannot_distinguish_queue, which is the safety guard and
+        # correctly takes precedence.
+        #
+        # Patched on the class, because execute() reads the
+        # declaration with type(self).coalescible_key_columns -- it is
+        # a property of the operation type, not of one instance.
+        with mock.patch.object(
+                NetOp, 'coalescible_key_columns',
+                ('network_uuid', 'node_uuid', 'no_such_column')):
+            op.execute()
+
+        self.assertEqual('key_column_missing', op.coalesce_outcome)
+        self.mock_claim.assert_not_called()
+        self.assertIsNone(op.coalesce_seconds)
+        op.dispatch_task.assert_called_once()
+
+    def test_a_key_column_which_is_none_still_folds(self):
+        # The other half of the pair above, and the reason the check is
+        # hasattr rather than "is the value set". A cluster-wide NetOp
+        # has a real node_uuid attribute whose value is None; that
+        # binds IS NULL, which is a narrower key and must not be
+        # confused with a mis-declared column.
+        op = self._make_net_op(['network_apply_update_dnsmasq'])
+        self.assertIsNone(op.node_uuid)
+        op.execute()
+
+        self.assertEqual('ran', op.coalesce_outcome)
+        self.mock_claim.assert_called_once()
+        self.assertEqual(
+            [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
+            self.mock_claim.call_args.kwargs['keys'])
 
     # -- Phase 11: the per-node fold guard (decisions 4 and 5) ---------
     #

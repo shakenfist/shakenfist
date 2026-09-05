@@ -498,14 +498,26 @@ def apply_min_samples(groups, min_samples):
 
 
 # Every value BaseClusterOperation.execute records for coalesce_outcome.
-# 'ran' means the fold's SQL was issued; the other four each name the
+# 'ran' means the fold's SQL was issued; the others each name the
 # guard which skipped it. 'type_not_coalescible' is an operation type
 # which declares no coalescing at all -- most cluster operations, and
 # the boring case -- while 'no_coalescible_tasks' is a type which could
 # have coalesced and this time had nothing to.
 # 'key_cannot_distinguish_queue' is the fold refusing to run because the
 # operation's coalescing key cannot tell its work apart from another
-# queue's. See shakenfist/operations/baseoperation.py, whose guard chain
+# queue's.
+#
+# Two of these exist so that a fold which did not happen never reports
+# as one which happened and matched nothing -- the reading that let
+# #3878 sit undetected for three months.
+# 'coalescing_unavailable' is a rolling upgrade against an sf-database
+# predating the V2 coalescing RPCs, so an operator can see the window
+# open and close in this table rather than by grepping daemon logs.
+# 'key_column_missing' is a coalescing key naming a column the
+# operation class does not have, which is a mis-declaration and would
+# otherwise degenerate the key to the columns that do resolve.
+#
+# See shakenfist/operations/baseoperation.py, whose guard chain
 # is the source of truth these strings are checked against by
 # test_every_outcome_the_code_records_is_reported -- which compares as
 # sets, so a retired name belongs in RETIRED_COALESCE_OUTCOMES below and
@@ -513,7 +525,9 @@ def apply_min_samples(groups, min_samples):
 COALESCE_OUTCOMES = [
     'ran',
     'batch_size_one',
+    'coalescing_unavailable',
     'key_cannot_distinguish_queue',
+    'key_column_missing',
     'no_coalescible_tasks',
     'type_not_coalescible',
 ]

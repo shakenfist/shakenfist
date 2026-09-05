@@ -16,6 +16,7 @@
 # exactly one gap this way, NetOp's missing ``_upgrade_step_1_to_2``,
 # by running the sweep below.
 
+import ast
 import glob
 import os
 import re
@@ -25,6 +26,34 @@ import shakenfist
 from shakenfist.tests import base
 
 
+def _defined_function_names(path):
+    """Every function or method *defined* anywhere in one source file.
+
+    Parsed with ``ast`` rather than matched as text. The whole point of
+    the sweep is to catch a step which is referenced but never defined,
+    so deciding "it exists" from a substring search is the wrong side
+    of the question: a step named only in a comment, a docstring, an
+    error message or the ``getattr`` string which looks it up would all
+    satisfy it. Walking the tree counts definitions and nothing else,
+    at any nesting depth, so a step on a class body is found without
+    the sweep having to know which class.
+
+    A file which does not parse returns nothing, so a syntax error
+    surfaces as a missing step rather than as a silent pass. Returns an
+    empty set for a file which does not exist, which is the common case
+    for a schema with no matching module in ``shakenfist/operations/``.
+    """
+    if not os.path.exists(path):
+        return set()
+    try:
+        tree = ast.parse(open(path).read(), filename=path)
+    except SyntaxError:
+        return set()
+    return {
+        node.name for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+
 def _find_missing_upgrade_steps(schema_operations_root, operations_root):
     """Every ``*_op.py`` schema with a version gap needs every step.
 
@@ -32,6 +61,12 @@ def _find_missing_upgrade_steps(schema_operations_root, operations_root):
     Both roots are directories, so the caller decides whether to point
     this at the real source tree or at a throwaway one built to prove
     the sweep actually catches something.
+
+    The version declarations are still matched as text, because they
+    are module-level assignments of integer literals and reading them
+    with ``ast`` would buy nothing. Whether a *step* exists is decided
+    by ``_defined_function_names`` -- see there for why that one has to
+    be a definition and not a mention.
     """
     missing = []
     for path in sorted(glob.glob(os.path.join(schema_operations_root, '*.py'))):
@@ -41,12 +76,17 @@ def _find_missing_upgrade_steps(schema_operations_root, operations_root):
         if not (lo and hi) or lo.group(1) == hi.group(1):
             continue
 
-        op_path = os.path.join(operations_root, os.path.basename(path))
-        op_src = open(op_path).read() if os.path.exists(op_path) else ''
+        # A step may live on the schema module itself or on the
+        # matching class in shakenfist/operations/ -- NetOp's are on
+        # the operation class, agentoperation.py's convention.
+        defined = (
+            _defined_function_names(path)
+            | _defined_function_names(
+                os.path.join(operations_root, os.path.basename(path))))
 
         for v in range(int(lo.group(1)), int(hi.group(1))):
             step = '_upgrade_step_%d_to_%d' % (v, v + 1)
-            if step not in op_src and step not in src:
+            if step not in defined:
                 missing.append((os.path.basename(path), step))
     return missing
 
@@ -110,6 +150,56 @@ class UpgradeStepSweepTestCase(base.ShakenFistTestCase):
                 f.write(
                     'def _upgrade_step_1_to_2(cls, static_values):\n'
                     '    pass\n')
+
+            self.assertEqual(
+                [], _find_missing_upgrade_steps(schema_dir, operations_dir))
+
+    def test_a_mention_is_not_a_definition(self):
+        # The sweep exists to catch a step which is referenced and
+        # never defined, so a file which only *names* the step -- in a
+        # comment, a docstring, or the getattr string which looks it up
+        # -- must still be reported missing. A substring search over
+        # the file contents would pass every one of these.
+        for body in (
+                '# _upgrade_step_1_to_2 is still to be written\n',
+                'DOC = "see _upgrade_step_1_to_2"\n',
+                'step = getattr(self, "_upgrade_step_1_to_2")\n'):
+            with tempfile.TemporaryDirectory() as tmp:
+                schema_dir = os.path.join(tmp, 'schema', 'operations')
+                operations_dir = os.path.join(tmp, 'operations')
+                os.makedirs(schema_dir)
+                os.makedirs(operations_dir)
+
+                with open(os.path.join(schema_dir, 'fake_op.py'), 'w') as f:
+                    f.write('initial_version = 1\ncurrent_version = 2\n')
+                with open(
+                        os.path.join(operations_dir, 'fake_op.py'), 'w') as f:
+                    f.write(body)
+
+                self.assertEqual(
+                    [('fake_op.py', '_upgrade_step_1_to_2')],
+                    _find_missing_upgrade_steps(schema_dir, operations_dir),
+                    f'a mention rather than a definition was accepted: '
+                    f'{body!r}')
+
+    def test_a_step_on_a_class_body_is_found(self):
+        # NetOp's steps are methods on the operation class, not module
+        # level functions, so the ast walk has to find a definition at
+        # any nesting depth rather than only at module scope.
+        with tempfile.TemporaryDirectory() as tmp:
+            schema_dir = os.path.join(tmp, 'schema', 'operations')
+            operations_dir = os.path.join(tmp, 'operations')
+            os.makedirs(schema_dir)
+            os.makedirs(operations_dir)
+
+            with open(os.path.join(schema_dir, 'fake_op.py'), 'w') as f:
+                f.write('initial_version = 1\ncurrent_version = 2\n')
+            with open(os.path.join(operations_dir, 'fake_op.py'), 'w') as f:
+                f.write(
+                    'class FakeOp:\n'
+                    '    @classmethod\n'
+                    '    def _upgrade_step_1_to_2(cls, static_values):\n'
+                    '        pass\n')
 
             self.assertEqual(
                 [], _find_missing_upgrade_steps(schema_dir, operations_dir))

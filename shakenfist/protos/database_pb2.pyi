@@ -550,6 +550,7 @@ class FindExistingCoalescibleOpV2Request(_message.Message):
     OPERATION_TYPE_FIELD_NUMBER: _builtins.int
     KEYS_FIELD_NUMBER: _builtins.int
     TASK_NAME_FIELD_NUMBER: _builtins.int
+    PRIORITIES_FIELD_NUMBER: _builtins.int
     operation_type: _builtins.str
     """As FindExistingCoalescibleOpRequest, but with the multi-column key
     described on ClaimCoalescibleSiblingsV2Request.
@@ -557,16 +558,32 @@ class FindExistingCoalescibleOpV2Request(_message.Message):
     task_name: _builtins.str
     @_builtins.property
     def keys(self) -> _containers.RepeatedCompositeFieldContainer[Global___CoalescibleKeyPair]: ...
+    @_builtins.property
+    def priorities(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """The priority names (PRIORITY enum member names, e.g.
+        'user_facing') a candidate op may carry and still be reused. The
+        enqueue side hands over every priority at least as urgent as the
+        caller's own, because adopting a less urgent pending op means
+        waiting on its queue: a user_facing mesh enqueue deduped onto a
+        queued background repair inherits the background lane's queue-sit
+        tail while a caller blocks on raise_for_error(). An empty list
+        means no priority filter, which is what an old V2 server which
+        does not know this field will effectively apply -- that is the
+        pre-change behaviour and is a lost optimisation rather than a
+        correctness problem, unlike ignoring a key column.
+        """
+
     def __init__(
         self,
         *,
         operation_type: _builtins.str = ...,
         keys: _abc.Iterable[Global___CoalescibleKeyPair] | None = ...,
         task_name: _builtins.str = ...,
+        priorities: _abc.Iterable[_builtins.str] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["keys", b"keys", "operation_type", b"operation_type", "task_name", b"task_name"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["keys", b"keys", "operation_type", b"operation_type", "priorities", b"priorities", "task_name", b"task_name"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

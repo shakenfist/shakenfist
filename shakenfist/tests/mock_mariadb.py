@@ -12,6 +12,7 @@ from collections import defaultdict
 from itertools import count
 from typing import List, Optional
 from unittest import mock
+from uuid import UUID
 from uuid import uuid4
 
 from shakenfist import mariadb
@@ -3835,8 +3836,13 @@ class MockMariaDB():
         ``None`` *value* is not a skip: the real preflight passes it
         through ``_maybe_uuid`` unchanged and the statement binds
         ``IS NULL``, which is a narrower key rather than a missing one.
-        An empty string is a skip, because ``_maybe_uuid('')`` raises
-        and the real code logs and returns. See decision 8 of
+        Any malformed uuid is a skip for the same reason, not only the
+        empty string: the real preflight puts every non-None value
+        through ``_maybe_uuid`` and returns on ``ValueError``. A mock
+        looser than that would report a match where production reports
+        a logged skip, which is how a previous divergence in this
+        helper came within one commit of making step 11e's assertions
+        measure nothing. See decision 8 of
         docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
         """
         if not keys:
@@ -3844,7 +3850,11 @@ class MockMariaDB():
         for column, value in keys:
             if column not in {'network_uuid', 'instance_uuid', 'node_uuid'}:
                 return False
-            if value is not None and value == '':
+            if value is None:
+                continue
+            try:
+                UUID(str(value))
+            except (ValueError, AttributeError, TypeError):
                 return False
         return True
 
@@ -3867,7 +3877,7 @@ class MockMariaDB():
         return True
 
     def _mariadb_find_existing_coalescible_op(
-            self, operation_type, keys, task_name):
+            self, operation_type, keys, task_name, priorities=None):
         """Mock implementation of mariadb.find_existing_coalescible_op().
 
         Mirrors the SQL guards in
@@ -3876,6 +3886,12 @@ class MockMariaDB():
         ``(column, uuid)`` pair of ``keys`` whose task equals
         ``task_name``, or ``None``. The oldest-first order matches the
         SQL ``ORDER BY created_at ASC LIMIT 1``.
+
+        ``priorities`` mirrors the real ``priority IN (...)`` clause,
+        and an empty or absent list means no filter exactly as it does
+        server side. The mock stores the serialised metadata flat on
+        the row, so the stored value is the ``PRIORITY`` member name
+        the real column holds.
         """
         if not self._coalescible_keys_valid(keys):
             return None
@@ -3885,6 +3901,8 @@ class MockMariaDB():
             if op_row.get('operation_type') != operation_type:
                 continue
             if not self._coalescible_row_matches(op_row, keys):
+                continue
+            if priorities and op_row.get('priority') not in priorities:
                 continue
             # The mock stores metadata fields flat on the row (see
             # ``_mariadb_create_and_enqueue_cluster_operation``),

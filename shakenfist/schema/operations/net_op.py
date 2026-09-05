@@ -149,6 +149,37 @@ def _coalescible_keys(
     return [(column, values[column]) for column in COALESCIBLE_KEY_COLUMNS]
 
 
+def _reusable_priorities(priority: PRIORITY) -> list[str]:
+    """The priorities an enqueue at ``priority`` may reuse an op from.
+
+    Reuse is one-sided. Adopting a pending op which is *more* urgent
+    than the caller asked for costs nothing -- the work runs sooner --
+    but adopting a less urgent one means adopting its queue.
+    ``enqueue_cluster_operation`` names queues
+    ``{target}-{family}-{priority}``, so the two sit on different
+    queues entirely, and the caller does not merely lose its lane: the
+    waiters in ``raise_for_error()`` and the ``runs_after`` dependency
+    an instance start hangs off both then block on the slower lane's
+    queue-sit tail, which phase 10 measured as the deep one.
+
+    That is not hypothetical for either coalescible task which has two
+    enqueue sites. ``Network.ensure_mesh`` enqueues
+    ``network_ensure_mesh`` at ``user_facing`` while the network
+    maintainer enqueues the same task, for the same network and the
+    same node, at ``background`` whenever ``is_mesh_okay()`` reports
+    drift -- which is the state a network is in immediately after an
+    instance starts elsewhere on it. ``create_on_network_node`` and the
+    maintainer straddle ``user_facing``/``background`` for
+    ``network_apply_create_network_node`` in the same way, and have
+    since before the mesh task became coalescible.
+
+    ``PRIORITY``'s values are ordered, lowest most urgent, so "at least
+    as urgent" is a numeric comparison. The result is member *names*,
+    because ``cluster_operations.priority`` stores the name.
+    """
+    return [p.name for p in PRIORITY if p.value <= priority.value]
+
+
 class model(BaseModel):
     # ``node_uuid`` is deliberately absent from this map, even though
     # it is a model field. ``enqueue_cluster_operation``
@@ -274,17 +305,29 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
                 f'sf-net drains it. A node-aware key is only sound on a '
                 f'dispatcher which partitions its workers by target: sf-net '
                 f'does, sf-queues does not (see the phase 11 plan, decision '
-                f'5, and the successor issue it names for the sf-queues '
-                f'half). This enqueue is on the {family!r} family.')
+                f'5, and issue #4017 for the sf-queues half). This enqueue '
+                f'is on the {family!r} family.')
 
     if (len(tasks) == 1
             and tasks[0] in COALESCIBLE_TASKS
             and depends_on is None
             and runs_after is None):
-        existing_uuid = mariadb.find_existing_coalescible_op(
-            operation_type=object_type.name.lower(),
-            keys=_coalescible_keys(network_uuid, node_uuid),
-            task_name=tasks[0].name)
+        try:
+            existing_uuid = mariadb.find_existing_coalescible_op(
+                operation_type=object_type.name.lower(),
+                keys=_coalescible_keys(network_uuid, node_uuid),
+                task_name=tasks[0].name,
+                priorities=_reusable_priorities(priority))
+        except exceptions.CoalescingUnavailable:
+            # A rolling upgrade against an sf-database predating the V2
+            # coalescing RPCs. Insert a new op, which is what a missed
+            # dedup always does; the worker-side fold catches the
+            # duplicate later if it is still there, and if that is
+            # unavailable too the task simply runs twice. Every
+            # coalescible task is idempotent by the definition of being
+            # coalescible, so the cost is duplicated work for the
+            # length of the upgrade and nothing else.
+            existing_uuid = None
         if existing_uuid is not None:
             LOG.with_fields({
                 'existing_op_uuid': existing_uuid,

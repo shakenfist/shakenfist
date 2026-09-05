@@ -22048,8 +22048,8 @@ def _coalescible_key_pairs(
 # Both coalescing wrappers below talk to the V2 RPCs, which carry the
 # whole multi-column key. An sf-database from before the V2 pair existed
 # answers UNIMPLEMENTED, and the *only* correct response to that is to
-# behave as though coalescing is unavailable: return "no match" / "folded
-# nothing" and log. Falling back to the V1 RPC would send just the first
+# behave as though coalescing is unavailable. Falling back to the V1 RPC
+# would send just the first
 # key column, and the server would happily fold every operation matching
 # it -- during a rolling upgrade that is a survivor on one hypervisor
 # marking another hypervisor's genuinely different work complete, which
@@ -22057,10 +22057,20 @@ def _coalescible_key_pairs(
 # Losing an optimisation loudly for the length of an upgrade is the
 # cheap failure; folding across nodes silently is not. See decision 1 of
 # docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+#
+# "Loudly" is why UNIMPLEMENTED raises CoalescingUnavailable rather than
+# returning the same "nothing matched" both functions return on every
+# other failure. The fold records its outcome for the queue-wait report,
+# and a fold which never ran reported as ``ran`` with zero siblings
+# folded reads there exactly like a fold which ran and matched nothing.
+# That is the ambiguity #3878 hid behind, so an upgrade window gets its
+# own outcome instead of borrowing the healthy one. Callers catch it;
+# nothing user facing sees it.
 def _grpc_find_existing_coalescible_op(
         operation_type: str,
         keys: 'list[tuple[str, Optional[str]]]',
-        task_name: str) -> Optional[str]:
+        task_name: str,
+        priorities: Optional[list[str]] = None) -> Optional[str]:
     """Read-only enqueue-side dedup lookup via the database microservice.
 
     See ``_direct_find_existing_coalescible_op`` for semantics. A
@@ -22073,7 +22083,8 @@ def _grpc_find_existing_coalescible_op(
         request = database_pb2.FindExistingCoalescibleOpV2Request(
             operation_type=operation_type,
             keys=_coalescible_key_pairs(keys),
-            task_name=task_name)
+            task_name=task_name,
+            priorities=priorities or [])
         reply = _grpc_call(stub.FindExistingCoalescibleOpV2, request)
         if not reply.op_uuid:
             return None
@@ -22086,7 +22097,9 @@ def _grpc_find_existing_coalescible_op(
                 f'unavailable for '
                 f'{operation_type}/{_coalescible_key_description(keys)}/'
                 f'{task_name}')
-            return None
+            raise exceptions.CoalescingUnavailable(
+                'FindExistingCoalescibleOpV2 is not implemented by this '
+                'database service')
         LOG.warning(
             f'gRPC FindExistingCoalescibleOpV2 failed for '
             f'{operation_type}/{_coalescible_key_description(keys)}/'
@@ -22123,7 +22136,9 @@ def _grpc_claim_coalescible_siblings(
                 f'this database service, the coalescing fold is '
                 f'unavailable for '
                 f'{operation_type}/{_coalescible_key_description(keys)}')
-            return []
+            raise exceptions.CoalescingUnavailable(
+                'ClaimCoalescibleSiblingsV2 is not implemented by this '
+                'database service')
         LOG.warning(
             f'gRPC ClaimCoalescibleSiblingsV2 failed for '
             f'{operation_type}/{_coalescible_key_description(keys)}: {e}')
@@ -22935,7 +22950,8 @@ def _coalescible_key_clause(
 def _direct_find_existing_coalescible_op(
         operation_type: str,
         keys: 'list[tuple[str, Optional[str]]]',
-        task_name: str) -> Optional[str]:
+        task_name: str,
+        priorities: Optional[list[str]] = None) -> Optional[str]:
     """Read-only enqueue-side dedup lookup.
 
     Returns the uuid of the oldest pending cluster operation that:
@@ -22947,6 +22963,20 @@ def _direct_find_existing_coalescible_op(
       is strictly narrower than a one-pair key.
     * has a single-task list whose entry equals ``task_name``
     * is currently in state ``queued`` (not yet picked up)
+    * carries one of ``priorities``, when the caller supplies them
+
+    ``priorities`` holds ``PRIORITY`` member names and exists because
+    reuse is not symmetric. Adopting a *more* urgent pending op is
+    free -- it runs sooner than the caller asked for -- but adopting a
+    less urgent one means inheriting its queue. ``queue_name`` is
+    ``{target}-{family}-{priority}``, so a ``user_facing`` mesh
+    enqueue deduped onto a queued ``background`` repair of the same
+    network and node does not merely lose its lane, it blocks a caller
+    which is sitting in ``raise_for_error()`` on the background lane's
+    queue-sit tail -- the tail phase 10 measured. Callers therefore
+    pass every priority at least as urgent as their own. ``None`` or an
+    empty list means no priority filter, which is the pre-#4007
+    behaviour.
 
     Returns ``None`` when there's no match. Callers use this to skip
     a new ``create_and_enqueue`` insert when an equivalent op is
@@ -23010,6 +23040,14 @@ def _direct_find_existing_coalescible_op(
                 stmt = stmt.where(
                     _coalescible_key_clause(
                         cluster_ops_table, column, value))
+            # cluster_operations.priority is a String(32) holding the
+            # PRIORITY member name, so this is an IN over bound
+            # strings rather than an ordering comparison. The caller
+            # did the ordering; see the docstring for why it is
+            # one-sided.
+            if priorities:
+                stmt = stmt.where(
+                    cluster_ops_table.c.priority.in_(priorities))
             row = conn.execute(stmt).fetchone()
             if row is None:
                 return None
@@ -24010,7 +24048,8 @@ def delete_work_queue_row(row_id: int) -> bool:
 def find_existing_coalescible_op(
         operation_type: str,
         keys: 'list[tuple[str, Optional[str]]]',
-        task_name: str) -> Optional[str]:
+        task_name: str,
+        priorities: Optional[list[str]] = None) -> Optional[str]:
     """Look up an existing pending coalescible op on the same target.
 
     ``keys`` is the coalescing key: a list of ``(column, uuid)``
@@ -24018,6 +24057,12 @@ def find_existing_coalescible_op(
     means the candidate's column must be NULL, which is how the
     cluster-wide operations (whose ``node_uuid`` is unset) fold only
     each other.
+
+    ``priorities`` names the ``PRIORITY`` members a candidate may
+    carry. Callers pass every priority at least as urgent as their
+    own, so a caller never adopts -- and then blocks on -- an op
+    sitting in a slower lane than the one it asked for. See
+    ``_direct_find_existing_coalescible_op``.
 
     Returns its uuid if found, otherwise ``None``. Used by
     ``create_and_enqueue`` for ops whose entire task list is a
@@ -24027,9 +24072,9 @@ def find_existing_coalescible_op(
     """
     if _use_database_service():
         return _grpc_find_existing_coalescible_op(
-            operation_type, keys, task_name)
+            operation_type, keys, task_name, priorities)
     return _direct_find_existing_coalescible_op(
-        operation_type, keys, task_name)
+        operation_type, keys, task_name, priorities)
 
 
 def claim_coalescible_siblings(
