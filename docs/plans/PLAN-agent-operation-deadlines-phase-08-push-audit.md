@@ -671,6 +671,306 @@ discipline, and the `deadline`/`progress_timeout` unit distinction.
 nothing failed.** No blocking findings. No advisory findings. Wave 2 (steps
 8c-8g) can proceed on this baseline without qualification.
 
+### 2a. Code quality
+
+Baseline: `git diff M^1 M` for each of the eleven non-doc-only merges listed
+in decision 1 of `docs/plans/PLAN-agent-operation-deadlines-phase-08-push-audit.md`
+(`87bbffcf4` skipped as docs-only): `f21d5da3a cb9e10bba 08807c83f 291054e98
+185de6b32 4afa29476 864608276 4a122bcd3 2341ae0c4 2e19bb1ea 91d565a05`.
+
+#### Wave 2 mechanical sweep
+
+- **TODO/FIXME/HACK/XXX in added lines:** none in any of the eleven merges.
+- **New `# noqa` / `# type: ignore` / `pragma: no cover`:** none.
+- **New `subprocess.` / `os.system` / `shell=True`:** none.
+- **Added test-function counts** (`^\+\s*def test_`): f21d5da3a=9,
+  cb9e10bba=35, 08807c83f=34, 291054e98=68, 185de6b32=53, 4afa29476=0,
+  864608276=0, 4a122bcd3=4, 2341ae0c4=7, 2e19bb1ea=8, 91d565a05=4. The two
+  zero-test merges (4afa29476, 864608276) are the phase-6 capability-token
+  and CI-suite-adoption merges (4 and 4 files changed, 20 and 46 insertions);
+  not a coverage gap for this brief.
+- **Docs touched:** every phase merge (1-7) and both repair merges (2e19bb1ea,
+  91d565a05 minus the latter, which touched none) touch `docs/plans/*` and/or
+  `docs/developer_guide/*`; 2341ae0c4 and 91d565a05 touch no docs at all
+  (pure code fixes plus tests).
+
+No mechanical finding to triage (step 7): the sweep is clean across every
+merge, so there is nothing here to grade blocking/advisory.
+
+#### F6 confirmations (both hold)
+
+- **SQL pushdown:** `git diff <M>^1 <M> -- '*.py' | grep -E '^\+[^+].*mariadb\.get_all_'`
+  returns nothing for any of the eleven merges. Confirmed clean.
+- **Cached FK list:** `git diff cb9e10bba^1 cb9e10bba -- shakenfist/schema/agentoperation_attributes.py`
+  shows exactly two new scalar fields added, `last_progress: Optional[float] = None`
+  and `attempts: int = 0` — no `list[...]` field. Confirmed clean.
+
+#### 3a. Command-list ownership rule (`docs/developer_guide/coding_rules.md`, "A frozen model is not a deep frozen model")
+
+Read `2e19bb1ea`'s addition to `coding_rules.md`: the rule names the four
+container fields on cached models that must be copied at the `_db_get()`
+boundary (`AgentOperationData.commands`, `InstanceData.disk_spec`,
+`.video`, `.side_channels`) and forbids a caller mutating an alias of one.
+
+Checked every boundary:
+- `shakenfist/operations/agentoperation.py:141` — `'commands': list(data.commands)`.
+- `shakenfist/instance.py:403,410,416` — `list(data.disk_spec)`, `dict(data.video)`,
+  `list(data.side_channels)`.
+- `shakenfist/daemons/sidechannel/main.py:622` — `SideChannelExecutorJob.__init__`
+  takes its own copy (`self.commands = list(agentop.commands)`), and only that
+  copy is popped (`self.commands.pop(0)` at line 1172).
+
+Grepped the whole tree for mutation of these fields
+(`grep -rn '\.commands\.\(pop\|append\|remove\|clear\|extend\|insert\)\|\.disk_spec\....\|\.side_channels\....'`).
+The only hits are the executor's own copy (line 1172, correct) and
+`out.commands.append(cmd)` in `_send_commands_single_envelope`/
+`_send_replies_single_envelope`, which append to a freshly built
+`agent_pb2.HypervisorToAgent()` protobuf message, not a cached model.
+
+**No violation found.** The rule is honoured everywhere it applies today,
+including at the two sites (`instance.py`, `agentoperation.py`) singled out
+for a second look.
+
+#### 3b. Executor teardown — finding
+
+Read `_request_all_threads_exit()`, `_request_thread_exit()`,
+`start_instance_executor()`, `reap_instance_executors()`,
+`_wait_for_all_threads_exit()` in full (`shakenfist/daemons/sidechannel/main.py`).
+
+Signal-before-join ordering is correct: `_request_all_threads_exit()`
+(lines 1750-1785) sets every thread's abort path in one loop over
+`list(self.monitors.values()) + list(self.executors.values())` *before*
+either of the two join loops runs, exactly as `2341ae0c4`'s fix and its
+comment describe. That part holds.
+
+**But a sibling race the same fix left unguarded:**
+`start_instance_executor()` (line 1504) registers the executor into
+`self.executors[instance_uuid]` at lines 1533-1537 — *before* calling
+`sc_thread.start()` at line 1547 — deliberately, so the reaper can see an
+in-flight dispatch before the thread exists (the comment at 1522-1532
+explains why). `reap_instance_executors()` (line 1559) knows about this
+window and guards it explicitly: `if t['thread'].ident is None: continue`
+(line 1586), with a comment spelling out that `join()` on an unstarted
+thread raises `RuntimeError: cannot join thread before it is started`.
+
+`_request_thread_exit()` (line 1787), the method `2341ae0c4` generalised
+from the old monitor-only version to serve both dictionaries, has **no
+such guard** and calls `t['thread'].join(0.5)` unconditionally (line 1800).
+For monitors this is safe by construction — `start_instance_monitor()`
+calls `sc_thread.start()` *before* registering into `self.monitors`, so a
+monitor entry is never seen mid-registration. For executors it is not:
+if `_request_all_threads_exit()` runs (from `_wait_for_all_threads_exit()`
+during daemon shutdown) while the dispatcher thread is between line 1537
+and line 1547 of `start_instance_executor()` for the same instance, the
+executor's `join(0.5)` call raises `RuntimeError`. Nothing at the call
+site (`_request_all_threads_exit()`'s `for instance_uuid in
+list(self.executors.keys()): self._request_thread_exit(...)`, line
+1783-1785) or in `_run_inner()`'s shutdown block (lines 2008-2011, no
+try/except around `self._wait_for_all_threads_exit()`) catches it, so the
+daemon's graceful-shutdown path crashes with an uncaught exception instead
+of reaching `LOG.info('Stopped')` / `daemon.force_clean_exit()`.
+
+**File:** `shakenfist/daemons/sidechannel/main.py:1787-1808` (`_request_thread_exit`),
+contrasted with the guard at `shakenfist/daemons/sidechannel/main.py:1586`
+(`reap_instance_executors`).
+**Grade: advisory.** The race window is a handful of bytecode instructions
+in `start_instance_executor()` between dict registration and
+`Thread.start()`, so it needs a shutdown signal to land in that exact
+window while the dispatcher is actively starting a new executor — rare in
+practice, and systemd will restart the daemon on the resulting crash
+(no data corruption: the operation is left mid-dispatch the same way an
+ordinary daemon kill -9 would leave it, which `agent_operation_next()`'s
+durability design and the reaper already tolerate). It is not blocking,
+but it is a second instance of exactly the defect class `2341ae0c4` was
+written to close (a `KeyError`/`RuntimeError` on shutdown teardown caused
+by the executor's "register before start" ordering), and the fix that
+generalised `_request_thread_exit()` for both dictionaries did not carry
+over the one guard that ordering requires. Concrete failure scenario: a
+rolling deploy sends SIGTERM to `sf-sidechannel` at the instant its
+dispatcher thread is between lines 1533 and 1547 dispatching a new
+operation; `_wait_for_all_threads_exit()` calls `_request_thread_exit()`
+on that same instance, which raises `RuntimeError` out of the shutdown
+path.
+
+#### 3c. Policy duplication — no finding (clean)
+
+Read `AgentOperation.effective_deadline()` / `deadline_passed()` /
+`effective_progress_timeout()` (`shakenfist/operations/agentoperation.py:251-317`),
+`resolve_abandoned_operation()` and `SideChannelExecutorJob.expire_if_out_of_budget()`
+(`shakenfist/daemons/sidechannel/main.py:528-592, 960-1061`),
+`Monitor._resolve_stuck_queue_head()` (same file, 1625-1748), and
+`Instance.agent_operation_next()` (`shakenfist/instance.py:2606-2684`), plus
+`NodeAgentopOp._preflight()` (`shakenfist/operations/node_aop_op.py:90-131`).
+
+The four "checks" the brief asks about collapse to two shared primitives and
+one single-site check, not four independent re-derivations:
+
+- **Wall-clock deadline** is decided in exactly one place,
+  `AgentOperation.deadline_passed()` (which itself delegates the NULL-anchor
+  resolution to `effective_deadline()`). Every enforcement site —
+  `agent_operation_next()` (dequeue), `NodeAgentopOp._preflight()` (twice,
+  before and mid blob copy), `SideChannelExecutorJob.expire_if_out_of_budget()`,
+  `Monitor._resolve_stuck_queue_head()`, and `resolve_abandoned_operation()`
+  — calls `agentop.deadline_passed(state=...)` rather than reading
+  `.deadline` and comparing against `time.time()` itself. Grepping the tree
+  for `deadline_passed\|effective_deadline` confirms there is no second
+  comparison anywhere.
+- **Progress timeout** is decided in exactly one place,
+  `AgentOperation.effective_progress_timeout()`, called from exactly one
+  site, `expire_if_out_of_budget()`. The reaper deliberately does not
+  duplicate this: its own docstring says "the progress timeout is that
+  executor's own job and it holds state this method does not," so a live,
+  in-budget executor is left alone rather than re-checked.
+- **Attempt bound** (`config.AGENT_OPERATION_MAX_ATTEMPTS`) is compared
+  against `agentop.attempts` in exactly one function,
+  `resolve_abandoned_operation()`. Both of the reaper's two resolution paths
+  (case one: no executor; case two: wedged executor past deadline) and the
+  executor's own two exit paths (progress-timeout stall, and the `finally`
+  block in `SideChannelExecutorJob.execute()`) all route through this one
+  function rather than re-implementing the attempt-cap comparison.
+- **The reaper's view of a stalled operation** (`_resolve_stuck_queue_head()`)
+  is not a fourth independent policy: it is `deadline_passed()` reused, plus
+  liveness evidence unique to the reaper (whether `self.executors` has a
+  thread for the instance) that no other site could derive since it depends
+  on this node's process state.
+
+**No finding.** A shared constant/method used four times, not four copies
+that can drift, exactly as the brief's threshold describes.
+
+#### 4. MariaDB three-layer pattern and RPC registration
+
+Checked the affected accessors in `shakenfist/mariadb.py`:
+`_direct_update_agent_operation_attributes` /
+`_grpc_update_agent_operation_attributes` / `update_agent_operation_attributes`
+(the field-mask trio), and the corresponding create/get/delete trios for
+`agent_operation` and `agent_operation_attributes`. All follow the
+`_direct_*` / `_grpc_*` / public-wrapper pattern already in place; the field
+mask (`fields: Optional[List[str]] = None`) is threaded through
+`_agent_operation_attributes_column_values()` identically in the direct
+path and as a `repeated string fields` proto field in the gRPC path, and
+every caller (`record_attempt()` → `fields=['attempts']`,
+`record_progress()` → `fields=['last_progress']`, `add_result()` /
+`clear_results()` → `fields=['results']`) passes an explicit mask, never
+`fields=None`.
+
+Verified wave 1's "no new RPC" claim directly rather than trusting it:
+`git diff <M>^1 <M> -- protos/database.proto` across all eleven merges
+shows only new *fields* added to three pre-existing messages
+(`AgentOperationStaticData` gained `deadline`/`progress_timeout`,
+`AgentOperationAttributesProto` gained `last_progress`/`attempts`,
+`UpdateAgentOperationAttributesRequest` gained `fields`) — no new `rpc`
+method declaration anywhere in the diff. `grep -n "AgentOperation"
+shakenfist/daemons/database/main.py` shows the five RPC handlers
+(`CreateAgentOperation`, `GetAgentOperation`, `DeleteAgentOperation`,
+`CreateAgentOperationAttributes`, `GetAgentOperationAttributes`,
+`UpdateAgentOperationAttributes`, `DeleteAgentOperationAttributes`) all
+pre-date this plan and are unchanged in count, so nothing new needed a
+Monitor-operations counter. Confirmed, not assumed.
+
+Also checked the migration for the two new columns
+(`_ensure_agent_operation_attributes_schema`, around
+`shakenfist/mariadb.py:18889-18915`): `last_progress DOUBLE NULL`,
+`attempts BIGINT NOT NULL DEFAULT 0`. `pydantic_to_sqlalchemy_table` maps
+Python `int` to `sa.BigInteger()` (`shakenfist/schema/sqlalchemy.py:272`),
+so a fresh install (via `create_all()`) and an upgraded cluster (via this
+`ALTER TABLE`) land on the same column type. No drift.
+
+**No finding.**
+
+#### 5. Duplicated code / missed abstractions
+
+Looked specifically at whether deadline/progress-timeout logic is
+duplicated between the executor, the REST layer, and
+`operations/agentoperation.py`, per the brief.
+
+`shakenfist/external_api/base.py:227-281` (`agent_operation_timing()`) and
+its helper `_timing_seconds()` are the single conversion point for the
+three request-body parameters (`deadline_seconds`, `progress_timeout_seconds`)
+into the stored `(deadline, progress_timeout)` pair. All three endpoints
+that create agent operations —
+`InstanceAgentPutEndpoint.post()`, `InstanceAgentGetEndpoint.post()`,
+`InstanceAgentExecuteEndpoint.post()` in `shakenfist/external_api/instance.py`
+(diffed directly: lines ~1676-1880 across the eleven merges) — call this one
+function rather than validating/defaulting inline, and share the two
+parameter-description constants (`DEADLINE_SECONDS_DESCRIPTION`,
+`PROGRESS_TIMEOUT_SECONDS_DESCRIPTION`, `instance.py:76-91`) instead of
+re-typing the Swagger description three times. No copy-paste found here.
+
+**No finding** — this is the one area the brief specifically worried about,
+and it is well-factored, not duplicated.
+
+#### 6. Comment proportion
+
+Scanned the touched files (`sidechannel/main.py`, `agentoperation.py`,
+`node_aop_op.py`, `external_api/base.py`, `external_api/instance.py`) for
+comment runs of 12+ lines, then checked which of those are actually new
+in this plan's diff (several long-standing blocks in `external_api/base.py`
+around credential redaction and decorator ordering pre-date this plan and
+are out of scope).
+
+Candidates actually introduced by this plan, all in
+`shakenfist/daemons/sidechannel/main.py`:
+- Lines 98-113 (`SideChannelJob.__init__`, abort-path ownership rationale).
+- Lines 607-621 (`SideChannelExecutorJob.__init__`, the #3970 command-list
+  copy rationale).
+- Lines 667-680 and 691-702 (`execute()`'s `finally` block).
+- Lines 991-1011 (`expire_if_out_of_budget`'s NULL-deadline anchor cache,
+  #4014).
+- Lines 1197-1214 and 1231-1257 (`_dispatch_next_command`'s terminal-state
+  guard and attempt-counting rationale).
+- Lines 1695-1714 (`_resolve_stuck_queue_head`, case-one fail-vs-expire
+  distinction).
+- Lines 1753-1774 (`_request_all_threads_exit`, the #3931 KeyError history).
+
+Also `shakenfist/external_api/base.py:227-256` (`agent_operation_timing`'s
+30-line docstring over its ~15-line body).
+
+Applying the shared block's test: every one of these documents either (a)
+a three-valued semantic that is genuinely non-obvious from the code alone
+(the `None`/`0`/value tri-state for deadline and progress timeout — code
+this short cannot say why `0` is special without prose), (b) a correctness
+invariant whose violation was a real, merged bug (#3516, #3970/#3931,
+#4014 are all named directly, with PR numbers), or (c) an ordering
+guarantee (attempt counted once per dispatch, not per command) that a
+future editor could plausibly get wrong without the explanation. None of
+them restate what the adjacent code already says in different words.
+
+**No advisory findings** — every candidate by line-count is justified by
+the shared block's own carve-out (a hard-won bug explanation or a
+non-obvious contract).
+
+#### 7. Triage of mechanical findings
+
+The wave 2 mechanical sweep (TODO/FIXME/HACK/XXX, new `# noqa` / `# type:
+ignore` / `pragma: no cover`, new `subprocess.`/`os.system`/`shell=True`)
+found nothing across all eleven merges. There is nothing to triage.
+
+---
+
+**Summary of what was examined:** `shakenfist/daemons/sidechannel/main.py`
+in full (2037 lines); `shakenfist/operations/agentoperation.py` in full;
+`shakenfist/operations/node_aop_op.py` (preflight deadline enforcement);
+`shakenfist/instance.py` (`_static_values_to_dict`, `agent_operation_next`,
+static-value properties for `disk_spec`/`video`/`side_channels`);
+`shakenfist/external_api/base.py` (`agent_operation_timing`,
+`_timing_seconds`) and `shakenfist/external_api/instance.py` (the three
+agent-operation endpoints) as diffed across the eleven merges;
+`shakenfist/mariadb.py` (agent-operation and agent-operation-attributes
+direct/gRPC/public trios, field-mask helper, schema migration);
+`shakenfist/daemons/database/main.py` (AgentOperation RPC handlers);
+`protos/database.proto` diffed across all eleven merges;
+`docs/developer_guide/coding_rules.md`'s "A frozen model is not a deep
+frozen model" section; `shakenfist/schema/agentoperation_attributes.py`
+and `shakenfist/schema/sqlalchemy.py` (`pydantic_to_sqlalchemy_table`'s
+`int` → `BigInteger` mapping).
+
+**Totals: 0 blocking, 1 advisory** finding (§3b, the unguarded
+`Thread.join()` in `_request_thread_exit()` for an executor thread that
+has been registered but not yet started). Everything else examined — the
+command-list ownership rule, the four timing-budget checks, the MariaDB
+three-layer pattern and RPC registration, REST-to-executor duplication,
+and the comment-proportion candidates — came back clean.
+
 ### 2c. Documentation review
 
 Baseline used: `git diff M^1 M` for each of the twelve merges named in
