@@ -84,9 +84,21 @@ jobs:
           name: collection
           path: dist-collection/
 
+  # The four publishing jobs are guarded so that a workflow_dispatch
+  # run only ever exercises the build and the twine check. The event
+  # is tested as well as the ref because a dispatch can be aimed at a
+  # tag: the ref test alone passes there, and the run re-signs and
+  # force-pushes a tag that already exists, rewriting a signed object
+  # someone may already have verified. Aimed at a branch instead, an
+  # unguarded sign-tag computes a tag name of the literal string
+  # "refs/heads/<branch>" and force-pushes a garbage
+  # refs/tags/refs/heads/<branch> ref. Nothing is lost by requiring
+  # push: re-running a failed release goes through "Re-run jobs",
+  # which keeps the original push event.
   sign-tag:
     name: Sign release tag with Sigstore
     needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, debian-12, s]
     environment: release
 
@@ -130,6 +142,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: [build, sign-tag]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, static]
     environment: release
 
@@ -186,6 +199,7 @@ jobs:
   publish-collection:
     name: Publish ansible collection to Galaxy
     needs: [build-collection, sign-tag]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, static]
     environment: release
 
@@ -220,6 +234,7 @@ jobs:
   github-release:
     name: Create GitHub Release
     needs: [build, sign-tag, publish-pypi]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, static]
 
     permissions:
