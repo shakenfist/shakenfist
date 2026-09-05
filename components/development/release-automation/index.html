@@ -14039,6 +14039,18 @@ the <code>release.yml</code> workflow:</p>
 <li><strong>Creates a GitHub Release</strong> with the built artifacts and
    auto-generated release notes</li>
 </ol>
+<p>The release job downloads the distribution to a named path and sets
+<code>fail_on_unmatched_files</code>, so that a release which attaches nothing
+fails rather than reporting success. Both are load bearing: with a
+bare download and the action's default of warning on an unmatched
+glob, an empty release is indistinguishable from a good one.</p>
+<p>The workflow can also be started by hand, which runs the build and the
+<code>twine check</code> as a smoke test and stops there. Everything from the tag
+signing down is confined to tag refs with
+<code>if: startsWith(github.ref, 'refs/tags/v')</code>. That guard is what makes
+the manual trigger safe to use: a dispatch arrives on a branch ref, and
+without it <code>sign-tag</code> would take <code>refs/heads/&lt;branch&gt;</code> for a tag name,
+force-push <code>refs/tags/refs/heads/&lt;branch&gt;</code>, and go on to publish.</p>
 <pre class="mermaid"><code>flowchart TB
     tag["Maintainer pushes v0.6.0 tag"]
     build["Build package"]

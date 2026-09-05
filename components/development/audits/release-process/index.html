@@ -13766,6 +13766,17 @@
 <li>If <code>pyproject.toml</code> exists, there must be a
   <code>.github/workflows/release.yml</code> and a <code>RELEASE-SETUP.md</code>.</li>
 <li>Releases use GitHub signed tags and Sigstore signing.</li>
+<li>A release job which attaches assets downloads them to a named
+  destination (<code>name:</code> or <code>merge-multiple: true</code>) and sets
+  <code>fail_on_unmatched_files: true</code>, so that a glob matching nothing
+  fails the job instead of publishing an empty release.</li>
+<li>Where <code>release.yml</code> offers <code>workflow_dispatch</code>, its publishing jobs
+  are confined to tags with
+  <code>if: startsWith(github.ref, 'refs/tags/v')</code>. A dispatch arrives on a
+  branch ref, so an unguarded <code>sign-tag</code> force-pushes a
+  <code>refs/tags/refs/heads/&lt;branch&gt;</code> tag and the run carries on into the
+  publish. Build jobs are exempt: running them is what the dispatch is
+  for.</li>
 </ul>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>Template: <code>templates/release-automation/</code>
