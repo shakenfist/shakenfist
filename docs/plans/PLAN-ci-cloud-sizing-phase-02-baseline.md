@@ -69,10 +69,15 @@ The survey below found that the waiting is already done.
 
 ## What the survey found
 
-Seven findings. Four contradict claims this phase inherited and are
+Eight findings. Four contradict claims this phase inherited and are
 corrected at source in the planning commit -- in the master plan's
 Situation and phase 2 sections -- so the next reader does not trip
 over them. Re-check those rather than redoing them.
+
+Findings 1 to 7 come from the planning survey. Finding 8 was added
+later, during implementation, when verifying step 2c against live
+merge runs turned up something the planning survey could not have
+seen without the harvest existing.
 
 **1. The waiting is already done: 66 merge runs are banked.** The
 master plan's phase 2 section reads as though a window must be
@@ -201,6 +206,40 @@ shape produced it; the artifact name does
 that fails loudly on an unknown bundle, and D20's actions change
 writes a label file so future harvests do not need one.
 
+**8. A node's ledger can read as 200% committed, and that alone
+would produce the 507 family.** Found while verifying step 2c
+against two live merge runs, so it is an observation from the
+instrument rather than from the plan. In run 33948911843's
+`Debian 12 tier` job -- which failed -- the raw sample for one node
+reads `cpu_measured: 0`, `cpu_committed: 6`, `cpu_limit: 3`,
+`cpu_committed_row_present: true`. Measured is zero, so this is not
+a measurement artefact and not overcommit of real CPU: the
+materialised capacity row itself records the node as holding twice
+the vCPU its own limit allows, with no domains running. The limit
+did not move during the run -- the harvest records the ledger as
+the range it moved over, and that range is 3.0 to 3.0.
+
+The consequence is mechanical. `_has_sufficient_cpu()` admits on
+`max(measured, committed) + requested <= limit`, so a node in this
+state refuses **every** subsequent create regardless of how idle it
+is, and the cluster loses a third of its hypervisors without
+anything reporting an error. That is the #3772 507 signature
+exactly, arrived at from the capacity counters rather than from
+real exhaustion -- and it is a defect that **growing the cloud
+would mask rather than fix**, which is precisely the outcome phase
+3 exists to prevent.
+
+This phase does not chase it: steps 2d and 2f own it, and it is
+recorded here so that it cannot be lost. What 2d must establish is
+how often the window contains it, and whether it correlates with
+the failing jobs; what 2f must establish before filing is how a
+row reaches that state at all, given that
+`admit_instance_placement()`'s guarded UPDATE is supposed to make
+`used + requested <= limit` an invariant. The likely candidates are
+a reconciler faithfully recomputing `used_cpus` from instances that
+are genuinely placed there, having arrived when the limit was
+higher or by a path that did not go through the guard.
+
 ## Decision items
 
 ### D16 -- Harvest the banked window; do not open a new one
@@ -241,6 +280,14 @@ treats the set as exactly these four per merge run:
 | Ubuntu 24.04 cluster | `slim-primary` | `bundle-shakenfist-full-ubuntu-2404-slim-primary` |
 | Guests | `slim-primary` | `bundle-shakenfist-full-guests` |
 | Debian 12 tier | `slim-tier` | `bundle-shakenfist-full-debian-12-slim-tier` |
+
+The job column is the readable name the matrix gives and the name
+step 2d groups by. It is **not** what the jobs API returns: the
+reusable workflow contributes its own name, so the API reports
+`Debian 12 cluster (collection) / Smoke tests (collection)`. The
+harvest records both, matching on the prefix, and records a null
+job conclusion rather than falling back to the run's when the match
+fails. Found while implementing step 2c.
 
 **Corrected after this plan was committed.** This decision
 originally named six jobs, adding `Ansible modules` and `Node
@@ -404,9 +451,12 @@ originally guessed "a few hundred bytes each... low hundreds of
 kilobytes". A real record, measured by running the step 2b tool
 over a real bundle from merge run 33944911413, is **3,675 bytes
 compact and 5,381 indented** -- an order of magnitude out. With
-D17's corrected job count that is 66 runs x 4 jobs x 3.7 KB, or
-roughly 950 KB compact and 1.4 MB indented, and the window grows
-with every merge run before step 2d executes.
+D17's corrected job count that is 66 runs x 4 jobs, and the window
+grows with every merge run before step 2d executes. Step 2c then
+measured eight *harvested* records -- which wrap the report record
+in framing fields -- at **5.0 KB compact** on average, giving
+roughly **1.3 MB** for the window. That is inside the budget below
+but with much less slack than either earlier estimate suggested.
 
 So: the harvest output is serialised **compact**
 (`separators=(',', ':')`), one record per line, and the budget is
@@ -426,7 +476,7 @@ because that one is read by a human.
 | 2c | high | opus | none | Write `tools/ci_headroom_harvest.py` in this repository (D16, D17). It enumerates `merge_group` runs of `functional-tests.yml`, downloads each run's functional cluster bundles, extracts `headroom.jsonl` and `headroom-census.json`, calls 2b's `summary_record()` on each, and writes one JSON object per job per run to an output file. **The bundle is a nested zip and this was verified against a real artifact, not assumed:** the artifact download is a zip whose single entry is `bundle.zip`, and the files you want are inside *that* at `bundle/traces/headroom.jsonl` and `bundle/traces/headroom-census.json`. A sample record is `{'sampled_at': ..., 'resources': {'per_node': ..., 'total': ...}, 'nodes': [...]}`, and the census is a Loki `query_range` response with its streams under `data.result`. Use `gh api "repos/shakenfist/shakenfist/actions/workflows/functional-tests.yml/runs?event=merge_group&per_page=100"` for the run list and `.../runs/<id>/artifacts` for the bundles, both via `subprocess` on the `gh` CLI rather than a HTTP library -- this is a local developer tool, so unlike the report it may use third-party imports, but `gh` handles the auth. Bundles are zips at roughly 5 MB; download to a cache directory keyed by artifact id and **skip anything already cached**, because this will be run more than once. The topology is not in the series (survey finding 7): map it from the artifact name with the explicit four-row table in D17, sourced from the matrix at `.github/workflows/functional-tests.yml:436-480`, and **fail loudly on a bundle name the table does not cover** rather than guessing or skipping silently. Only four bundles per run carry the probe at all -- `bundle-shakenfist-full-ansible-modules` and `bundle-functional-node-lifecycle-collection` have no `traces/` directory, for the two different reasons D17 gives -- so the harvest should skip those two by name, deliberately and with a comment, rather than treating them as missing data. Record per record: run id, head SHA, run creation time, job name, topology, the run's conclusion and that job's conclusion, and the summary record. A bundle with no `headroom.jsonl` (a run predating phase 1, or one whose probe never started) is recorded as such and not dropped. Add unit tests over a fixture bundle zip; follow `shakenfist/tests/test_ci_headroom_report.py` for how it loads a `tools/` script by path with `importlib.util.spec_from_file_location`. Document the tool in one paragraph in `docs/developer_guide/ci.md`, beside phase 1's headroom section -- **the sizing model itself is phase 6, so do not document topologies here**. |
 | 2d | xhigh | opus | worktree | Run the harvest over every merge run since 2026-08-30 and write the baseline (D22). This is the phase. Commit the dataset to `docs/plans/data/ci-cloud-sizing-baseline/` (summary records only, not raw series -- D22) with a README naming the window, the tool and the command. Then rewrite the master plan's *Situation* section so every figure in it is measured rather than hand-collected, keeping the section's structure and its cross-references intact. It must answer, with numbers and with n stated for each: what peak and p90 committed vCPU actually are per job and per topology; how the per-node maximum fraction relates to the cluster-wide one (D21 -- if the pinned-node pattern in survey finding 2 does not hold across the window, say so plainly and narrow D21 rather than defending it); whether committed-CPU utilisation correlates with the job failing, which is the master plan's central claim and is now testable -- **but only across the four instrumented jobs (D17), and node lifecycle, the best performer in the master plan's failure table, is not one of them**, so say what the correlation is computed over and do not present it as spanning that table; what the refusal census says per stage, with `sufficient_free_disk` and `sufficient_idle_disk` kept distinct; whether memory ever binds, which decides whether phase 0's D5 stands or narrows (survey finding 6); the ledger-provenance counts closing D7 (survey finding 5 -- the answer is already 12, so this is confirming a count of fallbacks across the window, not re-litigating); and the band bounds, either defending 0.35/0.70 for the cluster-wide figure or replacing them, plus a first proposal for the per-node bound. Be explicit about the two blind spots: guard refusals are **unknown** in this window, not zero (D20, survey finding 4), and the ledger-unreadable samples are excluded for a reason 2a only makes knowable prospectively (D19, survey finding 3). Do not propose a topology -- that is phase 4 and phase 3 gates it. |
 | 2e | medium | sonnet | none | Fix the refusal census in `shakenfist/actions` (D20). In `tools/ci_headroom_collect.sh`, widen the LogQL line filter so it matches the two capacity guard messages as well as the scheduler stage events: the current regex `schedule (at stage\|has no candidates at stage)` misses `instance placement denied` (`shakenfist/instance.py:1303`) and `placement admitted over namespace capacity claim` (`:1209`, `:1218`), which is why `ci_headroom_report.py` prints a *Capacity guard census* section saying it has nothing to count. The script's own header comment explains at length why the filter is a regex and why there is **no** `\|= "Added event"` line filter -- keep both explanations and extend the first. Also write the label the script is already passed into `/srv/ci/traces/headroom-label` on the primary, so it lands in the bundle and a later harvest need not infer the topology from the artifact name. Observe the repository's conventions: at most about five lines of inline shell per workflow step, `shellcheck --severity=error` clean, and nothing in this script may fail the job (it must still always `exit 0`, per phase 1 D15). This lands untested -- a pull request against `actions` cannot exercise a composite-action change -- so write it to be inert on failure, and note in the pull request that only the operator can push it. |
-| 2f | medium | opus | none | File the issues the measurement exposed, and only those. Two candidates, and each is filed **only if 2d's data supports it**: first, the ledger-unreadable window (survey finding 3) -- if 2a's flag, once running, shows these are failed reads rather than an unpopulated table, file that the CPU pre-filter is periodically blind and say what the observed rate is; if it shows an unpopulated table, file nothing and record the finding in the plan instead. Second, anything 2d finds that sizing cannot fix, which per the master plan's phase 3 framing must be recorded rather than silently absorbed when the clouds grow. Third -- not an issue but a *Future work* entry in the master plan -- that two jobs are uninstrumented for two different reasons (D17): `Ansible modules` because every probe step is gated `if: inputs.test_kind == 'functional'`, and `Node lifecycle` because it calls the `build-smoke-cluster` composite action directly and never reaches the workflow the probe steps live in. Note that the second is the same structural reason the master plan's *Future work* already gives for propagating the probe to downstream repositories, so the two entries should reference each other. Follow the repository's issue conventions and cross-reference #3772 where the signature matches. Add a *Bugs fixed during this work* entry to the master plan for each. Do not fix anything: this phase files and phase 4 does not depend on any of it being fixed. |
+| 2f | medium | opus | none | File the issues the measurement exposed, and only those. Three candidates, and each is filed **only if 2d's data supports it**: first, the 200%-committed capacity row of survey finding 8 -- establish how a row reaches `used_cpus` twice its own `limit_cpus` when `admit_instance_placement()`'s guarded UPDATE is meant to make that impossible, and file it as a scheduler defect rather than a CI one, because a node in that state refuses every create while measuring completely idle; second, the ledger-unreadable window (survey finding 3) -- if 2a's flag, once running, shows these are failed reads rather than an unpopulated table, file that the CPU pre-filter is periodically blind and say what the observed rate is; if it shows an unpopulated table, file nothing and record the finding in the plan instead. Second, anything 2d finds that sizing cannot fix, which per the master plan's phase 3 framing must be recorded rather than silently absorbed when the clouds grow. Third -- not an issue but a *Future work* entry in the master plan -- that two jobs are uninstrumented for two different reasons (D17): `Ansible modules` because every probe step is gated `if: inputs.test_kind == 'functional'`, and `Node lifecycle` because it calls the `build-smoke-cluster` composite action directly and never reaches the workflow the probe steps live in. Note that the second is the same structural reason the master plan's *Future work* already gives for propagating the probe to downstream repositories, so the two entries should reference each other. Follow the repository's issue conventions and cross-reference #3772 where the signature matches. Add a *Bugs fixed during this work* entry to the master plan for each. Do not fix anything: this phase files and phase 4 does not depend on any of it being fixed. |
 | 2g | medium | opus | none | After 2a and 2e have merged and a handful of merge runs have used them, re-harvest a short confirmation window and add an addendum to 2d's baseline. This closes the two blind spots the retrospective window could not: what the capacity guard census actually contains, and whether the ledger-unreadable samples are failed reads or an empty table. Five to ten merge runs is enough for both -- this is a classification, not a distribution, and it must not be allowed to grow into a second measurement window. If the addendum changes a conclusion in 2d, change the conclusion rather than appending a contradiction. Then hand 2f whatever it needs to decide the first issue. |
 | 2h | low | haiku | none | Set the phase 2 row to `Complete` in the master plan's Execution table and the index arithmetic in `docs/plans/index.md` to `3 of 7`, then run `python3 tools/check-plan-status.py`. Do this only after 2a-2g are reviewed and the operator has confirmed the addendum in 2g is based on real post-fix runs. |
 

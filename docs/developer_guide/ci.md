@@ -178,7 +178,37 @@ beside the other logs, with no separate download to go and find.
 into a printed summary at the end of the job log: p90 and peak
 committed vCPU and memory, cluster-wide and per node, both absolute
 and as a fraction of the admission ledger, plus the refusal census
-broken out by stage.
+broken out by stage. It also has a machine-readable form: everything
+it prints is computed once into a plain dict by `summary_record()`,
+the prose is rendered from that dict rather than computed separately,
+and `--json PATH` writes the dict out as one JSON object. Anything the
+report can print, a program can read without parsing the tables --
+which is what stops a change to the report's wording silently breaking
+a consumer. Two conventions hold throughout the record: a figure that
+was not measured is `null` and never `0`, and a ledger is recorded as
+the range it moved over rather than averaged.
+
+`tools/ci_headroom_harvest.py` is the batch counterpart, run by hand
+from a checkout rather than in CI. It enumerates the `merge_group`
+runs of `functional-tests.yml`, downloads each run's cluster bundles
+through the `gh` CLI (which supplies the credentials), unpacks the
+trace files -- an artifact download is a zip whose single member is
+`bundle.zip`, and the traces are inside *that* -- calls
+`summary_record()` on each, and writes one compact JSON object per job
+per run. It needs at least one of `--since` and `--limit`, because an
+unbounded harvest downloads the whole ninety day retention window;
+bundles are cached by artifact id under `~/.cache/shakenfist-ci-headroom`
+by default, outside any checkout, and an already-cached bundle is never
+re-fetched. Two things about it are deliberate and worth knowing before
+changing it. Only four of a merge run's cluster bundles carry the probe
+at all, and the other two are skipped *by name* with the reason
+recorded in the source, so they never appear as missing data; and a
+bundle whose artifact name the tool has no entry for raises
+`UnknownBundleError` rather than being guessed at or skipped, so adding
+a job to the merge matrix stops the harvest until someone says what the
+new job is. A bundle with no series is written out with a reason
+instead of being dropped, because a harvest that silently shrinks its
+own window is the failure mode that looks most like success.
 
 ### The series record format
 
