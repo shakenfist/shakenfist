@@ -117,9 +117,9 @@ Inside `summary`:
 | `guard` | The capacity guard census. In this window its `state` is `not_collected` on every record -- see below. |
 | `verdict` | The D3 band verdict against the provisional 0.35/0.70 bounds, and the per-node maximum D21 adds. |
 
-## Two things this dataset does not know
+## One thing this dataset does not know
 
-Both are blind spots of the retrospective window, and neither is zero.
+It is a blind spot of the retrospective window, and it is not zero.
 
 **Capacity guard refusals are unknown.** The census filter in
 `shakenfist/actions` matches the scheduler's per-candidate stage
@@ -131,16 +131,30 @@ records. That is a fact about the query, not about the cluster. Step
 guard refusals over this window exists, and none should be inferred
 from the absence of one.
 
-**Ledger-unreadable samples are excluded, for a reason this window
-cannot name.** 2,276 of 21,517 usable samples (10.6%) had
-`cpu_committed_row_present` false for every node at once, which is a
-failed capacity read wearing an idle cluster's clothes. They are
-excluded from every committed-CPU figure, which is why
-`cluster.committed_cpu.n` is smaller than `series.samples_usable`.
-Whether they are a failed read or an unpopulated table is not
-answerable from these records: the `capacity_degraded` flag that
-distinguishes the two was only added to `/admin/resources` in step 2a,
-after this window closed. Step 2g answers it.
+### Resolved: the ledger-unreadable samples
+
+This section was written listing a second unknown, and step 2f
+resolved it from the data's shape rather than needing step 2a's flag.
+It is kept here because `cluster.committed_cpu.n` is smaller than
+`series.samples_usable` in every record and a reader will want to know
+why.
+
+2,276 of 21,517 usable samples (10.6%) had `cpu_committed_row_present`
+false for every node at once, and are excluded from every
+committed-CPU figure. They are **an unpopulated table during warm-up,
+not a failing read.** In every one of the 204 job-runs those samples
+are a contiguous prefix of 9 to 14 samples, never mid-run, never
+scattered and never twice, and the prefix ends within seconds of the
+capacity reconciler's first pass. A failed gRPC read is an independent
+per-sample event; it would not land only on the head of 204
+independent runs.
+
+That warm-up window is itself the subject of the defect step 2f
+drafted -- `scheduler_node_capacity` has no rows for the first 135 to
+210 seconds of a cluster's life, so admission is unguarded throughout
+it. See *A node can record twice its own ledger, and sizing would hide
+it* in the master plan. Step 2g now confirms this rather than deciding
+it.
 
 ## Reproducing an analysis over this file
 
