@@ -35,6 +35,9 @@ class AgentOperationAttributesData(BaseModel):
             observed yet.
         attempts: How many times this operation has been dispatched,
             for the retry bound. Never NULL.
+        expiry_reason: Which timing budget expired the operation --
+            'deadline' or 'progress'. NULL unless the operation is in
+            the expired state.
     """
 
     model_config = ConfigDict(frozen=False)  # Mutable
@@ -56,3 +59,11 @@ class AgentOperationAttributesData(BaseModel):
     # -- an attempt count has no "unknown" state worth representing,
     # so a reader never has to write "attempts or 0".
     attempts: int = 0
+
+    # Which timing budget expired the operation: one of
+    # AgentOperation.EXPIRY_REASONS ('deadline' or 'progress'). NULL
+    # unless the operation is in the expired state. Written once by
+    # AgentOperation.expire() and surfaced on the external view so a
+    # client can branch on it without parsing the state message's
+    # prose (issue #4075).
+    expiry_reason: Optional[str] = None

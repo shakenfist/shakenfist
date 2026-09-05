@@ -164,10 +164,11 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
         burning the rest of the window, and every failure routes through
         _raise_agent_operation_failure() so it prints the operation and the
         instance's recent events. That matters most for an expiry: the
-        reason an operation expired is on its state row's message, which is
-        not part of the external view, but expire() also audits it against
-        the instance, so the events are where "the operation deadline
-        passed while queued" is actually readable.
+        external view's expiry_reason says which budget ran out, but the
+        prose reason lives on the state row's message, which is not part
+        of the view. expire() audits it against the instance, so the
+        events are where "the operation deadline passed while queued" is
+        actually readable.
         """
         terminal = tuple(self.AGENT_OPERATION_FAILED_STATES) + ('complete',)
         wanted = ', '.join(states)
@@ -229,6 +230,14 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
         self.assertEqual(
             {}, victim['results'],
             f'Expired operation produced results: {victim}')
+
+        # Which budget ran out is an enumerated fact on the external
+        # view (issue 4075), so a client can branch on it without
+        # parsing the audit event's prose. This one was the wall clock.
+        self.assertEqual(
+            'deadline', victim['expiry_reason'],
+            f'Expired operation does not name the budget that expired '
+            f'it: {victim}')
 
         # Leave the instance idle for the namespace teardown rather than
         # racing it against a live agent operation. The blocker has

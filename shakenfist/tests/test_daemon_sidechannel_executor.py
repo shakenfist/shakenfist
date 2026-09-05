@@ -1,5 +1,6 @@
 # Copyright 2019 Michael Still and contributors
 
+import functools
 import os
 import shutil
 import tempfile
@@ -53,6 +54,7 @@ class _FakeAgentOp:
         self.commands = list(commands)
         self.failure_reason = None
         self.expired_reason = None
+        self.expired_budget = None
 
         # Retry inputs. attempts is written on dispatch by the real
         # dispatcher, so a fake in the middle of its first attempt
@@ -80,12 +82,15 @@ class _FakeAgentOp:
         self.state = AgentOperation.STATE_ERROR
         self.failure_reason = message
 
-    def expire(self, reason):
-        """Stands in for AgentOperation.expire(), guard included."""
+    def expire(self, reason, budget):
+        """Stands in for AgentOperation.expire(), guards included."""
+        if budget not in AgentOperation.EXPIRY_REASONS:
+            raise ValueError(f'unknown expiry budget: {budget}')
         if self.state.value in self.TERMINAL_STATES:
             return
         self.state = AgentOperation.STATE_EXPIRED
         self.expired_reason = reason
+        self.expired_budget = budget
 
     def deadline_passed(self, state=None):
         # The real signature takes an already-read State to anchor a
@@ -488,7 +493,8 @@ class ExecutorTerminalStateGuardTestCase(base.ShakenFistTestCase):
         # errored one does.
         job = self._make_executor(
             AgentOperation.STATE_EXECUTING, [{'command': 'chmod'}])
-        job.agentop.expire('deadline passed')
+        job.agentop.expire('deadline passed',
+                           AgentOperation.EXPIRY_REASON_DEADLINE)
         job._abort_commands_if_terminal()
         self.assertEqual([], job.commands)
 
@@ -697,6 +703,8 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'the operation deadline passed while executing',
             agentop.expired_reason)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE, agentop.expired_budget)
 
     def test_stalled_progress_expires_and_stops(self):
         # The fake operation is an execute, which is never retried, so
@@ -713,6 +721,8 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
             'no progress from the agent for 30 seconds, and the '
             'operation cannot be safely retried',
             agentop.expired_reason)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_PROGRESS, agentop.expired_budget)
 
     def test_progress_inside_the_window_continues(self):
         agentop = _BudgetAgentOp(progress_timeout=30.0)
@@ -1373,10 +1383,17 @@ class ExecutorRetryTestCase(base.ShakenFistTestCase):
                 agentop, reason, terminal=terminal)
         return retried, event
 
+    @staticmethod
+    def _expire_on_stall(agentop):
+        """The terminal the executor's stall branch passes: expire, with
+        the budget it detected running out bound in."""
+        return functools.partial(
+            agentop.expire, budget=AgentOperation.EXPIRY_REASON_PROGRESS)
+
     def test_a_stall_under_the_cap_requeues_and_clears_results(self):
         agentop = self._op(commands=[{'command': 'get-file'}], attempts=1)
         retried, event = self._resolve(
-            agentop, self.STALL, agentop.expire)
+            agentop, self.STALL, self._expire_on_stall(agentop))
 
         self.assertTrue(retried)
         self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
@@ -1400,12 +1417,15 @@ class ExecutorRetryTestCase(base.ShakenFistTestCase):
         # set. The count is in the message so an operator can tell
         # "stalled once and gave up" from "stalled three times".
         agentop = self._op(commands=[{'command': 'get-file'}], attempts=3)
-        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+        retried, _ = self._resolve(
+            agentop, self.STALL, self._expire_on_stall(agentop))
 
         self.assertFalse(retried)
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(f'{self.STALL}, after 3 attempts',
                          agentop.expired_reason)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_PROGRESS, agentop.expired_budget)
         self.assertFalse(agentop.results_cleared)
 
     def test_a_passed_deadline_expires_even_with_attempts_left(self):
@@ -1413,23 +1433,32 @@ class ExecutorRetryTestCase(base.ShakenFistTestCase):
         # caller's budget is the thing which just ran out.
         agentop = self._op(commands=[{'command': 'get-file'}], attempts=1,
                            deadline_passed=True)
-        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+        retried, _ = self._resolve(
+            agentop, self.STALL, self._expire_on_stall(agentop))
 
         self.assertFalse(retried)
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
             f'{self.STALL}, and the operation deadline has passed',
             agentop.expired_reason)
+        # The budget is the one the caller detected running out -- the
+        # stall is what abandoned the attempt, the passed deadline only
+        # foreclosed the retry. The message carries both facts.
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_PROGRESS, agentop.expired_budget)
 
     def test_an_execute_operation_never_retries(self):
         agentop = self._op(commands=[{'command': 'execute'}], attempts=1)
-        retried, _ = self._resolve(agentop, self.STALL, agentop.expire)
+        retried, _ = self._resolve(
+            agentop, self.STALL, self._expire_on_stall(agentop))
 
         self.assertFalse(retried)
         self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
         self.assertEqual(
             f'{self.STALL}, and the operation cannot be safely retried',
             agentop.expired_reason)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_PROGRESS, agentop.expired_budget)
 
     def test_a_stalled_transfer_is_requeued_by_the_budget_check(self):
         # The same decision reached through the executor's progress
@@ -1890,9 +1919,9 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         order = []
         resolve = agentop.expire
 
-        def _expire(reason):
+        def _expire(reason, budget):
             order.append('resolve')
-            resolve(reason)
+            resolve(reason, budget)
 
         agentop.expire = _expire
 
@@ -1911,6 +1940,10 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
             'the sidechannel executor was wedged and made no progress, and '
             'the operation deadline has passed',
             agentop.expired_reason)
+        # The reaper only reaches a live executor because its deadline
+        # passed, so that is the budget it binds.
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE, agentop.expired_budget)
         self.assertEqual(self.EXECUTOR_ABORT, abort.call_args[0][0])
 
     def test_a_live_executor_inside_its_budget_is_left_alone(self):

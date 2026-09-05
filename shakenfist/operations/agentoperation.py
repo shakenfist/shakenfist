@@ -35,6 +35,16 @@ class AgentOperation(BaseOperation):
     # docs/plans/PLAN-agent-operation-deadlines.md.
     STATE_EXPIRED = 'expired'
 
+    # The two timing budgets an operation can exhaust, as expire()
+    # records them in the expiry_reason attribute. They are enumerated
+    # rather than free prose because a client is expected to branch on
+    # the value: a deadline expiry is answered by asking for a longer
+    # deadline, a progress expiry means the guest agent stalled and a
+    # bigger deadline does not help (issue #4075).
+    EXPIRY_REASON_DEADLINE = 'deadline'
+    EXPIRY_REASON_PROGRESS = 'progress'
+    EXPIRY_REASONS = (EXPIRY_REASON_DEADLINE, EXPIRY_REASON_PROGRESS)
+
     # Once an operation reaches one of these it has no further
     # transitions worth making, so expire() and fail() are no-ops from
     # them rather than raising InvalidStateException.
@@ -200,6 +210,7 @@ class AgentOperation(BaseOperation):
             'results': attrs.results,
             'last_progress': attrs.last_progress,
             'attempts': attrs.attempts,
+            'expiry_reason': attrs.expiry_reason,
             'error_message': self.error
         })
 
@@ -349,8 +360,13 @@ class AgentOperation(BaseOperation):
         return float(config.AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT)
 
     # Terminal outcomes.
-    def expire(self, reason):
+    def expire(self, reason, budget):
         """Move this operation to expired, recording why.
+
+        budget is which of the two timing budgets ran out, one of
+        EXPIRY_REASONS. It is persisted to the expiry_reason attribute
+        so the external view carries a value a client can branch on
+        without parsing the prose in reason (issue #4075).
 
         The reason is stored as the state's message and emitted as an
         audit event. It deliberately does not go to self.error: that
@@ -360,8 +376,20 @@ class AgentOperation(BaseOperation):
         break the invariant that an object with an error message is
         an object in an error state.
         """
+        if budget not in self.EXPIRY_REASONS:
+            raise ValueError(f'unknown expiry budget: {budget}')
+
         if self.state.value in self.TERMINAL_STATES:
             return
+
+        # Written before the state transition, so a reader who sees
+        # expired always sees the reason too. The field mask is not
+        # optional, for the reason record_progress() spells out in its
+        # docstring.
+        attrs = self._attributes()
+        attrs.expiry_reason = budget
+        mariadb.update_agent_operation_attributes(
+            attrs, fields=['expiry_reason'])
 
         self._state_update(self.STATE_EXPIRED, message=reason)
 
@@ -378,7 +406,7 @@ class AgentOperation(BaseOperation):
             EVENT_TYPE_AUDIT,
             [(self.object_type, self.uuid),
              (ObjectType.INSTANCE, self.instance_uuid)],
-            'operation expired', extra={'reason': reason})
+            'operation expired', extra={'reason': reason, 'budget': budget})
 
     def fail(self, message):
         """Move this operation to error, recording why.
@@ -436,6 +464,10 @@ class AgentOperation(BaseOperation):
     @property
     def attempts(self):
         return self._attributes().attempts
+
+    @property
+    def expiry_reason(self):
+        return self._attributes().expiry_reason
 
     def record_attempt(self):
         """Persist that another dispatch attempt of this operation has started.

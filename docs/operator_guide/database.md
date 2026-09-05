@@ -1104,7 +1104,7 @@ dedicated attribute tables:
 | `artifact_indexes` | Artifact | artifact_uuid + index_number (composite PK), blob_uuid |
 | `network_interface_attributes` | NetworkInterface | uuid, floating_address |
 | `network_attributes` | Network | uuid, floating_gateway, hosteddns (JSON dict) |
-| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict), last_progress (nullable), attempts |
+| `agent_operation_attributes` | AgentOperation | uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable) |
 | `instance_attributes` | Instance | uuid, placement (JSON), power_state (JSON), ports (JSON), enforced_deletes (JSON), block_devices (JSON), agent_state (JSON), agent_attributes (JSON), agent_operations (JSON), kvm_pid, error_message, vsock_cids (JSON dict) |
 
 Node attributes consolidate observed state, roles, daemons and versions
@@ -1152,7 +1152,10 @@ and recording one would describe the operation as something it is not.
 
 `last_progress` is the unix timestamp of the most recent observed
 forward progress, NULL when none has been observed, and `attempts`
-counts dispatches for the retry bound.
+counts dispatches for the retry bound. `expiry_reason` is NULL until
+the operation expires, and then records which budget ran out --
+`deadline` or `progress` -- as an enumerated value the external view
+surfaces for clients to branch on.
 
 `deadline` and `progress_timeout` are enforced: an operation which
 outlives either moves to the terminal `expired` state, checked at

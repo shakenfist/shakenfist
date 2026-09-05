@@ -1,6 +1,7 @@
 import base64
 import copy
 import errno
+import functools
 import json
 import os
 import socket
@@ -539,7 +540,10 @@ def resolve_abandoned_operation(agentop, reason, terminal):
     two callers differ: a stall which cannot retry expires, since the
     progress timeout is a budget the caller set, while an executor
     exit which cannot retry errors, preserving the message phase 4
-    gave it. Callers pass agentop.expire or agentop.fail.
+    gave it. Callers pass agentop.fail, or agentop.expire with its
+    budget bound via functools.partial -- the caller is the one which
+    knows which budget it detected running out, and expire() records
+    that as the expiry_reason a client can branch on.
 
     Retry is for a stalled attempt and never for a failed one. A
     passed deadline therefore never retries -- retrying spends time
@@ -1020,7 +1024,8 @@ class SideChannelExecutorJob(SideChannelJob):
                 'Operation deadline passed while executing, aborting '
                 'executor')
             self.agentop.expire(
-                'the operation deadline passed while executing')
+                'the operation deadline passed while executing',
+                AgentOperation.EXPIRY_REASON_DEADLINE)
             self._abandon_get_file_transfer()
             return True
 
@@ -1060,7 +1065,9 @@ class SideChannelExecutorJob(SideChannelJob):
         resolve_abandoned_operation(
             self.agentop,
             f'no progress from the agent for {window:g} seconds',
-            terminal=self.agentop.expire)
+            terminal=functools.partial(
+                self.agentop.expire,
+                budget=AgentOperation.EXPIRY_REASON_PROGRESS))
         self._abandon_get_file_transfer()
         return True
 
@@ -1751,7 +1758,9 @@ class Monitor(daemon.Daemon):
         resolve_abandoned_operation(
             agentop,
             'the sidechannel executor was wedged and made no progress',
-            terminal=agentop.expire)
+            terminal=functools.partial(
+                agentop.expire,
+                budget=AgentOperation.EXPIRY_REASON_DEADLINE))
         daemon.set_abort_path(
             executor['object'].abort_path,
             'from the side channel executor reaper')
