@@ -1326,20 +1326,48 @@ def redirect_to_root_clearing_jwt() -> flask.Response:
     return resp
 
 
+def _authorization_failure_log(e: Exception):
+    """A logger carrying the attribution a rejected request needs.
+
+    The record emitted here is the only one saying *why* a request was
+    rejected, and without the request-id it cannot be joined to the
+    'API request parsed' and audit records which say *which* request it
+    was (issue 4069). The exception class travels as its own field so
+    an expired token, an unparseable one and a revoked one are
+    distinguishable in a query rather than only by message text.
+    """
+    return LOG.with_fields({
+        'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
+        'method': flask.request.method,
+        'path': flask.request.path,
+        'remote-address': flask.request.remote_addr,
+        'error-class': type(e).__name__,
+        'error': str(e)
+    })
+
+
 def handle_authorization_exceptions(func):
+    # NOTE(mikal): like _reject_token, these are logged at INFO. Every
+    # rejection here is caused by the credential the client presented,
+    # which is an expected client condition and not a cluster fault, so
+    # none of them should be paging anyone (issue 3606).
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
 
         except TypeError as e:
+            _authorization_failure_log(e).info('API request rejected as malformed')
             return sf_api.error(400, str(e), suppress_traceback=False)
 
-        except DecodeError:
+        except DecodeError as e:
             # Send a more informative message than 'Not enough segments'. If this
             # is a web browser, redirect them back to the root URL. Otherwise just
             # return a 401.
+            log = _authorization_failure_log(e)
             if flask.request.headers.get('Accept', 'text/html').find('text/html') != -1:
+                log.info('Undecodable JWT, redirecting browser to root')
                 return redirect_to_root_clearing_jwt()
+            log.info('API request rejected, undecodable JWT')
             return sf_api.error(401, 'invalid JWT in Authorization header',
                                 suppress_traceback=True)
 
@@ -1347,8 +1375,11 @@ def handle_authorization_exceptions(func):
             # The JWT looked valid, except it has expired. If this is a web
             # browser, redirect them back to the root URL. Otherwise just return
             # a 401.
+            log = _authorization_failure_log(e)
             if flask.request.headers.get('Accept', 'text/html').find('text/html') != -1:
+                log.info('Expired JWT, redirecting browser to root')
                 return redirect_to_root_clearing_jwt()
+            log.info('API request rejected, expired JWT')
             return sf_api.error(401, str(e), suppress_traceback=True)
 
         except (JWTDecodeError,
@@ -1360,6 +1391,7 @@ def handle_authorization_exceptions(func):
                 CSRFError,
                 PyJWTError,
                 ) as e:
+            _authorization_failure_log(e).info('API request rejected, JWT authorization failed')
             return sf_api.error(401, str(e), suppress_traceback=True)
 
     return wrapper
