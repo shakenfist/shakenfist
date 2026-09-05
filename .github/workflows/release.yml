@@ -138,19 +138,29 @@ jobs:
       attestations: write
 
     steps:
+      # This job does not check out, so the workspace it starts in is
+      # whatever the last job on this runner left behind -- the static
+      # pool is persistent, and download-artifact adds to a directory
+      # rather than replacing it. Downloading into the per-job
+      # runner.temp is what makes the set of files here exactly the
+      # set that was built: nothing else can have put a file there.
+      # Everything downstream has to be pointed at the same place,
+      # including the publish step, whose own default is ./dist.
       - name: Download distribution artifacts
         uses: actions/download-artifact@v8
         with:
           name: dist
-          path: dist/
+          path: ${{ runner.temp }}/dist/
 
       - name: Generate attestations for artifacts
         uses: actions/attest-build-provenance@v4
         with:
-          subject-path: 'dist/*'
+          subject-path: '${{ runner.temp }}/dist/*'
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ${{ runner.temp }}/dist/
 
   publish-collection:
     name: Publish ansible collection to Galaxy
@@ -159,11 +169,13 @@ jobs:
     environment: release
 
     steps:
+      # As in publish-pypi: no checkout, so download into the per-job
+      # runner.temp, and point the publish command at the same place.
       - name: Download collection artifact
         uses: actions/download-artifact@v8
         with:
           name: collection
-          path: dist-collection/
+          path: ${{ runner.temp }}/dist-collection/
 
       - name: Install ansible-core
         run: |
@@ -175,7 +187,7 @@ jobs:
       - name: Publish to Ansible Galaxy
         run: |
           publish-venv/bin/ansible-galaxy collection publish \
-              dist-collection/*.tar.gz \
+              ${{ runner.temp }}/dist-collection/*.tar.gz \
               --api-key "${{ secrets.ANSIBLE_GALAXY_TOKEN }}"
 
   github-release:
@@ -187,26 +199,23 @@ jobs:
       contents: write
 
     steps:
-      # Both halves of this matter. A bare download-artifact decides
-      # the destination itself, which is not where "files: dist/*"
-      # looks, and action-gh-release treats a glob matching nothing as
-      # a warning -- so the job went green having attached no files.
-      # It looked intermittent rather than broken because these jobs
-      # share a persistent runner pool: when the release landed on the
-      # same runner as the build it globbed the build's leftover
-      # dist/, which is also to say it published files nothing had
-      # verified. Name the artifact, name the path, and fail loudly.
+      # As in publish-pypi: no checkout, so download into the per-job
+      # runner.temp rather than into a workspace this job did not
+      # create and does not clean. fail_on_unmatched_files is the
+      # other half -- action-gh-release treats a glob that matches
+      # nothing as a warning, so without it a release that attached
+      # no files at all still reported success.
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
           name: dist
-          path: dist/
+          path: ${{ runner.temp }}/dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          files: dist/*
+          files: ${{ runner.temp }}/dist/*
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
