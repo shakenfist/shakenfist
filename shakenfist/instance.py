@@ -1141,7 +1141,7 @@ class Instance(dbowo):
                 'node': location,
                 'failing_stage': result['failing_stage'],
                 'dimensions': result['dimensions']
-            }, log_as_error=True)
+            })
 
     def _event_claim_over_limit(self, location, result):
         """Record that a placement drew a namespace past its claim (D16).
@@ -1363,7 +1363,7 @@ class Instance(dbowo):
                     'Instance placed without a capacity guard')
                 self.add_event(
                     EVENT_TYPE_AUDIT, 'instance placed without capacity guard',
-                    extra={'node': location}, log_as_error=True)
+                    extra={'node': location})
 
             if result['clamped']:
                 # A counter would have gone negative releasing the old
@@ -1375,8 +1375,7 @@ class Instance(dbowo):
                         'Capacity counter clamped at zero during placement')
                 self.add_event(
                     EVENT_TYPE_AUDIT, 'capacity counter clamped at zero',
-                    extra={'node': location, 'previous_node': old_location},
-                    log_as_error=True)
+                    extra={'node': location, 'previous_node': old_location})
 
     def enqueue_disk_fetches(self, target_node, priority, request_id=None,
                              artifact_event=None):
@@ -1579,8 +1578,7 @@ class Instance(dbowo):
                 'Capacity counter clamped at zero during placement release')
             self.add_event(
                 EVENT_TYPE_AUDIT, 'capacity counter clamped at zero',
-                extra={'node': node_uuid, 'released': result['released']},
-                log_as_error=True)
+                extra={'node': node_uuid, 'released': result['released']})
 
         if result['released']:
             # The other half of the placement ledger, in the vocabulary

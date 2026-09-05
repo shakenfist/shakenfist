@@ -2316,6 +2316,101 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             self.inst._delete_globally()
         self.assertFalse(r.called)
 
+    #
+    # Issue 4051: the tolerated capacity conditions (P5, P7 and the two
+    # clamp sites) log WARNING in the daemon log, so their event echoes
+    # must not land in the log stream at ERROR beside them. Only the
+    # two genuine failures echo as errors, matching their .error()
+    # daemon-log lines.
+    #
+
+    def _event_echoes_as_error(self, add_event, message):
+        """Whether the one event carrying this message echoes at ERROR."""
+        calls = [c for c in add_event.call_args_list if c.args[1] == message]
+        self.assertEqual(
+            1, len(calls), f'expected exactly one {message!r} event, '
+            f'got {len(calls)}')
+        return calls[0].kwargs.get('log_as_error', False)
+
+    def test_an_over_limit_recording_does_not_echo_as_an_error(self):
+        # P5 is designed behaviour: a guard cannot refuse reality.
+        self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=1, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2, enforce=False)
+        self.assertFalse(self._event_echoes_as_error(
+            add_event, 'placement recorded despite exceeding capacity guard'))
+
+    def test_an_unguarded_placement_does_not_echo_as_an_error(self):
+        # P7 is designed behaviour: a node with no capacity row yet
+        # admits unguarded mid-upgrade rather than refusing every
+        # create.
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+        self.assertFalse(self._event_echoes_as_error(
+            add_event, 'instance placed without capacity guard'))
+
+    def test_a_placement_clamp_does_not_echo_as_an_error(self):
+        old = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.mock_mariadb.set_node_capacity(
+            self.node3, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+
+        # The drift the reconciler repairs: the ledger no longer holds
+        # this instance's share, so the move's release clamps at zero.
+        old['used_cpus'] = 0
+        old['used_memory_mb'] = 0
+        old['used_disk_gb'] = 0
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node3)
+        self.assertFalse(self._event_echoes_as_error(
+            add_event, 'capacity counter clamped at zero'))
+
+    def test_a_release_clamp_does_not_echo_as_an_error(self):
+        row = self.mock_mariadb.set_node_capacity(
+            self.node2, limit_cpus=16, limit_memory_mb=16384,
+            limit_disk_gb=100)
+        self.inst.place_instance(self.node2)
+        row['used_cpus'] = 0
+        row['used_memory_mb'] = 0
+        row['used_disk_gb'] = 0
+
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst._delete_globally()
+        self.assertFalse(self._event_echoes_as_error(
+            add_event, 'capacity counter clamped at zero'))
+
+    def test_a_failed_placement_write_echoes_as_an_error(self):
+        failure = {
+            'success': False, 'error': 'database unavailable',
+            'admitted': False, 'unguarded': False, 'clamped': False,
+            'failing_stage': '', 'dimensions': [], 'node_used_cpus': 0,
+            'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
+            'node_expected_demand': 0.0}
+        with mock.patch('shakenfist.mariadb.admit_instance_placement',
+                        return_value=failure):
+            with mock.patch.object(self.inst, 'add_event') as add_event:
+                self.inst.place_instance(self.node2, enforce=False)
+        self.assertTrue(self._event_echoes_as_error(
+            add_event, 'instance placement write failed'))
+
+    def test_a_failed_placement_release_echoes_as_an_error(self):
+        self.inst.place_instance(self.node2)
+        failure = {
+            'success': False, 'error': 'database unavailable',
+            'released': False, 'clamped': False}
+        with mock.patch('shakenfist.mariadb.release_instance_placement',
+                        return_value=failure):
+            with mock.patch.object(self.inst, 'add_event') as add_event:
+                self.inst._delete_globally()
+        self.assertTrue(self._event_echoes_as_error(
+            add_event, 'instance placement release failed'))
+
     def test_hard_delete_releases_before_deleting_the_rows(self):
         # The release needs the instance's cpus, memory and disk spec,
         # which only exist while the static and attribute rows do.
