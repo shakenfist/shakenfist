@@ -13722,8 +13722,10 @@ creating request; <code>progress_timeout</code> is a count of seconds, and reads
 operation like the one below whose commands cannot report progress. Both are set
 from the optional parameters described in
 <a href="/developer_guide/api_reference/instances/#bounding-how-long-an-agent-operation-may-take">bounding how long an agent operation may take</a>.
-<code>last_progress</code> and <code>attempts</code> stay <code>null</code> and <code>0</code> until a following release begins
-enforcing these values. A <code>null</code> in either caller-intent field means the operation
+<code>last_progress</code> is <code>null</code> until the operation's first observed forward progress,
+and stays <code>null</code> for an operation whose commands cannot report any; <code>attempts</code>
+counts dispatches, so it reads <code>1</code> for an operation which has run once and more
+if it was retried. A <code>null</code> in either caller-intent field means the operation
 was created by an API server which predates them, so the server default applies
 rather than "no deadline" -- see <a href="/operator_guide/database/">the database operator guide</a>.</p>
 <p>In general the API for agent operations is instance-centric -- you lookup the

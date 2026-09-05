@@ -13763,6 +13763,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#known-defects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known defects
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known defects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#repairs-which-landed-outside-the-phase-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repairs which landed outside the phase branches
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#non-goals" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14341,6 +14369,81 @@ three-repository audit of every consumer of agent operation state).</p>
    the agent cannot cancel the prior attempt's child process, so both
    attempts' side effects could land.</li>
 </ol>
+<h2 id="known-defects">Known defects<a class="headerlink" href="#known-defects" title="Permanent link">&para;</a></h2>
+<p>This plan's mechanism shipped with three defects still open. They are
+named here because a reader arriving at a completed plan should not
+have to search the issue tracker to learn that.</p>
+<ul>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4074">#4074</a> --
+  the executor slot can be parked on request.</strong> <code>agent/execute</code> with
+  <code>deadline_seconds=0</code> disables both budgets at once, because that
+  endpoint always stores a <code>progress_timeout</code> of <code>0.0</code>. No reaper case
+  can recover it, and there is no <code>AGENT_OPERATION_MAX_DEADLINE</code> for
+  an operator to bound it with. Found by phase 8's security review;
+  filed rather than fixed there because the fix is an operator-visible
+  ceiling and a restored backstop. Confined to the caller's own
+  namespace.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/3995">#3995</a> --
+  the default progress timeout expires a legitimate large transfer.</strong>
+  A 471 MiB <code>get-file</code> was expired after the guest answered the stat
+  in 20 ms and then sent nothing for 30 seconds. The issue asks for a
+  measurement of what a guest actually does before its first chunk,
+  not a larger constant, because a blanket increase would slacken the
+  #3516 detection the window exists for. Labelled
+  <code>automated-fix-attempted</code>.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4039">#4039</a> --
+  sidechannel <code>GetInstanceAttributes</code> over its load budget.</strong> Measured
+  at 1.716/s against a 1.486/s ceiling. Same surface as #4014, which
+  <code>91d565a05</code> fixed for three other pairs.</li>
+</ul>
+<p>Phase 8 also filed four advisory issues against this work:
+<a href="https://github.com/shakenfist/shakenfist/issues/4075">#4075</a> (the
+expiry reason is not on the wire),
+<a href="https://github.com/shakenfist/shakenfist/issues/4076">#4076</a> (a stale
+capability cache across a rolling upgrade),
+<a href="https://github.com/shakenfist/shakenfist/issues/4077">#4077</a>
+(functional coverage gaps), and in the client repository
+<a href="https://github.com/shakenfist/client-python/issues/388">client-python#388</a>,
+<a href="https://github.com/shakenfist/client-python/issues/389">#389</a> and
+<a href="https://github.com/shakenfist/client-python/issues/390">#390</a>.</p>
+<h3 id="repairs-which-landed-outside-the-phase-branches">Repairs which landed outside the phase branches<a class="headerlink" href="#repairs-which-landed-outside-the-phase-branches" title="Permanent link">&para;</a></h3>
+<p>Three defect fixes were needed against this plan's code after its
+phases merged. They are not in any phase's diff, and phase 8's audit
+baseline includes them for that reason:</p>
+<table>
+<thead>
+<tr>
+<th>Merge</th>
+<th>PR</th>
+<th>Issue</th>
+<th>What it repaired</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>2341ae0c4</code></td>
+<td>#3933</td>
+<td>#3931</td>
+<td>A <code>KeyError</code> on sidechannel executor teardown, armed when phase 5 separated the abort files</td>
+</tr>
+<tr>
+<td><code>2e19bb1ea</code></td>
+<td>#3970</td>
+<td>--</td>
+<td><code>SideChannelExecutorJob</code> aliased its working queue to <code>agentop.commands</code>, so <code>pop(0)</code> drained the operation and turned phase 5's retry into a permanent expiry. Also added a coding rule</td>
+</tr>
+<tr>
+<td><code>91d565a05</code></td>
+<td>#4025</td>
+<td>#4014</td>
+<td>The executor re-resolved a NULL deadline's anchor on every budget check, and CI harness pacing was being read as cluster polling</td>
+</tr>
+</tbody>
+</table>
+<p>Two of the three are defects in the retry and enforcement machinery
+phases 4 and 5 built, found by CI within days of merge. Phase 8's wave
+2 briefs were pointed at those areas for that reason, and the audit's
+own findings landed in the same neighbourhood.</p>
 <h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Fixing the agent-side get-file delivery bug itself (#2240). This
@@ -14447,19 +14550,19 @@ the slot at all.</p>
 <td>6</td>
 <td><code>PLAN-agent-operation-deadlines-phase-06-client.md</code> (in shakenfist/client-python, branch <code>agent-operation-deadlines-phase-06-client</code>)</td>
 <td>Complete</td>
-<td>client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>: await loops poll to their full timeout on terminal failure states instead of failing fast). The plan file lives in the client repository because the code does, following the <code>PLAN-vdi-console-tokens.md</code> precedent; a relative link cannot cross repositories, so it is named here rather than linked. Survey corrections applied at source: the new parameters need a capability token before a client can send them safely, which phase 3 did not add and phase 6 does. The phase plan also decides to repair <code>await_agent_fetch()</code>'s three hardcoded timeout windows, which make its <code>timeout</code> argument a lie, because the phase rewrites those same loops</td>
+<td>client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>: await loops poll to their full timeout on terminal failure states instead of failing fast). The plan file lives in the client repository because the code does, following the <code>PLAN-vdi-console-tokens.md</code> precedent; a relative link cannot cross repositories, so it is named here rather than linked. Survey corrections applied at source: the new parameters need a capability token before a client can send them safely, which phase 3 did not add and phase 6 does. The phase plan also decides to repair <code>await_agent_fetch()</code>'s three hardcoded timeout windows, which make its <code>timeout</code> argument a lie, because the phase rewrites those same loops. The phase also landed two pull requests in this repository, which the row above does not name because the phase plan lives elsewhere: #4005 added the capability token in <code>shakenfist/external_api/app.py</code> that a client needs before it can safely send the new parameters, and #4015 moved the CI suite onto the new client</td>
 </tr>
 <tr>
 <td>7</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-07-docs-and-ci/">PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 <td>Documentation and CI coverage. Survey corrections applied at source, because this row was written before phases 3 to 6 executed and was wrong in four places. (a) The documentation was <strong>not</strong> deferred from phase 3: <code>cf094551b</code> wrote both the API reference at <code>docs/developer_guide/api_reference/instances.md:657-710</code> and the release note section at <code>docs/release_notes/v07-v08.md:731-782</code>. What is missing is phase 5 (retry, attempts and the reaper), phase 6 (the CLI flags and the <code>AgentCommandError</code> to <code>AgentOperationFailed</code> change), and an operator-guide page for agent operations, of which there is none. (b) <code>base.AGENT_OPERATION_FAILURES</code> must <strong>not</strong> narrow to a plain <code>AgentOperationFailed</code> reference: the <code>getattr()</code> shim goes, but the tuple stays and gains <code>AgentAwaitTimeout</code>, because <code>await_agent_command()</code> raises three unrelated exceptions and the two catch sites are <code>_await_instance_ready</code>'s retry loop, which wants all of them. Only the two <code>test_get_missing_file</code> assertions narrow. (c) There is a <strong>third</strong> event-renewed await, <code>_await_objects_ready</code>, which backs the network, artifact and blob readiness helpers and so sits on nearly every test in the suite; #3770 is not fixed without it. (d) Commit <code>a0cc243ad</code> fixed the shared-clock flake in <code>guest_ci_tests/test_agentops.py</code> only, and the identical <code>smoke_ci_tests</code> copy -- the suite that runs on every pull request -- still has it. Note <code>docs/developer_guide/state_machine.md</code> is <strong>not</strong> this phase's: it is a rendering of <code>state_targets</code>, so phase 4 updated it when it added <code>expired</code> rather than leaving the tree self-contradictory for three phases, and phase 5 added its one further edge</td>
 </tr>
 <tr>
 <td>8</td>
-<td></td>
-<td>Not started</td>
-<td>Push audit: runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
+<td><a href="../PLAN-agent-operation-deadlines-phase-08-push-audit/">PLAN-agent-operation-deadlines-phase-08-push-audit.md</a></td>
+<td>Complete</td>
+<td>Push audit: runs <code>PUSH-AUDIT.md</code> over this plan's work as one body, not the last phase's diff alone. Survey correction applied at source: the "accumulated diff against <code>develop</code>" this row used to describe cannot be taken, because every phase is merged and <code>git diff develop...HEAD</code> is empty; the baseline is instead the explicit merge list in decision 1 of the phase plan, which also pulls in the three defect fixes that landed against this plan's code outside its phase branches (#3933, #3970, #4025). Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
 </tr>
 </tbody>
 </table>

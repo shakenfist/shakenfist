@@ -15117,10 +15117,25 @@ a terminal state immediately and raises <code>AgentOperationFailed</code> instea
 without waiting out the rest of its timeout. Anything catching
 <code>AgentCommandError</code> to mean "the operation did not succeed" needs to
 catch <code>AgentOperationFailed</code> as well, or catch both.</p>
-<p>Both changes are gated on the server advertising the
-<code>agentoperation-deadlines</code> capability, so an old client against a new
-cluster and a new client against an old cluster both keep behaving as
-they did before this release.</p>
+<p>Only the first of those two changes is gated on the server
+advertising the <code>agentoperation-deadlines</code> capability. A client which
+does not see it advertised sends neither timing parameter, so it
+cannot fail against a cluster which predates them.</p>
+<p>Two things do change across the upgrade, and neither is gated:</p>
+<ul>
+<li><strong>An old client against a new cluster inherits the new defaults.</strong>
+  It sends no timing parameters, so it gets the 600 second deadline
+  and, on <code>agent/get</code> and <code>agent/put</code>, the 30 second progress
+  timeout -- tighter than the 900 second backstop they replace, as
+  described above. Nothing about the client changes; the cluster's
+  behaviour does.</li>
+<li><strong>A new client raises a different exception on failure, against
+  any cluster.</strong> The fail-fast terminal-state handling is deliberately
+  not capability-gated, because recognising a terminal state needs
+  nothing from the server beyond the state itself. So a new client
+  against an old cluster raises <code>AgentOperationFailed</code> where it used
+  to raise <code>AgentCommandError</code>. Catch both, as above.</li>
+</ul>
 
 
 

@@ -14398,12 +14398,16 @@ read substitutes for a run against a real cluster.</p>
   <code>docs/release_notes/v07-v08.md:744</code> agree (600 seconds and 30
   seconds, in all three).
 - [x] <code>pre-commit run --all-files</code> exits zero.
-- [ ] CI has run green on the branch, including the smoke suite, and
+- [x] CI has run green on the branch, including the smoke suite, and
   the new deadline tests appear in its results rather than being
-  skipped. <strong>Not satisfied.</strong> The branch has not been pushed, and
-  the functional suite needs a real cluster that this closeout does
-  not have access to. This is what gates the merge; see What
-  remains.</p>
+  skipped. Satisfied by run
+  <a href="https://github.com/shakenfist/shakenfist/actions/runs/33802668130">33802668130</a>,
+  whose <code>Smoke tests (collection)</code> job reports all four as <code>... ok</code>:
+  <code>test_default_deadline_is_published</code> (166.69s),
+  <code>test_expiry_frees_the_executor_slot</code> (176.77s),
+  <code>test_silent_execute_survives_the_progress_timeout</code> (227.14s) and
+  <code>test_queued_operation_expires_on_its_deadline</code> (163.33s). None
+  was skipped. PR #4053 merged as <code>4a122bcd3</code> on 2026-09-04.</p>
 </li>
 </ul>
 <h2 id="review-follow-ups">Review follow-ups<a class="headerlink" href="#review-follow-ups" title="Permanent link">&para;</a></h2>
@@ -14415,17 +14419,21 @@ read substitutes for a run against a real cluster.</p>
 constructs, and leaving it on <code>BaseTestCase</code> would have been a latent
 <code>AttributeError</code> for the first non-namespaced caller to reach it.</p>
 <h2 id="what-remains">What remains<a class="headerlink" href="#what-remains" title="Permanent link">&para;</a></h2>
-<p>The code and documentation are done and reviewed: five commits, 7a
-through 7e, landed everything the step plan describes, and this
-closeout has independently re-run every Definition of done check that
-does not need a cluster. What is left is the one that does: a green CI
-run on this branch, including the smoke suite, with the four tests in
+<p>Nothing. The code and documentation were done and reviewed by five
+commits, 7a through 7e, and the closeout re-ran every Definition of
+done check that does not need a cluster. The one that does -- a green
+CI run including the smoke suite, with the four tests in
 <code>test_agentop_deadlines.py</code> appearing in the results rather than being
-skipped. The branch has not been pushed yet. Phase 7's status in
-<code>PLAN-agent-operation-deadlines.md</code>'s Execution table stays <code>In
-progress</code>, and the plan's row in <code>docs/plans/index.md</code> stays at <code>7 of
-9</code>, until that run happens; both flip to <code>Complete</code> and <code>8 of 9</code> once
-it does.</p>
+skipped -- was satisfied by run 33802668130, and PR #4053 merged as
+<code>4a122bcd3</code> on 2026-09-04.</p>
+<p>The section above previously said the branch had not been pushed and
+that the statuses would stay at <code>In progress</code> and <code>7 of 9</code> until it
+was. Step 7f, which was to make that flip, never ran; the phase 8
+planning commit made it instead, so phase 7 now reads <code>Complete</code> in
+<code>PLAN-agent-operation-deadlines.md</code>'s Execution table and the plan's
+row in <code>docs/plans/index.md</code> reads <code>8 of 9</code>. See
+<a href="../PLAN-agent-operation-deadlines-phase-08-push-audit/">PLAN-agent-operation-deadlines-phase-08-push-audit.md</a>,
+finding F1.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li>The master plan's phase 7 row observes that <code>_await_instance_ready</code>
