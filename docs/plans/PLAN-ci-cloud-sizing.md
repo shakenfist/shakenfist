@@ -502,9 +502,37 @@ It is therefore not a driver of the 507 family's *frequency*: at one
 percent of job-runs it cannot explain a 76% tier failure rate, and
 the phase 2 survey's expectation that it might be the most
 decision-relevant number in the dataset is not borne out. It remains
-a real invariant violation -- `admit_instance_placement()`'s guarded
-UPDATE is supposed to make `used + requested <= limit` impossible to
-breach -- and phase 2 files it rather than fixing it.
+a real defect, and phase 2 files it rather than fixing it.
+
+**Step 2f established the mechanism, and it is not a breach of the
+guarded UPDATE.** All 18 node-samples are the *first* samples after
+the capacity rows appear, and the journals put the reconciler's
+first pass between the last no-row sample and the first over-limit
+one, to within seconds, in both runs. `scheduler_node_capacity` has
+no rows until that pass, which is registered
+`schedule.every(5).minutes` (`daemons/cluster/main.py:750`) and so
+first runs five minutes after the cluster daemon starts. Until then
+`admit_instance_placement()` takes P7's fail-open branch on every
+node at once -- it writes the placement and the `instance_location`
+row and touches no counter -- and the CPU pre-filter charges
+`committed_cpus` zero, leaving only `cpu_total_instance_vcpus`,
+which counts *running* domains and republishes once a minute. So a
+burst of concurrent creates that are still fetching images all
+measure zero and all land. The first reconcile pass then recomputes
+`used_cpus` from those reference rows and faithfully writes 6 or 7
+onto a row whose `limit_cpus` is 3. The counter is a correct reading
+of an incorrect placement.
+
+That window is universal, not rare: in **all 204** job-runs the
+capacity table is empty for a contiguous prefix of **135 to 210
+seconds** (median 165), and in **176 of 204 (86%)** instances were
+already running before any capacity row existed. What is rare is the
+overshoot, and its rarity is the ledger's size -- both occurrences
+are `slim-tier`, whose network node has a `limit_cpus` of 3.
+Ruled out with the same evidence: the P5 forced ground-truth write
+(its `placement recorded despite exceeding capacity guard` event
+appears in neither bundle), a lowered limit, `_reconcile_placement()`'s
+documented restart overcount, and a mid-run loss of the rows.
 
 ### The under-cloud budget this spends
 
@@ -569,24 +597,35 @@ about what "too empty per node" would look like.
 
 ### What the baseline does not know
 
-Stated once more because both are easy to read as zero, and neither
-is:
+One thing, stated once more because it is easy to read as zero and
+is not:
 
 * **Capacity guard refusals: unknown.** Not collected in this
   window, because the census filter matched only the scheduler's
   stage events. Phase 2's D20 fixes it and phase 2's step 2g
   re-measures over a short post-fix window.
-* **Ledger-unreadable samples: excluded, cause unknown.** 2,276 of
-  21,517 usable samples (10.6%), spread across every one of the 204
-  job-runs, with a median of 9.9% per job-run and no job-run free of
-  them. Every committed-CPU figure above excludes them. During such
-  a window the CPU pre-filter charges every node zero and compares
-  against no limit, which is exactly the window in which a burst
-  would be admitted and then refused by the guard -- and 18 of the
-  1,965 refusal payloads did indeed fire with no capacity row
-  present. Phase 2's D19 publishes the flag that distinguishes a
-  failed read from an unpopulated table; it can only do so
-  prospectively, so this window cannot say which.
+
+The second entry that stood here -- the ledger-unreadable samples --
+**is now known**, and step 2f answered it from the shape of the data
+rather than from D19's flag. 2,276 of 21,517 usable samples (10.6%),
+in every one of the 204 job-runs, have every node's capacity row read
+as absent at once; every committed-CPU figure above excludes them. In
+**every** job-run those samples are exactly a contiguous *prefix* of
+the series, 9 to 14 samples long, ending at the reconciler's first
+pass -- never mid-run, never scattered, never twice. A failed gRPC
+read is an independent per-sample event and would not land only on
+the head of 204 independent job-runs. So this is an **unpopulated
+table during cluster warm-up, not a failing read**, and there is no
+read-reliability defect to file.
+
+What the window does expose is the other side of the same fact: for
+those 135 to 210 seconds the admission guard does not exist, which is
+where the 18 refusal payloads that fired with `capacity_row_present`
+false come from, and which is the defect drafted in *Bugs fixed
+during this work* below. Step 2g should confirm the classification
+prospectively once D19's flag is running -- `capacity_degraded`
+should read false throughout the prefix -- but that is a
+confirmation, not an open question.
 
 ### Reproducing the measurements
 
@@ -1258,7 +1297,26 @@ which is what `tools/check-plan-status.py` enforces.
 - **Generalise to the other repositories' clouds.** The
   downstream repositories fork these topologies. Phase 6
   propagates the shapes; making the headroom probe part of the
-  reusable workflow means they inherit the measurement too.
+  reusable workflow means they inherit the measurement too. Same
+  structural cause as the entry below: a cloud built by something
+  other than the workflow the probe steps live in is unmeasured.
+- **Instrument the two cluster jobs the probe cannot see.** Phase
+  2's D17 found that only four of the six clouds a merge run builds
+  carry the phase 1 probe, for two different reasons. `Ansible
+  modules` runs through the reusable `smoke-cluster` workflow but
+  with `test_kind: ansible-modules`
+  (`functional-tests.yml:514`), and every probe step is gated `if:
+  inputs.test_kind == 'functional'`; widening that gate is the whole
+  fix. `Node lifecycle` never reaches that workflow at all -- it
+  calls the `build-smoke-cluster` composite action directly
+  (`functional-tests.yml:554-557`), and the probe steps live in the
+  workflow rather than in the action, so moving them into (or
+  duplicating them beside) the action is a change to how *every*
+  caller deploys. That is the same seam as the entry above, and the
+  two should be done together. The cost of leaving it is concrete
+  and already paid: `Node lifecycle` is the best performer in the
+  failure table, and the baseline's utilisation-versus-failure
+  correlation cannot speak to it.
 
 ### Bugs fixed during this work
 
@@ -1319,6 +1377,23 @@ sure none of them is closed by accident:
   Phase 2 wants to compare the live ledger derivation against the
   reconciled `cluster_capacity` figure; if they disagree, this is
   why it is hard to tell which is wrong.
+- **Unguarded placements in a cluster's first minutes** (*drafted
+  by phase 2 step 2f, not yet filed -- there is no issue number for
+  this yet*). `scheduler_node_capacity` has no rows until the
+  reconciler's first pass, which `schedule.every(5).minutes` puts
+  five minutes after the cluster daemon starts, so for a measured
+  135 to 210 seconds of every one of the 204 job-runs in the
+  baseline window every admission takes P7's fail-open branch and
+  the CPU pre-filter sees only a once-a-minute count of *running*
+  domains. The first pass then recomputes `used_cpus` from the
+  placement rows that accumulated and writes a node above its own
+  `limit_cpus`, after which that node refuses every create while
+  measuring idle -- the #3772 signature without exhaustion. This is
+  the mechanism behind *A node can record twice its own ledger*
+  above, it is not a breach of the guarded UPDATE, and **growing
+  the cloud would mask it rather than fix it**, which is exactly
+  what phase 3 exists to prevent. Draft text is held outside the
+  repository by step 2f; the operator files it.
 
 ### Back brief
 

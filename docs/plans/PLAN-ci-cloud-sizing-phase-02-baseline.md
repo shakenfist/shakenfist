@@ -253,6 +253,14 @@ a reconciler faithfully recomputing `used_cpus` from instances that
 are genuinely placed there, having arrived when the limit was
 higher or by a path that did not go through the guard.
 
+**Step 2f established it, and it is the second of those.** The
+placements arrived by a path that did not go through the guard
+because there was no guard yet: `scheduler_node_capacity` has no
+rows until the reconciler's first pass, all 18 node-samples are the
+first samples after that pass, and every admission before it takes
+P7's fail-open branch. The full account is in the master plan's
+*A node can record twice its own ledger, and sizing would hide it*.
+
 ## Decision items
 
 ### D16 -- Harvest the banked window; do not open a new one
@@ -626,17 +634,21 @@ job-runs with no capacity refusal at all (n=44) exceed 0.85 in 1
 case, job-runs with at least one (n=160) exceed it in 123. No
 per-node lower bound is proposable -- the statistic is saturated.
 
-**Two things the window does not know, and neither is zero.**
+**One thing the window does not know, and it is not zero.**
 Capacity guard refusals were never collected (D20) -- `guard.state`
-is `not_collected` on all 204 summarised records. And 2,276 of
-21,517 usable samples (10.6%, present in every single job-run) had
-every capacity row read as absent at once and are excluded from
-every committed-CPU figure; whether that is a failed read or an
-unpopulated table needs D19's flag, which only exists
-prospectively. Suggestively, 18 of the 1,965 refusal payloads fired
-with `capacity_row_present` false -- the pre-filter refusing from
-the measurement alone while blind to the ledger -- which is
-material for step 2f.
+is `not_collected` on all 204 summarised records.
+
+The second, the 2,276 of 21,517 usable samples (10.6%, present in
+every single job-run) whose capacity rows all read as absent at once
+and which are excluded from every committed-CPU figure, was written
+here as unknowable without D19's flag. **Step 2f answered it from
+the shape of the data:** in every one of the 204 job-runs those
+samples are exactly a contiguous *prefix*, 9 to 14 samples long,
+ending at the reconciler's first pass -- so it is an unpopulated
+table during cluster warm-up, not a failing read, and no issue is
+filed for it. Step 2g confirms rather than decides. The 18 refusal
+payloads that fired with `capacity_row_present` false are the same
+window seen from the refusal path.
 
 **An error in the master plan that the data caught.** Its
 *Situation* section said the sampled `slim-primary` failures
