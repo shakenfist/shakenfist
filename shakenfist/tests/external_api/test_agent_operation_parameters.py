@@ -149,6 +149,16 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertIn('deadline_seconds', resp.get_json()['error'])
         new.assert_not_called()
 
+    def test_a_deadline_above_the_operator_ceiling_is_refused(self):
+        # Issue #4074: the ceiling published as the parameter's maximum
+        # is backed by a 400 from the handler, like the minimum.
+        resp, new = self._execute(
+            deadline_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn(
+            'AGENT_OPERATION_MAX_DEADLINE', resp.get_json()['error'])
+        new.assert_not_called()
+
     def test_an_unparsable_deadline_is_a_400_not_a_500(self):
         for value in ('soon', ['60'], {'seconds': 60}, True):
             with self.subTest(value=value):

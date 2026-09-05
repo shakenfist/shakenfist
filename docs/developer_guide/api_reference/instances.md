@@ -657,7 +657,10 @@ following operations via the agent:
 All three creating calls accept an optional `deadline_seconds`, and
 `agent/get` and `agent/put` additionally accept an optional
 `progress_timeout_seconds`. Both are counts of seconds, and both refuse
-a negative value with a 400.
+a negative value with a 400. Both are also capped by the operator
+ceiling `AGENT_OPERATION_MAX_DEADLINE` (86400 seconds, one day, unless
+the operator has changed it), published as the parameters' `maximum` in
+the API specification and likewise refused with a 400 above it.
 
 `deadline_seconds` is how long the operation may continue to be
 dispatched or execute, counted from the moment the API server received
@@ -679,13 +682,22 @@ two matters:
 |----------|--------------|
 | nothing | The server default applies: `AGENT_OPERATION_DEFAULT_DEADLINE` (600 seconds) or `AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT` (30 seconds), unless your operator has changed them. |
 | `0` | None at all. The operation is not bounded by that mechanism. |
-| a positive number | That many seconds. |
+| a positive number | That many seconds, up to `AGENT_OPERATION_MAX_DEADLINE`. |
 
 Sending `0` is not the same as omitting the parameter. Streaming a very
 large file out of an instance is the case the distinction exists for:
 send `deadline_seconds: 0` with a `progress_timeout_seconds`, and the
 transfer is allowed to take as long as it takes while a genuine stall
 is still detected.
+
+There is one exception to `0` meaning unbounded: an operation with
+*both* budgets disabled -- `deadline_seconds: 0` on `agent/execute`,
+which always stores no progress timeout, or combined with an explicit
+`progress_timeout_seconds: 0` on the transfers -- would otherwise hold
+its instance's single executor slot for as long as the guest command
+cared to run, blocking every other agent operation against that
+instance. Such an operation is expired `AGENT_OPERATION_MAX_DEADLINE`
+seconds after it last changed state instead.
 
 `agent/execute` does not accept `progress_timeout_seconds`, and sending
 it is a 400. Nothing an executed command does is observable as

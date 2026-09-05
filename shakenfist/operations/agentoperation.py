@@ -251,8 +251,18 @@ class AgentOperation(BaseOperation):
     def effective_deadline(self, state=None):
         """The absolute timestamp this operation must not outlive, or None.
 
-        None means there is no wall-clock deadline, which is what an
-        explicit 0.0 asks for.
+        None means there is no wall-clock deadline. An explicit 0.0
+        asks for that, but only gets it while a live progress timeout
+        still bounds the operation -- the design's licensed use for
+        the sentinel is a very large transfer whose stalls the
+        progress timeout detects. With both budgets disabled at once
+        (every agent/execute created with deadline_seconds=0, since
+        that endpoint always stores a progress timeout of 0.0) nothing
+        would ever end the operation, and it would hold its instance's
+        single executor slot for as long as the guest command ran
+        (issue #4074, the same wedge shape as #3516). Such an
+        operation is instead bounded by AGENT_OPERATION_MAX_DEADLINE,
+        anchored on its current state transition like a NULL row.
 
         A NULL column means no client intent was recorded -- the row
         was written by an API server which predates deadlines -- so
@@ -288,7 +298,11 @@ class AgentOperation(BaseOperation):
         has the value in hand already.
         """
         if self.deadline == 0.0:
-            return None
+            if self.effective_progress_timeout() is not None:
+                return None
+            if state is None:
+                state = self.state
+            return state.update_time + config.AGENT_OPERATION_MAX_DEADLINE
         if self.deadline is not None:
             return self.deadline
         if state is None:
@@ -303,6 +317,24 @@ class AgentOperation(BaseOperation):
         """
         deadline = self.effective_deadline(state=state)
         return deadline is not None and time.time() > deadline
+
+    def deadline_needs_state_anchor(self):
+        """True when effective_deadline() must read a State to resolve.
+
+        That read is an uncached GetState round trip, so a hot path
+        which checks repeatedly reads the State once and passes it in
+        instead (issue #4014, and see
+        SideChannelExecutorJob.expire_if_out_of_budget()). True for a
+        NULL deadline, whose server default anchors on a transition
+        time, and for the 0.0 sentinel with no live progress timeout,
+        whose AGENT_OPERATION_MAX_DEADLINE backstop anchors the same
+        way. Both columns tested here are static values, so this costs
+        no database read itself.
+        """
+        if self.deadline is None:
+            return True
+        return (self.deadline == 0.0
+                and self.effective_progress_timeout() is None)
 
     def effective_progress_timeout(self):
         """Seconds without progress which are fatal, or None if disabled.

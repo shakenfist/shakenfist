@@ -254,12 +254,22 @@ def agent_operation_timing(deadline_seconds, progress_timeout_seconds,
     omitted progress timeout stores ``0.0``, which is true of the
     operation, rather than a default which could never fire.
     """
-    deadline, error = _timing_seconds('deadline_seconds', deadline_seconds)
+    # Both parameters share one operator ceiling. It is what stops a
+    # caller parking an instance's single executor slot with an
+    # enormous budget, so the 0 sentinels are deliberately not folded
+    # into it here: an operation with no budget at all is instead
+    # bounded by the same ceiling at enforcement time (see
+    # AgentOperation.effective_deadline() and issue #4074), while the
+    # sentinel with a live progress timeout keeps meaning what it says.
+    deadline, error = _timing_seconds(
+        'deadline_seconds', deadline_seconds,
+        maximum=config.AGENT_OPERATION_MAX_DEADLINE)
     if error:
         return None, error
 
     progress_timeout, error = _timing_seconds(
-        'progress_timeout_seconds', progress_timeout_seconds)
+        'progress_timeout_seconds', progress_timeout_seconds,
+        maximum=config.AGENT_OPERATION_MAX_DEADLINE)
     if error:
         return None, error
 
@@ -281,13 +291,18 @@ def agent_operation_timing(deadline_seconds, progress_timeout_seconds,
     return (deadline, progress_timeout), None
 
 
-def _timing_seconds(name, value):
+def _timing_seconds(name, value, maximum=None):
     """Validate one timing parameter, returning (seconds_or_None, error).
 
     None comes back for an omitted parameter and is the caller's
     signal to apply a default. Every rejection is a 400: these are
     durations, and silently reinterpreting one a caller got wrong is
     how a timeout ends up meaning something nobody asked for.
+
+    maximum is the operator ceiling published as the parameter's
+    maximum in the API specification, which the rejection here is what
+    backs. The 0 sentinel trivially passes it, which is intended --
+    what it asks for is decided at enforcement time, not here.
     """
     if value is None:
         return None, None
@@ -322,6 +337,12 @@ def _timing_seconds(name, value):
     if seconds < 0:
         return None, sf_api.error(
             400, '%s must not be negative' % name)
+
+    if maximum is not None and seconds > maximum:
+        return None, sf_api.error(
+            400,
+            '%s must not exceed this deployment\'s '
+            'AGENT_OPERATION_MAX_DEADLINE of %d seconds' % (name, maximum))
 
     return seconds, None
 

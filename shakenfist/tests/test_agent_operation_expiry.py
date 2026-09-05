@@ -16,7 +16,7 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
-    """The expired state, and the three timing resolution helpers.
+    """The expired state, and the timing resolution helpers.
 
     Both stored timing columns are three valued (NULL, an explicit
     0.0, or a real value) and the two absences mean different things,
@@ -69,13 +69,74 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
 
     # effective_deadline() and deadline_passed()
     def test_explicit_zero_deadline_means_none(self):
+        # The licensed use of the sentinel: no wall-clock deadline,
+        # with a live progress timeout still bounding a stall. A NULL
+        # progress timeout resolves to the live server default, so it
+        # licenses the sentinel too (second assertion) -- though no
+        # API server since phase 3 writes that combination.
+        op = self._make_agentop(
+            state=AgentOperation.STATE_QUEUED, deadline=0.0,
+            progress_timeout=30.0)
+        self.assertIsNone(op.effective_deadline())
+
+        # However old the operation gets, it never expires.
+        with mock.patch('time.time', return_value=time.time() + 1000000):
+            self.assertFalse(op.deadline_passed())
+
         op = self._make_agentop(
             state=AgentOperation.STATE_QUEUED, deadline=0.0)
         self.assertIsNone(op.effective_deadline())
 
-        # However old the operation gets, an explicit zero never expires.
-        with mock.patch('time.time', return_value=time.time() + 1000000):
+    def test_zero_deadline_with_no_progress_timeout_gets_the_backstop(self):
+        # Issue #4074: deadline_seconds=0 on agent/execute disables
+        # both budgets at once, because that endpoint always stores a
+        # progress timeout of 0.0. Nothing would ever end such an
+        # operation, and it parks the instance's only executor slot
+        # for as long as the guest command runs, so the operator
+        # ceiling bounds it instead -- anchored on the current state
+        # transition, like a legacy NULL row.
+        op = self._make_agentop(
+            state=AgentOperation.STATE_EXECUTING, deadline=0.0,
+            progress_timeout=0.0)
+        anchor = op.state.update_time
+        backstop = self.mock_config.AGENT_OPERATION_MAX_DEADLINE
+        self.assertEqual(anchor + backstop, op.effective_deadline())
+
+        with mock.patch('time.time', return_value=anchor + backstop - 1):
             self.assertFalse(op.deadline_passed())
+        with mock.patch('time.time', return_value=anchor + backstop + 1):
+            self.assertTrue(op.deadline_passed())
+
+    def test_the_backstop_honours_a_supplied_state_anchor(self):
+        # The reaper and the executor pass the State they already read,
+        # for the same GetState-per-check reason as a NULL deadline.
+        op = self._make_agentop(
+            state=AgentOperation.STATE_EXECUTING, deadline=0.0,
+            progress_timeout=0.0)
+        backstop = self.mock_config.AGENT_OPERATION_MAX_DEADLINE
+        supplied = State(value=AgentOperation.STATE_EXECUTING,
+                         update_time=op.state.update_time - backstop - 5)
+        self.assertTrue(op.deadline_passed(state=supplied))
+        self.assertFalse(op.deadline_passed())
+
+    # deadline_needs_state_anchor()
+    def test_which_deadlines_need_a_state_anchor(self):
+        cases = [
+            # (deadline, progress_timeout, needs_anchor)
+            (None, None, True),      # legacy NULL row, server default
+            (None, 30.0, True),
+            (0.0, 0.0, True),        # both disabled, the #4074 backstop
+            (0.0, 30.0, False),      # licensed sentinel, no deadline
+            (0.0, None, False),      # NULL resolves to the live default
+            (1700000000.0, 0.0, False),  # stored absolute timestamp
+        ]
+        for deadline, progress_timeout, needs_anchor in cases:
+            op = self._make_agentop(
+                state=AgentOperation.STATE_QUEUED, deadline=deadline,
+                progress_timeout=progress_timeout)
+            self.assertEqual(
+                needs_anchor, op.deadline_needs_state_anchor(),
+                f'deadline={deadline} progress_timeout={progress_timeout}')
 
     def test_explicit_deadline_is_used_verbatim(self):
         op = self._make_agentop(
