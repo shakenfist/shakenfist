@@ -183,8 +183,10 @@
         that: ci_instance['meta'] | default({}, true) | length > 0
         fail_msg: "meta should be populated in {{ ci_instance }}"
 
-    # NOTE(mikal): we need to change the IP address here as well, otherwise we
-    # bump into the deletion halo around the previous IP address.
+    # NOTE(mikal): the IP address deliberately does not change here. The
+    # replacement deletes the old instance and immediately recreates it, so
+    # this exercises an explicit address request taking over the deletion
+    # halo around the previous instance's address (issue 4059).
     - name: Change the instance and check for replacement
       sf_instance:
         name: "ansibleci-004"
@@ -198,7 +200,7 @@
         networks:
           - "{{ ci_network_a['meta']['uuid'] }}"
         networkspecs:
-          - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.6,float=True"
+          - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
         state: present
       register: ci_instance
 
