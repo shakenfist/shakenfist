@@ -14455,7 +14455,10 @@ following operations via the agent:</p>
 <p>All three creating calls accept an optional <code>deadline_seconds</code>, and
 <code>agent/get</code> and <code>agent/put</code> additionally accept an optional
 <code>progress_timeout_seconds</code>. Both are counts of seconds, and both refuse
-a negative value with a 400.</p>
+a negative value with a 400. Both are also capped by the operator
+ceiling <code>AGENT_OPERATION_MAX_DEADLINE</code> (86400 seconds, one day, unless
+the operator has changed it), published as the parameters' <code>maximum</code> in
+the API specification and likewise refused with a 400 above it.</p>
 <p><code>deadline_seconds</code> is how long the operation may continue to be
 dispatched or execute, counted from the moment the API server received
 your request rather than from when the agent picked the work up. Time
@@ -14487,7 +14490,7 @@ two matters:</p>
 </tr>
 <tr>
 <td>a positive number</td>
-<td>That many seconds.</td>
+<td>That many seconds, up to <code>AGENT_OPERATION_MAX_DEADLINE</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -14496,6 +14499,14 @@ large file out of an instance is the case the distinction exists for:
 send <code>deadline_seconds: 0</code> with a <code>progress_timeout_seconds</code>, and the
 transfer is allowed to take as long as it takes while a genuine stall
 is still detected.</p>
+<p>There is one exception to <code>0</code> meaning unbounded: an operation with
+<em>both</em> budgets disabled -- <code>deadline_seconds: 0</code> on <code>agent/execute</code>,
+which always stores no progress timeout, or combined with an explicit
+<code>progress_timeout_seconds: 0</code> on the transfers -- would otherwise hold
+its instance's single executor slot for as long as the guest command
+cared to run, blocking every other agent operation against that
+instance. Such an operation is expired <code>AGENT_OPERATION_MAX_DEADLINE</code>
+seconds after it last changed state instead.</p>
 <p><code>agent/execute</code> does not accept <code>progress_timeout_seconds</code>, and sending
 it is a 400. Nothing an executed command does is observable as
 progress, so a timeout there could never fire; only <code>deadline_seconds</code>

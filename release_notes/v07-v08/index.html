@@ -15055,6 +15055,17 @@ same as omitting it. Streaming a very large file out of an instance is
 the case that distinction exists for: send <code>deadline_seconds: 0</code> with a
 <code>progress_timeout_seconds</code> and the transfer may take as long as it
 takes, while a genuine stall is still detected.</p>
+<p>Both parameters are capped by <code>AGENT_OPERATION_MAX_DEADLINE</code> (default
+86400 seconds, one day), an operator ceiling published as their
+<code>maximum</code> in the API specification and refused with a 400 above it. The
+same ceiling bounds an operation created with both budgets disabled at
+once -- <code>deadline_seconds: 0</code> on <code>agent/execute</code>, or with an explicit
+<code>progress_timeout_seconds: 0</code> on the transfers -- which would otherwise
+hold its instance's single executor slot for as long as the guest
+command cared to run (issue 4074). Such an operation expires
+<code>AGENT_OPERATION_MAX_DEADLINE</code> seconds after it last changed state. A
+<code>deadline_seconds: 0</code> alongside a live progress timeout keeps meaning
+no wall-clock deadline at all.</p>
 <p>Relatedly, an error reported by the in-guest agent now ends the
 operation immediately, in <code>error</code>, with the agent's own message. It
 previously only emitted an event and left the executor waiting, so the

@@ -13872,6 +13872,19 @@ the server applies a default.</p>
 omitting the parameter takes the default instead. See the API
 reference linked above for the full three-way distinction between
 omitted, zero and a positive value.</p>
+<p>Both parameters are bounded by <strong><code>AGENT_OPERATION_MAX_DEADLINE</code></strong>
+(default 86400 seconds -- one day, <code>shakenfist/config.py:320</code>), an
+operator ceiling published as their <code>maximum</code> in the API specification
+and refused with a 400 above it. The same ceiling is the backstop for
+an operation whose caller disabled both budgets at once, which every
+<code>agent/execute</code> created with <code>deadline_seconds=0</code> is: with no budget
+left anywhere, a single request could otherwise park an instance's
+only executor slot for as long as the guest command cared to run
+(issue 4074). Such an operation is expired
+<code>AGENT_OPERATION_MAX_DEADLINE</code> seconds after it last changed state. A
+<code>deadline_seconds</code> of <code>0</code> alongside a live progress timeout still
+means no wall-clock deadline at all, so a very large transfer which
+keeps making progress is never expired by the ceiling.</p>
 <h2 id="where-the-budgets-are-enforced">Where the budgets are enforced<a class="headerlink" href="#where-the-budgets-are-enforced" title="Permanent link">&para;</a></h2>
 <p>Three points enforce these budgets, so an operation that has run out
 of time is retired wherever it happens to be sitting rather than only
@@ -13972,9 +13985,12 @@ three situations:</p>
 <p>The reaper is rate-limited to once every 30 seconds per instance, and
 cannot help in two situations by design: an instance with no live
 monitor (it waits for the monitor to restart instead, normally within
-30 seconds), and an operation created with <code>deadline_seconds=0</code> whose
-executor wedges before connecting -- with no wall-clock budget at all,
-there is no evidence available to declare it stuck.</p>
+30 seconds), and an operation created with <code>deadline_seconds=0</code>
+alongside a live progress timeout whose executor wedges before
+connecting -- with no wall-clock budget, there is no evidence
+available to declare it stuck. (An operation with <em>both</em> budgets
+disabled is not in this hole: the <code>AGENT_OPERATION_MAX_DEADLINE</code>
+backstop gives it a wall-clock deadline the reaper can act on.)</p>
 <h2 id="what-to-tune-and-when">What to tune, and when<a class="headerlink" href="#what-to-tune-and-when" title="Permanent link">&para;</a></h2>
 <p>The most likely complaint you will see after upgrading is a long agent
 command being killed partway through. This is expected: the effective
@@ -14005,6 +14021,12 @@ before it even starts running.</p>
   recover but also lets a genuinely broken operation occupy an
   instance's executor slot for more attempts before it is finally
   retired.</li>
+<li><strong><code>AGENT_OPERATION_MAX_DEADLINE</code></strong> is the ceiling on what a caller
+  may request, and the backstop for an operation with no budgets at
+  all. Lower it if a day is more executor-slot parking than you are
+  willing to let one request buy; keep it at least
+  <code>AGENT_OPERATION_DEFAULT_DEADLINE</code>, or an omitted <code>deadline_seconds</code>
+  is granted more time than an explicit one may ask for.</li>
 </ul>
 
 
