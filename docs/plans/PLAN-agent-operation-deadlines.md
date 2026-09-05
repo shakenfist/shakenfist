@@ -547,19 +547,29 @@ three-repository audit of every consumer of agent operation state).
 
 ## Known defects
 
-This plan's mechanism shipped with three defects still open. They are
+This plan's mechanism shipped with three defects. Two are still open;
+the third was fixed within hours of the audit filing it. They are
 named here because a reader arriving at a completed plan should not
 have to search the issue tracker to learn that.
 
 * **[#4074](https://github.com/shakenfist/shakenfist/issues/4074) --
-  the executor slot can be parked on request.** `agent/execute` with
-  `deadline_seconds=0` disables both budgets at once, because that
-  endpoint always stores a `progress_timeout` of `0.0`. No reaper case
-  can recover it, and there is no `AGENT_OPERATION_MAX_DEADLINE` for
-  an operator to bound it with. Found by phase 8's security review;
-  filed rather than fixed there because the fix is an operator-visible
-  ceiling and a restored backstop. Confined to the caller's own
-  namespace.
+  the executor slot could be parked on request. Fixed by `7a1b4a0cb`
+  (#4080).** `agent/execute` with `deadline_seconds=0` disabled both
+  budgets at once, because that endpoint always stores a
+  `progress_timeout` of `0.0`. No reaper case could recover it, and
+  there was no `AGENT_OPERATION_MAX_DEADLINE` for an operator to bound
+  it with. Found by phase 8's security review and filed rather than
+  fixed there, because the fix is an operator-visible ceiling and a
+  restored backstop rather than an audit-sized edit. The fix added
+  that config option (default 86400 seconds), enforced it over both
+  `deadline_seconds` and `progress_timeout_seconds` in the existing
+  400 guard, published it as those parameters' maximum on all three
+  creating endpoints, and narrowed `effective_deadline()` so the `0.0`
+  sentinel returns `None` only while a live progress timeout still
+  bounds the operation -- with both budgets off, the ceiling applies as
+  a backstop anchored on the current state transition, which every
+  existing enforcement point then covers unchanged. The exposure was
+  confined to the caller's own namespace throughout.
 * **[#3995](https://github.com/shakenfist/shakenfist/issues/3995) --
   the default progress timeout expires a legitimate large transfer.**
   A 471 MiB `get-file` was expired after the guest answered the stat
