@@ -671,6 +671,219 @@ discipline, and the `deadline`/`progress_timeout` unit distinction.
 nothing failed.** No blocking findings. No advisory findings. Wave 2 (steps
 8c-8g) can proceed on this baseline without qualification.
 
+### 2c. Documentation review
+
+Baseline used: `git diff M^1 M` for each of the twelve merges named in
+decisions 1 and 2 of `docs/plans/PLAN-agent-operation-deadlines-phase-08-push-audit.md`
+(`87bbffcf4`, `f21d5da3a`, `cb9e10bba`, `08807c83f`, `291054e98`, `185de6b32`,
+`4afa29476`, `864608276`, `4a122bcd3`, `2341ae0c4`, `2e19bb1ea`, `91d565a05`).
+
+#### F6 confirmation (state machine)
+
+Confirmed: `docs/developer_guide/state_machine.md`'s *Agent Operations* section
+matches `AgentOperation.state_targets` (`shakenfist/operations/agentoperation.py:56-75`)
+exactly -- `expired` is documented, and the mermaid diagram's four
+`--> expired` edges (`initial`, `preflight`, `queued`, `executing`) plus the
+`executing --> queued` retry edge reproduce the dict verbatim.
+
+One caveat worth surfacing: F6 itself says the doc "carries all **five**
+`--> expired` edges." Both the code and the doc have **four**, not five
+(`None` does not target `expired`; only `initial`, `preflight`, `queued`,
+`executing` do). This is a miscount in the phase-8 plan's own survey text,
+not a doc/code mismatch -- the doc and code agree with each other, just not
+with F6's count. **Advisory** — worth a one-word fix in the plan
+(`docs/plans/PLAN-agent-operation-deadlines-phase-08-push-audit.md:~F6`)
+so a future reader doesn't recount and find a ghost discrepancy.
+
+#### 1. Single-sourcing of the three constants
+
+Read and checked against `shakenfist/config.py:240` (`AGENT_OPERATION_DEFAULT_DEADLINE`,
+600), `:259` (`AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT`, 30) and `:303`
+(`AGENT_OPERATION_MAX_ATTEMPTS`, 3, `ge=1`):
+
+- `docs/operator_guide/agent_operations.md:41,47,126` — 600 / 30 / 3, all correct.
+- `docs/developer_guide/api_reference/instances.md:680` — 600 / 30, correct (this
+  page never states MAX_ATTEMPTS, which is fine — it documents request
+  parameters, not retry).
+- `docs/developer_guide/api_reference/agentoperations.md` — states neither
+  numeric default directly (only describes the fields); no contradiction, but
+  see the stale-prose finding below.
+- `docs/operator_guide/database.md:1141-1142` — 600 / 30, correct; MAX_ATTEMPTS
+  mentioned by name at line 1163 with no restated number (safe).
+- `docs/release_notes/v07-v08.md:745,749,789` — 600 / 30 / 3, all correct.
+
+**All five agree with each other and with `config.py`.** No numeric
+contradiction found.
+
+**NULL semantics.** Checked every place that states what NULL means:
+`docs/operator_guide/database.md:1128-1131` gives the corrected meaning
+("NULL — no client intent was recorded, so the server default applies ...
+It does **not** mean 'no deadline'") and matches
+`AgentOperation.effective_deadline()`'s docstring
+(`shakenfist/operations/agentoperation.py:251-269`) almost verbatim, including
+the per-transition-anchor consequence. `docs/developer_guide/api_reference/agentoperations.md:14-17`
+states the same corrected meaning for the caller-intent fields. No document
+anywhere restates the old, wrong "NULL means no deadline."
+
+**Finding (advisory): stale enforcement-timing prose in `docs/developer_guide/api_reference/agentoperations.md:12-14`.**
+The sentence "`last_progress` and `attempts` stay `null` and `0` until a
+following release begins enforcing these values" was written in phase 2
+(`cb9e10bba`) when only the schema existed, and was never revisited when
+phases 4/5 (`291054e98`, `185de6b32`) actually shipped enforcement and the
+retry counter (`AgentOperation.attempts` setter increments it at
+`shakenfist/operations/agentoperation.py:421`, read and enforced by
+`shakenfist/daemons/sidechannel/main.py:564-566`). A reader of this page
+today would wrongly conclude `attempts` is inert and `last_progress` never
+populates outside a "following release" that, in this same tree, has
+already landed. **Advisory** (not blocking: nothing about it is wrong in
+outcome, only the framing is dated) — the fix is to drop the "until a
+following release" clause and state plainly that both fields are the
+server's live bookkeeping.
+
+#### 2. Shared blocks
+
+**readme-discipline.** `git diff M^1 M -- README.md` is empty for every one
+of the twelve merges. No feature bullets were added to `README.md`. Clean.
+
+**llm-doc-discipline.** `git diff M^1 M -- AGENTS.md ARCHITECTURE.md` is
+empty for every merge. Neither file grew, and neither restates a fact
+`docs/` owns (there is nothing to restate). Clean.
+
+**plan-phase-references.** Grepped `README.md` and `docs/` excluding
+`docs/plans/` for `phase [0-9]`, restricted to files this plan could plausibly
+have touched (`docs/operator_guide/`, `docs/developer_guide/`,
+`docs/release_notes/`, `AGENTS.md`, `ARCHITECTURE.md`, `README.md`,
+`docs/index.md`). Zero hits attributable to this plan. The only `phase N`
+hits under `docs/` outside `docs/plans/` belong entirely to
+`PLAN-scheduler-reservations.md` and `PLAN-ci-cloud-sizing.md` prose in
+`docs/operator_guide/scheduler.md`, `docs/operator_guide/database.md`,
+`docs/developer_guide/database_internals.md`, `docs/developer_guide/subsystem_internals.md`,
+`docs/developer_guide/ci.md` and `ARCHITECTURE.md:198` — none introduced or
+touched by any of the twelve merges in scope, and already tracked (per the
+shared block's own text) under the out-of-band consistency audit, issue
+#3732. Not this plan's finding. (`docs/components/development/**` also
+matches the grep heavily, but that subtree is an aggregated mirror of other
+repositories' own plan docs, unrelated to this plan and already covered by
+the same out-of-band audit — excluded as noise.) Clean for this plan.
+
+#### 3. Schema and upgrade path
+
+`docs/operator_guide/database.md:578-591` documents `sf-ctl
+ensure-mariadb-schema` generically (creates missing tables, applies pending
+migrations, must run before starting/rolling `sf-database`) and separately
+states (lines 92-98, elsewhere in the same doc) that `sf-database` performs
+compatibility and schema-version checks and refuses to start against a
+schema behind its build. The `agent_operations` (line 1084) and
+`agent_operation_attributes` (line 1107) table rows in the schema table list
+`deadline`/`progress_timeout` and `last_progress`/`attempts` respectively,
+both marked nullable where appropriate, matching the phase 2 migration
+(`ALTER TABLE ... ADD COLUMN IF NOT EXISTS ... DOUBLE NULL` /
+`BIGINT NOT NULL DEFAULT 0`). No new table was added by phase 2, so there is
+no gap in `EXPECTED_TABLE_NAMES` documentation to check. The upgrade path is
+discoverable from the same document an operator would already consult for
+any schema bump, and the refuse-to-start behaviour is generic rather than
+per-field, which is appropriate — it isn't specific to this plan's columns.
+No gap found.
+
+#### 4. Undocumented-by-any-plan coding rule (`2e19bb1ea`)
+
+`docs/developer_guide/coding_rules.md:481-529`, "A frozen model is not a
+deep frozen model." Checked for accuracy against the code it describes:
+
+- Claims `AgentOperationData.commands` is copied at its boundary — confirmed,
+  `list(data.commands)` at `shakenfist/operations/agentoperation.py:141`.
+- Claims `InstanceData`'s `disk_spec`, `video` and `side_channels` are
+  copied — confirmed at `shakenfist/instance.py:403` (`list(data.disk_spec)`),
+  `:410` (`dict(data.video)`), `:416` (`list(data.side_channels)`).
+- Claims `SideChannelExecutorJob.__init__` now copies rather than aliases —
+  confirmed, `self.commands = list(agentop.commands)` at
+  `shakenfist/daemons/sidechannel/main.py:622`, with an inline comment at
+  the site cross-referencing the same defect.
+
+All three claims check out. **Discoverability:** the rule is
+cross-referenced from `docs/developer_guide/database_internals.md:104-107`
+("... see 'A frozen model is not a deep frozen model' in ..."), which is
+where a reader investigating the object cache would already be looking, and
+it sits in `coding_rules.md` alongside every other real-defect rule (the
+file's own convention is a flat list of headings with no index, so this
+is consistent with how every other rule in the file is surfaced). No gap
+found.
+
+#### 5. Plan hygiene
+
+- `docs/plans/index.md:110` reads "In progress | 8 of 9" — correct, matching
+  phases 0-7 Complete / phase 8 In progress in
+  `PLAN-agent-operation-deadlines.md`'s Execution table (confirmed at
+  lines 610-618). This is step 8a's already-applied correction (decision 8);
+  confirming it, not re-deriving it.
+- `docs/plans/PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md`: zero
+  unticked `- [ ]` boxes (`grep -c '^- \[ \]'` → 0); `grep -n "has not been
+  pushed"` → no hits. Both Definition-of-done checks from the phase-8 plan
+  hold.
+- Every phase plan 00 through 05 (06 lives in client-python, 07 checked
+  above) has zero unticked Definition-of-done boxes.
+- Master plan's phase 6 row (line 616) correctly names both server-repo PRs
+  (#4005, #4015) alongside the client-python plan, per F3's correction.
+- No deferred items were found unlisted; the two genuinely undocumented
+  open defects (#3995, #4039) are explicitly out of this step's scope —
+  step 8h's job per decision 6.
+
+No plan hygiene findings.
+
+#### 6. Accuracy sweep of `docs/operator_guide/agent_operations.md`
+
+Read in full against the code paths it describes:
+
+- One-executor-per-instance claim — matches `Instance.agent_operation_next()`'s
+  docstring and the dispatcher's skip-if-live-executor behaviour
+  (`shakenfist/instance.py:2606-2626`).
+- The three enforcement points (dequeue, preflight, executor) — matches
+  `agent_operation_next()`, the preflight promotion task, and
+  `SideChannelExecutorJob.expire_if_out_of_budget()`.
+- `AGENT_OPERATION_MAX_ATTEMPTS` default 3, "counting the first attempt plus
+  retries" — matches `config.py:303` and its own extensive inline comment.
+- Retry conditions (retryable command list, deadline not passed, attempt cap
+  not reached) — matches `resolve_abandoned_operation()`
+  (`shakenfist/daemons/sidechannel/main.py:528-`) and its docstring.
+- Reaper's three recovered situations and its 30-second per-instance rate
+  limit — matches `Monitor.reap_instance_executors()` and
+  `EXECUTOR_REAP_INTERVAL = 30` (`shakenfist/daemons/sidechannel/main.py:76`),
+  including the two acknowledged blind spots (no live monitor;
+  `deadline_seconds=0` wedge before connecting).
+- The NULL-deadline anchor-restarts-per-transition claim is not on this page
+  directly, but the page correctly defers detail to
+  `docs/operator_guide/database.md`, which does state it and matches
+  `effective_deadline()`'s docstring verbatim (see task 1 above, and the
+  `91d565a05` fix which added the anchor cache without changing this
+  semantic).
+- "What to tune" section's framing (effective default now tighter than the
+  former 900-second backstop) matches the release notes and the removed
+  `AGENT_OPERATION_EXECUTION_TIMEOUT` constant.
+
+No inaccurate statement found on this page. It reads as current against the
+code including the three out-of-branch defect fixes.
+
+#### Summary of what was read
+
+`docs/operator_guide/agent_operations.md` (full), `docs/developer_guide/api_reference/instances.md`
+(lines 640-730), `docs/developer_guide/api_reference/agentoperations.md`
+(full), `docs/operator_guide/database.md` (schema table + lines 1084-1166,
+570-745), `docs/release_notes/v07-v08.md` (lines 700-840),
+`docs/developer_guide/state_machine.md` (Agent Operations section + diagram),
+`docs/developer_guide/coding_rules.md` (the new rule, lines 481-529),
+`docs/developer_guide/database_internals.md` (cross-reference at 104-107),
+`docs/plans/PLAN-agent-operation-deadlines.md` (Execution table, phase 6/7/8
+rows), `docs/plans/PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md`
+(Definition of done, What remains), `docs/plans/index.md:110`, `README.md`,
+`AGENTS.md`, `ARCHITECTURE.md` (diffed against all twelve merges), plus the
+relevant code: `shakenfist/config.py:230-320`,
+`shakenfist/operations/agentoperation.py` (state_targets, `effective_deadline`,
+`deadline_passed`, `attempts`, `_db_get`), `shakenfist/instance.py`
+(`agent_operation_next`, static-value copies), `shakenfist/daemons/sidechannel/main.py`
+(`SideChannelExecutorJob`, `resolve_abandoned_operation`,
+`reap_instance_executors`, `expire_if_out_of_budget`), and the diff of
+`91d565a05` and `2e19bb1ea`.
+
 ## Future work
 
 Recorded here at planning time; step 8h adds to it.
