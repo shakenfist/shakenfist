@@ -14656,7 +14656,7 @@ verdict, and see
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-09-04T10:53:24.418963+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-09-05T10:11:43.218556+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -16176,8 +16176,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/356" title="GitHub Issue: shakenfist/ryll #356">ryll#356</a></td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -16203,6 +16203,7 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
+<li><strong>ryll</strong> (Status): AGENTS.md is 307 lines / 2118 words (limits: 300 lines, 2500 words); move detail into docs/ and leave a summary and a link</li>
 <li><strong>visual-digest-rust</strong> (Status): AGENTS.md and ARCHITECTURE.md share the headings "feature flag matrix"; give each fact one home and link to it from the other file</li>
 </ul>
 <h2 id="llm-tooling">llm-tooling<a class="headerlink" href="#llm-tooling" title="Permanent link">&para;</a></h2>
@@ -16894,9 +16895,9 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>divergulent</strong> (Status): 2 of 2 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"), PLAN-patch-classification.md (no push audit phase; phase 6 is "6. BTS / upstream cross-reference"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md</li>
+<li><strong>divergulent</strong> (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md</li>
 <li><strong>occystrap</strong> (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-quay-label-search.md (no push audit phase; phase 5 is "5. Filter by tag age (since parameter)"); 1 plan(s) with no phases this check can read, not judged: PLAN-info-check.md</li>
-<li><strong>shakenfist</strong> (Status): 3 of 19 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-kerbside-vdi-tokens.md (push audit phase is not last, so phase 11 ("11. Close out the post-completion defects (#4003, #4009)") is unaudited; move the audit phase after it), PLAN-queue-performance.md (phase 8 is the push audit phase and is Complete, but phases up to 11 ("11. Multi-column coalescing key") come after it; if that work landed after the audit ran, append a new push audit phase rather than moving the finished one); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md</li>
+<li><strong>shakenfist</strong> (Status): 2 of 18 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-kerbside-vdi-tokens.md (push audit phase is not last, so phase 11 ("11. Close out the post-completion defects (#4003, #4009)") is unaudited; move the audit phase after it); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md</li>
 </ul>
 <h2 id="plan-index">plan-index<a class="headerlink" href="#plan-index" title="Permanent link">&para;</a></h2>
@@ -17304,8 +17305,8 @@ does.</p>
 </tr>
 <tr>
 <td>divergulent</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/79" title="GitHub Issue: shakenfist/divergulent #79">divergulent#79</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>instar</td>
@@ -17371,7 +17372,6 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>divergulent</strong> (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
 <li><strong>occystrap</strong> (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
 <li><strong>shakenfist</strong> (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)</li>
@@ -17424,8 +17424,8 @@ does.</p>
 </tr>
 <tr>
 <td>divergulent</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/82" title="GitHub Issue: shakenfist/divergulent #82">divergulent#82</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>instar</td>
@@ -17492,7 +17492,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>client-python-k3s</strong> (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)</li>
-<li><strong>divergulent</strong> (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)</li>
 <li><strong>instar</strong> (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)</li>
 <li><strong>occystrap</strong> (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)</li>
 <li><strong>ryll</strong> (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)</li>
@@ -17983,23 +17982,23 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/135" title="GitHub Issue: shakenfist/agent-python #135">agent-python#135</a></td>
 </tr>
 <tr>
 <td>client-python</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/391" title="GitHub Issue: shakenfist/client-python #391">client-python#391</a></td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/54" title="GitHub Issue: shakenfist/client-python-k3s #54">client-python-k3s#54</a></td>
 </tr>
 <tr>
 <td>clingwrap</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/131" title="GitHub Issue: shakenfist/clingwrap #131">clingwrap#131</a></td>
 </tr>
 <tr>
 <td>cloudgood</td>
@@ -18013,8 +18012,8 @@ does.</p>
 </tr>
 <tr>
 <td>divergulent</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/106" title="GitHub Issue: shakenfist/divergulent #106">divergulent#106</a></td>
 </tr>
 <tr>
 <td>instar</td>
@@ -18023,8 +18022,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/408" title="GitHub Issue: shakenfist/kerbside #408">kerbside#408</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -18043,8 +18042,8 @@ does.</p>
 </tr>
 <tr>
 <td>occystrap</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/132" title="GitHub Issue: shakenfist/occystrap #132">occystrap#132</a></td>
 </tr>
 <tr>
 <td>private-ci</td>
@@ -18063,8 +18062,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4082" title="GitHub Issue: shakenfist/shakenfist #4082">shakenfist#4082</a></td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -18078,6 +18077,17 @@ does.</p>
 </tr>
 </tbody>
 </table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>agent-python</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success</li>
+<li><strong>client-python</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success</li>
+<li><strong>client-python-k3s</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success</li>
+<li><strong>clingwrap</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success</li>
+<li><strong>divergulent</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success</li>
+<li><strong>kerbside</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success</li>
+<li><strong>occystrap</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success</li>
+<li><strong>shakenfist</strong> (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success; release.yml can be started by hand but its publishing jobs are not confined to tags: sign-tag, publish-pypi, publish-collection, github-release lack "if: startsWith(github.ref, 'refs/tags/v')", so a manual run on a branch force-pushes a "refs/tags/refs/heads/<branch>" tag and proceeds to publish</li>
+</ul>
 <h2 id="renovate-lockstep-groups">renovate-lockstep-groups<a class="headerlink" href="#renovate-lockstep-groups" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/renovate-lockstep-groups/">renovate-lockstep-groups.md</a></p>
 <table>
@@ -18434,8 +18444,8 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>actions</strong> (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)</li>
-<li><strong>development</strong> (Status): 159 of 174 in-scope files reviewed at HEAD; 15 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 121 of 229 in-scope files reviewed at HEAD; 108 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 153 of 174 in-scope files reviewed at HEAD; 21 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 120 of 229 in-scope files reviewed at HEAD; 109 need review (threshold 5)</li>
 <li><strong>ryll</strong> (Status): 85 of 188 in-scope files reviewed at HEAD; 103 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
@@ -18955,8 +18965,8 @@ does.</p>
 </tr>
 <tr>
 <td>divergulent</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/81" title="GitHub Issue: shakenfist/divergulent #81">divergulent#81</a></td>
+<td>N/A</td>
+<td>-</td>
 </tr>
 <tr>
 <td>instar</td>
@@ -19022,7 +19032,6 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>divergulent</strong> (Status): 2 of 2 HTTP request handler class(es) do not sanitize header values: divergulent/tests/test_fetch.py:164 (ErrorHandler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through; divergulent/tests/test_fetch.py:37 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through</li>
 <li><strong>ryll</strong> (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tools/browser-offer-probe.py:68 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through</li>
 </ul>
 <h2 id="sfui-vendor">sfui-vendor<a class="headerlink" href="#sfui-vendor" title="Permanent link">&para;</a></h2>
@@ -19380,8 +19389,8 @@ does.</p>
 <li><strong>agent-python</strong> (Status): Declared but never imported: grpcio-status (pyproject.toml:29), grpcio-tools (pyproject.toml:30). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
 <li><strong>client-python</strong> (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
 <li><strong>client-python-k3s</strong> (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
-<li><strong>kerbside</strong> (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), flask-request-id-middleware (pyproject.toml:47), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
-<li><strong>shakenfist</strong> (Status): Declared but never imported: chardet (pyproject.toml:101), clingwrap (pyproject.toml:37), flask-request-id-middleware (pyproject.toml:80), gevent (pyproject.toml:67), greenlet (pyproject.toml:66), grpcio-status (pyproject.toml:95), grpcio-tools (pyproject.toml:96), pbr (pyproject.toml:57), requests-toolbelt (pyproject.toml:100), urllib3 (pyproject.toml:102), uv (pyproject.toml:32). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
+<li><strong>kerbside</strong> (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
+<li><strong>shakenfist</strong> (Status): Declared but never imported: chardet (pyproject.toml:101), clingwrap (pyproject.toml:37), gevent (pyproject.toml:67), greenlet (pyproject.toml:66), grpcio-status (pyproject.toml:95), grpcio-tools (pyproject.toml:96), pbr (pyproject.toml:57), requests-toolbelt (pyproject.toml:100), urllib3 (pyproject.toml:102), uv (pyproject.toml:32). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array</li>
 </ul>
 <h2 id="version-file-gitignore">version-file-gitignore<a class="headerlink" href="#version-file-gitignore" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/version-file-gitignore/">version-file-gitignore.md</a></p>

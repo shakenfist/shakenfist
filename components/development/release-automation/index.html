@@ -14046,11 +14046,25 @@ bare download and the action's default of warning on an unmatched
 glob, an empty release is indistinguishable from a good one.</p>
 <p>The workflow can also be started by hand, which runs the build and the
 <code>twine check</code> as a smoke test and stops there. Everything from the tag
-signing down is confined to tag refs with
-<code>if: startsWith(github.ref, 'refs/tags/v')</code>. That guard is what makes
-the manual trigger safe to use: a dispatch arrives on a branch ref, and
-without it <code>sign-tag</code> would take <code>refs/heads/&lt;branch&gt;</code> for a tag name,
-force-push <code>refs/tags/refs/heads/&lt;branch&gt;</code>, and go on to publish.</p>
+signing down is confined to a pushed tag with
+<code>if: github.event_name == 'push' &amp;&amp; startsWith(github.ref,
+'refs/tags/v')</code>. Both clauses are needed: aimed at a branch, an
+unguarded <code>sign-tag</code> would take <code>refs/heads/&lt;branch&gt;</code> for a tag name and
+force-push <code>refs/tags/refs/heads/&lt;branch&gt;</code>; aimed at an existing tag, a
+ref-only guard would let the run re-sign and force-push that tag,
+rewriting a signed object someone may already have verified. Re-running
+a failed release still works, because "Re-run jobs" replays the original
+push event.</p>
+<p>These runners are persistent and <code>download-artifact</code> extracts into its
+target rather than replacing it, so a publishing job must not read a
+directory an earlier job may have left files in. The two jobs solve
+that differently. <code>publish-pypi</code> checks out, which cleans the workspace
+with <code>git clean -ffdx</code>, and works in <code>dist/</code> -- it has to, because
+<code>pypa/gh-action-pypi-publish</code> delegates to a Docker container action,
+and the container is given <code>RUNNER_TEMP</code> at <code>/github/runner_temp</code> while
+<code>${{ runner.temp }}</code> expands to the host path, which is not there.
+<code>github-release</code> runs a JavaScript action on the host, so it skips the
+checkout and downloads into the per-job <code>${{ runner.temp }}</code> instead.</p>
 <pre class="mermaid"><code>flowchart TB
     tag["Maintainer pushes v0.6.0 tag"]
     build["Build package"]
