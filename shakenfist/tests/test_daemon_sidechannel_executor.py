@@ -291,13 +291,7 @@ class RequestAllThreadsExitTestCase(base.ShakenFistTestCase):
                 mock.patch.object(sidechannel.daemon, 'clear_abort_path'), \
                 mock.patch.object(sidechannel.daemon,
                                   'set_abort_path') as abort:
-            try:
-                mon._request_all_threads_exit()
-            except KeyError:
-                # #3931, which lives in _request_thread_exit() and is
-                # fixed separately. The point of this test is that the
-                # signalling above it has already happened.
-                pass
+            mon._request_all_threads_exit()
 
         signalled = {c[0][0] for c in abort.call_args_list}
         for uuid in ('inst-a', 'inst-b'):
@@ -322,10 +316,7 @@ class RequestAllThreadsExitTestCase(base.ShakenFistTestCase):
                 mock.patch.object(
                     sidechannel.daemon, 'set_abort_path',
                     side_effect=lambda *a: order.append('signal')):
-            try:
-                mon._request_all_threads_exit()
-            except KeyError:
-                pass
+            mon._request_all_threads_exit()
 
         self.assertEqual(4, order[:4].count('signal'))
 

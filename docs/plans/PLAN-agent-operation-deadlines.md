@@ -545,6 +545,62 @@ three-repository audit of every consumer of agent operation state).
    the agent cannot cancel the prior attempt's child process, so both
    attempts' side effects could land.
 
+## Known defects
+
+This plan's mechanism shipped with three defects still open. They are
+named here because a reader arriving at a completed plan should not
+have to search the issue tracker to learn that.
+
+* **[#4074](https://github.com/shakenfist/shakenfist/issues/4074) --
+  the executor slot can be parked on request.** `agent/execute` with
+  `deadline_seconds=0` disables both budgets at once, because that
+  endpoint always stores a `progress_timeout` of `0.0`. No reaper case
+  can recover it, and there is no `AGENT_OPERATION_MAX_DEADLINE` for
+  an operator to bound it with. Found by phase 8's security review;
+  filed rather than fixed there because the fix is an operator-visible
+  ceiling and a restored backstop. Confined to the caller's own
+  namespace.
+* **[#3995](https://github.com/shakenfist/shakenfist/issues/3995) --
+  the default progress timeout expires a legitimate large transfer.**
+  A 471 MiB `get-file` was expired after the guest answered the stat
+  in 20 ms and then sent nothing for 30 seconds. The issue asks for a
+  measurement of what a guest actually does before its first chunk,
+  not a larger constant, because a blanket increase would slacken the
+  #3516 detection the window exists for. Labelled
+  `automated-fix-attempted`.
+* **[#4039](https://github.com/shakenfist/shakenfist/issues/4039) --
+  sidechannel `GetInstanceAttributes` over its load budget.** Measured
+  at 1.716/s against a 1.486/s ceiling. Same surface as #4014, which
+  `91d565a05` fixed for three other pairs.
+
+Phase 8 also filed four advisory issues against this work:
+[#4075](https://github.com/shakenfist/shakenfist/issues/4075) (the
+expiry reason is not on the wire),
+[#4076](https://github.com/shakenfist/shakenfist/issues/4076) (a stale
+capability cache across a rolling upgrade),
+[#4077](https://github.com/shakenfist/shakenfist/issues/4077)
+(functional coverage gaps), and in the client repository
+[client-python#388](https://github.com/shakenfist/client-python/issues/388),
+[#389](https://github.com/shakenfist/client-python/issues/389) and
+[#390](https://github.com/shakenfist/client-python/issues/390).
+
+### Repairs which landed outside the phase branches
+
+Three defect fixes were needed against this plan's code after its
+phases merged. They are not in any phase's diff, and phase 8's audit
+baseline includes them for that reason:
+
+| Merge | PR | Issue | What it repaired |
+|-------|----|-------|------------------|
+| `2341ae0c4` | #3933 | #3931 | A `KeyError` on sidechannel executor teardown, armed when phase 5 separated the abort files |
+| `2e19bb1ea` | #3970 | -- | `SideChannelExecutorJob` aliased its working queue to `agentop.commands`, so `pop(0)` drained the operation and turned phase 5's retry into a permanent expiry. Also added a coding rule |
+| `91d565a05` | #4025 | #4014 | The executor re-resolved a NULL deadline's anchor on every budget check, and CI harness pacing was being read as cluster polling |
+
+Two of the three are defects in the retry and enforcement machinery
+phases 4 and 5 built, found by CI within days of merge. Phase 8's wave
+2 briefs were pointed at those areas for that reason, and the audit's
+own findings landed in the same neighbourhood.
+
 ## Non-goals
 
 - Fixing the agent-side get-file delivery bug itself (#2240). This
@@ -615,7 +671,7 @@ the slot at all.
 | 5 | [PLAN-agent-operation-deadlines-phase-05-retry.md](PLAN-agent-operation-deadlines-phase-05-retry.md) | Complete | Retry: `EXECUTING -> QUEUED` edge, terminal-only lazy pop, attempt bound, partial-result cleanup; the node-local reaper, covering a dead executor thread, no executor at all after a daemon restart, and a live executor wedged in the pre-connection wait. Survey corrections applied at source: decision 5's address for `reap_instance_executors()`, that retryability is evaluated over the whole command list rather than the command in flight, and that partial-result cleanup has a registered-blob case the design sketch did not cover. The phase plan also decides that the terminal-only pop and the reaper must land in one commit, because the pop rule alone turns a daemon restart from a leak into a wedge |
 | 6 | `PLAN-agent-operation-deadlines-phase-06-client.md` (in shakenfist/client-python, branch `agent-operation-deadlines-phase-06-client`) | Complete | client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing client-python#363: await loops poll to their full timeout on terminal failure states instead of failing fast). The plan file lives in the client repository because the code does, following the `PLAN-vdi-console-tokens.md` precedent; a relative link cannot cross repositories, so it is named here rather than linked. Survey corrections applied at source: the new parameters need a capability token before a client can send them safely, which phase 3 did not add and phase 6 does. The phase plan also decides to repair `await_agent_fetch()`'s three hardcoded timeout windows, which make its `timeout` argument a lie, because the phase rewrites those same loops. The phase also landed two pull requests in this repository, which the row above does not name because the phase plan lives elsewhere: #4005 added the capability token in `shakenfist/external_api/app.py` that a client needs before it can safely send the new parameters, and #4015 moved the CI suite onto the new client |
 | 7 | [PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md](PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md) | Complete | Documentation and CI coverage. Survey corrections applied at source, because this row was written before phases 3 to 6 executed and was wrong in four places. (a) The documentation was **not** deferred from phase 3: `cf094551b` wrote both the API reference at `docs/developer_guide/api_reference/instances.md:657-710` and the release note section at `docs/release_notes/v07-v08.md:731-782`. What is missing is phase 5 (retry, attempts and the reaper), phase 6 (the CLI flags and the `AgentCommandError` to `AgentOperationFailed` change), and an operator-guide page for agent operations, of which there is none. (b) `base.AGENT_OPERATION_FAILURES` must **not** narrow to a plain `AgentOperationFailed` reference: the `getattr()` shim goes, but the tuple stays and gains `AgentAwaitTimeout`, because `await_agent_command()` raises three unrelated exceptions and the two catch sites are `_await_instance_ready`'s retry loop, which wants all of them. Only the two `test_get_missing_file` assertions narrow. (c) There is a **third** event-renewed await, `_await_objects_ready`, which backs the network, artifact and blob readiness helpers and so sits on nearly every test in the suite; #3770 is not fixed without it. (d) Commit `a0cc243ad` fixed the shared-clock flake in `guest_ci_tests/test_agentops.py` only, and the identical `smoke_ci_tests` copy -- the suite that runs on every pull request -- still has it. Note `docs/developer_guide/state_machine.md` is **not** this phase's: it is a rendering of `state_targets`, so phase 4 updated it when it added `expired` rather than leaving the tree self-contradictory for three phases, and phase 5 added its one further edge |
-| 8 | [PLAN-agent-operation-deadlines-phase-08-push-audit.md](PLAN-agent-operation-deadlines-phase-08-push-audit.md) | In progress | Push audit: runs `PUSH-AUDIT.md` over this plan's work as one body, not the last phase's diff alone. Survey correction applied at source: the "accumulated diff against `develop`" this row used to describe cannot be taken, because every phase is merged and `git diff develop...HEAD` is empty; the baseline is instead the explicit merge list in decision 1 of the phase plan, which also pulls in the three defect fixes that landed against this plan's code outside its phase branches (#3933, #3970, #4025). Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
+| 8 | [PLAN-agent-operation-deadlines-phase-08-push-audit.md](PLAN-agent-operation-deadlines-phase-08-push-audit.md) | Complete | Push audit: runs `PUSH-AUDIT.md` over this plan's work as one body, not the last phase's diff alone. Survey correction applied at source: the "accumulated diff against `develop`" this row used to describe cannot be taken, because every phase is merged and `git diff develop...HEAD` is empty; the baseline is instead the explicit merge list in decision 1 of the phase plan, which also pulls in the three defect fixes that landed against this plan's code outside its phase branches (#3933, #3970, #4025). Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
 Each phase gets its own detailed plan file before implementation.
 Unit tests land with each phase; the functional test in phase 7

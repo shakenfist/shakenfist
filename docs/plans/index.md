@@ -107,7 +107,7 @@ checker's blind spot, and the only numbers here it cannot recompute.
 | 2026-07-21 | [Per-host resource reservations](PLAN-per-host-resource-reservations.md) | Per-node RAM, CPU and disk reservation overrides | Complete | 4 of 4 |
 | 2026-07-28 | [sf-netserv](PLAN-netserv.md) | Replace dnsmasq with a Rust per-network service plane | Proposed | — |
 | 2026-08-03 | [API input validation](PLAN-api-input-validation.md) | Declarative request validation and a consistent error contract for the REST API | In progress | 3 of 8 |
-| 2026-08-14 | [Agent operation deadlines](PLAN-agent-operation-deadlines.md) | Client-propagated deadlines and per-command progress timeouts for agent operations | In progress | 8 of 9 |
+| 2026-08-14 | [Agent operation deadlines](PLAN-agent-operation-deadlines.md) | Client-propagated deadlines and per-command progress timeouts for agent operations | Complete | 9 of 9 |
 | 2026-08-14 | [Dependency-aware agent operations](PLAN-agent-operation-dependencies.md) | `depends_on` and `runs_after` for agent operations, including cross-instance edges | Blocked | — |
 | 2026-08-16 | [Bound gRPC reply sizes](PLAN-grpc-bounded-replies.md) | Make `DatabaseService` replies bounded by construction rather than by the message size limit | Not started | 0 of 7 |
 | 2026-08-27 | [Right-size the CI test clouds](PLAN-ci-cloud-sizing.md) | Measured sizing for the nested CI clouds, with headroom instrumentation and explicit saturation coverage before any cloud grows | In progress | 1 of 7 |

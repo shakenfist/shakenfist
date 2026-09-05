@@ -180,10 +180,12 @@ would otherwise send an agent to check from scratch:
   The blocking cached-FK-list rule has no candidate either.
 * **`docs/developer_guide/state_machine.md` matches the code.** Its
   *Agent Operations* section (line 19) documents `expired` at line 34
-  and carries all five `--> expired` edges plus the
-  `executing --> queued` retry edge, which is exactly
-  `AgentOperation.state_targets` at
-  `shakenfist/operations/agentoperation.py:56-75`.
+  and carries all four `--> expired` edges (`initial`, `preflight`,
+  `queued`, `executing`) plus the `executing --> queued` retry edge,
+  which is exactly `AgentOperation.state_targets` at
+  `shakenfist/operations/agentoperation.py:56-75`. (This sentence said
+  "five" as originally surveyed; step 8e caught the miscount and it is
+  corrected here.)
 * **The plan is already compliant with consistency issue #4063.**
   That audit requires a master plan to end with a push audit phase;
   this one does, and the issue's findings name three other plans, not
@@ -2428,10 +2430,77 @@ Stated explicitly per decision 9, each alongside what was examined:
   path.** Three `/agent/` POSTs, three `_add_agentop_timing()` calls, one
   `check_capability()` inside it.
 
+## Disposition
+
+Every finding, its grade, and what happened to it. Three were graded
+blocking; two of those were fixed in this branch and the third was
+filed at high priority, which is decision-9 territory and was put to
+the operator at the back brief's gate rather than settled by the
+audit.
+
+| Id | Step | Grade | Finding | Disposition |
+|----|------|-------|---------|-------------|
+| B1 | 8f | **blocking** | `agent/execute` with `deadline_seconds=0` disables both budgets at once and parks the instance's only executor slot, with no reaper case able to recover it and no operator ceiling | Filed as [#4074](https://github.com/shakenfist/shakenfist/issues/4074). Not fixed here: the fix is an `AGENT_OPERATION_MAX_DEADLINE` ceiling plus a restored backstop, which is an operator-visible knob and a behaviour change. The plan's risk section anticipated exactly this outcome |
+| B2 | 8d | **blocking** | `RequestAllThreadsExitTestCase` swallows the `KeyError` it exists to guard against, added two days after `b915cb018` removed the last path that could raise it | **Fixed here.** Both `try`/`except KeyError` wrappers deleted; the ten tests in scope still pass |
+| B3 | 8g | **blocking** | `docs/release_notes/v07-v08.md:832-836` says both changes are capability-gated so nothing changes across an upgrade. Neither half is true, and the same document contradicts one half in bold at `:758` | **Fixed here.** The paragraph now names the two things that do change and says which is gated |
+| A1 | 8c | advisory | `_request_thread_exit()` joins a thread that may not have started, where `reap_instance_executors()` guards the same window | **Fixed here.** Guard added mirroring the reaper's, with `test_an_unstarted_thread_is_signalled_but_not_joined`, which was mutation-tested: removing the guard fails it |
+| A2 | 8e | advisory | `docs/developer_guide/api_reference/agentoperations.md:14` says `last_progress` and `attempts` stay inert "until a following release" | **Fixed here.** Rewritten to describe what the two fields actually do |
+| A3 | 8e | advisory | Finding F6 of this plan miscounts the `--> expired` edges as five | **Fixed here.** Corrected to four, with a note saying so |
+| A4 | 8f | advisory | `1e308` is a finite, accepted second spelling of "no deadline" that evades the `0` sentinel | Covered by [#4074](https://github.com/shakenfist/shakenfist/issues/4074) -- a published `maximum` closes it as a side effect, and splitting it out would fragment one fix across two issues |
+| A5 | 8f | advisory | A narrow requeue-then-expire window between the executor's `finally` and the reaper leaves a confusing audit trail | **Declined.** The outcome is correct in every ordering; only the event sequence reads oddly, and no operator-visible state is wrong. Recorded in Future work rather than filed |
+| A6 | 8f | advisory | A guest-controlled `command_error.error` is interpolated into a `String(255)` state message and truncated | **Declined.** The consequence is a lost error string, not a lost slot or an injection: the value is bound as a SQLAlchemy parameter and the column truncates rather than overflows. Worth knowing, not worth a change |
+| A7 | 8d | advisory | A log-call assertion coupled to the `log.with_fields(...).warning(...)` chain | **Declined.** Fragile but correct; rewriting it is churn without a behavioural gain |
+| A8 | 8d | advisory | Several retry and expiry tests pin exact operator-facing message strings | **Declined.** These are audited state messages whose wording is itself part of the operator contract, so pinning them is defensible |
+| A9 | 8d | advisory | Terminal-state transition coverage is partial: `error` and `deleted` as sources are asserted only at dict-shape level | Filed with A10 as [#4077](https://github.com/shakenfist/shakenfist/issues/4077) |
+| A10 | 8d | advisory | No test drives an instance deletion racing an in-flight agent operation, and no test drives the no-deadline plus no-progress-timeout combination | Filed as [#4077](https://github.com/shakenfist/shakenfist/issues/4077), together with the missing functional coverage of retry and the attempt bound. The second half is what let B1 go unnoticed |
+| CR-2, CR-6, CR-8 | 8g | advisory | Unvalidated negative `--deadline` (rejected only after a full upload), CLI help that omits queue and preflight time, and no `state` on `AgentOperationFailed` | Filed as [client-python#389](https://github.com/shakenfist/client-python/issues/389) |
+| CR-3 | 8g | advisory | `await_agent_fetch()` propagates a deadline but never a progress timeout, pinning every fetch to the server's 30 second default | Filed as [client-python#388](https://github.com/shakenfist/client-python/issues/388). This is #3995's shape, and is a different change from retuning the constant, which decision 7 puts out of scope |
+| CR-4 | 8g | advisory | The post-await results and blob loops re-spend the caller's original clock and misreport a timeout as "no results" | Filed as [client-python#390](https://github.com/shakenfist/client-python/issues/390) |
+| CR-5 | 8g | advisory | Which budget expired an operation is unreachable through the API, and a release note implies otherwise | Filed as [#4075](https://github.com/shakenfist/shakenfist/issues/4075) |
+| CR-7 | 8g | advisory | The client's capability cache can be stale across a rolling `sf-api` upgrade, turning a gated parameter into a 500 | Filed as [#4076](https://github.com/shakenfist/shakenfist/issues/4076) |
+
+### The audit's overall result
+
+The mechanism this plan built is sound and the code implementing it is
+in good order. Wave 1 was clean; the two blocking rules the template
+treats as non-negotiable -- SQL pushdown and cached FK lists -- had no
+candidate anywhere in the footprint; the field mask is passed at every
+one of the four production sites; the four timing budgets turned out
+to be two shared methods rather than four drifting copies; and the
+capability token is load-bearing rather than decorative.
+
+What the audit found is concentrated in one place, and it is the place
+a per-phase review structurally could not look: the seam where the
+plan's own goal meets its own new parameters. The plan existed to stop
+a stuck operation monopolising an instance's executor slot (#3516). It
+succeeded for the case it set out to fix, and then handed callers a
+parameter combination which reinstates the same monopoly on request,
+after deleting the unconditional backstop that used to catch it. No
+phase could have seen that: phase 3 added the parameter, phase 4
+deleted the backstop, phase 5 wrote the reaper that cannot recover it,
+and each was correct on its own terms.
+
+The two blocking findings that were fixed here share a shape worth
+naming too. Both are statements which were true when written and
+became false when a later phase landed -- a test comment saying a bug
+is "fixed separately" two days after it was fixed, and a release note
+promising compatibility that a deliberate ungating had already broken.
+Neither is a coding error. Both are the cost of writing documentation
+and tests against a plan that is still moving, and both were invisible
+until somebody read the phases together.
+
 ## Future work
 
 Recorded here at planning time; step 8h adds to it.
 
+* **A5, the requeue-then-expire audit window.** Declined above. If
+  the event sequence ever confuses a real triage, the fix is to order
+  the executor's `finally` against the reaper rather than to change
+  either one's outcome.
+* **A6, the truncated guest error string.** Declined above. A guest
+  which returns an error longer than 255 characters loses the tail of
+  it in the state message; the instance event log keeps the whole
+  thing.
 * The two `test_agentops.py` files in `guest_ci_tests` and
   `smoke_ci_tests` remain near-exact copies with one number
   different, as phase 7's Future work records. This audit does not
