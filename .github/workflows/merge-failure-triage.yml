@@ -1,0 +1,137 @@
+# Triage a failed merge queue CI run with Claude Code
+#
+# When "Functional tests" fails on a merge_group event, GitHub ejects the pull
+# request from the merge queue and somebody has to work out whether the pull
+# request was at fault or whether the cluster fell over again. This automates
+# that first pass: it follows the merge-ci-triage skill, posts a verdict on the
+# pull request, and records a systemic failure against its tracking issue.
+#
+# WHY workflow_run AND NOT A JOB IN functional-tests.yml:
+# The obvious implementation is a job in the merge group run itself, gated on
+# "can_merge" having failed. It races the queue. Once can_merge reports its
+# failure the queue ejects the pull request and tears down the
+# gh-readonly-queue ref the run is on, and a triage job which takes minutes is
+# in exactly that window. Putting the triage in an earlier step of can_merge
+# avoids the race but holds the whole merge queue open while a model reads
+# logs. A job reachable on merge_group would also fall under the
+# merge-group-cancellation audit, whose correct behaviour -- be cancelled when
+# a newer merge group supersedes you -- is the opposite of what a triage job
+# wants. workflow_run runs afterwards, on the default branch, and cannot be
+# cancelled by any of that.
+#
+# The branches filter is doing real work: without it this workflow would be
+# invoked for every pull request run of the test suite as well, and every one
+# of those would show up in the Actions list as a skipped run. Merge group runs
+# are the only ones on a gh-readonly-queue ref.
+#
+# SECURITY CONSIDERATIONS:
+# - workflow_run runs in the base repository context with a writable token, and
+#   is deliberately never given the merge group's code. The checkout is the
+#   default branch; the failed run is read through gh, never executed.
+# - The model does read logs and a pull request diff, which are untrusted
+#   input. Its GitHub reach is bounded by the token permissions below: it can
+#   comment on issues and pull requests and nothing else. It cannot push, and
+#   the workflow does not check out or run any of the code it is triaging.
+# - The comment body is model output and goes through
+#   tools/neutralise-pr-body.sh before posting, so an @mention or an
+#   issue-closing keyword cannot fire on publication.
+#
+# NOTES:
+# - The verdict is uploaded as a build artifact and embedded in the pull
+#   request comment, both as tools/merge-triage-schema.json documents. The
+#   private-ci conductor consumes these to track which merge failures have been
+#   triaged and which of them blamed the pull request, so a document is written
+#   even when the model produces nothing usable -- see the header comment on
+#   tools/merge-ci-triage.sh.
+# - Scratch files live in runner.temp, never the workspace.
+
+name: Merge failure triage
+
+on:
+  workflow_run:
+    workflows: ["Functional tests"]
+    types: [completed]
+    branches:
+      - 'gh-readonly-queue/**'
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run id of the failed merge group run'
+        required: true
+        type: string
+      models:
+        description: 'Comma-separated models to try, in preference order'
+        required: false
+        default: 'claude-fable-5,claude-opus-5'
+        type: string
+      dry_run:
+        description: 'Dry run (classify only, no issue or PR comments)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+# One triage per failed run. Not cancel-in-progress: a second delivery for the
+# same run is rare, and cancelling a triage half way through leaves an issue
+# comment posted with no verdict published.
+concurrency:
+  group: merge-failure-triage-${{ github.event.workflow_run.id || inputs.run_id }}
+  cancel-in-progress: false
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+
+jobs:
+  triage:
+    name: 'Triage the merge failure'
+    # workflow_run carries no conclusion filter, so the "did it fail?" half of
+    # the gate has to live here.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'merge_group' &&
+       github.event.workflow_run.conclusion == 'failure')
+    runs-on: [self-hosted, claude-code]
+    # Triage is minutes of log reading. The six hour GitHub default would let a
+    # wedged model hold a scarce claude-code runner for the rest of the day.
+    timeout-minutes: 45
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      MODELS: ${{ inputs.models || 'claude-fable-5,claude-opus-5' }}
+      DRY_RUN: ${{ inputs.dry_run || 'false' }}
+      FAILED_RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+      TRIAGE_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      # The default branch, never the merge group's code. See the security
+      # note above.
+      - name: Checkout the default branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Triage the failure
+        # runner.temp is not available in a job-level env block, so this one
+        # lives here.
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/merge-triage
+        run: tools/merge-ci-triage.sh "${FAILED_RUN_ID}"
+
+      - name: Publish the verdict
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: merge-triage-${{ github.event.workflow_run.id || inputs.run_id }}
+          path: |
+            ${{ runner.temp }}/merge-triage/triage.json
+            ${{ runner.temp }}/merge-triage/response.txt
+            ${{ runner.temp }}/merge-triage/prompt.txt
+          if-no-files-found: warn
+          retention-days: 30

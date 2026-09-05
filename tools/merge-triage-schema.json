@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shakenfist.com/merge-triage-schema.json",
+  "title": "Merge queue failure triage",
+  "description": "Structured verdict from the automated merge CI triage job. The envelope fields are written by the workflow from GitHub's own data; the remainder is the model's verdict.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "repository",
+    "run_id",
+    "run_url",
+    "verdict",
+    "recommendation",
+    "triaged_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "description": "Version of this document format. Consumers should ignore documents with a version they do not know."
+    },
+    "repository": {
+      "type": "string",
+      "description": "owner/repo the failure happened in"
+    },
+    "run_id": {
+      "type": "integer",
+      "description": "Workflow run id of the failed merge group run"
+    },
+    "run_url": {
+      "type": "string",
+      "description": "URL of the failed merge group run"
+    },
+    "run_attempt": {
+      "type": "integer",
+      "description": "Attempt number of the failed run"
+    },
+    "head_branch": {
+      "type": "string",
+      "description": "The gh-readonly-queue/<base>/pr-<N>-<sha> ref the merge group ran on"
+    },
+    "head_sha": {
+      "type": "string",
+      "description": "Merge group commit the run tested"
+    },
+    "base_branch": {
+      "type": ["string", "null"],
+      "description": "Branch the merge group was queued against, parsed from head_branch"
+    },
+    "pull_request": {
+      "type": ["integer", "null"],
+      "description": "Pull request in the merge group, parsed from head_branch. Null when the ref could not be parsed."
+    },
+    "triaged_at": {
+      "type": "string",
+      "description": "RFC 3339 timestamp of when triage ran"
+    },
+    "triage_run_url": {
+      "type": ["string", "null"],
+      "description": "URL of the triage run which produced this document"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pr_caused", "systemic", "ambiguous", "unknown"],
+      "description": "Whether the pull request is to blame. 'unknown' means triage itself failed and nothing was classified."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "How firmly the evidence supports the verdict"
+    },
+    "summary": {
+      "type": "string",
+      "description": "One paragraph statement of what failed and why the verdict is what it is"
+    },
+    "failing_job": {
+      "type": ["string", "null"],
+      "description": "Name of the first failing job"
+    },
+    "failing_step": {
+      "type": ["string", "null"],
+      "description": "Name of the first failing step in that job, which is the diagnosis"
+    },
+    "failure_signature": {
+      "type": ["string", "null"],
+      "description": "Short stable string identifying this failure mode, suitable for grouping recurrences (a test name, or a key error phrase)"
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": ["requeue", "fix_first", "investigate"],
+      "description": "What should happen to the pull request next"
+    },
+    "tracking_issue": {
+      "type": ["integer", "null"],
+      "description": "Issue tracking a systemic failure. Verified to exist, and to reference this run, when tracking_issue_action is commented or created; with an action of none it is a reference only and nothing was recorded there."
+    },
+    "tracking_issue_action": {
+      "type": "string",
+      "enum": ["commented", "created", "none"],
+      "description": "What triage did with the tracking issue. Downgraded to 'none' by the workflow if the issue could not be verified."
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Short factual observations the verdict rests on",
+      "items": {"type": "string"}
+    },
+    "error": {
+      "type": ["string", "null"],
+      "description": "Why no verdict was reached. Set only when verdict is 'unknown'."
+    }
+  }
+}
