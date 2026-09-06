@@ -190,6 +190,7 @@ class InstanceVDIProxyConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
         resp = self._get(self.owner_token, instance_uuid=not_ready_uuid)
 
         self.assertEqual(406, resp.status_code)
+        self.assertIn('is not ready', resp.get_json()['error'])
         mock_mint.assert_not_called()
 
     @mock.patch(

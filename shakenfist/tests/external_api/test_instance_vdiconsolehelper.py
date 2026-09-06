@@ -148,6 +148,42 @@ class InstanceVDIConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual('31003', vv['tls-port'])
         self.assertNotIn('host-subject', vv)
 
+    def test_not_ready_instance_returns_406(self):
+        # Issue 4094: without a state gate, an instance in any
+        # non-created state with a placement returned 200 with a .vv
+        # carrying port=None, where the vdiconsoleproxy sibling says the
+        # instance is not ready.
+        for state in (dbo.STATE_INITIAL, dbo.STATE_ERROR):
+            instance_uuid = str(uuid4())
+            self.mock_mariadb.create_instance(
+                'vdi-instance-%s' % state, uuid=instance_uuid,
+                namespace='foo',
+                video={'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
+                set_state=state, place_on_node=config.NODE_UUID)
+
+            resp = self.client.get(
+                '/instances/%s/vdiconsolehelper' % instance_uuid,
+                headers={'Authorization': self.owner_token})
+            self.assertEqual(406, resp.status_code)
+            self.assertIn('is not ready', resp.get_json()['error'])
+
+    def test_not_ready_unplaced_instance_returns_406(self):
+        # The state gate sits outside redirect_instance_request, which
+        # answers with an empty response rather than an error for an
+        # instance with no placement -- an inner gate would never run
+        # for pre-placement states.
+        instance_uuid = str(uuid4())
+        self.mock_mariadb.create_instance(
+            'vdi-instance-unplaced', uuid=instance_uuid, namespace='foo',
+            video={'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
+            set_state=dbo.STATE_INITIAL)
+
+        resp = self.client.get(
+            '/instances/%s/vdiconsolehelper' % instance_uuid,
+            headers={'Authorization': self.owner_token})
+        self.assertEqual(406, resp.status_code)
+        self.assertIn('is not ready', resp.get_json()['error'])
+
     def test_ca_cert_escaping_round_trips(self):
         instance_uuid = self._make_instance(
             'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})

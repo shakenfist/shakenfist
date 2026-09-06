@@ -1677,10 +1677,17 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
         ],
         [(200, 'A .vv file to open in virt-viewer as a application/x-virt-viewer stream.',
           instance_vv_file_example),
-         (404, 'Instance not found.', None)],
-        requires_admin=True))
+         (404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    # The state gate sits outside the redirect, unlike the reboot and
+    # snapshot endpoints: redirect_instance_request answers with an empty
+    # response rather than an error for an instance with no placement, so
+    # an inner gate would never run for pre-placement states. Gating here
+    # also refuses a not-ready instance without a proxy hop, the same
+    # answer the vdiconsoleproxy sibling below gives.
+    @api_base.requires_instance_active
     @api_base.redirect_instance_request
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
@@ -1763,17 +1770,12 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
          (500, 'Kerbside signing key is not configured.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
+    @api_base.requires_instance_active
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None):
         if not config.KERBSIDE_URL:
             return sf_api.error(
                 404, 'kerbside integration is not configured')
-
-        if instance_from_db.state.value != dbo.STATE_CREATED:
-            return sf_api.error(
-                406,
-                f'instance {instance_from_db.uuid} is not ready '
-                f'({instance_from_db.state.value})')
 
         video = instance_from_db.video
         if not video or not video.get('vdi', '').startswith('spice'):
