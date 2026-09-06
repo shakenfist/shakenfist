@@ -13937,6 +13937,15 @@ token and virt-viewer (<code>.vv</code>) file. The audience Kerbside accepts is 
 <code>SF_CONSOLE_TOKEN_AUDIENCE</code> (or, when unset, derived from <code>PUBLIC_FQDN</code>) and
 must equal Shaken Fist's <code>KERBSIDE_URL</code> exactly; see
 <a href="/components/kerbside/configuration/">Configuration</a>.</p>
+<p><strong>What the exchange audits.</strong> A rejection that happens <em>after</em> the token
+verifies -- an unknown console, or a replayed <code>jti</code> -- names a verified source
+and console uuid, and is recorded as an audit event against that console. A
+rejection that happens <em>before</em> verification -- a malformed token, an unknown
+key id, a bad signature, an expired token, a wrong audience -- is logged only.
+<code>/sf-console.vv</code> is unauthenticated by design, since the Shaken Fist JWT is
+itself the credential, so those rejections can be provoked by anyone with no
+credential at all; auditing them would let an unauthenticated caller grow the
+<code>audit_events</code> table without limit, and nothing reaps it.</p>
 <p><strong>Backend certificate pinning.</strong> At scrape time each console's <code>host_subject</code>
 is pinned from the hypervisor node's published SPICE server certificate subject
 (<code>spice_server_cert_subject</code>), so the proxy's backend TLS leg can verify it is
@@ -13987,8 +13996,19 @@ optional <code>synthesize_host_subject</code> knob (below) lets an operator on t
 </table>
 <p><strong>Note</strong>: The CA certificate is verified against the cluster's advertised
 certificate during initialization, and the cluster's VDI token signing keys are
-fetched at the same time. If the CA certificates do not match, or the signing
-keys cannot be fetched, the source is marked as errored.</p>
+fetched at the same time. If the CA certificates do not match, the source is
+marked as errored and is not scraped.</p>
+<p>A failed signing key fetch is treated differently, because token exchange is
+optional and console scraping is not. The source is <strong>not</strong> errored: it is
+scraped as usual, its consoles stay in the inventory, and only
+<code>/sf-console.vv</code> token exchange is unavailable for that cluster until a later
+fetch succeeds. The most common cause is a cluster on which no signing key
+exists yet, because <code>sf-ctl ensure-kerbside-signing-key</code> has not been run --
+<code>/admin/vditokenpubkey</code> returns 404 until it has, and Shaken Fist never
+creates the key lazily. That case is logged at info level; a genuine failure
+such as an unreachable or unauthenticated cluster is logged as a warning.
+Kerbside refetches the keys on every maintenance pass, so nothing needs to be
+restarted once the key is created.</p>
 <h2 id="ovirt">oVirt<a class="headerlink" href="#ovirt" title="Permanent link">&para;</a></h2>
 <p>The following options are used to configure an oVirt console source
 (<code>type: ovirt</code>).</p>
