@@ -14,23 +14,15 @@ Every cluster in a QCOW2 image has an associated reference count:
 
 Like the L1/L2 tables, refcounts use a two-level hierarchy:
 
-```
-Cluster Index
-     |
-     v
-+-------------------+
-| Refcount Table    |  Memory-resident, one entry per refcount block
-| [table_index]     |
-+-------------------+
-     |
-     v  (refcount block offset)
-+-------------------+
-| Refcount Block    |  One cluster, contains many refcount entries
-| [block_index]     |
-+-------------------+
-     |
-     v
-   Refcount Value
+```mermaid
+flowchart TB
+    idx["Cluster index"]
+    table["Refcount table [table_index]<br/>Memory-resident, one entry per refcount block"]
+    block["Refcount block [block_index]<br/>One cluster, contains many refcount entries"]
+    value["Refcount value"]
+    idx --> table
+    table -- "refcount block offset" --> block
+    block --> value
 ```
 
 ## Index Calculations

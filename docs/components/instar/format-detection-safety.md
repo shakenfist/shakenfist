@@ -45,26 +45,20 @@ isolation**:
 
 ### KVM Sandbox Model
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Host System                          │
-│                                                              │
-│  ┌──────────────┐     ┌──────────────────────────────────┐  │
-│  │    instar     │     │         KVM Sandbox               │  │
-│  │    (VMM)     │     │  ┌────────────────────────────┐  │  │
-│  │              │     │  │     Guest (no_std Rust)    │  │  │
-│  │  - File I/O  │     │  │                            │  │  │
-│  │  - KVM setup │◄───►│  │  - Format parsing          │  │  │
-│  │  - Virtio    │     │  │  - Image operations        │  │  │
-│  │              │     │  │  - NO filesystem access    │  │  │
-│  │              │     │  │  - NO network access       │  │  │
-│  │              │     │  └────────────────────────────┘  │  │
-│  └──────────────┘     └──────────────────────────────────┘  │
-│                                                              │
-│  Input File ─────────► [virtio-block] ─────► Guest reads     │
-│  Output File ◄──────── [virtio-block] ◄───── Guest writes    │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph host["Host system"]
+        infile[("Input file")]
+        outfile[("Output file")]
+        vmm["instar (VMM)<br/>File I/O<br/>KVM setup<br/>Virtio"]
+        subgraph sandbox["KVM sandbox"]
+            guest["Guest (no_std Rust)<br/>Format parsing<br/>Image operations<br/>NO filesystem access<br/>NO network access"]
+        end
+    end
+    infile --> vmm
+    vmm --> outfile
+    vmm -- "virtio-block: guest reads" --> guest
+    guest -- "virtio-block: guest writes" --> vmm
 ```
 
 ### Mitigation Analysis

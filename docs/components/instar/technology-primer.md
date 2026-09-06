@@ -985,29 +985,16 @@ contain vulnerabilities.
 
 **The data flow:**
 
-```
-+-------------------------------------------------------------------+
-| Host                                                              |
-|  +-------------------------------------------------------------+  |
-|  | VMM (Virtual Machine Monitor)                               |  |
-|  |  - Opens source and destination files on host               |  |
-|  |  - Exposes them as virtio-block devices to guest            |  |
-|  |  - Handles virtqueue requests (reads raw bytes)             |  |
-|  |  - Never interprets image format structures                 |  |
-|  +-------------------------------------------------------------+  |
-|       |  virtio-block         |  virtio-block                     |
-|       |  (input)              |  (output)                         |
-|       v                       v                                   |
-|  +-------------------------------------------------------------+  |
-|  | KVM Sandbox (isolated VM)                                   |  |
-|  |  +-------------------------------------------------------+  |  |
-|  |  | Guest (bare-metal Rust, no kernel)                    |  |  |
-|  |  |  - Parses image formats (qcow2, raw, vmdk)            |  |  |
-|  |  |  - Performs conversions                               |  |  |
-|  |  |  - Any exploit is contained - no escape possible      |  |  |
-|  |  +-------------------------------------------------------+  |  |
-|  +-------------------------------------------------------------+  |
-+-------------------------------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph hostbox["Host"]
+        vmm["VMM (Virtual Machine Monitor)<br/>Opens source and destination files on host<br/>Exposes them as virtio-block devices to guest<br/>Handles virtqueue requests (reads raw bytes)<br/>Never interprets image format structures"]
+        subgraph sandbox["KVM sandbox (isolated VM)"]
+            guest["Guest (bare-metal Rust, no kernel)<br/>Parses image formats (qcow2, raw, vmdk)<br/>Performs conversions<br/>Any exploit is contained - no escape possible"]
+        end
+    end
+    vmm -- "virtio-block (input)" --> guest
+    guest -- "virtio-block (output)" --> vmm
 ```
 
 **What the guest includes:**

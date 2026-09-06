@@ -22,25 +22,21 @@ enabling machine-readable progress reporting and error handling.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                        VMM                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │
-│  │   KVM VM    │  │  Input Dev  │  │   Output Dev    │  │
-│  │   + vCPU    │  │  (read-only)│  │   (write)       │  │
-│  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘  │
-│         │                │                   │           │
-│         │                │ Backed by        │ Backed by │
-│         │                ▼ source file      ▼ dest file │
-│  ┌──────┴───────────────────────────────────────────┐   │
-│  │              Guest Memory (8MB)                   │   │
-│  └──────────────────────────────────────────────────┘   │
-│                         │                                │
-│                         ▼ Serial port (0x3f8)           │
-│              ┌─────────────────────┐                    │
-│              │ Protobuf decoder    │                    │
-│              └─────────────────────┘                    │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    src[("Source file")]
+    dst[("Dest file")]
+    subgraph vmm["VMM"]
+        kvm["KVM VM + vCPU"]
+        indev["Input device (read-only)"]
+        outdev["Output device (write)"]
+        mem["Guest memory (8MB)"]
+        decoder["Protobuf decoder"]
+    end
+    kvm -- "owns" --> mem
+    src --> indev --> mem
+    mem --> outdev --> dst
+    mem -- "serial port (0x3f8)" --> decoder
 ```
 
 ## Protocol Messages

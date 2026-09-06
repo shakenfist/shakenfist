@@ -15,26 +15,11 @@ complex functionality.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ VMM (Host Process)                                      │
-│  - Creates VM via /dev/kvm                              │
-│  - Sets up guest memory regions                         │
-│  - Configures vCPU state (long mode, page tables, GDT)  │
-│  - Loads guest binary into memory                       │
-│  - Runs vCPU loop, handles VM exits                     │
-│  - Reads results from guest memory when done            │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          │ KVM ioctls
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ Guest (Bare-Metal Binary)                               │
-│  - Starts directly in 64-bit long mode                  │
-│  - No runtime, no OS dependencies                       │
-│  - Processes data at known memory addresses             │
-│  - Signals completion via HLT or port I/O               │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    vmm["VMM (host process)<br/>Creates VM via /dev/kvm<br/>Sets up guest memory regions<br/>Configures vCPU state (long mode, page tables, GDT)<br/>Loads guest binary into memory<br/>Runs vCPU loop, handles VM exits<br/>Reads results from guest memory when done"]
+    guest["Guest (bare-metal binary)<br/>Starts directly in 64-bit long mode<br/>No runtime, no OS dependencies<br/>Processes data at known memory addresses<br/>Signals completion via HLT or port I/O"]
+    vmm -- "KVM ioctls" --> guest
 ```
 
 ## Components

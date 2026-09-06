@@ -123,27 +123,19 @@ Efficiency:
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                              VMM                                     │
-│  ┌─────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
-│  │   KVM VM    │  │   Input Dev     │  │    Output Dev           │  │
-│  │   + vCPU    │  │   (read-only)   │  │    (write)              │  │
-│  └──────┬──────┘  └────────┬────────┘  └──────────┬──────────────┘  │
-│         │                  │                       │                 │
-│  ┌──────┴──────────────────┴───────────────────────┴──────────────┐ │
-│  │                     VmmStats                                    │ │
-│  │  - total_exits, io_exits, mmio_exits, hlt_exits               │ │
-│  │  - bytes_read, bytes_written, sectors_processed               │ │
-│  │  - runtime tracking, exit rate calculation                    │ │
-│  └─────────────────────────────────────────────────────────────────┘ │
-│                              │                                       │
-│  ┌───────────────────────────┴─────────────────────────────────────┐│
-│  │                  KVM Binary Stats (capability check)             ││
-│  │  - Detects kernel support for KVM_CAP_BINARY_STATS_FD           ││
-│  │  - Infrastructure for future kernel statistics integration      ││
-│  └──────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph vmm["VMM"]
+        kvm["KVM VM + vCPU"]
+        indev["Input device (read-only)"]
+        outdev["Output device (write)"]
+        stats["VmmStats<br/>total_exits, io_exits, mmio_exits, hlt_exits<br/>bytes_read, bytes_written, sectors_processed<br/>runtime tracking, exit rate calculation"]
+        binstats["KVM binary stats (capability check)<br/>Detects kernel support for KVM_CAP_BINARY_STATS_FD<br/>Infrastructure for future kernel statistics"]
+    end
+    kvm -- "exit counts" --> stats
+    indev -- "sectors read" --> stats
+    outdev -- "sectors written" --> stats
+    binstats -. "future source, once kvm-ioctls exposes stats_fd" .-> stats
 ```
 
 ## KVM Binary Statistics

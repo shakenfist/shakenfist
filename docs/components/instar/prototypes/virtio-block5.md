@@ -62,38 +62,22 @@ Note: `--direct-io` and `--mmap-backing` are mutually exclusive.
 
 ## Architecture
 
-```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                              VMM (Multi-threaded)                              │
-│                                                                                │
-│  Main Thread (vCPU)                        I/O Thread                          │
-│  ─────────────────                         ─────────────                       │
-│  ┌─────────────────┐                       ┌─────────────────────────────────┐ │
-│  │   KVM VM        │                       │  epoll_wait() on eventfds       │ │
-│  │   + vCPU        │   ───eventfd───────>  │                                 │ │
-│  │   vcpu.run()    │                       │  On signal:                     │ │
-│  │                 │                       │    1. Lock device               │ │
-│  │   Handles:      │                       │    2. process_queue()           │ │
-│  │   - IO exits    │                       │    3. Update used ring          │ │
-│  │   - MMIO exits  │                       │    4. Set interrupt_status      │ │
-│  │   - Other exits │                       │    5. Update shared stats       │ │
-│  └────────┬────────┘                       └──────────────┬──────────────────┘ │
-│           │                                               │                    │
-│           │              Shared State (Arc<Mutex<>>)      │                    │
-│           │         ┌─────────────────────────────────────┘                    │
-│           │         │                                                          │
-│  ┌────────┴─────────┴──────────────────────────────────────────────────────┐  │
-│  │  Input Device (Arc<Mutex<>>)        Output Device (Arc<Mutex<>>)        │  │
-│  │  ┌─────────────────────────┐        ┌─────────────────────────┐         │  │
-│  │  │  VirtioBlockDevice      │        │  VirtioBlockDevice      │         │  │
-│  │  │  + BackingStore         │        │  + BackingStore         │         │  │
-│  │  └─────────────────────────┘        └─────────────────────────┘         │  │
-│  └─────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                │
-│  ┌─────────────────────────────────────────────────────────────────────────┐  │
-│  │  VmmStats (Arc<Mutex<>>)  - Shared between main thread and I/O thread   │  │
-│  └─────────────────────────────────────────────────────────────────────────┘  │
-└───────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph vmm["VMM (multi-threaded)"]
+        kvm["Main thread (vCPU)<br/>KVM VM + vCPU, vcpu.run()<br/>Handles IO exits, MMIO exits, other exits"]
+        io["I/O thread<br/>epoll_wait() on eventfds<br/>On signal: lock device, process_queue(),<br/>update used ring, set interrupt_status,<br/>update shared stats"]
+        indev["Input device<br/>VirtioBlockDevice + BackingStore"]
+        outdev["Output device<br/>VirtioBlockDevice + BackingStore"]
+        stats["VmmStats"]
+    end
+    kvm -- eventfd --> io
+    kvm -. "Arc&lt;Mutex&lt;&gt;&gt;" .- indev
+    kvm -. "Arc&lt;Mutex&lt;&gt;&gt;" .- outdev
+    io -. "Arc&lt;Mutex&lt;&gt;&gt;" .- indev
+    io -. "Arc&lt;Mutex&lt;&gt;&gt;" .- outdev
+    kvm -. "Arc&lt;Mutex&lt;&gt;&gt;" .- stats
+    io -. "Arc&lt;Mutex&lt;&gt;&gt;" .- stats
 ```
 
 ## Optimization Details
