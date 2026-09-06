@@ -82,8 +82,12 @@ kwargs before the handler sees it:
 `_resolve_artifact_ref` (`artifact.py:57`, reached through both
 `arg_is_artifact_ref` and `arg_is_visible_artifact_ref`). An AST walk
 of `shakenfist/external_api/` finds **55 handler methods** behind one
-of those four decorators, and **not one of them declares a body
-`namespace`**. The warn log saw nine findings because CI exercised one
+of those four decorators, and **51 of them declare no body
+`namespace`**. (The survey's first draft said none of them did. Four already had one — `InstanceEndpoint.get`/`delete` and
+`NetworkEndpoint.get`/`delete` — passing the audit only because those
+four handlers carry a vestigial `namespace=None` in their signature
+which the decorator's pop guarantees is always `None`. Corrected here
+during implementation.) The warn log saw nine findings because CI exercised one
 route family; the exposure is all 55.
 
 This is not a theoretical caller. `shakenfist_client/apiclient.py`
@@ -302,6 +306,99 @@ arrives.
 | 5 | medium | sonnet | none | Documentation and release note. In `docs/developer_guide/writing_an_endpoint.md`, rewrite "What validation does with them" (line 262) and "What is not checked yet" (294): enforcement is on, `enforce` is the default, and the sections currently state the opposite in four places. Add the `any` token wherever the type vocabulary is listed. In `docs/release_notes/v07-v08.md`, add an entry under `## REST API` (line 30) covering: malformed input is now refused with `{"error": "<parameter>: <reason>", "status": 400}`; validation runs ahead of the per-method decorators, **so a request that is both malformed and refers to a missing or unauthorised object now answers 400 where it previously answered 404 or 403** — this is the contract change and it must be stated plainly rather than implied; `required` is still not enforced; and `API_VALIDATION_MODE=warn` or `off` is the rollback for an operator whose callers break. Check `docs/developer_guide/coding_rules.md` and `CLAUDE.md`'s "Parameter declarations are enforced" section for statements that enforcement is off. Commit subject: `Document API input validation enforcement.` |
 | 6 | medium | sonnet | none | Functional CI coverage in `shakenfist/deploy/shakenfist_ci`. Add tests that a request carrying an undeclared body key is refused with a 400 whose error names the parameter and contains no Python interpreter text, and that a cross-namespace lookup passing `namespace` in the body — the exact `shakenfist_client` call pattern from `get_instance`/`get_artifact`/`get_network` — still works after step 1. The second is the regression test for #3739 and is the more important of the two: it is the thing that would have caught this before the warn window did. Follow the existing patterns in the CI suite; find a test that already asserts on an API error body rather than inventing a helper. Commit subject: `Test that malformed API input is refused.` |
 
+## Progress
+
+### Steps 1 and 2 were merged, because they cannot be separated
+
+`test_declared_names_are_real_parameters`
+(`shakenfist/tests/external_api/test_parameter_declarations.py:254`)
+asserts that every declared parameter name appears in the handler's
+own signature. The whole point of #3739 is that `namespace` never
+does — the decorator popped it. So the 55 declarations of step 1 fail
+that assertion 55 times until step 2's derivation term exists to
+explain them, and step 2's term turns 51 handlers red until step 1's
+declarations exist to satisfy it. Neither is green alone, and this
+repository requires each commit to build and pass its tests.
+
+They landed as one commit, `Declare the namespace parameter decorators
+consume.` The alternative — 55 entries in `UNDECLARED_BY_DESIGN` for
+one commit and their removal in the next — would have written the
+exact exemption list this phase exists to shrink.
+
+**The audit term was proven to fire, not assumed to.** With the
+derivation in place and the declarations reverted, `audit()` reports
+51 problems naming class, method and parameter, and no others; with
+the declarations applied it reports none. Three mutations were added
+to `tools/check-api-declaration-guards.sh` and all three are caught.
+
+### Found while implementing, recorded rather than fixed
+
+* **Mutation 4 of the guard harness had been silently defanged.** It
+  deleted a handler's `swag_from` by pasting the decorator's full
+  text; adding a parameter made the paste stop matching, so the
+  mutation became a no-op while still reporting success. Rewritten to
+  bound the deletion by line number. The harness has this fragility
+  wherever a mutation matches source text it does not own, and the
+  failure mode is the one this plan keeps meeting: a check that
+  reports success because it could not find what it was looking for.
+* **`requires_namespace_exist_if_specified` is dead on two routes.**
+  `InstanceEndpoint.delete` and `NetworkEndpoint.delete` carry it
+  *after* the ref decorator, which has already popped `namespace`, so
+  its `kwargs.get('namespace')` is always `None`. The other ten uses
+  are on creation and collection routes and work. Pre-existing, out of
+  scope, untouched.
+* **Four now-redundant `namespace=None` signature parameters** on the
+  same four handlers that already declared the key. Harmless and never
+  populated. Removing them is safe now that the derivation sees the
+  decorator, and is not worth its own risk in this phase.
+* **The `any` token needed the specification test's completeness
+  derivation widened.** That derivation asked whether a published
+  schema was an object or an array. A typeless schema is neither, so
+  the widest token in the vocabulary would have been the one type
+  change the table could never catch. It now also fires on a schema
+  with no `type`, verified by removing a registered entry and watching
+  the test fail.
+
+### Two comments in the tree blamed this phase wrongly
+
+Both are corrected, and both now point at issues instead.
+
+* **`InstanceSnapshotEndpoint.post` and `thin`** (`snapshot.py:66` and
+  the note above `UNDECLARED_BY_DESIGN`). Both said the
+  absent-versus-false distinction waits on phase 4. It does not: the
+  compiled path is check-only, so the handler receives `thin=False`
+  from `log_request`'s body merge whatever the validation mode, and
+  `'thin' in flask.request.json` draws the distinction today without
+  any schema layer. The real blocker is that every shipped client
+  sends the key unconditionally (`apiclient.py:706`), so honouring
+  `false` needs a client release plus a capability token to detect it.
+  Filed as
+  [#4100](https://github.com/shakenfist/shakenfist/issues/4100).
+* **The `get_args` fold** is
+  [#4098](https://github.com/shakenfist/shakenfist/issues/4098), per
+  D19, satisfying definition of done item 12.
+
+### Added to step 4's scope: empty `UNDECLARED_BY_DESIGN`
+
+The five `(*MetadataEndpoint, 'delete', 'value')` entries carry a
+comment saying they are deferred to phase 4 and that "once the schema
+layer rejects unknown parameters cleanly, this list should be empty".
+That is correct, and this phase should finish it: the five handlers
+accept a `value` kwarg on DELETE that none of them reads.
+
+It belongs in **step 4 and not earlier**. Removing the kwarg while
+validation is still in `warn` reintroduces exactly the leak the
+comment warns about — a caller sending `value` on a metadata delete
+gets `delete() got an unexpected keyword argument` as a 400. After the
+D16 flip, D14's RAISE answers `value: not declared by this endpoint`
+before the handler either way, so the signature cleanup becomes
+correct rather than dangerous.
+
+Checked before committing to it: the official client's
+`_delete_metadata` (`apiclient.py:514`) sends no body at all, so no
+shipped caller is affected. Two of the seven metadata delete handlers
+were cleaned up already, so the pattern is proven.
+
 ## Risks and mitigations
 
 **A caller nobody measured sends an undeclared key.** One sfcbr
@@ -369,7 +466,10 @@ run, so absence is evidence rather than silence.
     `docs/release_notes/v07-v08.md` and `CLAUDE.md`.
 11. `pre-commit run --all-files` is clean.
 12. An issue exists for the deferred `get_args` fold (D19), linked
-    from the master plan's Future work.
+    from the master plan. **Done: #4098.**
+13. `UNDECLARED_BY_DESIGN` in `test_parameter_declarations.py` is
+    empty, and the five metadata delete handlers no longer accept a
+    `value` kwarg they never read.
 
 ## Back brief
 

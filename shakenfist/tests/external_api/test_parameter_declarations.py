@@ -40,13 +40,17 @@ UNDECLARED_BY_DESIGN = {
     ('NodeMetadataEndpoint', 'delete', 'value'),
 }
 
-# Deferred to phase 4 for the same reason: InstanceSnapshotEndpoint.post
-# treats an explicit `thin: false` as unset. The official client has
-# always transmitted the key (`--thin/--flatten` defaults to False and
-# apiclient sends it unconditionally), so honouring false today would
-# make SNAPSHOTS_DEFAULT_TO_THIN inert for every shipped client. The
-# absent-versus-false distinction needs the schema layer plus a client
-# release that omits the key when unset.
+# Not deferred to phase 4 after all, though it long said it was:
+# InstanceSnapshotEndpoint.post treats an explicit `thin: false` as
+# unset. The official client has always transmitted the key
+# (`--thin/--flatten` defaults to False and apiclient sends it
+# unconditionally), so honouring false today would make
+# SNAPSHOTS_DEFAULT_TO_THIN inert for every shipped client. No phase of
+# PLAN-api-input-validation unblocks that: the validation layer is
+# check-only and never injects, so the handler sees thin=False
+# regardless, and the distinction is drawable today without it. It
+# needs a client release which omits the key, and a capability token to
+# detect one. Tracked as issue 4100.
 
 # Declarations exempt from location derivation. `header` and `formData`
 # cannot be derived from the code, so a declaration using one bypasses

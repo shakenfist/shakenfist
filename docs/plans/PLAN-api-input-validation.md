@@ -312,7 +312,16 @@ the plan was scoped against.
 2026-08-07), #3626 (specification validation in CI), #3616
 (`base.py` under mypy), #3642 (variadic handlers in the audit),
 #3629 (body-supplied `all`, see D6 below), #3615 (`log_request`
-discarding headers).
+discarding headers). #3739 (the ref decorators' undeclared
+`namespace`) is fixed by phase 4 and closes when that branch
+merges.
+
+**Filed by phase 4, and deliberately not fixed by it:** #4098 (the
+`get_args` fold, see the carried section below) and #4100 (an
+explicit `thin: false` on a snapshot request, which two comments
+in the tree wrongly blamed on this plan — the compiled path never
+injects, so no phase of this plan unblocks it; it needs a client
+release which omits the key).
 
 **Still open and still owned by this plan:** #528 (parent), #3612
 (the mechanism), #936, #534, #3269, #323, #3523, #3371, #2094;
@@ -510,8 +519,9 @@ belongs here is the one item phase 4 declined.
   to. That needs signature defaults at runtime and moves
   `blob.py`'s hand-rolled negative-offset check into a field,
   changing an error message -- a second request-visible change in
-  the phase that flips enforcement. It is tracked as its own
-  issue and is a candidate for phase 6, which already touches how
+  the phase that flips enforcement. It is tracked as
+  [#4098](https://github.com/shakenfist/shakenfist/issues/4098)
+  and is a candidate for phase 6, which already touches how
   values reach handlers. Enforcement does not depend on it: the
   compiled check runs first, so the duplication is inert.
 
