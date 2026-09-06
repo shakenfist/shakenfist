@@ -2,7 +2,15 @@
 
 ## Status
 
-In progress.
+Complete, 11 of 11 phases.
+
+Phase 11 merged to `develop` as PR #4007 on 2026-09-02, and its
+measurement write-up as PR #4033 on 2026-09-05. What the plan
+deliberately did not build is carried by issues rather than by this
+document: #4017 (the `sf-queues` half of the multi-column key), #3974
+(the two timestamps which would separate database queue sit from time
+inside the daemon) and the fairness question step 7 decided against.
+All three are described under "Follow-ups not landed here" below.
 
 Reopened on 2026-08-25 with three further phases. The plan reached 8
 of 8 while explicitly recording two things it had not proven and two
@@ -979,7 +987,8 @@ corrections found while landing it.
   instead and deferred this task to a successor issue on its own
   merits -- see decision 5 and the Future work section of
   [PLAN-queue-performance-phase-11-multi-column-key.md](PLAN-queue-performance-phase-11-multi-column-key.md).
-  Tracked as #3884.
+  Tracked as #4017; #3884, which asked for the key itself, was
+  completed by phase 11.
 
 * **Explicit fairness for low-priority queues**. The dequeue
   query honours strict priority order via `FIELD()`; lower
