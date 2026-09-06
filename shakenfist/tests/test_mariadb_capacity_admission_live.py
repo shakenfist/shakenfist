@@ -601,6 +601,10 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # And the cluster row's guards came off with the node's, because
         # the totals do not include a node with no capacity row.
         self.assertEqual(1008, self._cluster().unclaimed_used_cpus)
+        # The singleton is there, so this is one unsized node rather
+        # than a cluster the reconciler has never reached.
+        self.assertEqual(
+            mariadb.UNGUARDED_NODE_NOT_SIZED, result['unguarded_reason'])
 
     def test_a_cluster_with_no_singleton_admits_unguarded(self):
         cluster_t = mariadb._get_cluster_capacity_table()
@@ -611,8 +615,36 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         result = self._admit(self.node_a)
         self.assertTrue(result['admitted'], result['error'])
         self.assertTrue(result['unguarded'])
+        self.assertEqual(
+            mariadb.UNGUARDED_NEVER_RECONCILED, result['unguarded_reason'])
         # The node guard still applied, because that row exists.
         self.assertEqual(12, self._capacity(self.node_a).used_cpus)
+
+    def test_a_cluster_with_neither_row_reports_never_reconciled(self):
+        # Issue 4087's shape: a cluster in its first minutes has no
+        # singleton and no node rows, and every placement in it is
+        # admitted against nothing. The useful thing to report is that
+        # cluster-wide fact, not that this one node happens to be
+        # unsized.
+        cluster_t = mariadb._get_cluster_capacity_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.delete(cluster_t))
+            conn.commit()
+
+        result = self._admit(self.node_c)
+
+        self.assertTrue(result['admitted'], result['error'])
+        self.assertTrue(result['unguarded'])
+        self.assertEqual(
+            mariadb.UNGUARDED_NEVER_RECONCILED, result['unguarded_reason'])
+
+    def test_a_guarded_admission_carries_no_unguarded_reason(self):
+        # The reason must not leak onto an admission which was guarded.
+        result = self._admit(self.node_a)
+
+        self.assertTrue(result['admitted'], result['error'])
+        self.assertFalse(result['unguarded'])
+        self.assertEqual('', result['unguarded_reason'])
 
     def test_the_cluster_guard_refuses_when_the_node_would_not(self):
         # node_b has plenty of room, but the cluster does not.

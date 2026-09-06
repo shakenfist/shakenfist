@@ -9431,6 +9431,7 @@ class AdmitInstancePlacementReply(_message.Message):
     CLAIM_OVER_LIMIT_FIELD_NUMBER: _builtins.int
     CLAIM_DIMENSIONS_FIELD_NUMBER: _builtins.int
     CLAIM_UUID_FIELD_NUMBER: _builtins.int
+    UNGUARDED_REASON_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -9481,6 +9482,26 @@ class AdmitInstancePlacementReply(_message.Message):
     reads as "not reported" rather than as a real value.
     Dashed uuid form, or empty
     """
+    unguarded_reason: _builtins.str
+    """Which absent row made this admission unguarded, because the two
+    are different conditions wearing the same missing row and only
+    one of them is the normal state P7 was written for.
+
+    'never_reconciled' means the cluster_capacity singleton does not
+    exist, so the reconciler has never completed a pass and *nothing*
+    in this cluster is guarded -- every node fails open at once. That
+    is issue 4087, and it should be a transient of a cluster's first
+    moments rather than anything an operator sees in steady state.
+
+    'node_not_sized' means the singleton exists but this one node has
+    no row: mid-upgrade, or a node whose limits the reconciler
+    declined to guess. That is P7's designed behaviour and is
+    corrected by the next pass.
+
+    Empty when unguarded is false. Read unguarded for the fact and
+    this for the reason, so a reply from an sf-database predating
+    this field reads as "not reported" rather than as a condition.
+    """
     @_builtins.property
     def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
     @_builtins.property
@@ -9502,10 +9523,11 @@ class AdmitInstancePlacementReply(_message.Message):
         claim_over_limit: _builtins.bool = ...,
         claim_dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
         claim_uuid: _builtins.str = ...,
+        unguarded_reason: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "claim_uuid", b"claim_uuid", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["admitted", b"admitted", "claim_dimensions", b"claim_dimensions", "claim_over_limit", b"claim_over_limit", "claim_uuid", b"claim_uuid", "clamped", b"clamped", "dimensions", b"dimensions", "error", b"error", "failing_stage", b"failing_stage", "node_expected_demand", b"node_expected_demand", "node_used_cpus", b"node_used_cpus", "node_used_disk_gb", b"node_used_disk_gb", "node_used_memory_mb", b"node_used_memory_mb", "success", b"success", "unguarded", b"unguarded", "unguarded_reason", b"unguarded_reason"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
