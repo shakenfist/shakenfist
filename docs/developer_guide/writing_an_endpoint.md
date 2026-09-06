@@ -53,9 +53,25 @@ string whose published format is Swagger 2.0's standard `byte` token),
 stays the single source of truth for what parses, and a published
 IPv4 pattern would describe the API as narrower than it is), and real
 array types for `arrayofstring`/`arrayofdict` and a real object type
-for `dict`. Objects, and arrays of objects, can only be declared in
-the body: outside one there is no schema object to nest a structure
-in, so they are rejected at import time.
+for `dict`.
+
+`any` is the one token that deliberately constrains nothing: it
+renders with no `type` at all, only a `format` annotation saying what
+the parameter is. It exists for the object metadata `value`
+parameters, where `add_metadata_key()` serialises whatever it is
+given and real callers store strings, dictionaries and lists under
+the same key — so no single token is wide enough, and declaring one
+of them would make enforcement refuse working callers. Reach for it
+only when that is genuinely true of the parameter; the fourteen
+declarations using it today are pinned by name in
+`ANY_TOKEN_DECLARATIONS`
+(`shakenfist/tests/external_api/test_parameter_declarations.py`), so
+a fifteenth is a visible, reviewable edit rather than a quiet
+widening.
+
+Objects, arrays of objects, and `any` can only be declared in the
+body: outside one there is no schema object to nest a structure in,
+so they are rejected at import time.
 
 Declare the token that matches what the handler accepts, and **publish
 what the server backs**: a bound tighter than the server's own
@@ -229,6 +245,13 @@ other_decorator(func, ...)` delegation — which is how
 If you add a decorator that consumes a request parameter, the audit
 will require every handler wearing it to declare that parameter.
 
+`UNDECLARED_BY_DESIGN` does not reach these. It exists for a kwarg
+the signature names and the handler ignores; a kwarg a decorator pops
+is one a caller can send and which changes what happens, so there is
+no reading of it that is not part of the API. Both guards say so —
+`declarations.audit()`, which backs the pre-commit fixer, has no
+exemption path for one at all — so declare it or stop consuming it.
+
 A handler must therefore name its parameters: `*args` or `**kwargs` in
 the signature accepts body keys nothing can enumerate (`log_request`
 merges the whole JSON body into the handler's kwargs), so the audit
@@ -313,7 +336,7 @@ strings, because semantic validation of them is not built yet. Only
 ## What is not checked yet
 
 Enforcement is off, so a correct declaration still does not stop a
-caller sending something else. Five known gaps in the derivation
+caller sending something else. Six known gaps in the derivation
 itself:
 
 (The published specification itself *is* checked:
@@ -346,7 +369,27 @@ the type vocabulary landed.)
   handler are third-party (`swag_from`, `use_kwargs`) and reporting
   every unfound name would report the whole API and mean nothing.
   Within a decorator this *can* resolve, an unreadable pop key or an
-  unfollowable delegation is reported rather than skipped.
+  unfollowable delegation is reported rather than skipped. That report
+  fires on *any* top level `return <call>` whose callee is not a single
+  package function, including a decorator which consumes nothing and
+  merely happens to be written as `return functools.wraps(func)(wrapper)`
+  or `return _make_wrapper(func)` against a helper living elsewhere. No
+  decorator in the tree is written either way, and the report is
+  deliberately fail-closed — an unfollowable delegation and a decorator
+  that consumes nothing produce the same empty set, so guessing between
+  them is the confident wrong answer this module exists to refuse. The
+  remedy, which the message now names, is to return the wrapper directly
+  or move the helper to module level in `external_api/`.
+* Decoration sites and delegation targets are matched on their bare
+  name, because that is all the site carries: `@api_base.arg_is_instance_ref`
+  in one module and `@arg_is_artifact_ref` in another name the same kind
+  of thing, and nothing here resolves module aliases through the
+  decorating file's imports. Two package functions sharing a name are
+  reported as ambiguous, but a package function sharing a name with an
+  *imported* one is not detectable, and the derivation will confidently
+  attribute the package function's pops to the import. No such collision
+  exists today; if you import something into `external_api/` under a name
+  a module level function there already has, rename one of them.
 * A decorator that *reads* a parameter without removing it stays
   invisible. The derivation recognises `kwargs.pop` and
   `del kwargs[...]` because those are what make a kwarg the handler
@@ -360,7 +403,9 @@ the type vocabulary landed.)
   deleted rather than declared, since declaring it would have
   published a parameter that never worked, and
   `test_artifact_uuid_is_not_a_parameter` pins the property that made
-  it dead. A new one would have to be added deliberately.
+  it dead, while `test_arg_is_ref_namespace_scoping.py` covers the
+  control flow that replaced it. A new one would have to be added
+  deliberately.
 * A handler cannot both take a raw request body and sit behind a ref
   resolving decorator. `swagger_helper()` refuses
   `RAW_BODY_PARAMETER` combined with any named body parameter, while

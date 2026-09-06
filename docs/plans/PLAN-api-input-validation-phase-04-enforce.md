@@ -303,7 +303,7 @@ arrives.
 | 3 | medium | sonnet | none | Add an `any` type token and widen the metadata `value` declarations. In `ARGTYPES` (`shakenfist/external_api/base.py:359`) add `'any': {'format': 'any JSON value'}` — deliberately no `type`, so the published schema constrains nothing. `swagger_helper()` refuses object and array tokens outside a body; `any` must be refused outside a body for the same reason. If `openapi_spec_validator` rejects a typeless schema, fall back to `{}` and say so in the commit message; `shakenfist/tests/external_api/test_openapi_spec.py` decides, not the plan. Then change these fourteen declarations from `string` to `any`: `auth.py:664,690`, `instance.py:1387,1536`, `network.py:473,499`, `artifact.py:927,953`, `blob.py:402,427`, `node.py:224,252`, `interface.py:153,180` — verify each is the metadata `value` parameter before editing. **Do not touch `network.py:712`**, which is a different `value` correctly declared `ipv4`. Check whether `STRUCTURED_PARAMETERS` in `test_openapi_spec.py:104` needs entries: its completeness is derived from the published specification, so a typeless schema may or may not register as structured — if it does not, extend the derivation so a token this wide cannot be added invisibly. Add a test pinning that exactly fourteen declarations use `any` and that they are the metadata family. Commit subject: `Declare metadata values as any JSON value.` |
 | — | — | — | — | **Gate: back brief before step 4.** Steps 1-3 merge, sfcbr redeploys, and D22's confirmatory reading is taken and written into this plan's measurement log. Step 4 does not start until the operator has seen it. |
 | 4 | high | opus | none | Flip `API_VALIDATION_MODE`'s default from `'warn'` to `'enforce'` in `shakenfist/config.py:226`, update its description, and update `shakenfist/tests/test_config.py:43-55`. Then write the tests that pin what enforcement means, all of them at request level through the real decorator stack (phase 3's review found two defects that unit tests missed precisely because they tested components in isolation) in `shakenfist/tests/external_api/test_request_validation.py`: an undeclared body key on a declared endpoint answers exactly `{"error": "<name>: not declared by this endpoint", "status": 400}` and the response body contains **no** interpreter text — assert the absence positively, not by eyeballing; `enforce` plus an omitted `required` parameter still reaches the handler (decision D17); a body key colliding with a path parameter is refused (D18); a finding on a request that would have succeeded refuses it, and a request with no findings is untouched. **Mutation-test each assertion**: break the code it covers and confirm the test fails. Do not remove or "tidy" the `missing-required` filter at `base.py:1650`. Commit subject: `Enforce the API parameter declarations.` |
-| 5 | medium | sonnet | none | Documentation and release note. In `docs/developer_guide/writing_an_endpoint.md`, rewrite "What validation does with them" (line 262) and "What is not checked yet" (294): enforcement is on, `enforce` is the default, and the sections currently state the opposite in four places. Add the `any` token wherever the type vocabulary is listed. In `docs/release_notes/v07-v08.md`, add an entry under `## REST API` (line 30) covering: malformed input is now refused with `{"error": "<parameter>: <reason>", "status": 400}`; validation runs ahead of the per-method decorators, **so a request that is both malformed and refers to a missing or unauthorised object now answers 400 where it previously answered 404 or 403** — this is the contract change and it must be stated plainly rather than implied; `required` is still not enforced; and `API_VALIDATION_MODE=warn` or `off` is the rollback for an operator whose callers break. Check `docs/developer_guide/coding_rules.md` and `CLAUDE.md`'s "Parameter declarations are enforced" section for statements that enforcement is off. Commit subject: `Document API input validation enforcement.` |
+| 5 | medium | sonnet | none | Documentation and release note. In `docs/developer_guide/writing_an_endpoint.md`, rewrite "What validation does with them" (line 262) and "What is not checked yet" (294): enforcement is on, `enforce` is the default, and the sections currently state the opposite in four places. The `any` token and the fifty-five newly published request bodies were documented with the code in step 3 rather than waiting for this step, so check what is already there before writing it again. In `docs/release_notes/v07-v08.md`, add an entry under `## REST API` (line 30) covering: malformed input is now refused with `{"error": "<parameter>: <reason>", "status": 400}`; validation runs ahead of the per-method decorators, **so a request that is both malformed and refers to a missing or unauthorised object now answers 400 where it previously answered 404 or 403** — this is the contract change and it must be stated plainly rather than implied; `required` is still not enforced; and `API_VALIDATION_MODE=warn` or `off` is the rollback for an operator whose callers break. Check `docs/developer_guide/coding_rules.md` and `CLAUDE.md`'s "Parameter declarations are enforced" section for statements that enforcement is off. Commit subject: `Document API input validation enforcement.` |
 | 6 | medium | sonnet | none | Functional CI coverage in `shakenfist/deploy/shakenfist_ci`. Add tests that a request carrying an undeclared body key is refused with a 400 whose error names the parameter and contains no Python interpreter text, and that a cross-namespace lookup passing `namespace` in the body — the exact `shakenfist_client` call pattern from `get_instance`/`get_artifact`/`get_network` — still works after step 1. The second is the regression test for #3739 and is the more important of the two: it is the thing that would have caught this before the warn window did. Follow the existing patterns in the CI suite; find a test that already asserts on an API error body rather than inventing a helper. Commit subject: `Test that malformed API input is refused.` |
 
 ## Progress
@@ -399,6 +399,62 @@ Checked before committing to it: the official client's
 shipped caller is affected. Two of the seven metadata delete handlers
 were cleaned up already, so the pattern is proven.
 
+### Review round 2 on [#4101](https://github.com/shakenfist/shakenfist/pull/4101)
+
+Ten items: 1 `fix`, 2 `document`, 5 `consider`, 2 `none` — down from
+2 `fix`, and every remaining item is against code this branch added
+rather than against the original change, which is the shape the
+`pr-re-review` skill names as a converging round. All seven actionable
+items were taken; each was a single edit.
+
+**The `fix` was the round-1 fix's own shadow.** Round 1 deleted
+`_resolve_artifact_ref`'s dead `artifact_uuid` branch. It did not
+delete `test_artifact_uuid_branch_tenant_foreign_namespace_rejected`,
+which went on passing — the 404 it asserts comes from
+`resolve_lookup_namespace()` long before any artifact lookup, and its
+`from_db.assert_not_called()` became vacuous once nothing could call
+`from_db` at all. A test that cannot fail, guarding code that no
+longer exists: the same fault as mutation 32 and the `any` fallback
+warning, arriving for the third time in this phase because deleting
+code and deleting the test that watched it are two separate acts.
+
+Replaced with three tests over `arg_is_visible_artifact_ref`, which is
+the half of `_resolve_artifact_ref` the parametrised `_CASES` cannot
+reach: an unqualified name widens (`from_db_by_ref_visible_to`, and a
+foreign-namespace artifact reaches the handler), naming a namespace
+turns the widening off (`from_db_by_ref`), and a tenant naming
+somebody else's namespace is refused before either lookup. Both
+lookups are patched in each, so the assertion is *which one ran*.
+
+**Proven, not assumed.** `if widen and not body_namespace:` mutated to
+`if widen:` fails exactly `test_visible_ref_with_body_namespace_does_not_widen`;
+mutated to `if False:` fails exactly
+`test_visible_ref_without_body_namespace_widens`. Likewise for the two
+new `any` constraint cases: relaxing the numeric-type check to admit a
+typeless token fails the first, relaxing the pattern check fails the
+second. Each mutation, each caught, by the intended test alone.
+
+**The exemption disagreement was real and is closed.**
+`test_accepted_parameters_are_declared` honoured `UNDECLARED_BY_DESIGN`
+for a decorator-consumed kwarg while `audit()` — which backs
+`test_declared_locations_are_derivable` *and* the pre-commit fixer —
+had no exemption path at all, so an entry would have satisfied one
+guard, failed the other, and left neither message explaining why the
+documented escape hatch did not work. The rule is now the same in both
+and stated in `writing_an_endpoint.md`: the exemption is for a kwarg
+the signature names and the handler ignores, and a kwarg a decorator
+pops is one a caller can send and act on, so it has no opt-out.
+
+The three latent `consider` items were taken as message and
+documentation edits rather than machinery. An unfollowable delegation
+now names its remedy instead of only its symptom; the bare-name
+resolution's blind spot — a package function sharing a name with an
+import, which no ambiguity check can see — joins the gap list, which
+is now six entries. Both are fail-closed today and neither shape
+exists in the tree; rewriting the resolver to chase module aliases
+would buy a check against something that has never happened, which is
+the trade the gap list exists to record.
+
 ### Review round 1 on [#4101](https://github.com/shakenfist/shakenfist/pull/4101)
 
 Ten items: 2 `fix`, 1 `document`, 4 `consider`, 3 `none`. All seven
@@ -465,12 +521,17 @@ eight sites instead of one. Fragile rather than wrong — a multiplied
 identical defect still proves the guard fires for the reason claimed,
 which is exactly what mutation 32 did not do.
 
-**For step 5.** The release note must say that the specification now
-documents a body on GET and DELETE read routes. That is not new
-behaviour — the ref decorators have always popped `namespace` there —
-but it is newly *visible*, and a reader who takes the published
-specification as the contract will see a body appear on fifty-five
-routes that had none.
+**Moved out of step 5 in review round 2.** The release note saying
+that the specification now documents a body on GET and DELETE read
+routes landed with the declarations rather than with the enforcement
+flip. That is not new behaviour — the ref decorators have always
+popped `namespace` there — but it is newly *visible*, and a reader
+who takes the published specification as the contract sees a body
+appear on fifty-five routes that had none the moment this merges,
+not when enforcement is switched on. Publishing the specification
+diff in one release and the note explaining it in the next was a gap
+with no reason behind it. The same bullet covers the metadata `value`
+widening, which is the other change a regenerated client sees.
 
 ## Risks and mitigations
 

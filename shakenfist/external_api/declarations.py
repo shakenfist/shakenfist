@@ -548,8 +548,13 @@ def _consumed_kwargs(fn: ast.FunctionDef,
                 problems.append(
                     '%s delegates to %s, which this cannot resolve to a '
                     'single module level function, so the kwargs it '
-                    'consumes are missing from the derivation'
-                    % (fn.name, ast.unparse(stmt.value.func)))
+                    'consumes are missing from the derivation. If it '
+                    'consumes no request parameter, restructure the return '
+                    'so this can see that (return the wrapper, or apply '
+                    'functools.wraps as a decorator on it); otherwise move '
+                    'the target to module level in %s'
+                    % (fn.name, ast.unparse(stmt.value.func),
+                       os.path.basename(API_DIR)))
             continue
         if target in seen:
             continue
@@ -814,7 +819,10 @@ def audit(api_dir: str = API_DIR, app: Optional[str] = None
                 problems.append(
                     '%s.%s has a decorator which consumes %r before the '
                     'handler runs, so a caller can send it, but nothing '
-                    'declares it; declare it in the %s'
+                    'declares it; declare it in the %s. There is no '
+                    'UNDECLARED_BY_DESIGN exemption for a '
+                    'decorator-consumed parameter: declare it or stop '
+                    'consuming it'
                     % (cls.name, fn.name, name,
                        derived_location(name, fn, tree, cls, routes,
                                         problems)))

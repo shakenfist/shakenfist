@@ -467,23 +467,40 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             # unreadable parameter list is a failure, not an absence.
             problems = []
             kwargs = declarations.handler_kwargs(fn, problems)
-            kwargs += sorted(
-                declarations.decorator_kwargs(fn, functions, problems)
-                - set(kwargs))
+            consumed = declarations.decorator_kwargs(fn, functions, problems)
+            kwargs += sorted(consumed - set(kwargs))
             self.assertEqual(
                 [], problems,
                 '%s.%s: the accepted parameter list could not be '
                 'enumerated, so this assertion cannot hold: %s'
                 % (cls, method, '; '.join(problems)))
             for kwarg in kwargs:
-                if (cls, method, kwarg) in UNDECLARED_BY_DESIGN:
+                # A decorator-consumed parameter has no opt-out, and
+                # this is where that has to be said: declarations.audit()
+                # -- which backs test_declared_locations_are_derivable
+                # and the pre-commit fixer -- reports the same fact with
+                # no exemption path, so honouring one here would leave
+                # two guards disagreeing about a single handler with
+                # neither message explaining why. It is also the right
+                # rule on its own terms. UNDECLARED_BY_DESIGN exists for
+                # a kwarg the signature names and the handler ignores;
+                # a kwarg a decorator pops is one the caller can send
+                # and act on, so hiding it from the published API is
+                # exactly the invisibility this assertion exists to
+                # refuse.
+                if (kwarg not in consumed
+                        and (cls, method, kwarg) in UNDECLARED_BY_DESIGN):
                     continue
                 self.assertIn(
                     kwarg, names,
                     '%s.%s accepts %r but does not declare it, so it is '
-                    'invisible in the published API. Declare it, stop '
-                    'accepting it, or add it to UNDECLARED_BY_DESIGN with a '
-                    'reason.' % (cls, method, kwarg))
+                    'invisible in the published API. Declare it%s.'
+                    % (cls, method, kwarg,
+                       ' -- a decorator consumes it, so there is no '
+                       'UNDECLARED_BY_DESIGN exemption; declare it or stop '
+                       'consuming it' if kwarg in consumed
+                       else ', stop accepting it, or add it to '
+                       'UNDECLARED_BY_DESIGN with a reason'))
 
     def test_declared_locations_are_valid(self):
         """swagger_helper enforces this at import time; pin it here too, so
@@ -2095,7 +2112,15 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 [('thing', 'body', 'integer', 'A thing.', False,
                   {'minimum': 1.5})],
                 # Seven elements.
-                [('thing', 'body', 'string', 'A thing.', False, {}, 8)]):
+                [('thing', 'body', 'string', 'A thing.', False, {}, 8)],
+                # A bound and a pattern on the typeless `any` token.
+                # validation._field()'s `any` branch drops bounds and
+                # says it may because nothing can carry one here; that
+                # is a claim about this check, so pin it.
+                [('thing', 'body', 'any', 'A thing.', False,
+                  {'minimum': 1})],
+                [('thing', 'body', 'any', 'A thing.', False,
+                  {'pattern': '^a$'})]):
             with self.subTest(parameters=parameters):
                 self.assertRaises(
                     exceptions.InvalidAPIDeclaration, self._helper, parameters)
