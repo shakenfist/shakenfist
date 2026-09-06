@@ -329,7 +329,13 @@ class ArtifactEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact information.',
         [('artifact_ref', 'path', 'uuidorname',
-          'The UUID or name of the artifact.', True)],
+          'The UUID or name of the artifact.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the artifact reference in. Omit it and a name is resolved across everything the '
+          'caller can see, which includes shared artifacts and those owned by namespaces which trust the caller; '
+          'naming a namespace narrows the search to that one alone. A UUID is resolved without it, but the artifact '
+          'found must live in the named namespace or the request answers 404. Defaults to the namespace of the caller, '
+          'and only the system namespace may name another.', False)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact not found.', None)]))
     @arg_is_visible_artifact_ref
@@ -350,7 +356,12 @@ class ArtifactEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Delete an artifact.',
         [('artifact_ref', 'path', 'uuidorname',
-          'The UUID or name of the artifact.', True)],
+          'The UUID or name of the artifact.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+          'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved without '
+          'it, but the artifact found must live here or the request answers 404. Defaults to the namespace of the '
+          'caller, and only the system namespace may name another.', False)],
         [(200, ('The artifact has been deleted. The final state of the '
                 'artifact is returned.'), artifact_delete_example),
          (404, 'Artifact not found.', None)]))
@@ -711,6 +722,12 @@ class ArtifactEventsEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
+            ('namespace', 'body', 'namespace',
+             'The namespace to resolve the artifact reference in. Omit it and a name is resolved across everything the '
+             'caller can see, which includes shared artifacts and those owned by namespaces which trust the caller; '
+             'naming a namespace narrows the search to that one alone. A UUID is resolved without it, but the artifact '
+             'found must live in the named namespace or the request answers 404. Defaults to the namespace of the '
+             'caller, and only the system namespace may name another.', False),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
              'The number of events to return, defaults to 100 and is '
@@ -766,7 +783,13 @@ class ArtifactVersionsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Get artifact version information.',
         [('artifact_ref', 'path', 'uuidorname',
-          'The UUID or name of the artifact.', True)],
+          'The UUID or name of the artifact.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the artifact reference in. Omit it and a name is resolved across everything the '
+          'caller can see, which includes shared artifacts and those owned by namespaces which trust the caller; '
+          'naming a namespace narrows the search to that one alone. A UUID is resolved without it, but the artifact '
+          'found must live in the named namespace or the request answers 404. Defaults to the namespace of the caller, '
+          'and only the system namespace may name another.', False)],
         [(200, 'A list of the blobs which form the artifact versions.',
           artifact_versions_example),
          (404, 'Artifact not found.', None)]))
@@ -800,6 +823,11 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
+            ('namespace', 'body', 'namespace',
+             'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+             'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved '
+             'without it, but the artifact found must live here or the request answers 404. Defaults to the namespace '
+             'of the caller, and only the system namespace may name another.', False),
             ('max_versions', 'body', 'unsignedinteger',
              'The maximum number of versions, or revert to the default it not set.',
              False)
@@ -837,7 +865,12 @@ class ArtifactVersionEndpoint(api_base.Resource):
             ('artifact_ref', 'path', 'uuidorname',
              'The UUID or name of the artifact.', True),
             ('version_id', 'path', 'unsignedinteger',
-             'The version number to remove.', True)
+             'The version number to remove.', True),
+            ('namespace', 'body', 'namespace',
+             'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+             'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved '
+             'without it, but the artifact found must live here or the request answers 404. Defaults to the namespace '
+             'of the caller, and only the system namespace may name another.', False)
         ],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (404, 'Artifact index not found.', None)]))
@@ -868,7 +901,12 @@ class ArtifactShareEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Share the specified artifact with all namespaces.',
         [('artifact_ref', 'path', 'uuidorname',
-          'The UUID or name of the artifact.', True)],
+          'The UUID or name of the artifact.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+          'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved without '
+          'it, but the artifact found must live here or the request answers 404. Defaults to the namespace of the '
+          'caller, and only the system namespace may name another.', False)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (403, 'Only artifacts in the system namespace may be shared.', None),
          (404, 'Artifact not found.', None)]))
@@ -889,7 +927,12 @@ class ArtifactUnshareEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Unshare the specified artifact with all namespaces.',
         [('artifact_ref', 'path', 'uuidorname',
-          'The UUID or name of the artifact.', True)],
+          'The UUID or name of the artifact.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+          'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved without '
+          'it, but the artifact found must live here or the request answers 404. Defaults to the namespace of the '
+          'caller, and only the system namespace may name another.', False)],
         [(200, 'Information about a single artifact.', artifact_get_example),
          (403, 'Artifact not shared.', None),
          (404, 'Artifact not found.', None)]))
@@ -909,7 +952,12 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'artifacts', 'Fetch metadata for an artifact.',
         [('artifact_ref', 'path', 'uuidorname',
-          'The artifact to fetch metadata for.', True)],
+          'The artifact to fetch metadata for.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+          'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved without '
+          'it, but the artifact found must live here or the request answers 404. Defaults to the namespace of the '
+          'caller, and only the system namespace may name another.', False)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
@@ -923,6 +971,11 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
         'artifacts', 'Add metadata for an artifact.',
         [
             ('artifact_ref', 'path', 'uuidorname', 'The artifact to add a key to.', True),
+            ('namespace', 'body', 'namespace',
+             'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+             'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved '
+             'without it, but the artifact found must live here or the request answers 404. Defaults to the namespace '
+             'of the caller, and only the system namespace may name another.', False),
             ('key', 'body', 'string', 'The metadata key to set', True),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
@@ -950,6 +1003,11 @@ class ArtifactMetadataEndpoint(api_base.Resource):
         [
             ('artifact_ref', 'path', 'uuidorname', 'The artifact to add a key to.', True),
             ('key', 'path', 'string', 'The metadata key to set', True),
+            ('namespace', 'body', 'namespace',
+             'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+             'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved '
+             'without it, but the artifact found must live here or the request answers 404. Defaults to the namespace '
+             'of the caller, and only the system namespace may name another.', False),
             ('value', 'body', 'string', 'The value of the key.', True)
         ],
         [(200, 'Nothing.', None),
@@ -973,7 +1031,12 @@ class ArtifactMetadataEndpoint(api_base.Resource):
         'artifacts', 'Delete a metadata key for an artifact.',
         [
             ('artifact_ref', 'path', 'uuidorname', 'The artifact to remove a key from.', True),
-            ('key', 'path', 'string', 'The metadata key to set', True)
+            ('key', 'path', 'string', 'The metadata key to set', True),
+            ('namespace', 'body', 'namespace',
+             'The namespace to resolve the artifact reference in. A name is only looked up in this namespace, and is '
+             'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved '
+             'without it, but the artifact found must live here or the request answers 404. Defaults to the namespace '
+             'of the caller, and only the system namespace may name another.', False)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1020,6 +1083,12 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
         'artifacts', 'Get the outstanding cluster operations for an artifact.',
         [('artifact_ref', 'path', 'uuidorname',
           'The UUID or name of the artifact.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the artifact reference in. Omit it and a name is resolved across everything the '
+          'caller can see, which includes shared artifacts and those owned by namespaces which trust the caller; '
+          'naming a namespace narrows the search to that one alone. A UUID is resolved without it, but the artifact '
+          'found must live in the named namespace or the request answers 404. Defaults to the namespace of the caller, '
+          'and only the system namespace may name another.', False),
          ('all', 'query', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],

@@ -195,6 +195,10 @@ class InstanceAgentOperationsEndpoint(api_base.Resource):
         'instances', 'List agent operations for an instance.',
         [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the instance reference in. A name is only looked up in this namespace; a UUID is '
+          'resolved without it, but the instance found must live here or the request answers 404. Defaults to the '
+          'namespace of the caller, and only the system namespace may name another.', False),
          ('all', 'body', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],

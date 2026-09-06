@@ -254,15 +254,23 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
     def test_declared_names_are_real_parameters(self):
         """A declared name must be something the handler can receive.
 
+        Receiving it is not the same as it reaching the signature. A
+        decorator which pops a name out of kwargs consumes a parameter
+        the caller really sends -- `namespace` on every ref lookup --
+        and the handler never sees it, so the signature alone would
+        call fifty-five true declarations false (#3739).
+
         An empty declaration list is legitimate -- eight endpoints
         accept nothing -- and needs no guard, because the loop below is
         already a no-op for one. The sibling assertion's version of that
         guard was load-bearing and wrong, so it is deliberately absent
         here rather than kept for symmetry.
         """
+        functions = declarations.package_functions()
         for cls, method, fn in _endpoints():
             problems = []
-            accepted = declarations.handler_kwargs(fn, problems)
+            accepted = set(declarations.handler_kwargs(fn, problems))
+            accepted |= declarations.decorator_kwargs(fn, functions, problems)
             self.assertEqual(
                 [], problems,
                 '%s.%s: the accepted parameter list could not be '
@@ -287,7 +295,15 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         parameters have been emptied while the handler still accepts
         them. The three UNDOCUMENTED_BY_DESIGN handlers take no kwargs,
         so this loop is a no-op for them.
+
+        A parameter a decorator consumes counts as accepted, and is the
+        half of #3739 that matters going forward: the signature-only
+        rule declared the popped `namespace` invisible, so nobody had to
+        publish it, and the warn window found it as a rejection against
+        the official client. The next `kwargs.pop` in a decorator fails
+        here instead.
         """
+        functions = declarations.package_functions()
         for cls, method, fn in _endpoints():
             if not declarations.documented(fn):
                 continue
@@ -298,6 +314,9 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             # unreadable parameter list is a failure, not an absence.
             problems = []
             kwargs = declarations.handler_kwargs(fn, problems)
+            kwargs += sorted(
+                declarations.decorator_kwargs(fn, functions, problems)
+                - set(kwargs))
             self.assertEqual(
                 [], problems,
                 '%s.%s: the accepted parameter list could not be '
@@ -1113,6 +1132,277 @@ class FakeEndpoint(api_base.Resource):
         self.assertEqual(
             api_base.RAW_BODY_PARAMETER,
             declarations.base_constants()['RAW_BODY_PARAMETER'])
+
+    def test_decorator_consumed_kwargs_are_derived(self):
+        """A decorator which pops a kwarg consumes a real parameter.
+
+        The shape of #3739: the caller sends `namespace` in the body,
+        log_request merges it into kwargs, and the decorator takes it
+        before the handler runs. None of the other derivation sources
+        can see it -- it is not a route segment, not a webargs key, not
+        a flask.request.args read, and not in the signature -- so
+        without this term the parameter is functional and undeclarable.
+        """
+        source = '''
+def arg_is_thing_ref(func):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        del kwargs['scope']
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            {'namespace', 'scope'},
+            declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual([], problems)
+
+    def test_decorator_delegation_is_followed(self):
+        """arg_is_artifact_ref and arg_is_visible_artifact_ref are both
+        one-liners returning _resolve_artifact_ref(func, widen=...), so
+        the pop is a level below the name at the decoration site. A walk
+        which stopped at the decorator would answer "consumes nothing"
+        for nine handlers.
+        """
+        source = '''
+def _resolve(func, widen):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def arg_is_thing_ref(func):
+    return _resolve(func, widen=False)
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'_resolve': [tree.body[0]],
+                     'arg_is_thing_ref': [tree.body[1]]}
+        fn = tree.body[2].body[0]
+
+        problems = []
+        self.assertEqual(
+            {'namespace'},
+            declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual([], problems)
+
+    def test_unfollowable_delegation_is_a_problem(self):
+        """The decorator's real body is somewhere this cannot read, so
+        the empty set it would otherwise return is a confident wrong
+        answer rather than an absence."""
+        source = '''
+def arg_is_thing_ref(func):
+    return somewhere_else.resolve(func)
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('delegates to', problems[0])
+
+    def test_non_literal_pop_key_is_a_problem(self):
+        """The parameter is consumed whether or not its name can be
+        read, so saying nothing about it would leave it undeclarable and
+        unenforceable -- #3739 one level down."""
+        source = '''
+def arg_is_thing_ref(func):
+    def wrapper(*args, **kwargs):
+        value = kwargs.pop(KEY, None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('cannot read', problems[0])
+
+    def test_decorators_outside_the_package_are_not_problems(self):
+        """"Unresolvable" has to mean "found it and could not read it".
+
+        Every handler in the tree carries decorators which are not
+        package functions at all -- swag_from and use_kwargs come from
+        third party libraries -- so reporting a name this cannot find
+        would report the whole API and mean nothing. A pop on something
+        which is not a kwargs dict is not a consumed parameter either.
+        """
+        source = '''
+def helper(func):
+    def wrapper(*args, **kwargs):
+        local = {'a': 1}
+        local.pop('a', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @swag_from(api_base.swagger_helper('things', 'A thing.', [], []))
+    @use_kwargs(get_args, location='query')
+    @helper
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'helper': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual([], problems)
+
+    def test_ambiguous_decorator_name_is_a_problem(self):
+        """Names are resolved bare, because that is all a decoration
+        site carries. Two modules defining one is therefore a name this
+        cannot resolve, not a name it may pick a winner for."""
+        source = '''
+def arg_is_thing_ref(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0], tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('defined more than once', problems[0])
+
+    def test_a_consumed_parameter_must_be_declared(self):
+        """The audit term, end to end, on constructed sources.
+
+        Not drift -- there is no location literal to rewrite -- so it
+        lands in problems, which is what makes the fixer and the
+        pre-commit hook refuse the tree rather than silently pass it.
+        """
+        self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
+        self._write('fake.py', '''
+def arg_is_fake_ref(func):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('alpha', 'body', 'string', 'A parameter.', False)],
+        []))
+    @arg_is_fake_ref
+    def get(self, alpha=None):
+        pass
+''')
+
+        drifted, _, problems = declarations.audit(self.tempdir)
+
+        self.assertEqual([], drifted)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("consumes 'namespace'", problems[0])
+        self.assertIn('declare it in the body', problems[0])
+
+        # And declaring it makes the audit clean, which is the other
+        # side of the assertion: a term which reports whatever it is
+        # given is no better than one which reports nothing.
+        self._write('fake.py', '''
+def arg_is_fake_ref(func):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('alpha', 'body', 'string', 'A parameter.', False),
+         ('namespace', 'body', 'namespace', 'A namespace.', False)],
+        []))
+    @arg_is_fake_ref
+    def get(self, alpha=None):
+        pass
+''')
+
+        drifted, _, problems = declarations.audit(self.tempdir)
+
+        self.assertEqual([], drifted)
+        self.assertEqual([], problems)
+
+    def test_the_ref_decorators_are_seen_to_consume_namespace(self):
+        """The derivation must find the real thing, not just synthetic ones.
+
+        Every assertion above is written on constructed source, and a
+        decorator_kwargs() which returned the empty set for the actual
+        tree would satisfy all of them while leaving #3739 exactly
+        where it was: fifty-five declarations nothing requires and an
+        audit which reports a clean tree either way. So the four
+        decorators are named here and their pop is asserted through the
+        same index the audit uses.
+        """
+        functions = declarations.package_functions()
+        for decorator in ('arg_is_instance_ref', 'arg_is_network_ref',
+                          'arg_is_artifact_ref',
+                          'arg_is_visible_artifact_ref'):
+            self.assertEqual(
+                1, len(functions.get(decorator, [])),
+                '%s is not a single module level function of the API '
+                'package' % decorator)
+            fake = ast.parse('class Thing:\n    def get(self):\n        pass')
+            fn = fake.body[0].body[0]
+            fn.decorator_list = [ast.Name(id=decorator, ctx=ast.Load())]
+
+            problems = []
+            self.assertEqual(
+                {'namespace'},
+                declarations.decorator_kwargs(fn, functions, problems),
+                '%s no longer consumes namespace, or the walk stopped '
+                'seeing it' % decorator)
+            self.assertEqual([], problems)
 
     def setUp(self):
         super().setUp()

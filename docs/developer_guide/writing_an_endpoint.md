@@ -168,11 +168,20 @@ are listed in `UNDOCUMENTED_BY_DESIGN` in
 | a segment of the mounted route in `app.py` | `path` |
 | in a schema bound with `@use_kwargs(..., location='query')` | `query` |
 | read from `flask.request.args` | `query` |
+| popped out of kwargs by one of the handler's decorators | `body` |
 | anything else | `body` |
 
-That last row is the default because `log_request` merges the JSON
-request body into the handler's kwargs, and the official client sends
-a JSON body for every method including `GET`.
+The last two rows are the same default, because `log_request` merges
+the JSON request body into the handler's kwargs and the official client
+sends a JSON body for every method including `GET`. The decorator row
+is called out because it is the one source that reaches neither the
+signature nor any of the rows above: `arg_is_instance_ref`,
+`arg_is_network_ref` and the two artifact ref decorators each do
+`kwargs.pop('namespace', None)` and resolve the lookup with it, so
+`namespace` is a functional parameter of all 55 routes behind them
+while being invisible to a derivation that reads only signatures. It
+went undeclared for years on that account
+([#3739](https://github.com/shakenfist/shakenfist/issues/3739)).
 
 **3. A `path` parameter must be `required=True`.** The route cannot
 match without it, and an optional path parameter makes the published
@@ -202,13 +211,23 @@ collection and item endpoints into two classes, which is what the
 tree does everywhere (`Readyz`, the only class mounted twice, has two
 parameter-free routes).
 
-**5. Every kwarg the handler accepts is declared.** An accepted-but-
-undeclared parameter is invisible to anyone reading the API, which is
-how `sshkey` and `userdata` sat in the published specification for
-years while the handler read `ssh_key` and `user_data`. If a kwarg
-genuinely must not be published, add it to `UNDECLARED_BY_DESIGN` with
-a reason. Objects the decorators inject — anything ending in
-`_from_db` — are not parameters and must not be declared.
+**5. Every kwarg the handler accepts is declared**, including the ones
+a decorator consumes on its behalf. An accepted-but-undeclared
+parameter is invisible to anyone reading the API, which is how `sshkey`
+and `userdata` sat in the published specification for years while the
+handler read `ssh_key` and `user_data`. If a kwarg genuinely must not
+be published, add it to `UNDECLARED_BY_DESIGN` with a reason. Objects
+the decorators inject — anything ending in `_from_db` — are not
+parameters and must not be declared.
+
+"Accepts" means what a caller can send, not what the signature names.
+`declarations.decorator_kwargs()` resolves each of a handler's
+decorators to its definition in `shakenfist/external_api/` and collects
+the literal keys it removes from kwargs, following one `return
+other_decorator(func, ...)` delegation — which is how
+`arg_is_artifact_ref` and `arg_is_visible_artifact_ref` are written.
+If you add a decorator that consumes a request parameter, the audit
+will require every handler wearing it to declare that parameter.
 
 A handler must therefore name its parameters: `*args` or `**kwargs` in
 the signature accepts body keys nothing can enumerate (`log_request`
@@ -294,7 +313,7 @@ strings, because semantic validation of them is not built yet. Only
 ## What is not checked yet
 
 Enforcement is off, so a correct declaration still does not stop a
-caller sending something else. Two known gaps in the derivation
+caller sending something else. Three known gaps in the derivation
 itself:
 
 (The published specification itself *is* checked:
@@ -318,3 +337,13 @@ the type vocabulary landed.)
   know which parameters arrive in the query string, so an opt-out
   entry would have to restate the schema's keys by hand — exactly the
   second source of truth this machinery exists to remove.
+* A decorator that consumes a request parameter must be a module level
+  function of `shakenfist/external_api/`, and must consume it with a
+  literal `kwargs.pop('name', ...)` or `del kwargs['name']` reached
+  either directly or through a single `return other(func, ...)`
+  delegation. A decorator imported from outside the package is skipped
+  in silence — deliberately, because most of the decorators on any
+  handler are third-party (`swag_from`, `use_kwargs`) and reporting
+  every unfound name would report the whole API and mean nothing.
+  Within a decorator this *can* resolve, an unreadable pop key or an
+  unfollowable delegation is reported rather than skipped.

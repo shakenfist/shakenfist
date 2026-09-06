@@ -34,6 +34,10 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             'The namespace to resolve the instance reference in. A name is only looked up in this namespace; a UUID '
+             'is resolved without it, but the instance found must live here or the request answers 404. Defaults to '
+             'the namespace of the caller, and only the system namespace may name another.', False),
             ('all', 'body', 'boolean',
              'Snapshot every disk, rather than only the first.', False),
             ('device', 'body', 'string',
@@ -88,7 +92,11 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List the snapshots of an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          'The namespace to resolve the instance reference in. A name is only looked up in this namespace; a UUID is '
+          'resolved without it, but the instance found must live here or the request answers 404. Defaults to the '
+          'namespace of the caller, and only the system namespace may name another.', False)],
         [(200, 'Information about the snapshots of an instance.', None),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref

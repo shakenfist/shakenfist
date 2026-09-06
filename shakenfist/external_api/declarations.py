@@ -8,7 +8,7 @@ validation, at which point a declaration that disagrees with its handler
 stops being a documentation bug and starts rejecting valid requests. This
 module is the single statement of what agreement means.
 
-Four sources decide where a parameter comes from, in order:
+Five sources decide where a parameter comes from, in order:
 
 * a name appearing in a route the class is mounted on is in the ``path``;
 * a name in the schema of a ``@use_kwargs(..., location='query')`` on the
@@ -17,6 +17,11 @@ Four sources decide where a parameter comes from, in order:
   ``query``, even if it can also arrive in the body -- the published
   documentation and the query-string fallback phase 3 compiles must
   agree;
+* a name one of the handler's decorators pops out of kwargs before the
+  handler runs is in the ``body``. It needs a term of its own precisely
+  because it reaches none of the other three and never appears in the
+  handler's signature either, which is how the ref decorators' popped
+  ``namespace`` went undeclared for years (#3739);
 * everything else is in the ``body``, because ``log_request`` merges the
   JSON body into handler kwargs.
 
@@ -430,6 +435,182 @@ def handler_kwargs(fn: ast.FunctionDef,
             if a.arg != 'self' and not a.arg.endswith(INJECTED_SUFFIX)]
 
 
+def package_functions(api_dir: str = API_DIR
+                      ) -> dict[str, list[ast.FunctionDef]]:
+    """Module level functions of the API package, by bare name.
+
+    The index decorator_kwargs() resolves names through. Keyed on the
+    bare name because that is all a decoration site carries: the ref
+    decorators are written ``@api_base.arg_is_instance_ref`` in one
+    module and ``@arg_is_artifact_ref`` in another, and both name the
+    same kind of thing. A name defined in two modules keeps both
+    definitions, so the ambiguity is visible to the caller rather than
+    resolved by whichever file sorted first.
+
+    Only module level definitions are indexed. A decorator defined
+    inside a class or a function is not something a decoration site in
+    another module could name, and treating one as a match would
+    resolve a name to a function that is not what ran.
+    """
+    out: dict[str, list[ast.FunctionDef]] = collections.defaultdict(list)
+    for path in sorted(glob.glob(os.path.join(api_dir, '*.py'))):
+        for node in _parse(path).body:
+            if isinstance(node, ast.FunctionDef):
+                out[node.name].append(node)
+    return out
+
+
+def _bare_name(node: ast.expr) -> Optional[str]:
+    """The last dotted component of a Name or Attribute, else None."""
+    if isinstance(node, (ast.Name, ast.Attribute)):
+        return ast.unparse(node).split('.')[-1]
+    return None
+
+
+def _kwargs_dicts(fn: ast.FunctionDef) -> set[str]:
+    """Names bound as ``**kwargs`` anywhere inside this function.
+
+    A decorator's pops happen in its wrapper, not in the decorator
+    itself, and they happen to the wrapper's ``**kwargs`` -- the dict
+    flask's dispatch and log_request's body merge fill in. Collecting
+    the names first is what keeps ``some_local_dict.pop('x')`` from
+    reading as a consumed request parameter.
+    """
+    out: set[str] = set()
+    for node in ast.walk(fn):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                             ast.Lambda)) and node.args.kwarg is not None:
+            out.add(node.args.kwarg.arg)
+    return out
+
+
+def _consumed_kwargs(fn: ast.FunctionDef,
+                     functions: dict[str, list[ast.FunctionDef]],
+                     problems: Optional[list[str]],
+                     seen: set[str]) -> set[str]:
+    """Request parameters this decorator removes from kwargs.
+
+    Two forms are recognised, both with a literal key:
+    ``kwargs.pop('name', ...)`` and ``del kwargs['name']``. A key which
+    is not a literal is reported: the parameter is consumed either way,
+    and answering "this decorator consumes nothing" would leave it
+    undeclarable and unenforceable, which is the defect this whole term
+    exists to catch arriving one level down.
+
+    Delegation is followed through a *top level* ``return
+    some_function(...)``, which is how ``arg_is_artifact_ref`` and
+    ``arg_is_visible_artifact_ref`` are written -- both are one liners
+    returning ``_resolve_artifact_ref(func, widen=...)``, and the pop
+    lives there. Only the top level of the body, because the wrapper's
+    own ``return func(*args, **kwargs)`` is a call to a parameter and
+    following it would mean chasing the handler itself.
+
+    A delegation target this cannot resolve is a problem, not an
+    absence: the decorator's real body is somewhere else, and the empty
+    set returned for it is indistinguishable from a decorator which
+    genuinely consumes nothing.
+    """
+    out: set[str] = set()
+    dicts = _kwargs_dicts(fn)
+
+    for node in ast.walk(fn):
+        key: Optional[ast.expr] = None
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'pop'
+                and _bare_name(node.func.value) in dicts
+                and node.args):
+            key = node.args[0]
+        elif (isinstance(node, ast.Delete) and len(node.targets) == 1
+              and isinstance(node.targets[0], ast.Subscript)
+              and _bare_name(node.targets[0].value) in dicts):
+            key = node.targets[0].slice
+        else:
+            continue
+
+        name = literal(key)
+        if isinstance(name, str):
+            out.add(name)
+        elif problems is not None:
+            problems.append(
+                '%s removes a kwarg named by something this cannot read '
+                '(%s), so a parameter it consumes is missing from the '
+                'derivation' % (fn.name, ast.unparse(key)))
+
+    for stmt in fn.body:
+        if not isinstance(stmt, ast.Return) or not isinstance(stmt.value,
+                                                              ast.Call):
+            continue
+        target = _bare_name(stmt.value.func)
+        candidates = functions.get(target or '', [])
+        if target is None or not candidates or len(candidates) > 1:
+            if problems is not None:
+                problems.append(
+                    '%s delegates to %s, which this cannot resolve to a '
+                    'single module level function, so the kwargs it '
+                    'consumes are missing from the derivation'
+                    % (fn.name, ast.unparse(stmt.value.func)))
+            continue
+        if target in seen:
+            continue
+        out |= _consumed_kwargs(
+            candidates[0], functions, problems, seen | {target})
+
+    return out
+
+
+def decorator_kwargs(fn: ast.FunctionDef,
+                     functions: dict[str, list[ast.FunctionDef]],
+                     problems: Optional[list[str]] = None) -> set[str]:
+    """Request parameters the handler's decorators consume for it.
+
+    ``arg_is_instance_ref``, ``arg_is_network_ref`` and the two
+    artifact ref decorators all ``kwargs.pop('namespace', None)`` and
+    resolve the lookup with it. The parameter is functional -- the
+    official client sends it -- but it is in none of the other three
+    sources: it is not a route segment, not a webargs key and not a
+    flask.request.args read, and it never reaches the handler's
+    signature either, because the decorator took it. Without this term
+    the derivation has nothing to say about it, so it was declared
+    nowhere and phase 3's warn window found it as an
+    ``unknown-parameter`` finding against working callers (#3739).
+
+    A decorator name this cannot find among the package's module level
+    functions is skipped in silence, and that is deliberate rather than
+    an oversight of the "absence must not look like success" rule
+    every other source here follows. Every handler in the tree carries
+    several decorators which are not package functions at all --
+    ``swag_from`` and ``use_kwargs`` are imported from third party
+    libraries -- so reporting an unfound name would report most of the
+    API and mean nothing. "Unresolvable" here means the narrower and
+    more useful thing: the function *was* found and something inside it
+    could not be read. That is what lands in ``problems``.
+
+    The gap this leaves is a decorator defined outside this package
+    which pops a kwarg. There is none today, every ref decorator lives
+    in base.py or artifact.py beside the endpoints they decorate, and
+    the alternative -- resolving imports across the whole tree from
+    source -- buys a check against a shape which has never existed.
+    """
+    out: set[str] = set()
+    for dec in fn.decorator_list:
+        node = dec.func if isinstance(dec, ast.Call) else dec
+        name = _bare_name(node)
+        candidates = functions.get(name or '', [])
+        if not candidates:
+            continue
+        if len(candidates) > 1:
+            if problems is not None:
+                problems.append(
+                    '%s is decorated with %s, which is defined more than '
+                    'once in this package, so the kwargs it consumes cannot '
+                    'be told apart' % (fn.name, name))
+            continue
+        out |= _consumed_kwargs(
+            candidates[0], functions, problems, {name or ''})
+    return out
+
+
 def handlers(api_dir: str = API_DIR,
              problems: Optional[list[str]] = None
              ) -> Iterator[tuple[str, ast.Module, ast.ClassDef,
@@ -527,7 +708,17 @@ def documented(fn: ast.FunctionDef) -> bool:
 def derived_location(name: str, fn: ast.FunctionDef, tree: ast.Module,
                      cls: ast.ClassDef, routes: dict[str, set[str]],
                      problems: Optional[list[str]] = None) -> str:
-    """Where a parameter of this name actually arrives."""
+    """Where a parameter of this name actually arrives.
+
+    Called for the names a handler declares and, since #3739, for the
+    names its decorators consume as well -- see ``audit()``. A consumed
+    name takes no branch of its own: it arrives in the JSON body that
+    ``log_request`` merges into kwargs, which is the fallback below, and
+    a consumed name which is *also* a route segment or a webargs query
+    key really does come from there instead. So the answer for a
+    consumed name is derived by exactly the rules below rather than
+    asserted by the caller.
+    """
     # Every source is consulted before answering, rather than
     # short-circuiting on the first hit, so that a problem in a later
     # source is collected even for a name an earlier one resolved.
@@ -564,10 +755,18 @@ def audit(api_dir: str = API_DIR, app: Optional[str] = None
     ``problems`` is what makes that meaningful, because a source which
     could not be read produces the same empty set as one with nothing
     in it, and the derivation then confidently returns a wrong answer.
+
+    A parameter a decorator consumes and nothing declares lands in
+    ``problems`` too. It is not drift -- there is no location literal to
+    rewrite, so the fixer cannot correct it and must refuse the tree
+    instead -- and it is the one defect in here which reaches callers
+    rather than readers: an undeclared functional parameter is a 400 for
+    everyone using it the moment validation enforces (#3739).
     """
     problems: list[str] = []
     routes = route_parameters(
         app or os.path.join(api_dir, 'app.py'), problems)
+    functions = package_functions(api_dir)
     drifted = []
     underivable = []
 
@@ -580,6 +779,8 @@ def audit(api_dir: str = API_DIR, app: Optional[str] = None
         # unit test, so the pre-commit hook would still rewrite a tree
         # containing one.
         handler_kwargs(fn, problems)
+        consumed = decorator_kwargs(fn, functions, problems)
+        declared_names = set()
 
         for declared in declarations(fn, path=path, cls=cls.name):
             if declared.location in UNDERIVABLE_LOCATIONS:
@@ -598,9 +799,24 @@ def audit(api_dir: str = API_DIR, app: Optional[str] = None
                     % (cls.name, fn.name,
                        'name' if declared.name is None else 'location'))
                 continue
+            declared_names.add(declared.name)
             want = derived_location(
                 declared.name, fn, tree, cls, routes, problems)
             if declared.location != want:
                 drifted.append((declared, want))
+
+        # Gated on carrying a declaration at all, like
+        # test_accepted_parameters_are_declared: a handler absent from
+        # the published API declares nothing on purpose, and demanding
+        # a parameter of it would be demanding it be published.
+        if documented(fn):
+            for name in sorted(consumed - declared_names):
+                problems.append(
+                    '%s.%s has a decorator which consumes %r before the '
+                    'handler runs, so a caller can send it, but nothing '
+                    'declares it; declare it in the %s'
+                    % (cls.name, fn.name, name,
+                       derived_location(name, fn, tree, cls, routes,
+                                        problems)))
 
     return drifted, underivable, sorted(set(problems))
