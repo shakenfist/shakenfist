@@ -16302,7 +16302,7 @@ dedicated attribute tables:</p>
 <tr>
 <td><code>agent_operation_attributes</code></td>
 <td>AgentOperation</td>
-<td>uuid, results (JSON dict), last_progress (nullable), attempts</td>
+<td>uuid, results (JSON dict), last_progress (nullable), attempts, expiry_reason (nullable)</td>
 </tr>
 <tr>
 <td><code>instance_attributes</code></td>
@@ -16351,7 +16351,10 @@ of 0 rather than the default, because a timeout there could never fire
 and recording one would describe the operation as something it is not.</p>
 <p><code>last_progress</code> is the unix timestamp of the most recent observed
 forward progress, NULL when none has been observed, and <code>attempts</code>
-counts dispatches for the retry bound.</p>
+counts dispatches for the retry bound. <code>expiry_reason</code> is NULL until
+the operation expires, and then records which budget ran out --
+<code>deadline</code> or <code>progress</code> -- as an enumerated value the external view
+surfaces for clients to branch on.</p>
 <p><code>deadline</code> and <code>progress_timeout</code> are enforced: an operation which
 outlives either moves to the terminal <code>expired</code> state, checked at
 dequeue, during preflight and in the sidechannel executor. A NULL

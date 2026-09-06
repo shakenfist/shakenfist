@@ -13912,14 +13912,21 @@ distinct terminal state. The distinction matters operationally:
 <code>error</code> means the operation itself went wrong (the agent reported a
 failure, the command was unrecognised); <code>expired</code> means a budget the
 caller (or the server default) set simply ran out.</p>
-<p><em>Which</em> budget expired an operation is not on the operation's own
-external view -- it is in the state row's message, which is not
-surfaced as a separate field. The reliable place to read it is the
-instance's event log: <code>expire()</code> always writes an audit event against
-both the operation and the instance recording the reason, and because
-an expired operation is swept for hard deletion once the cleaner's
-delay elapses (the same as a completed one), the instance's copy of
-that event is the one that survives to be read later. When
+<p><em>Which</em> budget expired an operation is the <code>expiry_reason</code> field on
+the operation's external view: <code>deadline</code> for the wall clock,
+<code>progress</code> for the progress timeout, and null while the operation has
+not expired. The two want different responses -- a <code>deadline</code> expiry
+on a big transfer is answered by asking for a longer deadline, while a
+<code>progress</code> expiry means the guest agent stalled and a bigger deadline
+does not help -- and the field is enumerated exactly so a client can
+branch on it. The prose <em>reason</em> (which enforcement point noticed, and
+when) is in the state row's message, which is not surfaced as a
+separate field; the reliable place to read it is the instance's event
+log. <code>expire()</code> always writes an audit event against both the
+operation and the instance recording the reason and the budget, and
+because an expired operation is swept for hard deletion once the
+cleaner's delay elapses (the same as a completed one), the instance's
+copy of that event is the one that survives to be read later. When
 <code>instance execute</code>/<code>upload</code>/<code>download</code> on a current client hits a
 terminal state, it now raises <code>AgentOperationFailed</code> immediately
 rather than continuing to poll -- see the client behaviour note in the

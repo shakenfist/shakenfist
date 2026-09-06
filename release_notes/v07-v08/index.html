@@ -15038,7 +15038,10 @@ a caller may set on the request:</p>
 </ul>
 <p>Exhausting either moves the operation to <code>expired</code>, a new terminal
 state distinct from <code>error</code>: <code>error</code> means the operation failed,
-<code>expired</code> means a budget ran out, and the state's message says which.
+<code>expired</code> means a budget ran out. Which budget is the <code>expiry_reason</code>
+field on the operation's external view -- <code>deadline</code> or <code>progress</code> --
+so a client can branch on it; the prose reason is on the state row's
+message and in the audit events, not on the view.
 The budgets are enforced when an operation reaches the head of an
 instance's queue, during preflight, and while the executor is running
 it.</p>
