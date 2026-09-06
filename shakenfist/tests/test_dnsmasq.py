@@ -1,3 +1,4 @@
+import builtins
 import os
 import signal
 import tempfile
@@ -5,7 +6,6 @@ import time
 import uuid
 from unittest import mock
 
-import six
 import testtools
 from pydantic import AnyHttpUrl
 from pydantic import IPvAnyAddress
@@ -222,7 +222,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d._read_templates()
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             d._make_config(just_this_path='config')
 
         handle = mock_open()
@@ -276,7 +276,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d._read_templates()
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             d._make_config(just_this_path='config')
 
         handle = mock_open()
@@ -331,7 +331,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d._read_templates()
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             d._make_config(just_this_path='config')
 
         handle = mock_open()
@@ -405,7 +405,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d._read_templates()
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             d._make_config(just_this_path='config')
 
         handle = mock_open()
@@ -488,7 +488,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d._read_templates()
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             d._make_config(just_this_path='hosts')
 
         handle = mock_open()
@@ -539,7 +539,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d._read_templates()
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             d._make_config(just_this_path='dnshosts')
 
         handle = mock_open()
@@ -593,7 +593,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d._read_templates()
 
         mock_open = mock.mock_open()
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             d._make_config(just_this_path='dnshosts')
 
         handle = mock_open()
@@ -638,7 +638,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d = dnsmasq.DnsMasq.new(n)
 
         mock_open = mock.mock_open(read_data='424242')
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             self.assertEqual(True, d._send_signal(signal.SIGKILL))
 
         mock_pid_exists.assert_called()
@@ -661,7 +661,7 @@ class DnsMasqTestCase(testtools.TestCase):
         d = dnsmasq.DnsMasq.new(n)
 
         mock_open = mock.mock_open(read_data='424242')
-        with mock.patch.object(six.moves.builtins, 'open', new=mock_open):
+        with mock.patch.object(builtins, 'open', new=mock_open):
             self.assertEqual(False, d._send_signal(signal.SIGKILL))
 
         mock_pid_exists.assert_called()
