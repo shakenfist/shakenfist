@@ -68,6 +68,16 @@ token and virt-viewer (`.vv`) file. The audience Kerbside accepts is set by
 must equal Shaken Fist's `KERBSIDE_URL` exactly; see
 [Configuration](/components/kerbside/configuration/).
 
+**What the exchange audits.** A rejection that happens *after* the token
+verifies -- an unknown console, or a replayed `jti` -- names a verified source
+and console uuid, and is recorded as an audit event against that console. A
+rejection that happens *before* verification -- a malformed token, an unknown
+key id, a bad signature, an expired token, a wrong audience -- is logged only.
+`/sf-console.vv` is unauthenticated by design, since the Shaken Fist JWT is
+itself the credential, so those rejections can be provoked by anyone with no
+credential at all; auditing them would let an unauthenticated caller grow the
+`audit_events` table without limit, and nothing reaps it.
+
 **Backend certificate pinning.** At scrape time each console's `host_subject`
 is pinned from the hypervisor node's published SPICE server certificate subject
 (`spice_server_cert_subject`), so the proxy's backend TLS leg can verify it is
@@ -92,8 +102,20 @@ The following options are used to configure a Shaken Fist console source
 
 **Note**: The CA certificate is verified against the cluster's advertised
 certificate during initialization, and the cluster's VDI token signing keys are
-fetched at the same time. If the CA certificates do not match, or the signing
-keys cannot be fetched, the source is marked as errored.
+fetched at the same time. If the CA certificates do not match, the source is
+marked as errored and is not scraped.
+
+A failed signing key fetch is treated differently, because token exchange is
+optional and console scraping is not. The source is **not** errored: it is
+scraped as usual, its consoles stay in the inventory, and only
+`/sf-console.vv` token exchange is unavailable for that cluster until a later
+fetch succeeds. The most common cause is a cluster on which no signing key
+exists yet, because `sf-ctl ensure-kerbside-signing-key` has not been run --
+`/admin/vditokenpubkey` returns 404 until it has, and Shaken Fist never
+creates the key lazily. That case is logged at info level; a genuine failure
+such as an unreachable or unauthenticated cluster is logged as a warning.
+Kerbside refetches the keys on every maintenance pass, so nothing needs to be
+restarted once the key is created.
 
 ## oVirt
 
