@@ -85,3 +85,19 @@ class AdminVDITokenPublicKeyEndpointTestCase(base.ShakenFistTestCase):
 
         serialised = json.dumps(body)
         self.assertNotIn('private', serialised.lower())
+
+    @mock.patch(
+        'shakenfist.external_api.admin.vdi_tokens.get_signing_material')
+    def test_get_returns_500_with_message_on_corrupt_material(
+            self, mock_material):
+        # A stored row that is valid JSON but missing a member must not
+        # escape as a bare KeyError; it becomes a 500 naming the problem.
+        mock_material.return_value = {'active_kid': 'abcd1234'}
+
+        resp = self.client.get(
+            '/admin/vditokenpubkey',
+            headers={'Authorization': self.auth_token})
+
+        self.assertEqual(500, resp.status_code)
+        self.assertIn('corrupt', resp.get_json()['error'])
+        self.assertIn("'keys'", resp.get_json()['error'])
