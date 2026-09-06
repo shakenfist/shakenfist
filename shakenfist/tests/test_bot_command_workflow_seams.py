@@ -60,6 +60,14 @@ CONTAINS_RE = re.compile(
     r"contains\(\s*github\.event\.comment\.body\s*,\s*'([^']*)'\s*\)")
 
 
+# Where the bot commands are written down for people. Every mention in
+# it is inside backticks, which is what makes them findable.
+CI_DOC = os.path.join('docs', 'developer_guide', 'ci.md')
+
+
+DOCUMENTED_RE = re.compile(r'`@shakenfist-bot ([^`]+)`')
+
+
 def _repo_root():
     here = os.path.dirname(os.path.abspath(__file__))
     return os.path.dirname(os.path.dirname(here))
@@ -70,9 +78,29 @@ def _workflow_dir():
 
 
 def _triggers(workflow):
-    # YAML 1.1 reads a bare "on" as the boolean true, which is what
-    # yaml.safe_load implements and what GitHub's own parser does not.
-    return workflow.get('on', workflow.get(True))
+    """The workflow's trigger events, always as a dict keyed by event name.
+
+    Two normalisations, and both of them are the difference between this
+    file testing the tree and this file testing three files it already
+    knows about.
+
+    YAML 1.1 reads a bare "on" as the boolean true, which is what
+    yaml.safe_load implements and what GitHub's own parser does not.
+
+    And "on:" takes three shapes, not one. "on: push" is a string,
+    "on: [push, issue_comment]" is a list, and only the block form is a
+    dict. Returning them unnormalised meant the caller's isinstance
+    check dropped the other two silently -- so a fourth bot command
+    written "on: [issue_comment]" would have been excluded from every
+    assertion here, with nothing failing to say so. That is precisely
+    the workflow this file exists to cover.
+    """
+    triggers = workflow.get('on', workflow.get(True))
+    if isinstance(triggers, str):
+        return {triggers: None}
+    if isinstance(triggers, list):
+        return {trigger: None for trigger in triggers}
+    return triggers or {}
 
 
 class BotCommandWorkflowSeamsTestCase(base.ShakenFistTestCase):
@@ -85,8 +113,7 @@ class BotCommandWorkflowSeamsTestCase(base.ShakenFistTestCase):
                 continue
             with open(os.path.join(_workflow_dir(), name)) as f:
                 parsed = yaml.safe_load(f)
-            triggers = _triggers(parsed)
-            if isinstance(triggers, dict) and 'issue_comment' in triggers:
+            if 'issue_comment' in _triggers(parsed):
                 self.workflows[name] = parsed
 
     def _trigger_job(self, name):
@@ -182,3 +209,28 @@ class BotCommandWorkflowSeamsTestCase(base.ShakenFistTestCase):
             'workflow_dispatch', triggers,
             '%s has no workflow_dispatch trigger, so "please retest" '
             'cannot start it' % dispatched[0])
+
+    def test_the_documented_commands_are_the_implemented_ones(self):
+        # The drift this repairs is the one that produced the finding:
+        # ci.md advertised a bot command whose workflow had been retired,
+        # so a reader was told to type a phrase nothing listened for.
+        # Both halves matter -- an undocumented command is a feature
+        # nobody can find, and a documented one that does not exist is
+        # an instruction that fails silently -- so this compares the two
+        # sets rather than checking one direction.
+        with open(os.path.join(self.root, CI_DOC)) as f:
+            documented = set(DOCUMENTED_RE.findall(f.read()))
+
+        implemented = set()
+        for name in self.workflows:
+            _, _, step = self._trigger_job(name)
+            implemented.add(step['with']['trigger-phrase'])
+
+        self.assertEqual(
+            implemented, documented,
+            'the bot commands in %s and the trigger phrases in '
+            '.github/workflows/ disagree. Documented but not '
+            'implemented: %s. Implemented but not documented: %s.'
+            % (CI_DOC,
+               ', '.join(sorted(documented - implemented)) or 'none',
+               ', '.join(sorted(implemented - documented)) or 'none'))

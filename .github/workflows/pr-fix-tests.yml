@@ -37,6 +37,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       authorized: ${{ steps.trigger.outputs.authorized }}
+      same_repo: ${{ steps.trigger.outputs.same-repo }}
       pr_ref: ${{ steps.trigger.outputs.pr-ref }}
       pr_number: ${{ github.event.issue.number }}
 
@@ -54,7 +55,19 @@ jobs:
 
   fix-tests:
     needs: trigger-fix
-    if: needs.trigger-fix.outputs.authorized == 'true'
+    # same_repo is redundant -- pr-bot-trigger folds the fork check into
+    # authorized -- and it is stated twice here for the same reason
+    # pr-re-review.yml states it twice, only more so. This lane pushes
+    # commits: test-drift-fix.yml checks out pr_ref and pushes to it,
+    # and pr_ref is `.head.ref`, a bare branch name resolved against
+    # *this* repository. A fork pull request opened from the fork's
+    # default branch names "main". A regression in the shared action
+    # must not be able to quietly turn that into unreviewed commits on
+    # the default branch, and a reader must be able to see the
+    # restriction without leaving the file.
+    if: >-
+      needs.trigger-fix.outputs.authorized == 'true' &&
+      needs.trigger-fix.outputs.same_repo == 'true'
     uses: ./.github/workflows/test-drift-fix.yml
     with:
       ref: ${{ needs.trigger-fix.outputs.pr_ref }}
