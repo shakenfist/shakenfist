@@ -177,6 +177,12 @@ def load_cluster_config() -> None:
 
             for key_name, value_raw in rows:
                 if not _exportable_cluster_config_key(key_name):
+                    # Withheld silently and on purpose: this runs at
+                    # import time, before logging is configured, so
+                    # there is nowhere to say so. `sf-ctl show-config`
+                    # lists every row (redacting the values) and is the
+                    # diagnosis path for an operator whose undeclared,
+                    # secret-named row is not reaching a daemon.
                     continue
                 # Raw SQL gets the stored string; JSON-decode so we
                 # match the gRPC path's behavior.
@@ -217,6 +223,7 @@ def load_cluster_config() -> None:
 
         for entry in response.entries:
             if not _exportable_cluster_config_key(entry.key_name):
+                # See the direct branch above for why this is silent.
                 continue
             value = json.loads(entry.value_json)
             os.environ['SHAKENFIST_%s' % entry.key_name] = str(value)

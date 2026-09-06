@@ -79,6 +79,17 @@ _SPICE_SUBJECT_SHORT_NAMES = {
 _SPICE_SUBJECT_WARNED: set[str] = set()
 
 
+# ObjectIdentifier._name is private API in cryptography, and it is used
+# deliberately: it yields the human name an operator needs to recognise
+# the offending attribute ("serialNumber"). The public alternative,
+# NameAttribute.rfc4514_attribute_name, returns the dotted string for
+# anything outside its own short-name table -- '2.5.4.5' for
+# serialNumber on cryptography 50.0.1 -- which is exactly the value we
+# already log as the oid field, so it would cost the diagnosis and buy
+# nothing. Every read is getattr-guarded and degrades to 'unknown', and
+# test_unnameable_attribute_warns_once_and_names_the_oid asserts the
+# name reaches the message, so an upstream removal surfaces in CI
+# rather than in production.
 def _warn_spice_subject_once(reason: str, fields: dict, message: str) -> None:
     """Log a SPICE subject warning the first time each reason occurs."""
     if reason in _SPICE_SUBJECT_WARNED:
@@ -95,10 +106,10 @@ def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
     count, types, and (case- and whitespace-normalised) values. The
     string must therefore list the attributes in that same order, using
     the OpenSSL short names, with backslash and comma escaped in values.
-    Returns None if the subject carries an attribute we cannot name or a
-    value we cannot render, since that would make an exact, matchable
-    rendering impossible (and a partial one would wrongly reject the
-    backend).
+    Returns None if the subject is empty, carries an attribute we cannot
+    name, or carries a value we cannot render, since none of those can
+    produce an exact, matchable rendering (and a partial one would
+    wrongly reject the backend).
 
     Returning None fails open: spice_server_cert_subject becomes None,
     kerbside's scrape sets host_subject to None, and the proxy will
@@ -140,6 +151,26 @@ def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
             return None
         escaped = value.replace('\\', '\\\\').replace(',', '\\,')
         parts.append('%s=%s' % (short, escaped))
+
+    if not parts:
+        # An empty subject is legal, and increasingly common: a SAN-only
+        # certificate from a modern CA carries no subject attributes at
+        # all. Falling through to ','.join([]) would return '' -- which
+        # is not None, so the caller would treat it as a successful read,
+        # clear the warn-once state, and publish an empty
+        # spice_server_cert_subject. Every consumer tests truthiness
+        # (external_api/instance.py's `if subject:`, kerbside's
+        # `or None`), so pinning would be disabled exactly as it is for
+        # an unrenderable subject, but with none of the warning that
+        # exists to make that discoverable. Fail to None like the other
+        # two paths.
+        _warn_spice_subject_once(
+            'empty-subject',
+            {'path': SPICE_SERVER_CERT_PATH},
+            'SPICE certificate has an empty subject, so there is nothing '
+            'to pin. Host-subject pinning is disabled for this node.')
+        return None
+
     return ','.join(parts)
 
 

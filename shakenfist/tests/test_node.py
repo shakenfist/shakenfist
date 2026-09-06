@@ -1378,6 +1378,38 @@ class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
         warnings = mock_log.with_fields.return_value.warning.call_args_list
         self.assertEqual(2, len(warnings))
 
+    def test_empty_subject_disables_pinning_and_warns(self):
+        # A SAN-only certificate carries no subject attributes at all.
+        # Rendering it produced '' rather than None, which is not None,
+        # so the caller counted it as a successful read: it cleared the
+        # warn-once state and published an empty subject. Consumers test
+        # truthiness, so pinning was disabled with no warning anywhere --
+        # the same silent fail-open the warnings exist to expose.
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for([]))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(1, len(warnings))
+        self.assertIn('empty subject', warnings[0][0][0])
+
+    def test_empty_subject_does_not_clear_the_warn_once_state(self):
+        # The regression this pairs with: returning '' looked like a
+        # successful read, so it reset the throttle and masked a
+        # genuine problem reported moments earlier.
+        broken = [
+            (NameOID.COMMON_NAME, 'hv1'),
+            (NameOID.SERIAL_NUMBER, '12345'),
+        ]
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for(broken))
+            self.assertIsNone(self._subject_for([]))
+            self.assertIsNone(self._subject_for(broken))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        # One for the unnameable attribute, one for the empty subject,
+        # and crucially not a second copy of the first.
+        self.assertEqual(2, len(warnings))
+
     def test_unnameable_attribute_warns_once_and_names_the_oid(self):
         # Returning None fails open -- pinning is silently disabled for
         # this node, and on an operator's own PKI that can be every node

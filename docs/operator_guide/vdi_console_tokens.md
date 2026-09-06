@@ -228,10 +228,17 @@ anything else — a `serialNumber`, a custom OID — cannot be rendered exactly,
 and a partial rendering would wrongly reject the backend, so the node
 publishes nothing and enforcement is disabled for it. If your CA issues such
 subjects this happens on every node at once. It is not silent: each node
-logs a warning naming the offending attribute and its OID once per daemon
-start, so grep your logs for `no SPICE host-subject short name` if
+logs a warning naming the offending attribute and its OID once per episode
+rather than once per read — a certificate which is repaired and later
+regresses warns a second time, because that recurrence is the event you
+need to see. Grep your logs for `no SPICE host-subject short name` if
 `spice_server_cert_subject` is unexpectedly absent from a node in
 `GET /nodes`.
+
+A certificate with an empty subject — a SAN-only certificate, which some
+modern CAs issue by default — has nothing to pin and is treated the same
+way: nothing is published, enforcement is disabled for that node, and the
+node logs `empty subject`.
 
 ## Related pages
 
