@@ -853,8 +853,6 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "net", "", "")
           or
-          label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "queues", "", "")
-          or
           label_replace(label_replace(vector(1), "operation", "GetObjectState", "", ""), "caller_daemon", "resources", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
@@ -877,8 +875,6 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "net", "", "")
           or
-          label_replace(label_replace(vector(1), "operation", "RecordEventBatch", "", ""), "caller_daemon", "queues", "", "")
-          or
           label_replace(label_replace(vector(1), "operation", "RecordRelationship", "", ""), "caller_daemon", "cleaner", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "ReleaseLock", "", ""), "caller_daemon", "cleaner", "", "")
@@ -888,8 +884,6 @@ groups:
           label_replace(label_replace(vector(1), "operation", "SetNodeDaemonState", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "SetObjectState", "", ""), "caller_daemon", "net", "", "")
-          or
-          label_replace(label_replace(vector(1), "operation", "SetObjectState", "", ""), "caller_daemon", "queues", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "UpdateBlobLastUsed", "", ""), "caller_daemon", "cleaner", "", "")
           or

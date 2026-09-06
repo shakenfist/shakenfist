@@ -418,11 +418,23 @@ entries:
     caller_daemon: queues
     per_node_base_qps: 0.113
     per_instance_qps: 0.04
+    activity_coupled: true
     measured:
       mean_qps: 1.408
       r2: 0.512
     note: >-
-      State reads while processing queued work.
+      State reads while processing queued work, plus one per node every
+      ten seconds which is not. Node.set_daemon_state() reads the node's
+      own state row on every call and sf-queues calls it three times per
+      thirty second health check pass, which is what per_node_base_qps
+      measures -- the two sibling pairs from those same three calls,
+      SetNodeDaemonState and GetAllNodeDaemonStates, are both 0.099. The
+      rest is per work item: an operation's dependency scan, its two
+      state transitions, and one read per task. The model has no term
+      for that, so on a cluster small enough for the poll floor to be
+      dwarfed by a busy suite this reads far over model with nothing
+      wrong. Activity coupled for that reason (#4092); the poll half
+      stays enforced through those two siblings, which carry no churn.
   - operation: GetQueueLength
     caller_daemon: resources
     per_node_base_qps: 0.229
@@ -841,11 +853,22 @@ entries:
     caller_daemon: queues
     per_node_base_qps: 0.01
     per_instance_qps: 0.016
+    activity_coupled: true
     measured:
       mean_qps: 0.349
       r2: 0.405
     note: >-
-      Event logging from queue workers.
+      Event logging from queue workers. The drainer thread wakes every
+      hundred milliseconds but returns before the RPC when the spool is
+      empty (eventlog_drainer.py, _drain_one_batch), so a worker doing
+      nothing issues none of these at all: the rate is the event
+      production rate divided by the batch size. In this daemon that
+      production is per work item -- a state mutation audit, the
+      execution duration event, a defer event -- so the level is set by
+      how much work is flowing. Activity coupled (#3999). The cluster
+      and net entries for this operation are deliberately left enforced,
+      because their event production is driven by maintenance sweeps on
+      a fixed cadence rather than by dequeued work.
   - operation: GetInstanceAttributes
     caller_daemon: resources
     per_node_base_qps: 0.008
@@ -881,12 +904,18 @@ entries:
     caller_daemon: queues
     per_node_base_qps: 0.007
     per_instance_qps: 0.013
+    activity_coupled: true
     measured:
       mean_qps: 0.272
       r2: 0.54
     note: >-
-      State transitions written as objects move through their
-      lifecycle. This is work rather than polling, so it tracks churn.
+      State transitions written as objects move through their lifecycle.
+      This is work rather than polling, so it tracks churn, and unlike
+      the GetObjectState pair there is no poll underneath it: the only
+      write on the health check path is Node.set_daemon_state()'s
+      degraded reconcile, which is guarded on the state actually
+      changing and so never fires on a healthy cluster. The per-node
+      term is fit noise. Activity coupled (#4092).
   - operation: GetObjectsByState
     caller_daemon: cluster
     cluster_base_qps: 0.222

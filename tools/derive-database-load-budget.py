@@ -46,13 +46,21 @@ issue number. Provisional entries are reported by every consumer and
 enforced by none, so the defect does not become the floor that every
 detector then protects.
 
+**A pair whose level the workload sets is not a poll.** The caller rule
+below marks every ``api``, ``unknown`` and ``ctl`` pair ``activity_coupled``
+because none of those is one of our loops, but a pair called from one of
+our daemons can be workload driven too -- a queue worker's state reads
+happen once per work item, not once per tick. Mark those by hand, the same
+way as ``provisional``, and say in the note which of the two it is.
+
 Everything which is judgement rather than measurement is carried forward
 from the budget being replaced, named by ``--previous`` and defaulting to
-the shipped file: the ``defaults`` block, and each surviving pair's note
-and provisional marking. Only a pair which did not exist before gets a
-placeholder note, and the tool says on stderr how many did. This used to be
-a hand restoration step described in this docstring, which meant running
-the command above emitted a file that failed the repository's own tests --
+the shipped file: the ``defaults`` block, and each surviving pair's note,
+provisional marking and activity coupling. Only a pair which did not exist
+before gets a placeholder note, and the tool says on stderr how many did.
+This used to be a hand restoration step described in this docstring, which
+meant running the command above emitted a file that failed the
+repository's own tests --
 ``test_doc_block_records_its_provenance`` and
 ``test_provisional_entries_name_an_issue_and_are_not_enforced`` both assert
 things ``emit()`` never wrote. A generator whose output does not pass is a
@@ -311,6 +319,19 @@ def collect(args):
     return by_time, pairs
 
 
+# Callers which are nobody's loop: api is gunicorn serving whatever a
+# client asked for, ctl is the operator's CLI, and unknown is a caller
+# which never claimed an identity. to_entry() marks these activity coupled
+# without being asked, because their level is set by what somebody does
+# rather than by a cadence we choose.
+#
+# This is the default for a pair nobody has judged, not the definition of
+# the flag. A pair called from one of our own daemons can be workload
+# driven too -- a queue worker reads and writes object state once per work
+# item -- and those are marked by hand and carried forward by emit().
+NOT_OUR_LOOPS = ('api', 'unknown', 'ctl')
+
+
 def to_entry(key, stats, nodes):
     operation, caller = key
     # The elected cluster daemon does its maintenance sweeps once for the
@@ -343,7 +364,7 @@ def to_entry(key, stats, nodes):
             entry.pop(term, None)
         entry.update(override)
 
-    if caller in ('api', 'unknown', 'ctl'):
+    if caller in NOT_OUR_LOOPS:
         entry['activity_coupled'] = True
     entry['measured'] = {'mean_qps': round(stats['mean'], 3),
                          'r2': round(stats['r2'], 3)}
@@ -366,9 +387,10 @@ def load_previous(path):
     Everything in a budget which is judgement rather than measurement --
     the tuned defaults, the note naming the loop behind each pair, the
     provisional marking saying a pair is a known defect rather than a
-    floor -- lives only in this file. A re-derivation which does not read
-    it deletes all of it, which is why the tool used to emit something
-    that failed the repository's own tests.
+    floor, the activity coupling saying its level is set by the workload
+    rather than by a loop -- lives only in this file. A re-derivation
+    which does not read it deletes all of it, which is why the tool used
+    to emit something that failed the repository's own tests.
     """
     if not path:
         return None
@@ -383,7 +405,12 @@ def load_previous(path):
 
 
 def carried_forward(previous):
-    """Per-pair notes and provisional markings from the previous budget."""
+    """Per-pair judgement from the previous budget.
+
+    The note naming the loop, the provisional marking and the activity
+    coupling: three things a measurement cannot produce and a
+    re-derivation must not lose.
+    """
     if not previous:
         return {}
     return {(e.get('operation'), e.get('caller_daemon')): e
@@ -437,7 +464,16 @@ def emit(entries, by_time, args, out, coverage=None, previous=None):
                   'per_instance_qps'):
             if k in entry:
                 out.write('    %s: %s\n' % (k, entry[k]))
-        if entry.get('activity_coupled'):
+        # An activity coupled marking says "the level of this pair is set
+        # by how much work is flowing, not by one of our loops, so it is
+        # not a floor worth failing a build over". to_entry() can only
+        # derive that from the caller, which catches api, ctl and unknown
+        # and cannot catch a queue worker's per-work-item reads. Those are
+        # marked by hand, and a re-derivation used to silently delete
+        # them: the flag was emitted from the freshly fitted entry alone
+        # while the note and provisional marking beside it were read from
+        # the file. That is issue 4092.
+        if entry.get('activity_coupled') or before.get('activity_coupled'):
             out.write('    activity_coupled: true\n')
 
         # A provisional marking says "there is an open bug about this pair
@@ -551,8 +587,9 @@ def main():
     carried = carried_forward(previous)
     new_pairs = [k for k in kept if k not in carried]
     sys.stderr.write(
-        '%d pairs carried their note and provisional marking forward from '
-        '%s; %d are new and have a placeholder note to write: %s\n'
+        '%d pairs carried their note, provisional marking and activity '
+        'coupling forward from %s; %d are new and have a placeholder note '
+        'to write: %s\n'
         % (len(kept) - len(new_pairs), args.previous or 'nothing',
            len(new_pairs),
            ', '.join('%s/%s' % k for k in sorted(new_pairs)) or 'none'))
