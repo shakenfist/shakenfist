@@ -5258,6 +5258,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-differencing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VHD and VHDX differencing output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13914,6 +13942,13 @@ at the repo root).</p>
 <td>Cut the v0.3.0 tag and publish signed GitHub Release artifacts (tarball, .deb, .rpm) for x86_64 Linux, with the packaging manifests brought up to the 15/15 subcommand roster and the package smoke test extended to prove it</td>
 <td>Complete</td>
 <td>(no phase files; sequential gates)</td>
+</tr>
+<tr>
+<td>2026-09-05</td>
+<td><a href="/components/instar/plans/PLAN-differencing/">VHD and VHDX differencing output</a></td>
+<td>Emit differencing VHD (<code>disk_type=4</code> + parent locator table) and differencing VHDX (<code>HasParent</code> + parent locator metadata item) from <code>create -b</code>, add parent-locator parsing to the vhd and vhdx crates, and close the silent parent-ignoring read of differencing children. An instar-only capability: qemu-img creates neither and reads both as though the parent did not exist, so the plan establishes an external oracle first</td>
+<td>In progress</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-01-pin/">1: pin + oracle</a> ✓, 2: fixtures, 3: parse, 4: read policy, 5: vhd emitter, 6: vhdx emitter, 7: guest + host, 8: tests, 9: fuzz, 10: docs, 11: chain host, 12: vhd compose, 13: vhdx compose, 14: op rollout, 15: compose tests, 16: compose docs, 17: push audit</td>
 </tr>
 </tbody>
 </table>
