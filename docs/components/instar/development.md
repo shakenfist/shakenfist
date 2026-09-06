@@ -73,32 +73,52 @@ pull request path looks at the floor; and the failure surfaced as three
 red distros in the merge queue after the change was already on
 `develop`. The cheap check exists to make that a pull request failure.
 
-#### When bullseye reaches end of life
+#### bullseye reached end of life: apt is pinned to a snapshot
 
-**Debian 11 LTS ends on 2026-08-31**
-([wiki.debian.org/LTS](https://wiki.debian.org/LTS)). "Do not bump this
-tag" is not meant to outlive that date unexamined, so here is what
-happens and what the options are.
+**Debian 11 LTS ended on 2026-08-31**
+([wiki.debian.org/LTS](https://wiki.debian.org/LTS)), and it broke the
+image within a week, exactly as predicted: not as a glibc change but as
+an `apt-get` failure on a runner with no cached `instar-release`, while
+every warm runner stayed green. First the `deb.debian.org` CDN began
+returning 404 for pool objects the `bullseye-security` index still
+advertised (`gnupg2`, `glibc`, `xz-utils`), then the final
+`bullseye-security` `Release` expired at 2026-09-07 21:13 UTC, after
+which apt rejects the suite outright. See
+[#550](https://github.com/shakenfist/instar/issues/550).
 
-The failure mode is not a glibc change — it is the image's
-`apt-get update` starting to fail once bullseye moves to
-`archive.debian.org`, which breaks from-scratch builds of
-`instar-release` while an already-built image keeps working. Expect it
-to surface as a red CI job on a runner that had no cached image, not as
-a support-matrix regression.
+**The decision taken was the snapshot pin.**
+`src/.devcontainer/build/Dockerfile` still says `FROM debian:bullseye`,
+but rewrites `/etc/apt/sources.list` to a frozen
+[snapshot.debian.org](https://snapshot.debian.org/) timestamp
+(`ARG DEBIAN_SNAPSHOT`, currently `20260901T000000Z` — just after the
+last `bullseye-security` publication, so the image carries the final
+security state of the suite) and sets
+`Acquire::Check-Valid-Until "false"`, because a snapshot serves the
+historical `Release` file including its long-past `Valid-Until`. gpg
+signature verification stays on; the sources stay `http://` because the
+base ships no `ca-certificates` and that is the layer installing it.
+`archive.debian.org` was not usable: it carries
+`debian/dists/bullseye` but still has no
+`debian-security/dists/bullseye-security`.
 
-No option is free, because "move to the next Debian" is not available:
+The cost is a build toolchain that no longer receives updates. That is
+accepted deliberately — the shipped binary's security posture rests on
+the Rust toolchain (pinned, and bumped weekly by
+`rust-nightly-bump.yml`) and on our own code, not on the build image's
+C library, none of which is linked into the artifact beyond glibc
+itself.
+
+To move the pin, change `DEBIAN_SNAPSHOT` only. Do not change
+`FROM debian:bullseye`, and do not "fix" a future apt failure by
+pointing back at `deb.debian.org`.
+
+##### The options that were not taken
+
+No option was free, because "move to the next Debian" is not available:
 bookworm ships glibc 2.36, above both the 2.31 we publish and the 2.34
 the matrix needs, so taking it silently drops Debian 11, Ubuntu 22.04
 and Rocky 9.
 
-- **Pin a `snapshot.debian.org` bullseye base** and point apt at the
-  same snapshot. Keeps the floor and the support matrix exactly as
-  published; costs a frozen, unpatched build toolchain. The binary's
-  security posture depends on the Rust toolchain and our own code far
-  more than on the build image's C library, so this is the least
-  disruptive option, and the one to reach for if the deadline arrives
-  before a decision does.
 - **Move to bookworm and narrow the promise** to glibc 2.36. This drops
   Debian 11, Ubuntu 22.04 LTS and Rocky/RHEL 9 — the last of which is
   in the matrix CI and, per

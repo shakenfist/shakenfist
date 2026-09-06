@@ -64,6 +64,11 @@ reachability from in-repo callers was tried and is wrong -- it exempted
 group runs four nested clusters through, because a scheduled canary
 also calls it.
 
+A trigger line carrying a trailing comment -- `merge_group:  # the
+merge tier` -- is a trigger. It used to read as an absence of one, so
+the whole workflow was skipped; a repository written that way starts
+being measured, and may start failing, without having changed.
+
 Out of scope: jobs whose `if:` excludes `merge_group`. Deliberate
 exceptions take an `audit-ok: merge-group-cancellation` comment, read
 per job -- a marker inside a job exempts that job, and only a marker

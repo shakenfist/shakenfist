@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-05T10:11:43.218556+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-06T10:33:10.891686+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -316,6 +316,37 @@ Details for non-compliant projects:
 - **uncalibrated-sextant** (Status): Missing .github/workflows/export-repo-config.yml
 - **visual-digest-rust** (Status): Missing .github/workflows/export-repo-config.yml
 
+## fuzz-nightly-reporting
+
+Criterion: [fuzz-nightly-reporting.md](/components/development/audits/fuzz-nightly-reporting/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | N/A | - |
+| instar | compliant | - |
+| kerbside | N/A | - |
+| kerbside-client | N/A | - |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | N/A | - |
+| private-ci | N/A | - |
+| ryll | non-compliant | shakenfist/ryll#361 |
+| sfui | N/A | - |
+| shakenfist | N/A | - |
+| uncalibrated-sextant | N/A | - |
+| visual-digest-rust | N/A | - |
+
+Details for non-compliant projects:
+
+- **ryll** (Status): runs fuzz targets on merge_group in ci.yml, where the cost is charged against the queue timeout; no schedule trigger on ci.yml, so the targets only run when somebody dispatches them
+
 ## github-security
 
 Criterion: [github-security.md](/components/development/audits/github-security/)
@@ -339,7 +370,7 @@ Criterion: [github-security.md](/components/development/audits/github-security/)
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#3056 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#20 |
 | visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#20 |
 
@@ -349,7 +380,6 @@ Details for non-compliant projects:
 - **cloudgood** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
 - **kerbside-client** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
 - **library-utilities** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
-- **shakenfist** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
 - **uncalibrated-sextant** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
 - **visual-digest-rust** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
 
@@ -612,7 +642,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#103 |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#554 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
@@ -628,8 +658,9 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 Details for non-compliant projects:
 
 - **divergulent** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md
+- **instar** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)
 - **occystrap** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-quay-label-search.md (no push audit phase; phase 5 is "5. Filter by tag age (since parameter)"); 1 plan(s) with no phases this check can read, not judged: PLAN-info-check.md
-- **shakenfist** (Status): 2 of 18 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-kerbside-vdi-tokens.md (push audit phase is not last, so phase 11 ("11. Close out the post-completion defects (#4003, #4009)") is unaudited; move the audit phase after it); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
+- **shakenfist** (Status): 2 of 17 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-kerbside-vdi-tokens.md (push audit phase is not last, so phase 11 ("11. Close out the post-completion defects (#4003, #4009)") is unaudited; move the audit phase after it); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
 ## plan-index
@@ -679,7 +710,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | cloudgood | compliant | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#553 |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
 | kerbside-patches | compliant | - |
@@ -695,7 +726,8 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
-- **shakenfist** (Status): 24 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:70, docs/developer_guide/ci.md:132, docs/developer_guide/ci.md:185, docs/developer_guide/ci.md:236, docs/developer_guide/ci.md:237, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:110 (+14 more)
+- **instar** (Status): 6 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/quirks.md:4199, docs/quirks.md:4205, docs/quirks.md:4206, docs/quirks.md:4407, docs/quirks.md:4463, docs/quirks.md:4464
+- **shakenfist** (Status): 24 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:71, docs/developer_guide/ci.md:133, docs/developer_guide/ci.md:216, docs/developer_guide/ci.md:267, docs/developer_guide/ci.md:268, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:110 (+14 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
 
@@ -728,7 +760,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 Details for non-compliant projects:
 
-- **actions** (Status): 3 of 3 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): .github/workflows/smoke-cluster.yml:268 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:14 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_launch.sh:13 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md
+- **actions** (Status): 4 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): .github/workflows/smoke-cluster.yml:268 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:14 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:35 -> docs/plans/PLAN-ci-cloud-sizing-phase-02-baseline.md, tools/ci_headroom_launch.sh:13 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md
 - **visual-digest-rust** (Status): 1 of 1 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist-visual-digest/tests/qr.rs:7 -> PLAN-test-harness-phase-01-digest-crate.md
 
 ## plan-template
@@ -929,36 +961,25 @@ Criterion: [release-process.md](/components/development/audits/release-process/)
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | N/A | - |
-| agent-python | non-compliant | shakenfist/agent-python#135 |
-| client-python | non-compliant | shakenfist/client-python#391 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#54 |
-| clingwrap | non-compliant | shakenfist/clingwrap#131 |
+| agent-python | compliant | - |
+| client-python | compliant | - |
+| client-python-k3s | compliant | - |
+| clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
-| divergulent | non-compliant | shakenfist/divergulent#106 |
+| divergulent | compliant | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#408 |
+| kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#132 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4082 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **agent-python** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
-- **client-python** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
-- **client-python-k3s** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
-- **clingwrap** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
-- **divergulent** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
-- **kerbside** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
-- **occystrap** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success
-- **shakenfist** (Status): the github-release job downloads artifacts without "name:" or "merge-multiple: true", so the files do not land where its "files:" glob looks and the release is published empty; add "name: dist" and "path: dist/" as the publish job does; the github-release job attaches release assets without "fail_on_unmatched_files: true", so a glob which matches nothing is a warning and an empty release still reports success; release.yml can be started by hand but its publishing jobs are not confined to tags: sign-tag, publish-pypi, publish-collection, github-release lack "if: startsWith(github.ref, 'refs/tags/v')", so a manual run on a branch force-pushes a "refs/tags/refs/heads/<branch>" tag and proceeds to publish
 
 ## renovate-lockstep-groups
 
@@ -1040,7 +1061,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#45 |
+| development | non-compliant | shakenfist/development#103 |
 | divergulent | N/A | - |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
@@ -1057,9 +1078,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 0 of 93 in-scope files reviewed at HEAD; 93 need review (threshold 5)
-- **development** (Status): 153 of 174 in-scope files reviewed at HEAD; 21 need review (threshold 5)
-- **kerbside** (Status): 120 of 229 in-scope files reviewed at HEAD; 109 need review (threshold 5)
+- **actions** (Status): 0 of 94 in-scope files reviewed at HEAD; 94 need review (threshold 5)
+- **development** (Status): 160 of 176 in-scope files reviewed at HEAD; 16 need review (threshold 5)
+- **kerbside** (Status): 117 of 229 in-scope files reviewed at HEAD; 112 need review (threshold 5)
 - **ryll** (Status): 85 of 188 in-scope files reviewed at HEAD; 103 need review (threshold 5)
 
 ## review-scope-completeness
@@ -1274,14 +1295,13 @@ Criterion: [undeclared-direct-dependency.md](/components/development/audits/unde
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4044 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
 
 Details for non-compliant projects:
 
 - **kerbside** (Status): Imported but declared only as a transitive pin: packaging (pyproject.toml:110), PyJWT (pyproject.toml:113), requests (pyproject.toml:118), urllib3 (pyproject.toml:125). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run
-- **shakenfist** (Status): Imported but declared only as a transitive pin: jsonschema (pyproject.toml:134), packaging (pyproject.toml:142), pylogrus (pyproject.toml:144), six (pyproject.toml:151). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run
 
 ## unused-declared-dependency
 
@@ -1306,7 +1326,7 @@ Criterion: [unused-declared-dependency.md](/components/development/audits/unused
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4043 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
 
@@ -1316,7 +1336,6 @@ Details for non-compliant projects:
 - **client-python** (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **kerbside** (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
-- **shakenfist** (Status): Declared but never imported: chardet (pyproject.toml:101), clingwrap (pyproject.toml:37), gevent (pyproject.toml:67), greenlet (pyproject.toml:66), grpcio-status (pyproject.toml:95), grpcio-tools (pyproject.toml:96), pbr (pyproject.toml:57), requests-toolbelt (pyproject.toml:100), urllib3 (pyproject.toml:102), uv (pyproject.toml:32). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 
 ## version-file-gitignore
 
@@ -1390,7 +1409,7 @@ Details for non-compliant projects:
 - **occystrap** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:17 (self-hosted, vm, debian-12), python-unit-tests.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **shakenfist** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **shakenfist** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:718 (self-hosted, vm, debian-12), pin-indirect-dependencies.yml:50 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
-- **shakenfist** (devpi fallback): 9 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:133, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: https://pypi.org/simple/" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"
+- **shakenfist** (devpi fallback): 10 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:133, merge-failure-triage.yml:128, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: https://pypi.org/simple/" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"
 - **uncalibrated-sextant** (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **uncalibrated-sextant** (Permissions): 1 workflow(s) missing top-level permissions: pre-commit.yml
 - **visual-digest-rust** (VM size): 1 "vm" runner job(s) naming no size: ci.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
