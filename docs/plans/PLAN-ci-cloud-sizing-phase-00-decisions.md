@@ -215,6 +215,18 @@ already had to say "DO NOT FIX THIS" in capitals once.
 
 ### D7 -- The 12-versus-10 ledger discrepancy is phase 2's to resolve (survey)
 
+**CLOSED by the phase 2 survey: the tier's ledger is 12, and the
+discrepancy no longer exists.** Phase 1's headroom series reports a
+`slim-tier` cluster ledger of exactly 12.0 with per-node limits of
+3, 6 and 3, over 399 node-samples carrying a real capacity row and
+zero fallbacks to `cpu_hard_max`; and #3907, closed COMPLETED on
+2026-08-27, quotes the `cluster_capacity` singleton itself refusing
+a claim with `cpus (limit 12, used 9, requested 4)`. Both halves
+agree. Phase 2 confirms the fallback count across its whole window
+rather than re-litigating the figure, because a node without a
+capacity row would change what the ledger column means. The
+original decision is kept below with its reasoning intact.
+
 **Decision:** phase 2 reconciles the live derivation in
 `Scheduler._has_sufficient_cpu` against the reconciled
 `cluster_capacity.total_cpus` for the same cluster, and reports which

@@ -998,17 +998,27 @@ class Scheduler:
         # real one is how the two come to disagree. This is the same
         # read the CPU pre-filter makes, through the same helper.
         #
-        # A degraded read is discarded here rather than acted on: this
-        # summary has no instance to record an event against, and a
-        # failed read leaves every node reporting as uncounted, which is
-        # exactly what it already did.
-        capacity, _ = self._capacity_by_node()
+        # A degraded read is not acted on here: this summary has no
+        # instance to record an event against, and a failed read leaves
+        # every node reporting as uncounted, which is exactly what it
+        # already did. That reasoning still only covers eventing --
+        # it is not a reason to keep the flag out of the response body.
+        # A caller sampling this endpoint over time (the CI headroom
+        # probe, for one) has the same problem the pre-filter does: an
+        # empty `capacity` mapping is indistinguishable from a genuinely
+        # unpopulated table unless something says which. Publishing the
+        # flag below costs nothing here and lets that caller tell the
+        # two apart instead of discarding every sample from a failed
+        # read alongside every sample from a cluster the reconciler
+        # simply has not reached yet (P7).
+        capacity, capacity_degraded = self._capacity_by_node()
 
         # Only hypervisors with reasonable queue lengths are candidates
         resources = {
             'total': {
                 'cpu_available': 0,
-                'ram_available': 0
+                'ram_available': 0,
+                'capacity_degraded': capacity_degraded,
             },
             'per_node': {}
         }
