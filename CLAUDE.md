@@ -362,8 +362,10 @@ does not start**. The rules, in full in
 3. A `path` parameter must be `required=True`.
 4. A raw request body is declared as `api_base.RAW_BODY_PARAMETER`, and
    cannot be combined with named body parameters.
-5. Every kwarg the handler accepts is declared; decorator-injected
-   `*_from_db` objects are not parameters.
+5. Every kwarg the handler accepts is declared, including one a
+   decorator pops out of `kwargs` before the handler runs (the ref
+   decorators' `namespace`); decorator-injected `*_from_db` objects
+   are not parameters.
 6. The type is a token from `api_base.ARGTYPES`. Objects and arrays of
    objects can only be declared in the body, since outside one there is
    no schema object to nest a structure in.

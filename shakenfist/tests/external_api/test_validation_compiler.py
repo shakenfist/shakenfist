@@ -8,6 +8,8 @@ which is the property phase 4 turns into rejections, and so the last
 point at which a mistake is cheap.
 """
 
+from unittest import mock
+
 import marshmallow
 from marshmallow import fields
 
@@ -270,6 +272,62 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
                 self.assertEqual([1, 2, 3], value.deserialize([1, 2, 3]))
                 self.assertEqual('a string', value.deserialize('a string'))
                 self.assertIsNone(value.deserialize(None))
+
+    def test_any_is_not_compiled_through_the_unrecognised_type_path(self):
+        """'any' is deliberate, so it must not use the fallback.
+
+        Both paths return fields.Raw, so the resulting *field* cannot
+        tell them apart -- only the warning can, and the warning is the
+        point. The fallback shouts "unrecognised parameter type in the
+        published specification", which is a real signal: a token the
+        vocabulary defines and the compiler does not is a compiler bug.
+        While 'any' took that path, sf-api logged fourteen of those at
+        every start and a genuinely unrecognised token was
+        indistinguishable from the expected noise.
+
+        Asserted over a whole registry build rather than one call,
+        because the property wanted is that a correct tree compiles
+        silently -- which also fails the day a real unrecognised token
+        arrives, and that is a failure worth having.
+        """
+        with mock.patch.object(validation, 'LOG') as mock_log:
+            validation.build_registry(external_api.app)
+
+        self.assertEqual(
+            [], mock_log.with_fields.return_value.warning.call_args_list,
+            'compiling the published specification warned. Either a type '
+            'token really is unrecognised, or a deliberate one has fallen '
+            'back into the unrecognised path the way `any` once did.')
+
+    def test_an_unrecognised_token_still_warns(self):
+        """The mutation check on the test above.
+
+        A LOG patched over the whole build would also record nothing if
+        the warning had simply been deleted, so this proves the
+        fallback is still there and still audible, and that the
+        assertion above is looking in the place a warning would land.
+        """
+        with mock.patch.object(validation, 'LOG') as mock_log:
+            field = validation._field({'type': 'widget'})
+
+        self.assertIsInstance(field, fields.Raw)
+        self.assertEqual(
+            1, mock_log.with_fields.return_value.warning.call_count)
+
+    def test_the_any_rendering_is_the_one_the_vocabulary_publishes(self):
+        """The compiler recognises `any` by ARGTYPES' own rendering.
+
+        The recognition is a comparison against a rendered `format`
+        string, which is a shape a hand-written duplicate would drift
+        from silently -- the compiled schema would then say something
+        the published specification does not. base.py builds the token
+        from validation.ANY_VALUE_FORMAT for that reason, and this
+        holds it there.
+        """
+        self.assertEqual(
+            {'format': validation.ANY_VALUE_FORMAT},
+            api_base.ARGTYPES['any'])
+        self.assertNotIn('type', api_base.ARGTYPES['any'])
 
     def test_console_length_keeps_its_sentinel(self):
         """-1 means "the whole log", and the functional suite sends it.

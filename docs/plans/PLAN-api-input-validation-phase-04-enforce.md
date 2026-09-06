@@ -399,6 +399,79 @@ Checked before committing to it: the official client's
 shipped caller is affected. Two of the seven metadata delete handlers
 were cleaned up already, so the pattern is proven.
 
+### Review round 1 on [#4101](https://github.com/shakenfist/shakenfist/pull/4101)
+
+Ten items: 2 `fix`, 1 `document`, 4 `consider`, 3 `none`. All seven
+actionable items were taken, which is more than the exit rule asks
+for. The reasoning, since taking every `consider` is normally the
+wrong move: three of the four were one edit each, and the fourth
+shrank the diff.
+
+**Both `fix` items were the same fault this phase keeps finding: a
+check that reports success without meaning it.**
+
+* **Mutation 32 deleted a whole handler.** It searched for the
+  namespace tuple by its nine-space indentation, which is a substring
+  of the twelve-space declaration in `InstanceSnapshotEndpoint.post`
+  above it. The search matched `post`, the terminator search ran on,
+  and the splice removed the rest of `post`'s parameters, its
+  responses, all five decorators, its body, and the head of `get`'s
+  declaration. The result still parsed, so the harness reported a
+  catch — of "a handler vanished", not of the defect the mutation
+  names. Rewritten to anchor on `get`'s summary and bound every later
+  index to the region after it, with three assertions which refuse
+  the write rather than corrupting the tree; the old escaping splice
+  now trips assertion B. Verified by diffing the mutation applied to
+  a copy: one tuple, nothing else.
+* **`any` compiled through the unrecognised-type fallback.**
+  `_field()` reads `spec.get('type')`, and `any` deliberately has
+  none, so every one of the fourteen sites took the branch whose only
+  output is a warning saying the published specification contains a
+  type the compiler does not know. Fourteen of those at every sf-api
+  start, measured; a genuinely unrecognised token would have been
+  indistinguishable from the expected noise. The rendering moved to
+  `validation.ANY_VALUE_FORMAT` and `ARGTYPES['any']` is built from
+  it, so recognition and rendering are the same string by
+  construction. Measured after: **zero** warnings across 139 compiled
+  schemas.
+
+**One `consider` was stronger than reported.**
+`_resolve_artifact_ref` carried an `if 'artifact_uuid' in kwargs:`
+branch. The reviewer suggested declaring it, since the new derivation
+cannot see a *read* the way it sees a pop. It is worse than
+undeclared: no handler anywhere in `shakenfist/external_api/` accepts
+an `artifact_uuid` kwarg and no route mounts one, verified by AST
+walk, so the branch resolved the artifact and then called a handler
+which raised `TypeError` — a 400 carrying interpreter text. Declaring
+it would have published a parameter that never worked. Deleted, with
+`test_artifact_uuid_is_not_a_parameter` pinning the property that
+made it dead rather than the branch's absence.
+
+The other three: the four namespace descriptions were pasted inline
+at 55 sites, so a wording fix was 55 edits and drift between copies
+was invisible — hoisted into `api_base` with
+`test_namespace_descriptions_match_their_decorator` asserting the
+pairing per handler and pinning the count at 55, which took ~145
+lines *out* of the endpoint modules. The widened artifact description
+omitted that `from_db_by_ref_visible_to` searches the caller's own
+namespace first and wins, including answering 400 on an ambiguous
+name there rather than widening. And the gap list in
+`writing_an_endpoint.md` went from three entries to five.
+
+**Recorded, not fixed.** Eight `sed` mutations in the guard harness
+(1, 6, 7, 8, 10, 11, 15, 22) match several `blob.py` lines and mutate
+all of them identically, so the intended defect is created at four to
+eight sites instead of one. Fragile rather than wrong — a multiplied
+identical defect still proves the guard fires for the reason claimed,
+which is exactly what mutation 32 did not do.
+
+**For step 5.** The release note must say that the specification now
+documents a body on GET and DELETE read routes. That is not new
+behaviour — the ref decorators have always popped `namespace` there —
+but it is newly *visible*, and a reader who takes the published
+specification as the contract will see a body appear on fifty-five
+routes that had none.
+
 ## Risks and mitigations
 
 **A caller nobody measured sends an undeclared key.** One sfcbr

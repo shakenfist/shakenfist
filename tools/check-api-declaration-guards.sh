@@ -479,13 +479,40 @@ check 'undocumented handler compiled as empty'
 
 # 32. A ref-lookup handler which stops declaring the namespace its
 # decorator consumes. This is #3739 itself, reintroduced on one route.
+#
+# Anchored on the get handler's summary, with every later index bounded
+# to the region after it. The first version searched for the namespace
+# tuple by its nine-space indentation, which is a *substring* of the
+# twelve-space declaration in the post above it: the search matched
+# post, the terminator search then ran on to the next handler, and the
+# splice removed the rest of post's parameters, its response list, all
+# five of its decorators, its entire body and the head of get's
+# declaration. The result still parsed, so the harness reported a catch
+# -- of "a handler vanished", not of "a ref lookup handler stopped
+# declaring namespace". Mutation 4 was rewritten for the same class of
+# fault in the same commit.
+#
+# The assertions are the standing defence, and they are why this is
+# safe to leave keyed on source text at all: if the splice ever escapes
+# its handler again, the write does not happen, the tree is unchanged
+# and check() reports NO-OP rather than a catch. A mutation that
+# reports a catch for the wrong reason is worse than no mutation, and
+# this file has produced two of them.
 python3 - <<'PY'
 p = 'shakenfist/external_api/snapshot.py'
 s = open(p).read()
-start = s.index("         ('namespace', 'body', 'namespace',")
-end = s.index("False)]", start) + len('False)')
-s = s[:s.rindex(',', 0, start)] + s[end:]
-open(p, 'w').write(s)
+anchor = s.index("'instances', 'List the snapshots of an instance.',")
+start = s.index("('namespace', 'body', 'namespace',", anchor)
+end = s.index(', False)', start) + len(', False)')
+cut = s.rindex(',', anchor, start)
+
+removed = s[cut:end]
+assert removed.lstrip(", \n").startswith(
+    "('namespace', 'body', 'namespace',"), removed
+assert 'def ' not in removed and '@' not in removed, removed
+assert removed.count('False)') == 1, removed
+
+open(p, 'w').write(s[:cut] + s[end:])
 PY
 check 'ref lookup handler stops declaring namespace'
 

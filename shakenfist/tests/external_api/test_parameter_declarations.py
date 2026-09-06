@@ -97,6 +97,52 @@ ANY_TOKEN_DECLARATIONS = {
 }
 
 
+# The `namespace` body parameter every ref resolving decorator pops
+# (issue 3739) is described by one of four module constants in
+# api_base, and which constant goes with which decorator is a statement
+# about how a name resolves: the widened text promises a search across
+# shared and trusted artifacts, the narrow one promises the opposite.
+# Pasting the wrong one publishes a false statement that no other test
+# could see, so the pairing is pinned here.
+REF_DECORATOR_NAMESPACE_DESCRIPTIONS = {
+    'arg_is_instance_ref': 'INSTANCE_REF_NAMESPACE_DESCRIPTION',
+    'arg_is_network_ref': 'NETWORK_REF_NAMESPACE_DESCRIPTION',
+    'arg_is_artifact_ref': 'ARTIFACT_REF_NAMESPACE_DESCRIPTION',
+    'arg_is_visible_artifact_ref':
+        'VISIBLE_ARTIFACT_REF_NAMESPACE_DESCRIPTION',
+}
+
+
+def _bare_decorator_name(node):
+    """The undotted name of a decoration site, `@a.b.c(...)` -> 'c'."""
+    while isinstance(node, ast.Call):
+        node = node.func
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Name):
+        return node.id
+    return None
+
+
+def _namespace_description_node(fn):
+    """The description element of a handler's body `namespace` tuple."""
+    for dec in fn.decorator_list:
+        if not (isinstance(dec, ast.Call)
+                and 'swagger_helper' in ast.unparse(dec)):
+            continue
+        call = dec.args[0] if dec.args else None
+        if not (isinstance(call, ast.Call) and len(call.args) >= 3
+                and isinstance(call.args[2], ast.List)):
+            continue
+        for item in call.args[2].elts:
+            if not (isinstance(item, ast.Tuple) and len(item.elts) >= 5):
+                continue
+            if (declarations.literal(item.elts[0]) == 'namespace'
+                    and declarations.literal(item.elts[1]) == 'body'):
+                return item.elts[3]
+    return None
+
+
 def _endpoints():
     """Yield (class name, method name, method node) per handler."""
     for _, _, cls, fn in declarations.handlers():
@@ -577,6 +623,83 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     '%s.%s declares %r, which is injected by a decorator '
                     'rather than sent by a caller'
                     % (cls, method, parameter.name))
+
+    def test_namespace_descriptions_match_their_decorator(self):
+        """Each of the 55 ref lookup handlers uses the right constant.
+
+        The four descriptions were pasted inline at every site before
+        they were hoisted, which made a wording fix 55 edits and drift
+        between copies invisible. Hoisting them fixes that and creates
+        a new way to be wrong -- referencing the constant next to the
+        one the decorator implements -- so the pairing is asserted
+        rather than eyeballed. It is checked per handler, and the count
+        is pinned, because a derivation which silently stopped finding
+        the decorators would otherwise pass by examining nothing.
+        """
+        checked = 0
+        for cls, method, fn in _endpoints():
+            decorators = [
+                name for name in map(_bare_decorator_name, fn.decorator_list)
+                if name in REF_DECORATOR_NAMESPACE_DESCRIPTIONS]
+            if not decorators:
+                continue
+            self.assertEqual(
+                1, len(decorators),
+                '%s.%s carries more than one ref resolving decorator (%s), '
+                'so which namespace description is correct is ambiguous'
+                % (cls, method, ', '.join(decorators)))
+
+            node = _namespace_description_node(fn)
+            self.assertIsNotNone(
+                node,
+                '%s.%s is behind %s, which pops `namespace` out of kwargs, '
+                'but declares no body namespace parameter'
+                % (cls, method, decorators[0]))
+            name = node.attr if isinstance(node, ast.Attribute) else (
+                node.id if isinstance(node, ast.Name) else None)
+            self.assertEqual(
+                REF_DECORATOR_NAMESPACE_DESCRIPTIONS[decorators[0]], name,
+                '%s.%s is behind %s but describes its namespace parameter '
+                'with %s. The four descriptions differ in what they promise '
+                'about how a name resolves, so this publishes a false '
+                'statement.'
+                % (cls, method, decorators[0],
+                   repr(name) if name else 'text written inline rather than '
+                   'one of the api_base constants'))
+            checked += 1
+
+        self.assertEqual(
+            55, checked,
+            'expected 55 handlers behind a ref resolving decorator, found '
+            '%d. If the count changed on purpose, update it here.' % checked)
+
+    def test_artifact_uuid_is_not_a_parameter(self):
+        """`artifact_uuid` is an ordinary undeclared body key.
+
+        `_resolve_artifact_ref` used to resolve an artifact from a body
+        `artifact_uuid` without popping it, so the derivation could not
+        see it and the handler it then called could not accept it: the
+        branch resolved the artifact and the call raised TypeError,
+        which the broad except turned into a 400 carrying interpreter
+        text. It was deleted rather than declared, because declaring it
+        would publish a parameter that never worked.
+
+        The property asserted is the one that made the branch dead --
+        no handler accepts the kwarg -- rather than the absence of the
+        branch, so reintroducing the shape in any decorator fails here
+        too.
+        """
+        for cls, method, fn in _endpoints():
+            self.assertNotIn(
+                'artifact_uuid', declarations.handler_kwargs(fn),
+                '%s.%s accepts an artifact_uuid kwarg. Nothing populates '
+                'it from a route, so it can only arrive as an undeclared '
+                'body key; declare it or remove it.' % (cls, method))
+            for parameter in declarations.declarations(fn):
+                self.assertNotEqual(
+                    'artifact_uuid', parameter.name,
+                    '%s.%s declares artifact_uuid, but no handler accepts '
+                    'it and no route mounts it' % (cls, method))
 
     def test_every_endpoint_is_documented(self):
         """A handler with no swag_from is absent from the published API.

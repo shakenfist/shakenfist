@@ -313,7 +313,7 @@ strings, because semantic validation of them is not built yet. Only
 ## What is not checked yet
 
 Enforcement is off, so a correct declaration still does not stop a
-caller sending something else. Three known gaps in the derivation
+caller sending something else. Five known gaps in the derivation
 itself:
 
 (The published specification itself *is* checked:
@@ -347,3 +347,28 @@ the type vocabulary landed.)
   every unfound name would report the whole API and mean nothing.
   Within a decorator this *can* resolve, an unreadable pop key or an
   unfollowable delegation is reported rather than skipped.
+* A decorator that *reads* a parameter without removing it stays
+  invisible. The derivation recognises `kwargs.pop` and
+  `del kwargs[...]` because those are what make a kwarg the handler
+  cannot receive; a decorator that acts on `kwargs.get('x')`,
+  `'x' in kwargs` or `kwargs['x']` and leaves the key in place is not
+  seen, so nothing requires `x` to be declared. There is no example in
+  the tree: `_resolve_artifact_ref` had the only one, an
+  `if 'artifact_uuid' in kwargs:` branch which resolved an artifact
+  from a body key that no handler accepts — so the call after it
+  raised `TypeError` and answered 400 with interpreter text. It was
+  deleted rather than declared, since declaring it would have
+  published a parameter that never worked, and
+  `test_artifact_uuid_is_not_a_parameter` pins the property that made
+  it dead. A new one would have to be added deliberately.
+* A handler cannot both take a raw request body and sit behind a ref
+  resolving decorator. `swagger_helper()` refuses
+  `RAW_BODY_PARAMETER` combined with any named body parameter, while
+  the audit requires a decorator-consumed kwarg such as `namespace` to
+  be declared in the body — so such a handler could satisfy neither
+  rule: declaring the parameter aborts sf-api at import, omitting it
+  fails CI. No handler in the tree has both, and nothing detects the
+  combination; it is recorded here so the first author to hit the
+  contradiction does not have to derive it. The fix, if it is ever
+  needed, is a rendering for "a raw body plus these named
+  parameters", not an exemption from either rule.

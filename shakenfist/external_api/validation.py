@@ -57,6 +57,19 @@ LOG, _ = logs.setup(__name__)
 # 'header' carries the JWT, which the authentication decorators own.
 _IGNORED_LOCATIONS = frozenset(['header', 'formData'])
 
+# How the 'any' type token (D15) renders: a `format` annotation and no
+# `type` at all, so the published schema constrains nothing while still
+# telling a reader what the parameter is.
+#
+# It lives here rather than in base.py, where the rest of the type
+# vocabulary lives, because base.py imports this module and the reverse
+# would be an import cycle. ARGTYPES['any'] is built from this constant,
+# so the rendering and the compiler's recognition of it are the same
+# string by construction: a token that renders as one thing and compiles
+# as another is precisely the drift the "compile from the rendered
+# specification" design of this module exists to prevent.
+ANY_VALUE_FORMAT = 'any JSON value'
+
 _SCALARS: dict[str, type[fields.Field[Any]]] = {
     'string': fields.String,
     'integer': fields.Integer,
@@ -142,6 +155,33 @@ def _field(spec: dict[str, Any]) -> fields.Field[Any]:
         # items is always present: swagger_helper() renders the array
         # tokens with it, and OpenAPI 2.0 requires it.
         return fields.List(_field(spec.get('items', {})), **kwargs)
+
+    if 'type' not in spec and spec.get('format') == ANY_VALUE_FORMAT:
+        # The 'any' token, which is typeless deliberately rather than
+        # by omission. Without this branch it fell into the fallback
+        # below and logged "unrecognised type" once per site at every
+        # sf-api start -- fourteen warnings about a token the
+        # vocabulary defines, which is noise, and worse, it made a
+        # genuinely unrecognised token indistinguishable from expected
+        # noise. That warning is the only signal the fallback produces,
+        # so anything expected has to be kept out of it.
+        #
+        # Keyed on the absence of the `type` key rather than on
+        # `declared` being empty: the normalisation above flattens an
+        # unreadable type to '' too, and a schema whose type is present
+        # but not a string should still reach the warning. Absent and
+        # unreadable are different facts, and only the first is
+        # deliberate.
+        #
+        # Bounds are dropped for the same reason the fallback drops
+        # them: Raw does not coerce, so a Range or Regexp validator
+        # would raise TypeError from inside schema.validate() the
+        # moment it met a value of the wrong Python type.
+        # `_validated_constraints` already refuses a bound on a
+        # typeless token at import time, so 'any' carries none today;
+        # this keeps the next typeless token from depending on that.
+        kwargs.pop('validate', None)
+        return fields.Raw(**kwargs)
 
     field_class = _SCALARS.get(declared)
     if field_class is None:
