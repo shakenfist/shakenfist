@@ -47,6 +47,7 @@ from typing import Optional
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
+import jwt
 from shakenfist_utilities import logs
 
 LOG, _ = logs.setup(__name__)
@@ -65,6 +66,20 @@ MAX_PUBLISHED_KEYS = 2
 
 class SigningKeyError(Exception):
     """The stored signing material is missing or internally inconsistent."""
+
+
+def _material_members(material: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    """Return material's ``(active_kid, keys)`` members.
+
+    A stored row that is valid JSON but lacks either member is corrupt.
+    Raise the module's SigningKeyError, which callers already handle,
+    rather than letting a bare KeyError escape to them.
+    """
+    try:
+        return material['active_kid'], material['keys']
+    except KeyError as e:
+        raise SigningKeyError(
+            f'stored signing material is missing the {e.args[0]!r} member') from e
 
 
 def generate_keypair() -> dict[str, Any]:
@@ -124,10 +139,18 @@ def ensure_signing_key() -> dict[str, Any]:
     """Return existing signing material, creating it if absent.
 
     Idempotent: if the row already exists it is returned unchanged. If
-    it is absent, a fresh keypair is generated, written, and then the
-    row is re-read so that a concurrent writer who won the race is the
-    one whose material we return (there is no create-if-absent
-    primitive for cluster_config).
+    it is absent, a fresh keypair is generated and written. The write
+    is a last-writer-wins upsert: cluster_config deliberately has no
+    create-if-absent primitive (phase 1 decision 3 of
+    PLAN-kerbside-vdi-tokens), so two concurrent creators each write a
+    whole new ``{'active_kid': ..., 'keys': [...]}`` value and the
+    loser's key is discarded, not merged. Tokens minted with a
+    discarded key can never be verified. The row is re-read after the
+    write so the caller sees what is stored at that moment, but that
+    is a diagnostic courtesy, not a race guarantee. This is only safe
+    because the sole caller is ``sf-ctl ensure-kerbside-signing-key``,
+    a run-once deploy-time operator action; do not add an API-path
+    caller without first building a real create-if-absent primitive.
     """
     material = get_signing_material()
     if material is not None:
@@ -160,8 +183,11 @@ def rotate_signing_key() -> dict[str, Any]:
     material = get_signing_material()
     keypair = generate_keypair()
 
-    existing_keys = list(material['keys']) if material is not None else []
-    keys = ([keypair] + existing_keys)[:MAX_PUBLISHED_KEYS]
+    if material is None:
+        existing_keys: list[dict[str, Any]] = []
+    else:
+        _, existing_keys = _material_members(material)
+    keys = ([keypair] + list(existing_keys))[:MAX_PUBLISHED_KEYS]
     value = {'active_kid': keypair['kid'], 'keys': keys}
 
     # NOTE: inline import, see get_signing_material for rationale.
@@ -180,11 +206,11 @@ def rotate_signing_key() -> dict[str, Any]:
 def active_signing_key(material: dict[str, Any]) -> dict[str, Any]:
     """Return the key entry named by ``material['active_kid']``.
 
-    Raises SigningKeyError if the active kid is not present in the
-    published keys, which would mean the stored material is corrupt.
+    Raises SigningKeyError if either member is absent or the active kid
+    is not present in the published keys, both of which mean the stored
+    material is corrupt.
     """
-    active_kid = material['active_kid']
-    keys: list[dict[str, Any]] = material['keys']
+    active_kid, keys = _material_members(material)
     for key in keys:
         if key.get('kid') == active_kid:
             return key
@@ -226,10 +252,6 @@ def mint_console_token(
         'jti': jti,
     }
 
-    # NOTE: imported inline to keep PyJWT off the module import path for
-    # callers that only touch the key helpers.
-    import jwt
-
     # On PyJWT 2.x jwt.encode returns a str, so no decode is needed.
     token = jwt.encode(
         claims, key['private_pem'], algorithm=SIGNING_ALG,
@@ -252,10 +274,12 @@ def public_view(material: dict[str, Any]) -> dict[str, Any]:
 
     Produces ``{'active_kid': ..., 'keys': [{'kid', 'alg', 'public_pem',
     'created'}]}`` with no private members. Callers must handle absent
-    material (None) before calling this.
+    material (None) before calling this; corrupt material raises
+    SigningKeyError.
     """
+    active_kid, keys = _material_members(material)
     return {
-        'active_kid': material['active_kid'],
+        'active_kid': active_kid,
         'keys': [
             {
                 'kid': key['kid'],
@@ -263,6 +287,6 @@ def public_view(material: dict[str, Any]) -> dict[str, Any]:
                 'public_pem': key['public_pem'],
                 'created': key['created'],
             }
-            for key in material['keys']
+            for key in keys
         ],
     }

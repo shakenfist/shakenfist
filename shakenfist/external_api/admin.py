@@ -83,7 +83,8 @@ class AdminVDITokenPublicKeyEndpoint(api_base.Resource):
         [(200, 'The active key id and all currently published public keys.',
           admin_vdi_token_pubkey_get_example),
          (404, 'No Kerbside VDI token signing key has been configured.',
-          None)]))
+          None),
+         (500, 'The stored signing key material is corrupt.', None)]))
     @api_base.log_token_use
     def get(self):
         material = vdi_tokens.get_signing_material()
@@ -92,7 +93,11 @@ class AdminVDITokenPublicKeyEndpoint(api_base.Resource):
                 404,
                 'no Kerbside VDI token signing key configured, run '
                 'sf-ctl ensure-kerbside-signing-key')
-        return vdi_tokens.public_view(material)
+        try:
+            return vdi_tokens.public_view(material)
+        except vdi_tokens.SigningKeyError as e:
+            return sf_api.error(
+                500, f'stored Kerbside VDI token signing key is corrupt: {e}')
 
 
 admin_resources_get_example = """{

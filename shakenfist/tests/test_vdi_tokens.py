@@ -71,6 +71,13 @@ class RotateSigningKeyTestCase(base.ShakenFistTestCase):
         self.mariadb_patch.start()
         self.addCleanup(self.mariadb_patch.stop)
 
+    def test_rotate_raises_signingkeyerror_on_corrupt_material(self):
+        self.store.values[vdi_tokens.SIGNING_KEY_CONFIG_NAME] = {
+            'active_kid': 'abcd1234'}
+
+        self.assertRaises(
+            vdi_tokens.SigningKeyError, vdi_tokens.rotate_signing_key)
+
     def test_rotate_keeps_previous_and_caps_at_two(self):
         ensured = vdi_tokens.ensure_signing_key()
         first_kid = ensured['active_kid']
@@ -169,6 +176,16 @@ class PublicViewTestCase(base.ShakenFistTestCase):
                 {'kid', 'alg', 'public_pem', 'created'}, set(key.keys()))
             self.assertEqual(vdi_tokens.SIGNING_ALG, key['alg'])
 
+    def test_raises_signingkeyerror_not_keyerror_on_missing_members(self):
+        # A stored row that is valid JSON but missing a member must
+        # surface as the module's SigningKeyError, which API callers
+        # already translate to a useful HTTP error, not a bare KeyError.
+        for corrupt in ({}, {'active_kid': 'abcd1234'}, {'keys': []}):
+            with self.subTest(corrupt=corrupt):
+                self.assertRaises(
+                    vdi_tokens.SigningKeyError,
+                    vdi_tokens.public_view, corrupt)
+
 
 class ActiveSigningKeyTestCase(base.ShakenFistTestCase):
     """Tests for active_signing_key()."""
@@ -185,6 +202,13 @@ class ActiveSigningKeyTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             vdi_tokens.SigningKeyError,
             vdi_tokens.active_signing_key, material)
+
+    def test_raises_signingkeyerror_not_keyerror_on_missing_members(self):
+        for corrupt in ({}, {'active_kid': 'abcd1234'}, {'keys': []}):
+            with self.subTest(corrupt=corrupt):
+                self.assertRaises(
+                    vdi_tokens.SigningKeyError,
+                    vdi_tokens.active_signing_key, corrupt)
 
 
 class MintConsoleTokenTestCase(base.ShakenFistTestCase):

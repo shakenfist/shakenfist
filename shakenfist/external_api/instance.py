@@ -1767,7 +1767,8 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
           'configured.', None),
          (406, 'Instance is not ready.', None),
          (409, 'Instance does not have a SPICE console.', None),
-         (500, 'Kerbside signing key is not configured.', None)]))
+         (500, 'Kerbside signing key is not configured or is unusable.',
+          None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
@@ -1794,10 +1795,10 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
                 str(instance_from_db.uuid), namespace,
                 audience=base, issuer=config.ZONE,
                 duration=config.KERBSIDE_TOKEN_DURATION)
-        except vdi_tokens.SigningKeyError:
+        except vdi_tokens.SigningKeyError as e:
             return sf_api.error(
                 500,
-                'kerbside signing key is not configured, run sf-ctl '
+                f'kerbside signing key is not usable ({e}), run sf-ctl '
                 'ensure-kerbside-signing-key')
 
         url = f'{base}/sf-console.vv?token={minted["token"]}'
