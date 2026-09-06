@@ -71,7 +71,7 @@ dependencies = [
     # Imported directly, rather than reached through whichever package
     # happens to require them today, so what keeps them installed is a
     # declaration and not a transitive pin the reconciler could drop.
-    # tools/render-review.py imports jsonschema (via flasgger) and
+    # tools/merge-triage.py imports jsonschema (via flasgger) and
     # tools/build-collection.py imports packaging (via the oslo stack).
     "jsonschema==4.26.0",                 # mit
     "packaging==26.3",                    # apache2

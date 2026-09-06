@@ -1,0 +1,84 @@
+# Triggers a re-run of functional tests when an authorized user comments
+# "@shakenfist-bot please retest"
+#
+# This is useful after bot commits (which don't trigger CI) or when you
+# want to re-run checks without pushing a new commit.
+#
+# Template source: shakenfist/development/templates/ci-review-automation/
+
+name: PR Retest
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  trigger-retest:
+    name: "Trigger retest"
+    # Only run on PR comments (not issue comments)
+    # Never on a comment the bot itself posted. The automated review
+    # is model-generated text posted to the pull request, and a review
+    # quoting a trigger phrase would re-fire the lane -- contains()
+    # does not care that the phrase sits inside a quote.
+    if: |
+      github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      contains(github.event.comment.body, '@shakenfist-bot please retest')
+    runs-on: [self-hosted, static]
+    # Just a few gh API calls, so anything beyond this is a hang.
+    timeout-minutes: 10
+
+    steps:
+      - name: Handle trigger
+        id: trigger
+        uses: shakenfist/actions/pr-bot-trigger@main
+        with:
+          trigger-phrase: 'please retest'
+          reaction: 'rocket'
+
+      - name: Trigger functional tests
+        id: dispatch
+        if: steps.trigger.outputs.authorized == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_REF: ${{ steps.trigger.outputs.pr-ref }}
+        run: |
+          echo "Triggering functional tests on branch: ${PR_REF}"
+
+          # Report a failed dispatch rather than claiming success.
+          # Fork pull requests no longer reach this step -- pr-bot-trigger
+          # refuses them and says why -- so what is left is a workflow
+          # file that is missing, renamed or disabled.
+          if gh workflow run functional-tests.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${PR_REF}"; then
+            echo "dispatched=true" >> $GITHUB_OUTPUT
+            echo "Functional tests triggered successfully"
+          else
+            echo "dispatched=false" >> $GITHUB_OUTPUT
+            echo "Functional tests dispatch failed"
+          fi
+
+      - name: Post confirmation
+        if: steps.trigger.outputs.authorized == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_REF: ${{ steps.trigger.outputs.pr-ref }}
+        run: |
+          if [ "${{ steps.dispatch.outputs.dispatched }}" = "true" ]; then
+            gh pr comment "${{ github.event.issue.number }}" \
+              --repo "${{ github.repository }}" \
+              --body "Triggered functional tests on branch \`${PR_REF}\`.
+
+          [View workflow runs](https://github.com/${{ github.repository }}/actions/workflows/functional-tests.yml)"
+          else
+            gh pr comment "${{ github.event.issue.number }}" \
+              --repo "${{ github.repository }}" \
+              --body "Unable to trigger functional tests on \`${PR_REF}\`. Check that \`functional-tests.yml\` exists on the default branch, carries a \`workflow_dispatch\` trigger, and is not disabled -- or re-run the failed workflow from the Actions tab instead."
+          fi

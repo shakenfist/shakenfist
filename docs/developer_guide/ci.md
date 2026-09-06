@@ -18,7 +18,7 @@ Every workflow in `.github/workflows/`:
 | `renovate.yml` | Self-hosted Renovate dependency updates | Hourly schedule, manual |
 | `export-repo-config.yml` | Export GitHub repo settings to version control, via a shared reusable workflow in the `actions/` repository | Daily schedule |
 | `pr-re-review.yml` | Re-review PR on bot command | `@shakenfist-bot please re-review` |
-| `pr-address-comments.yml` | Address review comments on bot command | `@shakenfist-bot please address comments` |
+| `pr-retest.yml` | Re-run the functional tests on bot command | `@shakenfist-bot please retest` |
 | `pr-fix-tests.yml` | Fix test failures on bot command | `@shakenfist-bot please attempt to fix` |
 | `test-drift-fix.yml` | Unit test fixer (called by `pr-fix-tests.yml`) | workflow_call, workflow_dispatch |
 | `issue-fix.yml` | Triage open issues, propose a fix as a draft PR | workflow_dispatch |
@@ -783,10 +783,10 @@ Authorized users can trigger automation by commenting on PRs:
 
 - **`@shakenfist-bot please re-review`** - Triggers a fresh automated
   review of the PR using the shared review action.
-- **`@shakenfist-bot please address comments`** - Runs Claude Code to
-  address actionable items from the automated review. Uses
-  `tools/address-comments-with-claude.sh` with dual-checkout security
-  (trusted tools from base branch, PR code separately).
+- **`@shakenfist-bot please retest`** - Dispatches
+  `functional-tests.yml` against the PR branch, which is how a run is
+  re-tried after a bot commit or an infrastructure failure without
+  pushing a new commit.
 - **`@shakenfist-bot please attempt to fix`** - Runs Claude Code to fix
   unit test failures (`tox -ecover`). Uses `test-drift-fix.yml` with
   structured commit summaries.
