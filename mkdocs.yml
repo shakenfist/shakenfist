@@ -115,6 +115,7 @@ nav:
                 - "Audit: diagram format": components/development/audits/diagram-format.md
                 - "Audit: Expensive lane path filtering": components/development/audits/expensive-lane-path-filter.md
                 - "Audit: Exporting repo configuration changes": components/development/audits/export-repo-config.md
+                - "Audit: Fuzz nightly reporting": components/development/audits/fuzz-nightly-reporting.md
                 - "Audit: Generated version file": components/development/audits/version-file-gitignore.md
                 - "Audit: GitHub security settings and CodeQL": components/development/audits/github-security.md
                 - "Audit: HTTP header and file path sanitization": components/development/audits/security-sanitization.md
