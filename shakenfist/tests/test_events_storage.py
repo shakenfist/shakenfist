@@ -1072,14 +1072,14 @@ class DirectPruneOrphanEventsTestCase(base.ShakenFistTestCase):
 class OrphanPruneCursorTestCase(base.ShakenFistTestCase):
     """The orphan sweep cursor round-trips through cluster_config."""
 
-    @mock.patch('shakenfist.mariadb._direct_get_all_cluster_config',
-                return_value={})
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_config_value',
+                return_value=None)
     def test_load_returns_empty_string_when_unset(self, mock_get):
         self.assertEqual('', mariadb._load_orphan_prune_cursor())
+        mock_get.assert_called_once_with(mariadb._PRUNE_ORPHAN_CURSOR_KEY)
 
-    @mock.patch('shakenfist.mariadb._direct_get_all_cluster_config',
-                return_value={
-                    mariadb._PRUNE_ORPHAN_CURSOR_KEY: EVENT_UUID_1})
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_config_value',
+                return_value=EVENT_UUID_1)
     def test_load_returns_persisted_cursor(self, mock_get):
         self.assertEqual(EVENT_UUID_1, mariadb._load_orphan_prune_cursor())
 

@@ -720,7 +720,12 @@ class Monitor(daemon.Daemon):
         it either.
         """
         try:
-            stamps = mariadb.get_cluster_config()
+            # Keyed reads rather than the whole cluster_config table:
+            # the full-table read transits every cluster secret to a
+            # daemon that only wants a few timestamps (issue 4096).
+            stamps = {
+                key: mariadb.get_cluster_config_value(key)
+                for _, key in self._anchored_jobs}
         except Exception as e:
             # Better a process-local timer -- the status quo ante --
             # than no maintenance node at all.

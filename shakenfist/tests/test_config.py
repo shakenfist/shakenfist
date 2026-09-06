@@ -319,12 +319,11 @@ class ClusterConfigExportFilterTestCase(base.ShakenFistTestCase):
     def test_the_signing_key_is_still_readable_from_the_database(self):
         # The filter removes an environment copy, not the value. Its
         # only reader goes to the database for it, and
-        # mariadb.get_cluster_config() does not consult os.environ for
-        # the row's value.
+        # mariadb.get_cluster_config_value() does not consult os.environ
+        # for the row's value.
         material = {'active_kid': 'deadbeef',
                     'keys': [{'kid': 'deadbeef',
                               'private_pem': 'THE-PRIVATE-PEM'}]}
-        with mock.patch('shakenfist.mariadb.get_cluster_config',
-                        return_value={
-                            vdi_tokens.SIGNING_KEY_CONFIG_NAME: material}):
+        with mock.patch('shakenfist.mariadb.get_cluster_config_value',
+                        return_value=material):
             self.assertEqual(material, vdi_tokens.get_signing_material())

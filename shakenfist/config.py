@@ -91,8 +91,8 @@ def _exportable_cluster_config_key(key_name: str) -> bool:
     token for any instance in the cluster, and kerbside verifies
     offline, so the forgery would never be visible to Shaken Fist. The
     only reader of that row is shakenfist/util/vdi_tokens.py, which
-    reads it through mariadb.get_cluster_config() -- a database read
-    which does not consult os.environ -- so nothing needs it here.
+    reads it through mariadb.get_cluster_config_value() -- a database
+    read which does not consult os.environ -- so nothing needs it here.
 
     The rule is therefore: a row which corresponds to a declared
     SFConfig field is always exported, because that is what the

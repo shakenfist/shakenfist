@@ -5656,7 +5656,7 @@ _PRUNE_ORPHAN_CURSOR_KEY = 'EVENTS_PRUNE_ORPHAN_CURSOR'
 
 def _load_orphan_prune_cursor() -> str:
     """Return the persisted orphan-sweep cursor, or '' if none."""
-    value = _direct_get_all_cluster_config().get(_PRUNE_ORPHAN_CURSOR_KEY, '')
+    value = _direct_get_cluster_config_value(_PRUNE_ORPHAN_CURSOR_KEY)
     return value if isinstance(value, str) else ''
 
 
@@ -23602,6 +23602,28 @@ def _direct_get_all_cluster_config() -> dict[str, Any]:
         return {}
 
 
+def _direct_get_cluster_config_value(key_name: str) -> Any:
+    """Return one config key's JSON-decoded value, or None if absent.
+
+    An indexed single-row read, so callers wanting one key don't pay
+    for -- or transit -- the whole table (issue 4096).
+    """
+    engine = _get_engine()
+    table = _get_cluster_config_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.value_json).where(
+                table.c.key_name == key_name)
+            row = conn.execute(stmt).first()
+            return row[0] if row is not None else None
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB get_cluster_config_value failed for '
+            f'{key_name}: {e}')
+        return None
+
+
 def _direct_set_cluster_config(
         key_name: str, value: Any) -> None:
     """Upsert a single config key.
@@ -23910,6 +23932,28 @@ def _grpc_get_all_cluster_config() -> dict[str, Any]:
     }
 
 
+def _grpc_get_cluster_config_value(key_name: str) -> Any:
+    """Fetch one config key's value via the database microservice.
+
+    Scans the reply for the requested key rather than assuming a
+    single entry, because during a rolling upgrade an older
+    sf-database ignores key_name and returns the whole table.
+    """
+    stub = _get_database_stub()
+    if not stub:
+        return None
+
+    request = database_pb2.ClusterConfigRequest(key_name=key_name)
+    response = _grpc_call(stub.GetClusterConfig, request)
+    if response is None:
+        return None
+
+    for entry in response.entries:
+        if entry.key_name == key_name:
+            return json.loads(entry.value_json)
+    return None
+
+
 def _grpc_set_cluster_config(key_name: str, value: Any) -> None:
     """Set a cluster config key via the database microservice."""
     stub = _get_database_stub()
@@ -23956,6 +24000,24 @@ def get_cluster_config() -> dict[str, Any]:
     if _use_database_service():
         return _grpc_get_all_cluster_config()
     return _direct_get_all_cluster_config()
+
+
+def get_cluster_config_value(key_name: str) -> Any:
+    """Return one cluster config value, or None if the key is absent.
+
+    Prefer this to get_cluster_config() whenever only one key is
+    wanted: the full-table read materialises every cluster secret
+    (AUTH_SECRET_SEED, the VDI signing key's private PEM) in memory
+    and, on the gRPC path, on the wire (issue 4096).
+
+    Routes to the database microservice or direct MariaDB depending
+    on _use_database_service(). Callers running on the database node
+    (MARIADB_HOST set) use direct access so that bootstrap-time
+    commands work before the database daemon is started.
+    """
+    if _use_database_service():
+        return _grpc_get_cluster_config_value(key_name)
+    return _direct_get_cluster_config_value(key_name)
 
 
 def set_cluster_config(key_name: str, value: Any) -> None:

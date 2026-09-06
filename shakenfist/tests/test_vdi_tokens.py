@@ -16,17 +16,21 @@ from shakenfist.util import vdi_tokens
 class _FakeClusterConfigStore:
     """An in-memory stand-in for the mariadb cluster_config row.
 
-    Backs mariadb.get_cluster_config/set_cluster_config so
+    Backs mariadb.get_cluster_config_value/set_cluster_config so
     ensure_signing_key() and rotate_signing_key() round-trip through the
     same fake store, mirroring test_cluster_config.py's mocking style.
+    Records the keys requested so tests can assert the keyed-read
+    contract (issue 4096: no full-table reads from this module).
     """
 
     def __init__(self):
         self.values = {}
         self.set_calls = 0
+        self.requested_keys = []
 
-    def get_cluster_config(self):
-        return dict(self.values)
+    def get_cluster_config_value(self, name):
+        self.requested_keys.append(name)
+        return self.values.get(name)
 
     def set_cluster_config(self, name, value):
         self.set_calls += 1
@@ -36,9 +40,43 @@ class _FakeClusterConfigStore:
 def _patch_mariadb(store):
     return mock.patch.multiple(
         'shakenfist.mariadb',
-        get_cluster_config=mock.Mock(side_effect=store.get_cluster_config),
+        get_cluster_config_value=mock.Mock(
+            side_effect=store.get_cluster_config_value),
         set_cluster_config=mock.Mock(side_effect=store.set_cluster_config),
     )
+
+
+class GetSigningMaterialTestCase(base.ShakenFistTestCase):
+    """Tests for get_signing_material()'s keyed-read contract."""
+
+    def setUp(self):
+        super().setUp()
+        self.store = _FakeClusterConfigStore()
+        self.mariadb_patch = _patch_mariadb(self.store)
+        self.mariadb_patch.start()
+        self.addCleanup(self.mariadb_patch.stop)
+
+    def test_reads_only_the_signing_key_row(self):
+        # Issue 4096: the previous implementation fetched the whole
+        # cluster_config table -- every cluster secret -- to read one
+        # public-serving row. Pin the keyed read.
+        material = {'active_kid': 'deadbeef', 'keys': []}
+        self.store.values[vdi_tokens.SIGNING_KEY_CONFIG_NAME] = material
+
+        self.assertEqual(material, vdi_tokens.get_signing_material())
+        self.assertEqual(
+            [vdi_tokens.SIGNING_KEY_CONFIG_NAME],
+            self.store.requested_keys)
+
+    def test_absent_row_returns_none(self):
+        self.assertIsNone(vdi_tokens.get_signing_material())
+
+    def test_string_value_is_parsed(self):
+        material = {'active_kid': 'deadbeef', 'keys': []}
+        self.store.values[vdi_tokens.SIGNING_KEY_CONFIG_NAME] = (
+            json.dumps(material))
+
+        self.assertEqual(material, vdi_tokens.get_signing_material())
 
 
 class EnsureSigningKeyTestCase(base.ShakenFistTestCase):
