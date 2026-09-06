@@ -14,7 +14,7 @@ import uuid
 from logging.handlers import SysLogHandler
 from unittest import mock
 
-from pylogrus import JsonFormatter
+from shakenfist_utilities.logs import JsonFormatter
 
 from shakenfist import logship
 from shakenfist import logship_spool
