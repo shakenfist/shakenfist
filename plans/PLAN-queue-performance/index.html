@@ -13797,7 +13797,14 @@
 
 <h1 id="plan-queue-performance-and-coalescing">PLAN: Queue performance and coalescing<a class="headerlink" href="#plan-queue-performance-and-coalescing" title="Permanent link">&para;</a></h1>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>In progress.</p>
+<p>Complete, 11 of 11 phases.</p>
+<p>Phase 11 merged to <code>develop</code> as PR #4007 on 2026-09-02, and its
+measurement write-up as PR #4033 on 2026-09-05. What the plan
+deliberately did not build is carried by issues rather than by this
+document: #4017 (the <code>sf-queues</code> half of the multi-column key), #3974
+(the two timestamps which would separate database queue sit from time
+inside the daemon) and the fairness question step 7 decided against.
+All three are described under "Follow-ups not landed here" below.</p>
 <p>Reopened on 2026-08-25 with three further phases. The plan reached 8
 of 8 while explicitly recording two things it had not proven and two
 follow-ups it had not built; those are now phases 9, 10 and 11 rather
@@ -15250,7 +15257,8 @@ corrections found while landing it.</p>
   instead and deferred this task to a successor issue on its own
   merits -- see decision 5 and the Future work section of
   <a href="../PLAN-queue-performance-phase-11-multi-column-key/">PLAN-queue-performance-phase-11-multi-column-key.md</a>.
-  Tracked as #3884.</p>
+  Tracked as #4017; #3884, which asked for the key itself, was
+  completed by phase 11.</p>
 </li>
 <li>
 <p><strong>Explicit fairness for low-priority queues</strong>. The dequeue
