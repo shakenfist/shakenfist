@@ -357,6 +357,18 @@ CONSTRAINT_KEYS = frozenset(['minimum', 'maximum', 'pattern'])
 
 # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
 ARGTYPES: dict[str, dict[str, Any]] = {
+    # The metadata family's "the API stores this and never interprets
+    # it" case: add_metadata_key() (baseobject.py:669) serialises
+    # whatever it is given, and sfcbr's k3s orchestration traffic
+    # stored both a dict and a list under the same parameter, so
+    # neither 'dict' nor an 'arrayof*' token is wide enough -- callers
+    # store both shapes under one declaration. Deliberately no 'type'
+    # key, so the published schema constrains nothing while still
+    # telling a reader what the parameter is; this is the one token
+    # that deliberately validates nothing. Body-only, like 'dict' and
+    # the array tokens, for the same reason: outside a body there is
+    # no schema object to hold an unconstrained value.
+    'any': {'format': 'any JSON value'},
     # Real array types rather than prose-formatted strings: body
     # parameters render through schema objects, where array is
     # legal JSON Schema. Every use in the tree is body-located, and
@@ -659,18 +671,24 @@ def swagger_helper(section, description, parameters, responses,
 
         if location != 'body':
             # Outside a body a parameter must be primitive: there is
-            # no schema object to nest a structure in, so an object or
-            # an array of objects on a query or path parameter renders
-            # an invalid specification. test_openapi_spec.py would
-            # catch it, but every other declaration defect is refused
-            # at import time so sf-api does not start at all, and a
-            # tree which fails CI should not be able to serve an
-            # invalid specification in the meantime.
+            # no schema object to nest a structure in, so an object, an
+            # array of objects, or 'any's unconstrained value on a
+            # query or path parameter renders an invalid specification.
+            # test_openapi_spec.py would catch it, but every other
+            # declaration defect is refused at import time so sf-api
+            # does not start at all, and a tree which fails CI should
+            # not be able to serve an invalid specification in the
+            # meantime. 'any' is checked by name rather than by
+            # inspecting `rendered`: it is the one token that renders
+            # with no 'type' key at all, so it would otherwise slip
+            # past both checks below.
             if (rendered.get('type') == 'object'
-                    or rendered.get('items', {}).get('type') == 'object'):
+                    or rendered.get('items', {}).get('type') == 'object'
+                    or argtype == 'any'):
                 raise exceptions.InvalidAPIDeclaration(
                     '%s parameter %s declares type %r in the %s, but an '
-                    'object can only be declared in the body'
+                    'object, an array of objects, or an unconstrained '
+                    'value can only be declared in the body'
                     % (section, name, argtype, location))
 
             out['parameters'].append({

@@ -1432,7 +1432,9 @@ class InstanceMetadatasEndpoint(api_base.Resource):
              'is resolved without it, but the instance found must live here or the request answers 404. Defaults to '
              'the namespace of the caller, and only the system namespace may name another.', False),
             ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1585,7 +1587,9 @@ class InstanceMetadataEndpoint(api_base.Resource):
              'The namespace to resolve the instance reference in. A name is only looked up in this namespace; a UUID '
              'is resolved without it, but the instance found must live here or the request answers 404. Defaults to '
              'the namespace of the caller, and only the system namespace may name another.', False),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

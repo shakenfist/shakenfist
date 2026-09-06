@@ -67,11 +67,65 @@ UNDOCUMENTED_BY_DESIGN = {
     ('Readyz', 'get'),
 }
 
+# Every declaration allowed to use the 'any' type token (D15). 'any'
+# turns validation off for a parameter, so once it exists it is the
+# easy answer to any inconvenient type error; a fifteenth use must be
+# a deliberate, visible edit to this set rather than a quiet one. All
+# fourteen are the metadata `value` parameter -- the one place the API
+# stores a caller-supplied value it never interprets -- and
+# network.py's DNS record `value` (declared 'ipv4') is deliberately
+# not among them. (cls, method, name).
+ANY_TOKEN_DECLARATIONS = {
+    ('ArtifactMetadatasEndpoint', 'post', 'value'),
+    ('ArtifactMetadataEndpoint', 'put', 'value'),
+    ('AuthMetadatasEndpoint', 'post', 'value'),
+    ('AuthMetadataEndpoint', 'put', 'value'),
+    ('BlobMetadatasEndpoint', 'post', 'value'),
+    ('BlobMetadataEndpoint', 'put', 'value'),
+    ('InstanceMetadatasEndpoint', 'post', 'value'),
+    ('InstanceMetadataEndpoint', 'put', 'value'),
+    ('InterfaceMetadatasEndpoint', 'post', 'value'),
+    ('InterfaceMetadataEndpoint', 'put', 'value'),
+    ('NetworkMetadatasEndpoint', 'post', 'value'),
+    ('NetworkMetadataEndpoint', 'put', 'value'),
+    ('NodeMetadatasEndpoint', 'post', 'value'),
+    ('NodeMetadataEndpoint', 'put', 'value'),
+}
+
 
 def _endpoints():
     """Yield (class name, method name, method node) per handler."""
     for _, _, cls, fn in declarations.handlers():
         yield cls.name, fn.name, fn
+
+
+def _declared_types():
+    """(cls, method, name, location, argtype) for every declared
+    parameter in the tree.
+
+    declarations.Declaration never carries the type token -- nothing
+    in phase 3's derivation needs it -- so this mirrors
+    declarations.declarations()'s AST walk far enough to pull out
+    item.elts[2] as well, which is all pinning 'any' usage needs.
+    """
+    out = []
+    for _, _, cls, fn in declarations.handlers():
+        for dec in fn.decorator_list:
+            if 'swagger_helper' not in ast.unparse(dec):
+                continue
+            call = dec.args[0] if isinstance(dec, ast.Call) and dec.args else None
+            if not (isinstance(call, ast.Call) and len(call.args) >= 3
+                    and isinstance(call.args[2], ast.List)):
+                continue
+            for item in call.args[2].elts:
+                if not (isinstance(item, ast.Tuple) and len(item.elts) in (5, 6)):
+                    continue
+                out.append((
+                    cls.name, fn.name,
+                    declarations.literal(item.elts[0]),
+                    declarations.literal(item.elts[1]),
+                    declarations.literal(item.elts[2])))
+    return out
 
 
 class ParameterDeclarationTestCase(base.ShakenFistTestCase):
@@ -222,6 +276,55 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     'flask_restful passes the segment to every method on '
                     'the class' % (cls, name, cls, method))
         self.assertEqual([], problems)
+
+    def test_any_token_use_is_pinned(self):
+        """'any' (D15) turns validation off for a parameter. Once it
+        exists it is the easy answer to any inconvenient type error, so
+        pin the exact set of declarations using it -- the metadata
+        `value` family and nothing else -- so a fifteenth use is a
+        deliberate, visible edit to ANY_TOKEN_DECLARATIONS rather than
+        a quiet one."""
+        any_uses = [(cls, method, name, location)
+                    for (cls, method, name, location, argtype)
+                    in _declared_types() if argtype == 'any']
+        found = {(cls, method, name) for (cls, method, name, _) in any_uses}
+
+        self.assertEqual(
+            set(), found - ANY_TOKEN_DECLARATIONS,
+            'these declarations started using the \'any\' type token, '
+            'which this test does not expect. If that is deliberate, read '
+            'D15 in docs/plans/PLAN-api-input-validation-phase-04-enforce'
+            '.md, confirm the parameter really is a value the API stores '
+            'but never interprets, and add it to ANY_TOKEN_DECLARATIONS')
+        self.assertEqual(
+            set(), ANY_TOKEN_DECLARATIONS - found,
+            'these ANY_TOKEN_DECLARATIONS entries no longer match a '
+            'declaration using \'any\'; remove them, or the declaration '
+            'was narrowed back and this set has fallen behind')
+        self.assertEqual(
+            14, len(any_uses),
+            '\'any\' should be used by exactly fourteen declarations (the '
+            'metadata value family); if that count is changing '
+            'deliberately, update this number and ANY_TOKEN_DECLARATIONS '
+            'together')
+
+        wrong_name = [(cls, method, name) for (cls, method, name, _)
+                      in any_uses if name != 'value']
+        self.assertEqual(
+            [], wrong_name,
+            'every existing use of \'any\' is the metadata value '
+            'parameter; %r declares a different parameter as \'any\', '
+            'which is a new kind of use this test has not been told to '
+            'expect' % (wrong_name,))
+
+        wrong_location = [(cls, method, name, location) for
+                          (cls, method, name, location) in any_uses
+                          if location != 'body']
+        self.assertEqual(
+            [], wrong_location,
+            '\'any\' is body-only -- swagger_helper() refuses it '
+            'elsewhere -- so a non-body use here means that refusal has '
+            'a hole: %r' % (wrong_location,))
 
     def test_every_mounted_class_is_an_endpoint_and_vice_versa(self):
         """route_parameters() and handlers() must agree on what an
@@ -1902,8 +2005,13 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         in, so the specification would be invalid. Refused at import
         time like every other declaration defect, rather than left for
         test_openapi_spec.py to find after sf-api has started serving
-        it."""
-        for argtype in ('arrayofdict', 'dict'):
+        it.
+
+        'any' (D15) is included for the same reason even though it
+        renders no 'type' key at all: it is body-only like 'dict' and
+        the array tokens, refused outside a body by name rather than
+        by inspecting the rendered schema."""
+        for argtype in ('arrayofdict', 'dict', 'any'):
             for location in ('query', 'path', 'header', 'formData'):
                 with self.subTest(argtype=argtype, location=location):
                     self.assertRaises(

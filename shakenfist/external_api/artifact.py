@@ -977,7 +977,9 @@ class ArtifactMetadatasEndpoint(api_base.Resource):
              'without it, but the artifact found must live here or the request answers 404. Defaults to the namespace '
              'of the caller, and only the system namespace may name another.', False),
             ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1008,7 +1010,9 @@ class ArtifactMetadataEndpoint(api_base.Resource):
              'never widened to shared or trusted artifacts the way it is on the read routes; a UUID is resolved '
              'without it, but the artifact found must live here or the request answers 404. Defaults to the namespace '
              'of the caller, and only the system namespace may name another.', False),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

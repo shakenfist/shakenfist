@@ -221,7 +221,9 @@ class NodeMetadatasEndpoint(api_base.Resource):
         [
             ('node', 'path', 'node', 'The node to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -249,7 +251,9 @@ class NodeMetadataEndpoint(api_base.Resource):
         [
             ('node', 'path', 'node', 'The node to add a key to.', True),
             ('key', 'path', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

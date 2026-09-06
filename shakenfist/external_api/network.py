@@ -496,7 +496,9 @@ class NetworkMetadatasEndpoint(api_base.Resource):
              'namespace of the caller, and only the system namespace may name another. The floating network belongs to '
              'no namespace, so it is reachable only when this is omitted.', False),
             ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -527,7 +529,9 @@ class NetworkMetadataEndpoint(api_base.Resource):
              'resolved without it, but the network found must live here or the request answers 404. Defaults to the '
              'namespace of the caller, and only the system namespace may name another. The floating network belongs to '
              'no namespace, so it is reachable only when this is omitted.', False),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),

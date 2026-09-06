@@ -18,7 +18,13 @@ from shakenfist.external_api import declarations
 from shakenfist.external_api import validation
 from shakenfist.tests import base
 from shakenfist.tests.external_api.test_parameter_declarations import (
-    UNDOCUMENTED_BY_DESIGN)
+    ANY_TOKEN_DECLARATIONS, UNDOCUMENTED_BY_DESIGN)
+
+# The fourteen metadata endpoints, without the (always 'value')
+# parameter name ANY_TOKEN_DECLARATIONS also carries -- this module
+# indexes the compiled registry by (cls, method) alone.
+ANY_TOKEN_ENDPOINTS = sorted({(cls, method)
+                             for (cls, method, _) in ANY_TOKEN_DECLARATIONS})
 
 
 class ValidationCompilerTestCase(base.ShakenFistTestCase):
@@ -246,6 +252,24 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         self.assertIsInstance(
             instance_create.fields['disk'].inner, fields.Dict)
         self.assertIsInstance(instance_create.fields['cpus'], fields.Integer)
+
+    def test_any_accepts_every_json_shape(self):
+        """'any' (D15) compiles to fields.Raw, the same fallback the
+        compiler already uses for a type token it does not recognise --
+        phase 3's third review round made that path drop published
+        bounds, so a Raw field carrying none is already the supported
+        case. Proved at every one of the fourteen metadata `value`
+        sites, not just one, because a future compiler change could
+        special-case the token by name and treat the others
+        differently."""
+        for (cls, method) in ANY_TOKEN_ENDPOINTS:
+            value = self.registry[(cls, method)].body.fields['value']
+            with self.subTest(cls=cls, method=method):
+                self.assertIsInstance(value, fields.Raw)
+                self.assertEqual({'a': 1}, value.deserialize({'a': 1}))
+                self.assertEqual([1, 2, 3], value.deserialize([1, 2, 3]))
+                self.assertEqual('a string', value.deserialize('a string'))
+                self.assertIsNone(value.deserialize(None))
 
     def test_console_length_keeps_its_sentinel(self):
         """-1 means "the whole log", and the functional suite sends it.
