@@ -14499,6 +14499,18 @@ capacity row's own <code>limit_cpus</code> as <code>cpu_limit</code>, so a reade
 it against the live-derived <code>cpu_hard_max</code> and see the two ledgers
 disagree; a node with no capacity row reports <code>cpu_limit</code> as <code>None</code>
 rather than falling back to <code>cpu_hard_max</code>.</p>
+<p>Those per-node fields cannot, on their own, tell you <em>why</em> a node is
+uncounted. An empty read of the capacity table looks identical whether
+the table is genuinely unpopulated -- a cluster the reconciler has not
+reached yet -- or the read failed and the error was swallowed. The
+response therefore also carries <code>capacity_degraded</code> in its <code>total</code>
+block, forwarded from the same flag the scheduling path acts on. Read
+it before reading anything else: when it is true, every node's
+<code>cpu_committed</code> is zero and every <code>cpu_limit</code> is <code>None</code> for a reason
+that has nothing to do with the cluster's actual load, and the CPU
+pre-filter was equally blind for that moment. A sampler that treated
+such a response as evidence of an idle cluster would conclude the
+cluster is oversized precisely when its database is unwell.</p>
 <h2 id="namespace-capacity-claims">Namespace capacity claims<a class="headerlink" href="#namespace-capacity-claims" title="Permanent link">&para;</a></h2>
 <p>A <strong>capacity claim</strong> is a namespace's reservation of aggregate cluster
 capacity: so many vCPUs, so much instance memory and so much instance

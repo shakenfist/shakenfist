@@ -13687,6 +13687,61 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#how-full-the-clouds-actually-get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How full the clouds actually get
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-cluster-wide-figure-hides-the-node-that-refuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The cluster-wide figure hides the node that refuses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#does-utilisation-predict-the-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Does utilisation predict the failure?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-refusals-say-per-stage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the refusals say, per stage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memory-does-not-bind-but-is-not-spare-either" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory does not bind, but is not spare either
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#allocation-is-roughly-double-actual-usage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13698,10 +13753,43 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-node-can-record-twice-its-own-ledger-and-sizing-would-hide-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A node can record twice its own ledger, and sizing would hide it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-under-cloud-budget-this-spends" class="md-nav__link">
     <span class="md-ellipsis">
       
         The under-cloud budget this spends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-headroom-band-with-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The headroom band, with numbers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-baseline-does-not-know" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the baseline does not know
       
     </span>
   </a>
@@ -14115,12 +14203,41 @@ copy lives in shakenfist/development at
 <p>The nested test clouds that merge-queue CI builds are sized by a
 decision nobody recorded. Five hypervisors plus a primary, each
 node 4 vCPU and 12 GB, is what <code>ci-topology-slim-primary.yml</code> has
-always said. Until now there was no measurement either way, and no
-mechanism that would notice if the sizing stopped being right.</p>
-<p>There is now. The numbers below were gathered on 2026-08-27 from
-98 <code>merge_group</code> runs of <code>functional-tests.yml</code> spanning
-2026-08-12 to 2026-08-27, and from the private-ci conductor's
-per-instance samples over the same period.</p>
+always said. Until phase 1 there was no measurement either way, and
+no mechanism that would notice if the sizing stopped being right.</p>
+<p>There is now, and this section is written from it. Every figure
+below is either measured, with the sample it was measured over
+stated beside it, or marked as <strong>not measured</strong>. Nothing in it is
+hand-collected without saying so.</p>
+<p>The measured figures come from the phase 2 baseline, which is
+committed under
+<a href="../data/ci-cloud-sizing-baseline/"><code>docs/plans/data/ci-cloud-sizing-baseline/</code></a>:
+217 harvested records over <strong>55 merge runs</strong> between
+2026-08-30T07:48:03Z and 2026-09-05T07:15:07Z, of which <strong>204 carry
+a usable committed-CPU series</strong>. The harvest tool is
+<code>tools/ci_headroom_harvest.py</code> and the exact command is in that
+directory's README. Three caveats on the sample apply everywhere
+below and are not repeated:</p>
+<ul>
+<li>Only <strong>four</strong> jobs carry the phase 1 probe (phase 2, D17):
+  <code>Debian 12 cluster</code>, <code>Ubuntu 24.04 cluster</code> and <code>Guests</code> on
+  <code>slim-primary</code>, and <code>Debian 12 tier</code> on <code>slim-tier</code>. <code>Node
+  lifecycle</code> and <code>Ansible modules</code> are unmeasured, for the two
+  different structural reasons D17 records.</li>
+<li>Roughly <strong>10.6%</strong> of samples (2,276 of 21,517) had every node's
+  capacity row read as absent at once, and are excluded from every
+  committed-CPU figure. This is why an <code>n</code> quoted in samples is
+  smaller than the sample count. Whether those are failed reads or
+  an unpopulated table is <strong>not known</strong> for this window; phase 2's
+  D19 publishes the flag that answers it, prospectively.</li>
+<li>Capacity <strong>guard</strong> refusals were never collected in this window,
+  because the census filter did not match their messages (phase 2,
+  D20). They are <strong>unknown</strong>, not zero, everywhere below.</li>
+</ul>
+<p>Two sources remain hand-collected because this instrument cannot
+reach them: the private-ci conductor's per-instance CPU and memory
+samples, and the under-cloud's own capacity. Both are labelled
+where they are used.</p>
 <h3 id="what-actually-binds-is-the-admission-ledger">What actually binds is the admission ledger<a class="headerlink" href="#what-actually-binds-is-the-admission-ledger" title="Permanent link">&para;</a></h3>
 <p>The scheduler admits a create only if
 <code>max(measured, committed) + requested &lt;= cpu_schedulable x CPU_OVERCOMMIT_RATIO</code>
@@ -14142,6 +14259,7 @@ gives away half its threads, a 6 vCPU node a third.</p>
 <th>VMs</th>
 <th>Under-cloud cost</th>
 <th>Inner ledger</th>
+<th>Measured over</th>
 </tr>
 </thead>
 <tbody>
@@ -14150,105 +14268,577 @@ gives away half its threads, a 6 vCPU node a third.</p>
 <td>6 (1 database + 5 hypervisors)</td>
 <td>24 vCPU / 64 GB</td>
 <td><strong>27 vCPU</strong> (1x3 + 4x6)</td>
+<td>154 job-runs, every one</td>
 </tr>
 <tr>
 <td><code>slim-tier</code></td>
 <td>3 (all hypervisors)</td>
 <td>12 vCPU / 36 GB</td>
-<td><strong>~12 vCPU</strong> (3+3+6)</td>
+<td><strong>12 vCPU</strong> (3+3+6)</td>
+<td>50 job-runs, every one</td>
 </tr>
 </tbody>
 </table>
-<p>Both ledgers were confirmed against real scheduler audit events
-captured in CI job logs, not derived on paper: <code>slim-primary</code>
-publishes one node with <code>cpu_schedulable: 1</code> and four with
-<code>cpu_schedulable: 2</code>; <code>slim-tier</code> publishes two with <code>1</code> and one
-with <code>2</code>. The reconciled figure disagrees: issue #3907 records the
-<code>cluster_capacity</code> singleton reporting the tier's total as <code>limit
-10</code>, and no candidate explanation produces 10 from 12 (dropping a
-node without a capacity row subtracts 3 or 6, not 2). The tier's
-ledger is therefore quoted here as "12 by derivation, 10 by
-observation" and asserted as neither; phase 2 reconciles them
-(phase 0, D7).</p>
+<p>Those ledgers are not derived on paper. Across the whole baseline
+window the cluster ledger read exactly 27.0 in all 154
+<code>slim-primary</code> job-runs and exactly 12.0 in all 50 <code>slim-tier</code>
+job-runs, with no job-run in which the figure moved during the run;
+the per-node limits were 6.0 in 616 <code>slim-primary</code> node-job-runs
+and 3.0 in the other 154, and 3.0 in 100 <code>slim-tier</code> node-job-runs
+and 6.0 in the other 50. The under-cloud cost column is <strong>not
+measured</strong> -- it is read off the topology files.</p>
+<p>This document previously recorded the tier's ledger as "12 by
+derivation, 10 by observation", on the strength of issue #3907
+reporting the <code>cluster_capacity</code> singleton at <code>limit 10</code>. <strong>That
+discrepancy no longer exists and the tier's ledger is 12.</strong> #3907
+closed COMPLETED on 2026-08-27, and its final recurrence comment
+quotes the singleton itself refusing a claim with <code>cpus (limit 12,
+used 9, requested 4)</code>. Phase 0's D7 asked phase 2 to confirm the
+fallback count across a whole window, because a node without a
+capacity row would change what the ledger column means. It is
+confirmed: of <strong>85,563</strong> node-samples whose ledger was readable,
+<strong>zero</strong> fell back to <code>cpu_hard_max</code> and <strong>zero</strong> had no ledger at
+all. Every node in both topologies carried a real capacity row for
+the entire window. D7 is closed.</p>
+<p>The one qualification is that the singleton's own total is not
+published by <code>/admin/resources</code> -- <code>summarize_resources()</code> builds
+<code>total</code> from per-node arithmetic only -- so the 12 above is the sum
+of the rows, and the singleton is cited from #3907 rather than
+measured here.</p>
 <h3 id="the-three-node-topology-is-demonstrably-too-small">The three-node topology is demonstrably too small<a class="headerlink" href="#the-three-node-topology-is-demonstrably-too-small" title="Permanent link">&para;</a></h3>
-<p>Excluding cancellations, over those 98 merge runs:</p>
+<p>Over the 66 merge runs the baseline harvest enumerated, counting
+only the ones in which a job actually ran:</p>
 <table>
 <thead>
 <tr>
 <th>Job</th>
 <th>Topology</th>
 <th>Passed</th>
+<th>Instrumented</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td>Ansible modules</td>
+<td><code>slim-primary</code></td>
+<td>53 / 55 (96%)</td>
+<td>no</td>
+</tr>
+<tr>
 <td>Node lifecycle</td>
 <td><code>slim-primary</code></td>
-<td>81 / 88 (92%)</td>
-</tr>
-<tr>
-<td>Ubuntu 24.04 cluster</td>
-<td><code>slim-primary</code></td>
-<td>75 / 89 (84%)</td>
-</tr>
-<tr>
-<td>Debian 12 cluster</td>
-<td><code>slim-primary</code></td>
-<td>72 / 89 (81%)</td>
+<td>51 / 54 (94%)</td>
+<td>no</td>
 </tr>
 <tr>
 <td>Guests</td>
 <td><code>slim-primary</code></td>
-<td>71 / 90 (79%)</td>
+<td>47 / 54 (87%)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Ubuntu 24.04 cluster</td>
+<td><code>slim-primary</code></td>
+<td>43 / 54 (80%)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Debian 12 cluster</td>
+<td><code>slim-primary</code></td>
+<td>42 / 54 (78%)</td>
+<td>yes</td>
 </tr>
 <tr>
 <td><strong>Debian 12 tier</strong></td>
 <td><strong><code>slim-tier</code></strong></td>
-<td><strong>17 / 89 (19%)</strong></td>
+<td><strong>13 / 54 (24%)</strong></td>
+<td><strong>yes</strong></td>
 </tr>
 </tbody>
 </table>
-<p>The tier's failures are not spread across causes: 69 of them died
-in the <code>Run functional tests</code> step, and the sampled logs show
-<code>507 No nodes remaining at scheduling stage sufficient_idle_cpu</code>
-with <code>current_cpus: 3</code> against <code>limit_cpus: 3</code> -- nodes genuinely
-at their ledger. The sampled <code>slim-primary</code> failures contain no
-such refusal at all. This is the same failure family as the #3772
-umbrella and #3907.</p>
+<p>Only 14 of the 66 merge groups merged (21%). This table previously
+held five rows measured over a different, earlier window of 98 runs;
+it now holds the same six jobs a merge run actually builds, measured
+over the window the rest of this section is measured over, and the
+ordering and the spread are unchanged. <code>Ansible modules</code> was missing
+from it before, which is also why phase 2's D17 describes it as a
+six-job table when it had five rows.</p>
+<p>The tier's failures are not spread across causes. That was
+established from sampled logs -- 69 of the earlier window's tier
+failures died in the <code>Run functional tests</code> step, showing <code>507 No
+nodes remaining at scheduling stage sufficient_idle_cpu</code> with
+<code>current_cpus: 3</code> against <code>limit_cpus: 3</code>, nodes genuinely at their
+ledger. <strong>The step attribution is not re-measured here</strong>, but the
+refusal itself now is: <code>sufficient_idle_cpu</code> aborted in 35 of the
+tier's 50 instrumented job-runs, and 33 of those 35 failed. This is
+the same failure family as the #3772 umbrella and #3907.</p>
+<p>One claim in the same paragraph does <strong>not</strong> survive measurement.
+This document previously said the sampled <code>slim-primary</code> failures
+"contain no such refusal at all". They do. Across 154 instrumented
+<code>slim-primary</code> job-runs the CPU stage dropped 676 candidates in 110
+of them, and aborted outright in 14. <code>slim-primary</code> refuses work
+routinely; it just has four other hypervisors to fall through to,
+which is exactly the difference the per-node subsection below is
+about.</p>
 <p>Two things this is <em>not</em>:</p>
 <ul>
-<li>It is not slowness. Median wall clock is 43.7 minutes for the
-  tier against 46.1 for the Debian 12 cluster, and the median
-  functional-test step is 31.0 minutes against 30.4. The
-  <code>test_timeout_minutes: 70</code> and the comment in
-  <code>functional-tests.yml</code> claiming the tier "runs slower" are not
-  borne out by the data.</li>
-<li>It is not the #3813 demand guard, which was fixed on
-  2026-08-22. Splitting the window at that fix, the tier went from
-  17% to 23% -- unchanged within noise. The refusals now come from
-  the allocation dimension, which means the cluster really is
-  full.</li>
+<li>It is not slowness. The functional-test step's probe window --
+  which brackets the suite itself, not the deploy -- has a median of
+  <strong>28.8 minutes</strong> on the tier (n=50) against <strong>29.3</strong> for the
+  Debian 12 cluster (n=52) and <strong>25.0</strong> for Ubuntu (n=51). The tier
+  is, if anything, marginally the faster of the two Debian jobs.
+  Within the tier, failing job-runs are not longer than passing ones
+  (28.8 against 29.3 minutes). The <code>test_timeout_minutes: 70</code> and
+  the comment in <code>functional-tests.yml</code> claiming the tier "runs
+  slower" are not borne out.</li>
+<li>It is not the #3813 demand guard, which was fixed on 2026-08-22.
+  This claim is <strong>not re-measured</strong>: the baseline window lies
+  entirely after that fix, so it cannot split on it. The earlier
+  hand-collected window put the tier at 17% before and 23% after,
+  unchanged within noise, and the 24% measured here is consistent
+  with that.</li>
 </ul>
+<h3 id="how-full-the-clouds-actually-get">How full the clouds actually get<a class="headerlink" href="#how-full-the-clouds-actually-get" title="Permanent link">&para;</a></h3>
+<p>Committed vCPU as a fraction of the cluster ledger, one figure per
+job-run, <code>n</code> in job-runs. <code>p90</code> and <code>peak</code> are computed within a
+job-run across its samples; the columns then report the median and
+the extremes of those per-run figures across the window.</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Topology</th>
+<th>n</th>
+<th>p90 fraction (med / max)</th>
+<th>peak fraction (med / max)</th>
+<th>peak vCPU (med / max)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Guests</td>
+<td><code>slim-primary</code></td>
+<td>51</td>
+<td>0.296 / 0.370</td>
+<td>0.370 / 0.519</td>
+<td>10 / 14</td>
+</tr>
+<tr>
+<td>Debian 12 cluster</td>
+<td><code>slim-primary</code></td>
+<td>52</td>
+<td>0.333 / 0.444</td>
+<td>0.444 / 0.593</td>
+<td>12 / 16</td>
+</tr>
+<tr>
+<td>Ubuntu 24.04 cluster</td>
+<td><code>slim-primary</code></td>
+<td>51</td>
+<td>0.333 / 0.519</td>
+<td>0.444 / 0.593</td>
+<td>12 / 16</td>
+</tr>
+<tr>
+<td><strong>Debian 12 tier</strong></td>
+<td><strong><code>slim-tier</code></strong></td>
+<td><strong>50</strong></td>
+<td><strong>0.750 / 1.000</strong></td>
+<td><strong>0.917 / 1.000</strong></td>
+<td><strong>11 / 12</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Pooled by topology: <code>slim-primary</code> (n=154) has a median p90 fraction
+of 0.333 and <strong>never once exceeded 0.519</strong> in 154 job-runs;
+<code>slim-tier</code> (n=50) has a median of 0.750 and <strong>never once fell below
+0.500</strong>. The two distributions overlap only in the interval
+[0.500, 0.519].</p>
+<p>The three <code>slim-primary</code> jobs differ from each other by less than
+they differ from the tier, which is the answer to the question D17
+was written to make askable: the gap is the <em>shape</em>, not the suite.
+<code>Guests</code> is the lightest of the three and <code>Debian 12 cluster</code> and
+<code>Ubuntu 24.04 cluster</code> are indistinguishable.</p>
+<p>The tier reached a cluster-wide p90 of <strong>1.000</strong> in one job-run
+(33613379424, failed): every node at its ledger for ninety percent
+of the run.</p>
+<p>The window is stationary. Splitting each job's records into an
+earlier and a later half and comparing shifts nothing at any
+conventional threshold (smallest p = 0.08, on the per-node maximum
+for <code>Guests</code>), so the 55 head SHAs the window spans did not move the
+numbers.</p>
+<h3 id="the-cluster-wide-figure-hides-the-node-that-refuses">The cluster-wide figure hides the node that refuses<a class="headerlink" href="#the-cluster-wide-figure-hides-the-node-that-refuses" title="Permanent link">&para;</a></h3>
+<p>This is D21, and the pattern the phase 2 survey saw in two runs
+<strong>holds across the window</strong>.</p>
+<p>The scheduler admits against one node's ledger at a time and never
+against an average, so the statistic that matters is the highest
+committed-over-ledger ratio any single node stood at. Per job-run,
+that per-node maximum exceeds the cluster-wide figure by a median
+of <strong>0.412</strong> and a median <em>ratio</em> of <strong>2.25x</strong> (n=204, max 3.38x).</p>
+<table>
+<thead>
+<tr>
+<th>Topology</th>
+<th>n</th>
+<th>job-runs with a node at 1.000 (peak)</th>
+<th>with a node at 1.000 (p90)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>slim-primary</code></td>
+<td>154</td>
+<td>100 (65%)</td>
+<td>74 (48%)</td>
+</tr>
+<tr>
+<td><code>slim-tier</code></td>
+<td>50</td>
+<td>50 (100%)</td>
+<td>50 (100%)</td>
+</tr>
+</tbody>
+</table>
+<p>Read cluster-wide, <code>slim-primary</code> looks comfortable at a median p90
+of 0.333. Read per node, <strong>two out of three of its job-runs contain
+a node that was completely full</strong>, and half contain one that was
+full for ninety percent of the run. On the tier every single
+job-run does.</p>
+<p>It is disproportionately, but not only, the small node.
+<code>slim-primary</code>'s 3 vCPU network node peaked at or above its ledger
+in 68 of 154 node-job-runs (44%); its four 6 vCPU nodes did so in
+59 of 616 (10%).</p>
+<p><strong>D21 is defended, with one correction that matters for phase 5.</strong>
+The per-node maximum is the right statistic and the cluster-wide
+one is genuinely misleading -- but the per-node maximum is
+<em>saturated</em>, sitting at its ceiling in 48% of <code>slim-primary</code> and
+100% of <code>slim-tier</code> job-runs, including plenty that passed. It
+cannot discriminate a bad run from a good one at the top of its
+range; all of its information is in its lower tail. A per-node band
+has to be read as a statement about what a topology <em>should</em>
+achieve, not as a per-run alarm the current clouds could pass.</p>
+<h3 id="does-utilisation-predict-the-failure">Does utilisation predict the failure?<a class="headerlink" href="#does-utilisation-predict-the-failure" title="Permanent link">&para;</a></h3>
+<p>This is the central claim of this plan, and it is now testable. The
+answer is more precise than the claim was, and it is partly a null
+result.</p>
+<p><strong>What this is computed over.</strong> 204 job-runs of <strong>four</strong> jobs:
+<code>Debian 12 cluster</code>, <code>Ubuntu 24.04 cluster</code>, <code>Guests</code> and <code>Debian 12
+tier</code>. It is <strong>not</strong> computed over the six-job table above. <code>Node
+lifecycle</code>, the best performer in that table at 94%, carries no
+probe, so no claim of the form "utilisation explains the pass-rate
+spread across the fleet" is made or supportable here.</p>
+<p>Pooled across all four jobs, failing job-runs are much fuller than
+passing ones: a median cluster-wide p90 fraction of 0.667 against
+0.333 (Mann-Whitney, p &lt; 0.001). <strong>That comparison is confounded
+and should not be quoted.</strong> Three of the four jobs share a topology,
+and the fourth -- the tier -- is simultaneously the fullest cloud
+and the one that fails three times out of four, so the pooled test
+is measuring the topology, not the utilisation.</p>
+<p>Within each job, where the topology and the suite are held fixed,
+the cluster-wide committed fraction separates passing from failing
+job-runs <strong>not at all</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>pass / fail n</th>
+<th>median p90 fraction, pass vs fail</th>
+<th>p</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debian 12 cluster</td>
+<td>39 / 12</td>
+<td>0.333 vs 0.370</td>
+<td>0.27</td>
+</tr>
+<tr>
+<td>Ubuntu 24.04 cluster</td>
+<td>40 / 11</td>
+<td>0.333 vs 0.370</td>
+<td>0.59</td>
+</tr>
+<tr>
+<td>Guests</td>
+<td>44 / 7</td>
+<td>0.296 vs 0.296</td>
+<td>0.92</td>
+</tr>
+<tr>
+<td>Debian 12 tier</td>
+<td>13 / 37</td>
+<td>0.750 vs 0.750</td>
+<td>0.74</td>
+</tr>
+</tbody>
+</table>
+<p>The per-node maximum does no better within a job (smallest p =
+0.09), for the saturation reason above.</p>
+<p>What <em>does</em> separate them, in every job and strongly, is whether the
+scheduler ran out of candidates at all -- a <code>sufficient_idle_cpu</code>
+<strong>abort</strong>, which is the event a 507 is raised from, as opposed to a
+drop that merely removed one node from a list which still had
+others:</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>job-runs with an abort</th>
+<th>of those, failed</th>
+<th>of those without, failed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debian 12 cluster</td>
+<td>6 / 52</td>
+<td>4 (67%)</td>
+<td>8 / 46 (17%)</td>
+</tr>
+<tr>
+<td>Ubuntu 24.04 cluster</td>
+<td>1 / 51</td>
+<td>1 (100%)</td>
+<td>10 / 50 (20%)</td>
+</tr>
+<tr>
+<td>Guests</td>
+<td>7 / 51</td>
+<td>6 (86%)</td>
+<td>1 / 44 (2%)</td>
+</tr>
+<tr>
+<td>Debian 12 tier</td>
+<td>35 / 50</td>
+<td>33 (94%)</td>
+<td>4 / 15 (27%)</td>
+</tr>
+<tr>
+<td><strong>All four</strong></td>
+<td><strong>49 / 204</strong></td>
+<td><strong>44 (90%)</strong></td>
+<td><strong>23 / 155 (15%)</strong></td>
+</tr>
+</tbody>
+</table>
+<p>So the honest form of this plan's central claim is: <strong>how full a
+cloud gets does not predict whether its job fails; the cloud
+actually running out does, overwhelmingly.</strong> The two are not the
+same statement. The first would say the tier, at a median p90 of
+0.75, is at risk throughout; the measurement says a tier job-run
+which never aborted passed 11 times out of 15, and one which aborted
+failed 33 times out of 35. What sizing has to move is the abort
+rate, and utilisation is a lagging proxy for it -- useful for
+choosing a shape, useless as a per-run verdict.</p>
+<h3 id="what-the-refusals-say-per-stage">What the refusals say, per stage<a class="headerlink" href="#what-the-refusals-say-per-stage" title="Permanent link">&para;</a></h3>
+<p>Aggregated over the 204 job-runs, counting the four capacity stages
+separately as phase 0's D5 requires. <code>sufficient_free_disk</code> is disk
+<em>space</em>; <code>sufficient_idle_disk</code> is disk <em>bandwidth</em>, a rate
+predicate that no amount of sizing can address. They are never
+merged.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th><code>slim-primary</code> evaluations / drops</th>
+<th><code>slim-tier</code> evaluations / drops</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sufficient_idle_cpu</code></td>
+<td>16,421 / <strong>676</strong></td>
+<td>6,749 / <strong>1,189</strong></td>
+</tr>
+<tr>
+<td><code>sufficient_idle_memory</code></td>
+<td>16,407 / 0</td>
+<td>6,684 / 0</td>
+</tr>
+<tr>
+<td><code>sufficient_free_disk</code></td>
+<td>16,407 / 0</td>
+<td>6,684 / 0</td>
+</tr>
+<tr>
+<td><code>sufficient_idle_disk</code></td>
+<td>16,330 / 0</td>
+<td>6,647 / 0</td>
+</tr>
+</tbody>
+</table>
+<p>Every capacity refusal in the entire window happened at
+<code>sufficient_idle_cpu</code>, and every one of the 1,865 of them gave the
+reason <code>would exceed hard max CPUs</code>. Memory, disk space and disk
+bandwidth refused <strong>nothing at all</strong> in 23,091, 23,091 and 22,977
+evaluations respectively. Aborts, again only at CPU: 14 across 154
+<code>slim-primary</code> job-runs, 65 across 50 <code>slim-tier</code> job-runs.</p>
+<p>Two non-capacity stages are worth recording so that nobody counts
+them as capacity later. <code>is_hypervisor</code> dropped 7,326 candidates on
+<code>slim-primary</code> and <strong>none</strong> on <code>slim-tier</code>: <code>slim-primary</code> carries a
+node the roster names and <code>/admin/resources</code> reports as not a
+hypervisor, in all 154 of its job-runs, and the tier's three nodes
+are all hypervisors. That is structural, not scarcity. <code>affinity_constraints</code> aborted in 114
+job-runs with the reason <code>no co-located instance carries a required
+tag</code>, which is <code>test_affinity</code> reaching its documented skip after
+the 2026-09-01 correction below, not a capacity event.</p>
+<p>Capacity <strong>guard</strong> refusals -- <code>instance placement denied</code> and
+<code>placement admitted over namespace capacity claim</code> -- are
+<strong>unknown</strong> for this window. The census query never matched them.
+This is a hole in the measurement, not a zero.</p>
+<h3 id="memory-does-not-bind-but-is-not-spare-either">Memory does not bind, but is not spare either<a class="headerlink" href="#memory-does-not-bind-but-is-not-spare-either" title="Permanent link">&para;</a></h3>
+<p>Phase 0's D5 decided memory was "a real second dimension" on one
+observed <code>sufficient_idle_memory</code> refusal. <strong>That rationale does not
+survive the window: memory refused nothing in 23,091 stage
+evaluations across 204 job-runs.</strong> Not one drop, on either topology,
+in either direction.</p>
+<p>The reason is arithmetic. A node's memory ledger is
+<code>memory_max x RAM_OVERCOMMIT_RATIO</code>, and that ratio defaults to
+<strong>3.0</strong>, so a 12 GB CI node carries a 35,880 MB ledger over 11,960 MB
+of physical RAM. Committed memory against that ledger looks tiny --
+a median per-job-run p90 of 0.125 on <code>slim-primary</code> (n=154) and
+0.216 on the tier (n=50). Against the node's <em>physical</em> RAM it does
+not:</p>
+<p>Each node's own p90 committed vRAM, summarised across node-job-runs
+(770 on <code>slim-primary</code>, 150 on the tier):</p>
+<table>
+<thead>
+<tr>
+<th>Topology</th>
+<th>per-node p90 committed vRAM (med / p90 / max)</th>
+<th>as a share of that node's physical RAM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>slim-primary</code></td>
+<td>5,120 / 8,028 / 9,052 MB</td>
+<td>43% / 67% / 76%</td>
+</tr>
+<tr>
+<td><code>slim-tier</code></td>
+<td>8,028 / 9,052 / 12,124 MB</td>
+<td>67% / 76% / 101%</td>
+</tr>
+</tbody>
+</table>
+<p>The tier's worst node committed <strong>more vRAM than it physically
+has</strong>, which the 3x overcommit permits. That is committed
+allocation, not memory in use; the conductor's hand-collected
+7.5-10.2 GB actually in use on a tier node sits below it, as it
+should.</p>
+<p><strong>So D5 narrows, and its operative clause survives.</strong> Memory is not
+a binding <em>admission</em> dimension in either current shape and phase 3
+does not need a memory dimension in its saturation test. But per-node
+RAM is not headroom to reclaim: the measured per-node p90 commitment
+is 8.0 GB on <code>slim-primary</code> and 9.1 GB on the tier, and D5's rule
+that no topology drops per-node RAM below the measured p90 plus a
+margin now has those numbers behind it.</p>
 <h3 id="allocation-is-roughly-double-actual-usage">Allocation is roughly double actual usage<a class="headerlink" href="#allocation-is-roughly-double-actual-usage" title="Permanent link">&para;</a></h3>
-<p>From the conductor's per-instance samples (<code>workflow_cost_samples</code>,
-filtered to <code>is_runner = 0</code>, n ~ 550 VMs per job):</p>
+<p>This subsection has two sources and they measure different things.</p>
+<p><strong>Hand-collected, and not re-measured here.</strong> From the conductor's
+per-instance samples (<code>workflow_cost_samples</code>, filtered to
+<code>is_runner = 0</code>, n ~ 550 VMs per job), gathered 2026-08-27:</p>
 <ul>
 <li><strong>CPU</strong>: a 4 vCPU cluster VM averages <strong>0.71 cores</strong> across a
   <code>slim-primary</code> run (p90 1.03, max 1.46) -- about 18% of its
   allocation. The same VM in the tier averages 1.22 cores.</li>
 <li><strong>Memory</strong>: peak memory in use on a 12 GB node is
   <strong>4.9-7.6 GB</strong> on <code>slim-primary</code> and <strong>7.5-10.2 GB</strong> on the
-  tier, which is what carrying the same work on three nodes
-  rather than five looks like. Swap-out is <strong>zero on every node
-  of every job</strong>, so nothing is under memory pressure anywhere.</li>
+  tier. Swap-out is <strong>zero on every node of every job</strong>.</li>
 <li>The 4 GB primary in <code>slim-primary</code> is the tightest node in the
   fleet at 3.9 GB in use. It never swaps, but it has no slack.</li>
 </ul>
-<p>Read together with the ledger arithmetic, the finding is that the
-clouds are sized on the wrong axis. Real CPU is idle, real memory
-is half used, and the thing that runs out is a derived allocation
-limit that a wider node would relieve for free.</p>
+<p>The probe cannot reproduce these: it publishes vCPU counts, not
+core-seconds. They are the reason to believe real CPU is idle, and
+they remain the only such evidence.</p>
+<p><strong>Measured, from the baseline bundles.</strong> What the probe <em>can</em>
+answer is which of the scheduler's two ledgers refuses. Over 85,563
+ledgered node-samples, summed committed vCPU is only <strong>1.04x</strong>
+summed measured vCPU -- the capacity counters charge barely more
+than the running-domain census does. Committed exceeded measured in
+12.4% of node-samples and measured exceeded committed in 10.3%. Of
+the 1,965 <code>sufficient_idle_cpu</code> refusals whose payload could be
+classified, <strong>30.6% would have been admitted on the measurement
+alone</strong>, 27.4% would have been admitted on the counters alone, and
+42.0% were refused by both. In 15.1% the node measured <em>exactly
+zero</em> running vCPU at the moment it refused.</p>
+<p>(Both of these are computed from the raw series and census inside
+the bundles rather than from the committed summary records, which do
+not carry the underlying fields. The 1,965 exceeds the 1,865 counted
+in the stage table above because it is taken over all 217 bundles,
+including the thirteen whose series was absent but whose census was
+not.)</p>
+<p>Read together, the finding of this subsection is unchanged but
+sharper. What runs out is an allocation figure and not real CPU --
+both <code>measured</code> and <code>committed</code> count vCPU, and the conductor says
+those vCPU are 82% idle. But it is <strong>not</strong> specifically the
+capacity counters: nearly seven refusals in ten would have happened
+without them, from the running-domain count alone. Both are compared
+against the same <code>cpu_schedulable x CPU_OVERCOMMIT_RATIO</code>, so a
+wider node relieves both, and no fix to the counters would relieve
+either.</p>
+<h3 id="a-node-can-record-twice-its-own-ledger-and-sizing-would-hide-it">A node can record twice its own ledger, and sizing would hide it<a class="headerlink" href="#a-node-can-record-twice-its-own-ledger-and-sizing-would-hide-it" title="Permanent link">&para;</a></h3>
+<p>The instrument found one thing the plan was not looking for. A
+capacity row can record a node as committing more vCPU than its own
+limit allows. Because <code>_has_sufficient_cpu()</code> admits on
+<code>max(measured, committed) + requested &lt;= limit</code>, a node in that
+state refuses <strong>every</strong> subsequent create no matter how idle it is,
+and the cluster silently loses a hypervisor. That is the #3772 507
+signature arrived at from the counters rather than from real
+exhaustion, and it is a defect a bigger cloud would mask rather than
+fix.</p>
+<p>Quantified over the window, it is <strong>real, reproducible, and rare</strong>:</p>
+<ul>
+<li><strong>18 of 85,563</strong> ledgered node-samples (0.021%) recorded a node
+  above its own limit.</li>
+<li>All 18 fall in <strong>2 of 204</strong> job-runs (1.0%), both <code>Debian 12 tier</code>
+  on <code>slim-tier</code>. The node's limit did not move in either run.</li>
+<li>Run 33752413862 (2026-09-03): node <code>750651c4</code>, limit 3.0
+  throughout, committed p90 <strong>6.0</strong> and peak <strong>7.0</strong> -- a fraction
+  of 2.0 and 2.33, held for most of the run. <strong>That job passed.</strong></li>
+<li>Run 33948911843 (2026-09-05): node <code>2060c55b</code>, limit 3.0
+  throughout, committed peak <strong>6.0</strong>. That job failed.</li>
+<li>3 of the 18 samples had <code>cpu_measured</code> of exactly zero.</li>
+</ul>
+<p>It is therefore not a driver of the 507 family's <em>frequency</em>: at one
+percent of job-runs it cannot explain a 76% tier failure rate, and
+the phase 2 survey's expectation that it might be the most
+decision-relevant number in the dataset is not borne out. It remains
+a real defect, and phase 2 files it rather than fixing it.</p>
+<p><strong>Step 2f established the mechanism, and it is not a breach of the
+guarded UPDATE.</strong> All 18 node-samples are the <em>first</em> samples after
+the capacity rows appear, and the journals put the reconciler's
+first pass between the last no-row sample and the first over-limit
+one, to within seconds, in both runs. <code>scheduler_node_capacity</code> has
+no rows until that pass, which is registered
+<code>schedule.every(5).minutes</code> (<code>daemons/cluster/main.py:750</code>) and so
+first runs five minutes after the cluster daemon starts. Until then
+<code>admit_instance_placement()</code> takes P7's fail-open branch on every
+node at once -- it writes the placement and the <code>instance_location</code>
+row and touches no counter -- and the CPU pre-filter charges
+<code>committed_cpus</code> zero, leaving only <code>cpu_total_instance_vcpus</code>,
+which counts <em>running</em> domains and republishes once a minute. So a
+burst of concurrent creates that are still fetching images all
+measure zero and all land. The first reconcile pass then recomputes
+<code>used_cpus</code> from those reference rows and faithfully writes 6 or 7
+onto a row whose <code>limit_cpus</code> is 3. The counter is a correct reading
+of an incorrect placement.</p>
+<p>That window is universal, not rare: in <strong>all 204</strong> job-runs the
+capacity table is empty for a contiguous prefix of <strong>135 to 210
+seconds</strong> (median 165), and in <strong>176 of 204 (86%)</strong> instances were
+already running before any capacity row existed. What is rare is the
+overshoot, and its rarity is the ledger's size -- both occurrences
+are <code>slim-tier</code>, whose network node has a <code>limit_cpus</code> of 3.
+Ruled out with the same evidence: the P5 forced ground-truth write
+(its <code>placement recorded despite exceeding capacity guard</code> event
+appears in neither bundle), a lowered limit, <code>_reconcile_placement()</code>'s
+documented restart overcount, and a mid-run loss of the rows.</p>
 <h3 id="the-under-cloud-budget-this-spends">The under-cloud budget this spends<a class="headerlink" href="#the-under-cloud-budget-this-spends" title="Permanent link">&para;</a></h3>
+<p><strong>Not measured by this instrument.</strong> These figures are read from
+<code>sfcbr</code>'s own capacity and from the topology files, and the probe
+runs inside the nested clouds rather than the under-cloud.</p>
 <p><code>sfcbr</code> publishes a 234 vCPU admission ledger across six
 hypervisors and has 376 GB of physical RAM. One merge run builds
 <strong>six</strong> nested clouds (<code>Debian 12 cluster</code>, <code>Ubuntu 24.04
@@ -14260,37 +14850,112 @@ runner apiece.</p>
 merge run, which is why the queue is throttled to two parallel
 builds and why contention shows up as unrelated-looking flakes.
 <strong>RAM, not vCPU, is the scarce under-cloud resource</strong>, and the CI
-clouds are the largest consumer of it.</p>
-<h3 id="reproducing-the-measurements">Reproducing the measurements<a class="headerlink" href="#reproducing-the-measurements" title="Permanent link">&para;</a></h3>
-<p>Nothing here came from a tool we own, which is the deeper problem
-this plan exists to fix. For now:</p>
+clouds are the largest consumer of it. Closing the loop with the
+measured figures above: an inner node's committed vRAM reaches
+43-76% of its <em>physical</em> RAM on <code>slim-primary</code> and 67-101% on the
+tier, so that 356 GB is not obviously over-provisioned per node --
+any saving has to come from having fewer nodes, which is what phase
+4 will weigh.</p>
+<h3 id="the-headroom-band-with-numbers">The headroom band, with numbers<a class="headerlink" href="#the-headroom-band-with-numbers" title="Permanent link">&para;</a></h3>
+<p>Phase 0's D3 fixed the band's <em>form</em> and left its numbers to this
+phase, with provisional bounds of 0.35 and 0.70. Phase 2's D21 added
+a per-node component. Both are now set from the distribution.</p>
+<p><strong>Cluster-wide upper bound: keep 0.70.</strong> In 154 <code>slim-primary</code>
+job-runs the cluster-wide p90 fraction never reached it -- the
+maximum observed is 0.519 -- and 37 of 50 <code>slim-tier</code> job-runs
+exceed it. It separates the cloud this plan agrees is too small from
+the ones it does not, with no false positives in the window.</p>
+<p><strong>Cluster-wide lower bound: 0.35 is numerically right and
+operationally awkward.</strong> 104 of 154 <code>slim-primary</code> job-runs fall
+below it, and none of the tier's do. That is the correct <em>finding</em>
+-- <code>slim-primary</code> really is running at a third of its ledger -- but
+a per-run warning that fires on two runs in three is noise. The
+number stands; phase 5 has to decide whether the lower bound is
+evaluated per run or against a job's median across a window, and
+this phase does not decide that for it.</p>
+<p><strong>Per-node upper bound: 0.85, as a first proposal.</strong> Taking the
+p90 of the per-node maximum, job-runs which recorded <em>no</em> capacity
+refusal at all (n=44) sit at a median of 0.667 and exceed 0.85 in
+only <strong>1 of 44</strong> cases; job-runs which recorded at least one
+(n=160) sit at a median of 1.000 and exceed 0.85 in <strong>123 of 160</strong>.
+That is the cleanest separation any statistic in the dataset
+achieves, and 0.85 is where it falls. It fires on 48% of
+<code>slim-primary</code> and 100% of <code>slim-tier</code> job-runs today, which is the
+point of proposing it: the cluster-wide figure says those clouds
+are fine and they are not.</p>
+<p><strong>No per-node lower bound is proposable from this window.</strong> The
+statistic is saturated at the top, so its distribution says nothing
+about what "too empty per node" would look like.</p>
+<h3 id="what-the-baseline-does-not-know">What the baseline does not know<a class="headerlink" href="#what-the-baseline-does-not-know" title="Permanent link">&para;</a></h3>
+<p>One thing, stated once more because it is easy to read as zero and
+is not:</p>
 <ul>
-<li>Job and step timings: <code>gh api
+<li><strong>Capacity guard refusals: unknown.</strong> Not collected in this
+  window, because the census filter matched only the scheduler's
+  stage events. Phase 2's D20 fixes it and phase 2's step 2g
+  re-measures over a short post-fix window.</li>
+</ul>
+<p>The second entry that stood here -- the ledger-unreadable samples --
+<strong>is now known</strong>, and step 2f answered it from the shape of the data
+rather than from D19's flag. 2,276 of 21,517 usable samples (10.6%),
+in every one of the 204 job-runs, have every node's capacity row read
+as absent at once; every committed-CPU figure above excludes them. In
+<strong>every</strong> job-run those samples are exactly a contiguous <em>prefix</em> of
+the series, 9 to 14 samples long, ending at the reconciler's first
+pass -- never mid-run, never scattered, never twice. A failed gRPC
+read is an independent per-sample event and would not land only on
+the head of 204 independent job-runs. So this is an <strong>unpopulated
+table during cluster warm-up, not a failing read</strong>, and there is no
+read-reliability defect to file.</p>
+<p>What the window does expose is the other side of the same fact: for
+those 135 to 210 seconds the admission guard does not exist, which is
+where the 18 refusal payloads that fired with <code>capacity_row_present</code>
+false come from, and which is #4087, recorded in <em>Bugs fixed
+during this work</em> below. Step 2g should confirm the classification
+prospectively once D19's flag is running -- <code>capacity_degraded</code>
+should read false throughout the prefix -- but that is a
+confirmation, not an open question.</p>
+<h3 id="reproducing-the-measurements">Reproducing the measurements<a class="headerlink" href="#reproducing-the-measurements" title="Permanent link">&para;</a></h3>
+<p>The measured figures now come from a tool we own, which is what
+this plan existed to fix. The hand-collected ones still do not.</p>
+<ul>
+<li><strong>The baseline itself</strong>: <code>tools/ci_headroom_harvest.py</code>, with the
+  exact command and window in
+  <a href="../data/ci-cloud-sizing-baseline/"><code>docs/plans/data/ci-cloud-sizing-baseline/README.md</code></a>.
+  The dataset in that directory is the source for every figure above
+  marked as measured, except the two named as coming from the raw
+  bundles.</li>
+<li><strong>A single job's own numbers</strong>: <code>tools/ci_headroom_report.py</code>
+  against the <code>traces/headroom.jsonl</code> and
+  <code>traces/headroom-census.json</code> in that job's bundle, or <code>--json</code> for
+  the machine-readable record the harvest consumes. Every cluster job
+  also prints the prose summary into its own log.</li>
+<li><strong>Job pass rates</strong>: <code>gh api
   "repos/shakenfist/shakenfist/actions/workflows/functional-tests.yml/runs?event=merge_group"</code>
-  then <code>.../runs/&lt;id&gt;/jobs</code>, whose <code>steps[]</code> carry <code>started_at</code>
-  and <code>completed_at</code>. The <code>ci-status</code> helper summarises jobs but
-  strips step timestamps.</li>
-<li>Ledger and refusal evidence: <code>ci-status shakenfist/shakenfist
-  logs &lt;job id&gt;</code>, then grep for <code>cpu_schedulable</code>, <code>limit_cpus</code>
-  and <code>No nodes remaining at scheduling stage</code>. Note that the
-  scheduler's per-candidate audit payload is written on <em>every</em>
-  schedule, not only failing ones: <code>_log_and_raise_on_error()</code>
-  (<code>shakenfist/scheduler.py:348-364</code>) emits <code>schedule at stage
-  {stage}</code> carrying <code>extra['dropped']</code> whenever candidates
-  survived, and <code>schedule has no candidates at stage {stage},
-  aborting</code> when none did. A green run therefore does record its
-  refusals -- the phase 1 survey corrected an earlier claim here
-  that it did not.</li>
-<li>Per-instance utilisation: the conductor database, copied as
-  described in the private-ci access notes; join
+  then <code>.../runs/&lt;id&gt;/jobs</code>. The job names the API returns are not
+  the matrix names -- the reusable workflow contributes its own, so
+  <code>Debian 12 cluster</code> arrives as <code>Debian 12 cluster (collection) /
+  Smoke tests (collection)</code>.</li>
+<li><strong>Ledger and refusal evidence for one run</strong>: <code>ci-status
+  shakenfist/shakenfist logs &lt;job id&gt;</code>, then grep for
+  <code>cpu_schedulable</code>, <code>limit_cpus</code> and <code>No nodes remaining at
+  scheduling stage</code>. The scheduler's per-candidate audit payload is
+  written on <em>every</em> schedule, not only failing ones:
+  <code>_log_and_raise_on_error()</code> emits <code>schedule at stage {stage}</code>
+  carrying <code>extra['dropped']</code> whenever candidates survived, and
+  <code>schedule has no candidates at stage {stage}, aborting</code> when none
+  did. A green run therefore does record its refusals.</li>
+<li><strong>Per-instance utilisation (hand-collected)</strong>: the conductor
+  database, copied as described in the private-ci access notes; join
   <code>workflow_cost_samples</code> to <code>workflow_costs</code> on <code>namespace</code> and
   filter <code>is_runner = 0</code>. The conductor's own published <em>sizing
   recommendations</em> remain untrustworthy (they aggregate a whole
   nested cloud into the runner's namespace and read a guest's RSS
   as its working set); the raw per-instance samples used here are
   not affected by that, because they are not aggregated.</li>
-<li>Live under-cloud capacity: <code>GET /admin/resources</code> on <code>sfcbr</code>,
-  which is also the endpoint phase 1 makes CI sample.</li>
+<li><strong>Live under-cloud capacity (hand-collected)</strong>: <code>GET
+  /admin/resources</code> on <code>sfcbr</code>, which is also the endpoint phase 1
+  makes CI sample from inside each nested cloud.</li>
 </ul>
 <h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
 <p>Make the size of a CI test cloud a measured, continuously-checked
@@ -14358,6 +15023,13 @@ with per-node RAM unchanged -- so the same reshape can relax the
 CPU filter while tightening the memory one. Whether the test
 actually gets greener is therefore not settled by this plan; it is
 one more thing phase 2's per-stage refusal counts must show.</p>
+<p><em>Those counts are now in, and they answer the memory half of it:</em>
+across 204 instrumented job-runs the <code>sufficient_idle_memory</code> stage
+was evaluated 23,091 times and dropped <strong>nothing</strong>, on either
+topology -- see <em>What the refusals say, per stage</em> above. The
+tightening this paragraph worried about is not visible in the
+current shapes; whether a reshape creates it is phase 4's to check
+against the same counts.</p>
 <p><em>Correction (2026-09-01), from scheduler-reservations phase 6:</em>
 the worry above is discharged, and <code>test_affinity</code> should be
 dropped from the corpus of signatures this plan has to worry
@@ -14374,8 +15046,11 @@ the question has been answered, and the test reports "no
 information" rather than passing. #3772 and #3907 are unaffected
 and remain the live masking risk.</p>
 <h3 id="candidate-shapes">Candidate shapes<a class="headerlink" href="#candidate-shapes" title="Permanent link">&para;</a></h3>
-<p>Illustrative only -- phase 2 supplies the peak-demand figure that
-turns these into a decision.</p>
+<p>Illustrative only. Phase 2 has now supplied the peak-demand figure
+-- <em>How full the clouds actually get</em> and <em>The cluster-wide figure
+hides the node that refuses</em> above -- and deliberately does <strong>not</strong>
+turn it into a proposal. Phase 4 chooses a shape, and phase 3 gates
+phase 4.</p>
 <table>
 <thead>
 <tr>
@@ -14460,7 +15135,11 @@ those are corrected here as well.</p>
    run, and zero <code>sufficient_idle_cpu</code> refusals in a green run.
    Phase 2 supplies the distribution that makes those numbers
    honest, or replaces them. <strong>Decided in phase 0 as D3: the form
-   now, the numbers in phase 2.</strong></li>
+   now, the numbers in phase 2.</strong> <em>Answered by the phase 2
+   baseline: the cluster-wide upper bound of 0.70 is defended, the
+   lower bound of 0.35 is kept with an open question about how it
+   is evaluated, and a per-node upper bound of 0.85 is proposed for
+   the first time -- see</em> The headroom band, with numbers <em>above.</em></li>
 <li><strong>Does anything still need five hypervisors?</strong>
    <code>nodelifecycletests.sh</code> needs a script host, a network node and
    two distinct victims, and <code>functional-tests.yml</code> hardcodes
@@ -14475,7 +15154,14 @@ those are corrected here as well.</p>
    does not survive checking: the resources daemon publishes
    <code>psutil.virtual_memory().available</code>, which is <code>MemAvailable</code> and
    already excludes reclaimable cache, so the refusal was honest.
-   <strong>Decided in phase 0 as D5: memory is a real second dimension.</strong></li>
+   <strong>Decided in phase 0 as D5: memory is a real second dimension.</strong>
+   <em>Narrowed by the phase 2 baseline: memory refused nothing in
+   23,091 stage evaluations across 204 job-runs, so it is not a
+   binding admission dimension in either current shape. D5's
+   operative clause survives and now has numbers -- committed vRAM
+   already reaches 76% of a <code>slim-primary</code> node's physical RAM and
+   101% of a tier node's -- see</em> Memory does not bind, but is not
+   spare either <em>above.</em></li>
 <li><strong>How much of the phantom stays?</strong> <code>slim-primary</code> deliberately
    lists an unreachable <code>sf-absent</code> hypervisor as the regression
    guard for the 2026-07-20 absent-node deploy failure. Any
@@ -14510,12 +15196,12 @@ superseded.</p>
 <tr>
 <td>1. Headroom instrumentation: sample <code>/admin/resources</code> through every cluster job and publish the series</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-01-headroom-probe/">PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</a></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2. Baseline measurement window: the peak-demand distribution that has never existed</td>
-<td>PLAN-ci-cloud-sizing-phase-02-baseline.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-ci-cloud-sizing-phase-02-baseline/">PLAN-ci-cloud-sizing-phase-02-baseline.md</a></td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>3. Explicit saturation coverage, so that growing a cloud cannot silence a defect</td>
@@ -14573,14 +15259,39 @@ and which D7 needs; phase 1 adds it.</p>
 <code>build-smoke-cluster</code>), so it still needs an operator push and a
 real CI run to prove.</p>
 <h3 id="phase-2-baseline-measurement-window">Phase 2 -- Baseline measurement window<a class="headerlink" href="#phase-2-baseline-measurement-window" title="Permanent link">&para;</a></h3>
-<p>Leave phase 1 running for an agreed number of merge runs, then
-publish the distribution: what peak utilisation actually is per
+<p>Publish the distribution: what peak utilisation actually is per
 job, on both topologies, and how it correlates with the failures.
 This is the number that has never existed, and it is what turns
 the candidate shapes above into a decision.</p>
-<p>Expect it to also answer open question 5 (whether memory refusals
-are real) and to confirm or correct the tier's reconciled ledger
-against the live derivation.</p>
+<p>This section previously described phase 2 as leaving phase 1
+running for an agreed number of merge runs and waiting. <strong>The
+waiting is already done.</strong> The phase 2 survey counted 66
+<code>merge_group</code> runs of <code>functional-tests.yml</code> banked since the
+census fix merged on 2026-08-30, each carrying five cluster
+bundles, all still inside the 90 day artifact retention. Phase 2
+harvests them retrospectively (phase 2, D16) rather than opening a
+new window, because waiting adds weeks and no information while
+the early part of the window expires.</p>
+<p>Two things the phase 1 output already changes about what phase 2
+must look for. The cluster-wide committed fraction and the
+<em>per-node maximum</em> can disagree by a factor of two -- one sampled
+<code>slim-primary</code> run sat at a cluster-wide p90 of 0.407 with one node
+pinned at 1.000 and twelve real <code>sufficient_idle_cpu</code> refusals --
+so D3's band gains a per-node component (phase 2, D21). And open
+question 5's expected answer has flipped: memory recorded zero
+drops and a p90 of 0.14-0.20 of ledger in both sampled runs, so
+phase 2 is testing whether D5 should be <em>narrowed</em>, not whether it
+holds.</p>
+<p>The tier's ledger question (D7) is closed by evidence already in
+hand -- see the Situation section above -- so phase 2 confirms the
+fallback count across its window rather than reconciling two
+figures. It is confirmed at zero over 85,563 ledgered node-samples.</p>
+<p>The baseline is now published: the <em>Situation</em> section above is
+written entirely from it, and the dataset it was computed from is
+committed under
+<a href="../data/ci-cloud-sizing-baseline/"><code>docs/plans/data/ci-cloud-sizing-baseline/</code></a>.
+Its headline findings, including the ones that corrected this
+plan's expectations, are recorded in the phase 2 plan.</p>
 <h3 id="phase-3-explicit-saturation-coverage">Phase 3 -- Explicit saturation coverage<a class="headerlink" href="#phase-3-explicit-saturation-coverage" title="Permanent link">&para;</a></h3>
 <p><strong>Gate on this phase before phase 4.</strong> Convert the scarcity
 coverage we get by accident into coverage we get on purpose: a
@@ -14914,7 +15625,26 @@ which is what <code>tools/check-plan-status.py</code> enforces.</p>
 <li><strong>Generalise to the other repositories' clouds.</strong> The
   downstream repositories fork these topologies. Phase 6
   propagates the shapes; making the headroom probe part of the
-  reusable workflow means they inherit the measurement too.</li>
+  reusable workflow means they inherit the measurement too. Same
+  structural cause as the entry below: a cloud built by something
+  other than the workflow the probe steps live in is unmeasured.</li>
+<li><strong>Instrument the two cluster jobs the probe cannot see.</strong> Phase
+  2's D17 found that only four of the six clouds a merge run builds
+  carry the phase 1 probe, for two different reasons. <code>Ansible
+  modules</code> runs through the reusable <code>smoke-cluster</code> workflow but
+  with <code>test_kind: ansible-modules</code>
+  (<code>functional-tests.yml:514</code>), and every probe step is gated <code>if:
+  inputs.test_kind == 'functional'</code>; widening that gate is the whole
+  fix. <code>Node lifecycle</code> never reaches that workflow at all -- it
+  calls the <code>build-smoke-cluster</code> composite action directly
+  (<code>functional-tests.yml:554-557</code>), and the probe steps live in the
+  workflow rather than in the action, so moving them into (or
+  duplicating them beside) the action is a change to how <em>every</em>
+  caller deploys. That is the same seam as the entry above, and the
+  two should be done together. The cost of leaving it is concrete
+  and already paid: <code>Node lifecycle</code> is the best performer in the
+  failure table, and the baseline's utilisation-versus-failure
+  correlation cannot speak to it.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>Related issues to resolve or be aware of while planning. None of
@@ -14974,6 +15704,22 @@ sure none of them is closed by accident:</p>
   Phase 2 wants to compare the live ledger derivation against the
   reconciled <code>cluster_capacity</code> figure; if they disagree, this is
   why it is hard to tell which is wrong.</li>
+<li><strong>Unguarded placements in a cluster's first minutes</strong>
+  (<strong>#4087</strong>, filed by phase 2 step 2f).
+  <code>scheduler_node_capacity</code> has no rows until the
+  reconciler's first pass, which <code>schedule.every(5).minutes</code> puts
+  five minutes after the cluster daemon starts, so for a measured
+  135 to 210 seconds of every one of the 204 job-runs in the
+  baseline window every admission takes P7's fail-open branch and
+  the CPU pre-filter sees only a once-a-minute count of <em>running</em>
+  domains. The first pass then recomputes <code>used_cpus</code> from the
+  placement rows that accumulated and writes a node above its own
+  <code>limit_cpus</code>, after which that node refuses every create while
+  measuring idle -- the #3772 signature without exhaustion. This is
+  the mechanism behind <em>A node can record twice its own ledger</em>
+  above, it is not a breach of the guarded UPDATE, and <strong>growing
+  the cloud would mask it rather than fix it</strong>, which is exactly
+  what phase 3 exists to prevent.</li>
 </ul>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the

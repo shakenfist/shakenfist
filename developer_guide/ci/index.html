@@ -14225,7 +14225,36 @@ beside the other logs, with no separate download to go and find.</p>
 into a printed summary at the end of the job log: p90 and peak
 committed vCPU and memory, cluster-wide and per node, both absolute
 and as a fraction of the admission ledger, plus the refusal census
-broken out by stage.</p>
+broken out by stage. It also has a machine-readable form: everything
+it prints is computed once into a plain dict by <code>summary_record()</code>,
+the prose is rendered from that dict rather than computed separately,
+and <code>--json PATH</code> writes the dict out as one JSON object. Anything the
+report can print, a program can read without parsing the tables --
+which is what stops a change to the report's wording silently breaking
+a consumer. Two conventions hold throughout the record: a figure that
+was not measured is <code>null</code> and never <code>0</code>, and a ledger is recorded as
+the range it moved over rather than averaged.</p>
+<p><code>tools/ci_headroom_harvest.py</code> is the batch counterpart, run by hand
+from a checkout rather than in CI. It enumerates the <code>merge_group</code>
+runs of <code>functional-tests.yml</code>, downloads each run's cluster bundles
+through the <code>gh</code> CLI (which supplies the credentials), unpacks the
+trace files -- an artifact download is a zip whose single member is
+<code>bundle.zip</code>, and the traces are inside <em>that</em> -- calls
+<code>summary_record()</code> on each, and writes one compact JSON object per job
+per run. It needs at least one of <code>--since</code> and <code>--limit</code>, because an
+unbounded harvest downloads the whole ninety day retention window;
+bundles are cached by artifact id under <code>~/.cache/shakenfist-ci-headroom</code>
+by default, outside any checkout, and an already-cached bundle is never
+re-fetched. Two things about it are deliberate and worth knowing before
+changing it. Only four of a merge run's cluster bundles carry the probe
+at all, and the other two are skipped <em>by name</em> with the reason
+recorded in the source, so they never appear as missing data; and a
+bundle whose artifact name the tool has no entry for raises
+<code>UnknownBundleError</code> rather than being guessed at or skipped, so adding
+a job to the merge matrix stops the harvest until someone says what the
+new job is. A bundle with no series is written out with a reason
+instead of being dropped, because a harvest that silently shrinks its
+own window is the failure mode that looks most like success.</p>
 <h3 id="the-series-record-format">The series record format<a class="headerlink" href="#the-series-record-format" title="Permanent link">&para;</a></h3>
 <p>Phase 2 parses <code>headroom.jsonl</code> as a contract, so treat the shape
 below as load-bearing rather than as prose to paraphrase; the tool's

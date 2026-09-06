@@ -14001,6 +14001,17 @@ node that exists only to be absent is exactly the kind of thing a
 reshaping pass deletes as an oversight, and the comment in the file has
 already had to say "DO NOT FIX THIS" in capitals once.</p>
 <h3 id="d7-the-12-versus-10-ledger-discrepancy-is-phase-2s-to-resolve-survey">D7 -- The 12-versus-10 ledger discrepancy is phase 2's to resolve (survey)<a class="headerlink" href="#d7-the-12-versus-10-ledger-discrepancy-is-phase-2s-to-resolve-survey" title="Permanent link">&para;</a></h3>
+<p><strong>CLOSED by the phase 2 survey: the tier's ledger is 12, and the
+discrepancy no longer exists.</strong> Phase 1's headroom series reports a
+<code>slim-tier</code> cluster ledger of exactly 12.0 with per-node limits of
+3, 6 and 3, over 399 node-samples carrying a real capacity row and
+zero fallbacks to <code>cpu_hard_max</code>; and #3907, closed COMPLETED on
+2026-08-27, quotes the <code>cluster_capacity</code> singleton itself refusing
+a claim with <code>cpus (limit 12, used 9, requested 4)</code>. Both halves
+agree. Phase 2 confirms the fallback count across its whole window
+rather than re-litigating the figure, because a node without a
+capacity row would change what the ledger column means. The
+original decision is kept below with its reasoning intact.</p>
 <p><strong>Decision:</strong> phase 2 reconciles the live derivation in
 <code>Scheduler._has_sufficient_cpu</code> against the reconciled
 <code>cluster_capacity.total_cpus</code> for the same cluster, and reports which
