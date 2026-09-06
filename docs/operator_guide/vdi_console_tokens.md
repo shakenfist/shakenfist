@@ -107,11 +107,21 @@ default; never pass `--show-secrets` where the output could be logged, and
 never print or event private key material.
 
 The row is also excluded from the cluster configuration Shaken Fist exports
-into each daemon's environment at startup. Only `cluster_config` rows which
-name a declared configuration option are exported, so the signing key is read
-from the database by the one module that needs it rather than sitting in
-every daemon's `/proc/<pid>/environ` on every node. Nothing an operator does
-turns that off.
+into each daemon's environment at startup. A row is withheld when its name
+looks like a secret and it is not a declared configuration option; ordinary
+rows, including options this release does not know about, are still exported.
+So the signing key no longer sits in every daemon's `/proc/<pid>/environ` on
+every node, and is no longer inherited by the processes privexec spawns.
+Nothing an operator does turns that off.
+
+It is worth being precise about what that does and does not buy, because the
+distinction matters if you are reasoning about blast radius. Shaken Fist
+reads cluster configuration a whole table at a time, so the key is still
+sent to every daemon at startup and to the cluster daemon on each
+maintenance pass — it is simply no longer *retained* in their environment.
+An attacker who can read a daemon's memory is therefore not shut out by this
+change; one who can read its environment, or the environment of a command
+privexec ran, now is.
 
 The key is **not** created automatically: it must be provisioned explicitly
 before the first console is opened. Until it exists, the `vdiconsoleproxy`

@@ -381,7 +381,7 @@ Recommendations are recorded inline.
 | 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete |
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete |
 | 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete |
-| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | Complete |
+| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | In progress |
 | 11. Close out the post-completion defects (#4003, #4009) | shakenfist | See *Post-completion defects* below | Complete |
 
 The table above names plan files rather than pull requests, which
@@ -625,9 +625,12 @@ defect from the one configuration no phase ever tested (after
 high-severity finding in ryll's SPICE TLS verifier, which
 trusted the public WebPKI root set even when a `.vv` supplied
 a private cluster CA -- the mechanism this plan's whole
-`host_subject` story depends on. Both are fixed, along with
+`host_subject` story depends on. Both have fixes open as kerbside#412 and ryll#358 -- this phase
+stays In progress until they merge -- along with
 three medium security findings and the audit's own discovery
-that the `.vv` type-collapse regression test could not fail.
+that the `.vv` type collapse, though covered by a unit test,
+had no functional coverage -- in a project that prefers
+functional coverage where it can only have one.
 Fourteen advisory findings were filed as issues across the
 four repositories. Full detail, with what each heading
 examined and the management session's spot-checks and

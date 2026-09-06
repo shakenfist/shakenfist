@@ -1354,6 +1354,30 @@ class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
         ])
         self.assertIsNone(subject)
 
+    def test_a_repaired_then_broken_certificate_warns_again(self):
+        # The throttle covers one episode, not the life of the process.
+        # An operator reissues the certificate, pinning comes back, and
+        # then the same fault recurs -- that second occurrence is a new
+        # "pinning has just been disabled for this node" event and has
+        # to be reported. Keying the throttle on the reason alone would
+        # swallow it until the daemon happened to restart.
+        broken = [
+            (NameOID.COMMON_NAME, 'hv1'),
+            (NameOID.SERIAL_NUMBER, '12345'),
+        ]
+        good = [(NameOID.COMMON_NAME, 'hv1')]
+
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for(broken))
+            self.assertIsNone(self._subject_for(broken))
+            # Repaired: the read succeeds and clears the throttle.
+            self.assertEqual('CN=hv1', self._subject_for(good))
+            # Regressed to the same cause: warns a second time.
+            self.assertIsNone(self._subject_for(broken))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(2, len(warnings))
+
     def test_unnameable_attribute_warns_once_and_names_the_oid(self):
         # Returning None fails open -- pinning is silently disabled for
         # this node, and on an operator's own PKI that can be every node

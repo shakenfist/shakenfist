@@ -69,6 +69,13 @@ _SPICE_SUBJECT_SHORT_NAMES = {
 # different problem still gets its own line. Process-local: a daemon
 # restart deliberately re-reports, which is when an operator is most
 # likely to be looking.
+#
+# Cleared whenever a read succeeds, so the throttle covers one episode
+# rather than the life of the process. Without that, an operator who
+# reissues a certificate and later regresses to the same cause gets no
+# second warning until a restart -- and "host-subject pinning has just
+# been disabled for this node again" is exactly the event that must not
+# be swallowed.
 _SPICE_SUBJECT_WARNED: set[str] = set()
 
 
@@ -159,7 +166,13 @@ def read_spice_server_cert_subject() -> Optional[str]:
             {'path': SPICE_SERVER_CERT_PATH},
             'Could not read SPICE server certificate: %s' % e)
         return None
-    return _spice_host_subject_from_cert(cert)
+
+    subject = _spice_host_subject_from_cert(cert)
+    if subject is not None:
+        # The condition has cleared, so a later recurrence is a new
+        # episode and warns again.
+        _SPICE_SUBJECT_WARNED.clear()
+    return subject
 
 
 class Node(dbo):

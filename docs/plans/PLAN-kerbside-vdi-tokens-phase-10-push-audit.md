@@ -563,19 +563,29 @@ Examined every test module the ranges added or changed across three
 repositories, plus the CI configuration that decides which of them run.
 
 **The decision-3 scepticism paid off, on a different assertion than the
-plan predicted.** `cluster_ci_tests/test_vdi_console_file.py`'s `host`
+plan predicted -- and the finding is narrower than this section first
+recorded it (corrected after review).** The type collapse was never
+uncovered: the unit test
+`test_instance_vdiconsolehelper.py::test_spiceconcurrent_emits_valid_vv_file`,
+added by the #4009 fix itself, creates an instance with
+`vdi='spiceconcurrent'` and asserts `'spice'`, and it does fail when the
+collapse is removed. What was hollow is the *functional* assertion, which
+matters because this project prefers functional coverage to unit coverage
+where it can only have one. `cluster_ci_tests/test_vdi_console_file.py`'s `host`
 assertion is genuine: `known_addresses` comes from a real
 `get_nodes()` call against the live cluster, so it is cross-checked
 against a second real API response rather than a fixture, and the UUID
 regression would fail it. Its **`type` assertion was hollow**: the test
 creates its instance with `video` unset, and the server then defaults
 `vdi` to `'spice'`, so the `startswith('spice')` collapse is a no-op
-for it. Deleting that line entirely left the test passing. Fixed in
-this phase's PR with a test that creates `vdi='spiceconcurrent'` and
-asserts the internal enum never reaches the viewer -- mutation-verified
-by the management session: with the collapse removed the new assertion
-fails `'spice' != 'spiceconcurrent'`, and the pre-existing test still
-passes, which is precisely the gap.
+for it. Deleting that line entirely left the *cluster CI* test passing.
+Fixed in this phase's PR with a functional test that creates
+`vdi='spiceconcurrent'` and asserts the internal enum never reaches the
+viewer. Mutation-verified by the management session, and the result is
+what pins the scope of the finding: with the collapse removed, the unit
+module fails one test of five with `'spice' != 'spiceconcurrent'` --
+so the unit coverage was real all along -- while the cluster CI test's
+`type` assertion would have gone on passing.
 
 **The #201 fixture is genuinely fixed.** `_node()` now carries
 `uuid='node-uuid-1'` distinct from `fqdn='n1'`, where the old fixture
@@ -800,9 +810,9 @@ majority.
 
 | Finding | Grade | Disposition |
 |---------|-------|-------------|
-| F-B1 console deletion on key-fetch failure | Blocking | Fixed, kerbside `sf-source-console-deletion-fix` |
-| F8 ryll SPICE TLS trust anchors | High | Fixed, ryll `spice-tls-trust-anchors` |
-| F5 unauthenticated `audit_events` write | Medium | Fixed, kerbside `sf-source-console-deletion-fix` |
+| F-B1 console deletion on key-fetch failure | Blocking | Fix open as kerbside#412 |
+| F8 ryll SPICE TLS trust anchors | High | Fix open as ryll#358 |
+| F5 unauthenticated `audit_events` write | Medium | Fix open as kerbside#412 |
 | F1 signing key in every daemon's environ | Medium | Fixed, this PR |
 | F9 `host_subject` fails open silently | Medium | SF half fixed, this PR; kerbside half shakenfist#4097 |
 | SF-2 `.vv` type collapse uncovered | Advisory | Fixed, this PR (mutation-verified) |
@@ -822,8 +832,15 @@ majority.
 | client-python `tox -e cover` misconfiguration | Advisory | Pre-existing since 2020, out of scope, recorded |
 | kerbside logs source password at INFO | Advisory | Out of range, recorded above |
 
-No blocking finding remains open. F8 is fixed on a branch in the
-repository that owns it.
+**One blocking finding remains open**, and this phase therefore stays
+In progress. Decision 7 says a fix lands in the repository that owns
+it, and the Definition of done requires each disposition to name a
+merged fix, an issue, or a written declination -- a branch satisfies
+none of those, and neither does an open pull request. F-B1 and F5 are
+kerbside#412 and F8 is ryll#358; when both merge, this table records
+their merge references and phase 10 becomes Complete. Recorded after
+review pointed out that the status was ahead of the evidence, which it
+was.
 
 ### Spot-checks
 
