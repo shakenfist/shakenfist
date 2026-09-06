@@ -1737,6 +1737,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/fuzz-nightly-reporting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Fuzz nightly reporting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/version-file-gitignore/" class="md-nav__link">
         
   
@@ -3716,13 +3744,30 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#when-bullseye-reaches-end-of-life" class="md-nav__link">
+  <a href="#bullseye-reached-end-of-life-apt-is-pinned-to-a-snapshot" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When bullseye reaches end of life
+        bullseye reached end of life: apt is pinned to a snapshot
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="bullseye reached end of life: apt is pinned to a snapshot">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-options-that-were-not-taken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The options that were not taken
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -13926,13 +13971,30 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#when-bullseye-reaches-end-of-life" class="md-nav__link">
+  <a href="#bullseye-reached-end-of-life-apt-is-pinned-to-a-snapshot" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When bullseye reaches end of life
+        bullseye reached end of life: apt is pinned to a snapshot
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="bullseye reached end of life: apt is pinned to a snapshot">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-options-that-were-not-taken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The options that were not taken
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -14170,29 +14232,46 @@ to <code>debian:trixie</code> in #488; the floor went from <code>GLIBC_2.30</cod
 pull request path looks at the floor; and the failure surfaced as three
 red distros in the merge queue after the change was already on
 <code>develop</code>. The cheap check exists to make that a pull request failure.</p>
-<h4 id="when-bullseye-reaches-end-of-life">When bullseye reaches end of life<a class="headerlink" href="#when-bullseye-reaches-end-of-life" title="Permanent link">&para;</a></h4>
-<p><strong>Debian 11 LTS ends on 2026-08-31</strong>
-(<a href="https://wiki.debian.org/LTS">wiki.debian.org/LTS</a>). "Do not bump this
-tag" is not meant to outlive that date unexamined, so here is what
-happens and what the options are.</p>
-<p>The failure mode is not a glibc change — it is the image's
-<code>apt-get update</code> starting to fail once bullseye moves to
-<code>archive.debian.org</code>, which breaks from-scratch builds of
-<code>instar-release</code> while an already-built image keeps working. Expect it
-to surface as a red CI job on a runner that had no cached image, not as
-a support-matrix regression.</p>
-<p>No option is free, because "move to the next Debian" is not available:
+<h4 id="bullseye-reached-end-of-life-apt-is-pinned-to-a-snapshot">bullseye reached end of life: apt is pinned to a snapshot<a class="headerlink" href="#bullseye-reached-end-of-life-apt-is-pinned-to-a-snapshot" title="Permanent link">&para;</a></h4>
+<p><strong>Debian 11 LTS ended on 2026-08-31</strong>
+(<a href="https://wiki.debian.org/LTS">wiki.debian.org/LTS</a>), and it broke the
+image within a week, exactly as predicted: not as a glibc change but as
+an <code>apt-get</code> failure on a runner with no cached <code>instar-release</code>, while
+every warm runner stayed green. First the <code>deb.debian.org</code> CDN began
+returning 404 for pool objects the <code>bullseye-security</code> index still
+advertised (<code>gnupg2</code>, <code>glibc</code>, <code>xz-utils</code>), then the final
+<code>bullseye-security</code> <code>Release</code> expired at 2026-09-07 21:13 UTC, after
+which apt rejects the suite outright. See
+<a href="https://github.com/shakenfist/instar/issues/550">#550</a>.</p>
+<p><strong>The decision taken was the snapshot pin.</strong>
+<code>src/.devcontainer/build/Dockerfile</code> still says <code>FROM debian:bullseye</code>,
+but rewrites <code>/etc/apt/sources.list</code> to a frozen
+<a href="https://snapshot.debian.org/">snapshot.debian.org</a> timestamp
+(<code>ARG DEBIAN_SNAPSHOT</code>, currently <code>20260901T000000Z</code> — just after the
+last <code>bullseye-security</code> publication, so the image carries the final
+security state of the suite) and sets
+<code>Acquire::Check-Valid-Until "false"</code>, because a snapshot serves the
+historical <code>Release</code> file including its long-past <code>Valid-Until</code>. gpg
+signature verification stays on; the sources stay <code>http://</code> because the
+base ships no <code>ca-certificates</code> and that is the layer installing it.
+<code>archive.debian.org</code> was not usable: it carries
+<code>debian/dists/bullseye</code> but still has no
+<code>debian-security/dists/bullseye-security</code>.</p>
+<p>The cost is a build toolchain that no longer receives updates. That is
+accepted deliberately — the shipped binary's security posture rests on
+the Rust toolchain (pinned, and bumped weekly by
+<code>rust-nightly-bump.yml</code>) and on our own code, not on the build image's
+C library, none of which is linked into the artifact beyond glibc
+itself.</p>
+<p>To move the pin, change <code>DEBIAN_SNAPSHOT</code> only. Do not change
+<code>FROM debian:bullseye</code>, and do not "fix" a future apt failure by
+pointing back at <code>deb.debian.org</code>.</p>
+<h5 id="the-options-that-were-not-taken">The options that were not taken<a class="headerlink" href="#the-options-that-were-not-taken" title="Permanent link">&para;</a></h5>
+<p>No option was free, because "move to the next Debian" is not available:
 bookworm ships glibc 2.36, above both the 2.31 we publish and the 2.34
 the matrix needs, so taking it silently drops Debian 11, Ubuntu 22.04
 and Rocky 9.</p>
 <ul>
-<li><strong>Pin a <code>snapshot.debian.org</code> bullseye base</strong> and point apt at the
-  same snapshot. Keeps the floor and the support matrix exactly as
-  published; costs a frozen, unpatched build toolchain. The binary's
-  security posture depends on the Rust toolchain and our own code far
-  more than on the build image's C library, so this is the least
-  disruptive option, and the one to reach for if the deadline arrives
-  before a decision does.</li>
 <li><strong>Move to bookworm and narrow the promise</strong> to glibc 2.36. This drops
   Debian 11, Ubuntu 22.04 LTS and Rocky/RHEL 9 — the last of which is
   in the matrix CI and, per

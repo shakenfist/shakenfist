@@ -1741,6 +1741,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../fuzz-nightly-reporting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Fuzz nightly reporting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../version-file-gitignore/" class="md-nav__link">
         
   
@@ -13889,6 +13917,10 @@ reachability from in-repo callers was tried and is wrong -- it exempted
 <code>shakenfist/actions</code>' <code>smoke-cluster.yml</code>, which every shakenfist merge
 group runs four nested clusters through, because a scheduled canary
 also calls it.</p>
+<p>A trigger line carrying a trailing comment -- <code>merge_group:  # the
+merge tier</code> -- is a trigger. It used to read as an absence of one, so
+the whole workflow was skipped; a repository written that way starts
+being measured, and may start failing, without having changed.</p>
 <p>Out of scope: jobs whose <code>if:</code> excludes <code>merge_group</code>. Deliberate
 exceptions take an <code>audit-ok: merge-group-cancellation</code> comment, read
 per job -- a marker inside a job exempts that job, and only a marker
