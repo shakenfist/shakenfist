@@ -49,6 +49,21 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         self.assertIn('virt-viewer', cp.sections())
         return cp['virt-viewer']
 
+    def _assert_tls_port_is_pinned(self, vv):
+        """A TLS console port must carry a host-subject.
+
+        Every hypervisor's SPICE certificate is signed by the same
+        cluster CA, so CA validation alone cannot tell one node from
+        another: without a host-subject a viewer accepts any node in
+        the cluster as this endpoint. node.py fails open to no subject
+        when it cannot render one, which is deliberate, but that must
+        not happen on the stock PKI this cluster runs.
+        """
+        if 'tls-port' not in vv:
+            return
+        self.assertIn('host-subject', vv)
+        self.assertTrue(vv['host-subject'])
+
     def test_direct_vv_file_is_valid(self):
         # video is left unset so the server applies its default SPICE
         # console.
@@ -99,12 +114,7 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
             'the ca value does not round-trip to a PEM certificate')
         self.assertIn('-----END CERTIFICATE-----', pem)
 
-        # With a TLS port the node's certificate subject must be pinned:
-        # every hypervisor is signed by the same cluster CA, so without a
-        # host-subject a viewer would accept any node as this endpoint.
-        if 'tls-port' in vv:
-            self.assertIn('host-subject', vv)
-            self.assertTrue(vv['host-subject'])
+        self._assert_tls_port_is_pinned(vv)
 
     def test_spiceconcurrent_vv_type_is_collapsed(self):
         """The internal VDI enum must never reach the viewer.
@@ -122,3 +132,9 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
             video={'model': 'cirrus', 'memory': 16384,
                    'vdi': 'spiceconcurrent'})
         self.assertEqual('spice', vv['type'])
+
+        # instance.py allocates a TLS port for any spice* value, so the
+        # concurrent variant must be pinned exactly as the default one
+        # is. Asserting only the type here would repeat the narrowness
+        # the audit's seam lens found: this is the untested branch.
+        self._assert_tls_port_is_pinned(vv)

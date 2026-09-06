@@ -810,9 +810,9 @@ majority.
 
 | Finding | Grade | Disposition |
 |---------|-------|-------------|
-| F-B1 console deletion on key-fetch failure | Blocking | Fix open as kerbside#412 |
+| F-B1 console deletion on key-fetch failure | Blocking | Fixed, kerbside#412 (merged `e2a493ea6`) |
 | F8 ryll SPICE TLS trust anchors | High | Fix open as ryll#358 |
-| F5 unauthenticated `audit_events` write | Medium | Fix open as kerbside#412 |
+| F5 unauthenticated `audit_events` write | Medium | Fixed, kerbside#412 (merged `e2a493ea6`) |
 | F1 signing key in every daemon's environ | Medium | Fixed, this PR |
 | F9 `host_subject` fails open silently | Medium | SF half fixed, this PR; kerbside half shakenfist#4097 |
 | SF-2 `.vv` type collapse uncovered | Advisory | Fixed, this PR (mutation-verified) |
@@ -832,15 +832,24 @@ majority.
 | client-python `tox -e cover` misconfiguration | Advisory | Pre-existing since 2020, out of scope, recorded |
 | kerbside logs source password at INFO | Advisory | Out of range, recorded above |
 
-**One blocking finding remains open**, and this phase therefore stays
-In progress. Decision 7 says a fix lands in the repository that owns
-it, and the Definition of done requires each disposition to name a
-merged fix, an issue, or a written declination -- a branch satisfies
-none of those, and neither does an open pull request. F-B1 and F5 are
-kerbside#412 and F8 is ryll#358; when both merge, this table records
-their merge references and phase 10 becomes Complete. Recorded after
-review pointed out that the status was ahead of the evidence, which it
-was.
+**The blocking finding is fixed.** kerbside#412 merged as `e2a493ea6`
+on 2026-09-06, carrying both F-B1 and F5. The fix is on kerbside's
+`develop` branch and is not yet in a tagged release -- v0.5.0 and
+earlier are affected -- so Shaken Fist's own operator guide and release
+notes tell operators to provision the signing key before rolling
+daemons on a cluster Kerbside already scrapes. That was added after
+review pointed out that a Shaken Fist operator reads
+`docs/operator_guide/vdi_console_tokens.md`, not kerbside's issue
+tracker.
+
+**One high-severity finding remains open**, so this phase stays In
+progress. Decision 7 says a fix lands in the repository that owns it,
+and the Definition of done requires each disposition to name a merged
+fix, an issue, or a written declination -- a branch satisfies none of
+those, and neither does an open pull request. F8 is ryll#358; when it
+merges, this table records its merge reference and phase 10 becomes
+Complete. Recorded after review pointed out that the status was ahead
+of the evidence, which it was.
 
 ### Spot-checks
 

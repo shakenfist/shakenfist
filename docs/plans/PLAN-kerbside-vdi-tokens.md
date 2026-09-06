@@ -625,9 +625,12 @@ defect from the one configuration no phase ever tested (after
 high-severity finding in ryll's SPICE TLS verifier, which
 trusted the public WebPKI root set even when a `.vv` supplied
 a private cluster CA -- the mechanism this plan's whole
-`host_subject` story depends on. Both have fixes open as kerbside#412 and ryll#358 -- this phase
-stays In progress until they merge -- along with
-three medium security findings and the audit's own discovery
+`host_subject` story depends on. The kerbside fix merged as
+kerbside#412 (`e2a493ea6`), though not yet into a tagged
+release, so Shaken Fist's own operator guide and release notes
+carry the provisioning order which avoids it. ryll#358 is still
+open, and this phase stays In progress until it merges.
+Alongside those came three medium security findings and the audit's own discovery
 that the `.vv` type collapse, though covered by a unit test,
 had no functional coverage -- in a project that prefers
 functional coverage where it can only have one.

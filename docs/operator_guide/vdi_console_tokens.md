@@ -136,6 +136,30 @@ sf-ctl ensure-kerbside-signing-key
 This prints the active key id and how many keys are published; it never
 prints private material and does nothing if a key already exists.
 
+!!! warning "Provision the key before upgrading a cluster Kerbside already scrapes"
+
+    Do this *before* you roll the daemons, if Kerbside is already
+    configured with this cluster as a console source.
+
+    Until the key exists, `GET /admin/vditokenpubkey` returns HTTP 404.
+    **Kerbside v0.5.0 and earlier** treat that failure as making the whole
+    source unusable: the scrape is abandoned before it enumerates any
+    consoles, and the cleanup pass that follows then removes every console
+    Kerbside had previously recorded for this cluster. That deletes the
+    direct and proxy console routes too, not only the token-based ones, so
+    users lose consoles which have nothing to do with this feature.
+
+    Provisioning the key first avoids it entirely. If you have already hit
+    it, provision the key and let Kerbside scrape again — the inventory is
+    rebuilt from Shaken Fist, so the loss is an outage rather than
+    permanent damage.
+
+    The Kerbside-side fix downgrades a missing key to "this source has no
+    token consoles yet" rather than failing the source. It merged as
+    [kerbside#412](https://github.com/shakenfist/kerbside/pull/412) and is
+    on Kerbside's `develop` branch; it is not in a tagged release yet, so
+    provision the key first whatever Kerbside version you run.
+
 ## Publishing the public keys
 
 Kerbside verifies tokens with the **public** half of the signing key, which

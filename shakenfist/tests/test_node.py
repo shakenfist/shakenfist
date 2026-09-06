@@ -18,6 +18,7 @@ from unittest import mock
 from uuid import UUID
 
 from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ObjectIdentifier
 from pydantic import ValidationError
 import testtools
 
@@ -1437,6 +1438,31 @@ class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
         fields = mock_log.with_fields.call_args_list[0][0][0]
         self.assertEqual(
             NameOID.SERIAL_NUMBER.dotted_string, fields['oid'])
+        self.assertEqual('serialNumber', fields['attribute'])
+
+    def test_custom_oid_reports_no_name_rather_than_a_placeholder(self):
+        # cryptography's ObjectIdentifier._name does not return None for
+        # an OID it does not know: it returns the literal 'Unknown OID',
+        # which is truthy. Letting that through would put a constant
+        # placeholder in the structured 'attribute' field for every
+        # unknown OID -- the field an operator groups a Loki query on,
+        # where a fixed string that looks like a name is worse than a
+        # null. The message falls back to the dotted string instead.
+        oid = ObjectIdentifier('1.3.6.1.4.1.99999.1')
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for([
+                (NameOID.COMMON_NAME, 'hv1'),
+                (oid, 'whatever'),
+            ]))
+
+        fields = mock_log.with_fields.call_args_list[0][0][0]
+        self.assertIsNone(fields['attribute'])
+        self.assertEqual(oid.dotted_string, fields['oid'])
+
+        message = (
+            mock_log.with_fields.return_value.warning.call_args_list[0][0][0])
+        self.assertNotIn('Unknown OID', message)
+        self.assertIn(oid.dotted_string, message)
 
     def test_a_second_distinct_problem_still_warns(self):
         # Throttling is per reason, not a single global flag, so a

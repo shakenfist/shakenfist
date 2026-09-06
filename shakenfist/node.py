@@ -86,11 +86,29 @@ _SPICE_SUBJECT_WARNED: set[str] = set()
 # anything outside its own short-name table -- '2.5.4.5' for
 # serialNumber on cryptography 50.0.1 -- which is exactly the value we
 # already log as the oid field, so it would cost the diagnosis and buy
-# nothing. Every read is getattr-guarded and degrades to 'unknown', and
+# nothing. The read is getattr-guarded and
 # test_unnameable_attribute_warns_once_and_names_the_oid asserts the
 # name reaches the message, so an upstream removal surfaces in CI
 # rather than in production.
-def _warn_spice_subject_once(reason: str, fields: dict, message: str) -> None:
+def _spice_subject_attribute_name(oid: x509.ObjectIdentifier) -> Optional[str]:
+    """The human name cryptography has for an OID, or None if it has none.
+
+    For an OID outside its own table cryptography does not return None:
+    _name is a property yielding the literal string 'Unknown OID'. That
+    is truthy, so a naive `or` fallback never fires and the placeholder
+    reaches the structured 'attribute' field -- the field an operator
+    groups a Loki query on, where a constant string is worse than a
+    null because it looks like a name. Map it back to None so callers
+    can omit the field or substitute the dotted string.
+    """
+    name = getattr(oid, '_name', None)
+    if name == 'Unknown OID':
+        return None
+    return name
+
+
+def _warn_spice_subject_once(reason: str, fields: dict[str, Optional[str]],
+                             message: str) -> None:
     """Log a SPICE subject warning the first time each reason occurs."""
     if reason in _SPICE_SUBJECT_WARNED:
         return
@@ -119,24 +137,24 @@ def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
     docs/operator_guide/vdi_console_tokens.md) -- an unrenderable
     subject must not take consoles away -- but it used to happen with
     no log line at all, so an operator had no way to discover it. On a
-    PKI which qualifies subjects with an organisation, a serialNumber
-    or a custom OID this fires on every node at once, silently
-    disabling pinning cluster-wide. Hence the warning; the behaviour
-    is unchanged.
+    PKI which qualifies subjects with a serialNumber, a dnQualifier or
+    a custom OID this fires on every node at once, silently disabling
+    pinning cluster-wide. Hence the warning; the behaviour is
+    unchanged.
     """
     parts = []
     for attr in cert.subject:
         short = _SPICE_SUBJECT_SHORT_NAMES.get(attr.oid)
         if short is None:
             oid = attr.oid.dotted_string
+            name = _spice_subject_attribute_name(attr.oid)
             _warn_spice_subject_once(
                 'unnameable:%s' % oid,
                 {'path': SPICE_SERVER_CERT_PATH, 'oid': oid,
-                 'attribute': getattr(attr.oid, '_name', None)},
+                 'attribute': name},
                 'SPICE certificate subject carries attribute %s (%s), '
                 'which has no SPICE host-subject short name. Host-subject '
-                'pinning is disabled for this node.'
-                % (getattr(attr.oid, '_name', None) or 'unknown', oid))
+                'pinning is disabled for this node.' % (name or oid, oid))
             return None
         value = attr.value
         if not isinstance(value, str):
