@@ -180,6 +180,26 @@ class DeriveBudgetTestCase(base.ShakenFistTestCase):
                                     mean=1.4), nodes=6)
         self.assertNotIn('activity_coupled', entry)
 
+    def test_a_hand_marked_pair_says_why_in_its_note(self):
+        # to_entry() derives the marking for NOT_OUR_LOOPS and nothing
+        # else, so an activity coupled entry with any other caller is
+        # somebody's judgement that a loop of ours runs at a rate the
+        # workload sets. That judgement lives only in the note, is carried
+        # forward verbatim by every future re-derivation, and is the only
+        # thing standing between a deliberate exemption and a pair which
+        # quietly stopped being checked. Make it cite the issue it came
+        # from, the way a provisional marking does.
+        hand_marked = [e for e in budget.load_budget().entries
+                       if e.activity_coupled
+                       and e.caller_daemon not in tool.NOT_OUR_LOOPS]
+        # Vacuous if the list empties, which would retire the mechanism.
+        self.assertNotEqual(0, len(hand_marked))
+        for entry in hand_marked:
+            self.assertRegex(
+                entry.note, r'#\d{3,}',
+                '%s/%s is activity coupled but its note cites no issue '
+                'saying who decided that and why' % entry.key)
+
     def test_every_entry_gets_at_least_one_term(self):
         # A pair with no measurable base and no slope still needs a term,
         # or the budget carries an entry which predicts nothing and the

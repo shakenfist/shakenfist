@@ -409,8 +409,12 @@ Two flags in that output mean "expected, do not report":
   worth defending. Read the issue: it may already be fixed, in which case
   the entry over-predicts until the budget is next re-derived. Either way
   the pair is reported and never enforced.
-* `activity` -- the level is set by what you and your tooling do rather
-  than by one of our loops, so only you can say whether it is reasonable.
+* `activity` -- the level is set by how much work is flowing rather than
+  by one of our loops, so only you can say whether it is reasonable. Most
+  of these are the API serving your own requests, but a few are ours: a
+  queue worker reads and writes object state once per work item, not once
+  per tick, so its rate follows your workload however many nodes you run.
+  Each such entry's note in the budget says which it is and why.
 
 If a gateway does not answer, the command says which and reports on the
 rest. It never quietly reports part of the tier as the whole of it,
@@ -471,9 +475,9 @@ those coefficients were fitted against the API traffic of the cluster the
 budget was derived from -- which is ours, and is mostly CI. If your users
 and tooling call the API differently, and they will, those two lines
 diverge steadily and permanently without anything being wrong. The
-`enforced` lines cover only the pairs produced by Shaken Fist's own loops,
-so they are comparable across deployments, and they are the ones which
-should track each other as the cluster grows.
+`enforced` lines cover only the pairs whose rate one of our loops sets, so
+they are comparable across deployments, and they are the ones which should
+track each other as the cluster grows.
 
 #### When a pair is over budget
 

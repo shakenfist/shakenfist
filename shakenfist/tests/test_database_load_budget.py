@@ -108,6 +108,26 @@ class DatabaseLoadBudgetTestCase(base.ShakenFistTestCase):
             if entry.activity_coupled:
                 self.assertFalse(entry.enforced)
 
+    def test_the_queue_workers_health_check_poll_stays_enforced(self):
+        # sf-queues calls Node.set_daemon_state() three times per thirty
+        # second health check pass, and that one function issues a
+        # SetNodeDaemonState, a GetAllNodeDaemonStates and -- because it
+        # reads the node's own state to reconcile degraded -- a
+        # GetObjectState. The GetObjectState pair is activity coupled,
+        # because the same counter also carries a queue worker's
+        # per work item reads and the model has no term for those (#4092).
+        # These two carry no churn at all, so they are what is left
+        # watching that poll. Reclassify them and nothing is.
+        b = budget.load_budget()
+        for operation in ('SetNodeDaemonState', 'GetAllNodeDaemonStates'):
+            entry = b.get(operation, 'queues')
+            self.assertIsNotNone(entry, '%s/queues is not budgeted'
+                                 % operation)
+            self.assertTrue(entry.enforced,
+                            '%s/queues no longer guards the health check '
+                            'poll' % operation)
+            self.assertIsNotNone(entry.per_node_base_qps)
+
     def test_every_entry_names_the_loop_that_produces_it(self):
         # A budget entry whose note does not say what makes the traffic is
         # a number nobody can act on when it goes red.
