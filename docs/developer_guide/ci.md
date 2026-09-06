@@ -589,7 +589,10 @@ directly, because it deliberately passes `force` to review a PR the bot
 has already reviewed.
 
 The reviewer produces structured JSON reviews, creates GitHub issues for
-actionable items, and embeds the JSON in the PR comment for automation.
+actionable items, and embeds the JSON in the PR comment so a later reader
+-- human or machine -- can recover the item vocabulary, severities and
+verdicts that the rendered markdown flattens. Nothing consumes it today:
+the comment addresser was the only reader, and it has been retired.
 
 ### Merge failure triage
 
@@ -786,7 +789,21 @@ Authorized users can trigger automation by commenting on PRs:
 - **`@shakenfist-bot please retest`** - Dispatches
   `functional-tests.yml` against the PR branch, which is how a run is
   re-tried after a bot commit or an infrastructure failure without
-  pushing a new commit.
+  pushing a new commit. **This is the merge queue's lane, not the pull
+  request's, and it is the most expensive thing a comment can start
+  here.** The dispatch arrives as a `workflow_dispatch` event, and
+  `functional_matrix_merge_collection`, `ansible_modules_collection`,
+  `node_lifecycle_collection` and `schema_enum_widening` are each gated
+  on `merge_group || workflow_dispatch` -- so a retest runs the
+  multi-node nested-cluster jobs on top of the pull request set. Nor
+  does the docs-only skip apply: `check_paths` runs its path filter
+  only for events other than `workflow_dispatch` and otherwise defaults
+  `code_changed` to `true`, so a documentation-only branch gets the
+  whole suite. That is usually what you want, because the failure worth
+  re-trying is normally a merge queue one -- but it is a poor way to
+  re-run a lint job, and on a busy day it is several nested clusters'
+  worth of under-cloud capacity. Re-run the individual failed workflow
+  from the Actions tab when that is all that is needed.
 - **`@shakenfist-bot please attempt to fix`** - Runs Claude Code to fix
   unit test failures (`tox -ecover`). Uses `test-drift-fix.yml` with
   structured commit summaries.

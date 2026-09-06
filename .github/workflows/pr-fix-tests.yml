@@ -19,9 +19,18 @@ permissions:
 jobs:
   trigger-fix:
     name: "Trigger test fix"
-    # Only run on PR comments (not issue comments)
+    # Only run on PR comments (not issue comments), and never on a
+    # comment the bot itself posted: the automated review is
+    # model-generated text posted to the pull request, and a review
+    # that mentions a trigger phrase would re-fire the lane.
+    # contains() does not care that the phrase is inside a quote.
+    # This lane is the one of the three worth guarding hardest -- it
+    # holds contents: write and pushes commits to the pull request
+    # branch, so a self-retrigger writes code rather than burning a
+    # runner.
     if: |
       github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
       contains(github.event.comment.body, '@shakenfist-bot please attempt to fix')
     runs-on: [self-hosted, static]
     # Just a few gh API calls, so anything beyond this is a hang.

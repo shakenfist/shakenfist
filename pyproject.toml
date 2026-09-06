@@ -73,6 +73,18 @@ dependencies = [
     # declaration and not a transitive pin the reconciler could drop.
     # tools/merge-triage.py imports jsonschema (via flasgger) and
     # tools/build-collection.py imports packaging (via the oslo stack).
+    #
+    # jsonschema is the weaker of the two and is here deliberately.
+    # merge-triage.py wraps the import and degrades to _validate_basic()
+    # when it is absent, so nothing breaks without it -- and in CI it is
+    # absent as often as not, because merge-ci-triage.sh runs the script
+    # with the runner's bare python3 and never installs shakenfist. What
+    # the declaration buys is the full schema check everywhere shakenfist
+    # *is* installed, which is where a triage document is read closely:
+    # a maintainer running "merge-triage.py validate" against a captured
+    # run out of a checkout. The degraded path is a fallback for the
+    # runner, not the intended mode, so the pin stays rather than moving
+    # to the test extra.
     "jsonschema==4.26.0",                 # mit
     "packaging==26.3",                    # apache2
 
