@@ -14370,19 +14370,29 @@ three-repository audit of every consumer of agent operation state).</p>
    attempts' side effects could land.</li>
 </ol>
 <h2 id="known-defects">Known defects<a class="headerlink" href="#known-defects" title="Permanent link">&para;</a></h2>
-<p>This plan's mechanism shipped with three defects still open. They are
+<p>This plan's mechanism shipped with three defects. Two are still open;
+the third was fixed within hours of the audit filing it. They are
 named here because a reader arriving at a completed plan should not
 have to search the issue tracker to learn that.</p>
 <ul>
 <li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4074">#4074</a> --
-  the executor slot can be parked on request.</strong> <code>agent/execute</code> with
-  <code>deadline_seconds=0</code> disables both budgets at once, because that
-  endpoint always stores a <code>progress_timeout</code> of <code>0.0</code>. No reaper case
-  can recover it, and there is no <code>AGENT_OPERATION_MAX_DEADLINE</code> for
-  an operator to bound it with. Found by phase 8's security review;
-  filed rather than fixed there because the fix is an operator-visible
-  ceiling and a restored backstop. Confined to the caller's own
-  namespace.</li>
+  the executor slot could be parked on request. Fixed by <code>7a1b4a0cb</code>
+  (#4080).</strong> <code>agent/execute</code> with <code>deadline_seconds=0</code> disabled both
+  budgets at once, because that endpoint always stores a
+  <code>progress_timeout</code> of <code>0.0</code>. No reaper case could recover it, and
+  there was no <code>AGENT_OPERATION_MAX_DEADLINE</code> for an operator to bound
+  it with. Found by phase 8's security review and filed rather than
+  fixed there, because the fix is an operator-visible ceiling and a
+  restored backstop rather than an audit-sized edit. The fix added
+  that config option (default 86400 seconds), enforced it over both
+  <code>deadline_seconds</code> and <code>progress_timeout_seconds</code> in the existing
+  400 guard, published it as those parameters' maximum on all three
+  creating endpoints, and narrowed <code>effective_deadline()</code> so the <code>0.0</code>
+  sentinel returns <code>None</code> only while a live progress timeout still
+  bounds the operation -- with both budgets off, the ceiling applies as
+  a backstop anchored on the current state transition, which every
+  existing enforcement point then covers unchanged. The exposure was
+  confined to the caller's own namespace throughout.</li>
 <li><strong><a href="https://github.com/shakenfist/shakenfist/issues/3995">#3995</a> --
   the default progress timeout expires a legitimate large transfer.</strong>
   A 471 MiB <code>get-file</code> was expired after the guest answered the stat
