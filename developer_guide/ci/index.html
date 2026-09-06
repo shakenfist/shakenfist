@@ -13937,6 +13937,56 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#merge-failure-triage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge failure triage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Merge failure triage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-it-is-a-separate-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it is a separate workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-verdict-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The verdict document
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-model-can-and-cannot-touch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the model can and cannot touch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#developer-automation-bot-commands" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14069,6 +14119,11 @@ commands available on a PR.</p>
 <td><code>issue-fix.yml</code></td>
 <td>Triage open issues, propose a fix as a draft PR</td>
 <td>workflow_dispatch</td>
+</tr>
+<tr>
+<td><code>merge-failure-triage.yml</code></td>
+<td>Triage a failed merge queue run: PR-caused or systemic, record the occurrence, post a verdict</td>
+<td>workflow_run (a failed <code>Functional tests</code> merge group run), workflow_dispatch</td>
 </tr>
 <tr>
 <td><code>scheduled-tests.yml</code></td>
@@ -14450,6 +14505,9 @@ rather than a deployed cluster.</p>
 <p><strong>Important</strong>: Only <code>Can see status</code> and <code>Can enqueue</code> are required status checks
 in branch protection. <code>Can merge</code> is evaluated by the merge queue itself, not as
 a required check.</p>
+<p>A failed <code>Can merge</code> ejects the pull request from the queue, and
+<a href="#merge-failure-triage">merge failure triage</a> then classifies the failure
+automatically.</p>
 <h3 id="superseded-merge-groups-are-cancelled">Superseded merge groups are cancelled<a class="headerlink" href="#superseded-merge-groups-are-cancelled" title="Permanent link">&para;</a></h3>
 <p>Every job that can run in the queue and holds a scarce runner carries a
 <code>concurrency:</code> block whose key is merge-group aware — the four
@@ -14555,7 +14613,8 @@ was done. A unit test enforces that every entry is well formed and
 carries a comment.</p>
 <h2 id="automated-ci-jobs">Automated CI Jobs<a class="headerlink" href="#automated-ci-jobs" title="Permanent link">&para;</a></h2>
 <p><code>functional-tests.yml</code> carries three jobs which act on the pull request
-themselves rather than only reporting on it.</p>
+themselves rather than only reporting on it. A fourth piece of automation,
+merge failure triage, is a separate workflow for the reasons given below.</p>
 <h3 id="automated-delinter">Automated Delinter<a class="headerlink" href="#automated-delinter" title="Permanent link">&para;</a></h3>
 <p>When flake8 fails, the <code>automated_delinter</code> job runs Claude Code to fix lint
 errors automatically. It skips if the last commit was from the bot to prevent
@@ -14581,6 +14640,197 @@ directly, because it deliberately passes <code>force</code> to review a PR the b
 has already reviewed.</p>
 <p>The reviewer produces structured JSON reviews, creates GitHub issues for
 actionable items, and embeds the JSON in the PR comment for automation.</p>
+<h3 id="merge-failure-triage">Merge failure triage<a class="headerlink" href="#merge-failure-triage" title="Permanent link">&para;</a></h3>
+<p>When <code>Functional tests</code> fails on a <code>merge_group</code> event, GitHub ejects the pull
+request from the merge queue and somebody has to decide whether the pull
+request broke something or whether the test cloud fell over again.
+<code>merge-failure-triage.yml</code> does that first pass automatically, following the
+same steps a maintainer follows by hand: find the first failing step (later
+failures are usually cascade), classify the failure as caused by the pull
+request or systemic, search for an existing tracking issue and record the
+occurrence on it — or file one — and recommend re-queueing or fixing first. The
+verdict is posted as a comment on the ejected pull request.</p>
+<p>Merge groups here launch several nested test clusters at once, so merge CI is
+far more sensitive to under-cloud capacity than pull request CI is, and
+historically most merge failures have been environmental rather than code
+regressions. That prior is in the prompt, which is why the evidence rules below
+matter: a model given no evidence and that prior will happily conclude
+"systemic, re-queue".</p>
+<p>Most of the work is in <code>tools/merge-ci-triage.sh</code>, which gathers the evidence,
+runs the model, and publishes the result; <code>tools/merge-triage.py</code> parses,
+validates and renders the verdict. The evidence includes the other recent
+merge group runs <em>of the workflow that failed</em> — <code>--event merge_group</code> on its
+own is every workflow in the repository, and those twenty slots exist to answer
+"is this happening to everybody?" about this suite.</p>
+<h4 id="why-it-is-a-separate-workflow">Why it is a separate workflow<a class="headerlink" href="#why-it-is-a-separate-workflow" title="Permanent link">&para;</a></h4>
+<p>The obvious implementation is another job in <code>functional-tests.yml</code>, gated on
+<code>can_merge</code> having failed. It races the queue: once <code>Can merge</code> reports its
+failure the queue ejects the pull request and tears down the
+<code>gh-readonly-queue</code> ref the run is on, and a triage job which takes minutes
+sits in exactly that window. Moving the triage into an earlier <em>step</em> of
+<code>can_merge</code> avoids the race but holds the merge queue open while a model reads
+logs. A job reachable on <code>merge_group</code> would also fall under the
+<a href="https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md">merge-group-cancellation</a>
+audit, whose correct behaviour — be cancelled when a newer merge group
+supersedes you — is the opposite of what a triage job wants.</p>
+<p>The workflow's <code>permissions:</code> block names <code>actions: read</code>, which is not
+optional: naming any scope at all sets every unnamed scope to <code>none</code>, and every
+piece of evidence the triage gathers is an Actions API read.</p>
+<p><code>workflow_run</code> runs after the merge group run has finished, on the default
+branch, in the base repository context, and none of that can cancel it. The
+trigger carries a <code>branches: ['gh-readonly-queue/**']</code> filter so the workflow is
+only invoked for merge group runs; without it every pull request run of the
+test suite would create a skipped run here. <code>workflow_run</code> has no conclusion
+filter, so the "did it actually fail?" half of the gate is the job's <code>if:</code>.</p>
+<p>The workflow never checks out or runs the code it is triaging. It reads the
+failed run through <code>gh</code> and checks out the default branch, which is what makes
+a writable token safe in a workflow that reads a pull request diff.</p>
+<h4 id="the-verdict-document">The verdict document<a class="headerlink" href="#the-verdict-document" title="Permanent link">&para;</a></h4>
+<p>Each triage produces one JSON document matching
+<code>tools/merge-triage-schema.json</code>. It is published twice: as the
+<code>merge-triage-&lt;run id&gt;</code> build artifact, and embedded in a collapsed <code>&lt;details&gt;</code>
+section of the pull request comment, the same way the automated reviewer embeds
+its review. The private-ci conductor consumes these to track which merge
+failures have been triaged and which of them blamed the pull request, so the
+fields that matter to a consumer are:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>verdict</code></td>
+<td><code>pr_caused</code>, <code>systemic</code>, <code>ambiguous</code>, or <code>unknown</code></td>
+</tr>
+<tr>
+<td><code>recommendation</code></td>
+<td><code>requeue</code>, <code>fix_first</code>, or <code>investigate</code></td>
+</tr>
+<tr>
+<td><code>failure_signature</code></td>
+<td>Short stable string for grouping recurrences</td>
+</tr>
+<tr>
+<td><code>tracking_issue</code></td>
+<td>Issue recording a systemic failure, or null</td>
+</tr>
+<tr>
+<td><code>tracking_issue_action</code></td>
+<td><code>commented</code>, <code>created</code>, or <code>none</code></td>
+</tr>
+<tr>
+<td><code>run_id</code>, <code>pull_request</code></td>
+<td>What was triaged</td>
+</tr>
+</tbody>
+</table>
+<p>Four properties of that document are worth knowing before consuming it:</p>
+<ul>
+<li><strong>A document is always written.</strong> A model that answers in prose, a model
+  that could not be run at all, a run that cannot be read, a document that
+  fails its own schema — each yields <code>verdict: unknown</code> with an <code>error</code>
+  explaining why, never a missing file. Those are different failures and the
+  <code>error</code> names which one it was: the model wrapper's exit status is kept, so
+  "every model is out of subscription credit" does not reach a maintainer
+  disguised as "the response contained no JSON verdict object". The
+  guarantee is kept by an <code>EXIT</code> trap over an envelope written before anything
+  can fail, so it holds for the paths that fall over early too. A missing
+  document is indistinguishable from a triage that never ran; an <code>unknown</code> one
+  is not. The single exception is a run that was not a failed merge group run
+  at all: nothing was triaged, so there is nothing to publish a verdict about.
+  A document that failed the schema is uploaded alongside the replacement as
+  <code>triage.invalid.json</code>, since that is a bug in the tooling rather than a
+  triage outcome and the discarded document is the only evidence of it.</li>
+<li><strong>No evidence means no verdict.</strong> If neither the failed job list nor the
+  failed step logs can be read, no model is run: the document says so and the
+  verdict is <code>unknown</code>. Anything else that could not be gathered — the sibling
+  runs, the pull request diff — is named in <code>evidence</code>, so a verdict always
+  carries its own caveats rather than reading as though the model saw
+  everything.</li>
+<li><strong>The envelope is not model output.</strong> The repository, run id and pull request
+  number are written from what GitHub said and overwrite whatever the model put
+  in those fields, so a verdict cannot be filed against the wrong failure. Only
+  the fields in <code>MODEL_FIELDS</code> are taken from the response at all.</li>
+<li><strong>A cited tracking issue has been checked.</strong> A consumer can treat a non-null
+  <code>tracking_issue</code> as evidence the occurrence really was recorded — but only
+  when <code>tracking_issue_action</code> is <code>commented</code> or <code>created</code>, and those two are
+  the claims that get verified. The issue has to exist and the issue or one of
+  its comments has to carry the failed run's URL; a claim that does not check
+  out is downgraded to an action of <code>none</code>, keeping the number as a reference
+  and losing only the assertion, with the reason appended to <code>evidence</code>. An
+  issue that cannot be read at all is dropped outright, number and all — on a
+  dry run too, since an unreadable issue is not a useful pointer whichever mode
+  produced the citation. A citation whose action is already <code>none</code> is not
+  checked for the run URL —
+  nothing was written to it, so it will not reference this run, and checking
+  anyway would drop every reference-only citation ever made. A dry run forces
+  <code>none</code> unconditionally, whatever the model reports, because nothing was
+  written to GitHub on that path; the verification still runs against what the
+  model <em>claimed</em>, so that path is exercised outside production too. On a dry
+  run the missing reference is reported as such — nothing was written, so the
+  citation is unverified — rather than in the words used for a claim that did
+  not check out, which on that path would always read as a caught lie.</li>
+</ul>
+<p>The comment is only posted if the body could be neutralised —
+<code>tools/neutralise-pr-body.sh</code> rewrites it in place, and a failure inside it
+would otherwise leave the un-neutralised model prose where <code>gh pr comment</code>
+reads it from. A triage nobody sees is a smaller problem than one that fires an
+<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mention" title="GitHub User: mention">@mention</a> on publication, and the verdict is still in the artifact.</p>
+<p>An <code>unknown</code> verdict is posted on the pull request like any other. It is a thin
+comment, but the alternative is silence, and silence on an ejected pull request
+reads as "triage never ran" — the same ambiguity the always-write-a-document
+rule exists to remove, moved from the artifact to the thread. The comment names
+why triage reached nothing, which is what tells a maintainer whether to look at
+the failed run or at this workflow.</p>
+<p>Re-triaging the same run does not double-post: the comment carries an invisible
+<code>&lt;!-- merge-triage run:&lt;id&gt; --&gt;</code> marker which a later run recognises.</p>
+<p>A comment that could not be posted fails the triage run. The verdict is in the
+artifact either way, but a green run with nothing on the pull request is
+indistinguishable from a triage that never ran, so the run itself carries the
+signal.</p>
+<h4 id="what-the-model-can-and-cannot-touch">What the model can and cannot touch<a class="headerlink" href="#what-the-model-can-and-cannot-touch" title="Permanent link">&para;</a></h4>
+<p>The model runs with <code>--dangerously-skip-permissions</code> and the checkout as its
+working directory, so the job stages everything it executes into <code>runner.temp</code>
+before the model starts: <code>merge-ci-triage.sh</code> itself, <code>merge-triage.py</code>, its
+schema, <code>neutralise-pr-body.sh</code> and <code>claude-model-fallback.sh</code>. <code>issue-fix.yml</code>
+stages the same set for the same two reasons. Bash reads a script lazily as it
+executes, so an edit to the running driver would corrupt it mid-run; and the
+extractor and the neutraliser run <em>after</em> the model has exited, so reading them
+from the workspace would mean parsing and defusing model output with a copy the
+model could have rewritten. With the staging in place a workspace write has no
+effect at all — the checkout is discarded with the runner and is never pushed.</p>
+<p>The failed step logs are cut to a byte budget before they reach the prompt, and
+both ends are kept with the tail given the larger share. Keeping only the head
+is the obvious implementation and it is wrong here: a single Ansible
+cluster-build step routinely exceeds the whole budget in progress output, and
+the message saying what actually broke is the last thing it emits. The elision
+is marked inline with the number of bytes dropped, and each half is passed
+through <code>iconv -c</code> so a cut landing inside a multi-byte character cannot leave
+invalid UTF-8 at the join.</p>
+<p>The prompt reaches the model as a file, through
+<code>claude-model-fallback.sh --prompt-file</code>, which feeds it on stdin. Never as an
+argument: Linux caps a single argv element at 128KiB whatever <code>ulimit</code> says,
+this prompt is mostly log, and an argument over the cap does not truncate — the
+exec fails with <code>Argument list too long</code> and no model runs at all, on precisely
+the failures whose logs are largest. The byte budget above is therefore about
+what a model can usefully attend to and what the run costs, not about what can
+be passed to it. <code>issue-fix.yml</code> feeds its prompt the same way, for the same
+reason.</p>
+<p>What the staging does <em>not</em> bound is worth stating plainly: the model runs with
+<code>--dangerously-skip-permissions</code> and no tool restrictions on a persistent
+self-hosted runner, so it can run arbitrary commands as the runner user, and
+anything it leaves outside the workspace — <code>~/.claude</code> state, caches, the
+runner's own tree, a cron entry — survives the job and is there for whatever
+runs on that runner next. A narrower tool list does not help: triage reads
+GitHub through arbitrary <code>gh</code> sub-commands, so it needs <code>Bash</code>, and a model
+with <code>Bash</code> can write anything a <code>--disallowed-tools</code> list would have stopped.
+The risk is accepted on the same argument as the token — the content it is fed
+has already passed review, on the same runner fleet <code>issue-fix.yml</code> already
+hands a model with the same flags. Anything stronger means a disposable runner,
+not a longer flag list.</p>
 <h3 id="developer-automation-bot-commands">Developer Automation (Bot Commands)<a class="headerlink" href="#developer-automation-bot-commands" title="Permanent link">&para;</a></h3>
 <p>Authorized users can trigger automation by commenting on PRs:</p>
 <ul>
@@ -14649,6 +14899,16 @@ payload (<code>api_error_status</code>), which the claude CLI's own
 <code>--fallback-model</code> flag does not handle -- it only covers overloaded or
 unavailable models. A refused request is free, so the wrapper attempts
 the real job rather than paying for a pre-flight probe.</p>
+<p>Give it the prompt with <code>--prompt-file</code>, never as a claude argument.
+Linux caps a single argv element at 128KiB whatever <code>ulimit</code> says, and an
+argument over the cap does not truncate -- the exec fails with <code>Argument
+list too long</code>, so no model runs and the caller sees an empty answer it
+will blame on the model. <code>--prompt-file</code> feeds the prompt on stdin, which
+has no such limit. The option takes a path rather than reading the
+wrapper's own stdin because the wrapper may run claude more than once as
+it falls back through the model list, and one stream is drained by the
+first attempt. <code>shakenfist/tests/test_claude_model_fallback.py</code> covers
+both properties.</p>
 <h2 id="ci-caching">CI Caching<a class="headerlink" href="#ci-caching" title="Permanent link">&para;</a></h2>
 <p>Workflows that download packages use environment variables to route
 traffic through local caches:</p>
