@@ -33,6 +33,12 @@ import yaml
 from shakenfist.tests import base
 
 
+# The workflow whose merge group failures this triages. Matched by workflow
+# *name*, which is the seam test_the_trigger_names_the_functional_test_workflow
+# exists for.
+TRIGGERED_BY = os.path.join('.github', 'workflows', 'functional-tests.yml')
+
+
 # Everything tools/merge-ci-triage.sh reaches for through TOOLS_DIR, plus the
 # script itself. Kept here rather than derived, so that adding a helper to the
 # shell without staging it fails this test rather than failing in production
@@ -64,6 +70,11 @@ class MergeTriageWorkflowSeamsTestCase(base.ShakenFistTestCase):
             self.text = f.read()
         self.workflow = yaml.safe_load(self.text)
         self.steps = self.workflow['jobs']['triage']['steps']
+
+    def _triggers(self):
+        # YAML 1.1 reads a bare "on" as the boolean true, which is what
+        # yaml.safe_load implements and what GitHub's own parser does not.
+        return self.workflow.get('on', self.workflow.get(True))
 
     def _step(self, name):
         for step in self.steps:
@@ -129,6 +140,35 @@ class MergeTriageWorkflowSeamsTestCase(base.ShakenFistTestCase):
         self.assertTrue(OUTPUT_DIR.startswith('${{ runner.temp }}/'))
         self.assertTrue(STAGE_DIR.startswith('${{ runner.temp }}/'))
 
+    def test_the_trigger_names_the_functional_test_workflow(self):
+        # workflow_run matches by the workflow's name, not its filename, so
+        # renaming the "name:" in functional-tests.yml disables this triage
+        # silently and forever: no failing check, no skipped run, no comment
+        # on an ejected pull request. It is the only seam here whose breakage
+        # produces total silence rather than a failure.
+        with open(os.path.join(self.root, TRIGGERED_BY)) as f:
+            triggering = yaml.safe_load(f)
+
+        self.assertIn(
+            triggering['name'], self._triggers()['workflow_run']['workflows'],
+            '%s is named %r, which this workflow does not listen for'
+            % (TRIGGERED_BY, triggering['name']))
+
+    def test_the_trigger_only_fires_for_failed_merge_group_runs(self):
+        # Two halves of one gate. The branches filter is what stops a skipped
+        # run appearing for every pull request run of the test suite, and
+        # workflow_run carries no conclusion filter at all, so "did it fail?"
+        # can only live in the job's if:.
+        self.assertEqual(
+            ['gh-readonly-queue/**'],
+            self._triggers()['workflow_run']['branches'],
+            'without the branches filter this is invoked for every pull '
+            'request run of the test suite as well')
+
+        gate = self.workflow['jobs']['triage']['if']
+        self.assertIn("github.event.workflow_run.event == 'merge_group'", gate)
+        self.assertIn("github.event.workflow_run.conclusion == 'failure'", gate)
+
     def test_actions_read_is_declared(self):
         # Naming any scope in a permissions block sets every unnamed scope to
         # none, and every piece of evidence this workflow gathers -- the run,
@@ -154,7 +194,7 @@ class MergeTriageWorkflowSeamsTestCase(base.ShakenFistTestCase):
         # comments above the code that runs them.
         neutralise = re.search(
             r'(?m)^if ! "\$\{TOOLS_DIR\}/neutralise-pr-body\.sh"', script)
-        comment = re.search(r'(?m)^gh pr comment ', script)
+        comment = re.search(r'(?m)^if ! gh pr comment ', script)
         self.assertIsNotNone(
             neutralise,
             'the neutralisation result is discarded, so a failure inside it '

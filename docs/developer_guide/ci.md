@@ -582,7 +582,10 @@ matter: a model given no evidence and that prior will happily conclude
 
 Most of the work is in `tools/merge-ci-triage.sh`, which gathers the evidence,
 runs the model, and publishes the result; `tools/merge-triage.py` parses,
-validates and renders the verdict.
+validates and renders the verdict. The evidence includes the other recent
+merge group runs *of the workflow that failed* — `--event merge_group` on its
+own is every workflow in the repository, and those twenty slots exist to answer
+"is this happening to everybody?" about this suite.
 
 #### Why it is a separate workflow
 
@@ -633,9 +636,13 @@ fields that matter to a consumer are:
 
 Four properties of that document are worth knowing before consuming it:
 
-- **A document is always written.** A model that answers in prose, a run that
-  cannot be read, a document that fails its own schema — each yields
-  `verdict: unknown` with an `error` explaining why, never a missing file. The
+- **A document is always written.** A model that answers in prose, a model
+  that could not be run at all, a run that cannot be read, a document that
+  fails its own schema — each yields `verdict: unknown` with an `error`
+  explaining why, never a missing file. Those are different failures and the
+  `error` names which one it was: the model wrapper's exit status is kept, so
+  "every model is out of subscription credit" does not reach a maintainer
+  disguised as "the response contained no JSON verdict object". The
   guarantee is kept by an `EXIT` trap over an envelope written before anything
   can fail, so it holds for the paths that fall over early too. A missing
   document is indistinguishable from a triage that never ran; an `unknown` one
@@ -661,13 +668,18 @@ Four properties of that document are worth knowing before consuming it:
   its comments has to carry the failed run's URL; a claim that does not check
   out is downgraded to an action of `none`, keeping the number as a reference
   and losing only the assertion, with the reason appended to `evidence`. An
-  issue that cannot be read at all is dropped outright, number and all. A
-  citation whose action is already `none` is not checked for the run URL —
+  issue that cannot be read at all is dropped outright, number and all — on a
+  dry run too, since an unreadable issue is not a useful pointer whichever mode
+  produced the citation. A citation whose action is already `none` is not
+  checked for the run URL —
   nothing was written to it, so it will not reference this run, and checking
   anyway would drop every reference-only citation ever made. A dry run forces
   `none` unconditionally, whatever the model reports, because nothing was
   written to GitHub on that path; the verification still runs against what the
-  model *claimed*, so that path is exercised outside production too.
+  model *claimed*, so that path is exercised outside production too. On a dry
+  run the missing reference is reported as such — nothing was written, so the
+  citation is unverified — rather than in the words used for a claim that did
+  not check out, which on that path would always read as a caught lie.
 
 The comment is only posted if the body could be neutralised —
 `tools/neutralise-pr-body.sh` rewrites it in place, and a failure inside it
@@ -684,6 +696,11 @@ the failed run or at this workflow.
 
 Re-triaging the same run does not double-post: the comment carries an invisible
 `<!-- merge-triage run:<id> -->` marker which a later run recognises.
+
+A comment that could not be posted fails the triage run. The verdict is in the
+artifact either way, but a green run with nothing on the pull request is
+indistinguishable from a triage that never ran, so the run itself carries the
+signal.
 
 #### What the model can and cannot touch
 
@@ -703,7 +720,32 @@ both ends are kept with the tail given the larger share. Keeping only the head
 is the obvious implementation and it is wrong here: a single Ansible
 cluster-build step routinely exceeds the whole budget in progress output, and
 the message saying what actually broke is the last thing it emits. The elision
-is marked inline with the number of bytes dropped.
+is marked inline with the number of bytes dropped, and each half is passed
+through `iconv -c` so a cut landing inside a multi-byte character cannot leave
+invalid UTF-8 at the join.
+
+The prompt reaches the model as a file, through
+`claude-model-fallback.sh --prompt-file`, which feeds it on stdin. Never as an
+argument: Linux caps a single argv element at 128KiB whatever `ulimit` says,
+this prompt is mostly log, and an argument over the cap does not truncate — the
+exec fails with `Argument list too long` and no model runs at all, on precisely
+the failures whose logs are largest. The byte budget above is therefore about
+what a model can usefully attend to and what the run costs, not about what can
+be passed to it. `issue-fix.yml` feeds its prompt the same way, for the same
+reason.
+
+What the staging does *not* bound is worth stating plainly: the model runs with
+`--dangerously-skip-permissions` and no tool restrictions on a persistent
+self-hosted runner, so it can run arbitrary commands as the runner user, and
+anything it leaves outside the workspace — `~/.claude` state, caches, the
+runner's own tree, a cron entry — survives the job and is there for whatever
+runs on that runner next. A narrower tool list does not help: triage reads
+GitHub through arbitrary `gh` sub-commands, so it needs `Bash`, and a model
+with `Bash` can write anything a `--disallowed-tools` list would have stopped.
+The risk is accepted on the same argument as the token — the content it is fed
+has already passed review, on the same runner fleet `issue-fix.yml` already
+hands a model with the same flags. Anything stronger means a disposable runner,
+not a longer flag list.
 
 ### Developer Automation (Bot Commands)
 
@@ -780,6 +822,17 @@ payload (`api_error_status`), which the claude CLI's own
 `--fallback-model` flag does not handle -- it only covers overloaded or
 unavailable models. A refused request is free, so the wrapper attempts
 the real job rather than paying for a pre-flight probe.
+
+Give it the prompt with `--prompt-file`, never as a claude argument.
+Linux caps a single argv element at 128KiB whatever `ulimit` says, and an
+argument over the cap does not truncate -- the exec fails with `Argument
+list too long`, so no model runs and the caller sees an empty answer it
+will blame on the model. `--prompt-file` feeds the prompt on stdin, which
+has no such limit. The option takes a path rather than reading the
+wrapper's own stdin because the wrapper may run claude more than once as
+it falls back through the model list, and one stream is drained by the
+first attempt. `shakenfist/tests/test_claude_model_fallback.py` covers
+both properties.
 
 ## CI Caching
 

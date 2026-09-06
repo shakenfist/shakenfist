@@ -40,6 +40,19 @@
 #   constraint, not a token-level one; the bound that actually holds is the
 #   permissions block below. The residual risk is accepted because merge group
 #   content has already passed review.
+# - The larger bound, stated so that the acceptance is an informed one: the
+#   model runs with --dangerously-skip-permissions and no tool restrictions on
+#   a persistent [self-hosted, claude-code] runner, with untrusted input in its
+#   prompt. It can run arbitrary commands as the runner user, and anything it
+#   leaves outside the workspace -- ~/.claude state, caches, the runner's own
+#   tree, a cron entry or a shell profile -- survives this job and is there for
+#   whatever runs on that runner next. Narrowing the tool list does not bound
+#   that: triage reads GitHub through arbitrary gh sub-commands, so it needs
+#   Bash, and a model with Bash can write anything a --disallowed-tools list
+#   would have stopped. What actually bounds it is the same argument as for the
+#   token -- the model is fed content that has already passed review, and it is
+#   the same runner fleet issue-fix.yml already hands a model with the same
+#   flags. Anything stronger means a disposable runner, not a longer flag list.
 # - The comment body is model output and goes through
 #   tools/neutralise-pr-body.sh before posting, so an @mention or an
 #   issue-closing keyword cannot fire on publication. Publication is gated on

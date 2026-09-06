@@ -120,6 +120,9 @@ if args[:2] == ['pr', 'view']:
     sys.exit(emit('pr.json'))
 
 if args[:2] == ['pr', 'comment']:
+    if os.path.exists(os.path.join(fixtures, 'comment-fails')):
+        sys.stderr.write('stub gh: could not post the comment\\n')
+        sys.exit(1)
     body = args[args.index('--body-file') + 1]
     shutil.copy(body, os.path.join(fixtures, 'posted-comment.md'))
     sys.stdout.write('https://github.com/%s/pull/%s#issuecomment-1\\n'
@@ -139,9 +142,20 @@ sys.exit(3)
 '''
 
 # A stub model wrapper. The driver hands it the prompt and reads its stdout,
-# so a test says what the model answered by writing CLAUDE_RESPONSE.
+# so a test says what the model answered by writing CLAUDE_RESPONSE. Its
+# argument vector is recorded, because how the prompt gets to the model is
+# itself a property under test: as a file, never as an argument.
 CLAUDE_STUB = '''#!/bin/bash
+printf '%s\n' "$@" > "${GH_FIXTURES}/claude-args"
 cat "${CLAUDE_RESPONSE}"
+'''
+
+# A model wrapper that could not run a model at all -- every model out of
+# subscription credit is its documented exit 1, and an exec that never
+# happened looks the same from here.
+BROKEN_CLAUDE_STUB = '''#!/bin/bash
+echo "claude-model-fallback: every model in 'claude-fable-5' is out of credit" >&2
+exit 1
 '''
 
 # A neutraliser which fails, for the test that publication is gated on it.
@@ -245,6 +259,17 @@ class MergeCiTriageShellTestCase(base.ShakenFistTestCase):
     def gh_log(self):
         return self.read_fixture('gh.log') or ''
 
+    def claude_args(self):
+        """The argument vector the model wrapper was called with."""
+        recorded = self.read_fixture('claude-args')
+        if recorded is None:
+            return None
+        return recorded.split('\n')[:-1]
+
+    def prompt(self):
+        with open(os.path.join(self.output, 'prompt.txt')) as f:
+            return f.read()
+
     # -- the citation check ------------------------------------------------
 
     def test_a_citation_the_issue_references_survives(self):
@@ -333,10 +358,31 @@ class MergeCiTriageShellTestCase(base.ShakenFistTestCase):
 
         code, document, _ = self.run_triage(dry_run=True)
         self.assertEqual(0, code)
-        self.assertIn('kept as a reference only', ' '.join(document['evidence']))
+        # In the words of a dry run, not those of a claim that did not check
+        # out: on this path nothing was written, so the missing reference is
+        # certain and says nothing about the model. Reporting it as a caught
+        # lie is how a maintainer stops trusting the tool that does the
+        # catching.
+        evidence = ' '.join(document['evidence'])
+        self.assertIn('Nothing was written, so the citation is unverified',
+                      evidence)
+        self.assertNotIn('kept as a reference only', evidence)
         # The citation itself survives a dry run: the issue triage would have
         # used is the useful half of a dry run's output.
         self.assertEqual(3772, document['tracking_issue'])
+
+    def test_a_dry_run_drops_an_unreadable_citation_too(self):
+        # The two failures are not interchangeable and the order of the
+        # branches decides which one wins. An issue that cannot be read is not
+        # a useful pointer whichever mode produced the citation, and testing
+        # the dry run first would keep the number here -- inverting the
+        # documented contract on exactly the path a maintainer uses to inspect
+        # this behaviour by hand.
+        code, document, _ = self.run_triage(dry_run=True)
+        self.assertEqual(0, code)
+        self.assertIsNone(document['tracking_issue'])
+        self.assertEqual('none', document['tracking_issue_action'])
+        self.assertIn('could not be read', ' '.join(document['evidence']))
 
     # -- what the model is shown -------------------------------------------
 
@@ -357,6 +403,100 @@ class MergeCiTriageShellTestCase(base.ShakenFistTestCase):
         # 1016 bytes in, 300 of them kept.
         self.assertIn('[... 716 bytes elided by triage: this is the first 100 '
                       'and the last 200 bytes of the failed step logs ...]', logs)
+
+    def test_the_prompt_reaches_the_model_as_a_file(self):
+        # Never as an argument. Linux caps a single argv element at
+        # MAX_ARG_STRLEN, a hard 128KiB no ulimit raises, and an argument over
+        # it does not truncate -- the exec fails with E2BIG and no model runs.
+        code, _, _ = self.run_triage()
+        self.assertEqual(0, code)
+
+        args = self.claude_args()
+        self.assertIn('--prompt-file', args)
+        self.assertEqual(os.path.join(self.output, 'prompt.txt'),
+                         args[args.index('--prompt-file') + 1])
+        for arg in args:
+            self.assertNotIn(
+                'You are triaging a failed merge queue CI run', arg,
+                'the prompt is being passed as an argument again')
+
+    def test_a_prompt_over_the_argv_limit_still_reaches_the_model(self):
+        # The regression test for the bug above, at the size that produces it:
+        # a failed Ansible cluster build emits megabytes, the budget keeps
+        # 160KB of it here, and an argv element cannot exceed 131072 bytes.
+        # Passed as an argument this run reaches no model at all and publishes
+        # "unknown" -- on precisely the failure class the triage exists for.
+        self.write_fixture('failed-logs.txt', 'HEADMARK' + ('x' * 4000000) + 'TAILMARK')
+        self.write_fixture('issue-3772.body', 'The 507 flake.\n')
+        self.write_fixture('issue-3772.comments', 'Seen again in %s\n' % RUN_URL)
+
+        code, document, _ = self.run_triage(
+            env={'LOG_HEAD_BYTES': '60000', 'LOG_TAIL_BYTES': '100000'})
+        self.assertEqual(0, code)
+        self.assertGreater(
+            os.path.getsize(os.path.join(self.output, 'prompt.txt')), 131072,
+            'this test no longer builds a prompt over the argv limit, so it '
+            'no longer tests anything')
+        self.assertEqual('systemic', document['verdict'])
+
+    def test_a_model_that_could_not_be_run_is_not_a_model_that_rambled(self):
+        # Every model out of subscription credit, a crashed CLI, an exec that
+        # never happened: all of them exit non-zero and produce no verdict.
+        # Reporting them as "the response contained no JSON verdict object"
+        # sends a maintainer to read a response file that explains nothing,
+        # and the whole point of always publishing a document is that it says
+        # what happened.
+        self._write_executable(
+            os.path.join(self.tools, 'claude-model-fallback.sh'),
+            BROKEN_CLAUDE_STUB)
+
+        code, document, _ = self.run_triage()
+        self.assertEqual(0, code)
+        self.assertEqual('unknown', document['verdict'])
+        self.assertIn('the model wrapper exited 1', document['error'])
+        self.assertIn('the model wrapper exited 1', ' '.join(document['evidence']))
+
+    def test_the_sibling_runs_are_scoped_to_the_workflow_that_failed(self):
+        # "--event merge_group" on its own is every workflow in the
+        # repository, and these twenty slots exist to answer "is this
+        # happening to everybody?" about this suite. The run being triaged is
+        # not its own sibling either.
+        self.write_fixture('sibling-runs.json', json.dumps([
+            {'databaseId': int(RUN_ID), 'conclusion': 'failure',
+             'headBranch': 'gh-readonly-queue/develop/pr-4080-abcdef0',
+             'createdAt': '2026-09-05T00:00:00Z', 'url': RUN_URL},
+            {'databaseId': 33952027000, 'conclusion': 'failure',
+             'headBranch': 'gh-readonly-queue/develop/pr-4079-abcdef1',
+             'createdAt': '2026-09-04T00:00:00Z',
+             'url': 'https://github.com/%s/actions/runs/33952027000' % REPO}]))
+
+        code, _, _ = self.run_triage()
+        self.assertEqual(0, code)
+        self.assertIn("--workflow Functional tests", self.gh_log())
+
+        siblings = self.prompt().split('# Other recent merge_group runs')[1]
+        siblings = siblings.split('# The pull request')[0]
+        self.assertIn('33952027000', siblings)
+        self.assertNotIn(RUN_ID, siblings)
+
+    def test_a_log_cut_inside_a_character_leaves_valid_utf8(self):
+        # The budget is in bytes, which is the right unit -- one wrapped
+        # ansible line can be thousands of characters -- but a byte offset can
+        # land in the middle of one. What is left over is invalid UTF-8 at the
+        # join, and it travels into the prompt and into the run's artifact.
+        with open(os.path.join(self.fixtures, 'failed-logs.txt'), 'wb') as f:
+            # The cuts at 101 and 201 bytes both land inside a three-byte
+            # character.
+            f.write(b'x' * 100 + '\u4e2d'.encode('utf-8') * 40 + b'y' * 100)
+
+        code, _, _ = self.run_triage(
+            env={'LOG_HEAD_BYTES': '101', 'LOG_TAIL_BYTES': '101'})
+        self.assertEqual(0, code)
+
+        with open(os.path.join(self.output, 'failed-logs.txt'), 'rb') as f:
+            logs = f.read()
+        # Decodes, rather than raising UnicodeDecodeError on the join.
+        logs.decode('utf-8')
 
     def test_evidence_that_could_not_be_gathered_travels_with_the_verdict(self):
         # A model handed an empty log still produces a verdict, and the
@@ -411,6 +551,37 @@ class MergeCiTriageShellTestCase(base.ShakenFistTestCase):
         self.assertIn('mikal', prose)
         self.assertNotIn('@mikal', prose)
         self.assertNotIn('fixes #1234', prose)
+
+    def test_the_dedup_marker_survives_neutralisation(self):
+        # The marker is prepended to the comment body and the body is then
+        # rewritten by neutralise-pr-body.sh, so the marker a later run greps
+        # for is whatever came out of that pass. It has to be byte identical
+        # to the one written, or a re-delivered workflow_run posts the same
+        # verdict a second time.
+        self.write_fixture('issue-3772.body', 'The 507 flake.\n')
+        self.write_fixture('issue-3772.comments', 'Seen again in %s\n' % RUN_URL)
+
+        code, _, _ = self.run_triage()
+        self.assertEqual(0, code)
+        self.assertTrue(
+            self.read_fixture('posted-comment.md').startswith(
+                '<!-- merge-triage run:%s -->' % RUN_ID),
+            'the dedup marker did not survive the neutralisation pass')
+
+    def test_a_comment_that_cannot_be_posted_fails_the_run(self):
+        # A green run with nothing on the pull request is indistinguishable
+        # from a triage that never ran, which is the ambiguity this design
+        # exists to remove. The verdict is in the artifact either way, so what
+        # is missing is the signal, and the run itself has to carry it.
+        self.write_fixture('comment-fails', '')
+        self.write_fixture('issue-3772.body', 'The 507 flake.\n')
+        self.write_fixture('issue-3772.comments', 'Seen again in %s\n' % RUN_URL)
+
+        code, document, stderr = self.run_triage()
+        self.assertEqual(1, code)
+        self.assertIn('could not comment on #%d' % PR_NUMBER, stderr)
+        # The verdict itself is unharmed: it is the publication that failed.
+        self.assertEqual('systemic', document['verdict'])
 
     def test_an_already_triaged_run_is_not_commented_on_twice(self):
         # The dedup search reads the pull request's comments through the

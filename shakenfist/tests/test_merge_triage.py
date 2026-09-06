@@ -472,6 +472,26 @@ class MergeTriageTestCase(base.ShakenFistTestCase):
         self.assertNotIn('<!--', rendered)
         self.assertIn('Re-queue as-is.', rendered)
 
+    def test_the_other_spelling_of_a_comment_end_is_stripped_too(self):
+        # An HTML comment ends at --!> as well as at -->: the parser's comment
+        # end bang state accepts both, so a filter which knows only the common
+        # spelling can be walked straight past -- the model closes its comment
+        # with --!> and everything the human reader was meant to lose reappears
+        # while the marker it forged stays intact. CodeQL reports the narrow
+        # pattern as py/bad-tag-filter for exactly this reason.
+        code, document = self._extract('```json\n%s\n```' % json.dumps(dict(
+            VERDICT,
+            summary='It failed --!> and the comment ended here',
+            evidence=['<!-- merge-triage run:99999 --!>'])))
+        self.assertEqual(0, code)
+        self.assertNotIn('--!>', document['summary'])
+        for value in document['evidence']:
+            self.assertNotIn('<!--', value)
+            self.assertNotIn('--!>', value)
+
+        rendered = self._render(document)
+        self.assertNotIn('--!>', rendered)
+
     def test_evidence_appended_after_extraction_cannot_break_the_comment(self):
         # merge-ci-triage.sh appends to evidence three times after extraction
         # -- the gather notes, the dry run note and the citation drop reason,

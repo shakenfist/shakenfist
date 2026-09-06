@@ -9,7 +9,7 @@ things then need doing to it, and each is here rather than in
 tools/merge-ci-triage.sh because each has edge cases worth testing:
 
     merge-triage.py envelope <repository> <run json> <output> [triage run url]
-    merge-triage.py extract <response> <envelope> <output>
+    merge-triage.py extract <response> <envelope> <output> [no verdict error]
     merge-triage.py fallback <envelope> <output> <error>
     merge-triage.py render <triage> <output>
     merge-triage.py validate <triage>
@@ -30,7 +30,10 @@ from the response at all.
 A response which holds no usable object is not an error condition to be
 retried. It becomes a document with a verdict of `unknown` and an `error`
 saying why, because the conductor tracking these needs a record that triage
-ran and reached nothing far more than it needs a missing file. That is also
+ran and reached nothing far more than it needs a missing file. The caller may
+supply that `error` itself: an empty response because no model could be run at
+all is a tooling failure rather than an unreadable answer, and only the caller
+knows which of the two it is holding. That is also
 why there is no truncation salvage here of the sort
 `review-pr-with-claude/extract-review-json.py` carries: a review is hundreds of
 lines and worth rescuing halfway, a triage verdict is fifteen and a half one
@@ -102,7 +105,13 @@ QUEUE_REF_RE = re.compile(
 # extraction still succeeds, which is the worst shape a disagreement between
 # those two readers can take. It is also the dedup marker the driver writes,
 # and a marker that can be forged is not a marker.
-UNSAFE_MARKUP_RE = re.compile(r'```+|~~~+|</?details\b[^>]*>|<!--|-->', re.IGNORECASE)
+#
+# A comment ends at --!> as well as at -->; the HTML parser's comment end bang
+# state accepts both, so a pattern which knows only the common spelling can be
+# walked straight past. CodeQL's py/bad-tag-filter reports exactly that as a
+# security finding, and it is right to: every alternative here has to cover
+# every spelling of the construct it defuses, or it defuses nothing.
+UNSAFE_MARKUP_RE = re.compile(r'```+|~~~+|</?details\b[^>]*>|<!--|--!?>', re.IGNORECASE)
 
 # Characters that break a markdown table cell. The facts table puts model
 # prose in single cells, several of them inside an inline code span, so an
@@ -465,7 +474,7 @@ def do_fallback(envelope_path, output_path, error):
     return 0
 
 
-def do_extract(response_path, envelope_path, output_path):
+def do_extract(response_path, envelope_path, output_path, no_verdict_error=None):
     with open(envelope_path) as f:
         envelope = _envelope_defaults(json.load(f))
 
@@ -474,7 +483,12 @@ def do_extract(response_path, envelope_path, output_path):
 
     raw = _find_json_object(response)
     if raw is None:
-        document = _fallback(envelope, 'The triage response contained no JSON verdict object.')
+        # The caller's reason if it has one. "No JSON verdict object" is true
+        # of a model which answered in prose and misleading about a model that
+        # never ran, and the driver is the half that can tell them apart.
+        document = _fallback(
+            envelope,
+            no_verdict_error or 'The triage response contained no JSON verdict object.')
         used_model = False
     else:
         cleaned = _clean_model_fields(raw)
@@ -630,7 +644,7 @@ def main(argv):
 
     if command == 'envelope' and len(args) in (3, 4):
         return do_envelope(*args)
-    if command == 'extract' and len(args) == 3:
+    if command == 'extract' and len(args) in (3, 4):
         return do_extract(*args)
     if command == 'fallback' and len(args) == 3:
         return do_fallback(*args)

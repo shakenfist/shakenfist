@@ -165,6 +165,7 @@ run_event=$(jq -r '.event // ""' "${OUTPUT_DIR}/run.json")
 run_conclusion=$(jq -r '.conclusion // ""' "${OUTPUT_DIR}/run.json")
 head_branch=$(jq -r '.headBranch // ""' "${OUTPUT_DIR}/run.json")
 run_attempt=$(jq -r '.attempt // 1' "${OUTPUT_DIR}/run.json")
+workflow_name=$(jq -r '.workflowName // ""' "${OUTPUT_DIR}/run.json")
 
 echo "merge-ci-triage: ${REPO} run ${RUN_ID} (${run_event}, ${run_conclusion}) on ${head_branch}"
 
@@ -230,8 +231,26 @@ fi
 # the elision marker can state how much was dropped. gh's exit status is
 # ignored: whether anything arrived is the question that matters, and the file
 # answers it.
+#
+# The budget is about what a model can usefully attend to and what the run
+# costs, not about what can be passed to it: the prompt reaches the model as a
+# file on stdin, so the 128KiB kernel limit on a single argument does not
+# apply. See the --prompt-file note in tools/claude-model-fallback.sh.
 LOG_HEAD_BYTES="${LOG_HEAD_BYTES:-40000}"
 LOG_TAIL_BYTES="${LOG_TAIL_BYTES:-80000}"
+
+# head -c and tail -c cut at a byte offset, which is the right unit here, but
+# the cut can land in the middle of a multi-byte character and leave invalid
+# UTF-8 at the join -- which then travels into the prompt and into prompt.txt
+# in the run's artifact. iconv -c drops the partial sequence. Without iconv the
+# cut is used as it is: a byte of mojibake is a smaller problem than no logs.
+valid_utf8() {
+    if command -v iconv > /dev/null; then
+        iconv -f UTF-8 -t UTF-8 -c
+    else
+        cat
+    fi
+}
 
 gh run view "${RUN_ID}" --repo "${REPO}" --log-failed \
     > "${OUTPUT_DIR}/failed-logs.full.txt" 2>/dev/null || true
@@ -240,12 +259,12 @@ if [ "${log_bytes}" -le $((LOG_HEAD_BYTES + LOG_TAIL_BYTES)) ]; then
     cp "${OUTPUT_DIR}/failed-logs.full.txt" "${OUTPUT_DIR}/failed-logs.txt"
 else
     {
-        head -c "${LOG_HEAD_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt"
+        head -c "${LOG_HEAD_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt" | valid_utf8
         printf '\n\n[... %s bytes elided by triage: this is the first %s ' \
             "$((log_bytes - LOG_HEAD_BYTES - LOG_TAIL_BYTES))" "${LOG_HEAD_BYTES}"
         printf 'and the last %s bytes of the failed step logs ...]\n\n' \
             "${LOG_TAIL_BYTES}"
-        tail -c "${LOG_TAIL_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt"
+        tail -c "${LOG_TAIL_BYTES}" "${OUTPUT_DIR}/failed-logs.full.txt" | valid_utf8
     } > "${OUTPUT_DIR}/failed-logs.txt"
 fi
 if [ ! -s "${OUTPUT_DIR}/failed-logs.txt" ]; then
@@ -255,7 +274,21 @@ fi
 # Sibling merge groups, for the "is this happening to everybody?" question
 # which is what separates systemic from PR-caused more reliably than the log
 # does.
-if ! gh run list --repo "${REPO}" --event merge_group --limit 20 \
+#
+# Scoped to the workflow that failed, because "--event merge_group" on its own
+# is every workflow in the repository: the twenty slots would be shared with
+# runs of unrelated workflows, diluting the one signal this list exists to
+# carry. The name comes from the failed run itself rather than being hardcoded,
+# so triaging some other workflow's merge group failure correlates against that
+# workflow.
+sibling_args=(--repo "${REPO}" --event merge_group --limit 20)
+sibling_command="gh run list --repo ${REPO} --event merge_group --limit 20"
+if [ -n "${workflow_name}" ]; then
+    sibling_args+=(--workflow "${workflow_name}")
+    sibling_command="${sibling_command} --workflow '${workflow_name}'"
+fi
+
+if ! gh run list "${sibling_args[@]}" \
         --json databaseId,conclusion,headBranch,createdAt,url \
         > "${OUTPUT_DIR}/sibling-runs.json" 2>/dev/null; then
     echo '[]' > "${OUTPUT_DIR}/sibling-runs.json"
@@ -319,7 +352,7 @@ Your job, in order:
    default branch, so you can read more with:
      gh run view ${RUN_ID} --repo ${REPO} --log-failed
      gh pr diff ${pr_number:-N} --repo ${REPO}
-     gh run list --repo ${REPO} --event merge_group --limit 20
+     ${sibling_command}
 
    Anything listed under "What could not be read" below is missing, not
    uninteresting. Say so in your evidence and lower your confidence
@@ -414,9 +447,11 @@ fi)
 
 $(cat "${OUTPUT_DIR}/failed-jobs.json")
 
-# Recent merge_group runs on this repository
+# Other recent merge_group runs of ${workflow_name:-this workflow}
 
-$(jq -r '.[] | "- \(.createdAt) \(.conclusion // "in progress") \(.headBranch) \(.url)"' \
+$(jq -r --argjson this "${RUN_ID}" \
+    '.[] | select(.databaseId != $this) |
+     "- \(.createdAt) \(.conclusion // "in progress") \(.headBranch) \(.url)"' \
     "${OUTPUT_DIR}/sibling-runs.json" 2>/dev/null || true)
 
 # The pull request in the merge group
@@ -431,17 +466,42 @@ $(cat "${OUTPUT_DIR}/failed-logs.txt")
 PROMPT_EOF
 
     echo "merge-ci-triage: running triage with models ${MODELS}"
+
+    # The prompt goes to the model in a file, never as an argument. Linux caps
+    # a single argv element at 128KiB whatever ulimit says, and this prompt is
+    # mostly log: the default budget alone lands within a few kilobytes of that
+    # ceiling before a single failed job, sibling run or changed file is added.
+    # An argument over the cap does not truncate, it fails the exec with
+    # "Argument list too long" -- so the model never runs, and it never runs on
+    # exactly the failures this triage exists for, the ones whose failed step
+    # emitted megabytes. claude-model-fallback.sh feeds the file on stdin.
     "${TOOLS_DIR}/claude-model-fallback.sh" \
         --models "${MODELS}" \
-        -- "$(cat "${OUTPUT_DIR}/prompt.txt")" \
+        --prompt-file "${OUTPUT_DIR}/prompt.txt" \
+        -- \
         --dangerously-skip-permissions \
         --max-turns "${MAX_TURNS}" \
         --output-format text \
-        2>&1 | tee "${OUTPUT_DIR}/response.txt" \
-        || true
+        2>&1 | tee "${OUTPUT_DIR}/response.txt"
+    model_status=${PIPESTATUS[0]}
+
+    # "The model answered in prose" and "the model could not be run at all"
+    # are different failures with different remedies, and only the first is
+    # about the model. Every model in the list being out of subscription
+    # credit, a crashed CLI, an exec that never happened: all of those exit
+    # non-zero here, and reporting them as an unparseable answer sends a
+    # maintainer to read a response file which explains nothing. The status is
+    # the only thing that separates them, so it is not thrown away.
+    model_error='The triage response contained no JSON verdict object.'
+    if [ "${model_status}" -ne 0 ]; then
+        gather_notes+=("The triage model could not be run: the model wrapper exited ${model_status}.")
+        model_error="The triage model could not be run: the model wrapper exited ${model_status}."
+        model_error="${model_error} See response.txt in this run's artifact."
+    fi
 
     if ! python3 "${TOOLS_DIR}/merge-triage.py" extract \
-            "${OUTPUT_DIR}/response.txt" "${ENVELOPE_JSON}" "${TRIAGE_JSON}"; then
+            "${OUTPUT_DIR}/response.txt" "${ENVELOPE_JSON}" "${TRIAGE_JSON}" \
+            "${model_error}"; then
         echo "merge-ci-triage: triage produced no verdict, publishing the fallback document"
     fi
 fi
@@ -530,24 +590,40 @@ if [ -n "${tracking_issue}" ]; then
             drop_reason="${drop_reason}, so the claim that the occurrence was recorded there could not be checked."
         elif ! printf '%s\n%s\n' "${issue_body}" "${issue_comments}" \
                 | grep -qF "${run_url}"; then
-            drop_reason="Triage said it recorded this occurrence on issue #${tracking_issue}, but nothing"
-            drop_reason="${drop_reason} there references ${run_url}. The issue is kept as a reference only."
+            if [ "${DRY_RUN}" = "true" ]; then
+                # A dry run wrote nothing, so the absence of a reference is
+                # guaranteed and says nothing about whether the model would
+                # have written one. Reporting it in the words used for a claim
+                # that did not check out reads as a caught lie on the one path
+                # where the failure is certain and meaningless -- and dry runs
+                # are how a maintainer builds trust in this tooling.
+                drop_reason="Dry run: triage would have recorded this occurrence on issue"
+                drop_reason="${drop_reason} #${tracking_issue}. Nothing was written, so the citation is unverified."
+            else
+                drop_reason="Triage said it recorded this occurrence on issue #${tracking_issue}, but nothing"
+                drop_reason="${drop_reason} there references ${run_url}. The issue is kept as a reference only."
+            fi
         fi
     fi
 
     if [ -n "${drop_reason}" ]; then
         echo "merge-ci-triage: ${drop_reason}"
-        if [ "${DRY_RUN}" = "true" ]; then
+        if [ "${drop_citation}" = "true" ]; then
+            # Before the dry run branch, not after it: an issue which cannot be
+            # read is not a useful pointer whichever mode produced the
+            # citation, and testing the mode first would keep the number on a
+            # dry run -- inverting the documented contract on precisely the
+            # path a maintainer uses to inspect this behaviour by hand.
+            jq --arg reason "${drop_reason}" \
+                '.tracking_issue = null | .tracking_issue_action = "none" |
+                 .evidence += [$reason]' \
+                "${TRIAGE_JSON}" > "${TRIAGE_JSON}.checked" \
+                && mv "${TRIAGE_JSON}.checked" "${TRIAGE_JSON}"
+        elif [ "${DRY_RUN}" = "true" ]; then
             # A dry run wrote nothing, so there is no claim to take away. The
             # finding is still recorded: "the issue it would have used" is the
             # useful half of a dry run's output.
             jq --arg reason "${drop_reason}" '.evidence += [$reason]' \
-                "${TRIAGE_JSON}" > "${TRIAGE_JSON}.checked" \
-                && mv "${TRIAGE_JSON}.checked" "${TRIAGE_JSON}"
-        elif [ "${drop_citation}" = "true" ]; then
-            jq --arg reason "${drop_reason}" \
-                '.tracking_issue = null | .tracking_issue_action = "none" |
-                 .evidence += [$reason]' \
                 "${TRIAGE_JSON}" > "${TRIAGE_JSON}.checked" \
                 && mv "${TRIAGE_JSON}.checked" "${TRIAGE_JSON}"
         else
@@ -636,7 +712,14 @@ fi
 # always-write-a-document rule exists to remove, just moved from the artifact
 # to the thread. The comment names why triage reached nothing, which is what
 # tells a maintainer whether to look at the run or at this workflow.
-gh pr comment "${pr_number}" --repo "${REPO}" --body-file "${OUTPUT_DIR}/comment.md" \
-    || echo "merge-ci-triage: could not comment on #${pr_number}" >&2
+if ! gh pr comment "${pr_number}" --repo "${REPO}" \
+        --body-file "${OUTPUT_DIR}/comment.md"; then
+    # Red, rather than a green run with nothing on the pull request. The
+    # verdict survives in the artifact either way, but a missing comment is
+    # indistinguishable from a triage that never ran -- the ambiguity this
+    # design exists to remove -- so the run itself has to carry the signal.
+    echo "merge-ci-triage: could not comment on #${pr_number}" >&2
+    exit_status=1
+fi
 
 exit "${exit_status}"
