@@ -13936,7 +13936,25 @@ no callback to <code>sf-api</code> on the connection hot path.</p>
 row holds a newest-first, two-key window of Ed25519 keypairs; rotation
 (<code>sf-ctl rotate-kerbside-signing-key</code>) prepends a fresh key and trims to two,
 so tokens signed by the previous key stay verifiable until the next rotation.
-<code>shakenfist/util/vdi_tokens.py</code> is the only module that parses the row.
+<code>shakenfist/util/vdi_tokens.py</code> is the only module that parses the row, and
+reads it through <code>mariadb.get_cluster_config()</code>:
+<code>config.load_cluster_config()</code> withholds a <code>cluster_config</code> row from the
+daemon environment when its name matches <code>SECRET_CONFIG_KEY_RE</code> <em>and</em> is not
+a declared <code>SFConfig</code> field; every other row, declared or not, is still
+exported, so a new option reaches a daemon without a code change. The
+declared-field test comes first deliberately: <code>AUTH_SECRET_SEED</code> matches the
+secret pattern via <code>_SEED$</code> but is a declared field and must keep being
+exported, so a plain "never export a secret" rule would break authentication
+cluster-wide. <code>KERBSIDE_JWT_SIGNING_KEY</code> is withheld because it matches via
+<code>_KEY$</code> and is not declared.</p>
+<p>That keeps the private key out of every process's environment, and out of
+the privexec children which inherit it. It does not keep the key out of
+those processes: <code>mariadb.get_cluster_config()</code> and the <code>GetClusterConfig</code>
+RPC both return the whole table, so <code>load_cluster_config()</code> filters only
+after receipt and the row still crosses the wire to every daemon at startup,
+and to the cluster daemon on every maintenance pass. Closing that residue
+needs a keyed read, which is <a href="https://github.com/shakenfist/shakenfist/issues/4096">issue
+4096</a>.
 Per-node <code>spice_server_cert_subject</code> (published by <code>shakenfist/node.py</code>) is
 consumed by Kerbside as the enforced backend <code>host_subject</code>. See the
 <a href="../../operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>

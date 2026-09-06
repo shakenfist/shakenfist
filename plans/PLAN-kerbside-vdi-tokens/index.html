@@ -13896,189 +13896,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#phase-11-close-out-the-post-completion-defects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 11: Close out the post-completion defects
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dependencies-on-other-plans" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dependencies on other plans
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution model
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#planning-effort" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planning effort
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-level guidance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#management-session-review-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Management session review checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-found-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs found during this work
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Bugs found during this work">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#post-completion-defects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Post-completion defects
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#related-gap-not-a-defect" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related gap (not a defect)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -14546,14 +14363,98 @@ Recommendations are recorded inline.</p>
 <tr>
 <td>10. Push audit</td>
 <td>all</td>
-<td>PLAN-kerbside-vdi-tokens-phase-10-push-audit.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-kerbside-vdi-tokens-phase-10-push-audit/">PLAN-kerbside-vdi-tokens-phase-10-push-audit.md</a></td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>11. Close out the post-completion defects (#4003, #4009)</td>
 <td>shakenfist</td>
 <td>See <em>Post-completion defects</em> below</td>
-<td>Not started</td>
+<td>Complete</td>
+</tr>
+</tbody>
+</table>
+<p>The table above names plan files rather than pull requests, which
+meant phase 10 had to reconstruct the merge history from <code>git log</code> in
+four working copies before it could audit anything. That
+reconstruction is recorded once, in
+<a href="../PLAN-kerbside-vdi-tokens-phase-10-push-audit/">phase 10's decision 1</a>,
+and is the authoritative list of what this plan actually merged:</p>
+<table>
+<thead>
+<tr>
+<th>Repo</th>
+<th>Phases</th>
+<th>PR</th>
+<th>Merge</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>shakenfist</td>
+<td>1, 2, 6 (SF half), 7 (SF half), 8 (SF half)</td>
+<td>#3491</td>
+<td><code>9d41a1716</code></td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>9 closeout (docs)</td>
+<td>#3580</td>
+<td><code>07d7081b7</code></td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>plan update (docs)</td>
+<td>#4011</td>
+<td><code>c3e76ff8a</code></td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>11 (#4009)</td>
+<td>#4016</td>
+<td><code>5ef83c065</code></td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>11 (#4003)</td>
+<td>#4018</td>
+<td><code>913411586</code></td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>11 (#4004)</td>
+<td>#4024</td>
+<td><code>f2df423d8</code></td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>4</td>
+<td>#350</td>
+<td><code>b426e1f</code></td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>5, 6, 7, 8 (kerbside half)</td>
+<td>#167</td>
+<td><code>f50ea59</code></td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>9 (SF end-to-end lane)</td>
+<td>#194</td>
+<td><code>115416c</code></td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>post-phase-9 scrape fix</td>
+<td>#201</td>
+<td><code>7803368</code></td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>3</td>
+<td>#190</td>
+<td><code>fa7ee21</code></td>
 </tr>
 </tbody>
 </table>
@@ -14753,6 +14654,33 @@ last phase's diff alone. Findings land as their own pull
 request, and the plan is not complete until each is resolved
 or declined in writing here. If the audit finds nothing, that
 is recorded in one sentence.</p>
+<p><strong>What it found.</strong> Not nothing. One blocking defect, in
+kerbside: a failed VDI signing-key fetch errored the Shaken
+Fist console source, and an errored source is skipped before
+the scrape loop that would have kept its consoles alive -- so
+the unconditional cleanup afterwards deleted the source's
+entire console inventory, breaking the direct and proxy
+console routes that have nothing to do with tokens. It
+triggers against any cluster that has not run <code>sf-ctl
+ensure-kerbside-signing-key</code>, which makes it the <strong>third</strong>
+defect from the one configuration no phase ever tested (after</p>
+<h1 id="4003-and-4009-and-the-first-that-destroys-data-also-one">4003 and #4009), and the first that destroys data. Also one<a class="headerlink" href="#4003-and-4009-and-the-first-that-destroys-data-also-one" title="Permanent link">&para;</a></h1>
+<p>high-severity finding in ryll's SPICE TLS verifier, which
+trusted the public WebPKI root set even when a <code>.vv</code> supplied
+a private cluster CA -- the mechanism this plan's whole
+<code>host_subject</code> story depends on. The kerbside fix merged as
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> (<code>e2a493ea6</code>), though not yet into a tagged
+release, so Shaken Fist's own operator guide and release notes
+carry the provisioning order which avoids it. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/358" title="GitHub Issue: shakenfist/ryll #358">ryll#358</a> is still
+open, and this phase stays In progress until it merges.
+Alongside those came three medium security findings and the audit's own discovery
+that the <code>.vv</code> type collapse, though covered by a unit test,
+had no functional coverage -- in a project that prefers
+functional coverage where it can only have one.
+Fourteen advisory findings were filed as issues across the
+four repositories. Full detail, with what each heading
+examined and the management session's spot-checks and
+mutation tests, is in the phase plan's <em>Findings</em> section.</p>
 <h3 id="phase-11-close-out-the-post-completion-defects">Phase 11: Close out the post-completion defects<a class="headerlink" href="#phase-11-close-out-the-post-completion-defects" title="Permanent link">&para;</a></h3>
 <p>Phases 1-9 all closed, and the feature works on a cluster that
 runs Kerbside. But two defects found on 2026-09-01 against
@@ -14772,6 +14700,19 @@ finished while they stand:</p>
 <p>Both are shakenfist-only and independent of each other. Neither
 needs a Kerbside deployment to reproduce or to verify, which is
 precisely the property that was never tested.</p>
+<p><strong>Complete as at 2026-09-02.</strong> #4009 was fixed by PR #4016, #4003 by
+PR #4018, and the related gap #4004 by PR #4024; all three issues are
+closed and all three fixes are on <code>develop</code>. The direct <code>.vv</code> now
+resolves the placement node to its IP, collapses the internal <code>spice*</code>
+enum to <code>spice</code>, and emits <code>host-subject</code>
+(<code>shakenfist/external_api/instance.py:1688-1727</code>); <code>vdi-console-proxy</code>
+is a conditional capability token gated on <code>config.KERBSIDE_URL</code>
+(<code>shakenfist/external_api/app.py:355-360</code>); and the coverage whose
+absence let all three rot now exists as
+<code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_vdi_console_file.py</code>,
+which parses a real <code>.vv</code> on a cluster with no Kerbside deployed.
+Phase 10 audits those fixes along with everything else rather than
+taking them on trust.</p>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <p>None hard. This plan is independent of the BYO-MariaDB /
 remove-primary thread — it uses <code>cluster_config</code> as it exists
@@ -14855,12 +14796,13 @@ brief.</p>
   get a console for an instance in another namespace.</li>
 <li>The same command still works with only <code>remote-viewer</code>
   installed, and still works direct-to-hypervisor on
-  clusters with no <code>KERBSIDE_URL</code> configured.
-  <strong>NOT MET as at 2026-09-01</strong> — <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4003" title="GitHub Issue: shakenfist/shakenfist #4003">shakenfist#4003</a> (the
-  capability is advertised unconditionally, so the client
-  never reaches the direct path) and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4009" title="GitHub Issue: shakenfist/shakenfist #4009">shakenfist#4009</a> (the
-  direct <code>.vv</code> is malformed, and <code>remote-viewer</code> rejects its
-  <code>type</code> outright).</li>
+  clusters with no <code>KERBSIDE_URL</code> configured. <strong>Met as at
+  2026-09-02</strong>, having been broken from the feature's first
+  release until then: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4003" title="GitHub Issue: shakenfist/shakenfist #4003">shakenfist#4003</a> advertised the
+  capability unconditionally so the client never reached the
+  direct path, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4009" title="GitHub Issue: shakenfist/shakenfist #4009">shakenfist#4009</a> left the direct <code>.vv</code>
+  malformed. Both are fixed and both now have coverage on a
+  Kerbside-less cluster.</li>
 <li>Kerbside opens that console with zero Shaken Fist API calls
   on the exchange path (signature check + local DB only).</li>
 <li>A replayed exchange URL is rejected; an expired one is
@@ -14871,11 +14813,17 @@ brief.</p>
   static/oVirt sources.</li>
 <li>CI proves the end-to-end flow (kerbside SF lane) and the
   minting authorisation gate (SF cluster_ci), and the
-  pre-push checks pass in all four repos.
-  <strong>PARTIALLY MET</strong> — both of those lanes exist, but nothing
-  covers a Kerbside-<em>less</em> cluster, which is why #4003 and
-  #4009 both shipped. The pre-push audit (phase 10) has not
-  run.</li>
+  pre-push checks pass in all four repos. <strong>Met</strong>, with a
+  caveat worth carrying forward: the two lanes exist, the
+  Kerbside-<em>less</em> gap that let #4003 and #4009 ship is covered
+  by <code>cluster_ci_tests/test_vdi_console_file.py</code>, and the
+  pre-push audit ran in phase 10 and passed wave 1 in all four
+  repositories. The caveat is that phase 10's seam lens found
+  the mint path's own functional coverage never executes in
+  Shaken Fist's CI (#4093), and that several values crossing
+  repository boundaries are asserted only by hand-written
+  fixtures on both sides (#4097). CI proves the flow; it does
+  not yet prove the contract.</li>
 <li>Documentation in all four repos reflects the feature, and
   the plan index status tables are current.</li>
 </ul>

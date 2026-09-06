@@ -14183,14 +14183,18 @@ connections before the process exits.</p>
 <p>Shaken Fist mints short lived Ed25519 JWTs for the Kerbside VDI console
 proxy. <code>shakenfist/external_api/instance.py</code>
 (<code>InstanceVDIProxyConsoleHelperEndpoint</code>, <code>GET
-/instances/&lt;ref&gt;/vdiconsoleproxy</code>) mints a token and returns a proxy URL;
-<code>shakenfist/util/vdi_tokens.py</code> owns all key handling (mint, ensure, rotate,
-public view); <code>shakenfist/external_api/admin.py</code>
+/instances/&lt;ref&gt;/vdiconsoleproxy</code>) mints a token and returns <code>{url,
+expires_at}</code>, where <code>url</code> is <code>&lt;KERBSIDE_URL&gt;/sf-console.vv?token=&lt;jwt&gt;</code>. It
+returns 404 when the Kerbside integration is unconfigured, 406 unless the
+instance is <code>created</code>, 409 unless the console is SPICE, and 500 when no
+signing key exists. <code>shakenfist/util/vdi_tokens.py</code> owns all key handling
+(mint, ensure, rotate, public view); <code>shakenfist/external_api/admin.py</code>
 (<code>AdminVDITokenPublicKeyEndpoint</code>, <code>GET /admin/vditokenpubkey</code>) publishes the
 public verification keys. The signing key lives in a single <code>cluster_config</code>
 row, <code>KERBSIDE_JWT_SIGNING_KEY</code> (two-key rotation window). The <code>sf-ctl</code>
 <code>ensure-kerbside-signing-key</code> / <code>rotate-kerbside-signing-key</code> subcommands
-bootstrap and rotate it. Operator runbook: the
+bootstrap and rotate it. The trust model is in
+<a href="../security_model/">security_model.md</a>; the operator runbook is the
 <a href="../../operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</p>
 <h2 id="object-references">Object References<a class="headerlink" href="#object-references" title="Permanent link">&para;</a></h2>
 <p>The <code>object_references</code> table in MariaDB tracks relationships between objects.
@@ -14379,15 +14383,9 @@ terminal state, raising <code>ClusterOperationFailed</code> on error. Advanced c
 can opt out of polling with <code>wait=False</code> to receive the op handle directly.
 Two client methods <code>get_cluster_operation_chain</code> and
 <code>list_cluster_operations_for_target</code> expose the discovery endpoints.</p>
-<p><strong>VDI console proxy endpoints.</strong> <code>GET /instances/&lt;ref&gt;/vdiconsoleproxy</code>
-(<code>external_api/instance.py</code>, <code>InstanceVDIProxyConsoleHelperEndpoint</code>) mints a
-short lived Ed25519 JWT and returns <code>{url, expires_at}</code> where <code>url</code> is
-<code>&lt;KERBSIDE_URL&gt;/sf-console.vv?token=&lt;jwt&gt;</code>. It returns 404 when the Kerbside
-integration is unconfigured, 406 unless the instance is <code>created</code>, 409 unless
-the console is SPICE, and 500 when no signing key exists. <code>GET
-/admin/vditokenpubkey</code> (<code>external_api/admin.py</code>,
-<code>AdminVDITokenPublicKeyEndpoint</code>) publishes the public verification keys. See
-the VDI console token trust model in <a href="../security_model/">security_model.md</a>.</p>
+<p><strong>VDI console proxy endpoints.</strong> <code>GET /instances/&lt;ref&gt;/vdiconsoleproxy</code> and
+<code>GET /admin/vditokenpubkey</code> are described under
+<a href="#vdi-console-token-mint-path">VDI console token mint path</a> above.</p>
 
 
 

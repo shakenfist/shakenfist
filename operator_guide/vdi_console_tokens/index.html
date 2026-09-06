@@ -13826,6 +13826,21 @@ newest-first list of Ed25519 keypairs (private and public PEM). Because the
 configuration name ends in <code>_KEY</code>, <code>sf-ctl show-config</code> redacts it by
 default; never pass <code>--show-secrets</code> where the output could be logged, and
 never print or event private key material.</p>
+<p>The row is also excluded from the cluster configuration Shaken Fist exports
+into each daemon's environment at startup. A row is withheld when its name
+looks like a secret and it is not a declared configuration option; ordinary
+rows, including options this release does not know about, are still exported.
+So the signing key no longer sits in every daemon's <code>/proc/&lt;pid&gt;/environ</code> on
+every node, and is no longer inherited by the processes privexec spawns.
+Nothing an operator does turns that off.</p>
+<p>It is worth being precise about what that does and does not buy, because the
+distinction matters if you are reasoning about blast radius. Shaken Fist
+reads cluster configuration a whole table at a time, so the key is still
+sent to every daemon at startup and to the cluster daemon on each
+maintenance pass — it is simply no longer <em>retained</em> in their environment.
+An attacker who can read a daemon's memory is therefore not shut out by this
+change; one who can read its environment, or the environment of a command
+privexec ran, now is.</p>
 <p>The key is <strong>not</strong> created automatically: it must be provisioned explicitly
 before the first console is opened. Until it exists, the <code>vdiconsoleproxy</code>
 endpoint returns HTTP 500 naming the command to run below — minting never
@@ -13835,6 +13850,27 @@ key to Kerbside before anyone opens a console — with the idempotent:</p>
 </code></pre></div>
 <p>This prints the active key id and how many keys are published; it never
 prints private material and does nothing if a key already exists.</p>
+<div class="admonition warning">
+<p class="admonition-title">Provision the key before upgrading a cluster Kerbside already scrapes</p>
+<p>Do this <em>before</em> you roll the daemons, if Kerbside is already
+configured with this cluster as a console source.</p>
+<p>Until the key exists, <code>GET /admin/vditokenpubkey</code> returns HTTP 404.
+<strong>Kerbside v0.5.0 and earlier</strong> treat that failure as making the whole
+source unusable: the scrape is abandoned before it enumerates any
+consoles, and the cleanup pass that follows then removes every console
+Kerbside had previously recorded for this cluster. That deletes the
+direct and proxy console routes too, not only the token-based ones, so
+users lose consoles which have nothing to do with this feature.</p>
+<p>Provisioning the key first avoids it entirely. If you have already hit
+it, provision the key and let Kerbside scrape again — the inventory is
+rebuilt from Shaken Fist, so the loss is an outage rather than
+permanent damage.</p>
+<p>The Kerbside-side fix downgrades a missing key to "this source has no
+token consoles yet" rather than failing the source. It merged as
+<a href="https://github.com/shakenfist/kerbside/pull/412">kerbside#412</a> and is
+on Kerbside's <code>develop</code> branch; it is not in a tagged release yet, so
+provision the key first whatever Kerbside version you run.</p>
+</div>
 <h2 id="publishing-the-public-keys">Publishing the public keys<a class="headerlink" href="#publishing-the-public-keys" title="Permanent link">&para;</a></h2>
 <p>Kerbside verifies tokens with the <strong>public</strong> half of the signing key, which
 Shaken Fist serves to admin callers at
@@ -13904,6 +13940,24 @@ during its cluster-wide scrape and uses it as the connection <code>host_subject<
 See the
 <a href="/components/kerbside/console-sources/">Kerbside console sources page</a> for
 the proxy-side view.</p>
+<p>There is a second way to publish nothing, and it is easier to hit on your
+own PKI than on the one the deployer builds: Shaken Fist can only render a
+subject whose every attribute has a SPICE host-subject short name (<code>C</code>,
+<code>ST</code>, <code>L</code>, <code>O</code>, <code>OU</code>, <code>CN</code>, <code>DC</code>, <code>emailAddress</code>). A subject qualified with
+anything else — a <code>serialNumber</code>, a custom OID — cannot be rendered exactly,
+and a partial rendering would wrongly reject the backend, so the node
+publishes nothing and enforcement is disabled for it. If your CA issues such
+subjects this happens on every node at once. It is not silent: each node
+logs a warning naming the offending attribute and its OID once per episode
+rather than once per read — a certificate which is repaired and later
+regresses warns a second time, because that recurrence is the event you
+need to see. Grep your logs for <code>no SPICE host-subject short name</code> if
+<code>spice_server_cert_subject</code> is unexpectedly absent from a node in
+<code>GET /nodes</code>.</p>
+<p>A certificate with an empty subject — a SAN-only certificate, which some
+modern CAs issue by default — has nothing to pin and is treated the same
+way: nothing is published, enforcement is disabled for that node, and the
+node logs <code>empty subject</code>.</p>
 <h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/user_guide/consoles/">Consoles (user guide)</a> — how a user opens a
