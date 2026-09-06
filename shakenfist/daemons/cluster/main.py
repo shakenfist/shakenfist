@@ -63,6 +63,12 @@ ELECTED_LOOP_POLL_SECONDS = 5
 
 
 class Monitor(daemon.Daemon):
+    # Set by _run_inner() when the maintenance schedule is registered.
+    # Declared here as well because the election hook which forces a
+    # capacity pass reads it, and a Monitor built by a test which never
+    # registers a schedule would otherwise raise rather than no-op.
+    _capacity_reconcile_job = None
+
     def __init__(self, name):
         super().__init__(name)
         self.lock = None
@@ -616,15 +622,31 @@ class Monitor(daemon.Daemon):
         """Register a maintenance job whose cadence is anchored in the database.
 
         schedule computes a job's next run from the moment it is
-        registered, which is process start, so a task whose period is
-        longer than the typical daemon lifetime never comes due at all:
-        on a cluster which redeploys daily, the daily prune_events
-        effectively never ran and the events tables grew without bound
-        (issue 3869). Each run of an anchored task therefore records a
-        cluster-wide last-run stamp in cluster_config, and
-        _anchor_scheduled_jobs() re-reads the stamps on election. A
-        persisted RecurringOperation would fix this by construction;
-        until PLAN-recurring-operations lands, the stamp is the anchor.
+        registered, which is process start. There are two ways that
+        hurts, and a task with either one belongs here.
+
+        A task whose period is longer than the typical daemon lifetime
+        never comes due at all: on a cluster which redeploys daily, the
+        daily prune_events effectively never ran and the events tables
+        grew without bound (issue 3869).
+
+        A task which is the sole creator of state something else
+        depends on leaves that dependency unmet for one whole period
+        after every process start, however short the period is. The
+        capacity reconciler is the only thing which creates
+        scheduler_node_capacity rows, and admission fails open on a
+        node which has none (P7), so a five minute process-local timer
+        meant every placement in a new cluster's first minutes was
+        admitted against nothing -- and the reconciler's first pass
+        then wrote the resulting over-limit usage onto the row it
+        created, leaving a node refusing every create while measuring
+        completely idle (issue 4087).
+
+        Each run of an anchored task therefore records a cluster-wide
+        last-run stamp in cluster_config, and _anchor_scheduled_jobs()
+        re-reads the stamps on election. A persisted RecurringOperation
+        would fix this by construction; until PLAN-recurring-operations
+        lands, the stamp is the anchor.
         """
         key = SCHEDULED_TASK_LAST_RUN_PREFIX + task_name.upper()
 
@@ -644,7 +666,9 @@ class Monitor(daemon.Daemon):
                 }).warning('Could not record scheduled task last-run stamp')
             return ret
 
-        self._anchored_jobs.append((interval.do(stamped_task), key))
+        job = interval.do(stamped_task)
+        self._anchored_jobs.append((job, key))
+        return job
 
     def _anchor_scheduled_jobs(self):
         """Re-anchor long-period jobs to their persisted last-run stamps.
@@ -686,6 +710,45 @@ class Monitor(daemon.Daemon):
                     'stamp': stamp,
                     'error': str(e)
                 }).warning('Ignoring unusable scheduled task last-run stamp')
+
+    def _force_capacity_reconcile_if_unguarded(self):
+        """Make the capacity reconcile due now if nothing is guarding placement.
+
+        An empty scheduler_node_capacity table means every admission in
+        this cluster is failing open, because a node with no row is
+        admitted against nothing at all (P7). Anchoring the reconcile
+        covers the case which produced issue 4087 -- a fresh cluster,
+        whose stamp is missing, waiting out a five minute process-local
+        timer -- but a stamp is a proxy for the condition rather than
+        the condition itself. A cluster whose MariaDB outlived its
+        nodes has a recent stamp and no row for any node uuid which now
+        exists. Read the table and act on what it says.
+
+        A failed read is not an empty table, and this must not confuse
+        the two: get_scheduler_node_capacity() reports which it was, and
+        only an authoritative empty result forces a pass. A degraded
+        read leaves the anchored cadence alone rather than scheduling
+        work on a guess -- and if the database service is unreachable
+        the reconcile RPC would fail anyway.
+        """
+        if self._capacity_reconcile_job is None:
+            return
+
+        try:
+            rows, degraded = mariadb.get_scheduler_node_capacity()
+        except Exception as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read scheduler capacity counters, leaving the '
+                'capacity reconcile on its anchored cadence')
+            return
+
+        if degraded or rows:
+            return
+
+        LOG.warning(
+            'No scheduler capacity rows exist, so every placement is being '
+            'admitted unguarded; reconciling capacity now')
+        self._capacity_reconcile_job.next_run = datetime.datetime.now()
 
     def _run_due_scheduled_jobs(self):
         """Run every due maintenance job, petting between each one.
@@ -737,11 +800,15 @@ class Monitor(daemon.Daemon):
         # the timers are continuous and a newly elected node promptly
         # runs whatever fell due while it was idle.
         #
-        # Continuous timers are still process-local, though, and the two
-        # longest-period tasks are additionally anchored to a persisted
-        # cluster-wide last-run stamp (see _register_anchored_job) so
-        # that a process restart does not restart their period from zero
-        # either (issue 3869).
+        # Continuous timers are still process-local, though, so three
+        # tasks are additionally anchored to a persisted cluster-wide
+        # last-run stamp (see _register_anchored_job) so that a process
+        # restart does not restart their period from zero either. Two
+        # are anchored because their period outlives the daemon (issue
+        # 3869); the capacity reconciler is anchored because it is the
+        # only thing which creates the rows admission guards against,
+        # and a process-local timer left a new cluster with no guard at
+        # all for five minutes (issue 4087).
         self._anchored_jobs = []
         schedule.every(1).minutes.do(
             scheduled_tasks.log_cluster_queue_lengths)
@@ -751,14 +818,15 @@ class Monitor(daemon.Daemon):
             scheduled_tasks.per_blob_checks)
         schedule.every(5).minutes.do(
             scheduled_tasks.per_instance_checks_and_usage)
-        schedule.every(5).minutes.do(
-            scheduled_tasks.reconcile_scheduler_capacity)
         schedule.every(15).minutes.do(
             scheduled_tasks.per_deleted_object_checks)
         schedule.every(15).minutes.do(
             scheduled_tasks.reap_expired_namespace_keys)
         schedule.every(15).minutes.do(
             scheduled_tasks.reap_federation_records)
+        self._capacity_reconcile_job = self._register_anchored_job(
+            schedule.every(5).minutes, 'reconcile_scheduler_capacity',
+            scheduled_tasks.reconcile_scheduler_capacity)
         self._register_anchored_job(
             schedule.every(60).minutes, 'reconcile_orphaned_objects',
             scheduled_tasks.reconcile_orphaned_objects)
@@ -781,6 +849,7 @@ class Monitor(daemon.Daemon):
             # shutdown.
             if self.is_elected:
                 self._anchor_scheduled_jobs()
+                self._force_capacity_reconcile_if_unguarded()
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):

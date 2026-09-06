@@ -2709,11 +2709,22 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 # not evaluating at all.
                 self.monitor.counters[
                     'admit_instance_placement_unguarded'].inc()
+                if (result['unguarded_reason']
+                        == mariadb.UNGUARDED_NEVER_RECONCILED):
+                    # A subset of the counter above, not a replacement
+                    # for it: this one says no node in the cluster is
+                    # guarded, rather than one node the reconciler has
+                    # not sized. It should be a transient of a cluster's
+                    # first moments, so unlike its parent a sustained
+                    # rate here is a defect and not a slow upgrade.
+                    self.monitor.counters[
+                        'admit_instance_placement_never_reconciled'].inc()
             reply = database_pb2.AdmitInstancePlacementReply(
                 success=result['success'],
                 error=result['error'],
                 admitted=result['admitted'],
                 unguarded=result['unguarded'],
+                unguarded_reason=result['unguarded_reason'],
                 clamped=result['clamped'],
                 failing_stage=result['failing_stage'],
                 node_used_cpus=result['node_used_cpus'],
@@ -6540,6 +6551,14 @@ class Monitor(daemon.WorkerPoolDaemon):
             # staying above zero is a standing alert rather than a
             # transient.
             'admit_instance_placement_unguarded',
+            # The subset of those where the cluster_capacity singleton
+            # was missing, which means the reconciler has never
+            # completed a pass and *every* node is failing open at once
+            # rather than one the reconciler declined to size. That is a
+            # cluster's first moments and nothing else (issue 4087), so
+            # this one should return to zero and stay there; its parent
+            # legitimately ticks over during an upgrade.
+            'admit_instance_placement_never_reconciled',
             # MariaDB namespace claim operations
             'create_namespace_claim', 'get_namespace_claim',
             'get_namespace_claims', 'update_namespace_claim',

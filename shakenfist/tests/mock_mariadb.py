@@ -3092,7 +3092,8 @@ class MockMariaDB():
             'dimensions': [], 'node_used_cpus': 0,
             'node_used_memory_mb': 0, 'node_used_disk_gb': 0,
             'node_expected_demand': 0.0, 'claim_over_limit': False,
-            'claim_dimensions': [], 'claim_uuid': ''}
+            'claim_dimensions': [], 'claim_uuid': '',
+            'unguarded_reason': ''}
 
         attrs = self.instance_attributes.get(str(instance_uuid))
         if attrs is None:
@@ -3130,6 +3131,15 @@ class MockMariaDB():
         row = self.node_capacity.get(str(node_uuid))
         if row is None:
             result['unguarded'] = True
+            # The real probe reads the cluster_capacity singleton for
+            # this, and this double models no singleton. An entirely
+            # empty capacity table is the same fact though: the
+            # reconciler writes the singleton and the per-node rows in
+            # one transaction, so a cluster with no node rows has no
+            # singleton either.
+            result['unguarded_reason'] = (
+                mariadb.UNGUARDED_NEVER_RECONCILED if not self.node_capacity
+                else mariadb.UNGUARDED_NODE_NOT_SIZED)
         elif enforce:
             dimensions = []
             for dimension, requested in (('cpus', cpus),

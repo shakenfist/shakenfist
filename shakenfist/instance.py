@@ -1358,12 +1358,19 @@ class Instance(dbowo):
             if result['unguarded']:
                 # P7: a node whose capacity row the reconciler has not
                 # created yet admits without a guard rather than
-                # refusing every create mid-upgrade.
-                self.log.with_fields({'node': location}).warning(
+                # refusing every create mid-upgrade. The reason says
+                # which of the two fail-opens this was: one unsized
+                # node, or a cluster the reconciler has never reached,
+                # where every node fails open at once (issue 4087).
+                fields = {
+                    'node': location,
+                    'reason': result['unguarded_reason']
+                }
+                self.log.with_fields(fields).warning(
                     'Instance placed without a capacity guard')
                 self.add_event(
                     EVENT_TYPE_AUDIT, 'instance placed without capacity guard',
-                    extra={'node': location})
+                    extra=fields)
 
             if result['clamped']:
                 # A counter would have gone negative releasing the old

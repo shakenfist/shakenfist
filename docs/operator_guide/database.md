@@ -771,7 +771,18 @@ reconciler's next pass surfaces any excess in the drift figures. A node or the
 cluster singleton missing its capacity row — mid-upgrade, or a cluster
 whose reconciler has never run — fails open: placement proceeds
 unguarded, an `instance placed without capacity guard` event records
-it, and the reconciler's next pass creates the missing row. In every
+it, and the reconciler's next pass creates the missing row. That event
+carries a `reason` naming which of the two it was, because they are
+not the same condition. `node_not_sized` is one node the reconciler
+declined to size and is corrected by the next pass;
+`never_reconciled` means the `cluster_capacity` singleton is absent,
+so no pass has ever completed and *every* node is failing open at
+once. The second is a cluster's first moments and nothing else, and
+it is counted separately as
+`database_admit_instance_placement_never_reconciled_total` — a subset
+of `database_admit_instance_placement_unguarded_total`, not a
+replacement for it. A sustained rate on the subset is a defect; the
+parent legitimately ticks over during an upgrade. In every
 case — enforced denial, unenforced overage, or fail-open admission —
 the reconciler is the drift healer: whatever the guard let through or
 refused, the next five-minute pass recomputes every counter from

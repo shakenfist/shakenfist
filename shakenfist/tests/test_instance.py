@@ -1980,6 +1980,22 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         messages = [c.args[1] for c in add_event.call_args_list]
         self.assertIn('instance placed without capacity guard', messages)
 
+    def test_an_unguarded_placement_names_which_fail_open_it_was(self):
+        # An operator reading one instance's events has to be able to
+        # tell "one node the reconciler declined to size" from "this
+        # whole cluster has never been reconciled, so nothing is
+        # guarded" (issue 4087). The double models the second: its
+        # capacity table is empty.
+        with mock.patch.object(self.inst, 'add_event') as add_event:
+            self.inst.place_instance(self.node2)
+
+        unguarded = [c for c in add_event.call_args_list
+                     if c.args[1] == 'instance placed without capacity guard']
+        self.assertEqual(1, len(unguarded))
+        self.assertEqual(
+            mariadb.UNGUARDED_NEVER_RECONCILED,
+            unguarded[0].kwargs['extra']['reason'])
+
     def test_a_failed_write_raises_rather_than_reading_as_full(self):
         # A database blip must not be indistinguishable from "the
         # cluster has no room", or a caller walking candidates would 507

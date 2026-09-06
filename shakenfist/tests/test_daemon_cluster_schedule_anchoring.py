@@ -22,6 +22,7 @@ from shakenfist.tests import base
 
 PRUNE_KEY = 'SCHEDULED_TASK_LAST_RUN_PRUNE_EVENTS'
 RECONCILE_KEY = 'SCHEDULED_TASK_LAST_RUN_RECONCILE_ORPHANED_OBJECTS'
+CAPACITY_KEY = 'SCHEDULED_TASK_LAST_RUN_RECONCILE_SCHEDULER_CAPACITY'
 
 
 def _make_monitor():
@@ -183,7 +184,8 @@ class RunInnerAnchorWiringTestCase(base.ShakenFistTestCase):
         m._run_inner()
 
         anchored = {key: job for job, key in m._anchored_jobs}
-        self.assertEqual({PRUNE_KEY, RECONCILE_KEY}, set(anchored))
+        self.assertEqual(
+            {PRUNE_KEY, RECONCILE_KEY, CAPACITY_KEY}, set(anchored))
         # schedule 1.2.2 Jobs carry unit and interval, not a period.
         self.assertEqual(
             ('days', 1),
@@ -191,5 +193,131 @@ class RunInnerAnchorWiringTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ('minutes', 60),
             (anchored[RECONCILE_KEY].unit, anchored[RECONCILE_KEY].interval))
+        self.assertEqual(
+            ('minutes', 5),
+            (anchored[CAPACITY_KEY].unit, anchored[CAPACITY_KEY].interval))
         for job, _ in m._anchored_jobs:
             self.assertIn(job, schedule.jobs)
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.daemon.check_abort_path',
+        return_value=False)
+    def test_the_capacity_reconcile_is_not_also_registered_unanchored(
+            self, mock_abort):
+        # It used to be a plain schedule.every(5).minutes registration,
+        # and leaving that behind as well would run the pass twice per
+        # cadence while only one of the two recorded a stamp.
+        self.addCleanup(schedule.clear)
+        m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.lock = None
+        m.is_elected = False
+        m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
+
+        m._run_inner()
+
+        anchored = {job for job, _ in m._anchored_jobs}
+        unanchored_five_minute = [
+            j for j in schedule.jobs
+            if j not in anchored and (j.unit, j.interval) == ('minutes', 5)]
+        self.assertEqual(
+            2, len(unanchored_five_minute),
+            'expected only per_blob_checks and '
+            'per_instance_checks_and_usage to remain unanchored at five '
+            'minutes')
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.daemon.check_abort_path',
+        return_value=False)
+    def test_run_inner_keeps_a_handle_on_the_capacity_job(self, mock_abort):
+        self.addCleanup(schedule.clear)
+        m = cluster_main.Monitor.__new__(cluster_main.Monitor)
+        m.lock = None
+        m.is_elected = False
+        m.abort_path = '/nonexistent/sf-test-cluster-abort-path'
+
+        m._run_inner()
+
+        anchored = {key: job for job, key in m._anchored_jobs}
+        self.assertIs(anchored[CAPACITY_KEY], m._capacity_reconcile_job)
+
+
+class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
+    """The election-time check that placement is being guarded at all.
+
+    An empty scheduler_node_capacity table means every admission is
+    failing open (P7), which is issue 4087. Anchoring handles the
+    fresh-cluster case by way of a missing stamp; this handles every
+    other way the table can be empty while a stamp says a pass ran
+    recently.
+    """
+
+    def _monitor_with_capacity_job(self):
+        m = _make_monitor()
+        sched = schedule.Scheduler()
+        m._capacity_reconcile_job = m._register_anchored_job(
+            sched.every(5).minutes, 'reconcile_scheduler_capacity',
+            mock.MagicMock())
+        # Park it well out of reach so "became due" is unambiguous.
+        m._capacity_reconcile_job.next_run = (
+            datetime.datetime.now() + datetime.timedelta(days=1))
+        return m
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.'
+        'get_scheduler_node_capacity')
+    def test_an_empty_table_forces_the_pass_due(self, mock_get):
+        mock_get.return_value = ([], False)
+        m = self._monitor_with_capacity_job()
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertLessEqual(
+            m._capacity_reconcile_job.next_run, datetime.datetime.now())
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.'
+        'get_scheduler_node_capacity')
+    def test_a_populated_table_leaves_the_cadence_alone(self, mock_get):
+        mock_get.return_value = ([{'node_uuid': 'a-node'}], False)
+        m = self._monitor_with_capacity_job()
+        before = m._capacity_reconcile_job.next_run
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.'
+        'get_scheduler_node_capacity')
+    def test_a_degraded_read_is_not_an_empty_table(self, mock_get):
+        # rows is empty here too, so this fails if the check reads the
+        # rows without also reading what degraded says about them.
+        mock_get.return_value = ([], True)
+        m = self._monitor_with_capacity_job()
+        before = m._capacity_reconcile_job.next_run
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.'
+        'get_scheduler_node_capacity',
+        side_effect=DatabaseUnavailable('no database'))
+    def test_a_failed_read_does_not_escape_the_election(self, mock_get):
+        m = self._monitor_with_capacity_job()
+        before = m._capacity_reconcile_job.next_run
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.'
+        'get_scheduler_node_capacity')
+    def test_no_registered_job_reads_nothing(self, mock_get):
+        m = _make_monitor()
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        mock_get.assert_not_called()

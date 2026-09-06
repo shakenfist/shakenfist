@@ -329,7 +329,18 @@ namespace objects are excluded from zombie repair. Both kinds of
 orphan are otherwise invisible to every state-driven iterator.
 
 The elected cluster node also runs
-`reconcile_scheduler_capacity()` every five minutes. One pass is a single
+`reconcile_scheduler_capacity()` every five minutes. That cadence is
+anchored to a cluster-wide last-run stamp (the
+`SCHEDULED_TASK_LAST_RUN_RECONCILE_SCHEDULER_CAPACITY` key in
+`cluster_config`) rather than to process start, and a newly elected
+maintainer which finds `scheduler_node_capacity` empty runs a pass
+immediately instead of waiting out the cadence. Both exist because
+the reconciler is the only thing which *creates* capacity rows, and a
+node without a row is admitted against nothing at all: a
+process-local five minute timer left every placement in a new
+cluster's first minutes unguarded, and the first pass then recorded
+the resulting over-limit usage on the row it created (issue 4087).
+One pass is a single
 `ReconcileSchedulerCapacity` RPC which expires stale namespace
 claims, re-derives per-hypervisor limits from the typed
 `node_metrics` columns, recomputes usage counters from placed

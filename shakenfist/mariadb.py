@@ -25519,6 +25519,20 @@ CAPACITY_DIMENSIONS = ('cpus', 'memory_mb', 'disk_gb')
 # _direct_admit_instance_placement().
 CLAIM_ENFORCEMENT_HARD = False
 
+# Why an admission was made without a guard. P7 fails open when a
+# capacity row is missing, but "missing" covers two conditions which
+# want telling apart by anyone reading an instance's events.
+#
+# The cluster_capacity singleton is absent, so the reconciler has never
+# completed a pass and nothing in this cluster is guarded -- every node
+# fails open at once, and a burst of concurrent creates can put a node
+# past its own limit before any row exists to refuse them (issue 4087).
+UNGUARDED_NEVER_RECONCILED = 'never_reconciled'
+# The singleton exists but this one node has no row: mid-upgrade, or a
+# node whose limits the reconciler declined to guess. This is P7's
+# designed behaviour, corrected by the next reconcile pass.
+UNGUARDED_NODE_NOT_SIZED = 'node_not_sized'
+
 
 class CapacityDimensionDetailDict(TypedDict):
     """One dimension's numbers at the moment a guard refused."""
@@ -25574,6 +25588,12 @@ class AdmitPlacementResult(TypedDict):
     # namespace, or a move, which charges nothing on the namespace side.
     # Read the name for absence, never a zero.
     claim_uuid: str
+    # Which absent row made this admission unguarded:
+    # UNGUARDED_NEVER_RECONCILED, UNGUARDED_NODE_NOT_SIZED, or '' when
+    # the admission was guarded. Read unguarded for the fact and this
+    # for the reason; the two conditions wear the same missing row and
+    # only one of them is the normal state P7 was written for.
+    unguarded_reason: str
 
 
 class ReleasePlacementResult(TypedDict):
@@ -25810,6 +25830,7 @@ def _empty_admit_result() -> AdmitPlacementResult:
         'claim_over_limit': False,
         'claim_dimensions': [],
         'claim_uuid': '',
+        'unguarded_reason': '',
     }
 
 
@@ -26678,6 +26699,26 @@ def _direct_admit_instance_placement(
                     outcome['claim_over_limit'] = bool(
                         outcome['claim_dimensions'])
 
+        # Two conditions wear the same missing row, and both of the
+        # fail-opens above set the same boolean, so name which one this
+        # was in one place rather than at each set point -- where the
+        # cluster branch's assignment would silently shadow the node
+        # branch's on the paths that reach both.
+        #
+        # An absent singleton means the reconciler has never completed a
+        # pass, so nothing in this cluster is guarded and every node
+        # fails open at once (issue 4087). An absent node row under a
+        # present singleton is the single node P7 was written for,
+        # corrected by the next pass. The reason is derived from the
+        # probe rather than from which branch fired, because a move and
+        # a claimed namespace both skip the cluster branch entirely and
+        # would otherwise report the narrower reason for the wider
+        # condition.
+        if outcome['unguarded']:
+            outcome['unguarded_reason'] = (
+                UNGUARDED_NEVER_RECONCILED if not probe.cluster_present
+                else UNGUARDED_NODE_NOT_SIZED)
+
         outcome['admitted'] = True
         return outcome
 
@@ -26912,6 +26953,7 @@ def _grpc_admit_instance_placement(
         result['error'] = reply.error
         result['admitted'] = bool(reply.admitted)
         result['unguarded'] = bool(reply.unguarded)
+        result['unguarded_reason'] = reply.unguarded_reason
         result['clamped'] = bool(reply.clamped)
         result['failing_stage'] = reply.failing_stage
         result['dimensions'] = [

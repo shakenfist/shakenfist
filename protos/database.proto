@@ -2858,6 +2858,25 @@ message AdmitInstancePlacementReply {
   // for absence, so a reply from an sf-database predating this field
   // reads as "not reported" rather than as a real value.
   string claim_uuid = 14;   // Dashed uuid form, or empty
+  // Which absent row made this admission unguarded, because the two
+  // are different conditions wearing the same missing row and only
+  // one of them is the normal state P7 was written for.
+  //
+  // 'never_reconciled' means the cluster_capacity singleton does not
+  // exist, so the reconciler has never completed a pass and *nothing*
+  // in this cluster is guarded -- every node fails open at once. That
+  // is issue 4087, and it should be a transient of a cluster's first
+  // moments rather than anything an operator sees in steady state.
+  //
+  // 'node_not_sized' means the singleton exists but this one node has
+  // no row: mid-upgrade, or a node whose limits the reconciler
+  // declined to guess. That is P7's designed behaviour and is
+  // corrected by the next pass.
+  //
+  // Empty when unguarded is false. Read unguarded for the fact and
+  // this for the reason, so a reply from an sf-database predating
+  // this field reads as "not reported" rather than as a condition.
+  string unguarded_reason = 15;
 }
 
 message ReleaseInstancePlacementRequest {

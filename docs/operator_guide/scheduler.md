@@ -304,7 +304,14 @@ measurements alone.
 An instance being rescheduled is not charged for itself on the node
 it is already placed on, and a node with no capacity row -- one
 mid-upgrade, or one the reconciler declined to size -- is charged
-nothing, because admission will let it through unguarded too.
+nothing, because admission will let it through unguarded too. That
+is also true of a cluster whose reconciler has not completed a pass
+yet, where *no* node has a row; the reconcile is scheduled so that
+window is a cluster's first moments rather than its first five
+minutes (see [the database internals
+guide](../developer_guide/database_internals.md)), and an admission
+made inside it says so on the instance's `instance placed without
+capacity guard` event with a `reason` of `never_reconciled`.
 
 See [Admission is a guarded capacity
 claim](#admission-is-a-guarded-capacity-claim) for the check that

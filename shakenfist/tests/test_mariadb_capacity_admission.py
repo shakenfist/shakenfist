@@ -545,6 +545,71 @@ class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
         # The node guard still applies -- that row exists.
         self.assertIn('<=', self._node_update(router).split('WHERE', 1)[1])
 
+    def test_a_missing_node_row_alone_is_the_node_not_sized(self):
+        # The singleton exists, so the reconciler has run and declined
+        # to size this one node. That is P7's designed behaviour.
+        router = _PlacementRouter(node_row=None)
+        result = self._run(router)
+
+        self.assertTrue(result['unguarded'])
+        self.assertEqual(
+            mariadb.UNGUARDED_NODE_NOT_SIZED, result['unguarded_reason'])
+
+    def test_a_missing_singleton_is_never_reconciled(self):
+        # No singleton means no pass has ever completed, which is a
+        # statement about the whole cluster rather than this node.
+        router = _PlacementRouter(cluster_row=None)
+        result = self._run(router)
+
+        self.assertTrue(result['unguarded'])
+        self.assertEqual(
+            mariadb.UNGUARDED_NEVER_RECONCILED, result['unguarded_reason'])
+
+    def test_neither_row_present_reports_the_cluster_wide_reason(self):
+        # Issue 4087's actual shape: a cluster in its first minutes has
+        # neither, and the useful thing to say is that nothing at all is
+        # guarded, not that this one node happens to be unsized.
+        router = _PlacementRouter(node_row=None, cluster_row=None)
+        result = self._run(router)
+
+        self.assertTrue(result['unguarded'])
+        self.assertEqual(
+            mariadb.UNGUARDED_NEVER_RECONCILED, result['unguarded_reason'])
+
+    def test_a_move_still_reports_the_cluster_wide_reason(self):
+        # A move skips the cluster branch entirely, so the fail-open it
+        # trips is the node branch's. The reason still has to come from
+        # the probe: this cluster has no singleton, and reporting the
+        # narrower "one unsized node" for it would hide issue 4087
+        # behind P7's ordinary mid-upgrade state.
+        router = _PlacementRouter(node_row=None, cluster_row=None)
+        result = self._run(router, old_node_uuid=str(NODE2))
+
+        self.assertTrue(result['unguarded'])
+        self.assertEqual(
+            mariadb.UNGUARDED_NEVER_RECONCILED, result['unguarded_reason'])
+
+    def test_a_claimed_namespace_still_reports_the_cluster_wide_reason(self):
+        # Same shape as the move: a claimed namespace charges its claim
+        # instead of the singleton, so the cluster branch never runs.
+        router = _PlacementRouter(
+            claim=_claim_row(), node_row=None, cluster_row=None)
+        result = self._run(router)
+
+        self.assertTrue(result['unguarded'])
+        self.assertEqual(
+            mariadb.UNGUARDED_NEVER_RECONCILED, result['unguarded_reason'])
+
+    def test_a_guarded_admission_reports_no_reason(self):
+        # The reason must not leak onto an admission which was guarded,
+        # or an event trail reads as a fail-open that never happened.
+        router = _PlacementRouter()
+        result = self._run(router)
+
+        self.assertTrue(result['admitted'])
+        self.assertFalse(result['unguarded'])
+        self.assertEqual('', result['unguarded_reason'])
+
     def test_post_admit_counters_come_from_a_pk_select(self):
         # MariaDB has no UPDATE ... RETURNING.
         router = _PlacementRouter(node_row=_capacity_row(
@@ -1462,6 +1527,8 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         # An unclaimed namespace charges the cluster singleton, so there
         # is no claim to name and the empty string is what says so.
         'claim_uuid': '',
+        # Guarded, so there is no fail-open to give a reason for.
+        'unguarded_reason': '',
     }
     DENIED = {
         'success': True, 'error': '', 'admitted': False, 'unguarded': False,
@@ -1481,6 +1548,7 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         'claim_over_limit': False, 'claim_dimensions': [],
         # A denial rolled its transaction back, so nothing was charged.
         'claim_uuid': '',
+        'unguarded_reason': '',
     }
     OVER_CLAIM = {
         'success': True, 'error': '', 'admitted': True, 'unguarded': False,
@@ -1495,6 +1563,7 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         # Which claim was charged, so the namespace-side audit event can
         # name it after the claim itself has been deleted and recreated.
         'claim_uuid': str(CLAIM1),
+        'unguarded_reason': '',
     }
 
     def _servicer(self):
