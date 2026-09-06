@@ -1,11 +1,17 @@
+import json
+import os
 from unittest import mock
 
 from pydantic import SecretStr
 
+from shakenfist.config import SECRET_CONFIG_KEY_RE
 from shakenfist.config import SFConfig
 from shakenfist.config import UNCONFIGURED_AUTH_SECRET_SEED
+from shakenfist.config import _exportable_cluster_config_key
+from shakenfist.config import load_cluster_config
 from shakenfist.config import verify_config
 from shakenfist.tests import base
+from shakenfist.util import vdi_tokens
 
 
 class ConfigTestCase(base.ShakenFistTestCase):
@@ -185,3 +191,121 @@ class SecretConfigFieldTestCase(base.ShakenFistTestCase):
         conf = SFConfig()
         self.assertNotEqual(
             UNCONFIGURED_AUTH_SECRET_SEED, conf.AUTH_SECRET_SEED)
+
+
+class ClusterConfigExportFilterTestCase(base.ShakenFistTestCase):
+    """load_cluster_config() must not export undeclared secrets.
+
+    cluster_config is a general cluster-wide key/value store as well as
+    the backing store for SFConfig fields, and KERBSIDE_JWT_SIGNING_KEY
+    keeps an unencrypted Ed25519 private PEM in it. Exporting every row
+    put that private key in the environment of every daemon on every
+    node, and in every child privexec spawns, where it is readable from
+    /proc/<pid>/environ -- enough to forge a console token for any
+    instance in the cluster.
+    """
+
+    def test_declared_secret_field_is_exportable(self):
+        # AUTH_SECRET_SEED matches SECRET_CONFIG_KEY_RE via _SEED$ but
+        # is a declared field which SFConfig reads from the
+        # environment. If the filter ever stops exporting it, every
+        # daemon in the cluster falls back to the unconfigured
+        # sentinel. This is the trap a "never export a secret" filter
+        # walks into.
+        self.assertTrue(SECRET_CONFIG_KEY_RE.search('AUTH_SECRET_SEED'))
+        self.assertIn('AUTH_SECRET_SEED', SFConfig.model_fields)
+        self.assertTrue(_exportable_cluster_config_key('AUTH_SECRET_SEED'))
+
+    def test_undeclared_secret_row_is_not_exportable(self):
+        self.assertTrue(
+            SECRET_CONFIG_KEY_RE.search('KERBSIDE_JWT_SIGNING_KEY'))
+        self.assertNotIn('KERBSIDE_JWT_SIGNING_KEY', SFConfig.model_fields)
+        self.assertFalse(
+            _exportable_cluster_config_key('KERBSIDE_JWT_SIGNING_KEY'))
+
+    def test_ordinary_undeclared_row_is_exportable(self):
+        # A row which is not a declared field and does not look like a
+        # secret is still exported. cluster_config carries options
+        # which do not exist as fields yet, and a new option must reach
+        # a daemon without a code change.
+        self.assertIsNone(SECRET_CONFIG_KEY_RE.search('SOME_FUTURE_OPTION'))
+        self.assertNotIn('SOME_FUTURE_OPTION', SFConfig.model_fields)
+        self.assertTrue(_exportable_cluster_config_key('SOME_FUTURE_OPTION'))
+
+    @mock.patch.dict(
+        'os.environ', {'SHAKENFIST_MARIADB_HOST': 'db.example.com'},
+        clear=True)
+    @mock.patch('sqlalchemy.create_engine')
+    def test_direct_branch_applies_the_filter(self, mock_create_engine):
+        conn = mock.MagicMock()
+        conn.__enter__.return_value = conn
+        conn.execute.return_value.fetchall.return_value = [
+            ('AUTH_SECRET_SEED', json.dumps('a-real-seed')),
+            ('KERBSIDE_JWT_SIGNING_KEY', json.dumps(
+                {'active_kid': 'deadbeef',
+                 'keys': [{'kid': 'deadbeef',
+                           'private_pem': 'THE-PRIVATE-PEM'}]})),
+            ('KERBSIDE_URL', json.dumps('https://kerbside.example.com')),
+            ('SOME_FUTURE_OPTION', json.dumps('a-value')),
+        ]
+        mock_create_engine.return_value.connect.return_value = conn
+
+        load_cluster_config()
+
+        self.assertEqual(
+            'a-real-seed', os.environ.get('SHAKENFIST_AUTH_SECRET_SEED'))
+        self.assertEqual(
+            'https://kerbside.example.com',
+            os.environ.get('SHAKENFIST_KERBSIDE_URL'))
+        self.assertEqual(
+            'a-value', os.environ.get('SHAKENFIST_SOME_FUTURE_OPTION'))
+        self.assertNotIn(
+            'SHAKENFIST_KERBSIDE_JWT_SIGNING_KEY', os.environ)
+        # Belt and braces: the private material is not anywhere in the
+        # environment under any name.
+        self.assertNotIn(
+            'THE-PRIVATE-PEM', ''.join(os.environ.values()))
+
+    @mock.patch.dict(
+        'os.environ',
+        {'SHAKENFIST_MARIADB_GATEWAY_HOSTS': '10.0.0.1'}, clear=True)
+    @mock.patch('shakenfist.util.grpc_channel.make_database_channel')
+    @mock.patch('shakenfist.protos.database_pb2_grpc.DatabaseServiceStub')
+    def test_grpc_branch_applies_the_filter(self, mock_stub, mock_channel):
+        entries = [
+            mock.Mock(key_name='AUTH_SECRET_SEED',
+                      value_json=json.dumps('a-real-seed')),
+            mock.Mock(key_name='KERBSIDE_JWT_SIGNING_KEY',
+                      value_json=json.dumps(
+                          {'active_kid': 'deadbeef',
+                           'keys': [{'kid': 'deadbeef',
+                                     'private_pem': 'THE-PRIVATE-PEM'}]})),
+            mock.Mock(key_name='SOME_FUTURE_OPTION',
+                      value_json=json.dumps('a-value')),
+        ]
+        mock_stub.return_value.GetClusterConfig.return_value = mock.Mock(
+            entries=entries)
+
+        load_cluster_config()
+
+        self.assertEqual(
+            'a-real-seed', os.environ.get('SHAKENFIST_AUTH_SECRET_SEED'))
+        self.assertEqual(
+            'a-value', os.environ.get('SHAKENFIST_SOME_FUTURE_OPTION'))
+        self.assertNotIn(
+            'SHAKENFIST_KERBSIDE_JWT_SIGNING_KEY', os.environ)
+        self.assertNotIn(
+            'THE-PRIVATE-PEM', ''.join(os.environ.values()))
+
+    def test_the_signing_key_is_still_readable_from_the_database(self):
+        # The filter removes an environment copy, not the value. Its
+        # only reader goes to the database for it, and
+        # mariadb.get_cluster_config() does not consult os.environ for
+        # the row's value.
+        material = {'active_kid': 'deadbeef',
+                    'keys': [{'kid': 'deadbeef',
+                              'private_pem': 'THE-PRIVATE-PEM'}]}
+        with mock.patch('shakenfist.mariadb.get_cluster_config',
+                        return_value={
+                            vdi_tokens.SIGNING_KEY_CONFIG_NAME: material}):
+            self.assertEqual(material, vdi_tokens.get_signing_material())

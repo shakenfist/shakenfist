@@ -1,0 +1,887 @@
+# PLAN: Kerbside VDI console tokens phase 10 -- push audit
+
+Planning effort: high. Review effort: high.
+
+## Why this phase exists
+
+[PLAN-kerbside-vdi-tokens.md](PLAN-kerbside-vdi-tokens.md) ran across
+**four repositories** -- shakenfist, client-python, kerbside and ryll --
+and shipped a security feature: a cluster-signed JWT that a user
+exchanges, at a service Shaken Fist does not run, for a console session
+on their own instance. Each pull request was reviewed on its own, inside
+its own repository. Nobody has looked at the four sides as one system.
+
+That matters more here than in most plans, because this plan's defects
+have all lived precisely in the gaps between repositories, and none of
+them was found by review. Three shipped and were found by hand:
+kerbside#201 (the SF console source keyed its node map by fqdn and
+looked it up by UUID, so no console was ever scraped), shakenfist#4009
+(the direct `.vv` carried a node UUID as `host` and an internal enum as
+`type`), and shakenfist#4003 (the `vdi-console-proxy` capability was
+advertised unconditionally, so a client on a Kerbside-less cluster never
+reached the fallback path). All three are now fixed. Each of the three
+survived review because the test double on one side of a seam made the
+value the other side actually sends indistinguishable from the value it
+expects.
+
+`PUSH-AUDIT.md` is the repository's audit template, normally a pre-push
+gate run against `develop...HEAD`. Here it runs retrospectively over
+merges in four repositories, which changes the baseline but not the
+questions -- and adds one question the template does not have a heading
+for. Decision 4 is that question.
+
+The direct precedents are
+[PLAN-database-load-reduction-phase-08-push-audit.md](PLAN-database-load-reduction-phase-08-push-audit.md)
+(PR #3928) and
+[PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md)
+(PR #3880). Both are single-repository audits; this plan borrows their
+structure and their retrospectives' lesson -- an audit finds what its
+briefs point at, and a heading with no "what I examined" list is a
+rubber stamp -- and adds a cross-repository baseline they did not need.
+
+## Scope
+
+**In scope.** The code this plan added or changed across the eleven
+merge ranges in decision 1, in all four repositories, audited under the
+`PUSH-AUDIT.md` headings: wave 1 mechanical checks, and wave 2's code
+quality, test coverage, documentation and security reviews, plus the
+fifth lens in decision 4. Phase 11's three issue-fix merges are inside
+that baseline (decision 3), so the audit reads the tree as it stands
+today rather than as it stood before the defects were found.
+
+**Out of scope.** Fixing anything the audit finds, unless it is blocking
+or trivial. This plan's convention, like both precedents', is that a
+review phase records and files rather than expanding into the work it
+discovers.
+
+**Out of scope.** The deferred deployer phase (shakenfist#4004's larger
+half: a `kerbside` infrastructure group, `sources.yaml` rendering,
+kerbside's own TLS material). The plan deliberately deferred it and
+Future work records it. The audit may find that its absence makes
+something else in the shipped code untestable, and should say so, but it
+does not re-open the deferral.
+
+**Out of scope.** Re-litigating the reviews already recorded on each PR.
+shakenfist#3491 carries "Address PR #3491 review: docs and mint guards"
+and kerbside#167 carries "Address PR #167 review: token exchange
+hardening"; the audit starts by reading those commits rather than
+rediscovering what they fixed. It may disagree with a disposition, and
+should say so explicitly if it does.
+
+**Out of scope.** Adjacent changes to the same files that belong to
+other plans. Named exclusions in decision 2, so this is a decision and
+not an omission.
+
+**Out of scope.** Kerbside's own release. Phases 5 and 6 shipped in
+kerbside v0.5.0 and that release has happened; the audit does not
+re-cut it. A blocking finding against kerbside lands on `develop` and
+rides the next release like any other fix.
+
+## What the survey found
+
+The master plan's phase 10 section is four sentences long and every
+factual claim in it holds: `PUSH-AUDIT.md` exists at this repository's
+root, running it over the accumulated diff rather than the last phase's
+diff is the right instruction, findings can land as their own pull
+request, and "if the audit finds nothing, that is recorded in one
+sentence" is a workable exit. Six things it did not anticipate:
+
+1. **Phases do not map onto merges, and the mapping is much coarser
+   than one-per-phase.** The section says "every phase in this plan",
+   which reads as one range per phase. In fact five phases share a
+   single shakenfist PR (#3491 carries phases 1, 2, the SF half of 6,
+   the SF half of 7 and the SF half of 8) and four phases share a
+   single kerbside PR (#167 carries phases 5, 6, 7 and the kerbside
+   half of 8). An audit keyed on "one range per phase" would look for
+   ten ranges, find them missing, and either give up or invent them.
+   Decision 1 replaces it with the eleven ranges that actually exist.
+
+2. **The master plan records no PR or merge references at all.** Its
+   Execution table names plan files and repositories, never a PR
+   number, so the ranges in decision 1 had to be reconstructed from
+   `git log` in each of the four working copies. That reconstruction is
+   itself a deliverable of this plan: decision 1's table is the record
+   the master plan should have carried, and step 10a writes a pointer
+   to it into the master plan's Execution section. This is also what
+   consistency-audit issue #4063 (*Push audit phase in master plans*)
+   is about; this plan does not fix that audit finding, but it stops
+   this plan from being another instance of it.
+
+3. **Phase 11 is substantively complete and was recorded as "Not
+   started".** All three issues it tracks are closed with fixes on
+   `develop`: shakenfist#4009 by PR #4016 (`d36298a43`, "Emit a valid
+   direct-to-hypervisor .vv file"), shakenfist#4003 by PR #4018
+   (`046198908`, "Gate vdi-console-proxy capability on config") and
+   shakenfist#4004 by PR #4024 (`9fdc1d04e`, "Add a kerbside_url
+   variable to the node role"). Spot-checked against the tree, not
+   taken from the issue state: `external_api/app.py:355-360` now
+   registers `vdi-console-proxy` as a conditional token gated on
+   `config.KERBSIDE_URL`; `external_api/instance.py:1688-1727` resolves
+   the placement node to `n.ip`, collapses any `spice*` VDI type to
+   `spice`, and emits `host-subject` from
+   `node.spice_server_cert_subject`; and
+   `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_vdi_console_file.py`
+   parses a real `.vv` with `configparser` and asserts the host is not
+   a UUID -- the coverage whose absence let all three rot. Step 10a
+   corrects the master plan's Execution table, the success criteria's
+   two stale "NOT MET"/"PARTIALLY MET" annotations, and
+   `docs/plans/index.md`'s "10 of 12" at source, so the next reader
+   does not re-derive this. Note that this makes **phase 10 the only
+   phase outstanding**, and running it last -- after the phase 11 fixes
+   are in the baseline -- is the correct order rather than an accident
+   of numbering.
+
+4. **The proto-freshness check applies, unlike in the precedent.**
+   shakenfist#3491 touches `protos/database.proto` (+5) and regenerates
+   `shakenfist/protos/database_pb2.py` (656 lines changed) and
+   `database_pb2.pyi`, alongside +10 in
+   `shakenfist/daemons/database/main.py` and 37 changed lines in
+   `shakenfist/mariadb.py`. So `tox -e genprotos` followed by
+   `git diff --exit-code shakenfist/protos` is in wave 1 here.
+
+   What those changes are **not** is a new database call. Nothing in R1
+   adds a top-level `mariadb.py` function, a new gRPC method, or a new
+   Prometheus counter. The five proto lines add two fields
+   (`spice_server_cert_subject` and its `has_` companion) to the
+   existing `NodeAttributesProto`; the +10 in
+   `daemons/database/main.py` is the marshalling of those two fields
+   inside the existing `GetNodeAttributes` and `UpdateNodeAttributes`
+   handlers, whose `get_node_attributes` and `update_node_attributes`
+   counters already existed and already cover the extended messages.
+   So the three-layer direct/gRPC/public review in 2a has something
+   real to look at, but what it is looking at is one field threaded
+   through an existing trio -- `NodeAttributesProto` /
+   `get_node_attributes` / `update_node_attributes` -- and the
+   question is whether the field is carried consistently across all
+   three layers and both the direct and gRPC paths, not whether a new
+   call was built correctly.
+
+5. **The same node-identity confusion shipped twice, on opposite sides
+   of the seam, and a test fixture hid it both times.** kerbside#201's
+   own commit message says it plainly: "The bug stayed latent because
+   the unit-test fixture set both the instance's node and the node's
+   name to `n1`, making them indistinguishable." shakenfist#4009 is the
+   same class -- `placement['node']` became a node UUID and the `.vv`
+   generator kept substituting it as a hostname -- and its cause was
+   that no test in any repository parsed a `.vv` file. That is two
+   independent instances of one defect shape, found by hand a month
+   apart, in a plan whose whole substance is values crossing between
+   four codebases. Decision 4 turns it into the fifth wave-2 lens.
+
+6. **ryll really is published, so the phase-3 contract is checkable end
+   to end.** `https://pypi.org/pypi/ryll/json` returns 0.1.7 with
+   `ryll-0.1.7-py3-none-manylinux_2_28_x86_64.whl` and the aarch64
+   companion, and `client-python/pyproject.toml:51-53` declares the
+   `vdi` extra as `ryll ; sys_platform == 'linux'`. Phase 3's stated
+   goal -- "`pip install` puts a working `ryll` binary on the venv's
+   PATH" -- can therefore be verified by running it rather than by
+   reading the workflow that builds it. Step 10c does exactly that.
+
+Verified as part of the survey and reported as results in their own
+right: all eleven merge commits are ancestors of their repository's
+`develop`; nothing from this plan is unmerged in any of the four
+repositories, so there is no open-branch complication of the kind the
+database-load-reduction precedent's decision 2 had to handle; and the
+one leftover worktree and branch (`kerbside-wt-vdi-plan` on
+`kerbside-vdi-tokens-plan-update`, from kerbside PR #389) was clean,
+merged and has been removed. Deferred work was filed rather than
+dropped: #4004 carries the deployer gap and the master plan's Future
+work section carries the four remaining items.
+
+## Decisions
+
+1. **The audit baseline is this plan's merge ranges across four
+   repositories, not `develop...HEAD`.** Everything is merged, so
+   `git diff develop...HEAD` on this branch contains only this plan
+   document and every command in the template would report success
+   against nothing.
+
+   | # | Repo | Phases | PR | Merge | Size |
+   |---|------|--------|----|-------|------|
+   | R1 | shakenfist | 1, 2, 6 (SF half), 7 (SF half), 8 (SF half) | #3491 | `9d41a1716` | 37 files, +3256/-338 |
+   | R2 | shakenfist | 9 closeout (docs only) | #3580 | `07d7081b7` | 2 files, +4/-3 |
+   | R3 | shakenfist | plan update (docs only) | #4011 | `c3e76ff8a` | 2 files, +108/-8 |
+   | R4 | shakenfist | 11 (#4009) | #4016 | `5ef83c065` | |
+   | R5 | shakenfist | 11 (#4003) | #4018 | `913411586` | |
+   | R6 | shakenfist | 11 (#4004) | #4024 | `f2df423d8` | |
+   | R7 | client-python | 4 | #350 | `b426e1f` | 10 files, +654/-17 |
+   | R8 | kerbside | 5, 6, 7, 8 (kerbside half) | #167 | `f50ea59` | 25 files, +2144/-18 |
+   | R9 | kerbside | 9 (SF end-to-end lane) | #194 | `115416c` | 15 files, +1634/-2 |
+   | R10 | kerbside | post-phase-9 scrape fix | #201 | `7803368` | 4 files, +72/-21 |
+   | R11 | ryll | 3 | #190 | `fa7ee21` | 13 files, +636/-2 |
+
+   Each range is `<merge>^1...<merge>`, which is the diff the pull
+   request added and excludes anything merged in from the target branch.
+   The per-range diffs are what each agent reads. Where a later range
+   changed an earlier range's code -- R4/R5 both edit files R1 created,
+   and R10 edits a file R8 created -- the **net** state is what matters
+   for a correctness finding: an agent that finds something in an early
+   range must check the file as it stands on `develop` today before
+   reporting it. The range shows what changed; the working tree shows
+   what shipped.
+
+2. **Three adjacent merges are excluded by name, with reasons.**
+   ryll #207 (`067321a`, "Publish ryll straight to PyPI, drop
+   TestPyPI") is 17 lines of release-workflow change three days after
+   R11 and *is* part of phase 3's publish story -- it is excluded from
+   the code-review ranges because it is a workflow simplification with
+   no artefact consequence, but step 10c's install probe tests the
+   result of it directly, which is stronger coverage than reading the
+   diff. kerbside #292 (`0509c81`, which carries "Remove plan phase
+   references from the source tree") is the consistency audit's
+   plan-phase-reference work, not this plan's. ryll's August 2026
+   `release.yml` changes (`cd5419e` and its follow-ups, "Isolate the
+   cargo build from the network") belong to ryll's own supply-chain
+   work. Naming them here means a later reader can see the boundary was
+   drawn deliberately.
+
+3. **Phase 11's fixes are inside the baseline, not audited against a
+   pre-fix tree.** R4-R6 are in decision 1's table. The audit's job is
+   not to re-find #4003 and #4009 -- it is to ask whether their fixes
+   are complete, whether the class of defect they represent has other
+   instances, and whether the coverage added with them actually holds
+   the fixes in place. The database-load-reduction precedent found a
+   functional test whose fake made the tested call free
+   (`test_reaper_read_count_does_not_grow_with_address_count`); the
+   same question applies to `test_vdi_console_file.py` and to
+   kerbside#201's revised fixture, and 10e's brief asks it directly.
+
+4. **A fifth wave-2 lens: the seams between the four repositories.**
+   `PUSH-AUDIT.md`'s four headings each look at one body of code and
+   ask whether it is correct. Every defect this plan shipped was
+   correct on both sides of a seam and wrong across it, and survey
+   finding 5 says why that keeps happening: each repository's tests
+   mock the other repository, and a mock is written from the same
+   understanding that wrote the code, so it agrees with the code rather
+   than with the peer.
+
+   The fifth agent enumerates the values that cross a repository
+   boundary in this feature -- every JWT claim, every field of the
+   scraped console record, the public-key document's shape, the
+   capability token string, the `.vv` file's keys, the exchange URL's
+   query parameter, the `KERBSIDE_URL` join -- and for each asks four
+   questions: which repository writes it, which reads it, which side's
+   tests fix its shape, and what would a change on the writing side do
+   to the reading side's tests. A value whose shape is asserted only by
+   fixtures on both sides, with nothing that reads a real message, is a
+   finding whether or not it is currently wrong. This is the lens most
+   likely to find something and the one no template heading covers.
+
+5. **ryll's range is audited under wave 1 and security only, and this
+   is deliberate.** R11 is a packaging change: `pyproject.toml`, a
+   build script, and release-workflow jobs. It adds no application
+   logic, so 2a (code quality) and 2b (test coverage) have nothing to
+   read that is not better covered by actually installing the published
+   wheel. Its real risks are supply-chain ones -- how the wheel is
+   built, signed and published, and whether the `manylinux_2_28` tag is
+   honest about a GUI binary's dlopen'd dependencies -- and those go to
+   the security agent, which is the right heading for them. Recording
+   this as a decision means a later reader can see that ryll was scoped
+   out of two headings rather than forgotten by them.
+
+6. **Wave 1's exit condition is relaxed in one specific way.** The
+   template says stop if `pre-commit` or `tox` fails. Those run against
+   the working tree, which here is each repository's `develop` plus, in
+   this one, this plan document -- so a failure is a pre-existing
+   failure on `develop`, not something this plan introduced. If wave 1
+   fails, record it, check whether any of the eleven ranges is
+   implicated, and continue to wave 2 rather than stopping. Stopping
+   would only be correct if this branch were about to be pushed as
+   code. Same reasoning as both precedents.
+
+7. **A blocking finding is fixed in the repository it lives in, as its
+   own pull request.** This phase's PR is in shakenfist and can carry
+   shakenfist fixes directly. A blocking finding against client-python,
+   kerbside or ryll gets a pull request in that repository, and this
+   plan's Findings section records the PR number and its state. The
+   plan does not reach Complete while a blocking finding is open in any
+   of the four. Advisory findings are filed as issues in the owning
+   repository and listed here with their numbers.
+
+8. **A clean heading is a result, but only alongside a list of what was
+   examined.** If a heading finds nothing it says so in one sentence,
+   followed by what it actually read. An audit reporting nothing under
+   every heading is recorded as such rather than padded with
+   manufactured findings. The precedents' shared risk -- that a
+   retrospective audit rubber-stamps code which already shipped and
+   passed CI -- is guarded by requiring the "what I examined" list, not
+   by requiring findings.
+
+9. **Security is the heading that gets the most, and it runs at high
+   effort on opus.** This is the only plan in the current set that
+   mints a bearer credential, publishes a public key, and hands
+   authorisation to a service outside the cluster. The master plan's
+   own management-session checklist already names four security
+   questions; 10g's brief carries all four plus the ones the checklist
+   does not have.
+
+## Step plan
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 10a | medium | opus | none | *(Management session, this document.)* Write this phase plan; add it to the master plan's Execution table with status In progress; correct the master plan at source per survey finding 3 -- phase 11's Execution row becomes Complete with its three PR references, and the success criteria's "**NOT MET as at 2026-09-01**" and "**PARTIALLY MET**" annotations are rewritten to say what is true now; add decision 1's range table (or a pointer to it) to the master plan's Execution section so the PR references stop being unrecorded; update `docs/plans/index.md`'s row to "11 of 12" with the phase-10 link. Do **not** touch `docs/plans/order.yml` -- it carries master plans only. Run `tools/check-plan-status.py` and `pre-commit run --all-files`. |
+| 10b | medium | sonnet | none | **Wave 1, shakenfist.** In this worktree run `pre-commit run --all-files` and `tox`, recording actual output; per decision 6 a failure is reported, not a stop. Then, because R1 touches `protos/database.proto`, run `tox -e genprotos` followed by `git diff --exit-code shakenfist/protos` and record the result -- this check *does* apply here, unlike in the database-load-reduction audit, so do not skip it. Then run `PUSH-AUDIT.md`'s four style greps against **each** of ranges R1-R6 individually rather than `develop...HEAD`: lines over 120 characters, stray `print(`, new `etcd` references, and new `mariadb.get_all_*(` without a `# nopushdown:` tag. Then the style-conformance judgment brief from `PUSH-AUDIT.md` over R1-R6: import ordering, the `shakenfist_utilities.logs` pattern, single quotes for strings and double for docstrings, 120-character lines, event logging with the right `EVENT_TYPE_*` constant, and the three-layer direct/gRPC/public pattern. Note that R1 adds **no** new `mariadb.py` function, no new gRPC method and no new counter, so do not go looking for them: it threads one new field (`spice_server_cert_subject`, plus its `has_` companion) through the existing `NodeAttributesProto` / `get_node_attributes` / `update_node_attributes` trio, and the counters those two handlers already register cover it unchanged. The three-layer question here is whether that one field is carried consistently through the direct path, the gRPC path and the public wrapper, and whether the optional-field encoding round-trips `None`. `shakenfist/util/vdi_tokens.py` (268 lines, new) gets the closest read. Report the greps' actual output, not a summary of it. |
+| 10c | medium | sonnet | none | **Wave 1, the other three repositories, plus the install probe.** Working copies are at `/srv/kasm_profiles/mikal/vscode/src/shakenfist/{client-python,kerbside,ryll}`, all on `develop`. In client-python and kerbside run each repository's own pre-commit/tox equivalent (read their `.pre-commit-config.yaml` and `tox.ini`; kerbside's runs its tox envs, client-python's runs flake8 and its unit tests) and record actual output. ryll has no Python test suite to run for R11; instead **verify the phase-3 contract by running it**: create a throwaway venv under the scratchpad, `pip install ryll`, and confirm (a) a `ryll` executable lands on the venv's `bin/`, (b) it is the embedded binary rather than a launcher stub, and (c) `ryll --version` (or `--help` if there is no version flag) runs and exits zero. Then `pip install 'shakenfist-client[vdi]'` in a second venv and confirm the extra pulls ryll in. Record the wheel filename pip actually chose. Do **not** install anything into the system Python; PEP 668 will refuse and a venv is the supported path. Also run the four style greps against R7-R11, adapting them to each language (the `etcd` and `get_all_*` greps are shakenfist-specific and do not apply; say so rather than reporting them clean). |
+| 10d | high | opus | none | **2a, code quality.** Take 10b and 10c's mechanical output as input. Review ranges R1, R4-R10 (per decision 5, R11 is out of this heading; R2, R3 are documentation-only) for duplicated logic and missed abstractions, and apply the two blocking rules from `PUSH-AUDIT.md`: SQL pushdown (any new `mariadb.get_all_*(` that should be a `find_*`, including callers that reach a scan through a helper) and the cached-FK-list pattern (any new `list[str]`/`list[UUID4]` on a `shakenfist/schema/*_attributes.py` model -- R1 adds to `shakenfist/schema/node_attributes.py`, so check what it added and why). Specific things to read as they stand on `develop`, not only as the ranges changed them: `shakenfist/util/vdi_tokens.py`, the minting endpoint and the `.vv` generator in `shakenfist/external_api/instance.py`, the conditional-capability machinery in `shakenfist/external_api/app.py:290-400`, `kerbside/sf_token.py` and the console source in `kerbside/sources/shakenfist.py`. Apply the comment-proportion shared block: R1 and R8 both carry long explanatory comments and some are load-bearing while others restate the code. Triage every TODO / `# noqa` / `# type: ignore` the sweeps flagged as blocking or advisory. |
+| 10e | medium | sonnet | none | **2b, test coverage.** Review R1, R4-R10 for coverage. The question is not quantity -- this plan added roughly a thousand lines of tests -- but whether the *risky* paths are covered and whether the fixtures are faithful. Specifically: (i) does the minting endpoint have adversarial coverage (namespace A minting for namespace B's instance, an instance not in `created`, a non-VDI instance, `KERBSIDE_URL` unset), and is any of it functional rather than unit-only? (ii) Do the token tests cover replay, expiry and a signature from the wrong key, on the kerbside side where the verification actually lives? (iii) Per decision 3, does `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_vdi_console_file.py` actually hold #4009's fix in place, or does it assert against a value its own setup supplies? Read the test, not its docstring. (iv) Same question for the fixture kerbside#201 revised -- it previously set the instance's node and the node's name to the same string, which is what hid the bug; check what it sets now. (v) Shaken Fist prefers functional to unit coverage, so for each behaviour name which `cluster_ci_tests` module exercises it and which have unit coverage only. Flag assertions that test implementation details rather than behaviour. |
+| 10f | medium | sonnet | none | **2c, documentation.** Check documentation against code across all eleven ranges, applying the README, LLM-doc and plan-phase-reference shared blocks from `PUSH-AUDIT.md`. The specific risks: R1 added 15 lines to `AGENTS.md` and 38 to `ARCHITECTURE.md`, and the shared blocks say growth in those files is itself a finding -- check whether that content belongs in `docs/operator_guide/vdi_console_tokens.md` (216 lines, also added by R1) instead. The feature is documented in at least eight places across the four repositories (`docs/operator_guide/vdi_console_tokens.md`, `docs/user_guide/consoles.md`, `docs/developer_guide/api_reference/{admin,instances,nodes}.md`, `docs/developer_guide/security_model.md`, `docs/release_notes/v07-v08.md`, plus kerbside's `docs/components/kerbside/*` mirror in this repository and kerbside's own docs); the falsifiable question is whether any fact about the token -- its TTL, its claim set, its algorithm, the audience string, the error responses -- is stated differently on two pages. Check it and say so either way. Also confirm the phase-11 fixes reached the documentation: does anything still describe the `.vv` `host` as a node name, or the capability as unconditional? Confirm the master plan's Execution table and `docs/plans/index.md` agree after 10a, and that kerbside's `docs/plans/index.md` cross-reference entry is current. The plan **did** change database schema, in two of the four repositories, so migration guidance applies and the check is that it is documented rather than that it is unnecessary: R1 added `spice_server_cert_subject` to `NodeAttributesData`, backed by an `ALTER TABLE node_attributes ADD COLUMN IF NOT EXISTS` and a `NODE_ATTRIBUTES_VERSION` bump to 4 in `shakenfist/mariadb.py`, and R8 added `kerbside/migrations/versions/cdb5c3529858_sf_token_tables.py` creating `sf_token_jtis` and `sf_token_keys`. Each repository carries its migration in-tree in its own idiom -- Shaken Fist's additive `_ensure_node_attributes_schema` step run by `sf-ctl ensure-mariadb-schema`, kerbside's alembic revision run by `kerbside db upgrade` -- and each documents it, kerbside's tables in `docs/schema.md` and its upgrade runbook in `docs/installation.md`. So the requirement is met; check that those documents still match the code. |
+| 10g | high | opus | none | **2d, security.** Security review of R1, R4-R11. This is the heading that matters most here: the plan mints a bearer credential and delegates authorisation to a service outside the cluster. Work through, in order: **(1) key custody.** `shakenfist/util/vdi_tokens.py` generates and stores an EdDSA signing key in `cluster_config`. Can private material reach an API response, a log line, or an event? Is the lazy-creation race actually atomic, and what happens if two API nodes create simultaneously -- do both keys get used, and can a token signed by the loser be verified? Is there a rotation path and does it leave old tokens verifiable for their TTL? **(2) The mint gate.** Confirm the decorator stack on the minting endpoint is `@verify_token` / `@arg_is_instance_ref` / `@requires_instance_ownership` / `@log_token_use` and that `@redirect_instance_request` is deliberately absent; confirm a caller in namespace A cannot mint for namespace B's instance by any route including metadata or a stale reference. **(3) The claim set.** Read the claims the SF side signs and the claims the kerbside side trusts. Does kerbside read any backend address, port or hostname from the JWT (the master plan's checklist says it must not)? Is `aud` checked, is `exp` checked, is `jti` replayed-checked, and is the replay cache bounded? **(4) The public key endpoint.** `/admin/vditokenpubkey` is readable by any authenticated namespace; confirm nothing private is in the response and that the endpoint cannot be used to enumerate or to force key generation. **(5) host_subject.** SF publishes each node's SPICE certificate subject (R1's `shakenfist/node.py` change) and kerbside pins it (R8/R10). Every hypervisor's certificate is signed by the same cluster CA, so without the pin any node impersonates any other -- verify the pin is actually enforced on the proxy path and on the direct `.vv` path, and that R10's change to synthesize it from the fqdn cannot produce a subject that matches nothing (which fails open or closed -- say which). **(6) Supply chain, ryll (R11, per decision 5).** Is the wheel published via OIDC Trusted Publishers rather than a long-lived token? Is build provenance attested? Is the `manylinux_2_28` tag honest for a GUI binary -- `ryll/pyproject.toml` claims the GUI and audio libraries are dlopen'd rather than `DT_NEEDED`; verify that against the installed wheel from 10c rather than against the comment. **(7) The usual sweep** across the Python ranges: f-string or `text()` SQL, `shell=True`, unvalidated input reaching a subprocess or a template, and secrets in events. Report findings with severity; critical and high must be resolved before this phase closes. |
+| 10h | high | opus | none | **The cross-repository seam lens (decision 4).** This is the plan-specific brief and it has no template heading. Build the inventory of every value that crosses a repository boundary in this feature and, for each, name the writer, the reader, and which side's tests fix its shape. Start from -- and do not stop at -- these: every claim in the minted JWT (shakenfist writes, kerbside reads); every field of a scraped console record, especially `host`, `hypervisor` and `host_subject` (shakenfist's API writes, `kerbside/sources/shakenfist.py` reads -- this is where kerbside#201 lived); the `/admin/vditokenpubkey` document's shape (shakenfist writes, kerbside and client-python read); the `vdi-console-proxy` capability token, which the client detects by substring match against the root page (shakenfist writes, client-python reads -- this is where #4003 lived); the `.vv` file's keys and values (shakenfist writes, virt-viewer and ryll read -- this is where #4009 lived); the exchange URL and its `token=` parameter (shakenfist composes, kerbside parses); `KERBSIDE_URL` itself (the ansible collection renders, `config.py` reads, two endpoints branch on). For each, answer: what would happen if the writing side changed this value's shape tomorrow -- which test in which repository fails, and if the honest answer is "none", say so. A value whose shape is asserted only by hand-written fixtures on both sides, with nothing anywhere that reads a real message from the peer, is a finding regardless of whether it is currently correct. Grade each seam **covered** (name the test that would catch a change), **fixture-only**, or **uncovered**. "Covered" requires naming the mechanism, not the absence of a bug report. Where the answer is fixture-only or uncovered, propose the cheapest thing that would change it -- a contract test, a recorded real response, or a CI lane -- and note that kerbside's phase-9 end-to-end lane (R9) may already be that mechanism for some seams; check whether it is and which ones it covers. |
+| 10i | high | opus | none | *(Management session.)* Grade every finding blocking or advisory. Fix blocking findings in the repository they live in, per decision 7: shakenfist fixes in this phase's PR, others as their own PR in their own repository. File advisory findings as issues in the owning repository. Spot-check two findings per agent against the tree before accepting the report -- an agent that reasoned from a diffstat produces plausible findings that are not about this code. Check every heading names what it examined, per decision 8. Write the results into this plan's Findings section, mirror the summary into the master plan, set both statuses, and run `tools/check-plan-status.py` and `pre-commit run --all-files`. |
+
+## Risks and mitigations
+
+* **The audit rubber-stamps code that already shipped and passed CI in
+  four repositories.** Mitigation: decision 8 -- every heading names
+  what it examined, and "nothing found" is only acceptable alongside
+  that list. Step 10i checks this before writing results, and spot-
+  checks two findings per agent against the tree.
+* **Four repositories is enough surface to skim.** Roughly 8,400
+  insertions across eleven ranges in three languages. An agent that
+  reads the diffstat and reasons from file names will produce plausible
+  findings that are not about this code. Mitigation: every brief names
+  specific files and specific questions rather than a range and a
+  heading, and 10i's spot-check is the backstop.
+* **Agents working outside this repository get lost or edit the wrong
+  tree.** The other three working copies are on `develop` and are not
+  this phase's worktree. Mitigation: 10c and 10h are read-only in those
+  repositories; any fix lands through decision 7's own-PR route, made
+  by the management session, not by an audit agent.
+* **The seam lens finds something expensive.** An uncovered seam is not
+  a bug, it is an absent test -- and the honest fix for several of them
+  could be a new CI lane, which is a plan of its own. Mitigation: 10h
+  proposes the cheapest mechanism per seam and 10i grades; a finding
+  too large for this phase is filed at high priority and named here,
+  not downgraded to advisory to keep the phase small. The master plan's
+  Future work section is the right home for anything that becomes its
+  own plan.
+* **The install probe fails for an environmental reason and is read as
+  a defect.** `pip install ryll` on a host without the dlopen'd GUI
+  libraries will install fine and fail to run, which is the correct
+  behaviour for a manylinux wheel and not a finding. Mitigation: 10c
+  reports what it observed and 10g decides what it means; the two are
+  deliberately different steps.
+* **Phase 11's status correction is wrong.** Survey finding 3 asserts
+  phase 11 is complete on the strength of three closed issues and three
+  spot-checks. Mitigation: the spot-checks are named with file and line
+  so a reviewer can falsify them in a minute, and 10e's brief (iii) and
+  (iv) re-examine the coverage those fixes added rather than accepting
+  it.
+
+## Definition of done
+
+* Every one of the five wave-2 headings (2a, 2b, 2c, 2d, and the
+  decision-4 seam lens) has a written result naming what was examined.
+* Wave 1 has been run in all four repositories with output recorded --
+  not asserted -- and the style greps run against the individual ranges
+  in decision 1 rather than against `develop...HEAD`.
+* The proto-freshness check has been run (`tox -e genprotos` then
+  `git diff --exit-code shakenfist/protos`) and its result recorded.
+  Unlike the database-load-reduction audit, this check applies here;
+  recording it as not-applicable is a failure of this criterion.
+* `pip install ryll` into a fresh venv has been run, and the result
+  records the wheel filename pip chose, whether a `ryll` executable
+  landed on PATH, and whether it ran. `pip install
+  'shakenfist-client[vdi]'` has been run and the result records whether
+  the extra pulled ryll in.
+* The seam lens has produced an explicit inventory of the values that
+  cross a repository boundary, each graded covered, fixture-only or
+  uncovered, with "covered" naming the test that would catch a change
+  on the writing side.
+* No fact about the token -- TTL, claim set, algorithm, audience
+  string, error responses -- is stated differently on two documentation
+  pages across the four repositories, or every divergence found is
+  listed with its disposition.
+* The two database schema changes this plan shipped -- Shaken Fist's
+  `node_attributes` version 4 column and kerbside's
+  `cdb5c3529858_sf_token_tables` revision -- have each been checked
+  against their in-tree migration code and their documentation.
+  Recording migration guidance as not applicable is a failure of this
+  criterion: the plan changed schema in two repositories.
+* Every finding carries a grade (blocking or advisory) and a
+  disposition (fixed in this PR, fixed as <repo>#NNNN, filed as
+  <repo>#NNNN, or declined with a reason in writing here).
+* No blocking finding is left unresolved in any of the four
+  repositories.
+* Two findings per agent have been spot-checked against the tree by the
+  management session, and the spot-check is recorded.
+* The master plan's Execution table records a PR or merge reference for
+  every phase, so decision 1's reconstruction does not have to happen
+  again.
+* `tools/check-plan-status.py` passes, and the master plan's Execution
+  table and `docs/plans/index.md` agree with each other.
+* The master plan's status becomes Complete only if no blocking finding
+  remains open, and phase 11's status correction has been reviewed
+  rather than assumed.
+* If the audit finds nothing, that is recorded in one sentence, per the
+  master plan's own instruction for this phase.
+
+## Back brief
+
+Before executing any step of this plan, back brief the operator on your
+understanding of the plan and how the work you intend to do aligns with
+it.
+
+Two gates, for steps that are cheap to propose and expensive to redo:
+
+* **Before 10a's corrections to the master plan land**, confirm the
+  operator agrees that phase 11 is complete on the evidence in survey
+  finding 3. If it is not, the range table in decision 1 still stands
+  but this phase is not the last one and the master plan's status
+  arithmetic changes.
+* **Before 10i files or fixes anything outside this repository**,
+  confirm the shape of the split with the operator: which findings land
+  as pull requests in client-python, kerbside or ryll, and which are
+  filed as issues. Three extra pull requests across three repositories
+  is a different-sized commitment from one, and the master plan's
+  Execution table has no row for them.
+
+## Findings
+
+Eight agents ran: wave 1 in both halves (10b, 10c), the four
+`PUSH-AUDIT.md` judgment headings (10d-10g), and the decision-4 seam
+lens (10h). Every heading below names what it examined, per decision 8.
+The audit did not find nothing.
+
+### Wave 1 (10b, 10c) — passed, with one pre-existing failure
+
+**shakenfist.** `pre-commit` green (10 hooks; `mypy` flaked once on a
+subprocess exec and passed clean on a rerun of the same env). `tox`
+green: 4318 tests, 4200 passed, 118 skipped, 0 failed. **Proto
+freshness applies here and passes**: `tox -e genprotos` followed by
+`git diff --exit-code shakenfist/protos` returns no diff, so the stubs
+on `develop` are byte-identical to what R1's `protos/database.proto`
+generates. Style greps run against R1-R6 individually: no long lines in
+hand-written code (the only two hits are the serialized
+`FileDescriptor` line in generated `database_pb2.py`), no stray
+`print(`, no new `etcd` references, no new `mariadb.get_all_*(`. One
+new `# noqa`, in `client/ctl.py`, inside an existing block of five that
+all carry it for a documented reason.
+
+**client-python.** `pre-commit` green; 208 tests pass. `tox -e cover`
+fails because `tox.ini` sets `--source client` while the package is
+`shakenfist_client`; `git blame` dates that line to 2020-08-12, seven
+years before this plan. Reported, not a stop, per decision 6.
+
+**kerbside.** `pre-commit` green (10 hooks); `tox -e py3,flake8` green,
+264 tests.
+
+**ryll — the phase-3 contract verified by running it.** `pip install
+ryll` into a fresh venv chose
+`ryll-0.1.7-py3-none-manylinux_2_28_x86_64.whl`, landed a 60MB ELF
+`pie executable` on the venv's PATH (not a launcher stub -- `strings`
+found no fetch-on-first-run vocabulary), and `ryll --version` exits 0
+printing `ryll 0.1.7 (unknown)`. `pip install 'shakenfist-client[vdi]'`
+resolved the same wheel through the `vdi` extra. The published artefact
+is what the plan said it would be.
+
+### The blocking finding
+
+**F-B1. A failed signing-key fetch deletes the Shaken Fist source's
+entire console inventory.** BLOCKING. kerbside; found by 10d, verified
+by the management session, fixed in kerbside branch
+`sf-source-console-deletion-fix`.
+
+`ShakenFistSource.__init__` fetched signing keys inside a broad
+`except`, and on any failure set `self.errored = True` and returned.
+`main._parse_sources` then `continue`s **before** the scrape loop -- and
+that loop is the only thing that removes entries from `extra_consoles`.
+The cleanup after the loop runs unconditionally, exempting only
+`source_type[source] == 'openstack'`, so every one of that source's
+consoles was passed to `remove_console()` with a "Console no longer
+available" audit event.
+
+So an optional feature's fetch failure destroyed the source's core
+function, including kerbside's own `/console/direct/...` and
+`/console/proxy/...` routes, which have nothing to do with tokens.
+
+Two triggers, both likely on an upgrade. Shaken Fist's
+`/admin/vditokenpubkey` returns **404** until an operator runs `sf-ctl
+ensure-kerbside-signing-key`, and nothing creates the key lazily; the
+client maps 404 to `ResourceNotFoundException`, which the broad
+`except` caught. Separately, `shakenfist-client` is deliberately not a
+runtime dependency (the `>=0.8.3` floor lives only in the `test`
+extra), so a pre-0.8.3 client raises `AttributeError` into the same
+handler.
+
+**This is the third defect from the one configuration no phase ever
+tested** -- Kerbside integration not configured -- after #4003 and
+#4009, and the first that destroys data. The plan's own *Post-completion
+defects* section named that gap; this is the evidence it was wider than
+two bugs in one repository.
+
+The fix degrades the optional feature instead: the key fetch no longer
+errors the source, a 404 or `AttributeError` logs at info as a normal
+state, and genuine faults still warn. Verified by the management
+session rather than taken on report -- reinstating `self.errored = True;
+return` fails exactly six tests and nothing else; restored, 279 pass.
+
+### 2a, code quality (10d)
+
+Examined R1, R4-R10 across three repositories: `mariadb.py`'s v4
+migration and the whole `node_attributes` field path,
+`protos/database.proto`, `daemons/database/main.py`,
+`schema/node_attributes.py`, `node.py`, both console endpoints in
+`external_api/instance.py`, the `ConditionalCapability` machinery in
+`external_api/app.py`, all 268 lines of `util/vdi_tokens.py`,
+`external_api/admin.py`, `client/ctl.py`, the R6 collection files, and
+in kerbside all of `sf_token.py`, `sources/shakenfist.py`, `SfToken`,
+`NovaToken` and `ConsolesProxyVirtViewer` in `api.py`, the new `db.py`
+tables and the alembic revision.
+
+**The field-mask and schema question -- clean, and it was the right
+thing to check.** The v4 migration is `ALTER TABLE ... ADD COLUMN IF
+NOT EXISTS`, structurally identical to the v3 step above it, and
+idempotent on both the create and upgrade paths. There is exactly one
+production writer of `spice_server_cert_subject`,
+`Node.observe_this_node()`, and it **added the field to the existing
+explicit `fields=[...]` mask** rather than dropping it; the only other
+writer is a test helper, which also passes a mask. The new column is in
+`_node_attributes_column_values()`'s `all_values`, so it is both
+maskable and validated by the unknown-field check. `CLAUDE.md` records
+that unmasked writes caused two production CI flakes; this change did
+not repeat them.
+
+The cached-FK-list rule does not fire (the one new field is a scalar
+`Optional[str]`). No new `get_all_*` call sites, and no judgment-level
+pushdown cases. Comment proportion: eight blocks over the threshold,
+all eight judged to earn their length.
+
+Beyond the blocking finding, four advisories, all filed:
+`add_sf_token_jti` is a check-then-act whose comment claims a
+primary-key guard it does not implement (kerbside#409); the node-map
+miss is still a silent debug-level skip, so #201's *shape* survives its
+own fix (kerbside#410); the proxy `.vv` construction now exists in
+three copies and has already drifted (kerbside#411); the two Shaken
+Fist console endpoints disagree on their preconditions, so the direct
+one returns 200 with `port=None` for a non-`created` instance
+(shakenfist#4094).
+
+### 2b, test coverage (10e)
+
+Examined every test module the ranges added or changed across three
+repositories, plus the CI configuration that decides which of them run.
+
+**The decision-3 scepticism paid off, on a different assertion than the
+plan predicted -- and the finding is narrower than this section first
+recorded it (corrected after review).** The type collapse was never
+uncovered: the unit test
+`test_instance_vdiconsolehelper.py::test_spiceconcurrent_emits_valid_vv_file`,
+added by the #4009 fix itself, creates an instance with
+`vdi='spiceconcurrent'` and asserts `'spice'`, and it does fail when the
+collapse is removed. What was hollow is the *functional* assertion, which
+matters because this project prefers functional coverage to unit coverage
+where it can only have one. `cluster_ci_tests/test_vdi_console_file.py`'s `host`
+assertion is genuine: `known_addresses` comes from a real
+`get_nodes()` call against the live cluster, so it is cross-checked
+against a second real API response rather than a fixture, and the UUID
+regression would fail it. Its **`type` assertion was hollow**: the test
+creates its instance with `video` unset, and the server then defaults
+`vdi` to `'spice'`, so the `startswith('spice')` collapse is a no-op
+for it. Deleting that line entirely left the *cluster CI* test passing.
+Fixed in this phase's PR with a functional test that creates
+`vdi='spiceconcurrent'` and asserts the internal enum never reaches the
+viewer. Mutation-verified by the management session, and the result is
+what pins the scope of the finding: with the collapse removed, the unit
+module fails one test of five with `'spice' != 'spiceconcurrent'` --
+so the unit coverage was real all along -- while the cluster CI test's
+`type` assertion would have gone on passing.
+
+**The #201 fixture is genuinely fixed.** `_node()` now carries
+`uuid='node-uuid-1'` distinct from `fqdn='n1'`, where the old fixture
+had no UUID field at all, and one test asserts the hypervisor is *not*
+the UUID. The bug cannot recur through it.
+
+**kerbside's verification matrix is strong and is in the right place.**
+Expiry, wrong audience, unknown kid, and a forged signature under the
+same `kid` using a genuinely unrelated Ed25519 keypair -- all against
+real JWTs through the real `jwt.decode` path. Replay is enforced at the
+API layer with a jti that is deliberately *not* burned on a
+console-not-yet-scraped 404, so a legitimate retry succeeds. This is
+better than replay coverage on the minting side would have been.
+
+Two coverage gaps filed: `refresh_all_signing_keys()` has zero direct
+coverage despite per-source failure isolation being its stated reason
+for existing (folded into shakenfist#4097's seam package), and the
+mint path's functional coverage never executes in this repository's CI
+(shakenfist#4093).
+
+### 2c, documentation (10f)
+
+Examined every documentation file the ranges touched across four
+repositories, plus the current state of `AGENTS.md`, `ARCHITECTURE.md`,
+`CLAUDE.md` and `README.md` in each.
+
+**The cross-page consistency check came back genuinely clean.** Every
+fact -- algorithm, TTL, claim set, audience string, mint-path error
+codes, exchange URL shape, `KERBSIDE_URL` semantics, capability
+meaning -- is stated consistently everywhere it appears, in all four
+repositories. Shaken Fist and kerbside each independently warn about
+the `KERBSIDE_URL` / `SF_CONSOLE_TOKEN_AUDIENCE` naming collision. One
+honest nuance: no page states an HTTP status code for the *exchange*
+path, so that row is "nothing to disagree about" rather than "agree".
+
+**The phase-11 fixes reached the documentation.** No page in any
+repository still describes the `.vv` `host` as a hostname or the
+capability as unconditional. The operator guide's "not yet automated by
+the collection" line refers to deploying Kerbside itself -- the
+deliberately deferred phase -- and the same page documents #4024's
+`kerbside_url` variable two paragraphs later.
+
+**Three README-discipline violations shipped, and all three were fixed
+by later unrelated work** before this audit's baseline: client-python's
+38-line section (`c9ea800`), kerbside's CI-lane paragraph (`49058af`),
+ryll's install troubleshooting (`2f5891e`). R1's `AGENTS.md` and
+`ARCHITECTURE.md` growth was likewise cleaned up by the consistency
+commit `f9117ca3d`. Under decision 1's net-state rule these are
+historical, not open -- recorded so a later reader does not rediscover
+them. Two live remnants that `f9117ca3d` missed were fixed in this
+phase's PR.
+
+No plan-phase references leaked into any repository's `docs/` for this
+feature.
+
+### 2d, security (10g)
+
+Examined key custody end to end, both console endpoints and the whole
+decorator stack that authenticates them, the claim set on both the
+signing and the trusting side, the pubkey endpoint, the `host_subject`
+mechanism through Shaken Fist, kerbside, the Rust proxy and ryll's
+verifier, ryll's release workflow and the published wheel's ELF
+headers, and the usual SQL/shell/input/secret/timeout sweep.
+
+**The mint gate is clean, and it was attacked rather than read.** Six
+cross-namespace routes were tried -- another namespace's UUID, a
+`namespace` key in the body, an `instance_ref` body override, a name
+collision, metadata, and a deleted-then-recreated instance -- and all
+six are rejected. `@redirect_instance_request` is correctly absent and
+its sibling endpoint 60 lines above has it, so the contrast is visible
+at the decoration site. One correction to the plan's own text:
+`@verify_token` is not written on the method, because
+`Resource.method_decorators` applies authentication to every resource
+method outside every per-method decorator. That is *stronger* than what
+the plan described -- a hand-written decorator can be forgotten; this
+cannot.
+
+**The central claim-set question is satisfied.** Kerbside reads no
+backend address, port or hostname from the JWT: the verifier returns
+exactly `{source, sub, jti, exp}`, and every address in the returned
+`.vv` comes from kerbside's own configuration and the scraped console
+row. `aud`, `exp` and `alg` are all checked, `alg` twice. The replay
+cache is a MariaDB table with `jti` as primary key, reaped every 60
+seconds, and rows can only be added by a caller holding a legitimately
+minted token.
+
+**ryll's supply chain is in good shape**: PyPI publication is via OIDC
+Trusted Publishers with no long-lived token anywhere in the workflow,
+and build provenance is attested with `actions/attest-build-provenance`
+and verifiable by a consumer. The dlopen and glibc-floor claims in
+`pyproject.toml` were verified empirically against the published wheel
+and both hold.
+
+Findings, by disposition:
+
+* **F8, high -- ryll's SPICE TLS verifier trusted the public WebPKI and
+  discarded hostname checking.** `client.rs` seeded the root store with
+  the full Mozilla root set *unconditionally*, including when the `.vv`
+  supplied an inline cluster CA, and accepted `NotValidForName`. For a
+  backend with no pinned subject the only surviving check was "chains
+  to some root", so an on-path attacker with any publicly-issued
+  certificate could terminate the SPICE session -- full keyboard, mouse
+  and framebuffer access to the guest. This code predates the plan and
+  is outside R11, but it is the mechanism the plan's entire
+  `host_subject` story rests on, which is why the brief sent an agent
+  to read it. **Fixed** in ryll branch `spice-tls-trust-anchors`: a
+  custom CA now *replaces* the public roots rather than adding to them,
+  and the name-mismatch acceptance is gated on a custom CA being
+  present. `check_subject`'s `None` short-circuit is deliberately
+  unchanged -- that fail-open is Shaken Fist's documented decision and
+  reversing it here would break every deployment with no published
+  subject. Honest limit, recorded by the implementer: no test signs a
+  leaf under a real public root, which is impossible offline, so two
+  tests stand in for the end-to-end claim.
+* **F5, medium -- unauthenticated unbounded write at `/sf-console.vv`.**
+  Every pre-verification rejection wrote an `audit_events` row, on an
+  endpoint that is by design internet-facing and unauthenticated, and
+  nothing anywhere reaps that table (kerbside has exactly three
+  reapers and none covers it). A single host looping `curl` fills it at
+  tens of millions of rows a day, degrading `get_consoles()` and
+  eventually taking down console access including the operator
+  break-glass path. **Fixed** in the same kerbside branch: pre-
+  verification rejections log only; the post-verification rejections
+  that have real attribution still audit, which is what the plan's
+  success criteria require.
+* **F1, medium -- the cluster signing key was exported into every
+  daemon's environment.** `load_cluster_config()` copies *every*
+  `cluster_config` row into `os.environ`, with no filter to declared
+  `SFConfig` fields, in every Shaken Fist process on every node -- and
+  privexec passes `env=None`, so its children inherit it and expose it
+  in `/proc/<pid>/environ`. The row holds the unencrypted Ed25519
+  private PEM, so code execution as any daemon user on any node yielded
+  the ability to forge a console token for any instance, undetectably
+  (kerbside verifies offline by design). **Fixed** in this phase's PR:
+  a row reaches the environment only if it is a declared `SFConfig`
+  field, or does not match `SECRET_CONFIG_KEY_RE`. The ordering
+  matters and is commented -- `AUTH_SECRET_SEED` matches the secret
+  pattern via `_SEED$` but *is* declared and must keep being exported,
+  so a naive "do not export secrets" filter would break authentication
+  cluster-wide. Verified by the management session:
+  `AUTH_SECRET_SEED` → exported, `KERBSIDE_JWT_SIGNING_KEY` → not.
+* **F9, medium -- `host_subject` fails open, silently.** Every link
+  degrades to "no pin" rather than refusing:
+  `_spice_host_subject_from_cert` returns `None` if the subject holds
+  any attribute outside its eight-name map -- plausible cluster-wide on
+  an operator's own PKI -- with no log at all, and kerbside then
+  publishes the console unpinned. **Three agents converged on this
+  independently** (10e KB-5, 10h finding 3, 10g F9), from coverage,
+  seam and security directions. The Shaken Fist half is **fixed** in
+  this phase's PR: a throttled warning naming the unrenderable OID, so
+  the cause is discoverable. The fail-open itself is unchanged --
+  documented and deliberate. The kerbside half (assert in the e2e lane
+  that a scraped console carries a subject; four lines) is
+  shakenfist#4097 item 1.
+* **F11, medium -- the JWT is passed to the viewer in argv**, readable
+  through `/proc/<pid>/cmdline` on any multi-user host. Filed as
+  client-python#392; the fix needs a coordinated ryll change.
+* **F2, F3, F4, F6, F7, F10, low/informational.** Filed as
+  shakenfist#4094, #4095, #4096, kerbside#409 and ryll#357. F6 (the
+  bearer token in a URL query parameter) is a consequence of `ryll
+  --url` and is recorded rather than fixed; the mitigation is
+  single-use plus a 300-second TTL.
+
+Out of scope but recorded so it is not lost: `kerbside/main.py` logs
+the old and new values of a changed source `password` -- a Shaken Fist
+namespace key -- at INFO. `git log -S` places it in kerbside's initial
+commit, so it belongs to neither this plan nor these ranges.
+
+### The seam lens (10h, decision 4)
+
+Examined every value that crosses a repository boundary in this
+feature, tracing each to its writer and reader by file and line, and
+graded 30-odd seams covered / fixture-only / uncovered.
+
+**The lens justified itself.** The three seams where this plan's three
+shipped defects lived are all now covered, and by good mechanisms:
+`inst['node']` by the phase-9 e2e lane (which is what caught #201 on
+its first run), the `.vv` `host` by `test_vdi_console_file.py`
+(cross-checked against a second real API response), and the capability
+token by `test_capability_advertisement_matches_configuration` (which
+never skips). Most JWT and scrape seams are genuinely covered by the
+phase-9 lane -- the only mechanism in the four repositories that reads
+a real message from a peer. That lane is the strongest thing this plan
+built.
+
+What is not covered, and why it matters:
+
+* Shaken Fist signs `iss`, `sf:namespace` and `iat`; kerbside requires
+  only `['sub', 'jti', 'exp', 'aud']` and reads none of the three. They
+  are asserted only by the always-skipped test. Three claims in a
+  security token that no consumer validates.
+* `alg`, `active_kid` and `created` in the pubkey document are read by
+  nobody, and client-python's fixture names the field `pem` where the
+  server sends `public_pem` -- direct evidence that nothing on the
+  reader side is pinned to the real shape.
+* Nothing anywhere feeds a Shaken Fist-generated `.vv` to ryll or to
+  virt-viewer. `type=` -- the exact key #4009 got wrong -- has no
+  reader-side check in any repository. `ryll --url`, the CLI's primary
+  path, is run by nobody.
+* The e2e lane installs the *released* client, so client-python
+  `develop` is on no cross-repo lane at all.
+* The `kerbside_url` ansible variable #4024 added has never been read
+  by a running `sf-api`; the lane provisions through `sf-ctl
+  set-config` instead.
+* The audience byte-identity is enforced by prose in three documents
+  and by nothing executable.
+* The host-subject grammar is two independently hand-written tables of
+  the same eight OpenSSL short names. They agree today and both fail
+  closed, so this is robustness, not security.
+
+Also found: client-python's fixtures assert `expires_at` as an ISO
+string where the server emits an int epoch, and one uses a path that
+does not exist. Three wrong facts in one file, none detectable, in the
+same configuration that let #4009 and #201 ship.
+
+All of this is shakenfist#4097 and client-python#393, with the cheapest
+fix costed per item. Four changes -- totalling well under a hundred
+lines, all inside CI machinery that already exists -- close the
+majority.
+
+## Disposition
+
+| Finding | Grade | Disposition |
+|---------|-------|-------------|
+| F-B1 console deletion on key-fetch failure | Blocking | Fixed, kerbside#412 (merged `e2a493ea6`) |
+| F8 ryll SPICE TLS trust anchors | High | Fix open as ryll#358 |
+| F5 unauthenticated `audit_events` write | Medium | Fixed, kerbside#412 (merged `e2a493ea6`) |
+| F1 signing key in every daemon's environ | Medium | Fixed, this PR |
+| F9 `host_subject` fails open silently | Medium | SF half fixed, this PR; kerbside half shakenfist#4097 |
+| SF-2 `.vv` type collapse uncovered | Advisory | Fixed, this PR (mutation-verified) |
+| Two false claims in this plan | Advisory | Fixed, this PR |
+| `ARCHITECTURE.md` / `subsystem_internals.md` duplication | Advisory | Fixed, this PR |
+| F11 JWT in argv | Medium | Filed, client-python#392 |
+| SF-1 mint coverage never runs in CI | Advisory | Filed, shakenfist#4093 |
+| Console endpoint precondition asymmetry, F3 | Advisory | Filed, shakenfist#4094 |
+| F2 race comment, `KeyError` paths, late import | Advisory | Filed, shakenfist#4095 |
+| F7 full `cluster_config` read per call | Advisory | Filed, shakenfist#4096 |
+| Seam coverage package | Advisory | Filed, shakenfist#4097 |
+| F4 check-then-act, jti before failable ops | Advisory | Filed, kerbside#409 |
+| Silent node-map skip (#201's shape) | Advisory | Filed, kerbside#410 |
+| Triplicated proxy `.vv` construction | Advisory | Filed, kerbside#411 |
+| Client fallback, capability probe, fixtures | Advisory | Filed, client-python#393 |
+| F10 `--skip-auditwheel` platform tag | Advisory | Filed, ryll#357 |
+| client-python `tox -e cover` misconfiguration | Advisory | Pre-existing since 2020, out of scope, recorded |
+| kerbside logs source password at INFO | Advisory | Out of range, recorded above |
+
+**The blocking finding is fixed.** kerbside#412 merged as `e2a493ea6`
+on 2026-09-06, carrying both F-B1 and F5. The fix is on kerbside's
+`develop` branch and is not yet in a tagged release -- v0.5.0 and
+earlier are affected -- so Shaken Fist's own operator guide and release
+notes tell operators to provision the signing key before rolling
+daemons on a cluster Kerbside already scrapes. That was added after
+review pointed out that a Shaken Fist operator reads
+`docs/operator_guide/vdi_console_tokens.md`, not kerbside's issue
+tracker.
+
+**One high-severity finding remains open**, so this phase stays In
+progress. Decision 7 says a fix lands in the repository that owns it,
+and the Definition of done requires each disposition to name a merged
+fix, an issue, or a written declination -- a branch satisfies none of
+those, and neither does an open pull request. F8 is ryll#358; when it
+merges, this table records its merge reference and phase 10 becomes
+Complete. Recorded after review pointed out that the status was ahead
+of the evidence, which it was.
+
+### Spot-checks
+
+Per decision 8 and the risk register, the management session verified
+findings against the tree rather than accepting the reports. Confirmed:
+F1's unfiltered `os.environ` export on both branches of
+`load_cluster_config()`; F5's three reapers and the absence of a fourth
+for `audit_events`; the client-python fixture's ISO-string `expires_at`
+against the server's int epoch; the `video` default that makes the
+`.vv` type assertion hollow; and both halves of the blocking finding's
+call path (`errored` set in `__init__`, and the unconditional cleanup
+that only exempts `openstack`).
+
+Two fixes were mutation-tested by the management session rather than
+trusted: reinstating the blocking bug fails exactly six kerbside tests
+and nothing else, and removing the `.vv` type collapse fails the new
+assertion with `'spice' != 'spiceconcurrent'` while the pre-existing
+test still passes.
+
+### What this phase says about the plan
+
+The audit found a blocking, destructive defect that eight pull-request
+reviews across four repositories did not, and it found it in the *same*
+untested configuration that produced #4003 and #4009. The plan's own
+*Post-completion defects* section called that "the one combination no
+phase ever tested". It was not two bugs; it was a class, and it spans
+repositories.
+
+The seam lens (decision 4) is the heading that found it, and the one no
+`PUSH-AUDIT.md` heading covers. The recommendation for future
+cross-repository plans is that the lens becomes a standing heading
+rather than a per-plan invention: for every value crossing a repository
+boundary, name the test on the reading side that would fail if the
+writing side changed it, and treat "none" as a finding in its own
+right.

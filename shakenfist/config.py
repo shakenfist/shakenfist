@@ -72,8 +72,56 @@ def _parse_comma_separated_hosts(value: object) -> object:
     return value
 
 
+def _exportable_cluster_config_key(key_name: str) -> bool:
+    """May this cluster_config row be exported into os.environ?
+
+    The cluster_config table is not only the backing store for SFConfig
+    fields. It is also a general cluster-wide key/value store, and
+    things which are not configuration options live in it -- most
+    importantly KERBSIDE_JWT_SIGNING_KEY, whose value is a JSON
+    document containing an unencrypted Ed25519 PKCS8 private PEM.
+
+    load_cluster_config() used to export every row unconditionally,
+    which put that private key into the environment of every Shaken
+    Fist daemon on every node -- including nodes which are neither API
+    nodes nor hypervisors and have no business holding it -- and, since
+    daemons/privexec/main.py spawns children with env=None, into every
+    privileged child process too, where it is readable from
+    /proc/<pid>/environ. Anyone who can read it can forge a console
+    token for any instance in the cluster, and kerbside verifies
+    offline, so the forgery would never be visible to Shaken Fist. The
+    only reader of that row is shakenfist/util/vdi_tokens.py, which
+    reads it through mariadb.get_cluster_config() -- a database read
+    which does not consult os.environ -- so nothing needs it here.
+
+    The rule is therefore: a row which corresponds to a declared
+    SFConfig field is always exported, because that is what the
+    environment-variable mechanism is for; a row which does not, and
+    whose name matches SECRET_CONFIG_KEY_RE, is not.
+
+    The declared-field test comes first, and that ordering is
+    load-bearing rather than incidental. AUTH_SECRET_SEED matches
+    SECRET_CONFIG_KEY_RE via ``_SEED$`` and is a real secret, but it is
+    also a declared field which SFConfig reads from the environment,
+    and it has to keep being exported or every daemon in the cluster
+    signs and verifies JWTs with the unconfigured sentinel. So a
+    "never export a secret" filter -- the obvious simplification of
+    this function -- breaks authentication cluster-wide. Do not make
+    it. KERBSIDE_JWT_SIGNING_KEY is caught because it matches via
+    ``_KEY$`` *and* is not a declared field.
+    """
+    if key_name in SFConfig.model_fields:
+        return True
+    return SECRET_CONFIG_KEY_RE.search(key_name) is None
+
+
 def load_cluster_config() -> None:
     """Load cluster-wide config into environment variables.
+
+    Not every cluster_config row is exported --
+    ``_exportable_cluster_config_key()`` above is the filter, and the
+    reason it exists. Both read paths below apply it, and neither may
+    stop applying it.
 
     If MARIADB_HOST is set, this process has direct MariaDB
     access available and uses it. Direct access is preferred
@@ -128,6 +176,14 @@ def load_cluster_config() -> None:
                 )).fetchall()
 
             for key_name, value_raw in rows:
+                if not _exportable_cluster_config_key(key_name):
+                    # Withheld silently and on purpose: this runs at
+                    # import time, before logging is configured, so
+                    # there is nowhere to say so. `sf-ctl show-config`
+                    # lists every row (redacting the values) and is the
+                    # diagnosis path for an operator whose undeclared,
+                    # secret-named row is not reaching a daemon.
+                    continue
                 # Raw SQL gets the stored string; JSON-decode so we
                 # match the gRPC path's behavior.
                 try:
@@ -166,6 +222,9 @@ def load_cluster_config() -> None:
         response = stub.GetClusterConfig(request, timeout=5)
 
         for entry in response.entries:
+            if not _exportable_cluster_config_key(entry.key_name):
+                # See the direct branch above for why this is silent.
+                continue
             value = json.loads(entry.value_json)
             os.environ['SHAKENFIST_%s' % entry.key_name] = str(value)
 

@@ -309,13 +309,10 @@ Key configuration sources:
 - MariaDB `cluster_config` table - Cluster-wide configuration
 - Environment variables (highest priority)
 
-The Kerbside VDI console proxy integration is configured here too:
-`KERBSIDE_URL` (empty by default, which disables the integration; it is both
-the returned console URL base and the token audience) and
-`KERBSIDE_TOKEN_DURATION` (token lifetime in seconds, default 300). These are
-Shaken Fist cluster settings and are distinct from the Kerbside proxy
-daemon's own `KERBSIDE_`-prefixed environment. The signing key itself is
-stored in `cluster_config` as `KERBSIDE_JWT_SIGNING_KEY`.
+The Kerbside VDI console proxy integration is configured here too, and its
+signing key is a `cluster_config` row. The settings, the key's custody and
+its rotation are in
+[docs/operator_guide/vdi_console_tokens.md](docs/operator_guide/vdi_console_tokens.md).
 
 ### Node Identity
 

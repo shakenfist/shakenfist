@@ -106,6 +106,23 @@ configuration name ends in `_KEY`, `sf-ctl show-config` redacts it by
 default; never pass `--show-secrets` where the output could be logged, and
 never print or event private key material.
 
+The row is also excluded from the cluster configuration Shaken Fist exports
+into each daemon's environment at startup. A row is withheld when its name
+looks like a secret and it is not a declared configuration option; ordinary
+rows, including options this release does not know about, are still exported.
+So the signing key no longer sits in every daemon's `/proc/<pid>/environ` on
+every node, and is no longer inherited by the processes privexec spawns.
+Nothing an operator does turns that off.
+
+It is worth being precise about what that does and does not buy, because the
+distinction matters if you are reasoning about blast radius. Shaken Fist
+reads cluster configuration a whole table at a time, so the key is still
+sent to every daemon at startup and to the cluster daemon on each
+maintenance pass — it is simply no longer *retained* in their environment.
+An attacker who can read a daemon's memory is therefore not shut out by this
+change; one who can read its environment, or the environment of a command
+privexec ran, now is.
+
 The key is **not** created automatically: it must be provisioned explicitly
 before the first console is opened. Until it exists, the `vdiconsoleproxy`
 endpoint returns HTTP 500 naming the command to run below — minting never
@@ -118,6 +135,30 @@ sf-ctl ensure-kerbside-signing-key
 
 This prints the active key id and how many keys are published; it never
 prints private material and does nothing if a key already exists.
+
+!!! warning "Provision the key before upgrading a cluster Kerbside already scrapes"
+
+    Do this *before* you roll the daemons, if Kerbside is already
+    configured with this cluster as a console source.
+
+    Until the key exists, `GET /admin/vditokenpubkey` returns HTTP 404.
+    **Kerbside v0.5.0 and earlier** treat that failure as making the whole
+    source unusable: the scrape is abandoned before it enumerates any
+    consoles, and the cleanup pass that follows then removes every console
+    Kerbside had previously recorded for this cluster. That deletes the
+    direct and proxy console routes too, not only the token-based ones, so
+    users lose consoles which have nothing to do with this feature.
+
+    Provisioning the key first avoids it entirely. If you have already hit
+    it, provision the key and let Kerbside scrape again — the inventory is
+    rebuilt from Shaken Fist, so the loss is an outage rather than
+    permanent damage.
+
+    The Kerbside-side fix downgrades a missing key to "this source has no
+    token consoles yet" rather than failing the source. It merged as
+    [kerbside#412](https://github.com/shakenfist/kerbside/pull/412) and is
+    on Kerbside's `develop` branch; it is not in a tagged release yet, so
+    provision the key first whatever Kerbside version you run.
 
 ## Publishing the public keys
 
@@ -202,6 +243,26 @@ during its cluster-wide scrape and uses it as the connection `host_subject`.
 See the
 [Kerbside console sources page](/components/kerbside/console-sources/) for
 the proxy-side view.
+
+There is a second way to publish nothing, and it is easier to hit on your
+own PKI than on the one the deployer builds: Shaken Fist can only render a
+subject whose every attribute has a SPICE host-subject short name (`C`,
+`ST`, `L`, `O`, `OU`, `CN`, `DC`, `emailAddress`). A subject qualified with
+anything else — a `serialNumber`, a custom OID — cannot be rendered exactly,
+and a partial rendering would wrongly reject the backend, so the node
+publishes nothing and enforcement is disabled for it. If your CA issues such
+subjects this happens on every node at once. It is not silent: each node
+logs a warning naming the offending attribute and its OID once per episode
+rather than once per read — a certificate which is repaired and later
+regresses warns a second time, because that recurrence is the event you
+need to see. Grep your logs for `no SPICE host-subject short name` if
+`spice_server_cert_subject` is unexpectedly absent from a node in
+`GET /nodes`.
+
+A certificate with an empty subject — a SAN-only certificate, which some
+modern CAs issue by default — has nothing to pin and is treated the same
+way: nothing is published, enforcement is disabled for that node, and the
+node logs `empty subject`.
 
 ## Related pages
 

@@ -203,7 +203,26 @@ The private signing key lives in a single `cluster_config` row,
 row holds a newest-first, two-key window of Ed25519 keypairs; rotation
 (`sf-ctl rotate-kerbside-signing-key`) prepends a fresh key and trims to two,
 so tokens signed by the previous key stay verifiable until the next rotation.
-`shakenfist/util/vdi_tokens.py` is the only module that parses the row.
+`shakenfist/util/vdi_tokens.py` is the only module that parses the row, and
+reads it through `mariadb.get_cluster_config()`:
+`config.load_cluster_config()` withholds a `cluster_config` row from the
+daemon environment when its name matches `SECRET_CONFIG_KEY_RE` *and* is not
+a declared `SFConfig` field; every other row, declared or not, is still
+exported, so a new option reaches a daemon without a code change. The
+declared-field test comes first deliberately: `AUTH_SECRET_SEED` matches the
+secret pattern via `_SEED$` but is a declared field and must keep being
+exported, so a plain "never export a secret" rule would break authentication
+cluster-wide. `KERBSIDE_JWT_SIGNING_KEY` is withheld because it matches via
+`_KEY$` and is not declared.
+
+That keeps the private key out of every process's environment, and out of
+the privexec children which inherit it. It does not keep the key out of
+those processes: `mariadb.get_cluster_config()` and the `GetClusterConfig`
+RPC both return the whole table, so `load_cluster_config()` filters only
+after receipt and the row still crosses the wire to every daemon at startup,
+and to the cluster daemon on every maintenance pass. Closing that residue
+needs a keyed read, which is [issue
+4096](https://github.com/shakenfist/shakenfist/issues/4096).
 Per-node `spice_server_cert_subject` (published by `shakenfist/node.py`) is
 consumed by Kerbside as the enforced backend `host_subject`. See the
 [VDI console tokens operator guide](../operator_guide/vdi_console_tokens.md)

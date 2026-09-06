@@ -18,6 +18,7 @@ from unittest import mock
 from uuid import UUID
 
 from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ObjectIdentifier
 from pydantic import ValidationError
 import testtools
 
@@ -1307,6 +1308,12 @@ def _make_spice_cert(name_attrs):
 class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
     """Tests for reading the SPICE server certificate subject."""
 
+    def setUp(self):
+        super().setUp()
+        # The warn-once set is module state which outlives a test.
+        node_module._SPICE_SUBJECT_WARNED.clear()
+        self.addCleanup(node_module._SPICE_SUBJECT_WARNED.clear)
+
     def _subject_for(self, name_attrs):
         pem = _make_spice_cert(name_attrs)
         with tempfile.NamedTemporaryFile(
@@ -1348,6 +1355,129 @@ class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
         ])
         self.assertIsNone(subject)
 
+    def test_a_repaired_then_broken_certificate_warns_again(self):
+        # The throttle covers one episode, not the life of the process.
+        # An operator reissues the certificate, pinning comes back, and
+        # then the same fault recurs -- that second occurrence is a new
+        # "pinning has just been disabled for this node" event and has
+        # to be reported. Keying the throttle on the reason alone would
+        # swallow it until the daemon happened to restart.
+        broken = [
+            (NameOID.COMMON_NAME, 'hv1'),
+            (NameOID.SERIAL_NUMBER, '12345'),
+        ]
+        good = [(NameOID.COMMON_NAME, 'hv1')]
+
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for(broken))
+            self.assertIsNone(self._subject_for(broken))
+            # Repaired: the read succeeds and clears the throttle.
+            self.assertEqual('CN=hv1', self._subject_for(good))
+            # Regressed to the same cause: warns a second time.
+            self.assertIsNone(self._subject_for(broken))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(2, len(warnings))
+
+    def test_empty_subject_disables_pinning_and_warns(self):
+        # A SAN-only certificate carries no subject attributes at all.
+        # Rendering it produced '' rather than None, which is not None,
+        # so the caller counted it as a successful read: it cleared the
+        # warn-once state and published an empty subject. Consumers test
+        # truthiness, so pinning was disabled with no warning anywhere --
+        # the same silent fail-open the warnings exist to expose.
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for([]))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(1, len(warnings))
+        self.assertIn('empty subject', warnings[0][0][0])
+
+    def test_empty_subject_does_not_clear_the_warn_once_state(self):
+        # The regression this pairs with: returning '' looked like a
+        # successful read, so it reset the throttle and masked a
+        # genuine problem reported moments earlier.
+        broken = [
+            (NameOID.COMMON_NAME, 'hv1'),
+            (NameOID.SERIAL_NUMBER, '12345'),
+        ]
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for(broken))
+            self.assertIsNone(self._subject_for([]))
+            self.assertIsNone(self._subject_for(broken))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        # One for the unnameable attribute, one for the empty subject,
+        # and crucially not a second copy of the first.
+        self.assertEqual(2, len(warnings))
+
+    def test_unnameable_attribute_warns_once_and_names_the_oid(self):
+        # Returning None fails open -- pinning is silently disabled for
+        # this node, and on an operator's own PKI that can be every node
+        # at once. It used to do that with no log line, so there was
+        # nothing to discover it by. The warning must name the offending
+        # attribute, and must not repeat: observe_this_node() calls this
+        # every 15 seconds from both sentinel daemons.
+        attrs = [
+            (NameOID.COMMON_NAME, 'hv1'),
+            (NameOID.SERIAL_NUMBER, '12345'),
+        ]
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for(attrs))
+            self.assertIsNone(self._subject_for(attrs))
+            self.assertIsNone(self._subject_for(attrs))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(1, len(warnings))
+        message = warnings[0][0][0]
+        self.assertIn('serialNumber', message)
+        self.assertIn(NameOID.SERIAL_NUMBER.dotted_string, message)
+
+        # ...and the structured fields carry it too, since that is what
+        # a Loki query filters on.
+        fields = mock_log.with_fields.call_args_list[0][0][0]
+        self.assertEqual(
+            NameOID.SERIAL_NUMBER.dotted_string, fields['oid'])
+        self.assertEqual('serialNumber', fields['attribute'])
+
+    def test_custom_oid_reports_no_name_rather_than_a_placeholder(self):
+        # cryptography's ObjectIdentifier._name does not return None for
+        # an OID it does not know: it returns the literal 'Unknown OID',
+        # which is truthy. Letting that through would put a constant
+        # placeholder in the structured 'attribute' field for every
+        # unknown OID -- the field an operator groups a Loki query on,
+        # where a fixed string that looks like a name is worse than a
+        # null. The message falls back to the dotted string instead.
+        oid = ObjectIdentifier('1.3.6.1.4.1.99999.1')
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for([
+                (NameOID.COMMON_NAME, 'hv1'),
+                (oid, 'whatever'),
+            ]))
+
+        fields = mock_log.with_fields.call_args_list[0][0][0]
+        self.assertIsNone(fields['attribute'])
+        self.assertEqual(oid.dotted_string, fields['oid'])
+
+        message = (
+            mock_log.with_fields.return_value.warning.call_args_list[0][0][0])
+        self.assertNotIn('Unknown OID', message)
+        self.assertIn(oid.dotted_string, message)
+
+    def test_a_second_distinct_problem_still_warns(self):
+        # Throttling is per reason, not a single global flag, so a
+        # different unrenderable attribute is still reported.
+        with mock.patch('shakenfist.node.LOG') as mock_log:
+            self.assertIsNone(self._subject_for([
+                (NameOID.COMMON_NAME, 'hv1'),
+                (NameOID.SERIAL_NUMBER, '12345')]))
+            self.assertIsNone(self._subject_for([
+                (NameOID.COMMON_NAME, 'hv1'),
+                (NameOID.DN_QUALIFIER, 'q')]))
+
+        warnings = mock_log.with_fields.return_value.warning.call_args_list
+        self.assertEqual(2, len(warnings))
+
     def test_missing_certificate_returns_none(self):
         with mock.patch(
                 'shakenfist.node.SPICE_SERVER_CERT_PATH',
@@ -1362,3 +1492,36 @@ class NodeSpiceCertSubjectTestCase(base.ShakenFistTestCase):
         self.addCleanup(os.unlink, path)
         with mock.patch('shakenfist.node.SPICE_SERVER_CERT_PATH', path):
             self.assertIsNone(node_module.read_spice_server_cert_subject())
+
+    def test_a_damaged_certificate_warns_only_once(self):
+        # A damaged certificate is a permanent condition, and
+        # observe_this_node() reads it every 15 seconds from each of the
+        # two sentinel daemons -- eight warnings a minute, forever, all
+        # of them shipped to Loki, for one node an operator has already
+        # been told about.
+        with tempfile.NamedTemporaryFile(
+                suffix='.pem', delete=False) as f:
+            f.write(b'not a certificate')
+            path = f.name
+        self.addCleanup(os.unlink, path)
+
+        with mock.patch('shakenfist.node.SPICE_SERVER_CERT_PATH', path):
+            with mock.patch('shakenfist.node.LOG') as mock_log:
+                for _ in range(5):
+                    self.assertIsNone(
+                        node_module.read_spice_server_cert_subject())
+
+        self.assertEqual(
+            1, len(mock_log.with_fields.return_value.warning.call_args_list))
+
+    def test_a_missing_certificate_never_warns(self):
+        # The common case: a node which runs no SPICE instances has no
+        # such certificate and that is not a problem. Unchanged.
+        with mock.patch(
+                'shakenfist.node.SPICE_SERVER_CERT_PATH',
+                '/nonexistent/server-cert.pem'):
+            with mock.patch('shakenfist.node.LOG') as mock_log:
+                self.assertIsNone(
+                    node_module.read_spice_server_cert_subject())
+
+        mock_log.with_fields.return_value.warning.assert_not_called()

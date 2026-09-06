@@ -424,14 +424,18 @@ Operator-facing probe guidance is in
 Shaken Fist mints short lived Ed25519 JWTs for the Kerbside VDI console
 proxy. `shakenfist/external_api/instance.py`
 (`InstanceVDIProxyConsoleHelperEndpoint`, `GET
-/instances/<ref>/vdiconsoleproxy`) mints a token and returns a proxy URL;
-`shakenfist/util/vdi_tokens.py` owns all key handling (mint, ensure, rotate,
-public view); `shakenfist/external_api/admin.py`
+/instances/<ref>/vdiconsoleproxy`) mints a token and returns `{url,
+expires_at}`, where `url` is `<KERBSIDE_URL>/sf-console.vv?token=<jwt>`. It
+returns 404 when the Kerbside integration is unconfigured, 406 unless the
+instance is `created`, 409 unless the console is SPICE, and 500 when no
+signing key exists. `shakenfist/util/vdi_tokens.py` owns all key handling
+(mint, ensure, rotate, public view); `shakenfist/external_api/admin.py`
 (`AdminVDITokenPublicKeyEndpoint`, `GET /admin/vditokenpubkey`) publishes the
 public verification keys. The signing key lives in a single `cluster_config`
 row, `KERBSIDE_JWT_SIGNING_KEY` (two-key rotation window). The `sf-ctl`
 `ensure-kerbside-signing-key` / `rotate-kerbside-signing-key` subcommands
-bootstrap and rotate it. Operator runbook: the
+bootstrap and rotate it. The trust model is in
+[security_model.md](security_model.md); the operator runbook is the
 [VDI console tokens operator guide](../operator_guide/vdi_console_tokens.md).
 
 ## Object References
@@ -542,12 +546,6 @@ can opt out of polling with `wait=False` to receive the op handle directly.
 Two client methods `get_cluster_operation_chain` and
 `list_cluster_operations_for_target` expose the discovery endpoints.
 
-**VDI console proxy endpoints.** `GET /instances/<ref>/vdiconsoleproxy`
-(`external_api/instance.py`, `InstanceVDIProxyConsoleHelperEndpoint`) mints a
-short lived Ed25519 JWT and returns `{url, expires_at}` where `url` is
-`<KERBSIDE_URL>/sf-console.vv?token=<jwt>`. It returns 404 when the Kerbside
-integration is unconfigured, 406 unless the instance is `created`, 409 unless
-the console is SPICE, and 500 when no signing key exists. `GET
-/admin/vditokenpubkey` (`external_api/admin.py`,
-`AdminVDITokenPublicKeyEndpoint`) publishes the public verification keys. See
-the VDI console token trust model in [security_model.md](security_model.md).
+**VDI console proxy endpoints.** `GET /instances/<ref>/vdiconsoleproxy` and
+`GET /admin/vditokenpubkey` are described under
+[VDI console token mint path](#vdi-console-token-mint-path) above.

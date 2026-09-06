@@ -53,6 +53,69 @@ _SPICE_SUBJECT_SHORT_NAMES = {
 }
 
 
+# Distinct reasons we have already warned about while reading this
+# node's SPICE certificate subject, so a permanent condition is not
+# re-reported forever.
+#
+# observe_this_node() calls read_spice_server_cert_subject() every 15
+# seconds and both sentinel daemons run it, so an unthrottled warning
+# here is eight identical lines a minute for the life of the node --
+# and every one of them is shipped to Loki. The causes below are all
+# permanent until an operator intervenes (a certificate is reissued, a
+# file is repaired), so the first occurrence is the whole signal and
+# the repeats are noise which buries it.
+#
+# Keyed by reason rather than being a single flag, so a second,
+# different problem still gets its own line. Process-local: a daemon
+# restart deliberately re-reports, which is when an operator is most
+# likely to be looking.
+#
+# Cleared whenever a read succeeds, so the throttle covers one episode
+# rather than the life of the process. Without that, an operator who
+# reissues a certificate and later regresses to the same cause gets no
+# second warning until a restart -- and "host-subject pinning has just
+# been disabled for this node again" is exactly the event that must not
+# be swallowed.
+_SPICE_SUBJECT_WARNED: set[str] = set()
+
+
+# ObjectIdentifier._name is private API in cryptography, and it is used
+# deliberately: it yields the human name an operator needs to recognise
+# the offending attribute ("serialNumber"). The public alternative,
+# NameAttribute.rfc4514_attribute_name, returns the dotted string for
+# anything outside its own short-name table -- '2.5.4.5' for
+# serialNumber on cryptography 50.0.1 -- which is exactly the value we
+# already log as the oid field, so it would cost the diagnosis and buy
+# nothing. The read is getattr-guarded and
+# test_unnameable_attribute_warns_once_and_names_the_oid asserts the
+# name reaches the message, so an upstream removal surfaces in CI
+# rather than in production.
+def _spice_subject_attribute_name(oid: x509.ObjectIdentifier) -> Optional[str]:
+    """The human name cryptography has for an OID, or None if it has none.
+
+    For an OID outside its own table cryptography does not return None:
+    _name is a property yielding the literal string 'Unknown OID'. That
+    is truthy, so a naive `or` fallback never fires and the placeholder
+    reaches the structured 'attribute' field -- the field an operator
+    groups a Loki query on, where a constant string is worse than a
+    null because it looks like a name. Map it back to None so callers
+    can omit the field or substitute the dotted string.
+    """
+    name = getattr(oid, '_name', None)
+    if name == 'Unknown OID':
+        return None
+    return name
+
+
+def _warn_spice_subject_once(reason: str, fields: dict[str, Optional[str]],
+                             message: str) -> None:
+    """Log a SPICE subject warning the first time each reason occurs."""
+    if reason in _SPICE_SUBJECT_WARNED:
+        return
+    _SPICE_SUBJECT_WARNED.add(reason)
+    LOG.with_fields(fields).warning(message)
+
+
 def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
     """Render a certificate subject as a SPICE host-subject string.
 
@@ -61,21 +124,71 @@ def _spice_host_subject_from_cert(cert: x509.Certificate) -> Optional[str]:
     count, types, and (case- and whitespace-normalised) values. The
     string must therefore list the attributes in that same order, using
     the OpenSSL short names, with backslash and comma escaped in values.
-    Returns None if the subject carries an attribute we cannot name or a
-    value we cannot render, since that would make an exact, matchable
-    rendering impossible (and a partial one would wrongly reject the
-    backend).
+    Returns None if the subject is empty, carries an attribute we cannot
+    name, or carries a value we cannot render, since none of those can
+    produce an exact, matchable rendering (and a partial one would
+    wrongly reject the backend).
+
+    Returning None fails open: spice_server_cert_subject becomes None,
+    kerbside's scrape sets host_subject to None, and the proxy will
+    accept any node in the cluster as any other hypervisor, because
+    every hypervisor's certificate is signed by the same cluster CA.
+    That is the documented design choice (see
+    docs/operator_guide/vdi_console_tokens.md) -- an unrenderable
+    subject must not take consoles away -- but it used to happen with
+    no log line at all, so an operator had no way to discover it. On a
+    PKI which qualifies subjects with a serialNumber, a dnQualifier or
+    a custom OID this fires on every node at once, silently disabling
+    pinning cluster-wide. Hence the warning; the behaviour is
+    unchanged.
     """
     parts = []
     for attr in cert.subject:
         short = _SPICE_SUBJECT_SHORT_NAMES.get(attr.oid)
         if short is None:
+            oid = attr.oid.dotted_string
+            name = _spice_subject_attribute_name(attr.oid)
+            _warn_spice_subject_once(
+                'unnameable:%s' % oid,
+                {'path': SPICE_SERVER_CERT_PATH, 'oid': oid,
+                 'attribute': name},
+                'SPICE certificate subject carries attribute %s (%s), '
+                'which has no SPICE host-subject short name. Host-subject '
+                'pinning is disabled for this node.' % (name or oid, oid))
             return None
         value = attr.value
         if not isinstance(value, str):
+            oid = attr.oid.dotted_string
+            _warn_spice_subject_once(
+                'unrenderable:%s' % oid,
+                {'path': SPICE_SERVER_CERT_PATH, 'oid': oid,
+                 'attribute': short},
+                'SPICE certificate subject attribute %s (%s) is not a '
+                'string and cannot be rendered. Host-subject pinning is '
+                'disabled for this node.' % (short, oid))
             return None
         escaped = value.replace('\\', '\\\\').replace(',', '\\,')
         parts.append('%s=%s' % (short, escaped))
+
+    if not parts:
+        # An empty subject is legal, and increasingly common: a SAN-only
+        # certificate from a modern CA carries no subject attributes at
+        # all. Falling through to ','.join([]) would return '' -- which
+        # is not None, so the caller would treat it as a successful read,
+        # clear the warn-once state, and publish an empty
+        # spice_server_cert_subject. Every consumer tests truthiness
+        # (external_api/instance.py's `if subject:`, kerbside's
+        # `or None`), so pinning would be disabled exactly as it is for
+        # an unrenderable subject, but with none of the warning that
+        # exists to make that discoverable. Fail to None like the other
+        # two paths.
+        _warn_spice_subject_once(
+            'empty-subject',
+            {'path': SPICE_SERVER_CERT_PATH},
+            'SPICE certificate has an empty subject, so there is nothing '
+            'to pin. Host-subject pinning is disabled for this node.')
+        return None
+
     return ','.join(parts)
 
 
@@ -86,6 +199,10 @@ def read_spice_server_cert_subject() -> Optional[str]:
     unparseable certificate yields None, which leaves host-subject
     enforcement disabled for this backend rather than failing the
     node's observation loop.
+
+    A missing file is the normal case on a node which runs no SPICE
+    instances and stays silent. Anything else warns once per process
+    per failure kind -- see _SPICE_SUBJECT_WARNED for why once.
     """
     try:
         with open(SPICE_SERVER_CERT_PATH, 'rb') as f:
@@ -93,10 +210,18 @@ def read_spice_server_cert_subject() -> Optional[str]:
     except FileNotFoundError:
         return None
     except Exception as e:
-        LOG.with_fields({'path': SPICE_SERVER_CERT_PATH}).warning(
+        _warn_spice_subject_once(
+            'read:%s' % type(e).__name__,
+            {'path': SPICE_SERVER_CERT_PATH},
             'Could not read SPICE server certificate: %s' % e)
         return None
-    return _spice_host_subject_from_cert(cert)
+
+    subject = _spice_host_subject_from_cert(cert)
+    if subject is not None:
+        # The condition has cleared, so a later recurrence is a new
+        # episode and warns again.
+        _SPICE_SUBJECT_WARNED.clear()
+    return subject
 
 
 class Node(dbo):
