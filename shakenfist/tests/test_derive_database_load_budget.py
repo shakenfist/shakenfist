@@ -170,6 +170,16 @@ class DeriveBudgetTestCase(base.ShakenFistTestCase):
                                     mean=6.7), nodes=6)
         self.assertTrue(entry['activity_coupled'])
 
+    def test_one_of_our_own_loops_is_not_marked_by_the_caller_rule(self):
+        # The rule is a default for callers which are nobody's loop, not a
+        # judgement about the pair. If it reached wider it would unenforce
+        # pairs nobody looked at, and a detector which fails nothing
+        # passes everything.
+        entry = tool.to_entry(('GetObjectState', 'queues'),
+                              stats(slope=0.04, intercept=0.68, r2=0.51,
+                                    mean=1.4), nodes=6)
+        self.assertNotIn('activity_coupled', entry)
+
     def test_every_entry_gets_at_least_one_term(self):
         # A pair with no measurable base and no slope still needs a term,
         # or the budget carries an entry which predicts nothing and the
@@ -223,11 +233,19 @@ class EmitRoundTripTestCase(base.ShakenFistTestCase):
         # Re-measuring every shipped pair is what a re-derivation of the
         # same cluster looks like: the same pairs, freshly fitted terms,
         # and a placeholder note for every one of them.
+        #
+        # The activity coupling goes with the provisional marking rather
+        # than staying on the entry, because to_entry() derives it from
+        # the caller alone. Leaving it on would hand emit() a flag a real
+        # re-derivation never produces for one of our own daemons, and the
+        # carry-forward this class exists to check would never be
+        # exercised.
         entries = []
         for e in self.previous['entries']:
             entry = dict(e)
             entry['note'] = tool.PLACEHOLDER_NOTE
             entry.pop('provisional', None)
+            entry.pop('activity_coupled', None)
             entries.append(entry)
 
         out = io.StringIO()
@@ -261,6 +279,43 @@ class EmitRoundTripTestCase(base.ShakenFistTestCase):
                     if tool.PLACEHOLDER_NOTE in e.note]))
         self.assertNotEqual(
             0, len([e for e in parsed.entries if e.provisional is not None]))
+
+    def test_a_hand_marked_activity_coupling_survives_a_rederivation(self):
+        # to_entry() can only tell an activity coupled pair from a poll by
+        # its caller, so a pair called from one of our own daemons whose
+        # level is set by how much work is flowing has to be marked by
+        # hand. That marking used to be deleted by the next re-derivation
+        # without failing anything, which is issue 4092: the flag was
+        # written from the freshly fitted entry while the note and
+        # provisional marking beside it were read from the file.
+        previous = copy.deepcopy(self.previous)
+        marked = None
+        for entry in previous['entries']:
+            if (entry['caller_daemon'] not in tool.NOT_OUR_LOOPS
+                    and not entry.get('activity_coupled')):
+                entry['activity_coupled'] = True
+                marked = (entry['operation'], entry['caller_daemon'])
+                break
+        self.assertIsNotNone(marked, 'no enforced pair to mark')
+
+        parsed = budget.DatabaseLoadBudget.model_validate(
+            yaml.safe_load(io.StringIO(self.emit(previous))))
+        self.assertTrue(parsed.get(*marked).activity_coupled,
+                        '%s/%s lost its activity coupling' % marked)
+        self.assertFalse(parsed.get(*marked).enforced)
+
+    def test_a_rederivation_does_not_invent_an_activity_coupling(self):
+        # The carry forward must only restore a marking somebody made. If
+        # it reached wider than that it would quietly unenforce pairs,
+        # which is the failure this whole file is about in the other
+        # direction: a detector that fails nothing passes everything.
+        parsed = budget.DatabaseLoadBudget.model_validate(
+            yaml.safe_load(io.StringIO(self.emit(self.previous))))
+        before = {(e['operation'], e['caller_daemon'])
+                  for e in self.previous['entries']
+                  if e.get('activity_coupled')}
+        after = {e.key for e in parsed.entries if e.activity_coupled}
+        self.assertEqual(before, after)
 
     def test_a_tuned_default_is_not_reverted_to_the_tools_own_value(self):
         # emit() used to write the three defaults as literals, so tuning
