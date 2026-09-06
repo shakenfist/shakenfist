@@ -80,6 +80,50 @@ class TestNetworking(base.BaseNamespacedTestCase):
 
         self.assertEqual(['192.168.10.56'], ips)
 
+    def test_specific_ip_reuse_after_delete(self):
+        # Regression coverage for issue 4059: deleting an instance leaves
+        # its addresses in deletion-halo reservations for
+        # IP_DELETION_HALO_DURATION. An immediate recreate at the same
+        # explicit address must take over that halo rather than returning
+        # a 409, otherwise replacing an instance pinned to a static
+        # address always fails.
+        netdesc = [
+            {
+                'network_uuid': self.net_four['uuid'],
+                'address': '192.168.10.57'
+            }
+        ]
+        diskdesc = [
+            {
+                'size': 8,
+                'base': 'sf://upload/system/debian-12',
+                'type': 'disk'
+            }
+        ]
+
+        inst = self.test_client.create_instance(
+            'test-specific-ip-reuse', 1, 1024, netdesc, diskdesc, None, None)
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
+        self._await_instance_ready(inst['uuid'])
+
+        self.test_client.delete_instance(inst['uuid'])
+        self._await_instance_deleted(inst['uuid'])
+
+        inst = self.test_client.create_instance(
+            'test-specific-ip-reuse', 1, 1024, netdesc, diskdesc, None, None)
+        self.addDetail(
+            'inst_recreated',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
+        self._await_instance_ready(inst['uuid'])
+
+        nics = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.addDetail(
+            'nics',
+            content.text_content(json.dumps(nics, indent=4, sort_keys=True)))
+        self.assertEqual(['192.168.10.57'], [nic['ipv4'] for nic in nics])
+
     def test_specific_ip_request_invalid(self):
         self.assertRaises(
             apiclient.RequestMalformedException,

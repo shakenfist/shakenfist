@@ -4232,11 +4232,13 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
 # These call the database microservice for IPAM operations.
 # =============================================================================
 
-def _grpc_reserve_address(reservation: IPAMReservation) -> bool:
+def _grpc_reserve_address(reservation: IPAMReservation,
+                          evict_halo: bool = False) -> bool:
     """Atomically reserve an IP address via the database microservice."""
     try:
         stub = _get_database_stub()
         request = database_pb2.ReserveAddressRequest(
+            evict_halo=evict_halo,
             reservation=database_pb2.IPAMReservationData(
                 ipam_uuid=str(reservation.ipam_uuid),
                 address=str(reservation.address),
@@ -6396,15 +6398,20 @@ def delete_object_events(object_type: str, object_uuid: Any) -> None:
 # These are used by the database daemon for atomic IP address reservation.
 # =============================================================================
 
-def _direct_reserve_address(reservation: IPAMReservation) -> bool:
+def _direct_reserve_address(reservation: IPAMReservation,
+                            evict_halo: bool = False) -> bool:
     """Atomically reserve an IP address in MariaDB.
 
     Uses INSERT with the unique constraint on (ipam_uuid, address) to ensure
     atomicity. If the address is already reserved, IntegrityError is raised
-    and we return False.
+    and we return False -- unless evict_halo is set and the existing
+    reservation is a deletion-halo, in which case a guarded UPDATE takes the
+    halo over. The UPDATE's WHERE clause requires the row still be a
+    deletion-halo, so a concurrent real reservation is never overwritten.
 
     Args:
         reservation: The IPAMReservation to store.
+        evict_halo: Allow taking over a deletion-halo reservation.
 
     Returns:
         True if the reservation was created, False if the address was already
@@ -6429,10 +6436,34 @@ def _direct_reserve_address(reservation: IPAMReservation) -> bool:
             return True
     except IntegrityError:
         # Address already reserved - this is expected and not an error
-        return False
+        if not evict_halo:
+            return False
     except OperationalError as e:
         LOG.warning(f'MariaDB reserve failed for {reservation.ipam_uuid}/'
                     f'{reservation.address}: {e}')
+        return False
+
+    try:
+        with engine.connect() as conn:
+            update_stmt = sa.update(table).where(
+                sa.and_(
+                    table.c.ipam_uuid == reservation.ipam_uuid,
+                    table.c.address == str(reservation.address),
+                    table.c.reservation_type == ReservationType.DELETION_HALO
+                )
+            ).values(
+                reservation_type=reservation.reservation_type,
+                user_type=reservation.user_type,
+                user_uuid=reservation.user_uuid,
+                reserved_at=reservation.reserved_at,
+                comment=reservation.comment
+            )
+            result = conn.execute(update_stmt)
+            conn.commit()
+            return result.rowcount > 0
+    except OperationalError as e:
+        LOG.warning(f'MariaDB halo evicting reserve failed for '
+                    f'{reservation.ipam_uuid}/{reservation.address}: {e}')
         return False
 
 
@@ -6666,18 +6697,20 @@ def _direct_get_addresses_in_use(ipam_uuid: UUID) -> set[str]:
 # These route to either direct or gRPC access based on configuration.
 # =============================================================================
 
-def reserve_address(reservation: IPAMReservation) -> bool:
+def reserve_address(reservation: IPAMReservation,
+                    evict_halo: bool = False) -> bool:
     """Atomically reserve an IP address.
 
     Args:
         reservation: The IPAMReservation to store.
+        evict_halo: Allow taking over a deletion-halo reservation.
 
     Returns:
         True if the reservation was created, False if already reserved.
     """
     if _use_database_service():
-        return _grpc_reserve_address(reservation)
-    return _direct_reserve_address(reservation)
+        return _grpc_reserve_address(reservation, evict_halo=evict_halo)
+    return _direct_reserve_address(reservation, evict_halo=evict_halo)
 
 
 def release_address(ipam_uuid: UUID, address: str,

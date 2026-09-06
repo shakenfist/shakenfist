@@ -44,6 +44,7 @@ from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.ipam_reservation import IPAMReservation
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_types import ObjectType
@@ -1344,10 +1345,14 @@ class MockMariaDB():
         """
         return f'{ipam_uuid}/{address}'
 
-    def _mariadb_reserve_address(self, reservation: IPAMReservation) -> bool:
+    def _mariadb_reserve_address(self, reservation: IPAMReservation,
+                                 evict_halo: bool = False) -> bool:
         """Mock implementation of mariadb.reserve_address()"""
         key = self._ipam_key(reservation.ipam_uuid, str(reservation.address))
-        if key in self.ipam_reservations:
+        existing = self.ipam_reservations.get(key)
+        if existing and not (
+                evict_halo and
+                existing.reservation_type == ReservationType.DELETION_HALO):
             self._trace(f'MockMariaDB.reserve_address({key}): already exists')
             return False
         self.ipam_reservations[key] = reservation
