@@ -645,9 +645,15 @@ jobs:
           # subscription credit is exhausted (HTTP 429). Every model being
           # out of credit exits 1 and produces no output, which the assess
           # step below sees as "no changes".
+          #
+          # The prompt goes in by file, not as an argument: Linux caps a single
+          # argv element at 128KiB and an issue with a long body and a long
+          # comment thread can reach that, where the exec fails outright rather
+          # than truncating and no model runs at all.
           ${{ runner.temp }}/claude-model-fallback.sh \
             --models "${MODELS}" \
-            -- "$(cat ${{ runner.temp }}/claude-prompt.txt)" \
+            --prompt-file ${{ runner.temp }}/claude-prompt.txt \
+            -- \
             --dangerously-skip-permissions \
             --max-turns "${MAX_TURNS}" \
             --output-format text \

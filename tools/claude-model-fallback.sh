@@ -19,6 +19,18 @@
 # running a separate pre-flight probe, which would cost real money on every
 # run in which the preferred model *is* available.
 #
+# PASS A LARGE PROMPT WITH --prompt-file, NOT AS A CLAUDE ARGUMENT. Linux caps
+# a single argv element at MAX_ARG_STRLEN, a hard 128KiB which no ulimit
+# raises, and an exec over it fails outright with "Argument list too long" --
+# so the model never runs and the caller sees an empty answer rather than an
+# error it can name. A prompt carrying CI logs reaches that size easily.
+# --prompt-file hands the prompt to claude on stdin, which has no such limit.
+# It takes a path, and the redirect is made again for each attempt, because
+# this wrapper may run claude more than once: a stream -- the wrapper's own
+# stdin, or one descriptor opened before the loop -- is drained by the first
+# model, and the fallback would run against an empty prompt and answer
+# confidently about nothing.
+#
 # Usage:
 #   tools/claude-model-fallback.sh [options] -- <claude args...>
 #   tools/claude-model-fallback.sh --check MODEL
@@ -26,6 +38,9 @@
 # Options:
 #   --models LIST  Comma-separated models to try in order
 #                  (default: claude-fable-5,claude-opus-5)
+#   --prompt-file FILE
+#                  Read the prompt from FILE, on stdin, rather than passing it
+#                  as a claude argument. Required for a prompt of any size.
 #   --quiet        Suppress the "falling back" notice on stderr
 #   --check MODEL  Probe MODEL only and exit; 0 = available, 1 = out of
 #                  credit. Note that a successful probe costs a small
@@ -50,6 +65,7 @@ set -uo pipefail
 models='claude-fable-5,claude-opus-5'
 quiet=0
 check_model=''
+prompt_file=''
 output_format='text'
 claude_args=()
 
@@ -62,6 +78,10 @@ Usage:
 Options:
   --models LIST  Comma-separated models to try in order
                  (default: claude-fable-5,claude-opus-5)
+  --prompt-file FILE
+                 Read the prompt from FILE, on stdin, rather than passing it
+                 as a claude argument. Required for a prompt of any size: a
+                 single argument is capped at 128KiB by the kernel.
   --quiet        Suppress the "falling back" notice on stderr
   --check MODEL  Probe MODEL only and exit; 0 = available, 1 = out of credit
   --help         Show this help message
@@ -88,6 +108,15 @@ while [ $# -gt 0 ]; do
             models="${1#*=}"
             shift
             ;;
+        --prompt-file)
+            [ $# -ge 2 ] || { echo 'claude-model-fallback: --prompt-file needs a value' >&2; exit 2; }
+            prompt_file="$2"
+            shift 2
+            ;;
+        --prompt-file=*)
+            prompt_file="${1#*=}"
+            shift
+            ;;
         --quiet)
             quiet=1
             shift
@@ -112,6 +141,11 @@ while [ $# -gt 0 ]; do
 done
 
 command -v jq > /dev/null || { echo 'claude-model-fallback: jq is required' >&2; exit 2; }
+
+if [ -n "${prompt_file}" ] && [ ! -r "${prompt_file}" ]; then
+    echo "claude-model-fallback: prompt file '${prompt_file}' cannot be read" >&2
+    exit 2
+fi
 
 # --check: probe a single model with a throwaway prompt.
 if [ -n "${check_model}" ]; then
@@ -161,15 +195,23 @@ case "${output_format}" in
         ;;
 esac
 
-[ "${#claude_args[@]}" -gt 0 ] || {
+if [ "${#claude_args[@]}" -eq 0 ] && [ -z "${prompt_file}" ]; then
     echo 'claude-model-fallback: no claude arguments given' >&2
     exit 2
-}
+fi
 
 rc=0
 IFS=',' read -ra model_list <<< "${models}"
 for model in "${model_list[@]}"; do
-    out=$(claude -p --output-format json --model "${model}" "${claude_args[@]}")
+    if [ -n "${prompt_file}" ]; then
+        # Reopened for each attempt rather than being one stream shared by
+        # all of them: a stream is drained by the first model and the fallback
+        # would see an empty prompt. See the note at the top of this script.
+        out=$(claude -p --output-format json --model "${model}" \
+            "${claude_args[@]}" < "${prompt_file}")
+    else
+        out=$(claude -p --output-format json --model "${model}" "${claude_args[@]}")
+    fi
     rc=$?
 
     status=$(jq -r '.api_error_status // empty' <<< "${out}" 2>/dev/null)
