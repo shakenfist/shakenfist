@@ -31,6 +31,29 @@ commands by commenting on a PR:
 | `@shakenfist-bot please re-review` | `pr-re-review.yml` | Fresh automated review |
 | `@shakenfist-bot please attempt to fix` | `pr-fix-tests.yml` | Fix failing tests (separate template) |
 
+Repeating a command while the first one is still running does not run
+it twice. Both `pr-re-review.yml` and `pr-retest.yml` group their work
+per pull request and cancel the earlier run, so the last request wins
+and the run that cancelled its predecessor posts its own confirmation.
+
+### Which commit a re-review sees
+
+A re-review checks out GitHub's merge of the pull request into its
+base, so the reviewer judges the change where it will land rather than
+in isolation. GitHub does not always publish a merge commit for a pull
+request, and -- because it recomputes one asynchronously after a push
+-- the one it publishes is not always for the current head. Reviewing
+a stale merge commit produces a careful review of superseded code, and
+nothing about the run looks wrong.
+
+So `pr-re-review.yml` resolves the merge ref rather than naming it: it
+confirms the published merge commit is a merge of this pull request's
+head, waits briefly for a recomputation to catch up, and otherwise
+falls back to reviewing the head on its own. **When it falls back it
+says so in a comment on the pull request**, naming which of the two
+cases it hit. A review of the head is worth having; a reader who
+believes it saw the merge result is not.
+
 ## Security Model
 
 These workflows use `issue_comment` triggers, which run with

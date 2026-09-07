@@ -1,5 +1,17 @@
 # Two-stage CI with a merge queue
 
+> **Superseded in part, 2026-09.** The merge tier described below
+> no longer contains the four fuzz jobs: they moved to a nightly
+> `fuzz.yml` because asking the six-wide shared `l` pool for four
+> runners at merge-group time was hitting the 360-minute check
+> timeout and evicting pull requests from the queue
+> ([#329](https://github.com/shakenfist/ryll/issues/329)). The
+> merge tier is now the cross-platform build matrix alone. The
+> rest of this plan — the two-tier scheme, the three gates, the
+> ruleset — still describes what is deployed. See
+> [ci.md](/components/ryll/ci/) for the current arrangement; this page is
+> kept as the record of how the tiers were arrived at.
+
 ## Prompt
 
 Before responding to questions or discussion points in this

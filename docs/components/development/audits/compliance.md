@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-06T10:33:10.891686+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-07T11:54:31.870844+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -46,7 +46,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#26 |
-| shakenfist | non-compliant | shakenfist/shakenfist#3314 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#16 |
 | visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#16 |
 
@@ -58,7 +58,6 @@ Details for non-compliant projects:
 - **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **occystrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
-- **shakenfist** (Status): Missing pr-retest.yml; pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **visual-digest-rust** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 
@@ -195,7 +194,7 @@ Criterion: [diagram-format.md](/components/development/audits/diagram-format/)
 | cloudgood | non-compliant | shakenfist/cloudgood#9 |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#536 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
 | kerbside-patches | compliant | - |
@@ -212,7 +211,6 @@ Details for non-compliant projects:
 
 - **clingwrap** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:21
 - **cloudgood** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/memory-mapped-devices.md:729
-- **instar** (Status): 13 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:21, docs/format-detection-safety.md:48, docs/technology-primer.md:988, docs/prototypes/kvm-hello-world.md:18, docs/prototypes/kvm-hello-world2.md:22, docs/prototypes/virtio-block.md:49, docs/prototypes/virtio-block.md:96, docs/prototypes/virtio-block2.md:25, docs/prototypes/virtio-block3.md:26, docs/prototypes/virtio-block5.md:65 (+3 more)
 - **occystrap** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/internals.md:30
 
 ## docs-external-links
@@ -345,7 +343,7 @@ Criterion: [fuzz-nightly-reporting.md](/components/development/audits/fuzz-night
 
 Details for non-compliant projects:
 
-- **ryll** (Status): runs fuzz targets on merge_group in ci.yml, where the cost is charged against the queue timeout; no schedule trigger on ci.yml, so the targets only run when somebody dispatches them
+- **ryll** (Status): fuzz.yml runs on a schedule but cannot file an issue for what it finds (needs issues: write and a `gh issue create` or equivalent, directly or through a script)
 
 ## github-security
 
@@ -583,7 +581,7 @@ Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | N/A | - |
-| instar | N/A | - |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
@@ -727,7 +725,7 @@ Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **instar** (Status): 6 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/quirks.md:4199, docs/quirks.md:4205, docs/quirks.md:4206, docs/quirks.md:4407, docs/quirks.md:4463, docs/quirks.md:4464
-- **shakenfist** (Status): 24 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:71, docs/developer_guide/ci.md:133, docs/developer_guide/ci.md:216, docs/developer_guide/ci.md:267, docs/developer_guide/ci.md:268, docs/developer_guide/database_internals.md:340, docs/developer_guide/database_internals.md:344, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:110 (+14 more)
+- **shakenfist** (Status): 24 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:71, docs/developer_guide/ci.md:133, docs/developer_guide/ci.md:216, docs/developer_guide/ci.md:267, docs/developer_guide/ci.md:268, docs/developer_guide/database_internals.md:351, docs/developer_guide/database_internals.md:355, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:110 (+14 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
 
@@ -810,7 +808,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | non-compliant | shakenfist/instar#491 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
@@ -826,7 +824,6 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
-- **instar** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
 - **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 - **ryll** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
@@ -1078,10 +1075,10 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 0 of 94 in-scope files reviewed at HEAD; 94 need review (threshold 5)
-- **development** (Status): 160 of 176 in-scope files reviewed at HEAD; 16 need review (threshold 5)
+- **actions** (Status): 0 of 98 in-scope files reviewed at HEAD; 98 need review (threshold 5)
+- **development** (Status): 169 of 176 in-scope files reviewed at HEAD; 7 need review (threshold 5)
 - **kerbside** (Status): 117 of 229 in-scope files reviewed at HEAD; 112 need review (threshold 5)
-- **ryll** (Status): 85 of 188 in-scope files reviewed at HEAD; 103 need review (threshold 5)
+- **ryll** (Status): 83 of 195 in-scope files reviewed at HEAD; 112 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1375,7 +1372,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 
 | Project | flake8wrap | Runners | Static tags | VM size | Permissions | Linting | devpi fallback | devpi IP | Review marks | Issue |
 |---------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
-| actions | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | compliant | - |
+| actions | N/A | non-compliant | compliant | compliant | compliant | compliant | N/A | compliant | compliant | shakenfist/actions#57 |
 | agent-python | non-compliant | non-compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/agent-python#105, shakenfist/agent-python#130, shakenfist/agent-python#82 |
 | client-python | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/client-python#378 |
 | client-python-k3s | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
@@ -1392,12 +1389,13 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 | private-ci | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
 | ryll | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | sfui | N/A | compliant | compliant | compliant | compliant | compliant | compliant | compliant | N/A | - |
-| shakenfist | non-compliant | compliant | compliant | non-compliant | compliant | compliant | non-compliant | compliant | N/A | shakenfist/shakenfist#3057, shakenfist/shakenfist#3418, shakenfist/shakenfist#3977 |
+| shakenfist | compliant | compliant | compliant | non-compliant | compliant | compliant | compliant | compliant | N/A | shakenfist/shakenfist#3977 |
 | uncalibrated-sextant | N/A | non-compliant | compliant | compliant | non-compliant | compliant | N/A | compliant | N/A | shakenfist/uncalibrated-sextant#15, shakenfist/uncalibrated-sextant#17 |
 | visual-digest-rust | N/A | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/visual-digest-rust#15 |
 
 Details for non-compliant projects:
 
+- **actions** (Runners): 1 unmarked GitHub-hosted runner reference(s): issue-link-check.yml:36 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **agent-python** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **agent-python** (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **agent-python** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:25 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
@@ -1407,9 +1405,7 @@ Details for non-compliant projects:
 - **kerbside-client** (Linting): Missing .pre-commit-config.yaml
 - **occystrap** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **occystrap** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:17 (self-hosted, vm, debian-12), python-unit-tests.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
-- **shakenfist** (flake8wrap): Missing shellcheck disable=SC2086 directive
-- **shakenfist** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:718 (self-hosted, vm, debian-12), pin-indirect-dependencies.yml:50 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
-- **shakenfist** (devpi fallback): 10 devpi-backed env block(s) missing a PIP_EXTRA_INDEX_URL pypi fallback: code-formatting.yml:27, codeql-analysis.yml:20, docs-tests.yml:19, functional-tests.yml:26, issue-fix.yml:133, merge-failure-triage.yml:128, publish-website.yml:17, release.yml:26, scheduled-tests.yml:24, test-drift-fix.yml:78. Add "PIP_EXTRA_INDEX_URL: https://pypi.org/simple/" alongside PIP_INDEX_URL so a devpi cold-cache miss (empty index for a first-touch package) falls back to pypi instead of failing with "from versions: none"
+- **shakenfist** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:721 (self-hosted, vm, debian-12), pin-indirect-dependencies.yml:50 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **uncalibrated-sextant** (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **uncalibrated-sextant** (Permissions): 1 workflow(s) missing top-level permissions: pre-commit.yml
 - **visual-digest-rust** (VM size): 1 "vm" runner job(s) naming no size: ci.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason

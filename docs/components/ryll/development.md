@@ -263,12 +263,15 @@ GitHub Actions CI builds and tests ryll on Linux (x86_64 + aarch64),
 macOS (Apple Silicon), and Windows (x86_64 + aarch64) in two tiers. A
 smoke tier runs on pull requests — lint, the self-hosted Linux x86_64
 build and tests, a Windows cross-check, and the supply-chain scanners
-— while a merge tier runs in the merge queue with the fuzz targets and
-the cross-platform build matrix, so the expensive jobs run once,
-against the commit that is about to land. Linux x86_64 jobs run on
-self-hosted runners with the build wrapped in the devcontainer (via
-the same Makefile targets used locally); macOS, Windows, and aarch64
-Linux use GitHub-hosted runners because we own no matching hardware.
+— while a merge tier runs in the merge queue with the cross-platform
+build matrix, so the expensive jobs run once, against the commit that
+is about to land. The `cargo-fuzz` targets are in neither tier: they
+build and smoke-run nightly from `fuzz.yml`, which files a GitHub
+issue for each failing target rather than relying on anyone noticing
+a red scheduled run. Linux x86_64 jobs run on self-hosted runners
+with the build wrapped in the devcontainer (via the same Makefile
+targets used locally); macOS, Windows, and aarch64 Linux use
+GitHub-hosted runners because we own no matching hardware.
 PRs also receive an automated code review via Claude Code. Changes
 that only touch code-review artifacts (`REVIEWS.md`,
 `.vscode/*.weaudit*`, `.vscode/review-scope.toml`) skip every CI job

@@ -74,8 +74,17 @@ Error: invalid peer certificate: UnknownIssuer
 1. The `ca=` field in a .vv file contains inline PEM content
    (with `\n` escape sequences), not a file path. Ensure the
    full certificate is included.
-2. Ryll accepts hostname mismatches when a custom CA is provided
-   (SPICE self-signed certificates typically lack SAN extensions).
+2. A `ca=` field replaces the public CA roots rather than adding
+   to them: it asserts a private PKI, so a certificate that chains
+   to a public CA but not to the one named in the .vv is rejected.
+   A server whose certificate comes from a public CA must be used
+   without a `ca=` field.
+3. Ryll accepts hostname mismatches when a custom CA is provided
+   or a `host-subject` is pinned (SPICE self-signed certificates
+   typically lack SAN extensions, so the name check fails against
+   a backend reached by IP). With neither, the public roots apply
+   and the certificate's name must match the host connected to,
+   because the name is then all that identifies the backend.
 
 ## Display Issues
 
