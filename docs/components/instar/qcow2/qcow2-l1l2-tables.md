@@ -6,25 +6,15 @@ efficient copy-on-write operations.
 
 ## Address Translation Overview
 
-```
-Guest Offset (logical address)
-        |
-        v
-+-------------------+
-|   L1 Table        |  Memory-resident, one entry per L2 table
-|   [l1_index]      |
-+-------------------+
-        |
-        v  (L2 table offset)
-+-------------------+
-|   L2 Table        |  One cluster per table, cached on demand
-|   [l2_index]      |
-+-------------------+
-        |
-        v  (cluster offset + in-cluster offset)
-+-------------------+
-|   Data Cluster    |  Actual disk data
-+-------------------+
+```mermaid
+flowchart TB
+    offset["Guest offset (logical address)"]
+    l1["L1 table [l1_index]<br/>Memory-resident, one entry per L2 table"]
+    l2["L2 table [l2_index]<br/>One cluster per table, cached on demand"]
+    data["Data cluster<br/>Actual disk data"]
+    offset --> l1
+    l1 -- "L2 table offset" --> l2
+    l2 -- "cluster offset + in-cluster offset" --> data
 ```
 
 ## Index Calculations

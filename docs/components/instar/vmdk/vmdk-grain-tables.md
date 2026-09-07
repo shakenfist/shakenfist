@@ -27,25 +27,15 @@ grain_size_bytes = granularity * 512;  // From header
 
 ## Two-Level Address Translation
 
-```
-Virtual Offset
-      |
-      v
-+------------------+
-| Grain Directory  |  L1 table (GD)
-| [gd_index]       |
-+------------------+
-      |
-      v  (GT offset in sectors)
-+------------------+
-| Grain Table      |  L2 table (GT)
-| [gt_index]       |
-+------------------+
-      |
-      v  (grain offset in sectors)
-+------------------+
-| Grain Data       |  Actual data
-+------------------+
+```mermaid
+flowchart TB
+    offset["Virtual offset"]
+    gd["Grain directory [gd_index]<br/>L1 table (GD)"]
+    gt["Grain table [gt_index]<br/>L2 table (GT)"]
+    data["Grain data<br/>Actual data"]
+    offset --> gd
+    gd -- "GT offset in sectors" --> gt
+    gt -- "grain offset in sectors" --> data
 ```
 
 ## Index Calculations

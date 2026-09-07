@@ -46,25 +46,18 @@ guest/
 
 ## Virtio MMIO Device State Machine
 
-```
-       RESET
-         │
-         ▼
-    ACKNOWLEDGE ─────────────────────┐
-         │                           │
-         ▼                           │
-      DRIVER ────────────────────────┤
-         │                           │
-         ▼                           │
-   FEATURES_OK ──────────────────────┤
-         │                           │
-         ▼                           │
-    DRIVER_OK                        │
-         │                           │
-         ├──────── Normal Operation ─┤
-         │                           │
-         ▼                           │
-      FAILED ◄───────────────────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> RESET
+    RESET --> ACKNOWLEDGE
+    ACKNOWLEDGE --> DRIVER
+    DRIVER --> FEATURES_OK
+    FEATURES_OK --> DRIVER_OK
+    DRIVER_OK --> DRIVER_OK: normal operation
+    ACKNOWLEDGE --> FAILED
+    DRIVER --> FAILED
+    FEATURES_OK --> FAILED
+    DRIVER_OK --> FAILED
 ```
 
 ## Virtqueue Memory Layout
@@ -93,19 +86,15 @@ Base Address
 
 ## Block Request Descriptor Chain
 
+```mermaid
+flowchart LR
+    d0["Descriptor 0 (header)<br/>addr: header<br/>len: 16<br/>flags: NEXT<br/>next: 1"]
+    d1["Descriptor 1 (data)<br/>addr: buffer<br/>len: 512<br/>flags: NEXT +WRITE*"]
+    d2["Descriptor 2 (status)<br/>addr: status<br/>len: 1<br/>flags: WRITE<br/>next: 0"]
+    d0 --> d1 --> d2
 ```
-┌────────────────┐     ┌────────────────┐     ┌────────────────┐
-│   Descriptor 0 │────▶│   Descriptor 1 │────▶│   Descriptor 2 │
-│    (Header)    │     │     (Data)     │     │    (Status)    │
-├────────────────┤     ├────────────────┤     ├────────────────┤
-│ addr: header   │     │ addr: buffer   │     │ addr: status   │
-│ len: 16        │     │ len: 512       │     │ len: 1         │
-│ flags: NEXT    │     │ flags: NEXT    │     │ flags: WRITE   │
-│ next: 1        │     │       +WRITE*  │     │ next: 0        │
-└────────────────┘     └────────────────┘     └────────────────┘
-                       * WRITE flag set for
-                         READ operations
-```
+
+\* The `WRITE` flag is set on the data descriptor for READ operations.
 
 ## Request/Response Flow
 

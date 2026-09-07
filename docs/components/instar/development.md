@@ -172,6 +172,62 @@ To auto-fix formatting issues:
 ./scripts/check-rust.sh fix
 ```
 
+## Diagrams
+
+Diagrams of structure or flow -- components and the arrows between them,
+an ordered exchange of messages, a state machine -- are written as fenced
+`mermaid` blocks, which GitHub renders natively. Character art that is
+*not* a diagram stays in a plain fence: file trees, memory maps, register
+and bit-field layouts, wire-format byte layouts and captured terminal
+output all carry their meaning in the column alignment, and mermaid would
+destroy it. The full policy is the `diagram-discipline` shared block in
+`PUSH-AUDIT.md`.
+
+Mermaid fails at render time rather than at commit time, so a syntax error
+commits cleanly and then shows an error box on GitHub. Render before you
+push:
+
+```bash
+tools/mermaid-lint.sh            # every tracked markdown file
+tools/mermaid-lint.sh docs/x.md  # just this one
+```
+
+Check the exit status directly. Piping the script into `tail` or `grep`
+reports the filter's status, not the script's, and turns every failure
+green. `tools/audit/wave1.sh` runs it as part of the pre-push audit, and
+CI runs the same script from `mermaid-lint.yml` on any pull request that
+touches markdown, on any push to `develop` or `main` that does, and on
+demand via `workflow_dispatch`. The lane gates nothing automatically, so
+without the push trigger a commit that lands without a pull request would
+go unlinted until it failed somebody else's markdown change. (The
+template ships both branch names because the fleet's default branch
+varies; here only `develop` ever matches.)
+
+`mmdc` reads exactly one fence: three backticks, then `mermaid`, then
+nothing. GitHub renders a wider family, and every shape in between is
+rejected rather than skipped -- a tilde fence, a space before the
+language, four or more backticks, and anything after the language such
+as ```` ```mermaid title=x ````. The script names the file, the line and
+what to change. Trailing whitespace after the language is fine; `mmdc`
+reads that. Quoting one of the rejected forms in a document is also fine
+-- a fence nested inside a longer fence is an example, not a diagram, and
+this paragraph's own page is the case that rule exists for.
+
+Put a diagram at the top level. A `mermaid` fence inside a blockquote is
+the one shape that is neither linted nor rejected: GitHub renders it and
+`mmdc` finds nothing in the file, so it passes silently. That is a
+deliberate blind spot rather than an oversight -- refusing one means
+ruling on a fence nested inside a blockquoted fence -- but it does mean a
+blockquoted diagram is unchecked.
+
+If this repository ever grows a `REVIEWS.md`, the script skips it,
+matching the workflow's path filter: a review session rewrites the file
+and changes no diagram. Name it as an argument to lint it anyway.
+
+The container runs with `--network none`, so a diagram that reaches for a
+remote font or icon pack fails here rather than rendering differently
+depending on the runner.
+
 ## Makefile
 
 A Makefile is provided for common development tasks:
@@ -467,6 +523,11 @@ or any other container-backed Makefile target must install it first:
 Omitting the step does not fail at job start -- it fails part way through
 with `docker: command not found`, whenever the first container command is
 reached.
+
+The one exception is `mermaid-lint.yml`, which runs on
+`[self-hosted, vm, debian-12-docker, s]`. That is the fleet image that
+ships `docker.io`, so it needs no install step -- but the label has to be
+listed in `.github/actionlint.yaml` or actionlint rejects the workflow.
 
 ### Self-hosted runners and the GitHub CLI
 
@@ -802,6 +863,7 @@ Each review item has an `action` field:
 - `.github/workflows/lint.yml` - rustfmt and clippy in the containerised toolchain (PR, path-filtered to the Rust tree)
 - `.github/workflows/export-repo-config.yml` - nightly export of this repository's GitHub settings for the fleet configuration audit
 - `.github/workflows/renovate.yml` - self-hosted Renovate dependency updates (hourly)
+- `.github/workflows/mermaid-lint.yml` - renders every mermaid diagram in the repository's markdown and fails on any that does not parse (PR, push to develop, and workflow_dispatch; path-filtered to markdown)
 
 The self-hosted runners have no Docker preinstalled, so any job touching
 `docker` or a container-backed Makefile target needs an "Install Docker"
@@ -825,3 +887,4 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/ci/test-check-glibc-floor.sh` - Tests for that check; the `ci-tooling` CI job runs it
 - `tools/ci/claude-result.sh` - Reads the JSONL stream a `claude -p --output-format stream-json --verbose` run leaves behind; `--text` reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), `--trailer` emits the `Assisted-By:`/`Co-Authored-By:` pair naming the model the run actually resolved to. Called from `test-drift-fix.yml`
 - `tools/ci/test-claude-result.sh` - Tests for that helper; the `ci-tooling` CI job runs it
+- `tools/mermaid-lint.sh` - Renders every tracked markdown file that contains a mermaid fence, in the upstream mermaid-cli container (see "Diagrams" above); `mermaid-lint.yml` and the push audit's wave 1 both run it

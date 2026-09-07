@@ -19,23 +19,11 @@ These improvements become critical as complexity increases with virtio devices.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ VMM (Host Process)                                      │
-│  - Uses vm-memory for guest memory management           │
-│  - GuestMemoryMmap for automatic mmap allocation        │
-│  - GuestAddress for type-safe address handling          │
-│  - write_obj/write_slice for safe memory writes         │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          │ KVM ioctls
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ Guest (Bare-Metal Binary)                               │
-│  - Unchanged from helloworld                            │
-│  - Same no_std bare-metal code                          │
-│  - Guest is unaware of VMM implementation details       │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    vmm["VMM (host process)<br/>Uses vm-memory for guest memory management<br/>GuestMemoryMmap for automatic mmap allocation<br/>GuestAddress for type-safe address handling<br/>write_obj/write_slice for safe memory writes"]
+    guest["Guest (bare-metal binary)<br/>Unchanged from helloworld<br/>Same no_std bare-metal code<br/>Guest is unaware of VMM implementation details"]
+    vmm -- "KVM ioctls" --> guest
 ```
 
 ## Key Improvements

@@ -23,17 +23,18 @@ validate whether increased sector size improves performance.
 
 ## Architecture
 
-```
-VMM                                          Guest
- │                                            │
- │ ──── VmmConfig (sector sizes) ──────────> │  COM1 (0x3f8)
- │                                            │  Protobuf protocol
- │ <──── InitMessage (config received) ───── │
- │ <──── CapacityMessage (per device) ─────  │
- │ <──── ProgressMessage (copy progress) ──  │
- │ <──── CompleteMessage (done) ───────────  │
- │                                            │
- │ <──── Debug messages (plain text) ─────── │  COM2 (0x2f8)
+```mermaid
+sequenceDiagram
+    participant VMM
+    participant Guest
+    Note over VMM,Guest: COM1 (0x3f8) -- protobuf protocol
+    VMM->>Guest: VmmConfig (sector sizes)
+    Guest->>VMM: InitMessage (config received)
+    Guest->>VMM: CapacityMessage (per device)
+    Guest->>VMM: ProgressMessage (copy progress)
+    Guest->>VMM: CompleteMessage (done)
+    Note over VMM,Guest: COM2 (0x2f8) -- plain text
+    Guest->>VMM: Debug messages
 ```
 
 ### Serial Ports
