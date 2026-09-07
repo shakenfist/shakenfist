@@ -19,9 +19,28 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import field_validator
 
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.sqlalchemy import SQLIndex
+
+
+# The object_states.message and node_daemon_states.message columns are both
+# sa.String(255), so MariaDB rejects anything longer with a DataError (1406,
+# "Data too long"). Issue 4112: an over-long instance error message escaped
+# far enough to skip instance cleanup entirely.
+STATE_MESSAGE_MAX_LENGTH = 255
+
+
+def clip_state_message(message: Optional[str]) -> Optional[str]:
+    """Clip a state message to fit the 255 character message columns.
+
+    A state message is a summary -- the full text is in the log line that
+    produced it -- so we clip with an ellipsis rather than widen the column.
+    """
+    if message is not None and len(message) > STATE_MESSAGE_MAX_LENGTH:
+        return message[:STATE_MESSAGE_MAX_LENGTH - 3] + '...'
+    return message
 
 
 class State(BaseModel):
@@ -46,6 +65,17 @@ class State(BaseModel):
     value: Optional[str] = None
     update_time: float = 0.0
     message: Optional[str] = None
+
+    @field_validator('message', mode='before')
+    @classmethod
+    def _clip_message(cls, v: Any) -> Any:
+        # Every write to object_states.message funnels through a State
+        # (baseobject on the client side, the SetObjectState servicer on
+        # the database daemon side), so clipping here bounds the message
+        # everywhere before it can reach the sa.String(255) column.
+        if isinstance(v, str):
+            return clip_state_message(v)
+        return v
 
     def __repr__(self) -> str:
         return 'State(' + str(self.obj_dict()) + ')'

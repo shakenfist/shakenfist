@@ -6,6 +6,7 @@ import uuid
 from unittest import mock
 
 import grpc
+from sqlalchemy.exc import DataError
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
@@ -13,6 +14,7 @@ from shakenfist.config import BaseSettings
 from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist.protos import database_pb2
 from shakenfist.schema.node_daemon_state import NodeDaemonStateData
+from shakenfist.schema.object_state import STATE_MESSAGE_MAX_LENGTH
 from shakenfist.tests import base
 
 
@@ -70,6 +72,42 @@ class SetNodeDaemonStateTestCase(base.ShakenFistTestCase):
             NODE_UUID, 'net', 'daemon-running', 1234567890.0, None)
 
         self.assertFalse(result)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_returns_false_on_data_error(self, mock_get_engine):
+        # node_daemon_states.message is sa.String(255); an over-long value
+        # must degrade to a failed write, not an escaped exception
+        # (issue 4112).
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_conn.execute.side_effect = DataError(
+            'statement', {}, Exception("Data too long for column 'message'"))
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        mock_get_engine.return_value = mock_engine
+
+        result = mariadb._direct_set_node_daemon_state(
+            NODE_UUID, 'net', 'daemon-error', 1234567890.0, 'x' * 549)
+
+        self.assertFalse(result)
+
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    @mock.patch('shakenfist.mariadb._direct_set_node_daemon_state',
+                return_value=True)
+    def test_public_wrapper_clips_long_message(
+            self, mock_direct, mock_use_service):
+        # The public wrapper bounds the message on both routes before it
+        # can reach the 255 character column (issue 4112).
+        result = mariadb.set_node_daemon_state(
+            NODE_UUID, 'net', 'daemon-error', 1234567890.0, 'x' * 549)
+
+        self.assertTrue(result)
+        message = mock_direct.call_args.args[4]
+        self.assertEqual(STATE_MESSAGE_MAX_LENGTH, len(message))
+        self.assertTrue(message.endswith('...'))
 
 
 class GetNodeDaemonStateTestCase(base.ShakenFistTestCase):

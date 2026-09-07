@@ -41,6 +41,7 @@ from pydantic import SecretStr
 import sqlalchemy as sa
 from sqlalchemy import event as sa_event
 from sqlalchemy.dialects.mysql import INET4
+from sqlalchemy.exc import DataError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 from shakenfist_utilities import logs
@@ -94,6 +95,7 @@ from shakenfist.schema.cluster_operation_target import ClusterOperationTargetDat
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_metadata import ObjectMetadataData
 from shakenfist.schema.object_reference import ObjectReference
+from shakenfist.schema.object_state import clip_state_message
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
@@ -4038,7 +4040,10 @@ def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -
 
             conn.commit()
             return True
-    except OperationalError as e:
+    except (DataError, OperationalError) as e:
+        # DataError (e.g. 1406 "Data too long") must degrade to a False
+        # return like any other failed write, not escape the servicer
+        # (issue 4112).
         LOG.warning(
             f'MariaDB write failed for {object_type}/{object_uuid}: {e}')
         return False
@@ -11318,7 +11323,7 @@ def _direct_set_node_daemon_state(
             conn.execute(stmt)
             conn.commit()
             return True
-    except OperationalError as e:
+    except (DataError, OperationalError) as e:
         LOG.warning(
             f'MariaDB write failed for node_daemon_states '
             f'{node_uuid}/{daemon}: {e}')
@@ -12055,6 +12060,10 @@ def set_node_daemon_state(
     serialise concurrent writes for the same daemon at the SQL layer
     while leaving writes for different daemons fully parallel.
     """
+    # node_daemon_states.message is sa.String(255) like
+    # object_states.message; the message is a summary, so clip rather
+    # than let MariaDB reject the whole write (issue 4112).
+    message = clip_state_message(message)
     if _use_database_service():
         return _grpc_set_node_daemon_state(
             node_uuid, daemon, value, update_time, message)

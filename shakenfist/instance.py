@@ -2458,7 +2458,13 @@ class Instance(dbowo):
             # We can land here if there is a serious database error.
             self.state = self.STATE_ERROR
 
-        self.error = error_msg
+        try:
+            self.error = error_msg
+        except Exception as e:
+            # The error message is an annotation; failing to record it must
+            # not prevent the instance being cleaned up (issue 4112).
+            LOG.with_fields({'instance': self.uuid}).error(
+                f'Failed to record error message before delete: {e}')
         self.enqueue_delete()
 
     def snapshot(self, all=False, device=None, max_versions=None, thin=False):
