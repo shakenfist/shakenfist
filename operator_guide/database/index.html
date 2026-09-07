@@ -16805,7 +16805,10 @@ allocation. This provides:</p>
   conditions when multiple nodes try to allocate the same address</li>
 <li><strong>Efficient queries</strong>: Indexes on ipam_uuid and address for fast lookups</li>
 <li><strong>Deletion halo</strong>: Supports the deletion-halo pattern where recently released
-  addresses are temporarily unavailable to prevent reuse conflicts</li>
+  addresses are temporarily unavailable to prevent reuse conflicts. The halo
+  only guards against <em>random</em> reallocation: a reservation explicitly
+  requesting a haloed address (for example an instance create with a static
+  <code>address=</code>) atomically takes the halo over</li>
 </ul>
 <h3 id="the-ipam_reservations-table">The ipam_reservations Table<a class="headerlink" href="#the-ipam_reservations-table" title="Permanent link">&para;</a></h3>
 <p>The <code>ipam_reservations</code> table uses a composite primary key on (ipam_uuid, address):</p>
