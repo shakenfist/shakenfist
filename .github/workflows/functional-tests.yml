@@ -769,6 +769,15 @@ jobs:
   # any the wiser. This fails while the description can still be edited.
   # It also prints what the pull request will close, which is how a closing
   # keyword in ordinary prose shows itself before it shuts a live bug.
+  #
+  # This job deliberately carries no same-repo guard, unlike
+  # smoke_collection above. The called workflow checks out only
+  # shakenfist/actions and reads the pull request entirely through the
+  # API, so no fork-controlled code executes on the runner -- and
+  # skipping fork pull requests would silently exempt them from the
+  # gate, since can_enqueue treats a skipped dependency as success.
+  # Those are the terms on which the exposure is accepted; it is not an
+  # omission.
   issue_link_check:
     name: "Issue links"
     if: github.event_name == 'pull_request'
