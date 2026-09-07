@@ -158,7 +158,7 @@ port=5900
 | `port` | No* | SPICE insecure port (usually 5900+) |
 | `tls-port` | No* | SPICE TLS port for secure connections |
 | `password` | No | SPICE password for authentication |
-| `ca` | No | Inline PEM CA certificate for TLS verification |
+| `ca` | No | Inline PEM CA certificate for TLS verification. When present it is the only trust anchor for the connection -- the public CA roots are not trusted as well |
 | `host-subject` | No | Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup |
 
 ### Ticket lifecycle keys
@@ -215,8 +215,10 @@ ca=-----BEGIN CERTIFICATE-----\nMIIE...(base64)...\n-----END CERTIFICATE-----\n
 ```
 
 Note: the `ca=` field contains the PEM certificate inline with `\n`
-escape sequences for newlines, not a file path. Either `port` or
-`tls-port` (or both) must be specified.
+escape sequences for newlines, not a file path. It *replaces* the
+public CA roots for that connection rather than adding to them, so
+omit it for a server whose certificate comes from a public CA.
+Either `port` or `tls-port` (or both) must be specified.
 
 **Full configuration:**
 ```ini

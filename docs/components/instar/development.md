@@ -163,8 +163,11 @@ Beyond the Rust hooks, `pre-commit run --all-files` also runs:
 - `actionlint` over `.github/workflows/`, and `shellcheck` over
   `scripts/` and `tools/`.
 - `binary-sizes`, which checks the built binaries against the guest
-  memory layout, and `nightly-pins`, which fails if the two
-  devcontainer Dockerfiles disagree about the Rust nightly.
+  memory layout, and `devcontainer-pins`, which fails if the two
+  devcontainer Dockerfiles disagree about the Rust nightly or about the
+  version of any cargo tool they both install, if a `cargo install` line
+  has lost its `--locked`, or if a version pin has stopped being visible
+  to Renovate. See "Cargo tool pinning" below.
 
 To auto-fix formatting issues:
 
@@ -794,13 +797,78 @@ least building both images. (The lint container is separate and uses a
 stable `rust:` tag Renovate does manage; the dev image's Debian base is
 pinned by digest and Renovate walks it forward.)
 
+### Cargo tool pinning
+
+The Rust nightly is not the only thing a from-scratch image build
+resolves at build time. Both Dockerfiles `cargo install` their tooling
+from crates.io — `cargo-binutils`, `cargo-deb` and `cargo-generate-rpm`
+in both images, plus `cargo-fuzz` and `cargo-audit` in the dev image —
+and those installs are pinned two ways:
+
+* **An `ARG <TOOL>_VERSION` per crate**, so the tool version itself does
+  not float. Each ARG carries a `# renovate: datasource=crate
+  depName=<crate>` comment directly above it, which a `customManagers`
+  entry in `renovate.json` matches. Keep the comment adjacent to its
+  ARG or the pin silently stops being managed. Renovate raises one PR
+  per crate covering every file it appears in, so the dev and build
+  images move together — never bump one file alone.
+* **`cargo install --locked`**, so each tool builds against the exact
+  dependency versions its author released it with instead of
+  re-resolving to the newest semver-compatible transitive dependencies.
+
+`tools/ci/check-devcontainer-pins.sh` enforces both, from pre-commit
+and from the `build-and-test` CI job: it fails if the two images
+disagree about the nightly or about a shared tool version, if any
+`cargo install` line has lost its `--locked`, if a crate is installed
+at a hardcoded version rather than through its ARG, or if a pin's
+`# renovate:` comment is missing, detached, or names a different crate
+than the ARG. A quoted pin value fails too — `renovate.json` captures
+`[^\s"]+`, so `ARG CARGO_DEB_VERSION="3.8.0"` would match nothing and
+freeze silently.
+
+Nothing in the guard is keyed off a list of tool names or a `cargo-`
+prefix. The shared set it compares across the two images is the
+*intersection of what they actually install*, so a tool added to both
+later is covered from the day it is added rather than when someone
+remembers to extend a list; and the Renovate-visibility rules are
+applied to whatever crates the install lines name, so a dependency
+whose crate is not called `cargo-something` gets the same treatment.
+
+The guard also runs the `customManagers` regex **as it is written in
+`renovate.json` today** over both Dockerfiles, and requires it to find
+exactly the pins the guard found by its own parse — same crates, same
+versions, no more and no fewer (`tools/ci/check-renovate-manager.py`).
+Without that, the format rules above are only this repository's memory
+of what Renovate needs: a typo in `matchStrings`, or a
+`managerFilePatterns` entry that stops naming these files, would freeze
+all eight pins forever while the guard still reported them healthy. A
+frozen pin is worse than the floating install it replaced, because
+nothing errors anywhere.
+
+The second is what protects against a broken *transitive* dependency,
+and it is not hypothetical: on 2026-09-03 `tinyvec` 1.13.0 was
+published with `use alloc::vec::{self, Vec}`, which shadows the `vec!`
+macro so the crate does not compile at all. `cargo install cargo-audit`
+picked it up within the hour and failed the "Build and test via
+devcontainer" step on every PR until upstream shipped 1.13.2. Nothing
+in the repository had changed. `--locked` would have held cargo-audit
+to the tinyvec its lockfile names.
+
+Note the interaction with the Renovate rule that freezes
+`src/.devcontainer/build/Dockerfile`: that rule is scoped to the
+`docker` datasource, so it still pins `debian:bullseye` (whose glibc
+2.31 sets the floor of the shipped binary) while leaving the crate
+pins in the same file managed.
+
 ## CI tooling guards
 
 The `ci-tooling` CI job runs the cheap guards over CI's own tooling:
 the test-partition check below, plus
 `tools/ci/test-report-fuzz-crash.sh` and
 `tools/ci/test-pick-fuzz-artifact.sh` for the coverage-fuzz helpers
-(see "Crash reporting" in [docs/testing.md](/components/instar/testing/)). It is
+(see "Crash reporting" in [docs/testing.md](/components/instar/testing/)) and
+`tools/ci/test-check-devcontainer-pins.sh` for the devcontainer pin
+guard (see "Cargo tool pinning" above). It is
 also the job named in `automated_reviewer`'s `needs` list, which is
 required to list every job that can fail a PR.
 
