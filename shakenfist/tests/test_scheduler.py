@@ -259,10 +259,16 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
 
     def test_no_such_node(self):
         fake_inst = self.mock_mariadb.create_instance('fake-inst')
-        self.assertRaises(
+        exc = self.assertRaises(
             exceptions.CandidateNodeNotFoundException,
             scheduler.Scheduler().find_candidates,
             fake_inst, candidates=['barry'])
+        # The message is recorded against the user's instance when a
+        # forced placement fails, so a bare node UUID is not enough
+        # (issue 4113).
+        self.assertEqual(
+            'candidate node barry is not in the active node list, or its '
+            'metrics were unreadable', str(exc))
 
     def test_empty_forced_list_is_nowhere_not_everywhere(self):
         # The preflight redirect builds "every node except this one",
