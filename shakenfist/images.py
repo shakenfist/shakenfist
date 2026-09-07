@@ -117,7 +117,7 @@ class ImageFetchHelper:
         if self.instance:
             self.objects.append(self.instance)
 
-    def get_image(self):
+    def get_image(self, cached_only=False):
         fetched_blobs = []
         with self.artifact.get_lock(timeout=config.MAX_IMAGE_TRANSFER_SECONDS,
                                     op='get image'):
@@ -126,7 +126,7 @@ class ImageFetchHelper:
             # means that even if we have a cached post transcode version of the image
             # we insist on having the original locally. This was mostly done because
             # I am lazy, but it also serves as a partial access check.
-            fetched_blobs.append(self.transfer_image())
+            fetched_blobs.append(self.transfer_image(cached_only=cached_only))
 
             # If the image depends on another image, we must fetch that too.
             while depends_on := fetched_blobs[-1].depends_on:
@@ -149,13 +149,22 @@ class ImageFetchHelper:
             for b in fetched_blobs:
                 self.transcode_image(b)
 
-    def transfer_image(self):
+    def transfer_image(self, cached_only=False):
+        """Fetch the artifact's image into the local blob store.
+
+        With cached_only set the source URL is not consulted at all: the
+        most recent version the cluster already holds is used, and
+        BlobMissing is raised if there is no usable cached version. This
+        is the fallback for a source which cannot be reached but whose
+        image has previously been fetched (issue 3603).
+        """
         url = _resolve_image(self.artifact.source_url)
 
         # If this is a request for a URL, do we have the most recent version
         # somewhere in the cluster?
         if not url.startswith(BLOB_URL):
             most_recent = self.artifact.most_recent_index
+            most_recent_blob = None
             dirty = False
 
             if most_recent.get('index', 0) == 0:
@@ -164,8 +173,16 @@ class ImageFetchHelper:
                     'cluster does not have a copy of image')
                 dirty = True
             else:
+                # The index must name a blob which still exists before we
+                # can serve from cache, whether or not the source is
+                # reachable. This used to be checked only when the source
+                # responded, which crashed the "source is gone but we have
+                # a cached copy" path with an AttributeError below.
                 most_recent_blob = blob.Blob.from_db(most_recent['blob_uuid'])
+                if not most_recent_blob:
+                    dirty = True
 
+            if not dirty and not cached_only:
                 try:
                     resp = self._open_connection(url)
                 except exceptions.HTTPError as e:
@@ -177,45 +194,46 @@ class ImageFetchHelper:
                     normalized_new_timestamp = blob.Blob.normalize_timestamp(
                         resp.headers.get('Last-Modified'))
 
-                    if not most_recent_blob:
+                    if not most_recent_blob.modified:
+                        self.artifact.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'image requires fetch, no Last-Modified recorded')
                         dirty = True
-                    else:
-                        if not most_recent_blob.modified:
-                            self.artifact.add_event(
-                                EVENT_TYPE_AUDIT,
-                                'image requires fetch, no Last-Modified recorded')
-                            dirty = True
-                        elif most_recent_blob.modified != normalized_new_timestamp:
-                            self.artifact.add_event(
-                                EVENT_TYPE_AUDIT,
-                                'image requires fetch, Last-Modified changed',
-                                extra={
-                                    'old': most_recent_blob.modified,
-                                    'new': normalized_new_timestamp
-                                })
-                            dirty = True
+                    elif most_recent_blob.modified != normalized_new_timestamp:
+                        self.artifact.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'image requires fetch, Last-Modified changed',
+                            extra={
+                                'old': most_recent_blob.modified,
+                                'new': normalized_new_timestamp
+                            })
+                        dirty = True
 
-                        response_size = resp.headers.get('Content-Length')
-                        if response_size:
-                            response_size = int(response_size)
+                    response_size = resp.headers.get('Content-Length')
+                    if response_size:
+                        response_size = int(response_size)
 
-                        if not most_recent_blob.size:
-                            self.artifact.add_event(
-                                EVENT_TYPE_AUDIT,
-                                'image requires fetch, no Content-Length recorded')
-                            dirty = True
-                        elif most_recent_blob.size != response_size:
-                            self.artifact.add_event(
-                                EVENT_TYPE_AUDIT,
-                                'image requires fetch, Content-Length changed',
-                                extra={
-                                    'old': most_recent_blob.size,
-                                    'new': response_size
-                                })
-                            dirty = True
+                    if not most_recent_blob.size:
+                        self.artifact.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'image requires fetch, no Content-Length recorded')
+                        dirty = True
+                    elif most_recent_blob.size != response_size:
+                        self.artifact.add_event(
+                            EVENT_TYPE_AUDIT,
+                            'image requires fetch, Content-Length changed',
+                            extra={
+                                'old': most_recent_blob.size,
+                                'new': response_size
+                            })
+                        dirty = True
 
             if not dirty:
                 url = f'{BLOB_URL}{most_recent_blob.uuid}'
+            elif cached_only:
+                raise exceptions.BlobMissing(
+                    f'Artifact {self.artifact.uuid} has no cached version '
+                    'to fall back to')
 
         # Ensure that we have the blob in the local store. This blob is in the
         # "original format" if downloaded from an HTTP source.
