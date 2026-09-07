@@ -118,11 +118,21 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertTrue(' 100% packet' in results['stdout'])
 
     def test_overlapping_virtual_networks_are_separate(self):
+        # net_one and net_three deliberately share 192.168.242.0/24 with
+        # independent IPAMs, so randomly allocated addresses collide about
+        # once in 250 runs -- and then the ping below is inst1 pinging its
+        # own address, which succeeds without exercising isolation at all
+        # (issue 3497). Pin two distinct addresses so the assertion is
+        # always about traffic between the two meshes.
+        inst1_address = '192.168.242.10'
+        inst2_address = '192.168.242.20'
+
         inst1 = self.test_client.create_instance(
             'test-overlap-cidr-1', 1, 1024,
             [
                 {
-                    'network_uuid': self.net_one['uuid']
+                    'network_uuid': self.net_one['uuid'],
+                    'address': inst1_address
                 }
             ],
             [
@@ -145,7 +155,8 @@ class TestNetworking(base.BaseNamespacedTestCase):
             'test-overlap-cidr-2', 1, 1024,
             [
                 {
-                    'network_uuid': self.net_three['uuid']
+                    'network_uuid': self.net_three['uuid'],
+                    'address': inst2_address
                 }
             ],
             [
@@ -170,11 +181,20 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst1['uuid'])
         self._await_instance_ready(inst2['uuid'])
 
+        inst1_nics = self.test_client.get_instance_interfaces(inst1['uuid'])
+        self.addDetail(
+            'inst1_nics',
+            content.text_content(json.dumps(inst1_nics, indent=4,
+                                            sort_keys=True)))
+        self.assertEqual(1, len(inst1_nics))
+        self.assertEqual(inst1_address, inst1_nics[0]['ipv4'])
+
         nics = self.test_client.get_instance_interfaces(inst2['uuid'])
         self.addDetail(
             'nics',
             content.text_content(json.dumps(nics, indent=4, sort_keys=True)))
         self.assertEqual(1, len(nics))
+        self.assertEqual(inst2_address, nics[0]['ipv4'])
         for iface in nics:
             self.assertEqual(
                 'created',
