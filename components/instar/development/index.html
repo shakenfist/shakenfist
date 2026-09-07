@@ -3793,6 +3793,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#makefile" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14020,6 +14031,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#makefile" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14317,109 +14339,155 @@ Docker, ensuring consistent tooling regardless of local Rust installation.</p>
 <p>To auto-fix formatting issues:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./scripts/check-rust.sh<span class="w"> </span>fix
 </code></pre></div>
+<h2 id="diagrams">Diagrams<a class="headerlink" href="#diagrams" title="Permanent link">&para;</a></h2>
+<p>Diagrams of structure or flow -- components and the arrows between them,
+an ordered exchange of messages, a state machine -- are written as fenced
+<code>mermaid</code> blocks, which GitHub renders natively. Character art that is
+<em>not</em> a diagram stays in a plain fence: file trees, memory maps, register
+and bit-field layouts, wire-format byte layouts and captured terminal
+output all carry their meaning in the column alignment, and mermaid would
+destroy it. The full policy is the <code>diagram-discipline</code> shared block in
+<code>PUSH-AUDIT.md</code>.</p>
+<p>Mermaid fails at render time rather than at commit time, so a syntax error
+commits cleanly and then shows an error box on GitHub. Render before you
+push:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tools/mermaid-lint.sh<span class="w">            </span><span class="c1"># every tracked markdown file</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tools/mermaid-lint.sh<span class="w"> </span>docs/x.md<span class="w">  </span><span class="c1"># just this one</span>
+</code></pre></div>
+<p>Check the exit status directly. Piping the script into <code>tail</code> or <code>grep</code>
+reports the filter's status, not the script's, and turns every failure
+green. <code>tools/audit/wave1.sh</code> runs it as part of the pre-push audit, and
+CI runs the same script from <code>mermaid-lint.yml</code> on any pull request that
+touches markdown, on any push to <code>develop</code> or <code>main</code> that does, and on
+demand via <code>workflow_dispatch</code>. The lane gates nothing automatically, so
+without the push trigger a commit that lands without a pull request would
+go unlinted until it failed somebody else's markdown change. (The
+template ships both branch names because the fleet's default branch
+varies; here only <code>develop</code> ever matches.)</p>
+<p><code>mmdc</code> reads exactly one fence: three backticks, then <code>mermaid</code>, then
+nothing. GitHub renders a wider family, and every shape in between is
+rejected rather than skipped -- a tilde fence, a space before the
+language, four or more backticks, and anything after the language such
+as <code>```mermaid title=x</code>. The script names the file, the line and
+what to change. Trailing whitespace after the language is fine; <code>mmdc</code>
+reads that. Quoting one of the rejected forms in a document is also fine
+-- a fence nested inside a longer fence is an example, not a diagram, and
+this paragraph's own page is the case that rule exists for.</p>
+<p>Put a diagram at the top level. A <code>mermaid</code> fence inside a blockquote is
+the one shape that is neither linted nor rejected: GitHub renders it and
+<code>mmdc</code> finds nothing in the file, so it passes silently. That is a
+deliberate blind spot rather than an oversight -- refusing one means
+ruling on a fence nested inside a blockquoted fence -- but it does mean a
+blockquoted diagram is unchecked.</p>
+<p>If this repository ever grows a <code>REVIEWS.md</code>, the script skips it,
+matching the workflow's path filter: a review session rewrites the file
+and changes no diagram. Name it as an argument to lint it anyway.</p>
+<p>The container runs with <code>--network none</code>, so a diagram that reaches for a
+remote font or icon pack fails here rather than rendering differently
+depending on the runner.</p>
 <h2 id="makefile">Makefile<a class="headerlink" href="#makefile" title="Permanent link">&para;</a></h2>
 <p>A Makefile is provided for common development tasks:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Show all available targets</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>make<span class="w"> </span><span class="nb">help</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># List available prototypes</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>make<span class="w"> </span>list-prototypes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Show all available targets</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>make<span class="w"> </span><span class="nb">help</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># List available prototypes</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>make<span class="w"> </span>list-prototypes
 </code></pre></div>
 <p><strong>Main Instar Project:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Build instar</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>make<span class="w"> </span>instar
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Clean instar build</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>make<span class="w"> </span>clean-instar
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Show how to run instar</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>make<span class="w"> </span>run-instar
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Build instar</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>make<span class="w"> </span>instar
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Clean instar build</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>make<span class="w"> </span>clean-instar
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Show how to run instar</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>make<span class="w"> </span>run-instar
 </code></pre></div></p>
 <p><strong>Prototypes:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Build a specific prototype</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Build all prototypes</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>make<span class="w"> </span>build-all
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Build the shared guest-protocol crate</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>make<span class="w"> </span>guest-protocol
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># Build devcontainer for a prototype</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># Build the rust-lint Docker container</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>make<span class="w"> </span>build-lint-container
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Build a specific prototype</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Build all prototypes</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>make<span class="w"> </span>build-all
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Build the shared guest-protocol crate</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>make<span class="w"> </span>guest-protocol
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="c1"># Build devcontainer for a prototype</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="c1"># Build the rust-lint Docker container</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>make<span class="w"> </span>build-lint-container
 </code></pre></div></p>
 <p><strong>Cleaning:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Clean a specific prototype's target directory</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>make<span class="w"> </span>clean-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Clean all build directories (main + prototypes)</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>make<span class="w"> </span>clean-all
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Remove all devcontainer Docker images</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>make<span class="w"> </span>clean-devcontainers
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="c1"># Remove the rust-lint Docker image</span>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>make<span class="w"> </span>clean-lint-container
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="c1"># Remove everything (all targets + all containers)</span>
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>make<span class="w"> </span>distclean
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Clean a specific prototype's target directory</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>make<span class="w"> </span>clean-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Clean all build directories (main + prototypes)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>make<span class="w"> </span>clean-all
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># Remove all devcontainer Docker images</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>make<span class="w"> </span>clean-devcontainers
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="c1"># Remove the rust-lint Docker image</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>make<span class="w"> </span>clean-lint-container
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="c1"># Remove everything (all targets + all containers)</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>make<span class="w"> </span>distclean
 </code></pre></div></p>
 <p><strong>Linting:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Run rustfmt and clippy checks</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>make<span class="w"> </span>lint
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Run with auto-fix</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>make<span class="w"> </span>lint-fix
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># Install pre-commit hooks</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>make<span class="w"> </span>install-hooks
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Run rustfmt and clippy checks</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>make<span class="w"> </span>lint
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Run with auto-fix</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>make<span class="w"> </span>lint-fix
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Install pre-commit hooks</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>make<span class="w"> </span>install-hooks
 </code></pre></div></p>
 <p><strong>Integration Testing:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Create Python venv for tests (testtools/stestr)</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>make<span class="w"> </span>test-venv
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Run safe integration tests</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>make<span class="w"> </span><span class="nb">test</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Run tests with verbose output (shows diffs)</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>make<span class="w"> </span>test-report
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># Run all tests including malicious images (explicit opt-in)</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>make<span class="w"> </span>test-malicious
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>make<span class="w"> </span>test-container
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="c1"># Run split test targets (used by CI for parallel execution)</span>
-<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
-<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
-<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
-<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>
-<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="c1"># Clean test artifacts</span>
-<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>make<span class="w"> </span>clean-tests
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Create Python venv for tests (testtools/stestr)</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>make<span class="w"> </span>test-venv
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Run safe integration tests</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>make<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Run tests with verbose output (shows diffs)</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="c1"># Run all tests including malicious images (explicit opt-in)</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>make<span class="w"> </span>test-malicious
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>make<span class="w"> </span>test-container
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="c1"># Run split test targets (used by CI for parallel execution)</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="c1"># Clean test artifacts</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>make<span class="w"> </span>clean-tests
 </code></pre></div></p>
 <p><strong>Fuzz Testing:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Build a single coverage-guided fuzz target (uses the devcontainer)</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>make<span class="w"> </span>fuzz-build<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_resize_planners
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Build every coverage-guided fuzz target</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>make<span class="w"> </span>fuzz-build
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Run a single target for a bounded wall-clock budget (seconds; default 60)</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>make<span class="w"> </span>fuzz-run<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_resize_planners<span class="w"> </span><span class="nv">FUZZ_DURATION</span><span class="o">=</span><span class="m">300</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="c1"># Run the seven snapshot shell harnesses (live differential</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="c1"># verification against qemu-img; needs a built instar + /dev/kvm)</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>make<span class="w"> </span>snapshot-harnesses
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Build a single coverage-guided fuzz target (uses the devcontainer)</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>make<span class="w"> </span>fuzz-build<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_resize_planners
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Build every coverage-guided fuzz target</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>make<span class="w"> </span>fuzz-build
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Run a single target for a bounded wall-clock budget (seconds; default 60)</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>make<span class="w"> </span>fuzz-run<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_resize_planners<span class="w"> </span><span class="nv">FUZZ_DURATION</span><span class="o">=</span><span class="m">300</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># Run the seven snapshot shell harnesses (live differential</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="c1"># verification against qemu-img; needs a built instar + /dev/kvm)</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>make<span class="w"> </span>snapshot-harnesses
 </code></pre></div></p>
 <p>See the "Coverage-Guided Fuzzing" section below for the target list and the
 nightly CI rotation.</p>
 <p><strong>Running:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Show run instructions for a prototype</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>make<span class="w"> </span>run<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Show run instructions for a prototype</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>make<span class="w"> </span>run<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
 </code></pre></div></p>
 <h2 id="what-the-integration-tests-cover">What the integration tests cover<a class="headerlink" href="#what-the-integration-tests-cover" title="Permanent link">&para;</a></h2>
 <p>The integration tests compare <code>instar info</code> output against <code>qemu-img info</code> to
@@ -14447,63 +14515,63 @@ and qcow2-only enforcement, and empty-table behaviour. JSON goldens live in
 <code>testdata/README.md</code> for the test image catalogue (benign, malicious,
 edge-case, and AFL-discovered images).</p>
 <h2 id="directory-structure">Directory structure<a class="headerlink" href="#directory-structure" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar/
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>├── .devcontainer/  # Development containers
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>│   └── rust-lint/  # Stable Rust for linting
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>├── src/            # Main instar implementation
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>│   ├── vmm/        # Virtual machine monitor (host-side)
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>│   ├── core/       # Core guest initialization
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>│   ├── shared/     # Shared library code
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>│   ├── crates/     # Shared format parsing crates (no_std)
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>│   │   ├── qcow2/  # QCOW2 header, L1/L2, decompression, refcounts
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>│   │   ├── raw/    # MBR/GPT partition table detection
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>│   │   ├── vhd/    # VHD footer, dynamic header, BAT parsing
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>│   │   ├── vhdx/   # VHDX headers, region table, metadata, BAT, CRC-32C
-<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>│   │   ├── vmdk/   # VMDK4 header and descriptor parsing
-<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>│   │   ├── luks/   # LUKS header parsing, KDF, AFsplitter, decryption
-<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>│   │   ├── vdi/    # VDI header parsing, block-map lookup
-<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>│   │   ├── parallels/ # Parallels header parsing, BAT lookup
-<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>│   │   ├── qcow1/  # QCOW1 (v1) header, L1/L2 block-lookup
-<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>│   │   ├── dmg/    # DMG koly trailer, chunk-table, chunk lookup
-<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>│   │   └── ...     # Per-operation planner crates (measure, create,
-<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>│   │               # resize, rebase, commit, snapshot)
-<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>│   ├── operations/ # Pluggable operations (info, copy, check, compare, convert, measure, create, resize, rebase, commit, map, snapshot, amend, dd, bitmap, bench)
-<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>│   └── build.sh    # Build script
-<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a>├── crates/         # Shared Rust crates
-<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>│   └── guest-protocol/ # Protocol Buffers messaging for guests
-<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a>├── prototypes/     # Experimental implementations (reference)
-<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a>│   ├── helloworld/     # Minimal KVM VMM with bare-metal guest
-<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a>│   ├── helloworld2/    # Same, using rust-vmm vm-memory crate
-<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a>│   ├── virtio-block/   # Virtio-block device emulation
-<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a>│   ├── virtio-block2/  # With guest-protocol integration
-<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a>│   ├── virtio-block3/  # With configurable sector sizes
-<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a>│   ├── virtio-block4/  # With performance statistics
-<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a>│   ├── virtio-block5/  # With ioeventfd optimization
-<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a>│   ├── virtio-block6/  # With sparse/dynamic output support
-<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a>│   ├── pluggable/      # Modular operations architecture
-<a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a>│   ├── pluggable2/     # Separate binary loading for operations
-<a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a>│   └── info/           # Image format detection (qemu-img info)
-<a id="__codelineno-11-37" name="__codelineno-11-37" href="#__codelineno-11-37"></a>├── scripts/        # Build and check scripts
-<a id="__codelineno-11-38" name="__codelineno-11-38" href="#__codelineno-11-38"></a>├── tests/          # Integration tests (Python/testtools)
-<a id="__codelineno-11-39" name="__codelineno-11-39" href="#__codelineno-11-39"></a>│   ├── base.py         # Base test class
-<a id="__codelineno-11-40" name="__codelineno-11-40" href="#__codelineno-11-40"></a>│   ├── manifest.json   # Test image definitions
-<a id="__codelineno-11-41" name="__codelineno-11-41" href="#__codelineno-11-41"></a>│   ├── helpers/        # Test utilities
-<a id="__codelineno-11-42" name="__codelineno-11-42" href="#__codelineno-11-42"></a>│   └── test_*.py       # Test files
-<a id="__codelineno-11-43" name="__codelineno-11-43" href="#__codelineno-11-43"></a>├── docs/           # Design documents and research
-<a id="__codelineno-11-44" name="__codelineno-11-44" href="#__codelineno-11-44"></a>│   ├── index.md    # Documentation index
-<a id="__codelineno-11-45" name="__codelineno-11-45" href="#__codelineno-11-45"></a>│   ├── usage.md    # Platform usage analysis (oVirt, Proxmox, OpenStack)
-<a id="__codelineno-11-46" name="__codelineno-11-46" href="#__codelineno-11-46"></a>│   ├── security.md # CVE analysis for image handling
-<a id="__codelineno-11-47" name="__codelineno-11-47" href="#__codelineno-11-47"></a>│   ├── qcow2/      # QCOW2 format documentation
-<a id="__codelineno-11-48" name="__codelineno-11-48" href="#__codelineno-11-48"></a>│   ├── vmdk/       # VMDK format documentation
-<a id="__codelineno-11-49" name="__codelineno-11-49" href="#__codelineno-11-49"></a>│   └── raw/        # Raw format documentation
-<a id="__codelineno-11-50" name="__codelineno-11-50" href="#__codelineno-11-50"></a>├── testdata/       # Test images for security validation
-<a id="__codelineno-11-51" name="__codelineno-11-51" href="#__codelineno-11-51"></a>│   ├── benign/     # Safe test images (qcow2, raw, vmdk, vhdx, vpc)
-<a id="__codelineno-11-52" name="__codelineno-11-52" href="#__codelineno-11-52"></a>│   ├── malicious/  # CVE exploit images (DANGEROUS)
-<a id="__codelineno-11-53" name="__codelineno-11-53" href="#__codelineno-11-53"></a>│   └── downloaded/ # External test images (CirrOS, QEMU iotests, etc.)
-<a id="__codelineno-11-54" name="__codelineno-11-54" href="#__codelineno-11-54"></a>├── Makefile        # Build and development automation
-<a id="__codelineno-11-55" name="__codelineno-11-55" href="#__codelineno-11-55"></a>├── CHANGELOG.md    # Release history
-<a id="__codelineno-11-56" name="__codelineno-11-56" href="#__codelineno-11-56"></a>├── SECURITY.md     # Vulnerability reporting and security policy
-<a id="__codelineno-11-57" name="__codelineno-11-57" href="#__codelineno-11-57"></a>└── README.md
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar/
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>├── .devcontainer/  # Development containers
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>│   └── rust-lint/  # Stable Rust for linting
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>├── src/            # Main instar implementation
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>│   ├── vmm/        # Virtual machine monitor (host-side)
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>│   ├── core/       # Core guest initialization
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>│   ├── shared/     # Shared library code
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>│   ├── crates/     # Shared format parsing crates (no_std)
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>│   │   ├── qcow2/  # QCOW2 header, L1/L2, decompression, refcounts
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>│   │   ├── raw/    # MBR/GPT partition table detection
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>│   │   ├── vhd/    # VHD footer, dynamic header, BAT parsing
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>│   │   ├── vhdx/   # VHDX headers, region table, metadata, BAT, CRC-32C
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>│   │   ├── vmdk/   # VMDK4 header and descriptor parsing
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>│   │   ├── luks/   # LUKS header parsing, KDF, AFsplitter, decryption
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>│   │   ├── vdi/    # VDI header parsing, block-map lookup
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>│   │   ├── parallels/ # Parallels header parsing, BAT lookup
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>│   │   ├── qcow1/  # QCOW1 (v1) header, L1/L2 block-lookup
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>│   │   ├── dmg/    # DMG koly trailer, chunk-table, chunk lookup
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>│   │   └── ...     # Per-operation planner crates (measure, create,
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>│   │               # resize, rebase, commit, snapshot)
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>│   ├── operations/ # Pluggable operations (info, copy, check, compare, convert, measure, create, resize, rebase, commit, map, snapshot, amend, dd, bitmap, bench)
+<a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a>│   └── build.sh    # Build script
+<a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a>├── crates/         # Shared Rust crates
+<a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a>│   └── guest-protocol/ # Protocol Buffers messaging for guests
+<a id="__codelineno-12-25" name="__codelineno-12-25" href="#__codelineno-12-25"></a>├── prototypes/     # Experimental implementations (reference)
+<a id="__codelineno-12-26" name="__codelineno-12-26" href="#__codelineno-12-26"></a>│   ├── helloworld/     # Minimal KVM VMM with bare-metal guest
+<a id="__codelineno-12-27" name="__codelineno-12-27" href="#__codelineno-12-27"></a>│   ├── helloworld2/    # Same, using rust-vmm vm-memory crate
+<a id="__codelineno-12-28" name="__codelineno-12-28" href="#__codelineno-12-28"></a>│   ├── virtio-block/   # Virtio-block device emulation
+<a id="__codelineno-12-29" name="__codelineno-12-29" href="#__codelineno-12-29"></a>│   ├── virtio-block2/  # With guest-protocol integration
+<a id="__codelineno-12-30" name="__codelineno-12-30" href="#__codelineno-12-30"></a>│   ├── virtio-block3/  # With configurable sector sizes
+<a id="__codelineno-12-31" name="__codelineno-12-31" href="#__codelineno-12-31"></a>│   ├── virtio-block4/  # With performance statistics
+<a id="__codelineno-12-32" name="__codelineno-12-32" href="#__codelineno-12-32"></a>│   ├── virtio-block5/  # With ioeventfd optimization
+<a id="__codelineno-12-33" name="__codelineno-12-33" href="#__codelineno-12-33"></a>│   ├── virtio-block6/  # With sparse/dynamic output support
+<a id="__codelineno-12-34" name="__codelineno-12-34" href="#__codelineno-12-34"></a>│   ├── pluggable/      # Modular operations architecture
+<a id="__codelineno-12-35" name="__codelineno-12-35" href="#__codelineno-12-35"></a>│   ├── pluggable2/     # Separate binary loading for operations
+<a id="__codelineno-12-36" name="__codelineno-12-36" href="#__codelineno-12-36"></a>│   └── info/           # Image format detection (qemu-img info)
+<a id="__codelineno-12-37" name="__codelineno-12-37" href="#__codelineno-12-37"></a>├── scripts/        # Build and check scripts
+<a id="__codelineno-12-38" name="__codelineno-12-38" href="#__codelineno-12-38"></a>├── tests/          # Integration tests (Python/testtools)
+<a id="__codelineno-12-39" name="__codelineno-12-39" href="#__codelineno-12-39"></a>│   ├── base.py         # Base test class
+<a id="__codelineno-12-40" name="__codelineno-12-40" href="#__codelineno-12-40"></a>│   ├── manifest.json   # Test image definitions
+<a id="__codelineno-12-41" name="__codelineno-12-41" href="#__codelineno-12-41"></a>│   ├── helpers/        # Test utilities
+<a id="__codelineno-12-42" name="__codelineno-12-42" href="#__codelineno-12-42"></a>│   └── test_*.py       # Test files
+<a id="__codelineno-12-43" name="__codelineno-12-43" href="#__codelineno-12-43"></a>├── docs/           # Design documents and research
+<a id="__codelineno-12-44" name="__codelineno-12-44" href="#__codelineno-12-44"></a>│   ├── index.md    # Documentation index
+<a id="__codelineno-12-45" name="__codelineno-12-45" href="#__codelineno-12-45"></a>│   ├── usage.md    # Platform usage analysis (oVirt, Proxmox, OpenStack)
+<a id="__codelineno-12-46" name="__codelineno-12-46" href="#__codelineno-12-46"></a>│   ├── security.md # CVE analysis for image handling
+<a id="__codelineno-12-47" name="__codelineno-12-47" href="#__codelineno-12-47"></a>│   ├── qcow2/      # QCOW2 format documentation
+<a id="__codelineno-12-48" name="__codelineno-12-48" href="#__codelineno-12-48"></a>│   ├── vmdk/       # VMDK format documentation
+<a id="__codelineno-12-49" name="__codelineno-12-49" href="#__codelineno-12-49"></a>│   └── raw/        # Raw format documentation
+<a id="__codelineno-12-50" name="__codelineno-12-50" href="#__codelineno-12-50"></a>├── testdata/       # Test images for security validation
+<a id="__codelineno-12-51" name="__codelineno-12-51" href="#__codelineno-12-51"></a>│   ├── benign/     # Safe test images (qcow2, raw, vmdk, vhdx, vpc)
+<a id="__codelineno-12-52" name="__codelineno-12-52" href="#__codelineno-12-52"></a>│   ├── malicious/  # CVE exploit images (DANGEROUS)
+<a id="__codelineno-12-53" name="__codelineno-12-53" href="#__codelineno-12-53"></a>│   └── downloaded/ # External test images (CirrOS, QEMU iotests, etc.)
+<a id="__codelineno-12-54" name="__codelineno-12-54" href="#__codelineno-12-54"></a>├── Makefile        # Build and development automation
+<a id="__codelineno-12-55" name="__codelineno-12-55" href="#__codelineno-12-55"></a>├── CHANGELOG.md    # Release history
+<a id="__codelineno-12-56" name="__codelineno-12-56" href="#__codelineno-12-56"></a>├── SECURITY.md     # Vulnerability reporting and security policy
+<a id="__codelineno-12-57" name="__codelineno-12-57" href="#__codelineno-12-57"></a>└── README.md
 </code></pre></div>
 <h2 id="releases">Releases<a class="headerlink" href="#releases" title="Permanent link">&para;</a></h2>
 <p>See <a href="https://github.com/shakenfist/instar/blob/develop/CHANGELOG.md">CHANGELOG.md</a>
@@ -14512,9 +14580,9 @@ for release notes.</p>
 <a href="https://github.com/shakenfist/instar/releases">GitHub Releases</a>
 via the release workflow (<code>.github/workflows/release.yml</code>). Tags
 are signed with Sigstore. To cut a release:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>make<span class="w"> </span>release<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.2.0
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>HEAD
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>make<span class="w"> </span>release<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.2.0
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>HEAD
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
 </code></pre></div>
 <h2 id="github-automation">GitHub automation<a class="headerlink" href="#github-automation" title="Permanent link">&para;</a></h2>
 <p>This project uses Claude Code-powered GitHub automation for PR management.</p>
@@ -14571,28 +14639,32 @@ across the Shaken Fist projects.</p>
 Docker. Since instar is built and tested inside the devcontainer image,
 any job that runs <code>docker</code>, <code>make instar</code>, <code>make test-rust</code>, <code>make lint</code>
 or any other container-backed Makefile target must install it first:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="w">    </span><span class="nt">env</span><span class="p">:</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">      </span><span class="nt">DOCKER_BUILDKIT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install Docker</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">          </span><span class="no">sudo apt-get update</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">          </span><span class="no">sudo apt-get install -y docker.io</span>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">          </span><span class="no">sudo systemctl start docker</span>
-<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">          </span><span class="no">sudo chmod 666 /var/run/docker.sock</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="w">    </span><span class="nt">env</span><span class="p">:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">      </span><span class="nt">DOCKER_BUILDKIT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install Docker</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">          </span><span class="no">sudo apt-get update</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">          </span><span class="no">sudo apt-get install -y docker.io</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">          </span><span class="no">sudo systemctl start docker</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">          </span><span class="no">sudo chmod 666 /var/run/docker.sock</span>
 </code></pre></div>
 <p>Omitting the step does not fail at job start -- it fails part way through
 with <code>docker: command not found</code>, whenever the first container command is
 reached.</p>
+<p>The one exception is <code>mermaid-lint.yml</code>, which runs on
+<code>[self-hosted, vm, debian-12-docker, s]</code>. That is the fleet image that
+ships <code>docker.io</code>, so it needs no install step -- but the label has to be
+listed in <code>.github/actionlint.yaml</code> or actionlint rejects the workflow.</p>
 <h3 id="self-hosted-runners-and-the-github-cli">Self-hosted runners and the GitHub CLI<a class="headerlink" href="#self-hosted-runners-and-the-github-cli" title="Permanent link">&para;</a></h3>
 <p>The same applies to <code>gh</code>: the <code>[self-hosted, debian-12, ...]</code> runners do
 not ship it either, so any job that files an issue, opens a PR or
 otherwise calls the GitHub CLI must install it first. Do not paste an
 apt block into the workflow -- call the shared installer, which is a
 no-op when <code>gh</code> is already present:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install GitHub CLI on host</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tools/ci/install-gh-cli.sh</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install GitHub CLI on host</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tools/ci/install-gh-cli.sh</span>
 </code></pre></div>
 <p>The <code>[self-hosted, claude-code]</code> and <code>[self-hosted, static]</code> runners do
 have <code>gh</code> preinstalled, which is why the Claude Code workflows and the
@@ -14704,16 +14776,16 @@ ruleset, transform the exported object rather than PUTting the <code>GET</code>
 response back unchanged — the response carries fields that are not part
 of the update schema (<code>id</code>, <code>_links</code>, and <code>"parameters": null</code> on the
 rules that take no parameters):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="s1">  name, target, enforcement, conditions,</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="s1">  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="s1">  rules: [.rules[]</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="s1">    | if .type == "required_status_checks"</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="s1">      then .parameters.required_status_checks</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="s1">             += [{context: "Can merge", integration_id: 15368}]</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="s1">      else . end</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}'</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="s1">  name, target, enforcement, conditions,</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="s1">  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="s1">  rules: [.rules[]</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="s1">    | if .type == "required_status_checks"</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="s1">      then .parameters.required_status_checks</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="s1">             += [{context: "Can merge", integration_id: 15368}]</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="s1">      else . end</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}'</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
 </code></pre></div>
 <p>Read it back and diff it against the intent afterwards; dropping
 <code>bypass_actors</code> from the payload silently removes the bypass.</p>
@@ -14731,8 +14803,8 @@ rules that take no parameters):</p>
   never reports leaves the queue waiting forever.</li>
 </ul>
 <p>To inspect or recreate it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[] | "\(.id) \(.name) \(.enforcement)"'</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[] | "\(.id) \(.name) \(.enforcement)"'</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
 </code></pre></div>
 <p><code>.github/exported-config/</code> carries the nightly export of the live
 ruleset state, which is the machine-readable companion to the table
@@ -14741,16 +14813,16 @@ committing directly.</p>
 <h3 id="differential-fuzzing">Differential fuzzing<a class="headerlink" href="#differential-fuzzing" title="Permanent link">&para;</a></h3>
 <p>On-demand differential fuzzing compares instar against qemu-img on randomly
 generated images to find behavioral divergences:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
 </code></pre></div>
 <p>The fuzzer generates random images (varying format, size, cluster size,
 compression, data patterns), runs chains of operations (info, check, convert)
@@ -14763,9 +14835,9 @@ fills the gap for VMDK/VHD/VHDX where qemu-img check is unavailable.</p>
 <h3 id="coverage-guided-fuzzing">Coverage-guided fuzzing<a class="headerlink" href="#coverage-guided-fuzzing" title="Permanent link">&para;</a></h3>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
 parser crates directly without the VMM/KVM stack:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
 </code></pre></div>
 <p>40 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
 VDI, Parallels, QCOW1, DMG, RAW, LUKS) including header parsing,
@@ -14780,7 +14852,7 @@ refcount mutators (<code>fuzz_snapshot_refcount</code>), the dd window math
 which drives the write/copy-on-write planner through the crate's
 <code>sim</code> harness asserting the <code>max_rc &lt; 3</code> COW invariant oracle, and
 <code>fuzz_qcow2_write_growth</code>). Seed the corpus from <code>instar-testdata</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>The CI workflow runs nightly at 04:00 UTC. Crashes are minimized and
 filed as GitHub Issues with the <code>security-audit</code> label immediately.
@@ -14821,8 +14893,8 @@ starts marking glibc version needs weak. <code>nightly-2026-07-22</code> emitted
 took out the Rocky 9, Rocky 10 and Fedora matrix jobs in the merge
 queue. <code>.deb</code> packaging is unaffected — cargo-deb uses
 <code>dpkg-shlibdeps</code>. To inspect what a built package actually requires:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>rpm<span class="w"> </span>-qpR<span class="w"> </span>src/target/generate-rpm/instar-*.rpm
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>readelf<span class="w"> </span>-V<span class="w"> </span>src/target/release/instar<span class="w">   </span><span class="c1"># Version needs section</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>rpm<span class="w"> </span>-qpR<span class="w"> </span>src/target/generate-rpm/instar-*.rpm
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>readelf<span class="w"> </span>-V<span class="w"> </span>src/target/release/instar<span class="w">   </span><span class="c1"># Version needs section</span>
 </code></pre></div>
 <p>Note that this class of breakage is only caught by the distro matrix,
 which runs in the merge queue rather than in the pull-request gate.</p>
@@ -14900,6 +14972,7 @@ so issues are automatically closed when the PR merges.</p>
 <li><code>.github/workflows/lint.yml</code> - rustfmt and clippy in the containerised toolchain (PR, path-filtered to the Rust tree)</li>
 <li><code>.github/workflows/export-repo-config.yml</code> - nightly export of this repository's GitHub settings for the fleet configuration audit</li>
 <li><code>.github/workflows/renovate.yml</code> - self-hosted Renovate dependency updates (hourly)</li>
+<li><code>.github/workflows/mermaid-lint.yml</code> - renders every mermaid diagram in the repository's markdown and fails on any that does not parse (PR, push to develop, and workflow_dispatch; path-filtered to markdown)</li>
 </ul>
 <p>The self-hosted runners have no Docker preinstalled, so any job touching
 <code>docker</code> or a container-backed Makefile target needs an "Install Docker"
@@ -14921,6 +14994,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <li><code>tools/ci/test-check-glibc-floor.sh</code> - Tests for that check; the <code>ci-tooling</code> CI job runs it</li>
 <li><code>tools/ci/claude-result.sh</code> - Reads the JSONL stream a <code>claude -p --output-format stream-json --verbose</code> run leaves behind; <code>--text</code> reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), <code>--trailer</code> emits the <code>Assisted-By:</code>/<code>Co-Authored-By:</code> pair naming the model the run actually resolved to. Called from <code>test-drift-fix.yml</code></li>
 <li><code>tools/ci/test-claude-result.sh</code> - Tests for that helper; the <code>ci-tooling</code> CI job runs it</li>
+<li><code>tools/mermaid-lint.sh</code> - Renders every tracked markdown file that contains a mermaid fence, in the upstream mermaid-cli container (see "Diagrams" above); <code>mermaid-lint.yml</code> and the push audit's wave 1 both run it</li>
 </ul>
 
 

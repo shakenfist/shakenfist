@@ -14128,61 +14128,50 @@
 to host (physical) file offsets. This design enables sparse allocation and
 efficient copy-on-write operations.</p>
 <h2 id="address-translation-overview">Address Translation Overview<a class="headerlink" href="#address-translation-overview" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Guest Offset (logical address)
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>        |
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        v
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>+-------------------+
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>|   L1 Table        |  Memory-resident, one entry per L2 table
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>|   [l1_index]      |
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>+-------------------+
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        |
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        v  (L2 table offset)
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>+-------------------+
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>|   L2 Table        |  One cluster per table, cached on demand
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>|   [l2_index]      |
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>+-------------------+
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>        |
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>        v  (cluster offset + in-cluster offset)
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>+-------------------+
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>|   Data Cluster    |  Actual disk data
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>+-------------------+
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    offset["Guest offset (logical address)"]
+    l1["L1 table [l1_index]&lt;br/&gt;Memory-resident, one entry per L2 table"]
+    l2["L2 table [l2_index]&lt;br/&gt;One cluster per table, cached on demand"]
+    data["Data cluster&lt;br/&gt;Actual disk data"]
+    offset --&gt; l1
+    l1 -- "L2 table offset" --&gt; l2
+    l2 -- "cluster offset + in-cluster offset" --&gt; data</code></pre>
 <h2 id="index-calculations">Index Calculations<a class="headerlink" href="#index-calculations" title="Permanent link">&para;</a></h2>
 <p>Given a guest offset, compute the table indices:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Configuration derived from header</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">cluster_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">cluster_bits</span><span class="p">;</span><span class="w">          </span><span class="c1">// e.g., 65536 (64 KB)</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">l2_entries</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l2_entry_size</span><span class="p">;</span><span class="w"> </span><span class="c1">// e.g., 8192 for standard entries</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">l2_bits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">log2</span><span class="p">(</span><span class="n">l2_entries</span><span class="p">);</span><span class="w">                </span><span class="c1">// e.g., 13</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1">// Address translation</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">l1_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">l2_bits</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">cluster_bits</span><span class="p">);</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">l2_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">cluster_bits</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entries</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">in_cluster_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">cluster_size</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1">// Final host offset</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="n">l2_table_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l1_table</span><span class="p">[</span><span class="n">l1_index</span><span class="p">]</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L1E_OFFSET_MASK</span><span class="p">;</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">cluster_descriptor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_table</span><span class="p">[</span><span class="n">l2_index</span><span class="p">];</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">host_cluster_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_descriptor</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L2E_OFFSET_MASK</span><span class="p">;</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="n">host_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">host_cluster_offset</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">in_cluster_offset</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// Configuration derived from header</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">cluster_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">cluster_bits</span><span class="p">;</span><span class="w">          </span><span class="c1">// e.g., 65536 (64 KB)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">l2_entries</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l2_entry_size</span><span class="p">;</span><span class="w"> </span><span class="c1">// e.g., 8192 for standard entries</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">l2_bits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">log2</span><span class="p">(</span><span class="n">l2_entries</span><span class="p">);</span><span class="w">                </span><span class="c1">// e.g., 13</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1">// Address translation</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">l1_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">l2_bits</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">cluster_bits</span><span class="p">);</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">l2_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">cluster_bits</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entries</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">in_cluster_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">cluster_size</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1">// Final host offset</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">l2_table_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l1_table</span><span class="p">[</span><span class="n">l1_index</span><span class="p">]</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L1E_OFFSET_MASK</span><span class="p">;</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">cluster_descriptor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_table</span><span class="p">[</span><span class="n">l2_index</span><span class="p">];</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">host_cluster_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_descriptor</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L2E_OFFSET_MASK</span><span class="p">;</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">host_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">host_cluster_offset</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">in_cluster_offset</span><span class="p">;</span>
 </code></pre></div>
 <h3 id="example-64-kb-clusters-cluster_bits-16">Example: 64 KB Clusters (cluster_bits = 16)<a class="headerlink" href="#example-64-kb-clusters-cluster_bits-16" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cluster_size = 65536 bytes
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>l2_entries = 65536 / 8 = 8192 entries per L2 table
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>l2_bits = 13
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>For guest offset 0x12345678:
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  l1_index = 0x12345678 &gt;&gt; (13 + 16) = 0x12345678 &gt;&gt; 29 = 0
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  l2_index = (0x12345678 &gt;&gt; 16) &amp; 0x1FFF = 0x1234 &amp; 0x1FFF = 0x1234
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>  in_cluster_offset = 0x12345678 &amp; 0xFFFF = 0x5678
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cluster_size = 65536 bytes
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>l2_entries = 65536 / 8 = 8192 entries per L2 table
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>l2_bits = 13
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>For guest offset 0x12345678:
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  l1_index = 0x12345678 &gt;&gt; (13 + 16) = 0x12345678 &gt;&gt; 29 = 0
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  l2_index = (0x12345678 &gt;&gt; 16) &amp; 0x1FFF = 0x1234 &amp; 0x1FFF = 0x1234
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  in_cluster_offset = 0x12345678 &amp; 0xFFFF = 0x5678
 </code></pre></div>
 <h2 id="l1-table-entry-format-64-bits">L1 Table Entry Format (64 bits)<a class="headerlink" href="#l1-table-entry-format-64-bits" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a> 63  62       56  55                                  9  8        0
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>+---+----------+-------------------------------------+------------+
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>| C | Reserved |     L2 Table Offset (47 bits)      |  Reserved  |
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>+---+----------+-------------------------------------+------------+
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  |                         |
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  |                         +-- Must be cluster-aligned (bits 0-8 = 0)
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  +-- COPIED flag (refcount == 1)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a> 63  62       56  55                                  9  8        0
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>+---+----------+-------------------------------------+------------+
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>| C | Reserved |     L2 Table Offset (47 bits)      |  Reserved  |
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>+---+----------+-------------------------------------+------------+
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  |                         |
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  |                         +-- Must be cluster-aligned (bits 0-8 = 0)
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  +-- COPIED flag (refcount == 1)
 </code></pre></div>
 <table>
 <thead>
@@ -14216,20 +14205,20 @@ efficient copy-on-write operations.</p>
 </tbody>
 </table>
 <p><strong>Masks:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="cp">#define L1E_OFFSET_MASK     0x00fffffffffffe00ULL</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="cp">#define L1E_RESERVED_MASK   0x7f000000000001ffULL</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="cp">#define L1E_OFFSET_MASK     0x00fffffffffffe00ULL</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="cp">#define L1E_RESERVED_MASK   0x7f000000000001ffULL</span>
 </code></pre></div></p>
 <p><strong>Special values:</strong>
 - Entry = 0: L2 table not allocated (all clusters in this range unallocated)</p>
 <h2 id="l2-table-entry-format-standard-64-bits">L2 Table Entry Format - Standard (64 bits)<a class="headerlink" href="#l2-table-entry-format-standard-64-bits" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a> 63  62  61       56  55                          9  8     1  0
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>+---+---+----------+-------------------------------+-------+---+
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>| C | Z |  Rsvd    |    Host Cluster Offset        | Rsvd  | Z |
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>+---+---+----------+-------------------------------+-------+---+
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  |   |                      |                              |
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  |   |                      +-- Cluster-aligned offset     |
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  |   +-- COMPRESSED flag                                   |
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  +-- COPIED flag                                           +-- ZERO flag
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a> 63  62  61       56  55                          9  8     1  0
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>+---+---+----------+-------------------------------+-------+---+
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>| C | Z |  Rsvd    |    Host Cluster Offset        | Rsvd  | Z |
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>+---+---+----------+-------------------------------+-------+---+
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  |   |                      |                              |
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  |   |                      +-- Cluster-aligned offset     |
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  |   +-- COMPRESSED flag                                   |
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>  +-- COPIED flag                                           +-- ZERO flag
 </code></pre></div>
 <table>
 <thead>
@@ -14273,66 +14262,66 @@ efficient copy-on-write operations.</p>
 </tbody>
 </table>
 <p><strong>Masks:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="cp">#define L2E_OFFSET_MASK         0x00fffffffffffe00ULL</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="cp">#define L2E_STD_RESERVED_MASK   0x3f000000000001feULL</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="cp">#define QCOW_OFLAG_COPIED       (1ULL &lt;&lt; 63)</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="cp">#define QCOW_OFLAG_COMPRESSED   (1ULL &lt;&lt; 62)</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="cp">#define QCOW_OFLAG_ZERO         (1ULL &lt;&lt; 0)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="cp">#define L2E_OFFSET_MASK         0x00fffffffffffe00ULL</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="cp">#define L2E_STD_RESERVED_MASK   0x3f000000000001feULL</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="cp">#define QCOW_OFLAG_COPIED       (1ULL &lt;&lt; 63)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="cp">#define QCOW_OFLAG_COMPRESSED   (1ULL &lt;&lt; 62)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="cp">#define QCOW_OFLAG_ZERO         (1ULL &lt;&lt; 0)</span>
 </code></pre></div></p>
 <h2 id="cluster-type-determination">Cluster Type Determination<a class="headerlink" href="#cluster-type-determination" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">QCow2ClusterType</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">,</span><span class="w">  </span><span class="c1">// offset=0, zero=0: read from backing</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset=0, zero=1: reads as zeros</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset!=0, zero=1: allocated but zeros</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="p">,</span><span class="w">       </span><span class="c1">// offset!=0, compressed=0: standard data</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_COMPRESSED</span><span class="p">,</span><span class="w">   </span><span class="c1">// compressed=1: compressed data</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">}</span><span class="w"> </span><span class="n">QCow2ClusterType</span><span class="p">;</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">QCow2ClusterType</span><span class="w"> </span><span class="nf">get_cluster_type</span><span class="p">(</span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">l2_entry</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_COMPRESSED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_COMPRESSED</span><span class="p">;</span>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L2E_OFFSET_MASK</span><span class="p">;</span>
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_ZERO</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">;</span>
-<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>
-<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">;</span>
-<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">QCow2ClusterType</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">,</span><span class="w">  </span><span class="c1">// offset=0, zero=0: read from backing</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset=0, zero=1: reads as zeros</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset!=0, zero=1: allocated but zeros</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="p">,</span><span class="w">       </span><span class="c1">// offset!=0, compressed=0: standard data</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_COMPRESSED</span><span class="p">,</span><span class="w">   </span><span class="c1">// compressed=1: compressed data</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">}</span><span class="w"> </span><span class="n">QCow2ClusterType</span><span class="p">;</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">QCow2ClusterType</span><span class="w"> </span><span class="nf">get_cluster_type</span><span class="p">(</span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">l2_entry</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_COMPRESSED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_COMPRESSED</span><span class="p">;</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L2E_OFFSET_MASK</span><span class="p">;</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_ZERO</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">;</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">;</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="compressed-cluster-descriptor">Compressed Cluster Descriptor<a class="headerlink" href="#compressed-cluster-descriptor" title="Permanent link">&para;</a></h2>
 <p>When bit 62 (COMPRESSED) is set, the entry format changes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a> 63  62  61                        csize_shift                    0
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>+---+---+---------------------------+------------------------------+
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>| 0 | 1 |   Compressed Sectors - 1 |     Compressed Data Offset   |
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>+---+---+---------------------------+------------------------------+
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>      ^            ^                              ^
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>      |            |                              |
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>      |            +-- Number of 512B sectors     +-- NOT cluster-aligned!
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>      +-- COMPRESSED = 1 (COPIED always 0)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a> 63  62  61                        csize_shift                    0
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>+---+---+---------------------------+------------------------------+
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>| 0 | 1 |   Compressed Sectors - 1 |     Compressed Data Offset   |
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>+---+---+---------------------------+------------------------------+
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>      ^            ^                              ^
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>      |            |                              |
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>      |            +-- Number of 512B sectors     +-- NOT cluster-aligned!
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>      +-- COMPRESSED = 1 (COPIED always 0)
 </code></pre></div>
 <p>The bit positions are dynamic based on cluster size:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">csize_shift</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">62</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="n">cluster_bits</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">8</span><span class="p">);</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">csize_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">cluster_bits</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">8</span><span class="p">))</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">cluster_offset_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1ULL</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">csize_shift</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1">// Parsing a compressed entry</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="kt">uint64_t</span><span class="w"> </span><span class="n">compressed_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">cluster_offset_mask</span><span class="p">;</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="kt">int</span><span class="w"> </span><span class="n">nb_sectors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">((</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">csize_shift</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">csize_mask</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="kt">int</span><span class="w"> </span><span class="n">compressed_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nb_sectors</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">512</span><span class="w"> </span><span class="o">-</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">                      </span><span class="p">(</span><span class="n">compressed_offset</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">511</span><span class="p">);</span><span class="w">  </span><span class="c1">// Adjust for alignment</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">csize_shift</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">62</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="n">cluster_bits</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">8</span><span class="p">);</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">csize_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">cluster_bits</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">8</span><span class="p">))</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">cluster_offset_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1ULL</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">csize_shift</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1">// Parsing a compressed entry</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="kt">uint64_t</span><span class="w"> </span><span class="n">compressed_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">cluster_offset_mask</span><span class="p">;</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="kt">int</span><span class="w"> </span><span class="n">nb_sectors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">((</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">csize_shift</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">csize_mask</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="kt">int</span><span class="w"> </span><span class="n">compressed_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nb_sectors</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">512</span><span class="w"> </span><span class="o">-</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">                      </span><span class="p">(</span><span class="n">compressed_offset</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">511</span><span class="p">);</span><span class="w">  </span><span class="c1">// Adjust for alignment</span>
 </code></pre></div>
 <p><strong>Example for 64 KB clusters (cluster_bits = 16):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>csize_shift = 62 - 8 = 54
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>csize_mask = 0xFF (8 bits for sector count)
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>cluster_offset_mask = (1 &lt;&lt; 54) - 1
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>Bits 0-53: Compressed data offset (54 bits)
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>Bits 54-61: Sector count - 1 (8 bits, max 255+1 = 256 sectors = 128 KB)
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>Bit 62: COMPRESSED = 1
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>Bit 63: COPIED = 0 (always for compressed)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>csize_shift = 62 - 8 = 54
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>csize_mask = 0xFF (8 bits for sector count)
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>cluster_offset_mask = (1 &lt;&lt; 54) - 1
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>Bits 0-53: Compressed data offset (54 bits)
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>Bits 54-61: Sector count - 1 (8 bits, max 255+1 = 256 sectors = 128 KB)
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>Bit 62: COMPRESSED = 1
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>Bit 63: COPIED = 0 (always for compressed)
 </code></pre></div></p>
 <h2 id="extended-l2-entries-subclusters">Extended L2 Entries (Subclusters)<a class="headerlink" href="#extended-l2-entries-subclusters" title="Permanent link">&para;</a></h2>
 <p>When incompatible feature bit 4 (EXTL2) is set, L2 entries are 128 bits
@@ -14341,38 +14330,38 @@ efficient copy-on-write operations.</p>
 <h3 id="extended-l2-entry-format-128-bits">Extended L2 Entry Format (128 bits)<a class="headerlink" href="#extended-l2-entry-format-128-bits" title="Permanent link">&para;</a></h3>
 <p><strong>First 64 bits:</strong> Standard L2 entry (bit 0 unused)</p>
 <p><strong>Second 64 bits:</strong> Subcluster bitmap</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a> 63                              32  31                            0
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>+----------------------------------+--------------------------------+
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>|     Zero Bitmap (32 bits)        |   Allocation Bitmap (32 bits) |
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>+----------------------------------+--------------------------------+
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>       |                                        |
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>       +-- Bit N: subcluster N reads as zeros   |
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>                                                +-- Bit N: subcluster N allocated
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a> 63                              32  31                            0
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>+----------------------------------+--------------------------------+
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>|     Zero Bitmap (32 bits)        |   Allocation Bitmap (32 bits) |
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>+----------------------------------+--------------------------------+
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>       |                                        |
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>       +-- Bit N: subcluster N reads as zeros   |
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>                                                +-- Bit N: subcluster N allocated
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="cp">#define QCOW_EXTL2_SUBCLUSTERS_PER_CLUSTER  32</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="cp">#define QCOW_OFLAG_SUB_ALLOC(X)    (1ULL &lt;&lt; (X))</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="cp">#define QCOW_OFLAG_SUB_ZERO(X)     (1ULL &lt;&lt; ((X) + 32))</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="c1">// Subcluster index calculation</span>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="n">subcluster_bits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_bits</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w">  </span><span class="c1">// 32 subclusters</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="n">subcluster_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">32</span><span class="p">;</span>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="n">sc_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">subcluster_bits</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">31</span><span class="p">;</span>
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
-<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="c1">// Check subcluster status</span>
-<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="kt">bool</span><span class="w"> </span><span class="n">is_allocated</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitmap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_SUB_ALLOC</span><span class="p">(</span><span class="n">sc_index</span><span class="p">);</span>
-<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="kt">bool</span><span class="w"> </span><span class="n">is_zero</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitmap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_SUB_ZERO</span><span class="p">(</span><span class="n">sc_index</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="cp">#define QCOW_EXTL2_SUBCLUSTERS_PER_CLUSTER  32</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="cp">#define QCOW_OFLAG_SUB_ALLOC(X)    (1ULL &lt;&lt; (X))</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="cp">#define QCOW_OFLAG_SUB_ZERO(X)     (1ULL &lt;&lt; ((X) + 32))</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="c1">// Subcluster index calculation</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="n">subcluster_bits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_bits</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w">  </span><span class="c1">// 32 subclusters</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="n">subcluster_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">32</span><span class="p">;</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="n">sc_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">guest_offset</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">subcluster_bits</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">31</span><span class="p">;</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="c1">// Check subcluster status</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="kt">bool</span><span class="w"> </span><span class="n">is_allocated</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitmap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_SUB_ALLOC</span><span class="p">(</span><span class="n">sc_index</span><span class="p">);</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="kt">bool</span><span class="w"> </span><span class="n">is_zero</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitmap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_SUB_ZERO</span><span class="p">(</span><span class="n">sc_index</span><span class="p">);</span>
 </code></pre></div>
 <h3 id="subcluster-types">Subcluster Types<a class="headerlink" href="#subcluster-types" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">QCow2SubclusterType</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_UNALLOCATED_PLAIN</span><span class="p">,</span><span class="w">  </span><span class="c1">// Not allocated, read backing</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_UNALLOCATED_ALLOC</span><span class="p">,</span><span class="w">  </span><span class="c1">// Cluster allocated, SC not</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_ZERO_PLAIN</span><span class="p">,</span><span class="w">         </span><span class="c1">// Reads zeros, no allocation</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_ZERO_ALLOC</span><span class="p">,</span><span class="w">         </span><span class="c1">// Allocated but reads zeros</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_NORMAL</span><span class="p">,</span><span class="w">             </span><span class="c1">// Normal allocated data</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_COMPRESSED</span><span class="p">,</span><span class="w">         </span><span class="c1">// Entire cluster compressed</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_INVALID</span><span class="p">,</span><span class="w">            </span><span class="c1">// Invalid state</span>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="p">}</span><span class="w"> </span><span class="n">QCow2SubclusterType</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">QCow2SubclusterType</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_UNALLOCATED_PLAIN</span><span class="p">,</span><span class="w">  </span><span class="c1">// Not allocated, read backing</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_UNALLOCATED_ALLOC</span><span class="p">,</span><span class="w">  </span><span class="c1">// Cluster allocated, SC not</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_ZERO_PLAIN</span><span class="p">,</span><span class="w">         </span><span class="c1">// Reads zeros, no allocation</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_ZERO_ALLOC</span><span class="p">,</span><span class="w">         </span><span class="c1">// Allocated but reads zeros</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_NORMAL</span><span class="p">,</span><span class="w">             </span><span class="c1">// Normal allocated data</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_COMPRESSED</span><span class="p">,</span><span class="w">         </span><span class="c1">// Entire cluster compressed</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_INVALID</span><span class="p">,</span><span class="w">            </span><span class="c1">// Invalid state</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="p">}</span><span class="w"> </span><span class="n">QCow2SubclusterType</span><span class="p">;</span>
 </code></pre></div>
 <p><strong>Important constraints:</strong>
 - Compressed clusters cannot use subclusters (bitmap must be 0)
@@ -14447,11 +14436,11 @@ crate, called from the L2 walk in the check operation.</p>
 4. When refcount drops to 1, COPIED should be set</p>
 <h2 id="l2-table-caching">L2 Table Caching<a class="headerlink" href="#l2-table-caching" title="Permanent link">&para;</a></h2>
 <p>qemu loads L2 tables on demand and caches them:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// L2 cache sizing formula</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">l2_cache_max_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_cache_size</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l2_entry_size</span><span class="p">;</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1">// For 1 MB cache, 64 KB clusters, standard entries:</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1">// 1 MB * 64 KB / 8 = 8 GB of disk addressable</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1">// L2 cache sizing formula</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">l2_cache_max_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_cache_size</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l2_entry_size</span><span class="p">;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1">// For 1 MB cache, 64 KB clusters, standard entries:</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1">// 1 MB * 64 KB / 8 = 8 GB of disk addressable</span>
 </code></pre></div>
 <p>L2 tables are loaded in "slices" (typically 4 KB) rather than full clusters
 for memory efficiency.</p>
@@ -14485,11 +14474,11 @@ divergence. If a future divergence appears the behaviour becomes a
 candidate for <code>docs/quirks.md</code>.</p>
 <h2 id="backing-file-chain-resolution">Backing File Chain Resolution<a class="headerlink" href="#backing-file-chain-resolution" title="Permanent link">&para;</a></h2>
 <p>When a cluster is unallocated:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>1. Check local L2 entry
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>2. If unallocated (offset=0, zero=0):
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>   a. If backing file exists: recurse into backing file
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>   b. If no backing file: return zeros
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>3. Continue until allocated cluster found or chain ends
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>1. Check local L2 entry
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>2. If unallocated (offset=0, zero=0):
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>   a. If backing file exists: recurse into backing file
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>   b. If no backing file: return zeros
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>3. Continue until allocated cluster found or chain ends
 </code></pre></div>
 <p>The backing file path is stored after the header (see backing_file_offset).</p>
 

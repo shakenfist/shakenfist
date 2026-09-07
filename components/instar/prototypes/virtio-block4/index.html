@@ -14330,27 +14330,18 @@ different sector sizes and I/O patterns.</p>
 <a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>  Bytes/exit:   179.4
 </code></pre></div>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>┌─────────────────────────────────────────────────────────────────────┐
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>│                              VMM                                     │
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│  ┌─────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│  │   KVM VM    │  │   Input Dev     │  │    Output Dev           │  │
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│  │   + vCPU    │  │   (read-only)   │  │    (write)              │  │
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│  └──────┬──────┘  └────────┬────────┘  └──────────┬──────────────┘  │
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│         │                  │                       │                 │
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>│  ┌──────┴──────────────────┴───────────────────────┴──────────────┐ │
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>│  │                     VmmStats                                    │ │
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│  │  - total_exits, io_exits, mmio_exits, hlt_exits               │ │
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│  │  - bytes_read, bytes_written, sectors_processed               │ │
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>│  │  - runtime tracking, exit rate calculation                    │ │
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>│  └─────────────────────────────────────────────────────────────────┘ │
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>│                              │                                       │
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>│  ┌───────────────────────────┴─────────────────────────────────────┐│
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>│  │                  KVM Binary Stats (capability check)             ││
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>│  │  - Detects kernel support for KVM_CAP_BINARY_STATS_FD           ││
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>│  │  - Infrastructure for future kernel statistics integration      ││
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>│  └──────────────────────────────────────────────────────────────────┘│
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>└─────────────────────────────────────────────────────────────────────┘
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TB
+    subgraph vmm["VMM"]
+        kvm["KVM VM + vCPU"]
+        indev["Input device (read-only)"]
+        outdev["Output device (write)"]
+        stats["VmmStats&lt;br/&gt;total_exits, io_exits, mmio_exits, hlt_exits&lt;br/&gt;bytes_read, bytes_written, sectors_processed&lt;br/&gt;runtime tracking, exit rate calculation"]
+        binstats["KVM binary stats (capability check)&lt;br/&gt;Detects kernel support for KVM_CAP_BINARY_STATS_FD&lt;br/&gt;Infrastructure for future kernel statistics"]
+    end
+    kvm -- "exit counts" --&gt; stats
+    indev -- "sectors read" --&gt; stats
+    outdev -- "sectors written" --&gt; stats
+    binstats -. "future source, once kvm-ioctls exposes stats_fd" .-&gt; stats</code></pre>
 <h2 id="kvm-binary-statistics">KVM Binary Statistics<a class="headerlink" href="#kvm-binary-statistics" title="Permanent link">&para;</a></h2>
 <p>The KVM kernel provides a binary statistics API (<code>KVM_GET_STATS_FD</code>) that
 exposes per-VM and per-vCPU statistics directly from the kernel. This prototype

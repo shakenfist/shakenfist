@@ -14117,58 +14117,44 @@ with a bare-metal guest that copies data between two block devices.</p>
 <li><strong>serial.rs</strong>: Debug output to VMM console</li>
 </ul>
 <h2 id="virtio-mmio-device-state-machine">Virtio MMIO Device State Machine<a class="headerlink" href="#virtio-mmio-device-state-machine" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>       RESET
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>         │
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>         ▼
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    ACKNOWLEDGE ─────────────────────┐
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>         │                           │
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>         ▼                           │
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>      DRIVER ────────────────────────┤
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>         │                           │
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>         ▼                           │
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>   FEATURES_OK ──────────────────────┤
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>         │                           │
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>         ▼                           │
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    DRIVER_OK                        │
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>         │                           │
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>         ├──────── Normal Operation ─┤
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>         │                           │
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>         ▼                           │
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>      FAILED ◄───────────────────────┘
-</code></pre></div>
+<pre class="mermaid"><code>stateDiagram-v2
+    [*] --&gt; RESET
+    RESET --&gt; ACKNOWLEDGE
+    ACKNOWLEDGE --&gt; DRIVER
+    DRIVER --&gt; FEATURES_OK
+    FEATURES_OK --&gt; DRIVER_OK
+    DRIVER_OK --&gt; DRIVER_OK: normal operation
+    ACKNOWLEDGE --&gt; FAILED
+    DRIVER --&gt; FAILED
+    FEATURES_OK --&gt; FAILED
+    DRIVER_OK --&gt; FAILED</code></pre>
 <h2 id="virtqueue-memory-layout">Virtqueue Memory Layout<a class="headerlink" href="#virtqueue-memory-layout" title="Permanent link">&para;</a></h2>
 <p>For a queue with 256 entries:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Base Address
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  │
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  ├── Descriptor Table (256 × 16 bytes = 4KB)
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  │     ├── desc[0]: addr, len, flags, next
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  │     ├── desc[1]: ...
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  │     └── desc[255]: ...
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  │
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  ├── Available Ring (6 + 256 × 2 = 518 bytes)
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  │     ├── flags (2 bytes)
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  │     ├── idx (2 bytes)
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  │     └── ring[256] (512 bytes)
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>  │
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  └── Used Ring (6 + 256 × 8 = 2054 bytes)
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>        ├── flags (2 bytes)
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        ├── idx (2 bytes)
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        └── ring[256] (2048 bytes)
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>              └── elem: id (4), len (4)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Base Address
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  ├── Descriptor Table (256 × 16 bytes = 4KB)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  │     ├── desc[0]: addr, len, flags, next
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  │     ├── desc[1]: ...
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  │     └── desc[255]: ...
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  │
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>  ├── Available Ring (6 + 256 × 2 = 518 bytes)
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>  │     ├── flags (2 bytes)
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>  │     ├── idx (2 bytes)
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>  │     └── ring[256] (512 bytes)
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>  │
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>  └── Used Ring (6 + 256 × 8 = 2054 bytes)
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        ├── flags (2 bytes)
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        ├── idx (2 bytes)
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        └── ring[256] (2048 bytes)
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>              └── elem: id (4), len (4)
 </code></pre></div>
 <h2 id="block-request-descriptor-chain">Block Request Descriptor Chain<a class="headerlink" href="#block-request-descriptor-chain" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>┌────────────────┐     ┌────────────────┐     ┌────────────────┐
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>│   Descriptor 0 │────▶│   Descriptor 1 │────▶│   Descriptor 2 │
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>│    (Header)    │     │     (Data)     │     │    (Status)    │
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>├────────────────┤     ├────────────────┤     ├────────────────┤
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>│ addr: header   │     │ addr: buffer   │     │ addr: status   │
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>│ len: 16        │     │ len: 512       │     │ len: 1         │
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>│ flags: NEXT    │     │ flags: NEXT    │     │ flags: WRITE   │
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>│ next: 1        │     │       +WRITE*  │     │ next: 0        │
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>└────────────────┘     └────────────────┘     └────────────────┘
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>                       * WRITE flag set for
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>                         READ operations
-</code></pre></div>
+<pre class="mermaid"><code>flowchart LR
+    d0["Descriptor 0 (header)&lt;br/&gt;addr: header&lt;br/&gt;len: 16&lt;br/&gt;flags: NEXT&lt;br/&gt;next: 1"]
+    d1["Descriptor 1 (data)&lt;br/&gt;addr: buffer&lt;br/&gt;len: 512&lt;br/&gt;flags: NEXT +WRITE*"]
+    d2["Descriptor 2 (status)&lt;br/&gt;addr: status&lt;br/&gt;len: 1&lt;br/&gt;flags: WRITE&lt;br/&gt;next: 0"]
+    d0 --&gt; d1 --&gt; d2</code></pre>
+<p>* The <code>WRITE</code> flag is set on the data descriptor for READ operations.</p>
 <h2 id="requestresponse-flow">Request/Response Flow<a class="headerlink" href="#requestresponse-flow" title="Permanent link">&para;</a></h2>
 <h3 id="guest-submits-request">Guest Submits Request<a class="headerlink" href="#guest-submits-request" title="Permanent link">&para;</a></h3>
 <ol>
