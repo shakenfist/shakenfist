@@ -7,6 +7,7 @@ from unittest import mock
 from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.tests import base
 
@@ -387,6 +388,76 @@ class ExponentialBackoffMapTest(base.ShakenFistTestCase):
         self.assertEqual(workitem.BACKOFF_MAP_CAP, len(defer_delays))
         for i in range(1, workitem.BACKOFF_MAP_CAP + 1):
             self.assertIn(f'op-uuid-{i:04d}', defer_delays)
+
+
+class DependencyDeferBudgetTest(base.ShakenFistTestCase):
+    """Issue 3992: a dependency which never goes terminal must not
+    re-defer the waiter forever. The budget is checked against the
+    defer_count the work item persists, so it survives daemon restarts
+    and the back-off map's FIFO eviction."""
+
+    def _run(self, defer_count, dep_kind):
+        mock_op = mock.MagicMock()
+        mock_op.uuid = OP_UUID
+        mock_op.state.value = BaseClusterOperation.STATE_QUEUED
+        mock_op.depends_on = []
+        mock_op.runs_after = []
+        mock_op.current_defer_count = defer_count
+        dep = {'op_type': 'net_op', 'op_uuid': 'dep-uuid'}
+        setattr(mock_op, dep_kind, [dep])
+
+        mock_dep_op = mock.MagicMock()
+        mock_dep_op.state.value = BaseClusterOperation.STATE_QUEUED
+
+        dep_class = mock.MagicMock()
+        dep_class.from_db.return_value = mock_dep_op
+
+        from shakenfist.daemons.network.workitem import Job
+        job = Job.__new__(Job)
+        job.log = mock.MagicMock()
+        defer_delays = {str(OP_UUID): 15.0}
+
+        with mock.patch(
+                'shakenfist.daemons.network.workitem.get_object_class',
+                return_value=dep_class):
+            job._cluster_operation_execute(
+                QUEUE_NAME, mock_op, 1, defer_delays)
+
+        return mock_op, mock_dep_op, defer_delays
+
+    def test_depends_on_budget_exhausted_abandons_the_wait(self):
+        mock_op, mock_dep_op, defer_delays = self._run(
+            DEPENDENCY_DEFER_BUDGET, 'depends_on')
+
+        mock_op.abandon_dependency_wait.assert_called_once_with(mock_dep_op)
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_not_called()
+        # The worker's back-off entry is dropped with the wait.
+        self.assertNotIn(str(OP_UUID), defer_delays)
+
+    def test_depends_on_below_budget_still_defers(self):
+        mock_op, mock_dep_op, _ = self._run(
+            DEPENDENCY_DEFER_BUDGET - 1, 'depends_on')
+
+        mock_op.abandon_dependency_wait.assert_not_called()
+        mock_op.defer.assert_called_once()
+        mock_op.execute.assert_not_called()
+
+    def test_runs_after_budget_exhausted_warns_and_executes(self):
+        mock_op, _, _ = self._run(DEPENDENCY_DEFER_BUDGET, 'runs_after')
+
+        mock_op.abandon_dependency_wait.assert_not_called()
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_called_once()
+        messages = [c.args[1] for c in mock_op.add_event.call_args_list]
+        self.assertIn(
+            'warning, gave up waiting for runs_after dependency', messages)
+
+    def test_runs_after_below_budget_still_defers(self):
+        mock_op, _, _ = self._run(0, 'runs_after')
+
+        mock_op.defer.assert_called_once()
+        mock_op.execute.assert_not_called()
 
 
 class FakeNetOp:
