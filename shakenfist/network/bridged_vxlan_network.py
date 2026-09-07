@@ -44,6 +44,7 @@ from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import NotOnNetworkNode
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.managed_executables import dnsmasq
 from shakenfist.node import Nodes
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -223,7 +224,7 @@ class BridgedVXLanNetwork:
             str(self.network.uuid), floating_address)
 
     def _apply_route_address(self, ip: str) -> None:
-        """Add a host route for a floating IP onto the network's vx bridge.
+        """Route a floating IP into the network, from both directions.
 
         Lifted from ``Network.route_address`` (network.py:938-947). The
         single-target audit event on the wrapped network is preserved here
@@ -251,29 +252,103 @@ class BridgedVXLanNetwork:
             extra={'floating': ip})
         subst = self.network.subst_dict()
         subst['floating_address'] = ip
+
+        # Two routes, because the two directions of traffic for a routed
+        # address are decided in two different routing tables.
+        #
+        # The root namespace's route is how the world gets in: traffic
+        # arriving at the network node for the address is put onto the
+        # network's bridge, and whichever instance the user configured to
+        # answer ARP for it picks it up.
+        #
+        # The namespace's route is how an instance on the network itself
+        # gets there (issue 3662). A routed address comes out of the
+        # floating pool, and the namespace has that entire block on link
+        # on its egress veth -- so without a more specific route, an
+        # instance's packet reaches its default gateway and the namespace
+        # ARPs for the address out on the egress bridge. Nothing answers:
+        # unlike a floating address, a routed address is not anchored on
+        # an interface anywhere, it only exists as a route. The packet
+        # dies one hop from home while the same address answers happily
+        # from outside the cluster. A /32 back out the veth turns that
+        # into the u-turn the root namespace already performs for
+        # everybody else.
+        #
+        # ``replace`` rather than ``add`` because both of these are
+        # re-applied: the maintain loop restores a network node's routed
+        # addresses whenever it rebuilds a network, and ``ip route add``
+        # exits non-zero on a route which is already present. That would
+        # error the operation, and -- worse than the noise -- abandon the
+        # second route because the first one raised.
         util_concurrency.execute(
-            'ip route add %(floating_address)s/32 dev %(vx_bridge)s'
+            'ip route replace %(floating_address)s/32 dev %(vx_bridge)s'
             % subst)
+        util_concurrency.execute(
+            'ip route replace %(floating_address)s/32 dev %(vx_veth_inner)s'
+            % subst, netns=self.network.uuid)
 
     def _apply_unroute_address(self, ip: str) -> None:
-        """Remove a host route for a floating IP from the network's vx bridge.
+        """Remove both of a routed address's routes.
 
         Lifted from ``Network.unroute_address`` (network.py:950-960). As with
         ``_apply_route_address``, the single-target audit event on the
         wrapped network is preserved. The single-threaded net-worker
         dispatcher is the only caller of this method and provides natural
         serialisation; no explicit lock is required.
+
+        Declines quietly on a deleted network for the same reason as
+        ``_apply_route_address`` (issue 3962). That guard is not the
+        whole story for the namespace delete below, though: a network in
+        ``delete_wait``, or one on a network node which has rebooted
+        before the namespace was rebuilt, is not ``deleted`` and still
+        has no namespace to exec into. ``ip netns exec`` reports that
+        with an exit code of its own (255, verified against iproute2)
+        rather than the 2 which means "no such route", so it is
+        tolerated separately below. The end state this method exists to
+        reach -- no route -- is already true of a namespace which is not
+        there, and failing here would leave the address reserved
+        forever, which is exactly what the exit code 2 tolerance was
+        added to prevent.
         """
         self._require_network_node('_apply_unroute_address')
+
+        if self.network.state.value == dbo.STATE_DELETED:
+            self.network.add_event(
+                EVENT_TYPE_AUDIT,
+                'refusing to unroute address on deleted network',
+                extra={'floating': ip})
+            return
 
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
             extra={'floating': ip})
         subst = self.network.subst_dict()
         subst['floating_address'] = ip
+
+        # Both deletes tolerate exit code 2, which is what ip reports for
+        # a route which is not there. The namespace route needs that most:
+        # an address routed before the namespace half of this existed has
+        # only the root namespace's route, and an unroute which failed
+        # against the missing one would leave the address reserved
+        # forever. The end state we want is "no route", and a route which
+        # was never there already satisfies it.
         util_concurrency.execute(
             'ip route del %(floating_address)s/32 dev %(vx_bridge)s'
-            % subst)
+            % subst, check_exit_code=[0, 2])
+
+        # And the namespace delete tolerates the namespace itself being
+        # gone, which the deleted-network guard above does not cover.
+        try:
+            util_concurrency.execute(
+                'ip route del %(floating_address)s/32 dev %(vx_veth_inner)s'
+                % subst, netns=self.network.uuid, check_exit_code=[0, 2])
+        except ProcessExecutionError as e:
+            if e.exit_code != util_network.NETNS_MISSING_EXIT_CODE:
+                raise
+            self.network.add_event(
+                EVENT_TYPE_AUDIT,
+                'namespace absent while unrouting address, nothing to remove',
+                extra={'floating': ip})
 
     def _apply_remove_nat(self) -> None:
         """Tear down the network node's NAT for the wrapped network.

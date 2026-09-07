@@ -96,7 +96,10 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                            node_missing=False, execute_side_effect=None,
                            present_devices=None, bridge_members=None,
                            bridge_members_error=None,
-                           find_network_vxids_error=None):
+                           find_network_vxids_error=None,
+                           namespace_routes=None,
+                           root_routes=None,
+                           namespace_routes_error=None):
         """Drive Job.execute() through exactly one pass of the outer loop
         and return a dict of the mocks that callers will most likely
         want to assert on.
@@ -120,6 +123,17 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         ``get_bridge_members()`` raise. Both drive the host side
         cross-check the reaper performs before it mutates anything;
         the default is a bridge with no members at all.
+
+        ``namespace_routes`` is the set of host route destinations
+        ``get_host_routes()`` reports from inside a network namespace,
+        and ``root_routes`` the set it reports for the bridge in the
+        root namespace. Between them they are how the pass decides
+        whether a routed address still has both of its routes; the
+        default is none in the namespace, and whatever the namespace has
+        in the root, so a test which only cares about one side does not
+        have to say anything about the other.
+        ``namespace_routes_error`` makes the read raise instead, which
+        is what a namespace that is not there looks like.
         """
         if networks is None:
             networks = []
@@ -152,6 +166,16 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
             active['util_network'].discover_interfaces.return_value = (
                 None, None, vxid_to_mac)
+            if namespace_routes_error is not None:
+                active['util_network'].get_host_routes.side_effect = (
+                    namespace_routes_error)
+            else:
+                in_namespace = set(namespace_routes or [])
+                in_root = (in_namespace if root_routes is None
+                           else set(root_routes))
+                active['util_network'].get_host_routes.side_effect = (
+                    lambda netns, device:
+                        in_root if netns is None else in_namespace)
             if present_devices is not None:
                 active['util_network'].check_for_interface.side_effect = (
                     lambda device: device in present_devices)
@@ -637,6 +661,233 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         rc = routed_calls[0]
         self.assertEqual(fake_addr, rc.kwargs.get('ip'))
         self.assertEqual(PRIORITY.background, rc.kwargs.get('priority'))
+
+    def _routed_floating_network(self, network, address):
+        """A floating network whose IPAM has one routed address."""
+        from shakenfist.schema.ipam_reservation import ReservationType
+
+        reservation = mock.MagicMock()
+        reservation.reservation_type = ReservationType.ROUTED
+        reservation.user_uuid = network.uuid
+
+        fn = mock.MagicMock()
+        fn.ipam.in_use = [address]
+        fn.ipam.get_all_reservations.return_value = {address: reservation}
+        return fn
+
+    def test_a_missing_namespace_route_is_restored_on_its_own(self):
+        """A routed address with no in-namespace route is re-routed.
+
+        A routed address is two routes: one in the network node's root
+        namespace so the world can reach it, and one in the network's own
+        namespace so the network's instances can (issue 3662). Nothing
+        else re-applies the second one while the network is healthy, so a
+        cluster which upgraded into it while everything was well would
+        never acquire it for the addresses it already had.
+
+        Re-routing is idempotent and installs both routes, so this must
+        not drag the whole network through a rebuild to get there.
+        """
+        from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+        from shakenfist.schema.operations.net_ip_op \
+            import model_tasks as net_ip_tasks
+
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=[],
+        )
+
+        active['net_ip_create_and_enqueue'].assert_called_once()
+        call = active['net_ip_create_and_enqueue'].call_args
+        self.assertEqual('10.10.10.1', call.kwargs.get('ip'))
+        self.assertEqual(
+            [net_ip_tasks.route_address], call.kwargs.get('tasks'))
+        self.assertEqual(PRIORITY.background, call.kwargs.get('priority'))
+
+        # Nothing was rebuilt to achieve it.
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_a_present_namespace_route_is_left_alone(self):
+        """The pass is a no-op when both of the routes are already there."""
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=['10.10.10.1'],
+        )
+
+        active['net_ip_create_and_enqueue'].assert_not_called()
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_a_missing_root_route_is_restored_too(self):
+        """The root namespace route is audited alongside the namespace one.
+
+        The root route is how the world reaches a routed address, and it
+        can be lost while the bridge it points at survives -- in which
+        case ``is_created()`` stays true, the network looks perfectly
+        healthy, and the address is silently unreachable from outside
+        the cluster. That is the same drift this pass reads the
+        namespace for, in the other direction, and re-routing installs
+        both so the repair does not care which one went missing.
+        """
+        from shakenfist.schema.operations.net_ip_op \
+            import model_tasks as net_ip_tasks
+
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=['10.10.10.1'],
+            root_routes=[],
+        )
+
+        active['net_ip_create_and_enqueue'].assert_called_once()
+        call = active['net_ip_create_and_enqueue'].call_args
+        self.assertEqual('10.10.10.1', call.kwargs.get('ip'))
+        self.assertEqual(
+            [net_ip_tasks.route_address], call.kwargs.get('tasks'))
+
+        # Both tables really were read, rather than the namespace read
+        # answering for both.
+        self.assertEqual(
+            {None, str(n.uuid)},
+            {c.args[0] for c in
+             active['util_network'].get_host_routes.call_args_list})
+
+        # And nothing was rebuilt to get there.
+        active['net_create_and_enqueue'].assert_not_called()
+        active['nn_create_and_enqueue'].assert_not_called()
+
+    def test_a_drifted_mesh_defers_the_route_probe(self):
+        """A network heading for a mesh repair is not probed for routes.
+
+        The mesh repair branch discards whatever the probe would have
+        said -- any missing route waits for the pass after the mesh
+        comes back -- so paying an exec per pass for the answer is the
+        same waste the pending-operation gate already avoids.
+        """
+        n = _build_mock_network(is_okay=True, is_mesh_okay=False)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=[],
+        )
+
+        active['util_network'].get_host_routes.assert_not_called()
+        active['net_ip_create_and_enqueue'].assert_not_called()
+        # The mesh repair itself still happens.
+        active['net_create_and_enqueue'].assert_called_once()
+
+    def test_only_the_network_node_reads_namespace_routes(self):
+        """A hypervisor has no namespace to read, and must not look.
+
+        The namespaces exist only on the network node, so asking on a
+        hypervisor would be one wasted exec per network per pass, and
+        would report every routed address as missing.
+        """
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        active = self._run_one_iteration(
+            network_node=False,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=[],
+        )
+
+        active['util_network'].get_host_routes.assert_not_called()
+        active['net_ip_create_and_enqueue'].assert_not_called()
+
+    def test_a_missing_namespace_is_left_to_the_rebuild(self):
+        """A namespace which cannot be read is not a missing route.
+
+        ``ip route list`` inside a namespace which is not there fails,
+        and that is a larger drift than one absent route -- rebuilding
+        the network is what fixes it, and re-applies the routes on the
+        way past. Reporting every address as missing here would enqueue a
+        re-route per address per pass against a namespace which cannot
+        accept any of them.
+        """
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes_error=ProcessExecutionError(
+                'Cannot open network namespace'),
+        )
+
+        active['util_network'].get_host_routes.assert_called_once()
+        active['net_ip_create_and_enqueue'].assert_not_called()
+
+    def test_namespace_routes_are_not_read_while_an_op_is_pending(self):
+        """A network already being reconciled is not probed.
+
+        The in-flight operation will re-route the address when it runs,
+        and the pending-op gate discards whatever the probe would have
+        said, so paying an exec per pass for it is pure waste.
+        """
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=[],
+            pending_op=True,
+        )
+
+        active['util_network'].get_host_routes.assert_not_called()
+        active['net_ip_create_and_enqueue'].assert_not_called()
+
+    def test_a_failing_route_repair_is_guarded_by_its_own_history(self):
+        """The route repair is a NetIPOp, so its guards read NetIPOp state.
+
+        A re-route which can never succeed -- an absent veth, a namespace
+        in a state nothing here can fix -- would otherwise be enqueued
+        again on every pass forever, with a fresh event on the network
+        each time, because the network's NetOp history says nothing about
+        whether its NetIPOps have been failing.
+        """
+        n = _build_mock_network(is_okay=True, is_mesh_okay=True)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            floating_network=self._routed_floating_network(n, '10.10.10.1'),
+            namespace_routes=[],
+            recent_history=[('op-uuid-1', 'error', 9_995.0)],
+        )
+
+        active['net_ip_create_and_enqueue'].assert_not_called()
+        active['net_create_and_enqueue'].assert_not_called()
+
+        op_types = {
+            call.kwargs.get('op_type') for call in
+            active['mariadb'].get_recent_terminal_op_states_for_target
+            .call_args_list}
+        self.assertEqual({'net_ip_op'}, op_types)
+
+    def test_a_rebuild_is_still_guarded_by_net_op_history(self):
+        """Structural drift is repaired with a NetOp, and guarded as one."""
+        n = _build_mock_network(is_okay=False)
+        active = self._run_one_iteration(
+            network_node=True,
+            networks=[n],
+            recent_history=[('op-uuid-1', 'error', 9_995.0)],
+        )
+
+        active['net_create_and_enqueue'].assert_not_called()
+
+        op_types = {
+            call.kwargs.get('op_type') for call in
+            active['mariadb'].get_recent_terminal_op_states_for_target
+            .call_args_list}
+        self.assertEqual({'net_op'}, op_types)
 
     def test_stray_vxlan_within_grace_period_not_touched(self):
         """A stray vxlan seen for less than five minutes is only tracked,

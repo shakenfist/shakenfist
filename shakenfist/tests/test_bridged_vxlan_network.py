@@ -15,6 +15,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.exceptions import NotOnNetworkNode
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.network import bridged_vxlan_network
 from shakenfist.tests import base
 
@@ -344,18 +345,42 @@ class BridgedVXLanNetworkApplyRouteAddressTestCase(base.ShakenFistTestCase):
         network = _make_network_mock(vxid=vxid)
         network.subst_dict.return_value = {
             'vx_bridge': 'br-vxlan-%06x' % vxid,
+            'vx_veth_inner': 'veth-%06x-i' % vxid,
         }
         return network
 
-    def test_apply_route_address_runs_ip_route_add(self):
+    def test_apply_route_address_routes_in_both_namespaces(self):
+        """A routed address is two routes, one per namespace.
+
+        The root namespace route puts traffic arriving from outside onto
+        the network's bridge. The namespace route is what lets an
+        instance on the network reach the address at all: the namespace
+        has the whole floating block on link on its egress veth, so
+        without a more specific route it ARPs for the address out on the
+        egress bridge, where nothing answers (issue 3662).
+
+        Both are installed with ``replace`` rather than ``add``, because
+        both are re-applied: the maintain loop restores a network node's
+        routed addresses whenever it rebuilds a network, and ``ip route
+        add`` exits non-zero on a route which is already there. That
+        would error the operation, and would abandon the namespace route
+        entirely because the root namespace one raised first.
+        """
         network = self._make_network_with_subst(vxid=0xabc)
         bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
 
         bvn._apply_route_address('203.0.113.10')
 
         network.get_lock.assert_not_called()
-        self.mock_execute.assert_called_once_with(
-            'ip route add 203.0.113.10/32 dev br-vxlan-000abc')
+        self.assertEqual(
+            [
+                mock.call(
+                    'ip route replace 203.0.113.10/32 dev br-vxlan-000abc'),
+                mock.call(
+                    'ip route replace 203.0.113.10/32 dev veth-000abc-i',
+                    netns=network.uuid),
+            ],
+            self.mock_execute.call_args_list)
         # The single-target audit event is preserved at the apply layer.
         network.add_event.assert_called_once_with(
             EVENT_TYPE_AUDIT, 'routing floating ip to network',
@@ -377,18 +402,107 @@ class BridgedVXLanNetworkApplyRouteAddressTestCase(base.ShakenFistTestCase):
             'refusing to route address on deleted network',
             extra={'floating': '203.0.113.12'})
 
-    def test_apply_unroute_address_runs_ip_route_del(self):
+    def test_apply_unroute_address_removes_both_routes(self):
+        """Unroute undoes both routes, and tolerates either being absent.
+
+        An address routed before the namespace route existed has only the
+        root namespace's route. Exit code 2 is what ip reports for a
+        route which is not there, and failing on it would leave such an
+        address reserved forever.
+        """
         network = self._make_network_with_subst(vxid=0xdef)
         bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
 
         bvn._apply_unroute_address('203.0.113.11')
 
         network.get_lock.assert_not_called()
-        self.mock_execute.assert_called_once_with(
-            'ip route del 203.0.113.11/32 dev br-vxlan-000def')
+        self.assertEqual(
+            [
+                mock.call(
+                    'ip route del 203.0.113.11/32 dev br-vxlan-000def',
+                    check_exit_code=[0, 2]),
+                mock.call(
+                    'ip route del 203.0.113.11/32 dev veth-000def-i',
+                    netns=network.uuid, check_exit_code=[0, 2]),
+            ],
+            self.mock_execute.call_args_list)
         network.add_event.assert_called_once_with(
             EVENT_TYPE_AUDIT, 'unrouting floating ip to network',
             extra={'floating': '203.0.113.11'})
+
+    def test_apply_unroute_address_tolerates_a_missing_namespace(self):
+        """An absent namespace is the end state, not a failure.
+
+        The deleted-network guard does not cover every namespace which
+        is not there: a network in ``delete_wait``, or one on a network
+        node which has rebooted before the namespace was rebuilt, is not
+        ``deleted`` and still has nothing to exec into. ``ip netns exec``
+        reports that with 255, which is outside the exit codes ``ip``
+        itself uses, so it is tolerated separately. Failing here would
+        leave the address reserved forever, which is the outcome the
+        exit code 2 tolerance beside it was added to prevent.
+        """
+        network = self._make_network_with_subst(vxid=0xfed)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        self.mock_execute.side_effect = [
+            ('', ''),
+            ProcessExecutionError(
+                stdout='', stderr='Cannot open network namespace "%s": No '
+                                  'such file or directory' % network.uuid,
+                exit_code=255,
+                cmd='ip route del 203.0.113.14/32 dev veth-000fed-i'),
+        ]
+
+        bvn._apply_unroute_address('203.0.113.14')
+
+        self.assertEqual(2, self.mock_execute.call_count)
+        network.add_event.assert_any_call(
+            EVENT_TYPE_AUDIT,
+            'namespace absent while unrouting address, nothing to remove',
+            extra={'floating': '203.0.113.14'})
+
+    def test_apply_unroute_address_still_raises_other_failures(self):
+        """Only the missing namespace is tolerated, not everything.
+
+        A route delete which fails inside a namespace which is there is
+        a real failure, and must error the operation rather than being
+        swallowed as "well, it is gone now".
+        """
+        network = self._make_network_with_subst(vxid=0xfee)
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        self.mock_execute.side_effect = [
+            ('', ''),
+            ProcessExecutionError(
+                stdout='', stderr='RTNETLINK answers: Network is down',
+                exit_code=1,
+                cmd='ip route del 203.0.113.15/32 dev veth-000fee-i'),
+        ]
+
+        self.assertRaises(
+            ProcessExecutionError, bvn._apply_unroute_address, '203.0.113.15')
+
+    def test_apply_unroute_address_declines_deleted_network(self):
+        """A deleted network declines quietly, as its sibling does.
+
+        The namespace of a deleted network is gone too, and while the
+        delete below now tolerates that, declining here means the
+        network's teardown does not depend on an exec which is only
+        going to say the namespace is not there (issue 3962).
+        """
+        network = self._make_network_with_subst(vxid=0xbcd)
+        network.state = mock.Mock()
+        network.state.value = 'deleted'
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+
+        bvn._apply_unroute_address('203.0.113.13')
+
+        self.mock_execute.assert_not_called()
+        network.add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'refusing to unroute address on deleted network',
+            extra={'floating': '203.0.113.13'})
 
 
 class BridgedVXLanNetworkApplyRemoveNATTestCase(base.ShakenFistTestCase):

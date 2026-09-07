@@ -372,13 +372,56 @@ work equally well for other traffic.
     intended for a specific floating IP, but in return must have been configured
     to use that floating IP.
 
-The implementation of routed IPs is relatively trivial. For each routed IP, a
-route on the network node into the relevant virtual network bridge is created.
-Such a route might look like this:
+The implementation of routed IPs is relatively trivial. For each routed IP,
+two routes are created on the network node, one in each of the two routing
+tables which decide where the address's traffic goes.
+
+The first is in the network node's own routing table, and is how traffic
+from outside the cluster arrives. It puts the address onto the virtual
+network's bridge, where whichever interface was configured to answer ARP for
+it picks it up:
 
 ```
-ip route add 192.168.15.29/32 dev br-vxlan-e2300f
+ip route replace 192.168.15.29/32 dev br-vxlan-e2300f
 ```
+
+The second is inside the virtual network's own network namespace, and is how
+an instance *on* that network reaches the address:
+
+```
+ip netns exec 17be6538-8f96-4ccb-b71e-a7e3022fead3 \
+    ip route replace 192.168.15.29/32 dev veth-e2300f-i
+```
+
+That second route is needed because a routed IP comes from the floating pool,
+and as the routing table above shows, the namespace has the whole floating
+block on link on its egress veth. Without a more specific route an instance's
+packet reaches its default gateway and the namespace then ARPs for the address
+out on the egress bridge, where nothing answers -- unlike a floating IP, a
+routed IP is not configured on an interface anywhere on the network node, it
+exists only as a route. The `/32` turns that into a u-turn back into the
+network, which is the same delivery the network node performs for everybody
+else, and it means a routed address behaves identically whether the client is
+on the virtual network the address is routed to, or outside the cluster
+entirely (github issue #3662).
+
+A client on a *different* Shaken Fist virtual network is not covered by
+either route, and remains unsupported. That namespace also has the whole
+floating block on link on its egress veth, so it ARPs for the routed address
+on the egress bridge -- and unlike a floating IP, which the namespace owning
+it answers for from its egress veth, a routed IP is configured on no
+interface there and nothing replies. Reach a routed address from another
+virtual network the same way anything outside the cluster does, by way of the
+network node.
+
+Both routes use `ip route replace` rather than `ip route add` because they are
+re-applied: the network daemon's maintenance pass restores a network's routed
+addresses whenever it rebuilds the network on the network node, and also
+checks each maintenance pass that both routes are still there -- the one in
+the root namespace and the one inside the network's namespace. An address
+missing either is re-routed, which installs both, so a network which is
+otherwise healthy is not dragged through a rebuild to recover one route.
+Removing a routed IP deletes both routes, and tolerates either being absent.
 
 ## Interface naming conventions
 
