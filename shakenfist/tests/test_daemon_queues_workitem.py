@@ -4,6 +4,7 @@ from unittest import mock
 
 from shakenfist.daemons.queues import workitem
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.tests import base
 
 
@@ -114,6 +115,46 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
         mock_op, mock_dep_op = self._run_defer(14, 'runs_after')
         mock_op.defer.assert_called_once_with(
             waiting_on=[mock_dep_op], delay=workitem.MAX_DEFER_DELAY)
+
+    def test_depends_on_budget_exhausted_abandons_the_wait(self):
+        """Issue 3992: a dependency which never goes terminal must not
+        re-defer the waiter forever. At the budget the dispatcher gives
+        up loudly instead of deferring again."""
+        mock_op, mock_dep_op = self._run_defer(
+            DEPENDENCY_DEFER_BUDGET, 'depends_on')
+
+        mock_op.abandon_dependency_wait.assert_called_once_with(mock_dep_op)
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_not_called()
+
+    def test_depends_on_below_budget_still_defers(self):
+        mock_op, mock_dep_op = self._run_defer(
+            DEPENDENCY_DEFER_BUDGET - 1, 'depends_on')
+
+        mock_op.abandon_dependency_wait.assert_not_called()
+        mock_op.defer.assert_called_once_with(
+            waiting_on=[mock_dep_op], delay=workitem.MAX_DEFER_DELAY)
+
+    def test_runs_after_budget_exhausted_warns_and_executes(self):
+        """runs_after is an ordering hint, so an exhausted budget warns
+        and proceeds (matching the missing-dependency branch) rather
+        than aborting the operation."""
+        mock_op, _ = self._run_defer(DEPENDENCY_DEFER_BUDGET, 'runs_after')
+
+        mock_op.abandon_dependency_wait.assert_not_called()
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_called_once()
+        messages = [c.args[1] for c in mock_op.add_event.call_args_list]
+        self.assertIn(
+            'warning, gave up waiting for runs_after dependency', messages)
+
+    def test_runs_after_below_budget_still_defers(self):
+        mock_op, mock_dep_op = self._run_defer(
+            DEPENDENCY_DEFER_BUDGET - 1, 'runs_after')
+
+        mock_op.defer.assert_called_once_with(
+            waiting_on=[mock_dep_op], delay=workitem.MAX_DEFER_DELAY)
+        mock_op.execute.assert_not_called()
 
     def test_defer_not_called_when_dependency_complete(self):
         mock_op = mock.MagicMock()

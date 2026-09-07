@@ -28,6 +28,19 @@ class CannotDeferUnqueued(Exception):
     ...
 
 
+# The dependency-wait defer budget. A dependency which never reaches a
+# terminal state used to re-defer the waiting operation forever, parking
+# it invisibly until the client's own timeout fired (issue 3992: an
+# instance_create deferred at 15 second intervals for the entire ten
+# minute CI create timeout, with the instance silently in preflight
+# throughout). Both dispatchers share the same back-off ladder (0.1s
+# doubling to a 15s cap), so a budget of 30 defers gives up after
+# roughly six minutes of waiting -- comfortably inside a typical
+# client-side create timeout, so the abort is what the client sees
+# rather than its own deadline.
+DEPENDENCY_DEFER_BUDGET = 30
+
+
 class BaseOperation(dbo):
     # docs/developer_guide/state_machine.md has a description of these states.
     STATE_QUEUED = 'queued'
@@ -728,6 +741,49 @@ class BaseClusterOperation(BaseOperation):
             })
         self.defer(delay=delay)
         return True
+
+    def abandon_dependency_wait(self, dep_op: 'BaseClusterOperation') -> None:
+        """Abort this operation because a dependency never went terminal.
+
+        Called by the dispatchers once the dependency-wait defer budget
+        is exhausted (issue 3992). This lives on the operation rather
+        than in either dispatcher for the same reason
+        ``execution_duration_extra`` does: both of them call it, and two
+        copies is two chances for the event shape to drift apart.
+
+        The give-up event is mirrored onto every object this operation
+        targets (via the schema model's ``target_fields``, the same
+        declaration ``enqueue_cluster_operation`` writes
+        ``cluster_operation_targets`` rows from). The operation is hard
+        deleted thirty seconds after going terminal and takes its events
+        with it (#3864), so an event recorded only here would be
+        unreadable within a minute -- and it is the target (the instance
+        a client is awaiting) that an operator will actually look at.
+        """
+        references: list[Any] = [(str(self.object_type), str(self.uuid))]
+        model_class = getattr(self._schema, 'model', None)
+        target_fields = getattr(model_class, 'target_fields', {})
+        for target_column, target_object_type in target_fields.items():
+            target_uuid = getattr(self, target_column, None)
+            if target_uuid is not None:
+                references.append((str(target_object_type), str(target_uuid)))
+
+        if not self.in_memory_only:
+            eventlog.add_event_multi(
+                EVENT_TYPE_AUDIT, references,
+                'aborting operation, as dependency wait defer budget is '
+                'exhausted',
+                extra={
+                    'dep_object_type': dep_op.object_type,
+                    'dep_object_uuid': str(dep_op.uuid),
+                    'dep_object_state': dep_op.state.value,
+                    'defer_count': self.current_defer_count
+                })
+
+        try:
+            self.state = BaseClusterOperation.STATE_ABORT  # type: ignore[misc]
+        except exceptions.InvalidStateException:
+            self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
     def is_outstanding(self) -> bool:
         if self.state.value in [BaseClusterOperation.STATE_ERROR,

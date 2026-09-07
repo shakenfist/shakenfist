@@ -16,6 +16,7 @@ from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.config import config
 from shakenfist.operations.baseoperation import BaseClusterOperation
+from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_network_queues
 from shakenfist.util import concurrency as util_concurrency
@@ -414,6 +415,16 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_QUEUED,
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
+                # A dependency which never goes terminal must not park us
+                # forever (issue 3992) -- give up loudly once the defer
+                # budget is exhausted. The budget is checked against the
+                # defer_count the work item persists, not this worker's
+                # in-memory delay map, so it survives daemon restarts.
+                if op.current_defer_count >= DEPENDENCY_DEFER_BUDGET:
+                    op.abandon_dependency_wait(dep_op)
+                    self._drop_defer_entry(str(op.uuid), defer_delays)
+                    return
+
                 # Dependency not yet ready, we should defer
                 self._apply_defer(op, waiting_on=[dep_op], defer_delays=defer_delays)
                 return
@@ -439,6 +450,22 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_QUEUED,
                                 BaseClusterOperation.STATE_PREFLIGHT,
                                 BaseClusterOperation.STATE_EXECUTING]:
+                # runs_after is an ordering hint, and a missing dependency
+                # already warns and continues rather than making the object
+                # unmanageable -- treat an exhausted defer budget the same
+                # way (issue 3992).
+                if op.current_defer_count >= DEPENDENCY_DEFER_BUDGET:
+                    op.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'warning, gave up waiting for runs_after dependency',
+                        extra={
+                            'dep_object_type': dep_op.object_type,
+                            'dep_object_uuid': str(dep_op.uuid),
+                            'dep_object_state': dep_op_state,
+                            'defer_count': op.current_defer_count
+                        })
+                    continue
+
                 # Dependency not yet ready, we should defer
                 self._apply_defer(op, waiting_on=[dep_op], defer_delays=defer_delays)
                 return

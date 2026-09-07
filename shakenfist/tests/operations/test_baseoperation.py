@@ -1,9 +1,11 @@
 # Copyright 2026 Michael Still and contributors
 from unittest import mock
 
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist import exceptions
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
+from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.net_op import NetOp
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import artifact_fetch_op as fetch_schema
@@ -15,6 +17,7 @@ OP_UUID = '11111111-1111-4111-8111-111111111111'
 NETWORK_UUID = '22222222-2222-4222-8222-222222222222'
 NODE_UUID = '55555555-5555-4555-8555-555555555555'
 OTHER_NODE_UUID = '66666666-6666-4666-8666-666666666666'
+DEP_UUID = '77777777-7777-4777-8777-777777777777'
 
 
 class _StubOp(BaseClusterOperation):
@@ -162,6 +165,99 @@ class DeferWithBackoffTestCase(base.ShakenFistTestCase):
         # ops loaded outside the queue dispatch path.
         op = self._make_op()
         self.assertEqual(0, op.current_defer_count)
+
+
+class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
+    """The give-up path for a dependency which never goes terminal.
+
+    Issue 3992: an instance_create op re-deferred at 15 second intervals
+    forever behind a stuck network op, with nothing recorded against the
+    instance the client was awaiting. Once the dispatchers exhaust the
+    defer budget they call abandon_dependency_wait(), which must abort
+    the operation and mirror a diagnosable event onto the operation's
+    target objects (which outlive the op's thirty second post-terminal
+    hard delete, #3864).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        self.state_patcher = mock.patch.object(
+            BaseClusterOperation, '_state_update')
+        self.mock_state_update = self.state_patcher.start()
+        self.addCleanup(self.state_patcher.stop)
+
+        self.add_event_patcher = mock.patch.object(
+            BaseClusterOperation, 'add_event')
+        self.mock_add_event = self.add_event_patcher.start()
+        self.addCleanup(self.add_event_patcher.stop)
+
+        self.add_event_multi_patcher = mock.patch(
+            'shakenfist.operations.baseoperation.eventlog.add_event_multi')
+        self.mock_add_event_multi = self.add_event_multi_patcher.start()
+        self.addCleanup(self.add_event_multi_patcher.stop)
+
+    def _make_op(self):
+        op = NetOp(_make_net_op_static_values(['network_ensure_mesh']))
+        op.current_defer_count = DEPENDENCY_DEFER_BUDGET
+        return op
+
+    def _make_dep_op(self):
+        dep_op = mock.MagicMock()
+        dep_op.object_type = 'net_op'
+        dep_op.uuid = DEP_UUID
+        dep_op.state.value = BaseClusterOperation.STATE_QUEUED
+        return dep_op
+
+    def test_event_names_the_dependency_and_lands_on_the_target(self):
+        op = self._make_op()
+        op.abandon_dependency_wait(self._make_dep_op())
+
+        self.mock_add_event_multi.assert_called_once()
+        args = self.mock_add_event_multi.call_args
+        self.assertEqual(EVENT_TYPE_AUDIT, args.args[0])
+        references = args.args[1]
+        self.assertIn((str(ObjectType.NET_OP), OP_UUID), references)
+        # The network is the op's target_fields object; the event has to
+        # land there because the operation itself is hard deleted thirty
+        # seconds after going terminal.
+        self.assertIn(('network', NETWORK_UUID), references)
+        self.assertEqual(
+            'aborting operation, as dependency wait defer budget is '
+            'exhausted', args.args[2])
+        extra = args.kwargs['extra']
+        self.assertEqual('net_op', extra['dep_object_type'])
+        self.assertEqual(DEP_UUID, extra['dep_object_uuid'])
+        self.assertEqual(
+            BaseClusterOperation.STATE_QUEUED, extra['dep_object_state'])
+        self.assertEqual(DEPENDENCY_DEFER_BUDGET, extra['defer_count'])
+
+    def test_operation_is_aborted(self):
+        op = self._make_op()
+        op.abandon_dependency_wait(self._make_dep_op())
+
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ABORT)
+
+    def test_failed_abort_is_recorded_not_raised(self):
+        self.mock_state_update.side_effect = exceptions.InvalidStateException(
+            'no such transition')
+
+        op = self._make_op()
+        op.abandon_dependency_wait(self._make_dep_op())
+
+        self.mock_add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT, 'failed to abort operation')
+
+    def test_event_lands_on_the_op_alone_when_the_target_is_unset(self):
+        op = self._make_op()
+        with mock.patch.object(
+                NetOp, 'network_uuid',
+                new_callable=mock.PropertyMock, return_value=None):
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        references = self.mock_add_event_multi.call_args.args[1]
+        self.assertEqual([(str(ObjectType.NET_OP), OP_UUID)], references)
 
 
 class CoalescingExecuteTestCase(base.ShakenFistTestCase):
