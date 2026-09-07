@@ -222,7 +222,9 @@ def enable_nat(
     reply = _marshal_privexec_request(request, 'enable_nat_reply')
     response = reply.enable_nat_reply
     if response.error != privexec_pb2.EnableNATReply.OK:
-        raise EnableNATFailed()
+        raise EnableNATFailed(
+            privexec_pb2.EnableNATReply.Errors.Name(response.error),
+            response.error_text, network_uuid_str)
 
 
 def ensure_vxlan_mesh(

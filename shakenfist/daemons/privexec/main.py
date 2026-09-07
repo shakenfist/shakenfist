@@ -27,6 +27,7 @@ from shakenfist.daemons.privexec import util as privexec_util
 from shakenfist.protos import common_pb2
 from shakenfist.protos import privexec_pb2
 from shakenfist.util import exceptions as util_exceptions
+from shakenfist.util import iptables as util_iptables
 
 
 LOG, _ = logs.setup(__name__)
@@ -57,6 +58,100 @@ MESH_RE = re.compile(r'00:00:00:00:00:00 dst (.*) self permanent')
 
 class VXLANMeshDiscoveryFailure(Exception):
     ...
+
+
+def ensure_netns_iptables_rule(netns, table, rule):
+    """Append an iptables rule inside a network namespace, at most once.
+
+    ``rule`` is the chain name followed by the match and target arguments,
+    exactly as they are written after ``-A``. The rule is checked for with
+    ``-C`` first, because iptables has no "append if absent" and appending
+    unconditionally is not harmless: the first matching rule wins, so a
+    duplicate left behind by an earlier attempt masks any later change to
+    the rule beside it. ``_add_floating_ip`` installs its DNAT rule
+    through here for the same reason.
+
+    A namespace which predates that check can hold several identical
+    copies of one of these rules, and this deliberately leaves them
+    alone: extra copies of a rule which is byte for byte the one we
+    want are inert (the first match wins and they all say the same
+    thing), while converging on one copy would mean deleting the rule
+    and appending it again, which opens a window with no rule at all.
+    That window is unacceptable for ``_add_floating_ip``, which installs
+    a live floating address's DNAT through here. A rule we no longer
+    believe in is a different matter and
+    ``remove_netns_iptables_rule`` drains every copy of it.
+
+    Returns ``(present, error_text)``. ``error_text`` is empty unless
+    the append failed, in which case it carries iptables' own complaint
+    so the caller can report something more useful than "iptables
+    failed".
+    """
+    base = _netns_iptables_base(netns, table)
+
+    _, _, returncode = privexec_util.command_helper(
+        *base, '-C', *rule, failure_is_error=False)
+    if returncode == 0:
+        return True, ''
+
+    _, stderr, returncode = privexec_util.command_helper(*base, '-A', *rule)
+    if returncode != 0:
+        return False, (
+            f'failed to append {" ".join(rule)} to the {table} table in '
+            f'namespace {netns}: {stderr}')
+    return True, ''
+
+
+def _netns_iptables_base(netns, table):
+    return [
+        privexec_util.locate_command('ip'), 'netns', 'exec', netns,
+        privexec_util.locate_command('iptables'), '-w', '10', '-t', table]
+
+
+# The most copies of one rule we will delete before giving up. A
+# namespace should never hold more than a handful, and the bound is here
+# so that a command_helper which somehow always reports success cannot
+# spin forever.
+MAX_DUPLICATE_IPTABLES_RULES = 32
+
+
+def remove_netns_iptables_rule(netns, table, rule):
+    """Delete every copy of an iptables rule inside a network namespace.
+
+    Absence is the desired end state, so a delete which finds nothing to
+    delete has succeeded. iptables exits non-zero and says "does a rule
+    with that specification exist in that chain?" in that case, which is
+    indistinguishable here from any other failure -- and does not need
+    to be distinguished, because nothing downstream depends on the rule
+    having been present.
+
+    ``-D`` removes one matching rule, not all of them, and one match is
+    not enough here. The ``_enable_nat`` this replaced appended its
+    rules unconditionally on every network create and every maintain
+    driven recreate, so a long lived namespace on an upgraded cluster
+    can hold several copies of the rule we no longer believe in.
+    Deleting one of them would leave the rest, and no later pass would
+    ever look again -- so the loop runs until iptables says there is
+    nothing left to remove.
+
+    Returns the number of copies removed, which is zero when the rule
+    was not there at all.
+    """
+    base = _netns_iptables_base(netns, table)
+    removed = 0
+    while removed < MAX_DUPLICATE_IPTABLES_RULES:
+        _, _, returncode = privexec_util.command_helper(
+            *base, '-D', *rule, failure_is_error=False)
+        if returncode != 0:
+            return removed
+        removed += 1
+
+    LOG.with_fields({
+        'netns': netns,
+        'table': table,
+        'rule': ' '.join(rule)
+    }).warning('Stopped deleting duplicate iptables rules at the bound')
+    return removed
 
 
 class PrivExecJob:
@@ -211,40 +306,6 @@ class PrivExecJob:
         )
 
     def _enable_nat(self, req):
-        iptables_failed_error = privexec_pb2.PrivExecReply(
-            enable_nat_reply=privexec_pb2.EnableNATReply(
-                network_uuid=req.network_uuid,
-                network_address=req.network_address,
-                network_mask=req.network_mask,
-                vxid=req.vxid,
-                error=privexec_pb2.EnableNATReply.IPTABLES_FAILED
-            )
-        )
-
-        # Determine if we have NAT already
-        stdout, _, returncode = privexec_util.command_helper(
-            privexec_util.locate_command('iptables'), '-w', '10', '-t', 'nat',
-            '-L', 'POSTROUTING', '-n', '-v'
-        )
-        if returncode != 0:
-            return iptables_failed_error
-
-        # Output looks like this:
-        # Chain POSTROUTING (policy ACCEPT 199 packets, 18189 bytes)
-        # pkts bytes target     prot opt in     out     source               destination
-        #   23  1736 MASQUERADE  all  --  *      ens4    192.168.242.0/24     0.0.0.0/0
-        for line in stdout.split('\n'):
-            if line.find(str(req.network_address)) != -1:
-                return privexec_pb2.PrivExecReply(
-                    enable_nat_reply=privexec_pb2.EnableNATReply(
-                        network_uuid=req.network_uuid,
-                        network_address=req.network_address,
-                        network_mask=req.network_mask,
-                        vxid=req.vxid,
-                        error=privexec_pb2.EnableNATReply.RULES_ALREADY_PRESENT
-                    )
-                )
-
         # Ensure IP forwarding is enabled
         with open('/proc/sys/net/ipv4/ip_forward') as f:
             forwarding_enabled = f.read().rstrip() == '1'
@@ -253,37 +314,43 @@ class PrivExecJob:
             with open('/proc/sys/net/ipv4/ip_forward', 'w') as f:
                 f.write('1\n')
 
-        # Create iptables rules
-        egress_veth_inner = f'egr-{req.vxid:06x}-i'
-        vx_veth_inner = f'veth-{req.vxid:06x}-i'
+        # Create iptables rules. There used to be a "do we have NAT
+        # already?" probe here, which returned RULES_ALREADY_PRESENT and
+        # skipped the lot. It listed POSTROUTING in the *root* namespace
+        # while every rule it guarded is installed inside the network's own
+        # namespace, so it could not see the rules it was guarding. That
+        # went wrong in both directions: normally it matched nothing, and
+        # a network recreated by the maintain loop had these rules
+        # appended again on every pass; and when it did match -- the
+        # comparison was a substring search over the whole listing, so a
+        # 172.16.0.0/16 line elsewhere on the node matches a 172.16.0.0/24
+        # network -- the caller turned the reply into an EnableNATFailed
+        # and the network never came up. Each rule now carries its own -C
+        # check instead, which needs no cross-namespace guesswork.
+        # Rules an older Shaken Fist wrote which this one no longer
+        # believes in. Every copy of each is removed, and before the
+        # install, so the namespace ends up holding no rule which is not
+        # in util_iptables. It may still hold more than one copy of a
+        # rule which is -- see ensure_netns_iptables_rule for why those
+        # are left where they are.
+        for table, rule in util_iptables.stale_nat_rules(req.vxid):
+            remove_netns_iptables_rule(req.network_uuid, table, rule)
 
-        _, _, returncode = privexec_util.command_helper(
-            privexec_util.locate_command('ip'), 'netns', 'exec',
-            req.network_uuid, privexec_util.locate_command('iptables'),
-            '-w', '10', '-A', 'FORWARD', '-o', egress_veth_inner,
-            '-i', vx_veth_inner, '-j', 'ACCEPT'
-        )
-        if returncode != 0:
-            return iptables_failed_error
-
-        _, _, returncode = privexec_util.command_helper(
-            privexec_util.locate_command('ip'), 'netns', 'exec',
-            req.network_uuid, privexec_util.locate_command('iptables'),
-            '-w', '10', '-A', 'FORWARD', '-i', egress_veth_inner,
-            '-o', 'vx_veth_inner', '-j', 'ACCEPT'
-        )
-        if returncode != 0:
-            return iptables_failed_error
-
-        _, _, returncode = privexec_util.command_helper(
-            privexec_util.locate_command('ip'), 'netns', 'exec',
-            req.network_uuid, privexec_util.locate_command('iptables'),
-            '-w', '10', '-t', 'nat', '-A', 'POSTROUTING', '-s',
-            f'{req.network_address}/{req.network_mask}',
-            '-o', egress_veth_inner, '-j', 'MASQUERADE'
-        )
-        if returncode != 0:
-            return iptables_failed_error
+        for table, rule in util_iptables.network_nat_rules(
+                req.network_address, req.network_mask, req.vxid):
+            present, error_text = ensure_netns_iptables_rule(
+                req.network_uuid, table, rule)
+            if not present:
+                return privexec_pb2.PrivExecReply(
+                    enable_nat_reply=privexec_pb2.EnableNATReply(
+                        network_uuid=req.network_uuid,
+                        network_address=req.network_address,
+                        network_mask=req.network_mask,
+                        vxid=req.vxid,
+                        error=privexec_pb2.EnableNATReply.IPTABLES_FAILED,
+                        error_text=error_text
+                    )
+                )
 
         return privexec_pb2.PrivExecReply(
             enable_nat_reply=privexec_pb2.EnableNATReply(
@@ -471,33 +538,23 @@ class PrivExecJob:
         # Only append the DNAT rule if an identical rule is not already
         # present. Duplicated rules aren't just clutter -- the first match
         # wins, so a duplicate from an earlier partial attempt would mask
-        # later changes.
+        # later changes. That is exactly what ensure_netns_iptables_rule
+        # is for, so the check lives in one place rather than two.
         dnat_rule = [
             'PREROUTING', '-d', req.floating_address, '-j', 'DNAT',
             '--to-destination', req.inner_address]
-        _, _, returncode = privexec_util.command_helper(
-            privexec_util.locate_command('ip'), 'netns', 'exec',
-            req.network_uuid, privexec_util.locate_command('iptables'),
-            '-w', '10', '-t', 'nat', '-C', *dnat_rule,
-            failure_is_error=False)
-        if returncode != 0:
-            _, stderr, returncode = privexec_util.command_helper(
-                privexec_util.locate_command('ip'), 'netns', 'exec',
-                req.network_uuid, privexec_util.locate_command('iptables'),
-                '-w', '10', '-t', 'nat', '-A', *dnat_rule)
-            if returncode != 0:
-                return privexec_pb2.PrivExecReply(
-                    add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
-                        network_uuid=req.network_uuid,
-                        floating_address=req.floating_address,
-                        inner_address=req.inner_address,
-                        error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED,
-                        error_text=(
-                            f'failed to append DNAT rule for '
-                            f'{req.floating_address} in namespace '
-                            f'{req.network_uuid}: {stderr}')
-                    )
+        present, error_text = ensure_netns_iptables_rule(
+            req.network_uuid, 'nat', dnat_rule)
+        if not present:
+            return privexec_pb2.PrivExecReply(
+                add_floating_ip_reply=privexec_pb2.AddFloatingIPReply(
+                    network_uuid=req.network_uuid,
+                    floating_address=req.floating_address,
+                    inner_address=req.inner_address,
+                    error=privexec_pb2.AddFloatingIPReply.IPTABLES_FAILED,
+                    error_text=error_text
                 )
+            )
 
         # Announce the address with a gratuitous ARP out the egress
         # veth once the datapath is complete. Floating addresses are

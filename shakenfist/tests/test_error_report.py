@@ -82,7 +82,8 @@ class ErrorReportFromExceptionTestCase(base.ShakenFistTestCase):
             report.origin_class)
 
     def test_enable_nat_failed_maps_to_nat_enable_failed(self):
-        report = ErrorReport.from_exception(EnableNATFailed('nat failed'))
+        report = ErrorReport.from_exception(
+            EnableNATFailed('IPTABLES_FAILED', 'nat failed', 'netuuid'))
         self.assertEqual('network.nat.enable_failed', report.code)
         self.assertEqual(
             'shakenfist.exceptions.EnableNATFailed', report.origin_class)

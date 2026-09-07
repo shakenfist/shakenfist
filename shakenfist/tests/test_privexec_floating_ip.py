@@ -32,18 +32,30 @@ class CommandRecorder:
     `results` maps a substring to a (stdout, stderr, returncode) tuple.
     The first key found in the space-joined command wins. Unmatched
     commands succeed with no output.
+
+    A value may instead be a list of such tuples, which are returned one
+    per matching call and the last of which repeats once the list is
+    exhausted. That is how a command whose answer changes because of
+    what an earlier call did -- a delete which removes one of several
+    copies of a rule and eventually runs out -- is described.
     """
 
     def __init__(self, results=None):
         self.calls = []
         self.results = results or {}
+        self.sequence_positions = {}
 
     def __call__(self, *command, failure_is_error=True):
         self.calls.append(command)
         joined = ' '.join(command)
         for match, result in self.results.items():
-            if match in joined:
+            if match not in joined:
+                continue
+            if not isinstance(result, list):
                 return result
+            position = self.sequence_positions.get(match, 0)
+            self.sequence_positions[match] = position + 1
+            return result[min(position, len(result) - 1)]
         return ('', '', 0)
 
     def find(self, substring):
