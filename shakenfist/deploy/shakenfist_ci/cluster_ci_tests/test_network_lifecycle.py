@@ -159,6 +159,79 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
         self._await_network_presence(node_b, False)
 
 
+class TestNetworkVethMTU(base.BaseNamespacedTestCase):
+    """Both ends of the network node's veth pairs must share an MTU.
+
+    'ip link add ... mtu N type veth peer name P' applies the MTU to the
+    primary end only: unless the peer is given its own trailing mtu it
+    stays at the kernel default of 1500. That left the inner ends of the
+    vx and egress veth pairs -- the network namespace's entire datapath --
+    at 1500 while the outer ends, the bridges either side of them, and the
+    MTU advertised to guests by DHCP were all jumbo sized (github issue
+    #4115). Instance-to-instance traffic never crosses the namespace, so
+    the mismatch only bit egress, NAT and floating IP flows, where guests
+    sized packets against the advertised MTU and depended on path MTU
+    discovery to learn better.
+
+    The assertion is against the bridge each outer end is enslaved to (its
+    'master' in the link JSON) rather than a literal MTU, because the
+    correct value depends on the node's NICs: on an egress NIC at 1500 the
+    egress pair genuinely should be 1500.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'vethmtu'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+
+        self.network_node = self._network_node()
+        self._require_node_exec(self.network_node)
+
+        self.net = self.test_client.allocate_network(
+            '192.168.245.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
+        self._await_networks_ready([self.net['uuid']])
+
+    def _links(self, netns=None):
+        args = ['ip', '-json', 'link', 'show']
+        sudo = False
+        if netns:
+            args = ['ip', 'netns', 'exec', netns] + args
+            sudo = True
+        out, _ = self._node_exec(self.network_node, args, sudo=sudo)
+        return {link['ifname']: link for link in json.loads(out) if link}
+
+    def test_veth_ends_match_bridge_mtu(self):
+        hexid = '%06x' % self.net['vxlan_id']
+        outer_links = self._links()
+        inner_links = self._links(netns=self.net['uuid'])
+
+        for outer, inner in (('veth-%s-o' % hexid, 'veth-%s-i' % hexid),
+                             ('egr-%s-o' % hexid, 'egr-%s-i' % hexid)):
+            self.assertIn(
+                outer, outer_links,
+                '%s missing from the root namespace' % outer)
+            self.assertIn(
+                inner, inner_links,
+                '%s missing from the network namespace' % inner)
+
+            bridge = outer_links[outer].get('master')
+            self.assertIsNotNone(
+                bridge, '%s is not enslaved to a bridge' % outer)
+            bridge_mtu = outer_links[bridge]['mtu']
+
+            self.assertEqual(
+                bridge_mtu, outer_links[outer]['mtu'],
+                '%s does not match the MTU of %s' % (outer, bridge))
+            self.assertEqual(
+                bridge_mtu, inner_links[inner]['mtu'],
+                '%s does not match the MTU of %s' % (inner, bridge))
+
+
 class TestNetworkDeleteReleasesFloatingGateway(base.BaseNamespacedTestCase):
     """A deleted network must never still hold a floating gateway.
 

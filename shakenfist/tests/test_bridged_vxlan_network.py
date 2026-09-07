@@ -638,6 +638,37 @@ class BridgedVXLanNetworkApplyCreateOnNetworkNodeTestCase(
         # State transitioned to CREATED at the end.
         self.assertEqual('created', network.state)
 
+    def test_veth_pairs_created_with_peer_mtu(self):
+        # 'ip link add ... mtu N type veth peer name P' applies the MTU
+        # to the primary end only, so the peer must be given its own
+        # trailing mtu or it stays at the kernel default of 1500 (issue
+        # 4115). Each pair takes its own bridge's MTU: the egress bridge
+        # legitimately differs from the vx bridge on a node whose egress
+        # NIC is smaller.
+        network = self._make_network(vxid=77)
+        self.mock_check_for_interface.return_value = False
+
+        with mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_network.create_interface') as mock_create, \
+            mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_network.get_interface_mtu',
+                side_effect=[8950, 1500]) as mock_get_mtu, \
+            mock.patch(
+                'shakenfist.network.bridged_vxlan_network.'
+                'util_network.add_address_to_interface'):
+            bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+            bvn._apply_create_on_network_node()
+
+        mock_get_mtu.assert_has_calls([
+            mock.call('br-vxlan-00004d'), mock.call('egr-00004d')])
+        mock_create.assert_has_calls([
+            mock.call('vx-00004d-o', 'veth',
+                      'peer name vx-00004d-i mtu 8950', mtu=8950),
+            mock.call('eg-00004d-o', 'veth',
+                      'peer name eg-00004d-i mtu 1500', mtu=1500)])
+
     def test_provide_nat_invokes_enable_nat(self):
         network = self._make_network(provide_nat=True)
         network.floating_gateway = '203.0.113.10'

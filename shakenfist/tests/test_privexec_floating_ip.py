@@ -120,6 +120,22 @@ class AddFloatingIPTestCase(PrivExecFloatingIPTestCase):
         self.assertEqual(privexec_pb2.AddFloatingIPReply.OK,
                          reply.add_floating_ip_reply.error)
 
+    def test_add_creates_pair_with_peer_mtu(self):
+        # 'ip link add ... mtu N type veth peer name P' applies the MTU to
+        # the primary end only, so the peer must be given its own trailing
+        # mtu or it stays at the kernel default of 1500 (issue 4115). 7950
+        # is the config default (MAX_HYPERVISOR_MTU - 50) that
+        # create_interface gives the outer end.
+        self.patch_commands(results={' -C ': ('', '', 1)})
+        self._patch_utils()
+
+        self.job._add_floating_ip(self._request())
+
+        self.mock_create_interface.assert_called_once_with(
+            FLOATING_INTERFACE, 'veth',
+            ['peer', 'name', INNER_INTERFACE, 'mtu', '7950'],
+            inner_namespace=NETWORK_UUID)
+
     def test_add_is_idempotent(self):
         # A repeated add with the address and DNAT rule already in place
         # must not add a second address or append a duplicate DNAT rule.

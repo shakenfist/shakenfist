@@ -240,6 +240,17 @@ class UtilTestCase(base.ShakenFistTestCase):
         mock_execute.assert_called_with(
             'ip link add veth-foo-o mtu 7950 type veth peer name veth-foo-i')
 
+    @mock.patch('shakenfist.util.concurrency.execute')
+    def test_create_interface_veth_with_peer_mtu(self, mock_execute):
+        # The leading mtu applies to the primary end only; the peer needs
+        # its own trailing mtu or it stays at the kernel default of 1500
+        # (issue 4115).
+        util_network.create_interface(
+            'veth-foo-o', 'veth', 'peer name veth-foo-i mtu 8950', mtu=8950)
+        mock_execute.assert_called_with(
+            'ip link add veth-foo-o mtu 8950 type veth peer name veth-foo-i '
+            'mtu 8950')
+
     def test_random_macaddr(self):
         self.assertTrue(util_network.random_macaddr().startswith('02:00:00'))
 

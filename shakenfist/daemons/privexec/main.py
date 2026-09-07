@@ -19,6 +19,7 @@ import setproctitle
 from shakenfist_utilities import random      # noreorder
 from shakenfist_utilities import logs        # noreorder
 
+from shakenfist.config import config
 from shakenfist.daemons.daemon import apply_log_level
 from shakenfist.daemons.daemon import force_clean_exit
 from shakenfist.daemons.daemon import send_systemd_ready
@@ -373,9 +374,17 @@ class PrivExecJob:
             f'flt-{int(ipaddress.IPv4Address(req.floating_address)):08x}'
         inner_floating_interface = f'{floating_interface}-i'
 
+        # The peer's MTU must be given explicitly or it defaults to 1500
+        # (issue 4115). This pair is an address anchor which carries no
+        # traffic, but matching the MTU create_interface gives the outer
+        # end keeps every veth pair we create consistent.
+        veth_extra = [
+            'peer', 'name', inner_floating_interface,
+            'mtu', str(config.MAX_HYPERVISOR_MTU - 50)
+        ]
+
         success, create_error = privexec_util.create_interface(
-            floating_interface, 'veth',
-            ['peer', 'name', inner_floating_interface],
+            floating_interface, 'veth', veth_extra,
             inner_namespace=req.network_uuid
         )
 
@@ -394,8 +403,7 @@ class PrivExecJob:
             success = returncode == 0
             if success:
                 success, create_error = privexec_util.create_interface(
-                    floating_interface, 'veth',
-                    ['peer', 'name', inner_floating_interface],
+                    floating_interface, 'veth', veth_extra,
                     inner_namespace=req.network_uuid
                 )
             else:
