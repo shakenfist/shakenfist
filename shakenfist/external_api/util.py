@@ -38,6 +38,16 @@ def assign_routed_ip(n):
         n.unique_label(), ReservationType.ROUTED, '')
 
 
+def release_routed_ip(address):
+    # Inverse of assign_routed_ip. The host side teardown (the /32 route on
+    # the network node) is handled asynchronously by the unroute_address job;
+    # here we release the IPAM reservation so the address returns to the
+    # floating pool. Mirrors release_floating_ip(), except there is no
+    # interface record to clear.
+    fn = network.floating_network()
+    fn.ipam.release(address)
+
+
 def safe_get_network_interface(interface_uuid):
     ni = NetworkInterface.from_db(interface_uuid)
     if not ni:

@@ -6,6 +6,12 @@ from testtools import content
 from shakenfist_ci import base
 
 
+# The floating network's well known UUID, from
+# shakenfist.constants.FLOATING_NETWORK_UUID. Routed address reservations
+# live in this network's IPAM.
+FLOATING_NETWORK_UUID = 'f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f'
+
+
 class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
     """A network's host plumbing must appear only where needed and be
     fully removed once it is not.
@@ -217,3 +223,66 @@ class TestNetworkDeleteReleasesFloatingGateway(base.BaseNamespacedTestCase):
             time.sleep(1)
 
         self.fail('Network %s was never deleted' % self.net['uuid'])
+
+
+class TestUnrouteReleasesRoutedAddress(base.BaseNamespacedTestCase):
+    """Unrouting an address must release its floating pool reservation.
+
+    Routed addresses are reserved in the floating network's IPAM. The
+    unroute API tears down the host side route asynchronously, but the
+    reservation itself is released synchronously by the handler. Before
+    issue 4114 nothing released it, so a workload which routed and
+    unrouted addresses against a long lived network consumed the floating
+    pool permanently -- the address only came back on network delete.
+
+    This needs no host level access, only the API, so it does not use the
+    node-exec helpers.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'netunroute'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.244.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
+        self._await_networks_ready([self.net['uuid']])
+
+    def _floating_reservations(self):
+        return {r['address']: r for r in
+                self.system_client.get_network_addresses(FLOATING_NETWORK_UUID)}
+
+    def test_unroute_releases_reservation(self):
+        address = self.test_client.route_network_address(self.net['uuid'])
+        self.assertIsNotNone(address)
+
+        reservations = self._floating_reservations()
+        self.addDetail(
+            'reservations after route',
+            content.text_content(
+                json.dumps(reservations, indent=4, sort_keys=True)))
+        self.assertIn(address, reservations)
+        self.assertEqual('routed', reservations[address]['reservation_type'])
+
+        self.test_client.unroute_network_address(self.net['uuid'], address)
+
+        # The reservation is released synchronously by the unroute handler,
+        # so by the time the DELETE returns the address must no longer be
+        # held as routed. It may appear as a deletion halo for a while
+        # before returning to the pool, which is fine -- what matters is
+        # that it is no longer counted as in use by the network.
+        reservations = self._floating_reservations()
+        self.addDetail(
+            'reservations after unroute',
+            content.text_content(
+                json.dumps(reservations, indent=4, sort_keys=True)))
+        res = reservations.get(address)
+        if res:
+            self.assertNotEqual(
+                'routed', res['reservation_type'],
+                'Address %s is still reserved as routed after unroute: %s'
+                % (address, res))
