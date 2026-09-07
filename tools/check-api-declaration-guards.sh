@@ -192,18 +192,20 @@ open(p, 'w').write(s)
 PY
 check 'emptied parameter list, swag_from present'
 
-# 4. A handler with no declaration at all.
+# 4. A handler with no declaration at all. Bounded by its first and
+# last lines rather than quoted in full: an earlier version pasted the
+# whole decorator here and silently became a NO-OP the day a parameter
+# was added to it (#3739's namespace sweep), so the mutation stopped
+# proving anything while still reporting.
 python3 - <<'PY'
 p = 'shakenfist/external_api/snapshot.py'
 s = open(p).read()
-s = s.replace("""    @swag_from(api_base.swagger_helper(
-        'instances', 'List the snapshots of an instance.',
-        [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
-        [(200, 'Information about the snapshots of an instance.', None),
-         (404, 'Instance not found.', None)]))
-""", '', 1)
-open(p, 'w').write(s)
+head = ("    @swag_from(api_base.swagger_helper(\n"
+        "        'instances', 'List the snapshots of an instance.',")
+tail = "(404, 'Instance not found.', None)]))\n"
+start = s.index(head)
+end = s.index(tail, start) + len(tail)
+open(p, 'w').write(s[:start] + s[end:])
 PY
 check 'handler with no swag_from'
 
@@ -467,6 +469,71 @@ s = s.replace("""                # quietly arriving here.
 open(p, 'w').write(s)
 PY
 check 'undocumented handler compiled as empty'
+
+# 32-34 cover the term the derivation gained for #3739: the kwargs a
+# handler's decorators consume on its behalf. Without it the popped
+# `namespace` on 55 ref-lookup routes was a functional parameter which
+# nothing required anybody to declare, and phase 3's warn window found
+# it as a rejection against the official client rather than CI finding
+# it as a defect.
+
+# 32. A ref-lookup handler which stops declaring the namespace its
+# decorator consumes. This is #3739 itself, reintroduced on one route.
+#
+# Anchored on the get handler's summary, with every later index bounded
+# to the region after it. The first version searched for the namespace
+# tuple by its nine-space indentation, which is a *substring* of the
+# twelve-space declaration in the post above it: the search matched
+# post, the terminator search then ran on to the next handler, and the
+# splice removed the rest of post's parameters, its response list, all
+# five of its decorators, its entire body and the head of get's
+# declaration. The result still parsed, so the harness reported a catch
+# -- of "a handler vanished", not of "a ref lookup handler stopped
+# declaring namespace". Mutation 4 was rewritten for the same class of
+# fault in the same commit.
+#
+# The assertions are the standing defence, and they are why this is
+# safe to leave keyed on source text at all: if the splice ever escapes
+# its handler again, the write does not happen, the tree is unchanged
+# and check() reports NO-OP rather than a catch. A mutation that
+# reports a catch for the wrong reason is worse than no mutation, and
+# this file has produced two of them.
+python3 - <<'PY'
+p = 'shakenfist/external_api/snapshot.py'
+s = open(p).read()
+anchor = s.index("'instances', 'List the snapshots of an instance.',")
+start = s.index("('namespace', 'body', 'namespace',", anchor)
+end = s.index(', False)', start) + len(', False)')
+cut = s.rindex(',', anchor, start)
+
+removed = s[cut:end]
+assert removed.lstrip(", \n").startswith(
+    "('namespace', 'body', 'namespace',"), removed
+assert 'def ' not in removed and '@' not in removed, removed
+assert removed.count('False)') == 1, removed
+
+open(p, 'w').write(s[:cut] + s[end:])
+PY
+check 'ref lookup handler stops declaring namespace'
+
+# 33. The decorator walk resolving nothing, which silently exempts
+# every handler in the tree. The most dangerous shape here: a term
+# which reports nothing when the defect is present is worse than no
+# term at all, because the 55 declarations then look enforced and are
+# not.
+sed -i "s/        candidates = functions.get(name or '', \[\])/        candidates = []/" \
+    shakenfist/external_api/declarations.py
+check 'decorator walk resolves nothing'
+
+# 34. Delegation not followed. arg_is_artifact_ref and
+# arg_is_visible_artifact_ref are one-liners returning
+# _resolve_artifact_ref(func, widen=...), so a walk which stopped at
+# the decorator would answer "consumes nothing" for thirteen artifact
+# handlers -- and their declarations would then read as parameters the
+# handler cannot receive.
+sed -i "s/        target = _bare_name(stmt.value.func)/        continue/" \
+    shakenfist/external_api/declarations.py
+check 'decorator delegation not followed'
 
 echo
 if [ "${failures}" -ne 0 ]; then

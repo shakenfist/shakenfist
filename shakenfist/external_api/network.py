@@ -140,7 +140,7 @@ class NetworkEndpoint(api_base.Resource):
         [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True),
          ('namespace', 'body', 'namespace',
-          'Scope the name lookup to this namespace.', False)],
+          api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Information about a single network.', network_get_example),
          (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
@@ -154,7 +154,7 @@ class NetworkEndpoint(api_base.Resource):
         [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True),
          ('namespace', 'body', 'namespace',
-          'Scope the name lookup to this namespace.', False)],
+          api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)],
         [(202,
           'Deletion has been queued. The response body identifies the cluster '
           'operation that will perform the work; clients should poll the '
@@ -388,6 +388,8 @@ class NetworkEventsEndpoint(api_base.Resource):
         [
             ('network_ref', 'path', 'uuidorname',
              'The UUID or name of the network.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
              'The number of events to return, defaults to 100 and is '
@@ -435,7 +437,9 @@ class NetworkInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Get network interface information.',
         [('network_ref', 'path', 'uuidorname',
-          'The UUID or name of the network.', True)],
+          'The UUID or name of the network.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'The network interfaces on a single network.',
           network_interfaces_example),
          (404, 'Network not found.', None)]))
@@ -455,7 +459,9 @@ class NetworkMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Fetch metadata for a network.',
         [('network_ref', 'path', 'uuidorname',
-          'The network fetch metadata for.', True)],
+          'The network fetch metadata for.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Artifact metadata, if any.', None),
          (404, 'Artifact not found.', None)],
         requires_admin=True))
@@ -469,8 +475,12 @@ class NetworkMetadatasEndpoint(api_base.Resource):
         'networks', 'Add metadata for a network.',
         [
             ('network_ref', 'path', 'uuidorname', 'The network to add a key to.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
             ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -496,7 +506,11 @@ class NetworkMetadataEndpoint(api_base.Resource):
         [
             ('network_ref', 'path', 'uuidorname', 'The network to add a key to.', True),
             ('key', 'path', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -519,7 +533,9 @@ class NetworkMetadataEndpoint(api_base.Resource):
         'networks', 'Delete a metadata key for a network.',
         [
             ('network_ref', 'path', 'uuidorname', 'The network to remove a key from.', True),
-            ('key', 'path', 'string', 'The metadata key to set', True)
+            ('key', 'path', 'string', 'The metadata key to set', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -568,7 +584,9 @@ class NetworkPingEndpoint(api_base.Resource):
         [
             ('network_ref', 'path', 'uuidorname',
              'The network to send traffic on.', True),
-            ('address', 'path', 'string', 'The IPv4 address to ping.', True)
+            ('address', 'path', 'string', 'The IPv4 address to ping.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'The stdout and stderr of the ping request.', None),
          (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
@@ -618,7 +636,9 @@ class NetworkAddressesEndpoint(api_base.Resource):
         'networks', 'Return information about the address reservations in a network.',
         [
             ('network_ref', 'path', 'uuidorname',
-             'The network to return address allocation information about.', True)
+             'The network to return address allocation information about.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'Address allocations', network_allocations_example),
          (404, 'Network not found.', None)]))
@@ -639,7 +659,9 @@ class NetworkRouteAddressEndpoint(api_base.Resource):
         'networks', 'Route a floating address to this network, with no DNAT.',
         [
             ('network_ref', 'path', 'uuidorname',
-             'The network route the address to.', True)
+             'The network route the address to.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'The address that was routed', None),
          (507, 'No floating addresses are available', None),
@@ -671,7 +693,9 @@ class NetworkUnrouteAddressEndpoint(api_base.Resource):
         [
             ('network_ref', 'path', 'uuidorname',
              'The network route the address to.', True),
-            ('address', 'path', 'string', 'The address to remove routing for', True)
+            ('address', 'path', 'string', 'The address to remove routing for', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'The address that was routed', None),
          (403, 'That address is not routed by this network.', None),
@@ -708,6 +732,8 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
              ('The network to add a DNS record for, which must have provide_dns '
               'enabled.'),
              True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
             ('name', 'body', 'string', 'The DNS entry', True),
             ('value', 'body', 'ipv4',
              'The IP address the DNS entry resolves to', True)
@@ -738,6 +764,8 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
         [
             ('network_ref', 'path', 'uuidorname',
              'The network route the address to.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
             ('name', 'body', 'string', 'The DNS entry', True)
         ],
         [(200, 'DNS entry removed', None),
@@ -789,6 +817,8 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
         'networks', 'Get the outstanding cluster operations for a network.',
         [('network_ref', 'path', 'uuidorname',
           'The UUID or name of the network.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],

@@ -195,6 +195,8 @@ class InstanceAgentOperationsEndpoint(api_base.Resource):
         'instances', 'List agent operations for an instance.',
         [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'body', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],

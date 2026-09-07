@@ -32,7 +32,7 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: phases 0, 1, 2 and 3 planned; 0, 1 and 2 complete.**
+**Status: phases 0 to 4 planned; 0, 1, 2 and 3 complete.**
 The open questions at the bottom are answered in the Decisions
 section; see
 [`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
@@ -43,7 +43,9 @@ for what the audit found,
 for what the vocabulary work shipped and the four deviations it
 recorded, and
 [`PLAN-api-input-validation-phase-03-compile-and-warn.md`](PLAN-api-input-validation-phase-03-compile-and-warn.md)
-for the phase now ready to start. Phases 4 onward are not yet cut
+for the measurement that closed it, and
+[`PLAN-api-input-validation-phase-04-enforce.md`](PLAN-api-input-validation-phase-04-enforce.md)
+for the phase now ready to start. Phases 5 onward are not yet cut
 into per-phase files.
 
 ## Situation
@@ -294,8 +296,8 @@ declarations are good enough to compile.
 | 0: Research and decisions | Complete | Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See [phase 0](PLAN-api-input-validation-phase-00-decisions.md) |
 | 1: Declaration audit | Complete | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
 | 2: Type vocabulary | Complete | The specification-validation test (#3626) plus `schemes`/`securityDefinitions` template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; `unsignedinteger`/`macaddr`/`base64`/`netblock` tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events `limit` cap are visible to callers. See [phase 2](PLAN-api-input-validation-phase-02-type-vocabulary.md) |
-| 3: Compile and warn | In progress | Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is *already* a 400 carrying interpreter text. The measurement window opened the same day — sfcbr deployed, apparatus hand-verified, a full functional CI run covered — and exits when every finding is explained, no earlier than 2026-08-20. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) |
-| 4: Enforce | Not started | Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the hand-authored `get_args` schemas into the compiled path |
+| 3: Compile and warn | Complete | Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is *already* a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared `namespace` of #3739 and fourteen metadata `value` declarations narrower than their handlers — which phase 4 fixes before it enforces. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) |
+| 4: Enforce | In progress | Fix the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), teach the derivation to see decorator-consumed kwargs so that class cannot recur, then turn on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moves to Future work: read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) |
 | 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
 | 7: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
@@ -310,7 +312,16 @@ the plan was scoped against.
 2026-08-07), #3626 (specification validation in CI), #3616
 (`base.py` under mypy), #3642 (variadic handlers in the audit),
 #3629 (body-supplied `all`, see D6 below), #3615 (`log_request`
-discarding headers).
+discarding headers). #3739 (the ref decorators' undeclared
+`namespace`) is fixed by phase 4 and closes when that branch
+merges.
+
+**Filed by phase 4, and deliberately not fixed by it:** #4098 (the
+`get_args` fold, see the carried section below) and #4100 (an
+explicit `thin: false` on a snapshot request, which two comments
+in the tree wrongly blamed on this plan — the compiled path never
+injects, so no phase of this plan unblocks it; it needs a client
+release which omits the key).
 
 **Still open and still owned by this plan:** #528 (parent), #3612
 (the mechanism), #936, #534, #3269, #323, #3523, #3371, #2094;
@@ -480,6 +491,39 @@ Phase 3 therefore generalises an existing, tested loader to
 every parameter derived `query`, rather than introducing a
 second precedence rule alongside it. See
 [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md).
+
+### Carried into phase 4 from phase 3
+
+The measurement window found two declaration bugs, and phase 4
+fixes both before it enforces. Their detail is in
+[phase 4](PLAN-api-input-validation-phase-04-enforce.md); what
+belongs here is the one item phase 4 declined.
+
+* **The `get_args` fold is deferred, and this plan's description
+  of it was wrong.** Phase 4's line above used to read "fold the
+  hand-authored `get_args` schemas into the compiled path".
+  Read as "delete the four `@use_kwargs` decorators", that is a
+  defect rather than a refactor: `validation.check()` returns
+  findings and `validate_request` calls through, so the compiled
+  path never coerces or injects anything, and `log_request`
+  merges only the JSON body -- nothing merges
+  `flask.request.args`. `@use_kwargs` is therefore the sole
+  mechanism by which a query-string parameter reaches a handler.
+  Removing it from `blob.py` would silently revert `offset` and
+  `limit` to their signature defaults, reading a whole blob where
+  the caller asked for a range.
+
+  The defensible reading is to keep `@use_kwargs` and generate
+  its schema from the same declaration list `swagger_helper()`
+  receives, which removes the second source of truth D2 objected
+  to. That needs signature defaults at runtime and moves
+  `blob.py`'s hand-rolled negative-offset check into a field,
+  changing an error message -- a second request-visible change in
+  the phase that flips enforcement. It is tracked as
+  [#4098](https://github.com/shakenfist/shakenfist/issues/4098)
+  and is a candidate for phase 6, which already touches how
+  values reach handlers. Enforcement does not depend on it: the
+  compiled check runs first, so the duplication is inert.
 
 ## Open questions for phase 0
 

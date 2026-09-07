@@ -3,7 +3,8 @@
 # Parametrised tests for the arg_is_*_ref decorator family.
 #
 # The decorators (arg_is_instance_ref, arg_is_network_ref,
-# arg_is_artifact_ref) historically passed request_namespace() straight to
+# arg_is_artifact_ref and arg_is_visible_artifact_ref) historically
+# passed request_namespace() straight to
 # Object.from_db_by_ref, which collapsed to "search every namespace" for
 # system callers regardless of what namespace the request body asked for.
 # A system admin invoking `client.get_instance(name, namespace='ns1')`
@@ -198,30 +199,82 @@ class ArgIsRefNamespaceScopingTestCase(base.ShakenFistTestCase):
             self.assertNotIn(case.obj_kwarg, captured)
 
     # ------------------------------------------------------------------
-    # Artifact-specific: the `artifact_uuid` branch goes through
-    # Artifact.from_db rather than from_db_by_ref, but must still honour
-    # the namespace authz check so a tenant cannot bypass scoping by
-    # providing artifact_uuid in the request body.
+    # Artifact-specific: arg_is_visible_artifact_ref widens a *name*
+    # across everything the caller can see, while arg_is_artifact_ref
+    # (covered by _CASES above) does not. Both are one liners over
+    # _resolve_artifact_ref, so which of its two lookups runs is the
+    # only part of that function _CASES cannot reach.
     # ------------------------------------------------------------------
 
-    def test_artifact_uuid_branch_tenant_foreign_namespace_rejected(self):
+    def _run_visible(self, caller_ns, body_namespace, returned_obj_namespace):
+        """Drive arg_is_visible_artifact_ref, mocking both lookups.
+
+        Patching both is the point: the assertion is which one ran, so
+        a refactor that widened where it should not, or stopped
+        widening where it should, fails here rather than silently
+        answering the same 'ok'.
+        """
         captured = {}
 
-        @api_artifact.arg_is_artifact_ref
+        @api_artifact.arg_is_visible_artifact_ref
         def endpoint(**kwargs):
             captured.update(kwargs)
             return 'ok'
 
-        with mock.patch(_REQUEST_NS_TARGET, return_value='ns1'), \
-                mock.patch('shakenfist.external_api.artifact.Artifact'
-                           '.from_db') as from_db, \
-                mock.patch('shakenfist.external_api.artifact.Artifact'
-                           '.from_db_by_ref') as from_db_by_ref:
-            response = endpoint(artifact_uuid='some-uuid', namespace='ns2')
+        returned = _fake_obj(returned_obj_namespace)
 
+        with mock.patch(_REQUEST_NS_TARGET, return_value=caller_ns), \
+                mock.patch('shakenfist.external_api.artifact.Artifact'
+                           '.from_db_by_ref_visible_to',
+                           return_value=returned) as widened, \
+                mock.patch('shakenfist.external_api.artifact.Artifact'
+                           '.from_db_by_ref',
+                           return_value=returned) as scoped:
+            kwargs = {'artifact_ref': _REF}
+            if body_namespace is not None:
+                kwargs['namespace'] = body_namespace
+            response = endpoint(**kwargs)
+
+        return response, captured, widened, scoped
+
+    def test_visible_ref_without_body_namespace_widens(self):
+        # A shared artifact owned elsewhere reaches the handler: this
+        # is the whole reason the widening variant exists, and the
+        # post-lookup namespace check must not undo it when the caller
+        # named no namespace.
+        response, captured, widened, scoped = self._run_visible(
+            caller_ns='ns1', body_namespace=None, returned_obj_namespace='ns2')
+        self.assertEqual(
+            'ok', response,
+            f'unqualified visible lookup should succeed, got {response!r}')
+        widened.assert_called_once_with(_REF, 'ns1')
+        scoped.assert_not_called()
+        self.assertIn('artifact_from_db', captured)
+
+    def test_visible_ref_with_body_namespace_does_not_widen(self):
+        # Naming a namespace turns the widening off whatever the route
+        # asked for: that caller asked about one namespace and must be
+        # answered from it or not at all.
+        response, captured, widened, scoped = self._run_visible(
+            caller_ns='system', body_namespace='ns1',
+            returned_obj_namespace='ns1')
+        self.assertEqual(
+            'ok', response,
+            f'scoped visible lookup should succeed, got {response!r}')
+        scoped.assert_called_once_with(_REF, 'ns1')
+        widened.assert_not_called()
+        self.assertIn('artifact_from_db', captured)
+
+    def test_visible_ref_tenant_foreign_namespace_rejected(self):
+        # Widening does not weaken the authz posture: a tenant naming
+        # somebody else's namespace is refused before either lookup,
+        # exactly as it is on the narrow decorator.
+        response, captured, widened, scoped = self._run_visible(
+            caller_ns='ns1', body_namespace='ns2',
+            returned_obj_namespace='ns2')
         self.assertEqual(
             404, response.status_code,
             f'foreign-namespace tenant should be 404, got {response!r}')
-        from_db.assert_not_called()
-        from_db_by_ref.assert_not_called()
+        widened.assert_not_called()
+        scoped.assert_not_called()
         self.assertNotIn('artifact_from_db', captured)

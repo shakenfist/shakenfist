@@ -245,7 +245,7 @@ class InstanceEndpoint(api_base.Resource):
         [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
          ('namespace', 'body', 'namespace',
-          'Scope the name lookup to this namespace.', False)],
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Information about a single instance.', instance_get_example),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
@@ -259,7 +259,7 @@ class InstanceEndpoint(api_base.Resource):
         [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
          ('namespace', 'body', 'namespace',
-          'The namespace containing the instance', False)],
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Information about the instance post delete.',
           instance_get_example_deleted),
          (404, 'Instance not found.', None)]))
@@ -1074,7 +1074,9 @@ class InstanceInterfacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List network interfaces for an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'A list of network interfaces for an instance.',
           instance_interfaces_example),
          (404, 'Instance not found.', None)]))
@@ -1089,6 +1091,8 @@ class InstanceInterfacesEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('network', 'body', 'dict',
              'A networkspec defining the new interface. '
              'See https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
@@ -1219,6 +1223,8 @@ class InstanceEventsEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('event_type', 'body', 'string', 'The type of event to return.', False),
             ('limit', 'body', 'integer',
              'The number of events to return, defaults to 100 and is '
@@ -1238,7 +1244,9 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Soft (ACPI) reboot an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be rebooted.', None)]))
     @api_base.arg_is_instance_ref
@@ -1261,7 +1269,9 @@ class InstanceRebootHardEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Hard (reset switch) reboot an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be rebooted.', None)]))
     @api_base.arg_is_instance_ref
@@ -1284,7 +1294,9 @@ class InstancePowerOffEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Power off an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be powered off.', None)]))
     @api_base.arg_is_instance_ref
@@ -1307,7 +1319,9 @@ class InstancePowerOnEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Power on an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be powered on.', None)]))
     @api_base.arg_is_instance_ref
@@ -1330,7 +1344,9 @@ class InstancePauseEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Pause an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be paused.', None)]))
     @api_base.arg_is_instance_ref
@@ -1353,7 +1369,9 @@ class InstanceUnpauseEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Unpause an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
          (409, 'The instance cannot be unpaused.', None)]))
     @api_base.arg_is_instance_ref
@@ -1376,7 +1394,9 @@ class InstanceMetadatasEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Fetch metadata for an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The instance to fetch metadata for.', True)],
+          'The instance to fetch metadata for.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Instance metadata, if any.', None),
          (404, 'Instance not found.', None)],
         requires_admin=True))
@@ -1390,8 +1410,12 @@ class InstanceMetadatasEndpoint(api_base.Resource):
         'instances', 'Add metadata for an instance.',
         [
             ('instance_ref', 'path', 'uuidorname', 'The instance to add a key to.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1540,7 +1564,11 @@ class InstanceMetadataEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname', 'The instance to add a key to.', True),
             ('key', 'path', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1563,7 +1591,9 @@ class InstanceMetadataEndpoint(api_base.Resource):
         'instances', 'Delete a metadata key for an instance.',
         [
             ('instance_ref', 'path', 'uuidorname', 'The instance to remove a key from.', True),
-            ('key', 'path', 'string', 'The metadata key to set', True)
+            ('key', 'path', 'string', 'The metadata key to set', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -1587,6 +1617,8 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The instance fetch console data for.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             # Not unsignedinteger: -1 is a supported sentinel meaning
             # "the whole log", which get_console_data() special-cases
             # and the functional suite relies on. Publishing minimum 0
@@ -1631,7 +1663,9 @@ class InstanceConsoleDataEndpoint(api_base.Resource):
         'instances', 'Delete console data for an instance.',
         [
             ('instance_ref', 'path', 'uuidorname',
-             'The instance fetch console data for.', True)
+             'The instance fetch console data for.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'Nothing.', None),
          (404, 'Instance not found.', None)],
@@ -1680,7 +1714,9 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
          'for this instance.'),
         [
             ('instance_ref', 'path', 'uuidorname',
-             'The instance fetch console data for.', True)
+             'The instance fetch console data for.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'A .vv file to open in virt-viewer as a application/x-virt-viewer stream.',
           instance_vv_file_example),
@@ -1766,7 +1802,9 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
          'proxy URL for the SPICE console of this instance.'),
         [
             ('instance_ref', 'path', 'uuidorname',
-             'The instance to mint a VDI console proxy token for.', True)
+             'The instance to mint a VDI console proxy token for.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'A Kerbside proxy URL and the token expiry time.',
           instance_vdiconsoleproxy_get_example),
@@ -1828,6 +1866,8 @@ class InstanceAgentPutEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('blob_uuid', 'body', 'uuid',
              'The UUID of the blob to put onto the instance.', True),
             ('path', 'body', 'string',
@@ -1914,6 +1954,8 @@ class InstanceAgentGetEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('path', 'body', 'string',
              'The path to fetch the file from inside the instance.', True),
             ('deadline_seconds', 'body', 'number',
@@ -1975,6 +2017,8 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('command_line', 'body', 'string', 'The command to execute.', True),
             ('deadline_seconds', 'body', 'number',
              DEADLINE_SECONDS_DESCRIPTION, False,
@@ -2030,7 +2074,9 @@ class InstanceScreenshotEndpoint(api_base.Resource):
         'instances', 'Collect a screenshot of an instance.',
         [
             ('instance_ref', 'path', 'uuidorname',
-             'The UUID or name of the instance.', True)
+             'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'The UUID of a blob containing the screenshot.', None),
          (404, 'Instance not found.', None)]))
@@ -2095,6 +2141,8 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
         'instances', 'Get the outstanding cluster operations for an instance.',
         [('instance_ref', 'path', 'uuidorname',
           'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
           'Include operations which have already completed, rather than '
           'only those still in flight.', False)],

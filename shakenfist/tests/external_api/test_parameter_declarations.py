@@ -40,13 +40,17 @@ UNDECLARED_BY_DESIGN = {
     ('NodeMetadataEndpoint', 'delete', 'value'),
 }
 
-# Deferred to phase 4 for the same reason: InstanceSnapshotEndpoint.post
-# treats an explicit `thin: false` as unset. The official client has
-# always transmitted the key (`--thin/--flatten` defaults to False and
-# apiclient sends it unconditionally), so honouring false today would
-# make SNAPSHOTS_DEFAULT_TO_THIN inert for every shipped client. The
-# absent-versus-false distinction needs the schema layer plus a client
-# release that omits the key when unset.
+# Not deferred to phase 4 after all, though it long said it was:
+# InstanceSnapshotEndpoint.post treats an explicit `thin: false` as
+# unset. The official client has always transmitted the key
+# (`--thin/--flatten` defaults to False and apiclient sends it
+# unconditionally), so honouring false today would make
+# SNAPSHOTS_DEFAULT_TO_THIN inert for every shipped client. No phase of
+# PLAN-api-input-validation unblocks that: the validation layer is
+# check-only and never injects, so the handler sees thin=False
+# regardless, and the distinction is drawable today without it. It
+# needs a client release which omits the key, and a capability token to
+# detect one. Tracked as issue 4100.
 
 # Declarations exempt from location derivation. `header` and `formData`
 # cannot be derived from the code, so a declaration using one bypasses
@@ -67,11 +71,111 @@ UNDOCUMENTED_BY_DESIGN = {
     ('Readyz', 'get'),
 }
 
+# Every declaration allowed to use the 'any' type token (D15). 'any'
+# turns validation off for a parameter, so once it exists it is the
+# easy answer to any inconvenient type error; a fifteenth use must be
+# a deliberate, visible edit to this set rather than a quiet one. All
+# fourteen are the metadata `value` parameter -- the one place the API
+# stores a caller-supplied value it never interprets -- and
+# network.py's DNS record `value` (declared 'ipv4') is deliberately
+# not among them. (cls, method, name).
+ANY_TOKEN_DECLARATIONS = {
+    ('ArtifactMetadatasEndpoint', 'post', 'value'),
+    ('ArtifactMetadataEndpoint', 'put', 'value'),
+    ('AuthMetadatasEndpoint', 'post', 'value'),
+    ('AuthMetadataEndpoint', 'put', 'value'),
+    ('BlobMetadatasEndpoint', 'post', 'value'),
+    ('BlobMetadataEndpoint', 'put', 'value'),
+    ('InstanceMetadatasEndpoint', 'post', 'value'),
+    ('InstanceMetadataEndpoint', 'put', 'value'),
+    ('InterfaceMetadatasEndpoint', 'post', 'value'),
+    ('InterfaceMetadataEndpoint', 'put', 'value'),
+    ('NetworkMetadatasEndpoint', 'post', 'value'),
+    ('NetworkMetadataEndpoint', 'put', 'value'),
+    ('NodeMetadatasEndpoint', 'post', 'value'),
+    ('NodeMetadataEndpoint', 'put', 'value'),
+}
+
+
+# The `namespace` body parameter every ref resolving decorator pops
+# (issue 3739) is described by one of four module constants in
+# api_base, and which constant goes with which decorator is a statement
+# about how a name resolves: the widened text promises a search across
+# shared and trusted artifacts, the narrow one promises the opposite.
+# Pasting the wrong one publishes a false statement that no other test
+# could see, so the pairing is pinned here.
+REF_DECORATOR_NAMESPACE_DESCRIPTIONS = {
+    'arg_is_instance_ref': 'INSTANCE_REF_NAMESPACE_DESCRIPTION',
+    'arg_is_network_ref': 'NETWORK_REF_NAMESPACE_DESCRIPTION',
+    'arg_is_artifact_ref': 'ARTIFACT_REF_NAMESPACE_DESCRIPTION',
+    'arg_is_visible_artifact_ref':
+        'VISIBLE_ARTIFACT_REF_NAMESPACE_DESCRIPTION',
+}
+
+
+def _bare_decorator_name(node):
+    """The undotted name of a decoration site, `@a.b.c(...)` -> 'c'."""
+    while isinstance(node, ast.Call):
+        node = node.func
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Name):
+        return node.id
+    return None
+
+
+def _namespace_description_node(fn):
+    """The description element of a handler's body `namespace` tuple."""
+    for dec in fn.decorator_list:
+        if not (isinstance(dec, ast.Call)
+                and 'swagger_helper' in ast.unparse(dec)):
+            continue
+        call = dec.args[0] if dec.args else None
+        if not (isinstance(call, ast.Call) and len(call.args) >= 3
+                and isinstance(call.args[2], ast.List)):
+            continue
+        for item in call.args[2].elts:
+            if not (isinstance(item, ast.Tuple) and len(item.elts) >= 5):
+                continue
+            if (declarations.literal(item.elts[0]) == 'namespace'
+                    and declarations.literal(item.elts[1]) == 'body'):
+                return item.elts[3]
+    return None
+
 
 def _endpoints():
     """Yield (class name, method name, method node) per handler."""
     for _, _, cls, fn in declarations.handlers():
         yield cls.name, fn.name, fn
+
+
+def _declared_types():
+    """(cls, method, name, location, argtype) for every declared
+    parameter in the tree.
+
+    declarations.Declaration never carries the type token -- nothing
+    in phase 3's derivation needs it -- so this mirrors
+    declarations.declarations()'s AST walk far enough to pull out
+    item.elts[2] as well, which is all pinning 'any' usage needs.
+    """
+    out = []
+    for _, _, cls, fn in declarations.handlers():
+        for dec in fn.decorator_list:
+            if 'swagger_helper' not in ast.unparse(dec):
+                continue
+            call = dec.args[0] if isinstance(dec, ast.Call) and dec.args else None
+            if not (isinstance(call, ast.Call) and len(call.args) >= 3
+                    and isinstance(call.args[2], ast.List)):
+                continue
+            for item in call.args[2].elts:
+                if not (isinstance(item, ast.Tuple) and len(item.elts) in (5, 6)):
+                    continue
+                out.append((
+                    cls.name, fn.name,
+                    declarations.literal(item.elts[0]),
+                    declarations.literal(item.elts[1]),
+                    declarations.literal(item.elts[2])))
+    return out
 
 
 class ParameterDeclarationTestCase(base.ShakenFistTestCase):
@@ -223,6 +327,55 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     'the class' % (cls, name, cls, method))
         self.assertEqual([], problems)
 
+    def test_any_token_use_is_pinned(self):
+        """'any' (D15) turns validation off for a parameter. Once it
+        exists it is the easy answer to any inconvenient type error, so
+        pin the exact set of declarations using it -- the metadata
+        `value` family and nothing else -- so a fifteenth use is a
+        deliberate, visible edit to ANY_TOKEN_DECLARATIONS rather than
+        a quiet one."""
+        any_uses = [(cls, method, name, location)
+                    for (cls, method, name, location, argtype)
+                    in _declared_types() if argtype == 'any']
+        found = {(cls, method, name) for (cls, method, name, _) in any_uses}
+
+        self.assertEqual(
+            set(), found - ANY_TOKEN_DECLARATIONS,
+            'these declarations started using the \'any\' type token, '
+            'which this test does not expect. If that is deliberate, read '
+            'D15 in docs/plans/PLAN-api-input-validation-phase-04-enforce'
+            '.md, confirm the parameter really is a value the API stores '
+            'but never interprets, and add it to ANY_TOKEN_DECLARATIONS')
+        self.assertEqual(
+            set(), ANY_TOKEN_DECLARATIONS - found,
+            'these ANY_TOKEN_DECLARATIONS entries no longer match a '
+            'declaration using \'any\'; remove them, or the declaration '
+            'was narrowed back and this set has fallen behind')
+        self.assertEqual(
+            14, len(any_uses),
+            '\'any\' should be used by exactly fourteen declarations (the '
+            'metadata value family); if that count is changing '
+            'deliberately, update this number and ANY_TOKEN_DECLARATIONS '
+            'together')
+
+        wrong_name = [(cls, method, name) for (cls, method, name, _)
+                      in any_uses if name != 'value']
+        self.assertEqual(
+            [], wrong_name,
+            'every existing use of \'any\' is the metadata value '
+            'parameter; %r declares a different parameter as \'any\', '
+            'which is a new kind of use this test has not been told to '
+            'expect' % (wrong_name,))
+
+        wrong_location = [(cls, method, name, location) for
+                          (cls, method, name, location) in any_uses
+                          if location != 'body']
+        self.assertEqual(
+            [], wrong_location,
+            '\'any\' is body-only -- swagger_helper() refuses it '
+            'elsewhere -- so a non-body use here means that refusal has '
+            'a hole: %r' % (wrong_location,))
+
     def test_every_mounted_class_is_an_endpoint_and_vice_versa(self):
         """route_parameters() and handlers() must agree on what an
         endpoint is.
@@ -254,15 +407,23 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
     def test_declared_names_are_real_parameters(self):
         """A declared name must be something the handler can receive.
 
+        Receiving it is not the same as it reaching the signature. A
+        decorator which pops a name out of kwargs consumes a parameter
+        the caller really sends -- `namespace` on every ref lookup --
+        and the handler never sees it, so the signature alone would
+        call fifty-five true declarations false (#3739).
+
         An empty declaration list is legitimate -- eight endpoints
         accept nothing -- and needs no guard, because the loop below is
         already a no-op for one. The sibling assertion's version of that
         guard was load-bearing and wrong, so it is deliberately absent
         here rather than kept for symmetry.
         """
+        functions = declarations.package_functions()
         for cls, method, fn in _endpoints():
             problems = []
-            accepted = declarations.handler_kwargs(fn, problems)
+            accepted = set(declarations.handler_kwargs(fn, problems))
+            accepted |= declarations.decorator_kwargs(fn, functions, problems)
             self.assertEqual(
                 [], problems,
                 '%s.%s: the accepted parameter list could not be '
@@ -287,7 +448,15 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         parameters have been emptied while the handler still accepts
         them. The three UNDOCUMENTED_BY_DESIGN handlers take no kwargs,
         so this loop is a no-op for them.
+
+        A parameter a decorator consumes counts as accepted, and is the
+        half of #3739 that matters going forward: the signature-only
+        rule declared the popped `namespace` invisible, so nobody had to
+        publish it, and the warn window found it as a rejection against
+        the official client. The next `kwargs.pop` in a decorator fails
+        here instead.
         """
+        functions = declarations.package_functions()
         for cls, method, fn in _endpoints():
             if not declarations.documented(fn):
                 continue
@@ -298,20 +467,40 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             # unreadable parameter list is a failure, not an absence.
             problems = []
             kwargs = declarations.handler_kwargs(fn, problems)
+            consumed = declarations.decorator_kwargs(fn, functions, problems)
+            kwargs += sorted(consumed - set(kwargs))
             self.assertEqual(
                 [], problems,
                 '%s.%s: the accepted parameter list could not be '
                 'enumerated, so this assertion cannot hold: %s'
                 % (cls, method, '; '.join(problems)))
             for kwarg in kwargs:
-                if (cls, method, kwarg) in UNDECLARED_BY_DESIGN:
+                # A decorator-consumed parameter has no opt-out, and
+                # this is where that has to be said: declarations.audit()
+                # -- which backs test_declared_locations_are_derivable
+                # and the pre-commit fixer -- reports the same fact with
+                # no exemption path, so honouring one here would leave
+                # two guards disagreeing about a single handler with
+                # neither message explaining why. It is also the right
+                # rule on its own terms. UNDECLARED_BY_DESIGN exists for
+                # a kwarg the signature names and the handler ignores;
+                # a kwarg a decorator pops is one the caller can send
+                # and act on, so hiding it from the published API is
+                # exactly the invisibility this assertion exists to
+                # refuse.
+                if (kwarg not in consumed
+                        and (cls, method, kwarg) in UNDECLARED_BY_DESIGN):
                     continue
                 self.assertIn(
                     kwarg, names,
                     '%s.%s accepts %r but does not declare it, so it is '
-                    'invisible in the published API. Declare it, stop '
-                    'accepting it, or add it to UNDECLARED_BY_DESIGN with a '
-                    'reason.' % (cls, method, kwarg))
+                    'invisible in the published API. Declare it%s.'
+                    % (cls, method, kwarg,
+                       ' -- a decorator consumes it, so there is no '
+                       'UNDECLARED_BY_DESIGN exemption; declare it or stop '
+                       'consuming it' if kwarg in consumed
+                       else ', stop accepting it, or add it to '
+                       'UNDECLARED_BY_DESIGN with a reason'))
 
     def test_declared_locations_are_valid(self):
         """swagger_helper enforces this at import time; pin it here too, so
@@ -451,6 +640,83 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
                     '%s.%s declares %r, which is injected by a decorator '
                     'rather than sent by a caller'
                     % (cls, method, parameter.name))
+
+    def test_namespace_descriptions_match_their_decorator(self):
+        """Each of the 55 ref lookup handlers uses the right constant.
+
+        The four descriptions were pasted inline at every site before
+        they were hoisted, which made a wording fix 55 edits and drift
+        between copies invisible. Hoisting them fixes that and creates
+        a new way to be wrong -- referencing the constant next to the
+        one the decorator implements -- so the pairing is asserted
+        rather than eyeballed. It is checked per handler, and the count
+        is pinned, because a derivation which silently stopped finding
+        the decorators would otherwise pass by examining nothing.
+        """
+        checked = 0
+        for cls, method, fn in _endpoints():
+            decorators = [
+                name for name in map(_bare_decorator_name, fn.decorator_list)
+                if name in REF_DECORATOR_NAMESPACE_DESCRIPTIONS]
+            if not decorators:
+                continue
+            self.assertEqual(
+                1, len(decorators),
+                '%s.%s carries more than one ref resolving decorator (%s), '
+                'so which namespace description is correct is ambiguous'
+                % (cls, method, ', '.join(decorators)))
+
+            node = _namespace_description_node(fn)
+            self.assertIsNotNone(
+                node,
+                '%s.%s is behind %s, which pops `namespace` out of kwargs, '
+                'but declares no body namespace parameter'
+                % (cls, method, decorators[0]))
+            name = node.attr if isinstance(node, ast.Attribute) else (
+                node.id if isinstance(node, ast.Name) else None)
+            self.assertEqual(
+                REF_DECORATOR_NAMESPACE_DESCRIPTIONS[decorators[0]], name,
+                '%s.%s is behind %s but describes its namespace parameter '
+                'with %s. The four descriptions differ in what they promise '
+                'about how a name resolves, so this publishes a false '
+                'statement.'
+                % (cls, method, decorators[0],
+                   repr(name) if name else 'text written inline rather than '
+                   'one of the api_base constants'))
+            checked += 1
+
+        self.assertEqual(
+            55, checked,
+            'expected 55 handlers behind a ref resolving decorator, found '
+            '%d. If the count changed on purpose, update it here.' % checked)
+
+    def test_artifact_uuid_is_not_a_parameter(self):
+        """`artifact_uuid` is an ordinary undeclared body key.
+
+        `_resolve_artifact_ref` used to resolve an artifact from a body
+        `artifact_uuid` without popping it, so the derivation could not
+        see it and the handler it then called could not accept it: the
+        branch resolved the artifact and the call raised TypeError,
+        which the broad except turned into a 400 carrying interpreter
+        text. It was deleted rather than declared, because declaring it
+        would publish a parameter that never worked.
+
+        The property asserted is the one that made the branch dead --
+        no handler accepts the kwarg -- rather than the absence of the
+        branch, so reintroducing the shape in any decorator fails here
+        too.
+        """
+        for cls, method, fn in _endpoints():
+            self.assertNotIn(
+                'artifact_uuid', declarations.handler_kwargs(fn),
+                '%s.%s accepts an artifact_uuid kwarg. Nothing populates '
+                'it from a route, so it can only arrive as an undeclared '
+                'body key; declare it or remove it.' % (cls, method))
+            for parameter in declarations.declarations(fn):
+                self.assertNotEqual(
+                    'artifact_uuid', parameter.name,
+                    '%s.%s declares artifact_uuid, but no handler accepts '
+                    'it and no route mounts it' % (cls, method))
 
     def test_every_endpoint_is_documented(self):
         """A handler with no swag_from is absent from the published API.
@@ -1114,6 +1380,277 @@ class FakeEndpoint(api_base.Resource):
             api_base.RAW_BODY_PARAMETER,
             declarations.base_constants()['RAW_BODY_PARAMETER'])
 
+    def test_decorator_consumed_kwargs_are_derived(self):
+        """A decorator which pops a kwarg consumes a real parameter.
+
+        The shape of #3739: the caller sends `namespace` in the body,
+        log_request merges it into kwargs, and the decorator takes it
+        before the handler runs. None of the other derivation sources
+        can see it -- it is not a route segment, not a webargs key, not
+        a flask.request.args read, and not in the signature -- so
+        without this term the parameter is functional and undeclarable.
+        """
+        source = '''
+def arg_is_thing_ref(func):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        del kwargs['scope']
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            {'namespace', 'scope'},
+            declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual([], problems)
+
+    def test_decorator_delegation_is_followed(self):
+        """arg_is_artifact_ref and arg_is_visible_artifact_ref are both
+        one-liners returning _resolve_artifact_ref(func, widen=...), so
+        the pop is a level below the name at the decoration site. A walk
+        which stopped at the decorator would answer "consumes nothing"
+        for nine handlers.
+        """
+        source = '''
+def _resolve(func, widen):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def arg_is_thing_ref(func):
+    return _resolve(func, widen=False)
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'_resolve': [tree.body[0]],
+                     'arg_is_thing_ref': [tree.body[1]]}
+        fn = tree.body[2].body[0]
+
+        problems = []
+        self.assertEqual(
+            {'namespace'},
+            declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual([], problems)
+
+    def test_unfollowable_delegation_is_a_problem(self):
+        """The decorator's real body is somewhere this cannot read, so
+        the empty set it would otherwise return is a confident wrong
+        answer rather than an absence."""
+        source = '''
+def arg_is_thing_ref(func):
+    return somewhere_else.resolve(func)
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('delegates to', problems[0])
+
+    def test_non_literal_pop_key_is_a_problem(self):
+        """The parameter is consumed whether or not its name can be
+        read, so saying nothing about it would leave it undeclarable and
+        unenforceable -- #3739 one level down."""
+        source = '''
+def arg_is_thing_ref(func):
+    def wrapper(*args, **kwargs):
+        value = kwargs.pop(KEY, None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('cannot read', problems[0])
+
+    def test_decorators_outside_the_package_are_not_problems(self):
+        """"Unresolvable" has to mean "found it and could not read it".
+
+        Every handler in the tree carries decorators which are not
+        package functions at all -- swag_from and use_kwargs come from
+        third party libraries -- so reporting a name this cannot find
+        would report the whole API and mean nothing. A pop on something
+        which is not a kwargs dict is not a consumed parameter either.
+        """
+        source = '''
+def helper(func):
+    def wrapper(*args, **kwargs):
+        local = {'a': 1}
+        local.pop('a', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @swag_from(api_base.swagger_helper('things', 'A thing.', [], []))
+    @use_kwargs(get_args, location='query')
+    @helper
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'helper': [tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual([], problems)
+
+    def test_ambiguous_decorator_name_is_a_problem(self):
+        """Names are resolved bare, because that is all a decoration
+        site carries. Two modules defining one is therefore a name this
+        cannot resolve, not a name it may pick a winner for."""
+        source = '''
+def arg_is_thing_ref(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class Thing:
+    @arg_is_thing_ref
+    def get(self, thing_ref=None):
+        pass
+'''
+        tree = ast.parse(source)
+        functions = {'arg_is_thing_ref': [tree.body[0], tree.body[0]]}
+        fn = tree.body[1].body[0]
+
+        problems = []
+        self.assertEqual(
+            set(), declarations.decorator_kwargs(fn, functions, problems))
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn('defined more than once', problems[0])
+
+    def test_a_consumed_parameter_must_be_declared(self):
+        """The audit term, end to end, on constructed sources.
+
+        Not drift -- there is no location literal to rewrite -- so it
+        lands in problems, which is what makes the fixer and the
+        pre-commit hook refuse the tree rather than silently pass it.
+        """
+        self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
+        self._write('fake.py', '''
+def arg_is_fake_ref(func):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('alpha', 'body', 'string', 'A parameter.', False)],
+        []))
+    @arg_is_fake_ref
+    def get(self, alpha=None):
+        pass
+''')
+
+        drifted, _, problems = declarations.audit(self.tempdir)
+
+        self.assertEqual([], drifted)
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("consumes 'namespace'", problems[0])
+        self.assertIn('declare it in the body', problems[0])
+
+        # And declaring it makes the audit clean, which is the other
+        # side of the assertion: a term which reports whatever it is
+        # given is no better than one which reports nothing.
+        self._write('fake.py', '''
+def arg_is_fake_ref(func):
+    def wrapper(*args, **kwargs):
+        body_namespace = kwargs.pop('namespace', None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+class FakeEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'fakes', 'A fake.',
+        [('alpha', 'body', 'string', 'A parameter.', False),
+         ('namespace', 'body', 'namespace', 'A namespace.', False)],
+        []))
+    @arg_is_fake_ref
+    def get(self, alpha=None):
+        pass
+''')
+
+        drifted, _, problems = declarations.audit(self.tempdir)
+
+        self.assertEqual([], drifted)
+        self.assertEqual([], problems)
+
+    def test_the_ref_decorators_are_seen_to_consume_namespace(self):
+        """The derivation must find the real thing, not just synthetic ones.
+
+        Every assertion above is written on constructed source, and a
+        decorator_kwargs() which returned the empty set for the actual
+        tree would satisfy all of them while leaving #3739 exactly
+        where it was: fifty-five declarations nothing requires and an
+        audit which reports a clean tree either way. So the four
+        decorators are named here and their pop is asserted through the
+        same index the audit uses.
+        """
+        functions = declarations.package_functions()
+        for decorator in ('arg_is_instance_ref', 'arg_is_network_ref',
+                          'arg_is_artifact_ref',
+                          'arg_is_visible_artifact_ref'):
+            self.assertEqual(
+                1, len(functions.get(decorator, [])),
+                '%s is not a single module level function of the API '
+                'package' % decorator)
+            fake = ast.parse('class Thing:\n    def get(self):\n        pass')
+            fn = fake.body[0].body[0]
+            fn.decorator_list = [ast.Name(id=decorator, ctx=ast.Load())]
+
+            problems = []
+            self.assertEqual(
+                {'namespace'},
+                declarations.decorator_kwargs(fn, functions, problems),
+                '%s no longer consumes namespace, or the walk stopped '
+                'seeing it' % decorator)
+            self.assertEqual([], problems)
+
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.mkdtemp()
@@ -1575,7 +2112,15 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 [('thing', 'body', 'integer', 'A thing.', False,
                   {'minimum': 1.5})],
                 # Seven elements.
-                [('thing', 'body', 'string', 'A thing.', False, {}, 8)]):
+                [('thing', 'body', 'string', 'A thing.', False, {}, 8)],
+                # A bound and a pattern on the typeless `any` token.
+                # validation._field()'s `any` branch drops bounds and
+                # says it may because nothing can carry one here; that
+                # is a claim about this check, so pin it.
+                [('thing', 'body', 'any', 'A thing.', False,
+                  {'minimum': 1})],
+                [('thing', 'body', 'any', 'A thing.', False,
+                  {'pattern': '^a$'})]):
             with self.subTest(parameters=parameters):
                 self.assertRaises(
                     exceptions.InvalidAPIDeclaration, self._helper, parameters)
@@ -1612,8 +2157,13 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         in, so the specification would be invalid. Refused at import
         time like every other declaration defect, rather than left for
         test_openapi_spec.py to find after sf-api has started serving
-        it."""
-        for argtype in ('arrayofdict', 'dict'):
+        it.
+
+        'any' (D15) is included for the same reason even though it
+        renders no 'type' key at all: it is body-only like 'dict' and
+        the array tokens, refused outside a body by name rather than
+        by inspecting the rendered schema."""
+        for argtype in ('arrayofdict', 'dict', 'any'):
             for location in ('query', 'path', 'header', 'formData'):
                 with self.subTest(argtype=argtype, location=location):
                     self.assertRaises(

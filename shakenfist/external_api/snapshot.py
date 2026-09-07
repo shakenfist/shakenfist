@@ -34,6 +34,8 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         [
             ('instance_ref', 'path', 'uuidorname',
              'The UUID or name of the instance.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('all', 'body', 'boolean',
              'Snapshot every disk, rather than only the first.', False),
             ('device', 'body', 'string',
@@ -63,10 +65,14 @@ class InstanceSnapshotEndpoint(api_base.Resource):
         # client has always transmitted `thin: false` when the caller did
         # not ask for thin (the CLI flag defaults to False), so honouring
         # an explicit false here would make SNAPSHOTS_DEFAULT_TO_THIN
-        # inert for every shipped client. The absent-versus-false
-        # distinction cannot be drawn until phase 4 of
-        # PLAN-api-input-validation, alongside a client that omits the
-        # key when unset.
+        # inert for every shipped client. This used to say the
+        # absent-versus-false distinction waits on phase 4 of
+        # PLAN-api-input-validation; it does not. Request validation is
+        # check-only, so the handler receives thin=False from
+        # log_request's body merge whatever the mode, and
+        # `'thin' in flask.request.json` draws the distinction today
+        # without any schema layer. The blocker is only ever the
+        # client: see issue 4100.
         if not thin:
             thin = config.SNAPSHOTS_DEFAULT_TO_THIN
 
@@ -88,7 +94,9 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'List the snapshots of an instance.',
         [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True)],
+          'The UUID or name of the instance.', True),
+         ('namespace', 'body', 'namespace',
+          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(200, 'Information about the snapshots of an instance.', None),
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref

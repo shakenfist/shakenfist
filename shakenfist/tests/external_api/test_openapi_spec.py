@@ -233,11 +233,51 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
         ('/auth/namespaces/{namespace}/claims/{claim_ref}/events', 'get',
          'limit', {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
+        # The fourteen metadata `value` declarations (D15): 'any'
+        # renders with no 'type' key at all, so a typeless schema is
+        # exactly as much this table's business as an object or an
+        # array -- see the typeless branch of
+        # test_every_published_structure_or_bound_is_registered.
+        # Do not add network.py's DNS record `value` here: it is a
+        # different parameter, declared 'ipv4', and correctly typed.
+        ('/artifacts/{artifact_ref}/metadata', 'post', 'value',
+         {'format': 'any JSON value'}),
+        ('/artifacts/{artifact_ref}/metadata/{key}', 'put', 'value',
+         {'format': 'any JSON value'}),
+        ('/auth/namespaces/{namespace}/metadata', 'post', 'value',
+         {'format': 'any JSON value'}),
+        ('/auth/namespaces/{namespace}/metadata/{key}', 'put', 'value',
+         {'format': 'any JSON value'}),
+        ('/blobs/{blob_uuid}/metadata', 'post', 'value',
+         {'format': 'any JSON value'}),
+        ('/blobs/{blob_uuid}/metadata/{key}', 'put', 'value',
+         {'format': 'any JSON value'}),
+        ('/instances/{instance_ref}/metadata', 'post', 'value',
+         {'format': 'any JSON value'}),
+        ('/instances/{instance_ref}/metadata/{key}', 'put', 'value',
+         {'format': 'any JSON value'}),
+        ('/interfaces/{interface_uuid}/metadata', 'post', 'value',
+         {'format': 'any JSON value'}),
+        ('/interfaces/{interface_uuid}/metadata/{key}', 'put', 'value',
+         {'format': 'any JSON value'}),
+        ('/networks/{network_ref}/metadata', 'post', 'value',
+         {'format': 'any JSON value'}),
+        ('/networks/{network_ref}/metadata/{key}', 'put', 'value',
+         {'format': 'any JSON value'}),
+        ('/nodes/{node}/metadata', 'post', 'value',
+         {'format': 'any JSON value'}),
+        ('/nodes/{node}/metadata/{key}', 'put', 'value',
+         {'format': 'any JSON value'}),
     ]
 
     # A published parameter is this table's business if it carries a
     # structure or a bound. Everything else is a plain scalar whose
-    # type token says all there is to say.
+    # type token says all there is to say. A schema with no 'type' key
+    # at all counts too: 'any' (D15) is the one token that renders
+    # this way, and it constrains nothing, so a declaration changing to
+    # it must be exactly as visible here as one gaining an object or an
+    # array -- see the typeless check in
+    # test_every_published_structure_or_bound_is_registered().
     STRUCTURE_TYPES = frozenset(['object', 'array'])
 
     def _published_parameters(self, operation):
@@ -349,7 +389,14 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                     continue
                 published, _ = self._published_parameters(operation)
                 for (name, schema) in published.items():
-                    structured = schema.get('type') in self.STRUCTURE_TYPES
+                    # A schema with no 'type' key at all is 'any'
+                    # (D15): unconstrained rather than structured in
+                    # the object/array sense, but exactly as wide, so
+                    # it must register here too -- otherwise the
+                    # widest token in the vocabulary is the one type
+                    # change this table would never catch.
+                    structured = ('type' not in schema
+                                  or schema.get('type') in self.STRUCTURE_TYPES)
                     bounded = bool(set(schema) & api_base.CONSTRAINT_KEYS)
                     if not structured and not bounded:
                         continue
@@ -360,7 +407,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                             % (method, path, name,
                                {k: v for (k, v) in schema.items()
                                 if k in api_base.CONSTRAINT_KEYS
-                                or k in ('type', 'items')}))
+                                or k in ('type', 'items', 'format')}))
 
         self.assertEqual(
             [], unregistered,

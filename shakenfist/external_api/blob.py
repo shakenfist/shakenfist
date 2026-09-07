@@ -399,7 +399,9 @@ class BlobMetadatasEndpoint(api_base.Resource):
         [
             ('blob_uuid', 'path', 'uuid', 'The blob to add a key to.', True),
             ('key', 'body', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
@@ -424,7 +426,9 @@ class BlobMetadataEndpoint(api_base.Resource):
         [
             ('blob_uuid', 'path', 'uuid', 'The blob to add a key to.', True),
             ('key', 'path', 'string', 'The metadata key to set', True),
-            ('value', 'body', 'string', 'The value of the key.', True)
+            ('value', 'body', 'any',
+             'The value of the key. Stored verbatim as any JSON value and never '
+             'interpreted by the API.', True)
         ],
         [(200, 'Nothing.', None),
          (400, 'One of key or value are missing.', None),
