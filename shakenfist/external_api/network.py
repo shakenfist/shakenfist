@@ -723,6 +723,12 @@ class NetworkUnrouteAddressEndpoint(api_base.Resource):
             request_id=util_general.get_request_id()
         )
 
+        # The job above only tears down the host side route. Release the
+        # IPAM reservation here, mirroring the defloat path; otherwise the
+        # address never returns to the floating pool until the network is
+        # deleted (issue 4114).
+        api_util.release_routed_ip(address)
+
 
 class NetworkDNSAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(

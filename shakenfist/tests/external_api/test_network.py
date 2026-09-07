@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+import time
 from unittest import mock
 from uuid import uuid4
 
@@ -9,6 +10,9 @@ from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.exceptions import NetworkOperationFailed
 from shakenfist.external_api import app as external_api
+from shakenfist.schema.ipam_reservation import IPAMReservation
+from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -534,3 +538,119 @@ class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
             headers={'Authorization': self.auth_token},
             data=json.dumps({'name': 'fail.example'}))
         self.assertEqual(500, resp.status_code)
+
+
+class NetworkUnrouteAddressEndpointTestCase(base.ShakenFistTestCase):
+    """Unrouting an address must release its IPAM reservation.
+
+    The unroute_address job only tears down the host side route; the
+    handler is responsible for returning the address to the floating
+    pool, mirroring the defloat path. Before issue 4114 the handler
+    enqueued the job and stopped, so the reservation stayed in the
+    floating pool until the owning network was deleted.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.2',
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=False,
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.client = external_api.app.test_client()
+
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
+
+        self.network_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            'routenet',
+            uuid=self.network_id,
+            namespace='foo',
+            set_state=dbo.STATE_CREATED)
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def _routed_reservation(self, user_uuid):
+        return IPAMReservation(
+            ipam_uuid=str(uuid4()),
+            address='192.168.20.75',
+            reservation_type=ReservationType.ROUTED,
+            user_type=ObjectType.NETWORK,
+            user_uuid=user_uuid,
+            reserved_at=time.time())
+
+    @mock.patch('shakenfist.external_api.network.nip_create_and_enqueue')
+    @mock.patch('shakenfist.network.network.floating_network')
+    def test_unroute_releases_reservation(self, mock_fn, mock_enqueue):
+        fake_fn = mock.MagicMock()
+        fake_fn.ipam.get_reservation.return_value = \
+            self._routed_reservation(self.network_id)
+        mock_fn.return_value = fake_fn
+
+        resp = self.client.delete(
+            '/networks/%s/route/192.168.20.75' % self.network_id,
+            headers={'Authorization': self.auth_token})
+
+        self.assertEqual(200, resp.status_code)
+        mock_enqueue.assert_called_once()
+        # The host side teardown is asynchronous, but the reservation must
+        # be released synchronously or the address leaks from the floating
+        # pool until the network is deleted.
+        fake_fn.ipam.release.assert_called_once_with('192.168.20.75')
+
+    @mock.patch('shakenfist.external_api.network.nip_create_and_enqueue')
+    @mock.patch('shakenfist.network.network.floating_network')
+    def test_unroute_unreserved_address_404_no_release(
+            self, mock_fn, mock_enqueue):
+        fake_fn = mock.MagicMock()
+        fake_fn.ipam.get_reservation.return_value = None
+        mock_fn.return_value = fake_fn
+
+        resp = self.client.delete(
+            '/networks/%s/route/192.168.20.75' % self.network_id,
+            headers={'Authorization': self.auth_token})
+
+        self.assertEqual(404, resp.status_code)
+        mock_enqueue.assert_not_called()
+        fake_fn.ipam.release.assert_not_called()
+
+    @mock.patch('shakenfist.external_api.network.nip_create_and_enqueue')
+    @mock.patch('shakenfist.network.network.floating_network')
+    def test_unroute_other_networks_address_403_no_release(
+            self, mock_fn, mock_enqueue):
+        fake_fn = mock.MagicMock()
+        fake_fn.ipam.get_reservation.return_value = \
+            self._routed_reservation(str(uuid4()))
+        mock_fn.return_value = fake_fn
+
+        resp = self.client.delete(
+            '/networks/%s/route/192.168.20.75' % self.network_id,
+            headers={'Authorization': self.auth_token})
+
+        self.assertEqual(403, resp.status_code)
+        mock_enqueue.assert_not_called()
+        fake_fn.ipam.release.assert_not_called()
