@@ -34,6 +34,11 @@ if test "x$1" = "x-HEAD" ; then
     fi
 
     echo "Running flake8 on ${filtered_files}"
+    # filtered_files is a space separated list of paths, and the word
+    # splitting here is deliberate: quoting it would hand diff and flake8 a
+    # single argument named "a.py b.py", which breaks as soon as more than
+    # one python file changed.
+    # shellcheck disable=SC2086
     diff -u --from-file /dev/null ${filtered_files} | $FLAKE_COMMAND ${filtered_files}
 else
     echo "Running flake8 on all files"

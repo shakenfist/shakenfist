@@ -2,7 +2,20 @@
 # "@shakenfist-bot please re-review"
 #
 # Template source: shakenfist/development/templates/ci-review-automation/
-
+#
+# The trigger and the review are separate jobs on purpose. A claude-code
+# runner is scarce, and doing the permission check, the reaction and the
+# refusal reply on one would hold a claude-code runner for every comment
+# containing the phrase -- including comments from people with no write
+# access at all.
+#
+# The trigger handling is pr-bot-trigger rather than inline shell. An
+# earlier version of this file open-coded it, and the copy drifted: it
+# reacted with +1 rather than rocket, worded its refusal differently,
+# never checked the trigger phrase itself so it could not tell "phrase
+# not matched" from "not authorized", and -- once pr-bot-trigger grew a
+# fork guard -- did not refuse fork pull requests at all. Using the
+# shared action is what keeps this file getting fixes made elsewhere.
 name: PR Re-review
 
 permissions:
@@ -15,65 +28,110 @@ on:
     types: [created]
 
 jobs:
-  check_and_review:
-    # Only run on PR comments (not issue comments)
+  trigger-re-review:
+    name: "Trigger re-review"
+    # Only run on PR comments (not issue comments), and never on a
+    # comment the bot itself posted: the automated review is
+    # model-generated text posted to the pull request, and a review
+    # that mentions a trigger phrase would re-fire the lane.
+    # contains() does not care that the phrase is inside a quote.
     if: |
       github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
       contains(github.event.comment.body, '@shakenfist-bot please re-review')
-    runs-on: [self-hosted, claude-code]
-    name: "Re-review PR"
-    # A review typically takes a handful of minutes. Without this the
-    # job inherits the six hour GitHub default, so a wedged Claude run
-    # would hold a scarce claude-code runner for the rest of the day.
-    timeout-minutes: 60
+    runs-on: [self-hosted, static]
+    # Just a few gh API calls, so anything beyond this is a hang.
+    timeout-minutes: 10
+    outputs:
+      authorized: ${{ steps.trigger.outputs.authorized }}
+      same_repo: ${{ steps.trigger.outputs.same-repo }}
+      pr_number: ${{ github.event.issue.number }}
 
     steps:
-      - name: Check commenter permissions
-        id: check_permission
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          permission=$(gh api \
-            repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission \
-            --jq '.permission' 2>/dev/null || echo "none")
+      # pr-bot-trigger refuses fork pull requests as well as
+      # unauthorised commenters, and folds both into `authorized`.
+      - name: Handle trigger
+        id: trigger
+        uses: shakenfist/actions/pr-bot-trigger@main
+        with:
+          trigger-phrase: 'please re-review'
+          reaction: 'rocket'
 
-          echo "User ${{ github.event.comment.user.login }} has permission: ${permission}"
+  re-review:
+    name: "Re-review PR"
+    needs: trigger-re-review
+    # same_repo is redundant -- pr-bot-trigger already folds it into
+    # authorized -- and it is here anyway. This job puts a pull
+    # request's code on a runner holding a write-scoped token, so the
+    # fork guard is the one thing in this file worth stating twice: a
+    # regression in the shared action cannot quietly widen what runs
+    # here, and a reader (or a scanner) can see the restriction without
+    # leaving the file.
+    if: >-
+      needs.trigger-re-review.outputs.authorized == 'true' &&
+      needs.trigger-re-review.outputs.same_repo == 'true'
+    runs-on: [self-hosted, claude-code]
+    # A review normally finishes in three to six minutes. Without this
+    # the job inherits the six hour GitHub default, so a wedged Claude
+    # run would hold a scarce claude-code runner for the rest of the day.
+    timeout-minutes: 60
+    # Two re-review requests in quick succession would otherwise run
+    # concurrently on the scarce runner and post two reviews on the same
+    # pull request. The automatic lane -- the reusable workflow at
+    # shakenfist/actions/.github/workflows/pr-auto-review.yml, called
+    # from this project's own CI workflow -- carries the same guard.
+    concurrency:
+      group: pr-re-review-${{ github.event.issue.number }}
+      cancel-in-progress: true
 
-          if [[ "${permission}" == "admin" || "${permission}" == "write" ]]; then
-            echo "authorized=true" >> $GITHUB_OUTPUT
-            echo "User is authorized to request re-review"
-          else
-            echo "authorized=false" >> $GITHUB_OUTPUT
-            echo "User is not authorized to request re-review"
-          fi
-
-      - name: React to comment
-        if: steps.check_permission.outputs.authorized == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
-            -f content='+1' \
-            --silent || true
-
-      - name: Post unauthorized message
-        if: steps.check_permission.outputs.authorized == 'false'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr comment ${{ github.event.issue.number }} \
-            --body "Sorry @${{ github.event.comment.user.login }}, only repository collaborators with write access can request a re-review."
-
-      - name: Checkout code
-        if: steps.check_permission.outputs.authorized == 'true'
+    steps:
+      # The pull request's merge ref, not the default branch. Without a
+      # ref: this checks out main, and review-pr-with-claude.sh opens
+      # every prompt by reading AGENTS.md, ARCHITECTURE.md and README.md
+      # from the working directory -- so a re-review would judge the
+      # change against the conventions as they were *before* it. The
+      # diff itself comes from the API and is unaffected, which is what
+      # makes the symptom subtle: a real review, calibrated wrongly.
+      # shakenfist/actions/.github/workflows/pr-auto-review.yml checks
+      # out the merge ref for this reason and says so in its header. It
+      # lives in that repository, not this one, so there is nothing
+      # alongside this file to compare against.
+      #
+      # This puts the pull request's code on the runner, which is
+      # exactly why pr-bot-trigger refusing fork pull requests above is
+      # load bearing rather than tidiness.
+      #
+      # persist-credentials: false because this working tree holds the
+      # pull request's code and the next step runs Claude Code over it
+      # with --dangerously-skip-permissions. The default leaves a
+      # write-scoped token in .git/config of exactly that tree.
+      # review-pr-with-claude authenticates gh from GH_TOKEN and never
+      # pushes, so it does not need the git credential helper.
+      # The retired pr-address-comments.yml always did this; this
+      # file did not.
+      - name: Checkout the pull request
         uses: actions/checkout@v7
         with:
+          ref: refs/pull/${{ needs.trigger-re-review.outputs.pr_number }}/merge
           fetch-depth: 0
+          persist-credentials: false
+
+      # core.hooksPath=/dev/null because the checkout above put the
+      # pull request's code on the runner and the next step runs over
+      # it. Hooks are not tracked in a checkout, so this is defence in
+      # depth rather than a hole being closed -- but the security model
+      # claims the control, and a claimed control that is not set is
+      # worse than one that was never promised. Set on the repository
+      # rather than --global: this job runs on the shared claude-code
+      # pool, and a global setting would change state every other
+      # repository's jobs on that machine inherit. The security model
+      # is documented at
+      # https://github.com/shakenfist/development/blob/main/docs/ci-review-automation.md
+      - name: Disable git hooks
+        run: git config core.hooksPath /dev/null
 
       - name: Run automated reviewer
-        if: steps.check_permission.outputs.authorized == 'true'
         uses: shakenfist/actions/review-pr-with-claude@main
         with:
-          pr-number: ${{ github.event.issue.number }}
+          pr-number: ${{ needs.trigger-re-review.outputs.pr_number }}
           force: 'true'

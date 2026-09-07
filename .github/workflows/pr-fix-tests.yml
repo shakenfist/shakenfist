@@ -19,15 +19,25 @@ permissions:
 jobs:
   trigger-fix:
     name: "Trigger test fix"
-    # Only run on PR comments (not issue comments)
+    # Only run on PR comments (not issue comments), and never on a
+    # comment the bot itself posted: the automated review is
+    # model-generated text posted to the pull request, and a review
+    # that mentions a trigger phrase would re-fire the lane.
+    # contains() does not care that the phrase is inside a quote.
+    # This lane is the one of the three worth guarding hardest -- it
+    # holds contents: write and pushes commits to the pull request
+    # branch, so a self-retrigger writes code rather than burning a
+    # runner.
     if: |
       github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
       contains(github.event.comment.body, '@shakenfist-bot please attempt to fix')
     runs-on: [self-hosted, static]
     # Just a few gh API calls, so anything beyond this is a hang.
     timeout-minutes: 10
     outputs:
       authorized: ${{ steps.trigger.outputs.authorized }}
+      same_repo: ${{ steps.trigger.outputs.same-repo }}
       pr_ref: ${{ steps.trigger.outputs.pr-ref }}
       pr_number: ${{ github.event.issue.number }}
 
@@ -45,7 +55,19 @@ jobs:
 
   fix-tests:
     needs: trigger-fix
-    if: needs.trigger-fix.outputs.authorized == 'true'
+    # same_repo is redundant -- pr-bot-trigger folds the fork check into
+    # authorized -- and it is stated twice here for the same reason
+    # pr-re-review.yml states it twice, only more so. This lane pushes
+    # commits: test-drift-fix.yml checks out pr_ref and pushes to it,
+    # and pr_ref is `.head.ref`, a bare branch name resolved against
+    # *this* repository. A fork pull request opened from the fork's
+    # default branch names "main". A regression in the shared action
+    # must not be able to quietly turn that into unreviewed commits on
+    # the default branch, and a reader must be able to see the
+    # restriction without leaving the file.
+    if: >-
+      needs.trigger-fix.outputs.authorized == 'true' &&
+      needs.trigger-fix.outputs.same_repo == 'true'
     uses: ./.github/workflows/test-drift-fix.yml
     with:
       ref: ${{ needs.trigger-fix.outputs.pr_ref }}

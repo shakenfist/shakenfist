@@ -18,6 +18,9 @@ env:
   http_proxy: http://192.168.1.15:3128
   https_proxy: http://192.168.1.15:3128
   PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+  # Fall back to pypi so a devpi cold-cache miss (empty index on a
+  # first-touch package) cannot hard-fail the job.
+  PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
 
 jobs:
   analyze:

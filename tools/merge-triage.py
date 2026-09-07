@@ -60,9 +60,9 @@ import re
 import sys
 
 
-# jsonschema is not in the runtime dependencies, and this script runs on a CI
-# runner where it may or may not be installed. Validation degrades to the
-# structural checks in _validate_basic() rather than failing, which follows
+# jsonschema is declared in pyproject.toml, but this script also runs on a CI
+# runner where shakenfist itself may not be installed. Validation degrades to
+# the structural checks in _validate_basic() rather than failing, which follows
 # what review-pr-with-claude/render-review.py does with the review schema.
 try:
     import jsonschema
