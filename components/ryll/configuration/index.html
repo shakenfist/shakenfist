@@ -14732,7 +14732,7 @@ the standard virt-viewer format used by <code>remote-viewer</code> and other SPI
 <tr>
 <td><code>ca</code></td>
 <td>No</td>
-<td>Inline PEM CA certificate for TLS verification</td>
+<td>Inline PEM CA certificate for TLS verification. When present it is the only trust anchor for the connection -- the public CA roots are not trusted as well</td>
 </tr>
 <tr>
 <td><code>host-subject</code></td>
@@ -14786,8 +14786,10 @@ reconnect UX correctly.</p>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="na">ca</span><span class="o">=</span><span class="s">-----BEGIN CERTIFICATE-----\nMIIE...(base64)...\n-----END CERTIFICATE-----\n</span>
 </code></pre></div></p>
 <p>Note: the <code>ca=</code> field contains the PEM certificate inline with <code>\n</code>
-escape sequences for newlines, not a file path. Either <code>port</code> or
-<code>tls-port</code> (or both) must be specified.</p>
+escape sequences for newlines, not a file path. It <em>replaces</em> the
+public CA roots for that connection rather than adding to them, so
+omit it for a server whose certificate comes from a public CA.
+Either <code>port</code> or <code>tls-port</code> (or both) must be specified.</p>
 <p><strong>Full configuration:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[virt-viewer]</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="na">type</span><span class="o">=</span><span class="s">spice</span>

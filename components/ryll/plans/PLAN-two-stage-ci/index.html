@@ -13936,6 +13936,19 @@
 
 
 <h1 id="two-stage-ci-with-a-merge-queue">Two-stage CI with a merge queue<a class="headerlink" href="#two-stage-ci-with-a-merge-queue" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Superseded in part, 2026-09.</strong> The merge tier described below
+no longer contains the four fuzz jobs: they moved to a nightly
+<code>fuzz.yml</code> because asking the six-wide shared <code>l</code> pool for four
+runners at merge-group time was hitting the 360-minute check
+timeout and evicting pull requests from the queue
+(<a href="https://github.com/shakenfist/ryll/issues/329">#329</a>). The
+merge tier is now the cross-platform build matrix alone. The
+rest of this plan — the two-tier scheme, the three gates, the
+ruleset — still describes what is deployed. See
+<a href="/components/ryll/ci/">ci.md</a> for the current arrangement; this page is
+kept as the record of how the tiers were arrived at.</p>
+</blockquote>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the ryll CI configuration thoroughly. Read

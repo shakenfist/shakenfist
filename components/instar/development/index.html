@@ -14333,8 +14333,11 @@ Docker, ensuring consistent tooling regardless of local Rust installation.</p>
 <li><code>actionlint</code> over <code>.github/workflows/</code>, and <code>shellcheck</code> over
   <code>scripts/</code> and <code>tools/</code>.</li>
 <li><code>binary-sizes</code>, which checks the built binaries against the guest
-  memory layout, and <code>nightly-pins</code>, which fails if the two
-  devcontainer Dockerfiles disagree about the Rust nightly.</li>
+  memory layout, and <code>devcontainer-pins</code>, which fails if the two
+  devcontainer Dockerfiles disagree about the Rust nightly or about the
+  version of any cargo tool they both install, if a <code>cargo install</code> line
+  has lost its <code>--locked</code>, or if a version pin has stopped being visible
+  to Renovate. See "Cargo tool pinning" below.</li>
 </ul>
 <p>To auto-fix formatting issues:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./scripts/check-rust.sh<span class="w"> </span>fix
@@ -14912,12 +14915,71 @@ not un-pin the toolchain, and do not bump the pin by hand without at
 least building both images. (The lint container is separate and uses a
 stable <code>rust:</code> tag Renovate does manage; the dev image's Debian base is
 pinned by digest and Renovate walks it forward.)</p>
+<h3 id="cargo-tool-pinning">Cargo tool pinning<a class="headerlink" href="#cargo-tool-pinning" title="Permanent link">&para;</a></h3>
+<p>The Rust nightly is not the only thing a from-scratch image build
+resolves at build time. Both Dockerfiles <code>cargo install</code> their tooling
+from crates.io — <code>cargo-binutils</code>, <code>cargo-deb</code> and <code>cargo-generate-rpm</code>
+in both images, plus <code>cargo-fuzz</code> and <code>cargo-audit</code> in the dev image —
+and those installs are pinned two ways:</p>
+<ul>
+<li><strong>An <code>ARG &lt;TOOL&gt;_VERSION</code> per crate</strong>, so the tool version itself does
+  not float. Each ARG carries a <code># renovate: datasource=crate
+  depName=&lt;crate&gt;</code> comment directly above it, which a <code>customManagers</code>
+  entry in <code>renovate.json</code> matches. Keep the comment adjacent to its
+  ARG or the pin silently stops being managed. Renovate raises one PR
+  per crate covering every file it appears in, so the dev and build
+  images move together — never bump one file alone.</li>
+<li><strong><code>cargo install --locked</code></strong>, so each tool builds against the exact
+  dependency versions its author released it with instead of
+  re-resolving to the newest semver-compatible transitive dependencies.</li>
+</ul>
+<p><code>tools/ci/check-devcontainer-pins.sh</code> enforces both, from pre-commit
+and from the <code>build-and-test</code> CI job: it fails if the two images
+disagree about the nightly or about a shared tool version, if any
+<code>cargo install</code> line has lost its <code>--locked</code>, if a crate is installed
+at a hardcoded version rather than through its ARG, or if a pin's
+<code># renovate:</code> comment is missing, detached, or names a different crate
+than the ARG. A quoted pin value fails too — <code>renovate.json</code> captures
+<code>[^\s"]+</code>, so <code>ARG CARGO_DEB_VERSION="3.8.0"</code> would match nothing and
+freeze silently.</p>
+<p>Nothing in the guard is keyed off a list of tool names or a <code>cargo-</code>
+prefix. The shared set it compares across the two images is the
+<em>intersection of what they actually install</em>, so a tool added to both
+later is covered from the day it is added rather than when someone
+remembers to extend a list; and the Renovate-visibility rules are
+applied to whatever crates the install lines name, so a dependency
+whose crate is not called <code>cargo-something</code> gets the same treatment.</p>
+<p>The guard also runs the <code>customManagers</code> regex <strong>as it is written in
+<code>renovate.json</code> today</strong> over both Dockerfiles, and requires it to find
+exactly the pins the guard found by its own parse — same crates, same
+versions, no more and no fewer (<code>tools/ci/check-renovate-manager.py</code>).
+Without that, the format rules above are only this repository's memory
+of what Renovate needs: a typo in <code>matchStrings</code>, or a
+<code>managerFilePatterns</code> entry that stops naming these files, would freeze
+all eight pins forever while the guard still reported them healthy. A
+frozen pin is worse than the floating install it replaced, because
+nothing errors anywhere.</p>
+<p>The second is what protects against a broken <em>transitive</em> dependency,
+and it is not hypothetical: on 2026-09-03 <code>tinyvec</code> 1.13.0 was
+published with <code>use alloc::vec::{self, Vec}</code>, which shadows the <code>vec!</code>
+macro so the crate does not compile at all. <code>cargo install cargo-audit</code>
+picked it up within the hour and failed the "Build and test via
+devcontainer" step on every PR until upstream shipped 1.13.2. Nothing
+in the repository had changed. <code>--locked</code> would have held cargo-audit
+to the tinyvec its lockfile names.</p>
+<p>Note the interaction with the Renovate rule that freezes
+<code>src/.devcontainer/build/Dockerfile</code>: that rule is scoped to the
+<code>docker</code> datasource, so it still pins <code>debian:bullseye</code> (whose glibc
+2.31 sets the floor of the shipped binary) while leaving the crate
+pins in the same file managed.</p>
 <h2 id="ci-tooling-guards">CI tooling guards<a class="headerlink" href="#ci-tooling-guards" title="Permanent link">&para;</a></h2>
 <p>The <code>ci-tooling</code> CI job runs the cheap guards over CI's own tooling:
 the test-partition check below, plus
 <code>tools/ci/test-report-fuzz-crash.sh</code> and
 <code>tools/ci/test-pick-fuzz-artifact.sh</code> for the coverage-fuzz helpers
-(see "Crash reporting" in <a href="/components/instar/testing/">docs/testing.md</a>). It is
+(see "Crash reporting" in <a href="/components/instar/testing/">docs/testing.md</a>) and
+<code>tools/ci/test-check-devcontainer-pins.sh</code> for the devcontainer pin
+guard (see "Cargo tool pinning" above). It is
 also the job named in <code>automated_reviewer</code>'s <code>needs</code> list, which is
 required to list every job that can fail a PR.</p>
 <p>Integration tests are split across several CI jobs by stestr regex

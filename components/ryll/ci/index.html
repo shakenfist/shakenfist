@@ -10061,6 +10061,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-nightly-fuzz-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The nightly fuzz lane
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The nightly fuzz lane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#failures-are-issues-not-a-red-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failures are issues, not a red workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-reporting-does-not-cover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the reporting does not cover
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-three-gates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13935,6 +13974,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-nightly-fuzz-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The nightly fuzz lane
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The nightly fuzz lane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#failures-are-issues-not-a-red-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failures are issues, not a red workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-reporting-does-not-cover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the reporting does not cover
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-three-gates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14153,7 +14231,7 @@ enqueue</code> status check:</p>
 <tr>
 <td><code>shellcheck</code></td>
 <td>self-hosted <code>s</code></td>
-<td><code>tools/run-shellcheck.sh</code>, then <code>tools/audit/test-audit-range.sh</code></td>
+<td><code>tools/run-shellcheck.sh</code>, then <code>tools/audit/test-audit-range.sh</code>, <code>tools/test-report-fuzz-failure.sh</code>, <code>tools/test-report-fuzz-run.sh</code> and <code>tools/test-fuzz-targets.sh</code></td>
 </tr>
 <tr>
 <td><code>bidi and zero-width</code></td>
@@ -14177,11 +14255,6 @@ enqueue</code> status check:</p>
 </tr>
 </thead>
 <tbody>
-<tr>
-<td><code>Fuzz (×4)</code></td>
-<td>self-hosted <code>l</code></td>
-<td>Build and smoke-run each <code>cargo-fuzz</code> target</td>
-</tr>
 <tr>
 <td><code>Build (Linux aarch64)</code></td>
 <td><code>ubuntu-24.04-arm</code></td>
@@ -14207,8 +14280,14 @@ enqueue</code> status check:</p>
 <p>In practice the smoke tier finishes in about ten minutes, paced
 by the Linux build, and the merge tier in about fifteen, paced
 by the Windows x86_64 build.</p>
+<p>Fuzzing is not a tier. It runs nightly from <code>fuzz.yml</code>; see
+<a href="#the-nightly-fuzz-lane">the nightly fuzz lane</a> below.</p>
 <p><code>workflow_dispatch</code> deliberately runs <strong>both</strong> tiers, which is
-what makes <code>@shakenfist-bot please retest</code> a full retest.</p>
+what makes <code>@shakenfist-bot please retest</code> a full retest.
+Fuzzing is not included in that: a retest runs both tiers and
+the fuzz lane is neither, so a retest neither builds nor
+format-checks the fuzz workspace. Exercise that with
+<code>gh workflow run fuzz.yml</code>.</p>
 <h3 id="the-windows-cross-check-is-a-proxy">The Windows cross-check is a proxy<a class="headerlink" href="#the-windows-cross-check-is-a-proxy" title="Permanent link">&para;</a></h3>
 <p><code>make check-windows</code> cross-compiles the
 <code>x86_64-pc-windows-gnu</code> triple from the Linux devcontainer. It
@@ -14221,6 +14300,318 @@ without an MSVC toolchain, because <code>cargo check</code> still runs
 build scripts and <code>aws-lc-sys</code> compiles vendored BoringSSL C for
 the target. See
 <a href="/components/ryll/plans/PLAN-two-stage-ci/">PLAN-two-stage-ci.md</a>.</p>
+<h2 id="the-nightly-fuzz-lane">The nightly fuzz lane<a class="headerlink" href="#the-nightly-fuzz-lane" title="Permanent link">&para;</a></h2>
+<p><code>.github/workflows/fuzz.yml</code> builds and smoke-runs every
+<code>cargo-fuzz</code> target in <code>shakenfist-spice-protocol/fuzz</code> at
+12:00 UTC daily, and on <code>workflow_dispatch</code>. It is not part of
+either tier and gates nothing. The targets are read from the
+<code>[[bin]]</code> tables in <code>fuzz/Cargo.toml</code> rather than listed in the
+workflow, so a new one is fuzzed because it exists rather than
+because somebody remembered to add it. That manifest and not a
+glob over <code>fuzz_targets/</code>, because it is what <code>cargo fuzz build
+&lt;name&gt;</code> itself resolves against: a glob would pick up a helper
+module dropped in the directory, and would miss a <code>[[bin]]</code> whose
+<code>path</code> points elsewhere.</p>
+<p>The extraction lives in <code>tools/fuzz-targets.sh</code> rather than
+inline in the workflow. It decides which targets get fuzzed at
+all, which makes its failure mode silence — a target it drops is
+never built, never fails, and so is never reported — and nothing
+in this repository lints or tests a workflow <code>run:</code> block, since
+<code>tools/run-shellcheck.sh</code> globs <code>scripts/</code> and <code>tools/</code> and no
+job invokes <code>actionlint</code>. As a script it gets both, the second
+through <code>tools/test-fuzz-targets.sh</code>.</p>
+<p>The extraction is an <code>awk</code> pattern, not a TOML parser, so it can
+be shown valid TOML it does not understand — <code>name="x"</code> without
+the spaces is the practical one, and <code>cargo fuzz</code> accepts it. The
+zero-target guard only catches losing <em>every</em> target, so the
+script counts <code>[[bin]]</code> tables independently and fails if that
+count and the number of names parsed disagree. The count
+deliberately tolerates leading whitespace the parser does not: a
+guard blind in the same places as the thing it guards would agree
+with it and say nothing. The name is taken as the whole remainder
+of its line rather than as <code>awk</code>'s third field, so a name
+containing a space arrives whole and is rejected by the
+<code>[A-Za-z0-9_-]</code> check; reading the third field would hand back
+its first word, which looks like a clean shorter name, agrees
+with the table count, and fuzzes a target that does not exist.</p>
+<p>A quoted value is matched and unwrapped whole, in both of TOML's
+string spellings, rather than having its quotes stripped and a
+trailing <code>#</code> comment cut off afterwards. That order is the point.
+Cutting at the first <code>#</code> first would turn <code>name = "fuzz#target"</code>
+into <code>fuzz</code> — a plausible-looking shorter name that passes the
+charset check and fuzzes a target that does not exist, which is
+the same silent shortening every other guard here exists to
+prevent. Unwrapping first means a <code>#</code> inside the literal survives
+to be rejected loudly, and a <code>#</code> after it is never part of the
+value at all. Both spellings and the trap are fixtures in
+<code>tools/test-fuzz-targets.sh</code>.</p>
+<p>It is one job, not a matrix leg per target. Every leg of the
+matrix it replaced spent 255 of its 340 seconds on <code>ensure-cache
+fuzz-devcontainer</code> — the same image build, four times, on four
+separate runners, ahead of 78 seconds of work that actually
+differed. Sharing it trades wall-clock the nightly does not need
+(roughly 570s serial against 340s parallel) for the thing that
+is actually scarce, which is <code>l</code> runners.</p>
+<p>It used to be the merge tier's other half, running on
+<code>merge_group</code> beside the cross-platform builds. That asked the
+shared <code>l</code> pool for four runners at the moment a merge group
+formed — the largest single request ryll makes of a pool six
+workers wide across every repository — and when the pool was
+starved the queue did not merely run slowly. GitHub's
+<code>check_response_timeout_minutes</code> caps at 360, it is a wall clock
+from when the merge group forms, and it does not distinguish a
+job that is running slowly from one that has not been given a
+runner. Three times in eight days
+(<a href="https://github.com/shakenfist/ryll/issues/329">#329</a>) the fuzz
+jobs waited out the full six hours and the pull request was
+evicted from the queue. On the third occasion they got runners
+and passed twenty minutes <em>after</em> the eviction, so the merge
+group's run was entirely green and the PR had silently failed to
+merge.</p>
+<p>The fuzz crate's format check came along with them, and it is
+worth saying why it did not stay behind in the smoke tier
+instead. The fuzz crate is a detached workspace, so <code>cargo fmt
+--all --check</code> in the <code>lint</code> job does not reach it, and a format
+check is otherwise exactly the sort of cheap, deliver-it-early
+job the smoke tier is for. It is not cheap here: <code>make
+fuzz-fmt-check</code> depends on <code>ensure-cache fuzz-devcontainer</code>,
+which is 255 of the 340 seconds a fuzz leg used to take, and it
+needs an <code>l</code> runner to do it. Paying that on every push to every
+pull request would spend more of the scarce pool than moving the
+fuzz jobs off the merge queue gives back, so formatting drift in
+<code>shakenfist-spice-protocol/fuzz</code> is caught by the nightly along
+with everything else.</p>
+<p>Within the nightly the format check is tolerant rather than
+fatal, and reports as its own issue through the reporter's
+<code>--fmt-failure</code> mode. Formatting drift here is both the most
+likely non-target failure in this lane and the least urgent one,
+and a check that aborted the job would mean a target that had
+genuinely stopped compiling stayed invisible for as long as the
+format nit went unfixed — inverting the priority the lane exists
+to serve. Its marker lives in <code>fuzz-logs/fmt/</code> so the
+<code>fuzz-logs/*.failed</code> glob the report job walks cannot mistake it
+for a target.</p>
+<p>The <code>fuzz-devcontainer</code> build is the one thing that does abort
+the job, in a step of its own ahead of both. Everything below it
+needs that image, so a broken build is not a per-target failure:
+letting it through would fail every target and file an issue
+about each of them for one problem. Failing early leaves no
+markers at all, which the report job reads as a run that died
+before the targets and files exactly one issue about.</p>
+<p>A smoke run that panics leaves the input that produced it in
+<code>shakenfist-spice-protocol/fuzz/artifacts/&lt;target&gt;/</code>, and a step
+before the upload copies that into <code>fuzz-logs/artifacts/</code> so it
+travels with the logs. The 40-line tail in the issue body
+usually carries libFuzzer's base64 line, but that is a fallback
+rather than a guarantee, and a crash found a day later against
+develop is worth more to reproduce than one that was in front of
+a human immediately. The copy is deliberate rather than a second
+<code>path:</code> on the upload step: a second path moves the artifact's
+root up to the workspace, which would nest <code>fuzz-logs/</code> a
+directory deeper than <code>tools/report-fuzz-run.sh</code> walks and turn
+every failing night into a <code>--no-artifact</code> issue.</p>
+<p>The job's <code>timeout-minutes: 90</code> covers every target end to end.
+It was previously per matrix leg, i.e. per target. Four targets
+finish inside ten minutes so there is a great deal of headroom,
+but the work is serial now and <code>tools/fuzz-targets.sh</code> exists
+precisely so the target count can grow without anyone editing
+the workflow, so the budget is worth revisiting when it does.
+A timeout truncates the loop, and the targets never reached
+write no marker and are indistinguishable from passing ones;
+only <code>targets-ran.txt</code>'s absence catches that, as a single
+run-level issue that cannot name them.</p>
+<p>The <code>report</code> job runs only on <code>develop</code>. <code>workflow_dispatch</code> is
+the documented way to exercise this lane on demand, and without
+that guard a dispatch from a scratch branch would file genuine
+<code>bug</code>-labelled issues — which the real nightly would then dedup
+onto, commenting on somebody's test issue instead of filing its
+own. A branch dispatch still runs the fuzz job and still uploads
+its logs; it just does not file.</p>
+<p>The trade is deliberate: a fuzz target that stops building is
+now caught within a day rather than before the change lands.
+That is acceptable here because this is a build-and-doesn't-panic
+gate rather than a real fuzz campaign — long-running
+coverage-guided fuzzing is <a href="https://github.com/shakenfist/ryll/issues/135">#135</a> —
+and because nothing else in the merge tier depended on its result.</p>
+<h3 id="failures-are-issues-not-a-red-workflow">Failures are issues, not a red workflow<a class="headerlink" href="#failures-are-issues-not-a-red-workflow" title="Permanent link">&para;</a></h3>
+<p>Nobody reads a scheduled workflow's result. A failing pull
+request check stands between someone and their merge; a failing
+nightly is a mark on the Actions tab, and GitHub's only
+notification for it is an email to whoever pushed last, which at
+12:00 UTC is nobody's inbox in particular.</p>
+<p>So the <code>report</code> job files a GitHub issue per failing target, and
+<em>that</em> is the notification. Two scripts do it:
+<code>tools/report-fuzz-run.sh</code> walks the marker files the fuzz job
+left behind and decides what gets reported, and
+<code>tools/report-fuzz-failure.sh</code> writes each issue. Both are
+scripts rather than workflow <code>run:</code> blocks for the reason given
+above for <code>tools/fuzz-targets.sh</code>: nothing lints or tests a
+<code>run:</code> block, and every one of these three has silence as its
+failure mode. <code>tools/test-report-fuzz-run.sh</code> stubs the reporter
+and asserts which invocations the walk chooses, which is the part
+the reporter's own test cannot see.</p>
+<p>Six details in the arrangement are load-bearing:</p>
+<ul>
+<li>The fuzzing step exits 0 whatever the target does, recording
+  the verdict as a marker file. A step that aborted the job would
+  take the log upload and the report job with it. The markers
+  carry text rather than being <code>touch</code>ed empty: a zero-byte
+  file's survival through <code>upload-artifact</code> and back is an
+  assumption, and a marker that went missing would read to the
+  report job as a run that failed outside the targets — an
+  actively wrong diagnosis, filed under the wrong title.</li>
+<li>The log is uploaded before anything fails, because when issue
+  filing is the thing that broke, the artifact is how the failure
+  reaches a human.</li>
+<li><code>fuzz-logs/</code> is created in a step of its own, immediately
+  after <code>actions/checkout</code> and ahead of everything else that can
+  fail, and the report job's <code>download-artifact</code> is
+  <code>continue-on-error</code>. A job that died in the devcontainer build
+  or the format check writes no marker and no log; an upload of
+  an empty path creates no artifact, and a download of a missing
+  artifact is a hard error that would take the report job — and
+  with it the whole notification — down with the fuzz job. The
+  step sits <em>ahead</em> of the cargo cache rather than after it
+  because the two run-level modes below exist to be told apart:
+  behind the cache restore, a cache failure wrote no run marker
+  and so filed <code>--no-artifact</code>, whose body sends the reader to
+  the upload and download steps — the wrong first move for a job
+  that never got as far as having anything to upload.</li>
+<li>The target step writes <code>fuzz-logs/targets-ran.txt</code> <em>after</em> the
+  loop, and the walk keys its run-level branch on that file's
+  absence. A passing target writes no marker, so an empty marker
+  set on its own is ambiguous between "every target passed" and
+  "the loop never ran" — and the loop does abort, at an
+  <code>exit 1</code>, when <code>tools/fuzz-targets.sh</code> rejects the manifest.
+  Inferring the answer from the absence of <em>other</em> markers is
+  what a second failure on the same night can mask: a formatting
+  drift and an unreadable manifest together used to file the
+  formatting issue and say nothing at all about no target having
+  been fuzzed. A positive completion marker says which happened
+  directly, so the two cannot interfere.</li>
+<li>The report job never finishes having reported nothing. It only
+  runs when the fuzz job did not succeed, so a marker set that
+  accounts for no failure is itself a failure worth hearing
+  about — the run died before the loop, the loop was cut short,
+  or something after it (the artifact upload, say) broke. Which
+  of those gets said depends on <code>fuzz-logs/run-info.txt</code>, written
+  immediately after checkout. Present, the artifact round-tripped
+  and the failure really is in the run: <code>--run-failure</code>. Absent,
+  either checkout itself failed — it is the one step ahead of the
+  marker, and the <code>--no-artifact</code> body names it first — or the
+  logs never arrived at all; both leave the fuzz job's own
+  failure unread, so both are <code>--no-artifact</code>. The
+  modes are separate because they are different bugs with
+  different first moves, and because they carry separate titles
+  none of them can dedup on top of another and bury it.</li>
+<li>Reporting runs on the static runner, where the rest of this
+  repository's <code>gh</code> calls run — <code>release.yml</code>'s version-mismatch
+  issue is the precedent. The <code>debian-12-docker</code> image is not
+  known to carry the CLI. A failure to report is counted rather
+  than thrown, and fails the job at the end: one target nobody
+  could file about must not stop the rest being filed.</li>
+</ul>
+<p>Recurrences comment on the open issue for that target rather
+than filing a duplicate: a target that stops compiling stays
+broken until someone fixes it, and without dedup the nightly
+would file one issue per target per night. The dedup lookup
+matches on issue title alone and deliberately not on the <code>bug</code>
+label the reporter applies, because a label stripped during
+triage would silently switch dedup back off.</p>
+<p>A lookup that fails falls through to filing — a duplicate issue
+is a much smaller problem than a failure nobody hears about —
+but it says so first. The <code>gh issue list</code> call and the <code>jq</code> that
+reads it are separate steps with their statuses checked, and a
+missing <code>jq</code>, a non-zero <code>gh</code>, or output <code>jq</code> cannot parse each
+emit a <code>::warning::</code> before falling through. Without that,
+a permanently broken lookup and a genuine first failure produce
+the same empty answer, and the nightly quietly refiles the same
+issue every night — which reads as ordinary nightly noise rather
+than as the reporter being broken.</p>
+<p>Because dedup keys on an <em>open</em> issue, closing one is part of
+the fix. An issue left open after the target is repaired turns
+every later failure of the same thing into a "Failed again"
+comment on a thread people have stopped reading, rather than
+into new work. Nothing closes them automatically — the fuzz job
+runs on <code>debian-12-docker</code>, which is not known to carry <code>gh</code>,
+and giving it <code>issues: write</code> to close what the static runner
+filed would spread the credential across both — so every issue
+this lane files says so in its own body, where the person doing
+the fixing will read it.</p>
+<p>The reporter is the only channel this lane has, so its failure
+mode is silence — and silence is invisible until a fuzz target
+happens to break. <code>tools/test-report-fuzz-failure.sh</code> pins its
+behaviour against that: the excerpt bounds, the UTF-8 and NUL
+scrubbing, the markdown fence, the <code>--run-failure</code>,
+<code>--no-artifact</code> and <code>--fmt-failure</code> bodies, and the argument
+contract, all through <code>--dry-run</code> so it needs no network and no
+<code>GH_TOKEN</code>.</p>
+<p>Dedup is covered too, and that part cannot go through <code>--dry-run</code>
+— a dry run returns before the reporter talks to GitHub at all,
+which would leave the search qualifier, the <code>--json</code> field set
+and the jq exact-title match untested. Those are the pieces a
+<code>gh</code> or API change breaks <em>quietly</em>: a lookup that starts
+returning nothing does not error, it just files a fresh issue
+every night. So the reporter takes its <code>gh</code> command from <code>$GH</code>
+and the test stubs it, driving the recurrence, first-failure,
+near-miss-title, unparseable-response and failing-<code>gh</code> paths
+against canned responses — the last two also asserting the
+warning, which is the only thing separating a broken lookup from
+a first failure.</p>
+<p>The recurrence case asserts the recorded <code>gh</code> argv and not only
+the outcome. The stub answers any <code>issue list</code> from its canned
+response whatever it was asked, so an assertion that only reads
+the result holds just as well for a lookup that has lost
+<code>in:title</code> or asks for a field set the jq cannot read. The
+qualifier, the <code>--state open</code> filter and the exact
+<code>--json number,title</code> field set are each pinned directly, the
+last of them as a substring with a trailing space so that a
+widened field set does not satisfy it.</p>
+<p>It runs in pre-commit and in <code>ci.yml</code>'s <code>shellcheck</code> job, beside
+the audit-range test, <code>tools/test-report-fuzz-run.sh</code> and
+<code>tools/test-fuzz-targets.sh</code>, which exist for the same reason.</p>
+<p>Two of its assertions depend on tools the test does not itself
+need — <code>iconv</code> for the UTF-8 scrub, <code>jq</code> for the dedup lookup —
+and skip when they are absent. That is right in pre-commit, where
+a missing tool must not block an unrelated commit, and wrong in
+CI, where an image change that dropped <code>jq</code> would quietly delete
+the most valuable coverage in the file and leave the check green.
+So <code>ci.yml</code> sets <code>FUZZ_REPORTER_TEST_STRICT=1</code> and the skips
+become failures there — and, because that turns the <code>jq</code> skip
+into a hard failure, the job installs <code>jq</code> alongside <code>shellcheck</code>
+rather than assuming the <code>debian-12</code> image carries it. Every
+other <code>jq</code> user in this repository runs on the static runner, so
+nothing had established that it does.</p>
+<h3 id="what-the-reporting-does-not-cover">What the reporting does not cover<a class="headerlink" href="#what-the-reporting-does-not-cover" title="Permanent link">&para;</a></h3>
+<p>Everything above protects against a <em>fuzz</em> failure going
+unheard. It does not protect against the notification channel
+itself being what broke, and that residual hole is worth naming
+rather than leaving a reader to infer that the lane is
+airtight.</p>
+<p>If <code>gh</code> is missing from the static runner, the <code>GITHUB_TOKEN</code> is
+under-scoped or expired, the <code>bug</code> label has been deleted, or
+<code>tools/report-fuzz-run.sh</code> exits 1 on failures it counted but
+could not file, the outcome is exactly the one this section
+opens by rejecting: a red scheduled run and no issue. The tests
+above make that unlikely for reasons inside the scripts —
+argument handling, body construction, the marker walk, the dedup
+lookup — but nothing exercises the live path, because the report
+job only runs on <code>develop</code> and only when a fuzz job has already
+failed. The first real execution of the filing path is the first
+night something genuinely breaks.</p>
+<p>Two things bound it in practice. The reporter fails the report
+job rather than swallowing an error, so the run is at least red
+on the Actions tab; and the fuzz job's own logs survive for 30
+days in the <code>fuzz-logs</code> artifact, which is the fallback the
+"upload before anything fails" ordering exists to guarantee. If
+a stronger guarantee is ever wanted, the shape that would give
+it is a low-frequency canary — a monthly dispatch that files a
+known issue and immediately closes it — which detects a dead
+reporter without waiting for a real failure to do it.</p>
+<p>This shape is the fleet-wide standard, generalized from instar's
+<code>coverage-fuzz.yml</code>; the criterion is
+<a href="https://github.com/shakenfist/development/blob/main/docs/audits/fuzz-nightly-reporting.md">fuzz-nightly-reporting</a>
+in shakenfist/development.</p>
 <h2 id="the-three-gates">The three gates<a class="headerlink" href="#the-three-gates" title="Permanent link">&para;</a></h2>
 <p>The <code>develop</code> ruleset requires exactly three status checks, and
 none of them builds anything — they are aggregators over the
@@ -14425,6 +14816,10 @@ consistency audit.</p>
 <td>Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in <code>ci.yml</code></td>
 </tr>
 <tr>
+<td><code>fuzz.yml</code></td>
+<td>Nightly <code>cargo-fuzz</code> build and smoke run against develop; failures filed as issues</td>
+</tr>
+<tr>
 <td><code>renovate.yml</code></td>
 <td>Automated dependency updates (hourly)</td>
 </tr>
@@ -14500,6 +14895,25 @@ for what the unfixed version cost, and the fleet audit
 <p>Scheduled, push-to-default, and release workflows must <strong>not</strong>
 enable <code>cancel-in-progress</code>. Cancelling a release mid-publish,
 or a renovate run mid-PR-creation, leaves partial state behind.</p>
+<p><code>fuzz.yml</code> is the awkward case: it is scheduled, but it also
+takes a <code>workflow_dispatch</code>, and a manual run <em>should</em> supersede
+an in-flight nightly rather than queue behind it. It resolves
+that by making the flag an expression rather than choosing one
+answer for both events:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'workflow_dispatch' }}</span>
+</code></pre></div>
+<p>A flat <code>true</code> there is the general rule's case exactly. The job
+waits on the same starved <code>l</code> pool the lane exists to get out of
+the way of, so a nightly can still be sitting unstarted when the
+next one is created, and <code>cancel-in-progress</code> cancels <em>pending</em>
+members of a group as well as running ones. Night N would be
+cancelled by night N+1; the report job skips <code>cancelled</code>; and
+the lane goes silent every night the pool stays starved — in
+precisely the condition it was written for. Left to queue, night
+N is failed by GitHub after 24 hours and correctly files
+<code>--no-artifact</code>. The only cancellation left is a dispatch
+superseding a nightly, which is the one the report job is right
+to ignore.</p>
 <h2 id="build-network-isolation">Build network isolation<a class="headerlink" href="#build-network-isolation" title="Permanent link">&para;</a></h2>
 <p>Cargo runs a dependency's <code>build.rs</code> as ordinary code at compile
 time, so a compromised crate can execute during a plain <code>cargo
@@ -14523,8 +14937,8 @@ build-script dropper (reported as <a class="magiclink magiclink-github magiclink
 <code>RUSTSEC-YYYY-NNNN</code> id had been assigned at the time of writing)
 into a loud build failure rather than a silent compromise.</p>
 <p>Three targets still compile with the network up, and both of the
-lanes they serve are real: <code>fuzz</code> runs on every merge-group entry
-and <code>publish-crates</code> on every release.</p>
+lanes they serve are real: <code>fuzz</code> runs nightly and
+<code>publish-crates</code> on every release.</p>
 <ul>
 <li><code>fuzz-build-%</code> and <code>fuzz-smoke-%</code> build the detached fuzz
   workspace (see <code>shakenfist-spice-protocol/fuzz/Cargo.toml</code>'s
@@ -14536,10 +14950,10 @@ and <code>publish-crates</code> on every release.</p>
   part of its verify step and genuinely needs the network to
   upload. This one cannot be isolated.</li>
 </ul>
-<p>(<code>fuzz-fmt-check</code> also runs networked, but it only runs <code>cargo
-fmt --check</code> and compiles nothing. So do <code>deb</code>, <code>rpm</code> and the
-<code>web-smoke</code> targets, which repackage or run the binary <code>release</code>
-already produced.)</p>
+<p>(<code>fuzz-fmt-check</code> and <code>fuzz-fmt</code> also run networked, but they
+only run <code>cargo fmt</code> and compile nothing. So do <code>deb</code>, <code>rpm</code> and
+the <code>web-smoke</code> targets, which repackage or run the binary
+<code>release</code> already produced.)</p>
 <p>Outside the Makefile entirely: release's <code>build-ryll-wheels</code> job
 runs <code>tools/build-ryll-wheel.sh</code>, which builds ryll with maturin
 inside <code>quay.io/pypa/manylinux_2_28_*</code> rather than the

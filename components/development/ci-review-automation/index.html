@@ -1326,6 +1326,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#which-commit-a-re-review-sees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which commit a re-review sees
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13891,6 +13902,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#which-commit-a-re-review-sees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which commit a re-review sees
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14076,6 +14098,25 @@ commands by commenting on a PR:</p>
 </tr>
 </tbody>
 </table>
+<p>Repeating a command while the first one is still running does not run
+it twice. Both <code>pr-re-review.yml</code> and <code>pr-retest.yml</code> group their work
+per pull request and cancel the earlier run, so the last request wins
+and the run that cancelled its predecessor posts its own confirmation.</p>
+<h3 id="which-commit-a-re-review-sees">Which commit a re-review sees<a class="headerlink" href="#which-commit-a-re-review-sees" title="Permanent link">&para;</a></h3>
+<p>A re-review checks out GitHub's merge of the pull request into its
+base, so the reviewer judges the change where it will land rather than
+in isolation. GitHub does not always publish a merge commit for a pull
+request, and -- because it recomputes one asynchronously after a push
+-- the one it publishes is not always for the current head. Reviewing
+a stale merge commit produces a careful review of superseded code, and
+nothing about the run looks wrong.</p>
+<p>So <code>pr-re-review.yml</code> resolves the merge ref rather than naming it: it
+confirms the published merge commit is a merge of this pull request's
+head, waits briefly for a recomputation to catch up, and otherwise
+falls back to reviewing the head on its own. <strong>When it falls back it
+says so in a comment on the pull request</strong>, naming which of the two
+cases it hit. A review of the head is worth having; a reader who
+believes it saw the merge result is not.</p>
 <h2 id="security-model">Security Model<a class="headerlink" href="#security-model" title="Permanent link">&para;</a></h2>
 <p>These workflows use <code>issue_comment</code> triggers, which run with
 elevated permissions. Security is enforced through multiple layers:</p>
