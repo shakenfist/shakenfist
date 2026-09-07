@@ -19,6 +19,7 @@ from unittest import mock
 import uuid
 
 import grpc
+from sqlalchemy.exc import DataError
 from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
@@ -1937,3 +1938,23 @@ class DirectSetStateInterfaceDeletedHookTestCase(base.ShakenFistTestCase):
         ]
         self.assertEqual(1, len(executed_sql))
         self.assertNotIn('network_interfaces', executed_sql[0])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_data_error_returns_false(self, mock_get_engine):
+        """A DataError degrades to a failed write, not an escaped exception.
+
+        Issue 4112: an over-long state message raised DataError 1406 out
+        of the SetObjectState servicer, which cascaded into skipped
+        instance cleanup on the queue node.
+        """
+        from shakenfist.schema.object_state import State
+        from shakenfist.schema.object_types import ObjectType
+
+        engine, conn = self._make_engine()
+        conn.execute.side_effect = DataError(
+            'statement', {}, Exception("Data too long for column 'message'"))
+        mock_get_engine.return_value = engine
+
+        self.assertFalse(mariadb._direct_set_state(
+            ObjectType.INSTANCE, str(uuid.uuid4()),
+            State(value='creating-error', update_time=0.0)))
