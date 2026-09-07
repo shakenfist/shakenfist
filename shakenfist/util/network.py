@@ -283,6 +283,38 @@ def get_host_routes(netns: str | None, device: str) -> set[str]:
     return destinations
 
 
+def check_for_iptables_rule(netns: str | None, table: str,
+                            rule: list[str]) -> bool:
+    """Is an iptables rule present, optionally inside a namespace?
+
+    ``rule`` is the chain name followed by the match and target
+    arguments, as ``shakenfist.util.iptables`` builds them.
+
+    This asks iptables with ``-C`` rather than parsing ``-S`` output,
+    because iptables normalises what it prints: a rule written with a
+    dotted quad netmask -- which is how the network object holds one --
+    lists back as a prefix length, so a textual comparison would report
+    a rule which is right there as missing. Anything which stops the
+    check running at all, a namespace which is not there included,
+    counts as absent: the repair for both is the same rebuild.
+
+    The elements of ``rule`` are joined with spaces and interpolated
+    into a command string which sf-privexec runs as root through a
+    shell, so they must never carry user supplied data. Today's callers
+    build rules from ``shakenfist.util.iptables``, whose only inputs are
+    an IPAM derived address and netmask and a hex formatted vxid; a
+    caller which wants to check something a user chose needs to quote it
+    first.
+    """
+    try:
+        concurrency.execute(
+            'iptables -w 10 -t {} -C {}'.format(table, ' '.join(rule)),
+            netns=netns)
+        return True
+    except ProcessExecutionError:
+        return False
+
+
 def add_default_route(netns: str, router: str) -> None:
     try:
         concurrency.execute(

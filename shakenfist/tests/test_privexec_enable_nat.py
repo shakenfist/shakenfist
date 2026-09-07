@@ -17,6 +17,7 @@ from shakenfist.protos import privexec_pb2
 from shakenfist.tests import base
 from shakenfist.tests.test_privexec_floating_ip import CommandRecorder
 from shakenfist.util import concurrency as util_concurrency
+from shakenfist.util import iptables as util_iptables
 
 
 NETWORK_UUID = 'ccc652aa-f7b6-4f99-b76d-443ae4d91412'
@@ -96,6 +97,10 @@ class PrivExecEnableNATTestCase(base.ShakenFistTestCase):
                  '-t', 'nat', '-A', 'POSTROUTING', '-s',
                  '172.16.0.0/255.255.255.0', '-o', EGRESS_VETH,
                  '-j', 'MASQUERADE'),
+                ('ip', 'netns', 'exec', NETWORK_UUID, 'iptables', '-w', '10',
+                 '-t', 'nat', '-A', 'POSTROUTING', '-s',
+                 '172.16.0.0/255.255.255.0', '-o', VX_VETH,
+                 '-m', 'conntrack', '--ctstate', 'DNAT', '-j', 'MASQUERADE'),
             ],
             self._appends(recorder))
 
@@ -228,6 +233,40 @@ class PrivExecEnableNATTestCase(base.ShakenFistTestCase):
                 ('ip', 'netns', 'exec', NETWORK_UUID), call[:4],
                 'command ran outside the network namespace: %s' % (call,))
 
+    def test_the_hairpin_rule_only_matches_the_u_turn(self):
+        """The hairpin masquerade is confined to DNATed local traffic.
+
+        An instance reaching another instance's floating address is
+        DNATed here and sent straight back out the veth it arrived on;
+        the reply goes directly over the virtual network's L2 and is
+        never un-DNATed, so the connection hangs. Masquerading the u-turn
+        puts this namespace back on the return path.
+
+        Both of the matches beside it are load bearing, and each
+        excludes a different thing. Without -s the rule would also
+        rewrite traffic arriving from outside the cluster for a floating
+        address -- that is DNATed here too, and it reaches the holder
+        with the caller's real address today. Without --ctstate DNAT it
+        would catch anything this namespace forwards back into the
+        network without rewriting it, a routed address included, whose
+        whole point is that it is not rewritten.
+        """
+        recorder = self.patch_commands(RULE_ABSENT)
+
+        self._enable_nat()
+
+        hairpin = [c for c in self._appends(recorder)
+                   if 'conntrack' in c]
+        self.assertEqual(1, len(hairpin))
+        rule = hairpin[0]
+        self.assertEqual(('--ctstate', 'DNAT'),
+                         rule[rule.index('--ctstate'):
+                              rule.index('--ctstate') + 2])
+        self.assertEqual('172.16.0.0/255.255.255.0',
+                         rule[rule.index('-s') + 1])
+        self.assertEqual(VX_VETH, rule[rule.index('-o') + 1])
+        self.assertEqual('MASQUERADE', rule[-1])
+
     def test_an_existing_rule_is_not_appended_again(self):
         """A rule which -C finds is left alone.
 
@@ -244,7 +283,34 @@ class PrivExecEnableNATTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             privexec_pb2.EnableNATReply.OK, reply.enable_nat_reply.error)
         self.assertEqual([], self._appends(recorder))
-        self.assertEqual(3, len([c for c in recorder.calls if '-C' in c]))
+        self.assertEqual(4, len([c for c in recorder.calls if '-C' in c]))
+
+    def test_the_audited_rule_is_one_of_the_installed_rules(self):
+        """What is checked for later is what is installed here.
+
+        ``Network.is_nat_okay`` audits a namespace for the hairpin rule,
+        which is how a cluster that upgraded while all of its networks
+        were healthy ever acquires it. The audit asks
+        ``hairpin_masquerade_rule`` and the install walks
+        ``network_nat_rules``; this is the assertion that the first is
+        still one of the second, so an edit to either cannot leave the
+        audit hunting for a rule nothing writes.
+        """
+        rules = util_iptables.network_nat_rules(
+            '172.16.0.0', '255.255.255.0', VXID)
+        hairpin = util_iptables.hairpin_masquerade_rule(
+            '172.16.0.0', '255.255.255.0', VXID)
+
+        self.assertIn((util_iptables.HAIRPIN_TABLE, hairpin), rules)
+
+        # And the install really does write it, rather than the pairing
+        # above being true of a list nothing uses.
+        recorder = self.patch_commands(RULE_ABSENT)
+        self._enable_nat()
+        self.assertIn(
+            ('ip', 'netns', 'exec', NETWORK_UUID, 'iptables', '-w', '10',
+             '-t', util_iptables.HAIRPIN_TABLE, '-A', *hairpin),
+            self._appends(recorder))
 
     def test_a_failed_append_stops_and_reports_iptables_failed(self):
         recorder = self.patch_commands({

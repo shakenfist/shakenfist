@@ -8,23 +8,27 @@ from shakenfist_ci import base
 
 
 class TestInNetworkReachability(base.BaseNamespacedTestCase):
-    """An address which is routed into a network must work inside it too.
+    """An address which answers from outside must answer from inside too.
 
-    A routed address is handed to a virtual network by the network
-    node, and it used to work only for clients which were not on that
-    network: it was never routed inside the network's own namespace, so
-    an instance's packet reached its default gateway and died there
-    (github issue #3662).
+    Both of Shaken Fist's externally reachable address types are handed
+    to a virtual network by the network node, and both used to work only
+    for clients which were not on that network. A routed address was
+    never routed inside the network's own namespace, so an instance's
+    packet reached its default gateway and died there; a floating
+    address was DNAT'ed into the network and the reply then travelled
+    back over the virtual network's own layer 2, so it never had its
+    source rewritten and the caller discarded it (github issue #3662).
 
-    The consequence was that a routed address was not usable from inside
-    the network -- which is what a Kubernetes service address, or any
-    other load balanced address, has to be. It stayed hidden because the
+    The consequence was that no Shaken Fist address was both stable
+    across instance replacement and usable from inside the network --
+    which is what a Kubernetes service address, or any other
+    load-balanced address, has to be. It stayed hidden because the
     clients which most wanted it (kube-proxy, on a cluster member)
     intercept the address in iptables before routing ever happens.
 
-    This is deliberately black box: the assertion is that an instance
-    can reach the address, not that any particular route exists. The
-    host side commands are pinned by the unit tests.
+    These are deliberately black box: the assertion is that an instance
+    can reach the address, not that any particular rule or route exists.
+    The host side commands are pinned by the unit tests.
     """
 
     def __init__(self, *args, **kwargs):
@@ -111,9 +115,21 @@ class TestInNetworkReachability(base.BaseNamespacedTestCase):
         self.fail('Could not ping %s (%s) from instance %s'
                   % (address, description, instance_uuid))
 
-    def test_a_routed_address_answers_from_inside(self):
-        # Both instances are shared by every assertion below. Booting a
-        # guest is by far the most expensive thing this test does.
+    def _await_floating_address(self, interface_uuid):
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            floating = self.test_client.get_interface(
+                interface_uuid).get('floating')
+            if floating:
+                return floating
+            time.sleep(5)
+        self.fail('No floating address appeared on interface %s'
+                  % interface_uuid)
+
+    def test_routed_and_floating_addresses_answer_from_inside(self):
+        # Both halves share these two instances. Booting a guest is by
+        # far the most expensive thing this test does, and splitting the
+        # two scenarios into separate test methods would boot four.
         server = self._create_instance('uturn-server')
         client = self._create_instance('uturn-client')
         self._await_instance_ready(server['uuid'])
@@ -157,3 +173,11 @@ class TestInNetworkReachability(base.BaseNamespacedTestCase):
         # routed by this network, so returning at all is an assertion
         # about the half of the lifecycle the ping cannot see.
         self.test_client.unroute_network_address(self.net['uuid'], routed)
+
+        # A floating address, which is DNAT'ed rather than routed, and
+        # which the instance holding it never sees.
+        self.test_client.float_interface(server_iface['uuid'])
+        floating = self._await_floating_address(server_iface['uuid'])
+        self.addDetail('floating address', content.text_content(floating))
+
+        self._await_ping(client['uuid'], floating, 'floating address ping')

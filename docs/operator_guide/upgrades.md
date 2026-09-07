@@ -86,6 +86,24 @@ the existing definition. Recreating the instance is the supported
 route; this is a workaround, and it is on you to confirm the instance
 comes back.
 
+### Network nodes need the iptables conntrack match
+
+Since the release which made floating addresses answer from inside their own
+network, a NAT providing network's namespace carries a hairpin masquerade
+rule matched with `-m conntrack --ctstate DNAT`. A network node whose kernel
+lacks `xt_conntrack` will fail to install that rule, and the network will not
+come up there at all.
+
+Every stock Ubuntu and Debian kernel has it, so this is only a concern if you
+run a custom kernel. Check before you roll the daemons:
+
+```bash
+iptables -m conntrack --help > /dev/null && echo ok
+```
+
+See the floating IP discussion in [the networking overview](networking/overview.md)
+for what the rule does and why both of its matches are needed.
+
 ## MariaDB schema migrations
 
 Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The

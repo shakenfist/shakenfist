@@ -2,14 +2,18 @@
 
 """The iptables rules a NAT providing network needs in its namespace.
 
-The rules are data here rather than statements inside sf-privexec, so
-that the set can be walked -- which is what makes installing each of
-them at most once a loop rather than several hand written copies of the
-same check.
+These live here rather than beside the daemon which installs them
+because they have two users, not one. sf-privexec writes them when a
+network is created on the network node, and ``Network.is_okay()`` asks
+whether the hairpin rule is still there -- which is how a cluster that
+upgraded while all of its networks were healthy ever acquires it.
+Written out in both places they would drift; derived from here they
+cannot.
 
 A rule is the chain name followed by the match and target arguments
 exactly as iptables writes them after ``-A``, which is also exactly
-what it wants after ``-C``. So the same list serves both.
+what it wants after ``-C``. So the same list serves both the install
+and the audit.
 
 This module deliberately imports nothing. sf-privexec runs as root and
 is kept as small as we can manage.
@@ -53,6 +57,52 @@ def stale_nat_rules(vxid: int) -> list[tuple[str, list[str]]]:
     ]
 
 
+def hairpin_masquerade_rule(
+        network_address: str, network_mask: str, vxid: int) -> list[str]:
+    """Masquerade a floating address connection which turns around here.
+
+    An instance reaching another instance's floating address sends it to
+    its default gateway, which is the network's namespace; the
+    PREROUTING DNAT rewrites the destination to the holder's address and
+    the packet goes straight back out the veth it came in on. The reply
+    then travels directly over the virtual network's L2, never returns
+    through the namespace, and so is never un-DNATed: the client sees a
+    packet from an address it never spoke to and drops it, and the
+    connection hangs until it times out (issue 3662).
+
+    Masquerading the u-turn to the namespace's own address on the
+    network puts the namespace back on the return path, where conntrack
+    can undo the destination rewrite. The cost is that the holder sees
+    the connection as coming from the network's gateway rather than from
+    the calling instance -- which is inherent to hairpin NAT, and is the
+    price of the floating address being invisible to its holder in the
+    first place. An instance which needs to know who is calling should
+    be reached on a routed address, which is not rewritten at all.
+
+    Both matches beside the target are load bearing, and each excludes a
+    different thing:
+
+    * ``-s`` is what preserves the caller's address for clients outside
+      the cluster. Their traffic is DNATed here too, so the conntrack
+      match alone would masquerade it and the holder would lose the
+      real source address it sees today.
+    * ``--ctstate DNAT`` is what excludes the routed address u-turn, and
+      anything else this namespace forwards back into the network
+      without rewriting. A routed address is never DNATed, and its whole
+      point is that it arrives unrewritten.
+    """
+    _, vx_veth_inner = veth_names(vxid)
+    return [
+        'POSTROUTING', '-s', f'{network_address}/{network_mask}',
+        '-o', vx_veth_inner, '-m', 'conntrack', '--ctstate', 'DNAT',
+        '-j', 'MASQUERADE']
+
+
+# The table the hairpin rule lives in, named here so the audit does not
+# have to know it independently of the install.
+HAIRPIN_TABLE = 'nat'
+
+
 def network_nat_rules(
         network_address: str, network_mask: str,
         vxid: int) -> list[tuple[str, list[str]]]:
@@ -75,4 +125,7 @@ def network_nat_rules(
         # Instances reach the world as the network's floating gateway.
         ('nat', ['POSTROUTING', '-s', f'{network_address}/{network_mask}',
                  '-o', egress_veth_inner, '-j', 'MASQUERADE']),
+
+        (HAIRPIN_TABLE, hairpin_masquerade_rule(
+            network_address, network_mask, vxid)),
     ]
