@@ -412,19 +412,26 @@ class BridgedVXLanNetwork:
 
         subst = self.network.subst_dict()
 
+        # 'ip link add ... mtu N type veth peer name P' applies the MTU to
+        # the primary end only; the peer keeps the kernel default of 1500
+        # unless given its own trailing mtu (issue 4115). Both ends of each
+        # pair carry routed traffic, so both take their bridge's MTU --
+        # forcing the config default onto the inner end would be wrong on a
+        # node whose egress NIC is smaller.
         if not util_network.check_for_interface(subst['vx_veth_outer']):
+            subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
+                subst['vx_bridge'])
             util_network.create_interface(
                 subst['vx_veth_outer'], 'veth',
-                'peer name %(vx_veth_inner)s' % subst)
+                'peer name %(vx_veth_inner)s mtu %(vx_bridge_mtu)s' % subst,
+                mtu=subst['vx_bridge_mtu'])
             util_concurrency.execute(
                 'ip link set %(vx_veth_inner)s netns %(netns)s' % subst)
 
             # Refer to bug 952 for more details here, but it turns out
             # that adding an interface to a bridge overwrites the MTU of
-            # the bridge in an undesirable way. So we lookup the existing
-            # MTU and then re-specify it here.
-            subst['vx_bridge_mtu'] = util_network.get_interface_mtu(
-                subst['vx_bridge'])
+            # the bridge in an undesirable way. So we re-specify the
+            # bridge's MTU here.
             util_concurrency.execute(
                 'ip link set %(vx_veth_outer)s master %(vx_bridge)s '
                 'mtu %(vx_bridge_mtu)s' % subst)
@@ -439,16 +446,18 @@ class BridgedVXLanNetwork:
                 subst['vx_veth_inner'])
 
         if not util_network.check_for_interface(subst['egress_veth_outer']):
+            subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
+                subst['egress_bridge'])
             util_network.create_interface(
                 subst['egress_veth_outer'], 'veth',
-                'peer name %(egress_veth_inner)s' % subst)
+                'peer name %(egress_veth_inner)s mtu %(egress_bridge_mtu)s'
+                % subst,
+                mtu=subst['egress_bridge_mtu'])
 
             # Refer to bug 952 for more details here, but it turns out
             # that adding an interface to a bridge overwrites the MTU of
-            # the bridge in an undesirable way. So we lookup the existing
-            # MTU and then re-specify it here.
-            subst['egress_bridge_mtu'] = util_network.get_interface_mtu(
-                subst['egress_bridge'])
+            # the bridge in an undesirable way. So we re-specify the
+            # bridge's MTU here.
             util_concurrency.execute(
                 'ip link set %(egress_veth_outer)s master %(egress_bridge)s '
                 'mtu %(egress_bridge_mtu)s' % subst)
