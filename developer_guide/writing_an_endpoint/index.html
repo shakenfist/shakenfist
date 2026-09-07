@@ -13789,9 +13789,23 @@ string whose published format is Swagger 2.0's standard <code>byte</code> token)
 stays the single source of truth for what parses, and a published
 IPv4 pattern would describe the API as narrower than it is), and real
 array types for <code>arrayofstring</code>/<code>arrayofdict</code> and a real object type
-for <code>dict</code>. Objects, and arrays of objects, can only be declared in
-the body: outside one there is no schema object to nest a structure
-in, so they are rejected at import time.</p>
+for <code>dict</code>.</p>
+<p><code>any</code> is the one token that deliberately constrains nothing: it
+renders with no <code>type</code> at all, only a <code>format</code> annotation saying what
+the parameter is. It exists for the object metadata <code>value</code>
+parameters, where <code>add_metadata_key()</code> serialises whatever it is
+given and real callers store strings, dictionaries and lists under
+the same key — so no single token is wide enough, and declaring one
+of them would make enforcement refuse working callers. Reach for it
+only when that is genuinely true of the parameter; the fourteen
+declarations using it today are pinned by name in
+<code>ANY_TOKEN_DECLARATIONS</code>
+(<code>shakenfist/tests/external_api/test_parameter_declarations.py</code>), so
+a fifteenth is a visible, reviewable edit rather than a quiet
+widening.</p>
+<p>Objects, arrays of objects, and <code>any</code> can only be declared in the
+body: outside one there is no schema object to nest a structure in,
+so they are rejected at import time.</p>
 <p>Declare the token that matches what the handler accepts, and <strong>publish
 what the server backs</strong>: a bound tighter than the server's own
 behaviour belongs in the specification only where the server already
@@ -13906,14 +13920,26 @@ are listed in <code>UNDOCUMENTED_BY_DESIGN</code> in
 <td><code>query</code></td>
 </tr>
 <tr>
+<td>popped out of kwargs by one of the handler's decorators</td>
+<td><code>body</code></td>
+</tr>
+<tr>
 <td>anything else</td>
 <td><code>body</code></td>
 </tr>
 </tbody>
 </table>
-<p>That last row is the default because <code>log_request</code> merges the JSON
-request body into the handler's kwargs, and the official client sends
-a JSON body for every method including <code>GET</code>.</p>
+<p>The last two rows are the same default, because <code>log_request</code> merges
+the JSON request body into the handler's kwargs and the official client
+sends a JSON body for every method including <code>GET</code>. The decorator row
+is called out because it is the one source that reaches neither the
+signature nor any of the rows above: <code>arg_is_instance_ref</code>,
+<code>arg_is_network_ref</code> and the two artifact ref decorators each do
+<code>kwargs.pop('namespace', None)</code> and resolve the lookup with it, so
+<code>namespace</code> is a functional parameter of all 55 routes behind them
+while being invisible to a derivation that reads only signatures. It
+went undeclared for years on that account
+(<a href="https://github.com/shakenfist/shakenfist/issues/3739">#3739</a>).</p>
 <p><strong>3. A <code>path</code> parameter must be <code>required=True</code>.</strong> The route cannot
 match without it, and an optional path parameter makes the published
 specification invalid — client generators reject it outright.</p>
@@ -13938,13 +13964,28 @@ when their parameter sets differ, so mounting one <code>Resource</code> on both
 collection and item endpoints into two classes, which is what the
 tree does everywhere (<code>Readyz</code>, the only class mounted twice, has two
 parameter-free routes).</p>
-<p><strong>5. Every kwarg the handler accepts is declared.</strong> An accepted-but-
-undeclared parameter is invisible to anyone reading the API, which is
-how <code>sshkey</code> and <code>userdata</code> sat in the published specification for
-years while the handler read <code>ssh_key</code> and <code>user_data</code>. If a kwarg
-genuinely must not be published, add it to <code>UNDECLARED_BY_DESIGN</code> with
-a reason. Objects the decorators inject — anything ending in
-<code>_from_db</code> — are not parameters and must not be declared.</p>
+<p><strong>5. Every kwarg the handler accepts is declared</strong>, including the ones
+a decorator consumes on its behalf. An accepted-but-undeclared
+parameter is invisible to anyone reading the API, which is how <code>sshkey</code>
+and <code>userdata</code> sat in the published specification for years while the
+handler read <code>ssh_key</code> and <code>user_data</code>. If a kwarg genuinely must not
+be published, add it to <code>UNDECLARED_BY_DESIGN</code> with a reason. Objects
+the decorators inject — anything ending in <code>_from_db</code> — are not
+parameters and must not be declared.</p>
+<p>"Accepts" means what a caller can send, not what the signature names.
+<code>declarations.decorator_kwargs()</code> resolves each of a handler's
+decorators to its definition in <code>shakenfist/external_api/</code> and collects
+the literal keys it removes from kwargs, following one <code>return
+other_decorator(func, ...)</code> delegation — which is how
+<code>arg_is_artifact_ref</code> and <code>arg_is_visible_artifact_ref</code> are written.
+If you add a decorator that consumes a request parameter, the audit
+will require every handler wearing it to declare that parameter.</p>
+<p><code>UNDECLARED_BY_DESIGN</code> does not reach these. It exists for a kwarg
+the signature names and the handler ignores; a kwarg a decorator pops
+is one a caller can send and which changes what happens, so there is
+no reading of it that is not part of the API. Both guards say so —
+<code>declarations.audit()</code>, which backs the pre-commit fixer, has no
+exemption path for one at all — so declare it or stop consuming it.</p>
 <p>A handler must therefore name its parameters: <code>*args</code> or <code>**kwargs</code> in
 the signature accepts body keys nothing can enumerate (<code>log_request</code>
 merges the whole JSON body into the handler's kwargs), so the audit
@@ -14014,7 +14055,7 @@ strings, because semantic validation of them is not built yet. Only
 <code>type</code>, <code>pattern</code>, <code>minimum</code> and <code>maximum</code> constrain anything.</p>
 <h2 id="what-is-not-checked-yet">What is not checked yet<a class="headerlink" href="#what-is-not-checked-yet" title="Permanent link">&para;</a></h2>
 <p>Enforcement is off, so a correct declaration still does not stop a
-caller sending something else. Two known gaps in the derivation
+caller sending something else. Six known gaps in the derivation
 itself:</p>
 <p>(The published specification itself <em>is</em> checked:
 <code>shakenfist/tests/external_api/test_openapi_spec.py</code> validates the
@@ -14037,6 +14078,63 @@ the type vocabulary landed.)</p>
   know which parameters arrive in the query string, so an opt-out
   entry would have to restate the schema's keys by hand — exactly the
   second source of truth this machinery exists to remove.</li>
+<li>A decorator that consumes a request parameter must be a module level
+  function of <code>shakenfist/external_api/</code>, and must consume it with a
+  literal <code>kwargs.pop('name', ...)</code> or <code>del kwargs['name']</code> reached
+  either directly or through a single <code>return other(func, ...)</code>
+  delegation. A decorator imported from outside the package is skipped
+  in silence — deliberately, because most of the decorators on any
+  handler are third-party (<code>swag_from</code>, <code>use_kwargs</code>) and reporting
+  every unfound name would report the whole API and mean nothing.
+  Within a decorator this <em>can</em> resolve, an unreadable pop key or an
+  unfollowable delegation is reported rather than skipped. That report
+  fires on <em>any</em> top level <code>return &lt;call&gt;</code> whose callee is not a single
+  package function, including a decorator which consumes nothing and
+  merely happens to be written as <code>return functools.wraps(func)(wrapper)</code>
+  or <code>return _make_wrapper(func)</code> against a helper living elsewhere. No
+  decorator in the tree is written either way, and the report is
+  deliberately fail-closed — an unfollowable delegation and a decorator
+  that consumes nothing produce the same empty set, so guessing between
+  them is the confident wrong answer this module exists to refuse. The
+  remedy, which the message now names, is to return the wrapper directly
+  or move the helper to module level in <code>external_api/</code>.</li>
+<li>Decoration sites and delegation targets are matched on their bare
+  name, because that is all the site carries: <code>@api_base.arg_is_instance_ref</code>
+  in one module and <code>@arg_is_artifact_ref</code> in another name the same kind
+  of thing, and nothing here resolves module aliases through the
+  decorating file's imports. Two package functions sharing a name are
+  reported as ambiguous, but a package function sharing a name with an
+  <em>imported</em> one is not detectable, and the derivation will confidently
+  attribute the package function's pops to the import. No such collision
+  exists today; if you import something into <code>external_api/</code> under a name
+  a module level function there already has, rename one of them.</li>
+<li>A decorator that <em>reads</em> a parameter without removing it stays
+  invisible. The derivation recognises <code>kwargs.pop</code> and
+  <code>del kwargs[...]</code> because those are what make a kwarg the handler
+  cannot receive; a decorator that acts on <code>kwargs.get('x')</code>,
+  <code>'x' in kwargs</code> or <code>kwargs['x']</code> and leaves the key in place is not
+  seen, so nothing requires <code>x</code> to be declared. There is no example in
+  the tree: <code>_resolve_artifact_ref</code> had the only one, an
+  <code>if 'artifact_uuid' in kwargs:</code> branch which resolved an artifact
+  from a body key that no handler accepts — so the call after it
+  raised <code>TypeError</code> and answered 400 with interpreter text. It was
+  deleted rather than declared, since declaring it would have
+  published a parameter that never worked, and
+  <code>test_artifact_uuid_is_not_a_parameter</code> pins the property that made
+  it dead, while <code>test_arg_is_ref_namespace_scoping.py</code> covers the
+  control flow that replaced it. A new one would have to be added
+  deliberately.</li>
+<li>A handler cannot both take a raw request body and sit behind a ref
+  resolving decorator. <code>swagger_helper()</code> refuses
+  <code>RAW_BODY_PARAMETER</code> combined with any named body parameter, while
+  the audit requires a decorator-consumed kwarg such as <code>namespace</code> to
+  be declared in the body — so such a handler could satisfy neither
+  rule: declaring the parameter aborts sf-api at import, omitting it
+  fails CI. No handler in the tree has both, and nothing detects the
+  combination; it is recorded here so the first author to hit the
+  contradiction does not have to derive it. The fix, if it is ever
+  needed, is a rendering for "a raw body plus these named
+  parameters", not an exemption from either rule.</li>
 </ul>
 
 

@@ -13889,7 +13889,7 @@ file per detailed phase, named with <code>-phase-NN-descriptive</code>
 appended.</p>
 <p>I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.</p>
-<p><strong>Status: phases 0, 1, 2 and 3 planned; 0, 1 and 2 complete.</strong>
+<p><strong>Status: phases 0 to 4 planned; 0, 1, 2 and 3 complete.</strong>
 The open questions at the bottom are answered in the Decisions
 section; see
 <a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>
@@ -13900,7 +13900,9 @@ for what the audit found,
 for what the vocabulary work shipped and the four deviations it
 recorded, and
 <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/"><code>PLAN-api-input-validation-phase-03-compile-and-warn.md</code></a>
-for the phase now ready to start. Phases 4 onward are not yet cut
+for the measurement that closed it, and
+<a href="../PLAN-api-input-validation-phase-04-enforce/"><code>PLAN-api-input-validation-phase-04-enforce.md</code></a>
+for the phase now ready to start. Phases 5 onward are not yet cut
 into per-phase files.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
 <p>The REST API does not validate its inputs. A request body value
@@ -14219,13 +14221,13 @@ declarations are good enough to compile.</p>
 </tr>
 <tr>
 <td>3: Compile and warn</td>
-<td>In progress</td>
-<td>Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. The measurement window opened the same day — sfcbr deployed, apparatus hand-verified, a full functional CI run covered — and exits when every finding is explained, no earlier than 2026-08-20. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
+<td>Complete</td>
+<td>Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared <code>namespace</code> of #3739 and fourteen metadata <code>value</code> declarations narrower than their handlers — which phase 4 fixes before it enforces. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
 </tr>
 <tr>
 <td>4: Enforce</td>
-<td>Not started</td>
-<td>Turn on rejection once the warn log is quiet, with one malformed-input response shape that never contains interpreter text; fold the hand-authored <code>get_args</code> schemas into the compiled path</td>
+<td>In progress</td>
+<td>Fix the two declaration bugs the warn window found (#3739's undeclared <code>namespace</code> on 55 handlers, and fourteen metadata <code>value</code> declarations), teach the derivation to see decorator-consumed kwargs so that class cannot recur, then turn on rejection with one malformed-input response shape that never contains interpreter text. The <code>get_args</code> fold moves to Future work: read as "delete the four <code>@use_kwargs</code> decorators" it is a bug, because the compiled path is check-only and <code>@use_kwargs</code> is the only thing that gets a query parameter to a handler. See <a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a></td>
 </tr>
 <tr>
 <td>5: Narrow the handlers</td>
@@ -14252,7 +14254,15 @@ the plan was scoped against.</p>
 2026-08-07), #3626 (specification validation in CI), #3616
 (<code>base.py</code> under mypy), #3642 (variadic handlers in the audit),</p>
 <h1 id="3629-body-supplied-all-see-d6-below-3615-log_request">3629 (body-supplied <code>all</code>, see D6 below), #3615 (<code>log_request</code><a class="headerlink" href="#3629-body-supplied-all-see-d6-below-3615-log_request" title="Permanent link">&para;</a></h1>
-<p>discarding headers).</p>
+<p>discarding headers). #3739 (the ref decorators' undeclared
+<code>namespace</code>) is fixed by phase 4 and closes when that branch
+merges.</p>
+<p><strong>Filed by phase 4, and deliberately not fixed by it:</strong> #4098 (the
+<code>get_args</code> fold, see the carried section below) and #4100 (an
+explicit <code>thin: false</code> on a snapshot request, which two comments
+in the tree wrongly blamed on this plan — the compiled path never
+injects, so no phase of this plan unblocks it; it needs a client
+release which omits the key).</p>
 <p><strong>Still open and still owned by this plan:</strong> #528 (parent), #3612
 (the mechanism), #936, #534, #3269, #323, #3523, #3371, #2094;</p>
 <h1 id="3606-is-in-flight-as-pr-3714">3606 is in flight as PR #3714.<a class="headerlink" href="#3606-is-in-flight-as-pr-3714" title="Permanent link">&para;</a></h1>
@@ -14428,6 +14438,37 @@ the mechanism rather than choosing one:</p>
 every parameter derived <code>query</code>, rather than introducing a
 second precedence rule alongside it. See
 <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>.</p>
+<h3 id="carried-into-phase-4-from-phase-3">Carried into phase 4 from phase 3<a class="headerlink" href="#carried-into-phase-4-from-phase-3" title="Permanent link">&para;</a></h3>
+<p>The measurement window found two declaration bugs, and phase 4
+fixes both before it enforces. Their detail is in
+<a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a>; what
+belongs here is the one item phase 4 declined.</p>
+<ul>
+<li><strong>The <code>get_args</code> fold is deferred, and this plan's description
+  of it was wrong.</strong> Phase 4's line above used to read "fold the
+  hand-authored <code>get_args</code> schemas into the compiled path".
+  Read as "delete the four <code>@use_kwargs</code> decorators", that is a
+  defect rather than a refactor: <code>validation.check()</code> returns
+  findings and <code>validate_request</code> calls through, so the compiled
+  path never coerces or injects anything, and <code>log_request</code>
+  merges only the JSON body -- nothing merges
+  <code>flask.request.args</code>. <code>@use_kwargs</code> is therefore the sole
+  mechanism by which a query-string parameter reaches a handler.
+  Removing it from <code>blob.py</code> would silently revert <code>offset</code> and
+  <code>limit</code> to their signature defaults, reading a whole blob where
+  the caller asked for a range.</li>
+</ul>
+<p>The defensible reading is to keep <code>@use_kwargs</code> and generate
+  its schema from the same declaration list <code>swagger_helper()</code>
+  receives, which removes the second source of truth D2 objected
+  to. That needs signature defaults at runtime and moves
+  <code>blob.py</code>'s hand-rolled negative-offset check into a field,
+  changing an error message -- a second request-visible change in
+  the phase that flips enforcement. It is tracked as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>
+  and is a candidate for phase 6, which already touches how
+  values reach handlers. Enforcement does not depend on it: the
+  compiled check runs first, so the duplication is inert.</p>
 <h2 id="open-questions-for-phase-0">Open questions for phase 0<a class="headerlink" href="#open-questions-for-phase-0" title="Permanent link">&para;</a></h2>
 <p>All answered above; retained as the record of what phase 0
 was asked to decide.</p>
