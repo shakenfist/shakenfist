@@ -14129,9 +14129,9 @@ commands available on a PR.</p>
 <td><code>@shakenfist-bot please re-review</code></td>
 </tr>
 <tr>
-<td><code>pr-address-comments.yml</code></td>
-<td>Address review comments on bot command</td>
-<td><code>@shakenfist-bot please address comments</code></td>
+<td><code>pr-retest.yml</code></td>
+<td>Re-run the functional tests on bot command</td>
+<td><code>@shakenfist-bot please retest</code></td>
 </tr>
 <tr>
 <td><code>pr-fix-tests.yml</code></td>
@@ -14667,7 +14667,10 @@ still uses the <code>shakenfist/actions/review-pr-with-claude@main</code> action
 directly, because it deliberately passes <code>force</code> to review a PR the bot
 has already reviewed.</p>
 <p>The reviewer produces structured JSON reviews, creates GitHub issues for
-actionable items, and embeds the JSON in the PR comment for automation.</p>
+actionable items, and embeds the JSON in the PR comment so a later reader
+-- human or machine -- can recover the item vocabulary, severities and
+verdicts that the rendered markdown flattens. Nothing consumes it today:
+the comment addresser was the only reader, and it has been retired.</p>
 <h3 id="merge-failure-triage">Merge failure triage<a class="headerlink" href="#merge-failure-triage" title="Permanent link">&para;</a></h3>
 <p>When <code>Functional tests</code> fails on a <code>merge_group</code> event, GitHub ejects the pull
 request from the merge queue and somebody has to decide whether the pull
@@ -14864,10 +14867,24 @@ not a longer flag list.</p>
 <ul>
 <li><strong><code>@shakenfist-bot please re-review</code></strong> - Triggers a fresh automated
   review of the PR using the shared review action.</li>
-<li><strong><code>@shakenfist-bot please address comments</code></strong> - Runs Claude Code to
-  address actionable items from the automated review. Uses
-  <code>tools/address-comments-with-claude.sh</code> with dual-checkout security
-  (trusted tools from base branch, PR code separately).</li>
+<li><strong><code>@shakenfist-bot please retest</code></strong> - Dispatches
+  <code>functional-tests.yml</code> against the PR branch, which is how a run is
+  re-tried after a bot commit or an infrastructure failure without
+  pushing a new commit. <strong>This is the merge queue's lane, not the pull
+  request's, and it is the most expensive thing a comment can start
+  here.</strong> The dispatch arrives as a <code>workflow_dispatch</code> event, and
+  <code>functional_matrix_merge_collection</code>, <code>ansible_modules_collection</code>,
+  <code>node_lifecycle_collection</code> and <code>schema_enum_widening</code> are each gated
+  on <code>merge_group || workflow_dispatch</code> -- so a retest runs the
+  multi-node nested-cluster jobs on top of the pull request set. Nor
+  does the docs-only skip apply: <code>check_paths</code> runs its path filter
+  only for events other than <code>workflow_dispatch</code> and otherwise defaults
+  <code>code_changed</code> to <code>true</code>, so a documentation-only branch gets the
+  whole suite. That is usually what you want, because the failure worth
+  re-trying is normally a merge queue one -- but it is a poor way to
+  re-run a lint job, and on a busy day it is several nested clusters'
+  worth of under-cloud capacity. Re-run the individual failed workflow
+  from the Actions tab when that is all that is needed.</li>
 <li><strong><code>@shakenfist-bot please attempt to fix</code></strong> - Runs Claude Code to fix
   unit test failures (<code>tox -ecover</code>). Uses <code>test-drift-fix.yml</code> with
   structured commit summaries.</li>
