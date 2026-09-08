@@ -7,7 +7,9 @@ from shakenfist.artifact import Artifact
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist.exceptions import BlobFetchFailed
+from shakenfist.exceptions import BlobMissing
 from shakenfist.exceptions import BlobTransferSetupFailed
+from shakenfist.exceptions import HTTPError
 from shakenfist.schema.operations.artifact_fetch_op import create_and_enqueue
 from shakenfist.schema.operations.artifact_fetch_op import current_version
 from shakenfist.schema.operations.artifact_fetch_op import model
@@ -244,16 +246,9 @@ class ArtifactFetchOpResolutionTestCase(base.ShakenFistTestCase):
         self.assertEqual(str(self.theirs.uuid), str(a.uuid))
 
 
-class ArtifactFetchOpBlobReplicationFailureTestCase(base.ShakenFistTestCase):
-    """Blob replication failures retry with backoff, and once the retry
-    budget is exhausted the instance is driven to an error state.
-
-    Issue 3494: every replication source timed out awaiting the fetching
-    node's transfer connection, the fetch op errored in under a minute
-    with no retry, and the instance sat in state initial forever because
-    the dependent instance start operation was aborted by the dispatcher
-    without ever executing.
-    """
+class ArtifactFetchOpFailureScaffold(base.ShakenFistTestCase):
+    """Shared scaffolding for the fetch-failure test cases below. Holds
+    no tests of its own."""
 
     URL = 'https://example.com/an-image.qcow2'
     QUEUE = 'test-clusteroperation-user_facing'
@@ -274,6 +269,19 @@ class ArtifactFetchOpBlobReplicationFailureTestCase(base.ShakenFistTestCase):
         afo.queue_name = self.QUEUE
         afo.current_defer_count = defer_count
         return afo
+
+
+class ArtifactFetchOpBlobReplicationFailureTestCase(
+        ArtifactFetchOpFailureScaffold):
+    """Blob replication failures retry with backoff, and once the retry
+    budget is exhausted the instance is driven to an error state.
+
+    Issue 3494: every replication source timed out awaiting the fetching
+    node's transfer connection, the fetch op errored in under a minute
+    with no retry, and the instance sat in state initial forever because
+    the dependent instance start operation was aborted by the dispatcher
+    without ever executing.
+    """
 
     def _fetch_with_failure(self, afo, inst, exc):
         with mock.patch(
@@ -376,3 +384,129 @@ class ArtifactFetchOpBlobReplicationFailureTestCase(base.ShakenFistTestCase):
             afo.dispatch_task(model_tasks.image_fetch)
 
         self.assertEqual('abort', afo.state.value)
+
+
+class ArtifactFetchOpUpstreamFailureTestCase(ArtifactFetchOpFailureScaffold):
+    """Upstream (source URL) fetch failures fall back to the version the
+    cluster has already cached when the artifact has one.
+
+    Issue 3603: the fallback previously only logged 'using already cached
+    version' without fetching anything, so a node which had never seen
+    the image completed the operation with nothing in its image cache.
+    It also classified every failure as a DNS error, because it tested
+    str.find() truthiness (-1, and so true, when the substring is
+    absent).
+    """
+
+    def test_upstream_failure_falls_back_to_cached_version(self):
+        # Issue 3603: an artifact with a previously fetched good version
+        # must serve instances from the cache when the source cannot be
+        # reached -- and the fallback has to actually fetch the cached
+        # version, because this node may never have seen it.
+        a = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='an-image',
+            namespace='system')
+        a.state = Artifact.STATE_CREATED
+
+        inst = mock.MagicMock()
+        afo = self._make_op()
+        with mock.patch(
+                'shakenfist.operations.artifact_fetch_op.images') as images:
+            get_image = images.ImageFetchHelper.return_value.get_image
+            get_image.side_effect = [
+                HTTPError('Failed to fetch HEAD of x (status code 404)'),
+                None]
+            afo._image_fetch(inst)
+
+        self.assertEqual(
+            [mock.call(), mock.call(cached_only=True)],
+            get_image.call_args_list)
+        inst.enqueue_delete_due_error.assert_not_called()
+        self.assertIsNone(self.mock_mariadb.get_work_queue_payload(self.QUEUE))
+        self.assertEqual(
+            Artifact.STATE_CREATED, Artifact.from_db(str(a.uuid)).state.value)
+
+    def test_upstream_failure_with_unusable_cache_defers(self):
+        a = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='an-image',
+            namespace='system')
+        a.state = Artifact.STATE_CREATED
+
+        afo = self._make_op()
+        with mock.patch(
+                'shakenfist.operations.artifact_fetch_op.images') as images:
+            get_image = images.ImageFetchHelper.return_value.get_image
+            get_image.side_effect = [
+                HTTPError('Failed to fetch HEAD of x (status code 404)'),
+                BlobMissing('no cached version to fall back to')]
+            afo._image_fetch(None)
+
+        payload = self.mock_mariadb.get_work_queue_payload(self.QUEUE)
+        self.assertEqual(1, payload['defer_count'])
+        self.assertEqual('queued', afo.state.value)
+
+    def test_upstream_failure_exhausted_leaves_created_artifact_alone(self):
+        # Exhausting the retry budget errors the instance and the op, but
+        # not an artifact which still has a good version -- the source
+        # being gone does not make the cached copies bad.
+        a = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='an-image',
+            namespace='system')
+        a.state = Artifact.STATE_CREATED
+
+        inst = mock.MagicMock()
+        afo = self._make_op(defer_count=3)
+        with mock.patch(
+                'shakenfist.operations.artifact_fetch_op.images') as images:
+            get_image = images.ImageFetchHelper.return_value.get_image
+            get_image.side_effect = [
+                HTTPError('Failed to fetch HEAD of x (status code 404)'),
+                BlobMissing('no cached version to fall back to')]
+            afo._image_fetch(inst)
+
+        inst.enqueue_delete_due_error.assert_called_once()
+        self.assertIn(
+            'status code 404',
+            inst.enqueue_delete_due_error.call_args.args[0])
+        self.assertEqual('error', afo.state.value)
+        self.assertEqual(
+            Artifact.STATE_CREATED, Artifact.from_db(str(a.uuid)).state.value)
+
+    def test_upstream_failure_of_never_fetched_artifact_skips_fallback(self):
+        # An artifact with no good version has nothing to fall back to,
+        # and once retries are exhausted it is errored as before.
+        a = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='an-image',
+            namespace='system')
+
+        afo = self._make_op(defer_count=3)
+        with mock.patch(
+                'shakenfist.operations.artifact_fetch_op.images') as images:
+            get_image = images.ImageFetchHelper.return_value.get_image
+            get_image.side_effect = HTTPError(
+                'Failed to fetch HEAD of x (status code 404)')
+            afo._image_fetch(None)
+
+        self.assertEqual([mock.call()], get_image.call_args_list)
+        self.assertEqual('error', afo.state.value)
+        errored = Artifact.from_db(str(a.uuid))
+        self.assertEqual(Artifact.STATE_ERROR, errored.state.value)
+        self.assertIn('status code 404', errored.error)
+
+    def test_dns_errors_are_still_classified(self):
+        # The str.find() truthiness bug classified every failure as a DNS
+        # error; real DNS failures must still be cleaned for the event log.
+        a = Artifact.new(
+            Artifact.TYPE_IMAGE, self.URL, name='an-image',
+            namespace='system')
+
+        afo = self._make_op(defer_count=3)
+        with mock.patch(
+                'shakenfist.operations.artifact_fetch_op.images') as images:
+            get_image = images.ImageFetchHelper.return_value.get_image
+            get_image.side_effect = HTTPError(
+                'gaierror: [Errno -2] Name or service not known')
+            afo._image_fetch(None)
+
+        self.assertEqual(
+            'DNS error', Artifact.from_db(str(a.uuid)).error)

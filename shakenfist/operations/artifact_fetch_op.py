@@ -176,47 +176,67 @@ class ArtifactFetchOp(BaseClusterOperation):
 
         except (HTTPError, requests.exceptions.RequestException,
                 requests.exceptions.ConnectionError) as e:
-            # Clean common problems to store in events
+            # Clean common problems to store in events. These used to test
+            # str.find() truthiness, which is -1 (true) when the substring
+            # is absent, so every failure was classified as a DNS error.
             msg = str(e)
-            if msg.find('Name or service not known'):
-                msg = 'DNS error'
-            if msg.find('No address associated with hostname'):
+            if ('Name or service not known' in msg or
+                    'No address associated with hostname' in msg):
                 msg = 'DNS error'
 
-            # If the artifact has never successfully downloaded, then we are
-            # clearly in an error state. However, if we already have a copy of the
-            # artifact and the serving web site is experiencing a transient error
-            # we should not mark the entire artifact as in error.
-            if (a.state.value in [Artifact.STATE_INITIAL,
-                                  Artifact.STATE_CREATING] or
-                    msg != 'DNS error'):
-                # Transient network/upstream failures are common during
-                # OS patch reboots and brief upstream outages. Retry a
-                # handful of times before declaring the artifact dead.
-                if self.defer_with_backoff(reason=msg):
+            # If the artifact has previously downloaded successfully, then
+            # a source which cannot be reached -- a transient upstream
+            # outage, or a source which has been removed entirely -- must
+            # not break instances we can serve from the cached version.
+            # Falling back means actually fetching that version, which
+            # might not be local to this node, not just declaring it
+            # usable (issue 3603).
+            if a.state.value not in [Artifact.STATE_INITIAL,
+                                     Artifact.STATE_CREATING]:
+                try:
+                    images.ImageFetchHelper(inst, a).get_image(
+                        cached_only=True)
                     a.add_event(
                         EVENT_TYPE_AUDIT,
-                        'transient fetch failure, will retry',
+                        'updating image failed, using already cached version',
+                        extra={'message': msg})
+                    return
+                except Exception as cache_error:
+                    a.add_event(
+                        EVENT_TYPE_AUDIT,
+                        ('updating image failed and the cached version was '
+                         'not usable'),
                         extra={
                             'message': msg,
-                            'defer_count': self.current_defer_count + 1
+                            'cache_error': str(cache_error)
                         })
-                    return
 
-                a.state = Artifact.STATE_ERROR
-                a.error = msg
-                if inst:
-                    inst.enqueue_delete_due_error(
-                        f'failed to fetch image: {msg}')
-
-                # The op might not be in executing if it has been aborted
-                # because the instance start request which created it has been
-                # aborted.
-                if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
-                    self.state = ArtifactFetchOp.STATE_ERROR
-
-            else:
+            # Transient network/upstream failures are common during
+            # OS patch reboots and brief upstream outages. Retry a
+            # handful of times before declaring the artifact dead.
+            if self.defer_with_backoff(reason=msg):
                 a.add_event(
                     EVENT_TYPE_AUDIT,
-                    'updating image failed, using already cached version',
-                    extra={'message': msg})
+                    'transient fetch failure, will retry',
+                    extra={
+                        'message': msg,
+                        'defer_count': self.current_defer_count + 1
+                    })
+                return
+
+            # As with the replication failures above, an unreachable
+            # source does not make an artifact with a good version bad.
+            if a.state.value in [Artifact.STATE_INITIAL,
+                                 Artifact.STATE_CREATING]:
+                a.state = Artifact.STATE_ERROR
+                a.error = msg
+
+            if inst:
+                inst.enqueue_delete_due_error(
+                    f'failed to fetch image: {msg}')
+
+            # The op might not be in executing if it has been aborted
+            # because the instance start request which created it has been
+            # aborted.
+            if self.state.value == ArtifactFetchOp.STATE_EXECUTING:
+                self.state = ArtifactFetchOp.STATE_ERROR

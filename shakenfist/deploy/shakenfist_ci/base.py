@@ -12,6 +12,7 @@ import sys
 import time
 
 import testtools
+from testtools import content
 from prettytable import PrettyTable
 from shakenfist_client import apiclient
 
@@ -630,6 +631,29 @@ class BaseTestCase(testtools.TestCase):
             return f'did not finish within {ceiling} seconds overall'
         return None
 
+    def _instance_error_detail(self, instance_uuid, i):
+        """Capture why an instance errored, before raising StartException.
+
+        Issue 3603: raising as soon as an instance showed state error
+        reported nothing about why, which left one-off CI failures
+        undiagnosable. Attach the instance view and its event log to the
+        test result, and return the error message for the exception text.
+        """
+        self.addDetail(
+            f'errored instance {instance_uuid}',
+            content.text_content(json.dumps(i, indent=4, sort_keys=True)))
+        try:
+            events = self.system_client.get_instance_events(instance_uuid)
+            self.addDetail(
+                f'errored instance {instance_uuid} events',
+                content.text_content(json.dumps(
+                    events, indent=4, sort_keys=True, default=str)))
+        except Exception as e:
+            self.addDetail(
+                f'errored instance {instance_uuid} events',
+                content.text_content(f'unavailable: {e}'))
+        return i.get('error_message')
+
     # An instance has to be created, boot, and have its in-guest agent report
     # in, so the window here is generous and the ceiling more so.
     AGENT_STATE_PROGRESS_TIMEOUT = 500
@@ -648,9 +672,10 @@ class BaseTestCase(testtools.TestCase):
         while True:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
+                error_message = self._instance_error_detail(instance_uuid, i)
                 raise StartException(
                     f'Instance {instance_uuid} failed to start (marked as '
-                    'error state)')
+                    f'error state): {error_message}')
 
             if i['agent_state'] and i['agent_state'].startswith(desired):
                 return
@@ -688,9 +713,10 @@ class BaseTestCase(testtools.TestCase):
         while True:
             i = self.system_client.get_instance(instance_uuid)
             if i['state'] == 'error':
+                error_message = self._instance_error_detail(instance_uuid, i)
                 raise StartException(
                     f'Instance {instance_uuid} failed to start (marked as '
-                    'error state)')
+                    f'error state): {error_message}')
 
             if i['state'] == 'created':
                 # Issue 3897: an instance allocated the same port for two of
