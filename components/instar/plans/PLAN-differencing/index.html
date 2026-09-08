@@ -14202,9 +14202,25 @@ built from <code>d59cc40</code> and qemu-img 10.0.11:</p>
 <code>disk_type = 4</code> in its footer but its parent unique id, parent
 unicode name and all eight parent locator entries are zero: it is
 a type marker, not a differencing disk, and its companion
-<code>vhd-diff-base.vhd</code> is not referenced by it. Nothing in
-<code>instar-testdata/scripts/</code> generates them. There is no VHDX
+<code>vhd-diff-base.vhd</code> is not referenced by it. There is no VHDX
 differencing fixture at all.</p>
+<p>The generator is not missing, though — phase 2's survey found it
+in the other repository from where the master plan looked for it.
+<code>scripts/create-vhd-testdata.sh</code> <strong>in instar</strong> produces both
+existing VHD fixtures, writing into
+<code>../instar-testdata/custom/format-coverage</code> by default, and its
+comment at <code>:150-152</code> states the strategy outright: qemu-img
+cannot create differencing VHDs, so it patches <code>disk_type</code> from 3
+to 4 in a dynamic image and recomputes the checksums. The type
+marker was deliberate, and the manifest entry
+(<code>tests/manifest.json:197-206</code>) describes it honestly as "patched
+from dynamic for type acceptance testing". Two tests depend on it
+(<code>tests/test_check_formats.py:1877</code>, <code>:1900</code>), so phase 2
+supplements rather than replaces it.</p>
+<p>The house pattern this reveals — generator in instar, binaries in
+instar-testdata, registration in instar's <code>tests/manifest.json</code> —
+means phase 2 spans both repositories and lands as two pull
+requests, and its <code>Merged</code> cell carries a record from each.</p>
 <p>Related planned work lives in the testdata repository:
 <code>instar-testdata/docs/plans/PLAN-extra-coverage.md</code> priority 7
 proposes five adversarial parent-locator fixtures (absolute
@@ -14423,13 +14439,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <td>1. Semantics pin, oracle selection, and the doc correction</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-01-pin/">PLAN-differencing-phase-01-pin.md</a></td>
 <td>Complete</td>
-<td></td>
+<td><code>8b81a0f</code> (#549)</td>
 </tr>
 <tr>
-<td>2. Real differencing fixtures, happy-path and adversarial (instar-testdata)</td>
-<td>PLAN-differencing-phase-02-fixtures.md</td>
-<td>Not started</td>
-<td></td>
+<td>2. Real differencing fixtures, happy-path and adversarial (instar + instar-testdata)</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-02-fixtures/">PLAN-differencing-phase-02-fixtures.md</a></td>
+<td>Complete</td>
+<td>instar-testdata <code>77f5f589f0</code> + <code>623a30866f</code> (direct to <code>main</code>); instar: pending</td>
 </tr>
 <tr>
 <td>3. Parent-locator parsing in <code>crates/vhd</code> and <code>crates/vhdx</code></td>
