@@ -108,9 +108,27 @@ The fixtures are not usable as they stand.
 `disk_type = 4` in its footer but its parent unique id, parent
 unicode name and all eight parent locator entries are zero: it is
 a type marker, not a differencing disk, and its companion
-`vhd-diff-base.vhd` is not referenced by it. Nothing in
-`instar-testdata/scripts/` generates them. There is no VHDX
+`vhd-diff-base.vhd` is not referenced by it. There is no VHDX
 differencing fixture at all.
+
+The generator is not missing, though — phase 2's survey found it
+in the other repository from where the master plan looked for it.
+`scripts/create-vhd-testdata.sh` **in instar** produces both
+existing VHD fixtures, writing into
+`../instar-testdata/custom/format-coverage` by default, and its
+comment at `:150-152` states the strategy outright: qemu-img
+cannot create differencing VHDs, so it patches `disk_type` from 3
+to 4 in a dynamic image and recomputes the checksums. The type
+marker was deliberate, and the manifest entry
+(`tests/manifest.json:197-206`) describes it honestly as "patched
+from dynamic for type acceptance testing". Two tests depend on it
+(`tests/test_check_formats.py:1877`, `:1900`), so phase 2
+supplements rather than replaces it.
+
+The house pattern this reveals — generator in instar, binaries in
+instar-testdata, registration in instar's `tests/manifest.json` —
+means phase 2 spans both repositories and lands as two pull
+requests, and its `Merged` cell carries a record from each.
 
 Related planned work lives in the testdata repository:
 `instar-testdata/docs/plans/PLAN-extra-coverage.md` priority 7
@@ -326,8 +344,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Semantics pin, oracle selection, and the doc correction | [PLAN-differencing-phase-01-pin.md](/components/instar/plans/PLAN-differencing-phase-01-pin/) | Complete | |
-| 2. Real differencing fixtures, happy-path and adversarial (instar-testdata) | PLAN-differencing-phase-02-fixtures.md | Not started | |
+| 1. Semantics pin, oracle selection, and the doc correction | [PLAN-differencing-phase-01-pin.md](/components/instar/plans/PLAN-differencing-phase-01-pin/) | Complete | `8b81a0f` (#549) |
+| 2. Real differencing fixtures, happy-path and adversarial (instar + instar-testdata) | [PLAN-differencing-phase-02-fixtures.md](/components/instar/plans/PLAN-differencing-phase-02-fixtures/) | Complete | instar-testdata `77f5f589f0` + `623a30866f` (direct to `main`); instar: pending |
 | 3. Parent-locator parsing in `crates/vhd` and `crates/vhdx` | PLAN-differencing-phase-03-parse.md | Not started | |
 | 4. Read-side policy: close the silent parent-ignoring read | PLAN-differencing-phase-04-read-policy.md | Not started | |
 | 5. `plan_vhd` differencing emitter | PLAN-differencing-phase-05-vhd-emitter.md | Not started | |
