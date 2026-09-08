@@ -134,6 +134,17 @@ def _record_exception(sender, exception, **extra):
 got_request_exception.connect(_record_exception, app)
 
 
+# The failure to resolve is logged at most once per worker. Resolution
+# itself is still retried on every request, because a node which is
+# missing from the database now may be present later -- but the log
+# line is not news a second time, and repeating it per request is how a
+# genuinely unresolvable worker buries every other line in its journal.
+# It buried the unit tests too: a single test module emitted six
+# thousand copies of this warning, none of which said anything the
+# first one did not.
+_node_uuid_warning_emitted = False
+
+
 @app.before_request
 def resolve_node_uuid():
     """Resolve config.NODE_UUID if not already set.
@@ -142,6 +153,8 @@ def resolve_node_uuid():
     populated by _resolve_node_uuid(). We resolve it lazily on the first
     request instead.
     """
+    global _node_uuid_warning_emitted
+
     # Health probes must never touch the database. On a configured node
     # NODE_UUID is already set so this is a no-op anyway, but short-circuit
     # explicitly so the "a /readyz burst makes zero DB calls" guarantee holds
@@ -159,7 +172,8 @@ def resolve_node_uuid():
         config.NODE_UUID = node_uuid
         LOG.with_fields({'node_uuid': node_uuid}).info(
             'Resolved node UUID in API worker')
-    else:
+    elif not _node_uuid_warning_emitted:
+        _node_uuid_warning_emitted = True
         LOG.warning('Failed to resolve node UUID in API worker')
 
 

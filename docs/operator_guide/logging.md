@@ -276,6 +276,25 @@ requires the query to find *that* before it will assert that
 nothing else matched. A detector which has never been observed
 firing is not evidence of anything.
 
+## Conditions logged once per worker
+
+A few warnings describe a condition of the process rather than of
+a request, and those are logged at most once for the lifetime of
+that process. `Failed to resolve node UUID in API worker` is the
+one you are most likely to meet: an `sf-api` gunicorn worker
+resolves this node's UUID lazily on its first non-probe request,
+from the persisted UUID file or from the node's FQDN in the
+database, and warns if neither answers.
+
+Seeing that line once does **not** mean the condition has since
+cleared. The worker keeps retrying on every subsequent request --
+a node absent from the database now may be present later -- but
+it does not repeat the warning, because a per-request copy of it
+would bury every other line the worker emits. Confirm the
+condition is resolved by looking for the matching
+`Resolved node UUID in API worker` line (which carries the
+`node_uuid` field), not by the absence of further warnings.
+
 ## Events vs logs
 
 Shaken Fist has two structured-record streams, and they are not
