@@ -133,7 +133,7 @@ publishes no releases and so has no release branch for `develop` to
 integrate against.
 
 All scoping and exemptions live in `REPO_OVERRIDES` in
-`scripts/audit-check.py`, so they are reported as N/A with the reason
+`scripts/audit/repo.py`, so they are reported as N/A with the reason
 attached rather than quietly disappearing from the table.
 
 ## Audit index

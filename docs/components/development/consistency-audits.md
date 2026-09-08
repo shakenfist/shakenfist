@@ -21,7 +21,7 @@ A criterion exists in two places, and both have to agree.
 | Layer | Lives in | Audience |
 |-------|----------|----------|
 | Specification | `docs/audits/<check-id>.md` | Humans and agents. Why the rule exists, what is checked, what it does not cover, which template implements it, and a link to its section of the compliance page. Hand-written throughout. |
-| Check | `scripts/audit-check.py` | The runner. A function returning `pass`, `fail` or `not_applicable` with a reason. |
+| Check | `scripts/audit/checks/<family>.py` | The runner. A `Check` subclass returning `self.ok()`, `self.fail()` or `self.skip()` with a reason, registered in `CHECKS` in `scripts/audit/registry.py`. `scripts/audit-check.py` is the entry point that runs the schedule and prints the results. |
 
 The split is deliberate. The specification is where a rule explains
 itself, and it is what an agent or a person reads when they pick up an
@@ -213,7 +213,7 @@ python3 scripts/audit-check.py --repo-path ~/src/shakenfist/<repo> \
 
 Repository properties that cannot be detected from a clone -- docs-only
 repositories, repositories where Python is incidental -- are declared in
-`REPO_OVERRIDES` in `scripts/audit-check.py`.
+`REPO_OVERRIDES` in `scripts/audit/repo.py`.
 
 A repository that should be audited for some checks but not others
 takes an `only_checks` list in the same place. `private-ci` is the

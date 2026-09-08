@@ -64,15 +64,22 @@ For a repository the check names as undecided, one of:
   decision with a reason attached rather than an omission.
 
 For a name that is not in the listing, the check asks GitHub about it
-directly rather than assuming, and says which of four things happened:
+directly rather than assuming, and says which of five things happened:
 
 - **It no longer exists** -- the API answered 404. The entry goes with
   it, subject to the caveat below.
-- **It was renamed.** The finding names the new name; write that in
-  the matrix or the list. The API follows a rename redirect while
-  issue listing and search do not, which is why a stale name is worth
-  fixing rather than tolerating: `audit-manage-issues.py` has its own
-  warning for the same trap.
+- **It was renamed inside the organisation.** The finding names the
+  new name; write that in the matrix or the list. The API follows a
+  rename redirect while issue listing and search do not, which is why
+  a stale name is worth fixing rather than tolerating:
+  `audit-manage-issues.py` has its own warning for the same trap.
+- **It moved out of the organisation.** A transfer redirects exactly
+  as a rename does, but the entry cannot be edited to follow it. The
+  audit clones `shakenfist/${{ matrix.repo }}`, so a repository under
+  another owner has no name that fits in the matrix, and the excluded
+  list is a list of repositories here. The finding says to remove the
+  entry, which is the only edit available -- and the two are told
+  apart so that nobody is asked for one that is not.
 - **It exists but the listing did not return it.** Then the lists are
   right and the listing is short. Nothing about the scope is wrong,
   and the finding says to check the token, because a listing that
