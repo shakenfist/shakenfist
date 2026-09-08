@@ -13865,6 +13865,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#the-issue-link-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The issue link check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#superseded-merge-groups-are-cancelled" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14536,6 +14547,44 @@ a required check.</p>
 <p>A failed <code>Can merge</code> ejects the pull request from the queue, and
 <a href="#merge-failure-triage">merge failure triage</a> then classifies the failure
 automatically.</p>
+<h3 id="the-issue-link-check">The issue link check<a class="headerlink" href="#the-issue-link-check" title="Permanent link">&para;</a></h3>
+<p><code>Can enqueue</code> also needs the <code>Issue links</code> job, which calls the reusable
+<code>issue-link-check.yml</code> in <code>shakenfist/actions</code>. It compares what a pull
+request claims to fix -- its branch name, its description, and its commit
+messages -- against <code>closingIssuesReferences</code>, which is GitHub's own parse
+of what will actually close, and fails when the two disagree.</p>
+<p><strong>The closing stanza has to be in the pull request description.</strong> Two
+things that look like they would work do not:</p>
+<ul>
+<li>A stanza wrapped in backticks is a code span. GitHub renders it and
+  parses nothing.</li>
+<li>A stanza in a <em>commit message</em> closes nothing on this repository. GitHub
+  acts on commit-message stanzas only for commits pushed to the default
+  branch in the ordinary way, and the merge queue advances <code>develop</code> from
+  its own staging ref. Putting the stanza in the commit message as well is
+  still worth doing -- it is how <code>git log</code> records why a change was made --
+  but it is traceability, not closure.</li>
+</ul>
+<p>So a description needs a plain, unbackticked <code>Fixes #NNNN</code> on a line of its
+own. <code>issue-fix.yml</code> already emits one: the workflow appends its own
+<code>Fixes #${ISSUE_NUMBER}</code> as the <em>first</em> line of the body, after
+<code>tools/neutralise-pr-body.sh</code> has run over the model's prose, so bot-authored
+fix pull requests satisfy this gate as they stand. Do not "fix" a failure
+here by loosening the branch-name pattern in the checker.</p>
+<p>Where a pull request is deliberately only part of the work on an issue, opt
+out with a line of the form <code>X-No-Autoclose: #NNNN</code> in the description.</p>
+<p>The job also prints the issues GitHub <em>will</em> close that nobody asked for --
+the other direction of the same defect, and how a closing keyword sitting
+beside a reference in ordinary prose reveals itself before it shuts a live
+bug. That direction is reported and never enforced: real descriptions carry
+headings and table cells of the same shape, and a check that cried wolf on
+those would be ignored within a week.</p>
+<p><strong>Editing the description does not re-run the check.</strong> <code>functional-tests.yml</code>
+declares no <code>types:</code> on its <code>pull_request</code> trigger, so it fires on <code>opened</code>,
+<code>synchronize</code> and <code>reopened</code> only. After correcting a description, re-run the
+failed jobs from the Actions tab (or push a commit) to clear the required
+check. Adding <code>edited</code> to the trigger is not the fix -- it would re-run the
+entire functional matrix on every description tweak.</p>
 <h3 id="superseded-merge-groups-are-cancelled">Superseded merge groups are cancelled<a class="headerlink" href="#superseded-merge-groups-are-cancelled" title="Permanent link">&para;</a></h3>
 <p>Every job that can run in the queue and holds a scarce runner carries a
 <code>concurrency:</code> block whose key is merge-group aware — the four
@@ -14935,6 +14984,11 @@ model having complied. Fenced code is passed through untouched --
 GitHub does not linkify inside a fence, and a description quoting a
 decorator or an email address is a normal description.
 <code>shakenfist/tests/test_neutralise_pr_body.py</code> covers both halves.</p>
+<p>Neutralising the model's prose does not leave the draft unable to close
+its issue. The workflow appends its own <code>Fixes #${ISSUE_NUMBER}</code> as the
+first line of the body <em>after</em> this pass, above the model text and
+outside any fence the model may have left open, which is what satisfies
+<a href="#the-issue-link-check">the issue link check</a>.</p>
 <p><code>issue-fix.yml</code> runs its fix attempt through
 <code>tools/claude-model-fallback.sh</code>, which takes a comma-separated
 preference list (<code>--models</code>, default <code>claude-fable-5,claude-opus-5</code>) and
