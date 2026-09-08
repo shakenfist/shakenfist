@@ -1567,14 +1567,28 @@ class Instance(dbowo):
             node_uuid=node_uuid)
 
         if not result['success']:
-            self.log.with_fields({
-                'node': node_uuid,
-                'error': result['error']}).error(
+            # An instance on its way to state deleted tolerates a failed
+            # release: the reconciler's ground truth excludes deleted
+            # instances, so the counters are recomputed within one pass,
+            # and hard_delete() releases again as a backstop. An instance
+            # whose state ends in -error goes to state error instead
+            # (_delete_globally()'s final branch), stays in ground truth,
+            # and keeps its placement row until hard delete -- only that
+            # case is a genuine error.
+            extra = {'node': node_uuid, 'error': result['error']}
+            if self.state.value.endswith(f'-{self.STATE_ERROR}'):
+                self.log.with_fields(extra).error(
                     'Instance placement release failed')
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'instance placement release failed',
-                extra={'node': node_uuid, 'error': result['error']},
-                log_as_error=True)
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance placement release failed',
+                    extra=extra, log_as_error=True)
+            else:
+                self.log.with_fields(extra).warning(
+                    'Instance placement release failed; capacity will be '
+                    'recomputed by the next reconciler pass')
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance placement release failed',
+                    extra=extra)
             return result
 
         if result['clamped']:
