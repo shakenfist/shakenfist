@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-07T11:54:31.870844+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-08T10:52:37.746658+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -735,7 +735,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#43 |
+| actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | compliant | - |
 | client-python-k3s | N/A | - |
@@ -743,7 +743,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#556 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
@@ -758,7 +758,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 
 Details for non-compliant projects:
 
-- **actions** (Status): 4 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): .github/workflows/smoke-cluster.yml:268 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:14 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:35 -> docs/plans/PLAN-ci-cloud-sizing-phase-02-baseline.md, tools/ci_headroom_launch.sh:13 -> docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md
+- **instar** (Status): 2 of 204 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): scripts/create-vhd-testdata.sh:46 -> docs/plans/PLAN-extra-coverage.md, scripts/create-vhd-testdata.sh:463 -> instar-testdata/docs/plans/PLAN-extra-coverage.md
 - **visual-digest-rust** (Status): 1 of 1 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist-visual-digest/tests/qr.rs:7 -> PLAN-test-harness-phase-01-digest-crate.md
 
 ## plan-template
@@ -1075,8 +1075,8 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 0 of 98 in-scope files reviewed at HEAD; 98 need review (threshold 5)
-- **development** (Status): 169 of 176 in-scope files reviewed at HEAD; 7 need review (threshold 5)
+- **actions** (Status): 63 of 98 in-scope files reviewed at HEAD; 35 need review (threshold 5)
+- **development** (Status): 161 of 179 in-scope files reviewed at HEAD; 18 need review (threshold 5)
 - **kerbside** (Status): 117 of 229 in-scope files reviewed at HEAD; 112 need review (threshold 5)
 - **ryll** (Status): 83 of 195 in-scope files reviewed at HEAD; 112 need review (threshold 5)
 
@@ -1256,7 +1256,7 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | non-compliant | shakenfist/private-ci#23 |
+| private-ci | compliant | - |
 | ryll | non-compliant | shakenfist/ryll#349 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
@@ -1266,7 +1266,6 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 Details for non-compliant projects:
 
 - **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 - **ryll** (Status): ryll/src/web/assets/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency

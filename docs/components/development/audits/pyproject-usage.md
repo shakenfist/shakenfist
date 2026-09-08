@@ -19,7 +19,7 @@ archive with Python helper scripts, not a Python project). Rust
 projects need no declaration -- the check reads a `Cargo.toml` at the
 root of the clone and exempts the repository on that alone. The rest
 are declared `not_python` or `is_docs_only` in `REPO_OVERRIDES` in
-`scripts/audit-check.py`.
+`scripts/audit/repo.py`.
 
 Note that `requirements.txt` / `test-requirements.txt` removal is
 covered by the [release process audit](/components/development/audits/release-process/), and the
