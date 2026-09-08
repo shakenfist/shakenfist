@@ -195,6 +195,7 @@ class FakeGitHub:
         self.jobs = jobs
         self.zips = zips
         self.downloaded = []
+        self.paths = []
 
     def json(self, path):
         self.calls += 1
@@ -202,6 +203,7 @@ class FakeGitHub:
 
     def paginate(self, path, key, per_page=100, pages=None):
         self.calls += 1
+        self.paths.append(path)
         if path.startswith('actions/workflows/'):
             yield list(self.runs)
             return
@@ -553,10 +555,7 @@ class RunListingTestCase(HarvestTestCase):
             runs.append(run)
         return FakeGitHub(runs, {}, {}, {})
 
-    def test_since_stops_at_the_window_edge(self):
-        # Newest first, so the first run before the window means every
-        # remaining run is too -- which is what keeps the harvest from
-        # walking the whole of the repository's history.
+    def test_since_filters_a_newest_first_listing(self):
         github = self._listing([
             '2026-09-02T00:00:00Z', '2026-08-31T00:00:00Z',
             '2026-08-29T00:00:00Z', '2026-08-28T00:00:00Z'])
@@ -564,11 +563,43 @@ class RunListingTestCase(HarvestTestCase):
             github, since=harvest.parse_since('2026-08-30'))
         self.assertEqual([1000, 1001], [r['id'] for r in runs])
 
+    def test_since_filters_an_oldest_first_listing_too(self):
+        # This is the regression. The listing is not documented as ordered
+        # and on 2026-09-08 it arrived oldest first, whereupon the old
+        # early-exit read the first run, found it before the window, and
+        # returned nothing at all for a window with sixteen runs in it.
+        github = self._listing([
+            '2026-08-28T00:00:00Z', '2026-08-29T00:00:00Z',
+            '2026-08-31T00:00:00Z', '2026-09-02T00:00:00Z'])
+        runs = harvest.list_runs(
+            github, since=harvest.parse_since('2026-08-30'))
+        self.assertEqual([1003, 1002], [r['id'] for r in runs])
+
+    def test_the_window_is_pushed_down_to_the_api(self):
+        # Client-side filtering alone would walk the whole of the
+        # repository's history now that nothing stops early.
+        github = self._listing(['2026-09-02T00:00:00Z'])
+        harvest.list_runs(github, since=harvest.parse_since('2026-08-30'))
+        self.assertIn('created=%3E%3D2026-08-30T00%3A00%3A00Z',
+                      github.paths[0])
+
     def test_limit_caps_the_run_count(self):
         github = self._listing([
             '2026-09-02T00:00:00Z', '2026-09-01T00:00:00Z',
             '2026-08-31T00:00:00Z'])
         runs = harvest.list_runs(github, limit=2)
+        self.assertEqual([1000, 1001], [r['id'] for r in runs])
+
+    def test_limit_takes_the_newest_whatever_the_order(self):
+        github = self._listing([
+            '2026-08-31T00:00:00Z', '2026-09-02T00:00:00Z',
+            '2026-09-01T00:00:00Z'])
+        runs = harvest.list_runs(github, limit=2)
+        self.assertEqual([1001, 1002], [r['id'] for r in runs])
+
+    def test_a_run_with_no_creation_time_is_kept_not_dropped(self):
+        github = self._listing(['2026-09-02T00:00:00Z', None])
+        runs = harvest.list_runs(github, since=harvest.parse_since('2026-08-30'))
         self.assertEqual([1000, 1001], [r['id'] for r in runs])
 
     def test_a_naive_since_is_read_as_utc(self):

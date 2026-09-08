@@ -211,6 +211,16 @@ new job is. A bundle with no series is written out with a reason
 instead of being dropped, because a harvest that silently shrinks its
 own window is the failure mode that looks most like success.
 
+That last principle has been tested once. `--since` is applied as a
+`created=>=` filter on the API call *and* again on the returned runs,
+and nothing in the tool infers anything from the order the listing
+arrives in -- an earlier version stopped at the first out-of-window
+run on the belief that the runs API returns newest first, which it
+does not promise and on at least one occasion did not do, so a harvest
+of a perfectly good window enumerated nothing and exited zero. If you
+add another listing to this tool, filter it server side and sort what
+comes back.
+
 ### The series record format
 
 Phase 2 parses `headroom.jsonl` as a contract, so treat the shape

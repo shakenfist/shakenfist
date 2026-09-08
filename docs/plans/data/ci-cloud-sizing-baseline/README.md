@@ -8,6 +8,16 @@ step 2d of
 that is described as measured is traceable to a record in
 `records.jsonl`.
 
+There are **two** files here, with the same record schema and different
+jobs to do. `records.jsonl` is the baseline: the retrospective window,
+and the source of every distribution the plan reasons about.
+`records-addendum.jsonl` is step 2g's confirmation window, harvested
+after the two instrument fixes this phase made had merged, and it exists
+to close the two things the baseline could not see. It is a
+classification, not a second baseline, and no distribution should be
+recomputed from it -- it is an eighth the size and covers a day and a
+half.
+
 The bundles this was computed from expire ninety days after their
 merge run, so this directory is the only durable copy. The raw series
 and census are deliberately *not* committed -- D22 -- only the per-job
@@ -117,19 +127,27 @@ Inside `summary`:
 | `guard` | The capacity guard census. In this window its `state` is `not_collected` on every record -- see below. |
 | `verdict` | The D3 band verdict against the provisional 0.35/0.70 bounds, and the per-node maximum D21 adds. |
 
-## One thing this dataset does not know
+## What this dataset does not know
 
-It is a blind spot of the retrospective window, and it is not zero.
+**Nothing, now.** Both entries that stood here are answered, one by
+step 2f from the shape of the baseline itself and one by step 2g's
+confirmation window. They are kept below because a reader of
+`records.jsonl` alone will meet both and should not have to rediscover
+them.
 
-**Capacity guard refusals are unknown.** The census filter in
-`shakenfist/actions` matches the scheduler's per-candidate stage
-events and nothing else, so neither `instance placement denied` nor
-`placement admitted over namespace capacity claim` was ever collected.
+### Resolved: capacity guard refusals
+
 `summary.guard.state` reads `not_collected` on all 204 summarised
-records. That is a fact about the query, not about the cluster. Step
-2e fixes the filter and step 2g re-measures; until then, no count of
-guard refusals over this window exists, and none should be inferred
-from the absence of one.
+records in `records.jsonl`, and that is a fact about the LogQL query,
+not about the cluster: the census filter in `shakenfist/actions`
+matched the scheduler's per-candidate stage events and neither
+`instance placement denied` nor `placement admitted over namespace
+capacity claim`. **No count of guard refusals over the baseline window
+exists, and none may be inferred from the absence of one.**
+
+Step 2e widened the filter and step 2g re-measured. In
+`records-addendum.jsonl` the state is `collected` on all 32 records,
+and what it holds is in *The confirmation window* below.
 
 ### Resolved: the ledger-unreadable samples
 
@@ -153,8 +171,103 @@ That warm-up window is itself the subject of the defect step 2f
 drafted -- `scheduler_node_capacity` has no rows for the first 135 to
 210 seconds of a cluster's life, so admission is unguarded throughout
 it. See *A node can record twice its own ledger, and sizing would hide
-it* in the master plan. Step 2g now confirms this rather than deciding
-it.
+it* in the master plan, and **#4087**.
+
+**Step 2g confirmed it directly.** `/admin/resources` now publishes
+`total.capacity_degraded`, and across all 3,359 samples of the
+confirmation window the flag is present and **false in every one** --
+including in all 367 of the samples whose capacity rows read as absent.
+A failed capacity read would have set it. The prefix pattern also
+repeats exactly: contiguous from sample zero in all 32 job-runs, 9 to
+14 samples, spanning 120 to 195 seconds between its first and last
+sample, so 135 to 210 seconds of wall clock at the 15 second interval.
+That is the same figure #4087 was filed with, measured a second time
+from a different window with an instrument that can now tell a failing
+read from an empty table.
+
+## The confirmation window
+
+`records-addendum.jsonl`, harvested by step 2g on 2026-09-08.
+
+| | |
+|---|---|
+| Why | Close the baseline's two blind spots against runs that used the fixed instrument |
+| Nominal window | runs created at or after **2026-09-07** |
+| Effective window | **2026-09-07T10:25:26Z** to **2026-09-08T01:55:33Z** |
+| Merge runs asked for | 10 (`--limit`) |
+| Merge runs contributing a bundle | 8 (two had every functional job skipped by `Check paths`) |
+| Records | **32**, all four instrumented jobs in every run |
+| Records carrying a usable series | **32** |
+| Distinct head SHAs | 8 |
+
+Both fixes were live throughout: step 2a's `capacity_degraded` merged
+to `develop` at 2026-09-06T06:17Z and step 2e's census filter merged to
+`shakenfist/actions` at 2026-09-06T00:09Z.
+
+```
+python3 tools/ci_headroom_harvest.py --since 2026-09-07 --limit 10 \
+    --cache-dir /var/tmp/ci-headroom-harvest-cache \
+    --output records-addendum.jsonl
+```
+
+### The guard census, which the baseline could not see
+
+**3,480 denials over 32 job-runs** -- a median of 121 per
+`slim-primary` job-run and 134.5 per `slim-tier` one. The CPU
+pre-filter, over the same 32 runs, dropped 283 candidates in 3,862
+evaluations and aborted 11 times. The composition of the denials is
+almost entirely one thing:
+
+| | count |
+|---|---|
+| Denials whose sole exceeded dimension is `demand` | 3,477 |
+| Denials whose sole exceeded dimension is `cpus` | 3 (one at the `node` stage, two at `cluster`) |
+| ... of the demand denials, `demand_measured_alone` | 1,789 |
+| ... `demand_estimate_tipped` | 1,688 |
+| `malformed`, `unenforced`, `empty_dimensions`, `nothing_exceeded`, `demand_unsplit` | 0 each |
+| Unrecognised stages, unrecognised dimensions | none |
+
+**A denial is not a failed create.** Both placement walks
+(`external_api/instance.py` and `operations/node_inst_netdesc_op.py`)
+catch `CapacityAdmissionDenied`, try the next candidate, and -- when
+nothing admitted and every refusal was demand-only, which is what
+3,477 of 3,480 of these are -- re-walk with the demand clause waived.
+So this is overwhelmingly a count of the walk absorbing a refusal, not
+of work the cluster refused.
+
+There were also **24 claim exceedances**, one per namespace across 24
+distinct `ci-claimaccount-*` namespaces, on all three dimensions. Those
+are *admitted* placements reported over an advisory claim
+(`CLAIM_ENFORCEMENT_HARD` is false), never refusals, and they are the
+claims suite exercising exactly the path it was written for.
+
+The widened filter did not cost the census its completeness:
+`summary.census.truncated` is false on all 32 records, which is the
+empirical form of the argument made when the filter was widened.
+
+### What the census still cannot see
+
+Named because it is the same shape of mistake the baseline made once.
+The filter matches the two guard messages and the stage events; it does
+**not** match the two events that say what became of a denial --
+`no candidate admitted and some refused on demand alone, waiving demand
+guard`, and `schedule failed, every candidate refused by capacity
+guard`. So the number of creates that actually failed on the guard
+cannot be derived from this file. It is not zero, and it is not 3,480.
+
+### Comparability with the baseline
+
+Stated so that a reader does not mistake the addendum for a shift.
+Committed-CPU medians land where `records.jsonl` left them: cluster-wide
+p90 fraction 0.333 median on `slim-primary` (n=24, max 0.481) against
+0.296-0.333 per job in the baseline, and 0.792 on `slim-tier` (n=8, max
+0.833) against 0.750. Memory dropped nothing in 3,851 evaluations, so
+D5's narrowing holds. Ledger provenance is zero fallbacks and zero
+missing ledgers over another 13,274 ledgered node-samples, so D7 stays
+closed at zero. Of the 7 job-runs with a `sufficient_idle_cpu` abort,
+**7 failed**, and 7 of the window's 8 job failures had one -- the same
+relationship the baseline found over 204 runs, at a sample size that
+could not have established it alone.
 
 ## Reproducing an analysis over this file
 

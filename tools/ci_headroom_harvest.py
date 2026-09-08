@@ -70,6 +70,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import zipfile
 
 
@@ -270,10 +271,11 @@ class GitHubCLI:
     def paginate(self, path, key, per_page=100, pages=None):
         """Walk a paginated listing, yielding one page's items at a time.
 
-        Pages rather than items because the run listing wants to stop early:
-        runs come back newest first, so once a page's oldest run is before
-        the window there is nothing older worth asking for, and asking
-        anyway would walk the whole of the repository's history.
+        Pages rather than items so that a caller can reason about a whole
+        page at once. Nothing here assumes an order: the run listing used
+        to stop early on the first out-of-window run, on the belief that
+        runs arrive newest first, and that belief turned out to be false --
+        see ``list_runs``, which now bounds its window at the API instead.
         """
         joiner = '&' if '?' in path else '?'
         page = 1
@@ -353,24 +355,53 @@ def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, limit=None):
     ``since`` is inclusive and compared against the run's creation time,
     which is the field D16's window is defined in terms of (the census fix
     merged on 2026-08-30, and runs created before that carry a census which
-    could not have collected the guard events).
+    could not have collected the guard events). It is applied twice, on
+    purpose: as a ``created=>=`` filter on the API call, so that a window
+    never walks the whole of the repository's history, and again here, so
+    that a ``--since`` carrying a time of day is honoured exactly rather
+    than to the day the API filter rounds to.
+
+    **Nothing in here may assume the order the listing arrives in.** The
+    first version of this function did -- it read runs until it met one
+    created before the window and then stopped, documented as "the listing
+    is newest first". On 2026-09-08 the API served this workflow's
+    ``merge_group`` runs *oldest* first, so the very first run was outside
+    any recent window, and step 2g's harvest wrote zero records and exited
+    zero: exactly the silently half-completed harvest this tool's module
+    docstring says it must never be. The window is now bounded at the API
+    and the ordering ``limit`` needs is established here by sorting.
+
+    The cost of that is one listing page which a ``--limit`` alone would
+    once have skipped: the limit is applied after the sort rather than
+    while reading, so a bare ``--limit`` walks the run listing (three
+    pages at the time of writing) before taking its newest few. Pair it
+    with ``--since`` and the API filter makes even that small. Listing
+    pages are metadata; the bundles are what cost anything, and nothing
+    outside the limit is downloaded.
     """
-    runs = []
     path = 'actions/workflows/%s/runs?event=merge_group&status=completed' % workflow
+    if since is not None:
+        path += '&created=%s' % urllib.parse.quote(
+            '>=' + since.strftime('%Y-%m-%dT%H:%M:%SZ'), safe='')
+
+    runs = []
     for page in github.paginate(path, 'workflow_runs'):
-        exhausted = False
         for run in page:
             created = parse_timestamp(run.get('created_at'))
             if since is not None and created is not None and created < since:
-                # The listing is newest first, so the first run before the
-                # window means every remaining run is too.
-                exhausted = True
-                break
+                continue
             runs.append(run)
-            if limit is not None and len(runs) >= limit:
-                return runs
-        if exhausted:
-            break
+
+    # Newest first, whatever order they arrived in. A run with an
+    # unparseable creation time sorts oldest rather than being dropped:
+    # --limit should never be the thing that silently discards a run.
+    runs.sort(key=lambda run: (parse_timestamp(run.get('created_at'))
+                               or datetime.datetime.min.replace(
+                                   tzinfo=datetime.timezone.utc),
+                               run.get('id') or 0),
+              reverse=True)
+    if limit is not None:
+        runs = runs[:limit]
     return runs
 
 
