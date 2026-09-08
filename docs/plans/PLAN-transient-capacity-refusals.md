@@ -341,7 +341,7 @@ Note what bounds the improvement, because an earlier draft of this
 section claimed seconds. The elected loop polls every
 `ELECTED_LOOP_POLL_SECONDS = 5`
 (`shakenfist/daemons/cluster/main.py:63`) but its maintenance body
-sits behind `if now - last_loop_run >= 60` (`:912`), and
+sits behind `if now - last_loop_run >= 60` (`:913`), and
 `_run_due_scheduled_jobs()` is inside that gate (`:918`). Marking
 the job due does not run it any sooner than the next 60 s tick, so
 a check placed inside the gate closes the window to about a
@@ -497,7 +497,7 @@ spelling above is the one to write.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | PLAN-transient-capacity-refusals-phase-01-warm-up.md | Not started |
+| 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Not started |
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | PLAN-transient-capacity-refusals-phase-02-suite-wait.md | Not started |
 | 3. Publish metrics when the running-domain set changes | PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md | Not started |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started |
@@ -533,7 +533,7 @@ existing code is careful about (`rows` is empty for both; only
 
 **The decision this phase owns is where the check runs**, and the
 master plan does not pre-empt it. Inside the elected loop's 60 s
-maintenance gate (`:912`) the check costs nothing new -- it rides
+maintenance gate (`:913`) the check costs nothing new -- it rides
 a pass that already reads the database -- and closes the warm-up
 window to about a minute. Outside the gate, on the
 `ELECTED_LOOP_POLL_SECONDS = 5` poll, it closes the window to
@@ -572,8 +572,9 @@ against it before it is written. That assertion also retires a
 when a node has no capacity row, which is exactly the condition
 this phase makes impossible after start-up. Remove the skip in the
 same change rather than leaving unreachable code behind it. Phase
-1 also comments on #4087 with the finding and reopens it if that
-is the convention the tracker follows for an incomplete fix.
+1 also comments on #4087 with the finding and closes it. The issue
+is still open -- #4106 never closed it -- so there is nothing to
+reopen.
 
 Small, server-side, one file plus tests. Plan at high effort: the
 placement decision above, the interaction with the stability gate
@@ -1014,8 +1015,9 @@ while planning it.
 
 - **#3772** (open, umbrella) -- the refusal this plan is about.
   Stays open until phase 6 has the before-and-after numbers.
-- **#4087** (closed by #4106, incompletely) -- the warm-up window.
-  Phase 1 reopens or comments, and fixes it.
+- **#4087** (open; #4106 attempted it and did not close it) -- the
+  warm-up window. Phase 1 fixes it, comments with what #4106 did and
+  did not cover, and closes it.
 - **#3498, #3602, #3670, #3728, #3749, #3767** (closed into #3772)
   -- the per-test victims. Do not file another; the umbrella exists
   because per-test tracking stopped paying for itself.
