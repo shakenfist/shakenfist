@@ -804,7 +804,9 @@ for why a `SELECT` ahead of the `UPDATE` reintroduces ER_CHECKREAD
 Operator-facing observability is the `scheduler_capacity_*` family of
 prometheus metrics (per-node limit/used/expected-demand gauges, cluster-row
 gauges, and reconcile pass/failure counters, last-success timestamp and
-duration) exported from the cluster daemon's metrics port
+duration, plus `scheduler_capacity_reconcile_forced_total` counting
+passes the elected node forced because a hypervisor had no capacity
+row) exported from the cluster daemon's metrics port
 (`CLUSTER_METRICS_PORT`, default `13007`), plus one structured log line
 per reconcile pass.
 

@@ -332,14 +332,23 @@ The elected cluster node also runs
 `reconcile_scheduler_capacity()` every five minutes. That cadence is
 anchored to a cluster-wide last-run stamp (the
 `SCHEDULED_TASK_LAST_RUN_RECONCILE_SCHEDULER_CAPACITY` key in
-`cluster_config`) rather than to process start, and a newly elected
-maintainer which finds `scheduler_node_capacity` empty runs a pass
-immediately instead of waiting out the cadence. Both exist because
+`cluster_config`) rather than to process start, and the elected
+maintainer's own maintenance pass forces a reconcile as soon as it
+sees an active hypervisor with fresh metrics and no
+`scheduler_node_capacity` row, instead of waiting out the cadence.
+Both exist because
 the reconciler is the only thing which *creates* capacity rows, and a
 node without a row is admitted against nothing at all: a
 process-local five minute timer left every placement in a new
 cluster's first minutes unguarded, and the first pass then recorded
 the resulting over-limit usage on the row it created (issue 4087).
+The check was a one-shot on the election path until
+`PLAN-transient-capacity-refusals` phase 1, which is why it used to
+miss a cold cluster entirely -- election happens seconds after
+start-up, before any hypervisor has published, so the pass it forced
+had nothing to size. See
+[the subsystem internals](subsystem_internals.md) for the predicate
+it applies now.
 One pass is a single
 `ReconcileSchedulerCapacity` RPC which expires stale namespace
 claims, re-derives per-hypervisor limits from the typed

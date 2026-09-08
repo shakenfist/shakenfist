@@ -1055,6 +1055,69 @@ def per_node_max_cpu_fractions(series):
     return maxima
 
 
+def _fully_covered(sample):
+    """Whether every hypervisor in this sample's roster has a capacity row.
+
+    A roster of None -- the sample recorded no roster at all -- cannot
+    confirm anything, so it counts as not covered rather than vacuously
+    true; that mirrors how absences() treats ABSENCE_NO_ROSTER. A
+    hypervisor entirely missing from per_node (stale metrics, an overlong
+    queue, or gone) is likewise not covered: it carries no
+    cpu_committed_row_present at all, let alone one which is true.
+
+    A roster naming no hypervisor at all is vacuously covered. Every real
+    CI topology has at least one, so this edge is not expected to fire; it
+    is handled explicitly rather than left to fall out of the loop by
+    accident.
+    """
+    if sample.roster is None:
+        return False
+    for entry in sample.roster:
+        if not isinstance(entry, dict) or entry.get('is_hypervisor') is not True:
+            continue
+        node = entry.get('uuid')
+        node_sample = sample.nodes.get(node) if node else None
+        if node_sample is None or node_sample.row_present is not True:
+            return False
+    return True
+
+
+def capacity_coverage_record(series):
+    """Time to first full scheduler_node_capacity coverage (D6).
+
+    The offset from the first sample in the series to the first sample in
+    which every hypervisor named in that sample's roster carries
+    cpu_committed_row_present true -- the measurement of how long
+    PLAN-transient-capacity-refusals phase 1's warm-up window actually
+    lasted in this run. Until that sample, at least one hypervisor was
+    admitting placements unguarded (P7).
+
+    ``achieved`` is recorded explicitly rather than left to be inferred from
+    ``seconds`` being None: a series with no usable samples and a series
+    which ran to completion without ever covering every hypervisor both
+    have ``seconds`` None, and printing a zero for either would read as
+    "the window was instant", which is exactly backwards -- the trap this
+    figure exists to avoid.
+    """
+    stamped = sorted(
+        (s for s in series.samples if s.sampled_at is not None),
+        key=lambda s: s.sampled_at)
+
+    record = collections.OrderedDict([
+        ('achieved', False),
+        ('window_start', stamped[0].sampled_at if stamped else None),
+        ('covered_at', None),
+        ('seconds', None),
+    ])
+    for sample in stamped:
+        if _fully_covered(sample):
+            record['achieved'] = True
+            record['covered_at'] = sample.sampled_at
+            record['seconds'] = sample.sampled_at - record['window_start']
+            break
+    return record
+
+
 def series_record(series):
     """What was read out of the series file, and what could not be."""
     stamps = [s.sampled_at for s in series.samples if s.sampled_at is not None]
@@ -1405,6 +1468,7 @@ def build_summary_record(series, census, label=None):
     record['record_version'] = RECORD_VERSION
     record['label'] = label
     record['series'] = series_record(series)
+    record['capacity_coverage'] = capacity_coverage_record(series)
     record['ledger_provenance'] = ledger_provenance_record(series)
     record['cluster'] = cluster_record(series)
     record['per_node'] = per_node_record(series)
@@ -1572,6 +1636,35 @@ def print_series_summary(record):
         print('    That is NOT that the cluster was idle.')
         print('    Those samples are excluded from the committed CPU figures')
         print('    below. Memory is unaffected: it comes from node metrics.')
+
+
+def print_capacity_coverage(record):
+    """Time-to-first-capacity-row (PLAN-transient-capacity-refusals D6).
+
+    The offset from the first sample to the first sample in which every
+    hypervisor in its roster carries a scheduler_node_capacity row -- the
+    window during which at least one hypervisor was admitting placements
+    unguarded (P7). Printed only; nothing in this tool gates on it
+    (ci-cloud-sizing D15).
+    """
+    coverage = record['capacity_coverage']
+    print_heading('Time to first full capacity-row coverage')
+    if coverage['window_start'] is None:
+        print('  No usable samples, so there is nothing to measure.')
+        return
+    if not coverage['achieved']:
+        print('  NEVER OBSERVED: no sample in this series had every')
+        print('  hypervisor in its roster carrying a scheduler_node_capacity')
+        print('  row. Reported as absent rather than as zero -- a zero here')
+        print('  would read as an instant window, which is exactly backwards.')
+        return
+    print('  %s seconds after the first sample (at %s): every hypervisor in'
+          % (fmt(coverage['seconds'], 0), fmt_time(coverage['window_start'])))
+    print('  the roster had a scheduler_node_capacity row by %s.'
+          % fmt_time(coverage['covered_at']))
+    print('  Until then at least one hypervisor was admitting placements')
+    print('  unguarded (P7): every placement onto it failed open because the')
+    print('  capacity reconciler had not sized it yet.')
 
 
 def print_ledger_provenance(record):
@@ -2081,6 +2174,7 @@ def print_report(record):
         print('Label:  %s' % record['label'])
 
     print_series_summary(record)
+    print_capacity_coverage(record)
     if record['series']['samples_usable']:
         print_ledger_provenance(record)
         print_cluster_table(record)

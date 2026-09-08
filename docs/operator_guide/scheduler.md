@@ -306,12 +306,18 @@ it is already placed on, and a node with no capacity row -- one
 mid-upgrade, or one the reconciler declined to size -- is charged
 nothing, because admission will let it through unguarded too. That
 is also true of a cluster whose reconciler has not completed a pass
-yet, where *no* node has a row; the reconcile is scheduled so that
-window is a cluster's first moments rather than its first five
-minutes (see [the database internals
-guide](../developer_guide/database_internals.md)), and an admission
-made inside it says so on the instance's `instance placed without
-capacity guard` event with a `reason` of `never_reconciled`.
+yet, where *no* node has a row: the elected cluster node's
+maintenance pass forces a reconcile as soon as it sees an active
+hypervisor with fresh metrics and no capacity row, so that window
+closes roughly a minute after the hypervisor's metrics become visible
+rather than waiting out the reconciler's five-minute cadence (see
+[the database internals
+guide](../developer_guide/database_internals.md)). That minute is not
+the dominant term -- most of the wait is for the resources daemon to
+publish metrics at all, on its own roughly 60-second cadence, which
+this does not shorten -- and an admission made inside either window
+says so on the instance's `instance placed without capacity guard`
+event with a `reason` of `never_reconciled`.
 
 See [Admission is a guarded capacity
 claim](#admission-is-a-guarded-capacity-claim) for the check that
@@ -765,10 +771,14 @@ tells the whole story:
   MariaDB, which the reply reports back on its `degraded` field. It is
   *not* emitted for an empty table: a cluster the reconciler has not
   reached yet has no rows at all, which is normal and admits
-  unguarded. Admission is unchanged either way, so this marks a
-  decision made with less information rather than a decision made
-  differently. Seeing it repeatedly points at the database tier rather
-  than at the scheduler.
+  unguarded -- and self-limiting, since the elected node forces a
+  reconcile within about a minute of an active hypervisor's metrics
+  becoming visible (see [Admission is a guarded capacity
+  claim](#admission-is-a-guarded-capacity-claim) above). Admission is
+  unchanged either way, so this marks a decision made with less
+  information rather than a decision made differently. Seeing it
+  repeatedly points at the database tier rather than at the
+  scheduler.
 - `schedule at stage affinity_constraints` is the hard constraint
   filter, with a `dropped` map naming which of `require_with_tag` or
   `require_without_tag` ejected each node. It is absent when no hard

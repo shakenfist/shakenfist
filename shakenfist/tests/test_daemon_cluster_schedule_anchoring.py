@@ -242,13 +242,21 @@ class RunInnerAnchorWiringTestCase(base.ShakenFistTestCase):
 
 
 class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
-    """The election-time check that placement is being guarded at all.
+    """The maintenance-pass check that placement is being guarded at all.
 
-    An empty scheduler_node_capacity table means every admission is
-    failing open (P7), which is issue 4087. Anchoring handles the
-    fresh-cluster case by way of a missing stamp; this handles every
-    other way the table can be empty while a stamp says a pass ran
-    recently.
+    A node with no scheduler_node_capacity row has its placements
+    admitted against nothing at all (P7), which is issue 4087.
+    Anchoring handles the fresh-cluster case by way of a missing stamp;
+    this handles every other way a node can end up unguarded while a
+    stamp says a pass ran recently -- an empty table, and a populated
+    table which has no row for a hypervisor that has only just started
+    publishing metrics.
+
+    The predicate matters more than the plumbing: it has to agree with
+    the one _direct_reconcile_scheduler_capacity() applies, because a
+    check which qualifies a node the reconciler will never size forces
+    the five minute job every sixty seconds for the life of the
+    cluster.
     """
 
     def _monitor_with_capacity_job(self):
@@ -261,6 +269,42 @@ class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
         m._capacity_reconcile_job.next_run = (
             datetime.datetime.now() + datetime.timedelta(days=1))
         return m
+
+    def _park(self, m):
+        """Push the job back out of reach and report where it was put."""
+        m._capacity_reconcile_job.next_run = (
+            datetime.datetime.now() + datetime.timedelta(days=1))
+        return m._capacity_reconcile_job.next_run
+
+    def _became_due(self, m):
+        return m._capacity_reconcile_job.next_run <= datetime.datetime.now()
+
+    def _metrics(self, node_uuid, metrics, age=0):
+        return {
+            'node_uuid': node_uuid,
+            'fqdn': f'{node_uuid}.example.com',
+            'timestamp': time.time() - age,
+            'metrics': metrics
+        }
+
+    def _row(self, node_uuid):
+        return {'node_uuid': node_uuid}
+
+    def _patch(self, rows, metrics, active):
+        """Patch the three reads the check makes, for the whole test."""
+        capacity = mock.patch(
+            'shakenfist.daemons.cluster.main.mariadb.'
+            'get_scheduler_node_capacity',
+            return_value=(rows, False))
+        node_metrics = mock.patch(
+            'shakenfist.daemons.cluster.main.mariadb.get_all_node_metrics',
+            return_value=metrics)
+        nodes = mock.patch(
+            'shakenfist.daemons.cluster.main.Nodes',
+            return_value=[mock.MagicMock(uuid=u) for u in active])
+        for patcher in (capacity, node_metrics, nodes):
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     @mock.patch(
         'shakenfist.daemons.cluster.main.mariadb.'
@@ -279,6 +323,27 @@ class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
         'get_scheduler_node_capacity')
     def test_a_populated_table_leaves_the_cadence_alone(self, mock_get):
         mock_get.return_value = ([{'node_uuid': 'a-node'}], False)
+        # The other two reads are mocked so this exercises the path it
+        # names. Without them the metrics read raises immediately (no
+        # MARIADB_HOST in a unit test), the check returns on the
+        # unknown-answer branch, and the assertion below passes without
+        # ever reaching the question of whether a populated table
+        # leaves the cadence alone.
+        metrics = mock.patch(
+            'shakenfist.daemons.cluster.main.mariadb.get_all_node_metrics',
+            return_value=[{
+                'node_uuid': 'a-node',
+                'fqdn': 'a-node.example.com',
+                'timestamp': time.time(),
+                'metrics': {'is_hypervisor': True}
+            }])
+        nodes = mock.patch(
+            'shakenfist.daemons.cluster.main.Nodes',
+            return_value=[mock.MagicMock(uuid='a-node')])
+        for patcher in (metrics, nodes):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
         m = self._monitor_with_capacity_job()
         before = m._capacity_reconcile_job.next_run
 
@@ -321,3 +386,223 @@ class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
         m._force_capacity_reconcile_if_unguarded()
 
         mock_get.assert_not_called()
+
+    def test_a_fresh_hypervisor_with_no_row_forces_the_pass(self):
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics('guarded', {'is_hypervisor': True}),
+                     self._metrics('unguarded', {'is_hypervisor': True})],
+            active=['guarded', 'unguarded'])
+        m = self._monitor_with_capacity_job()
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertTrue(self._became_due(m))
+
+    def test_the_same_unguarded_set_does_not_force_twice(self):
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics('unguarded', {'is_hypervisor': True})],
+            active=['guarded', 'unguarded'])
+        m = self._monitor_with_capacity_job()
+
+        m._force_capacity_reconcile_if_unguarded()
+        self.assertTrue(self._became_due(m))
+
+        # Nothing about the cluster has changed, so a second pass must
+        # leave the cadence alone rather than re-forcing every minute.
+        before = self._park(m)
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    def test_a_changed_unguarded_set_forces_again(self):
+        capacity = mock.patch(
+            'shakenfist.daemons.cluster.main.mariadb.'
+            'get_scheduler_node_capacity',
+            return_value=([self._row('guarded')], False))
+        capacity.start()
+        self.addCleanup(capacity.stop)
+        node_metrics = mock.patch(
+            'shakenfist.daemons.cluster.main.mariadb.get_all_node_metrics')
+        mock_metrics = node_metrics.start()
+        self.addCleanup(node_metrics.stop)
+        nodes = mock.patch(
+            'shakenfist.daemons.cluster.main.Nodes',
+            return_value=[mock.MagicMock(uuid=u)
+                          for u in ('guarded', 'one', 'two')])
+        nodes.start()
+        self.addCleanup(nodes.stop)
+
+        m = self._monitor_with_capacity_job()
+
+        mock_metrics.return_value = [
+            self._metrics('one', {'is_hypervisor': True})]
+        m._force_capacity_reconcile_if_unguarded()
+        self.assertTrue(self._became_due(m))
+
+        self._park(m)
+        mock_metrics.return_value = [
+            self._metrics('one', {'is_hypervisor': True}),
+            self._metrics('two', {'is_hypervisor': True})]
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertTrue(self._became_due(m))
+
+    def test_stale_metrics_do_not_force(self):
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics(
+                'ancient', {'is_hypervisor': True},
+                age=cluster_main.mariadb.RECONCILE_METRICS_MAX_AGE_SECONDS
+                + 60)],
+            active=['guarded', 'ancient'])
+        m = self._monitor_with_capacity_job()
+        before = self._park(m)
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    def test_a_non_hypervisor_does_not_force(self):
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics('storage', {'is_hypervisor': False})],
+            active=['guarded', 'storage'])
+        m = self._monitor_with_capacity_job()
+        before = self._park(m)
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    def test_an_unknown_is_hypervisor_does_not_force(self):
+        # Mid-upgrade, before the resources daemon repopulates the
+        # column, is_hypervisor is absent or NULL. The reconciler counts
+        # such a node as neither a hypervisor nor a non-hypervisor, so
+        # neither does this.
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics('absent', {}),
+                     self._metrics('null', {'is_hypervisor': None})],
+            active=['guarded', 'absent', 'null'])
+        m = self._monitor_with_capacity_job()
+        before = self._park(m)
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    def test_a_phantom_metrics_row_does_not_force(self):
+        # The load regression this check exists to avoid. A node_metrics
+        # row which outlived its node reads as a fresh hypervisor
+        # forever, so a check without the active-node intersection would
+        # force the five minute reconcile every sixty seconds for the
+        # life of the cluster -- and the pass would never create a row
+        # for it, so the condition would never clear.
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics('phantom', {'is_hypervisor': True})],
+            active=['guarded'])
+        m = self._monitor_with_capacity_job()
+        before = self._park(m)
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    @mock.patch('shakenfist.daemons.cluster.main.Nodes')
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.get_all_node_metrics')
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.'
+        'get_scheduler_node_capacity')
+    def test_a_degraded_read_forces_nothing_even_with_a_candidate(
+            self, mock_get, mock_metrics, mock_nodes):
+        # rows is empty and a hypervisor would qualify, but a degraded
+        # read means this process knows nothing about the counters. It
+        # must not read metrics on the strength of a guess either.
+        mock_get.return_value = ([], True)
+        mock_metrics.return_value = [
+            self._metrics('unguarded', {'is_hypervisor': True})]
+        mock_nodes.return_value = [mock.MagicMock(uuid='unguarded')]
+        m = self._monitor_with_capacity_job()
+        before = self._park(m)
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+        mock_metrics.assert_not_called()
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.get_all_node_metrics',
+        side_effect=DatabaseUnavailable('no database'))
+    @mock.patch(
+        'shakenfist.daemons.cluster.main.mariadb.'
+        'get_scheduler_node_capacity')
+    def test_a_failed_metrics_read_leaves_the_cadence_alone(
+            self, mock_get, mock_metrics):
+        mock_get.return_value = ([self._row('guarded')], False)
+        m = self._monitor_with_capacity_job()
+        before = self._park(m)
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+    def test_a_cold_cluster_forces_again_once_metrics_appear(self):
+        # The sequence issue 4087 is actually about. The first pass on a
+        # cold cluster finds an empty table and no hypervisor metrics at
+        # all, so the pass it forces has nothing to size and the table
+        # stays empty. When the first hypervisor finally publishes, that
+        # is a different condition and must force another pass -- if the
+        # empty table alone were the condition, the cluster would wait
+        # out the five minute cadence, which is the defect.
+        capacity = mock.patch(
+            'shakenfist.daemons.cluster.main.mariadb.'
+            'get_scheduler_node_capacity',
+            return_value=([], False))
+        capacity.start()
+        self.addCleanup(capacity.stop)
+        node_metrics = mock.patch(
+            'shakenfist.daemons.cluster.main.mariadb.get_all_node_metrics',
+            return_value=[])
+        mock_metrics = node_metrics.start()
+        self.addCleanup(node_metrics.stop)
+        nodes = mock.patch(
+            'shakenfist.daemons.cluster.main.Nodes',
+            return_value=[mock.MagicMock(uuid='hyp')])
+        nodes.start()
+        self.addCleanup(nodes.stop)
+
+        m = self._monitor_with_capacity_job()
+
+        m._force_capacity_reconcile_if_unguarded()
+        self.assertTrue(self._became_due(m))
+
+        # Still nothing to size, so no second pass.
+        before = self._park(m)
+        m._force_capacity_reconcile_if_unguarded()
+        self.assertEqual(before, m._capacity_reconcile_job.next_run)
+
+        # And now there is.
+        self._park(m)
+        mock_metrics.return_value = [
+            self._metrics('hyp', {'is_hypervisor': True})]
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertTrue(self._became_due(m))
+
+    def test_a_fully_guarded_cluster_forgets_what_it_forced(self):
+        # Once the condition clears the memory must clear too, or the
+        # next occurrence of the same set would never be forced.
+        self._patch(
+            rows=[self._row('guarded')],
+            metrics=[self._metrics('guarded', {'is_hypervisor': True})],
+            active=['guarded'])
+        m = self._monitor_with_capacity_job()
+        m._forced_capacity_reconcile_for = frozenset(['guarded'])
+
+        m._force_capacity_reconcile_if_unguarded()
+
+        self.assertIsNone(m._forced_capacity_reconcile_for)

@@ -129,13 +129,27 @@ class TestNodes(base.BaseNamespacedTestCase):
                 resources, indent=4, sort_keys=True)))
             per_node = resources['per_node'][node['uuid']]
 
-            # A node the capacity reconciler has not written a row for
-            # yet -- a cluster whose first reconcile pass has not run --
-            # is charged nothing because it is guarded by nothing (P7).
-            # There is no ledger to assert against in that window.
-            if not per_node.get('cpu_committed_row_present', True):
-                self.skipTest(
-                    'Node has no scheduler_node_capacity row yet')
+            # A node the capacity reconciler has not written a row for is
+            # admitted unguarded (P7): every placement onto it fails open
+            # and the node's ledger cannot be trusted. Since
+            # PLAN-transient-capacity-refusals phase 1, the elected loop's
+            # maintenance pass forces a reconcile within about a minute of
+            # any hypervisor's metrics becoming fresh
+            # (`_force_capacity_reconcile_if_unguarded()`), and this test
+            # only runs once `tools/ci_wait_schedulable.py` has gated the
+            # functional test step -- see
+            # `shakenfist/actions/build-smoke-cluster/action.yml`'s "Wait
+            # for the cluster to become schedulable" step, which runs
+            # before "Run functional tests" in
+            # `shakenfist/actions/.github/workflows/smoke-cluster.yml`.
+            # So a missing row here is the regression this phase exists to
+            # prevent, not a normal start-up state, and must fail rather
+            # than hide behind a skip.
+            self.assertTrue(
+                per_node.get('cpu_committed_row_present', True),
+                'Node %s is admitting placements unguarded: it has no '
+                'scheduler_node_capacity row, so the capacity reconciler '
+                'has not sized it yet' % node['uuid'])
 
             # Our instance is placed here and not deleted, so the node's
             # committed total must account for at least its one vCPU
