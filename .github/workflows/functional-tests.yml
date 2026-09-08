@@ -762,6 +762,36 @@ jobs:
       - name: "Immediate success"
         run: true
 
+  # GitHub only acts on an issue-closing stanza in a pull request's
+  # description. A stanza wrapped in backticks is a code span and is
+  # ignored, and a commit message stanza is not parsed at all on the merge
+  # queue path -- so a fix can merge with the issue left open and nobody
+  # any the wiser. This fails while the description can still be edited.
+  # It also prints what the pull request will close, which is how a closing
+  # keyword in ordinary prose shows itself before it shuts a live bug.
+  #
+  # This job deliberately carries no same-repo guard, unlike
+  # smoke_collection above. The called workflow checks out only
+  # shakenfist/actions and reads the pull request entirely through the
+  # API, so no fork-controlled code executes on the runner -- and
+  # skipping fork pull requests would silently exempt them from the
+  # gate, since can_enqueue treats a skipped dependency as success.
+  # Those are the terms on which the exposure is accepted; it is not an
+  # omission.
+  issue_link_check:
+    name: "Issue links"
+    if: github.event_name == 'pull_request'
+    uses: shakenfist/actions/.github/workflows/issue-link-check.yml@main
+    # This file grants only "contents: read" at the top, and a called
+    # workflow cannot hold more than its caller was given, so the reads it
+    # needs are granted here rather than widening the whole file.
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    with:
+      runs_on: '["self-hosted","static"]'
+
   can_enqueue:
     name: "Can enqueue"
     needs:
@@ -769,6 +799,7 @@ jobs:
       - sanity_checks
       - check_paths
       - credential_scan
+      - issue_link_check
     if: always() && github.event_name != 'merge_group'
     permissions:
       actions: read

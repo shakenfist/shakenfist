@@ -434,6 +434,50 @@ A failed `Can merge` ejects the pull request from the queue, and
 [merge failure triage](#merge-failure-triage) then classifies the failure
 automatically.
 
+### The issue link check
+
+`Can enqueue` also needs the `Issue links` job, which calls the reusable
+`issue-link-check.yml` in `shakenfist/actions`. It compares what a pull
+request claims to fix -- its branch name, its description, and its commit
+messages -- against `closingIssuesReferences`, which is GitHub's own parse
+of what will actually close, and fails when the two disagree.
+
+**The closing stanza has to be in the pull request description.** Two
+things that look like they would work do not:
+
+- A stanza wrapped in backticks is a code span. GitHub renders it and
+  parses nothing.
+- A stanza in a *commit message* closes nothing on this repository. GitHub
+  acts on commit-message stanzas only for commits pushed to the default
+  branch in the ordinary way, and the merge queue advances `develop` from
+  its own staging ref. Putting the stanza in the commit message as well is
+  still worth doing -- it is how `git log` records why a change was made --
+  but it is traceability, not closure.
+
+So a description needs a plain, unbackticked `Fixes #NNNN` on a line of its
+own. `issue-fix.yml` already emits one: the workflow appends its own
+`Fixes #${ISSUE_NUMBER}` as the *first* line of the body, after
+`tools/neutralise-pr-body.sh` has run over the model's prose, so bot-authored
+fix pull requests satisfy this gate as they stand. Do not "fix" a failure
+here by loosening the branch-name pattern in the checker.
+
+Where a pull request is deliberately only part of the work on an issue, opt
+out with a line of the form `X-No-Autoclose: #NNNN` in the description.
+
+The job also prints the issues GitHub *will* close that nobody asked for --
+the other direction of the same defect, and how a closing keyword sitting
+beside a reference in ordinary prose reveals itself before it shuts a live
+bug. That direction is reported and never enforced: real descriptions carry
+headings and table cells of the same shape, and a check that cried wolf on
+those would be ignored within a week.
+
+**Editing the description does not re-run the check.** `functional-tests.yml`
+declares no `types:` on its `pull_request` trigger, so it fires on `opened`,
+`synchronize` and `reopened` only. After correcting a description, re-run the
+failed jobs from the Actions tab (or push a commit) to clear the required
+check. Adding `edited` to the trigger is not the fix -- it would re-run the
+entire functional matrix on every description tweak.
+
 ### Superseded merge groups are cancelled
 
 Every job that can run in the queue and holds a scarce runner carries a
@@ -859,6 +903,12 @@ model having complied. Fenced code is passed through untouched --
 GitHub does not linkify inside a fence, and a description quoting a
 decorator or an email address is a normal description.
 `shakenfist/tests/test_neutralise_pr_body.py` covers both halves.
+
+Neutralising the model's prose does not leave the draft unable to close
+its issue. The workflow appends its own `Fixes #${ISSUE_NUMBER}` as the
+first line of the body *after* this pass, above the model text and
+outside any fence the model may have left open, which is what satisfies
+[the issue link check](#the-issue-link-check).
 
 `issue-fix.yml` runs its fix attempt through
 `tools/claude-model-fallback.sh`, which takes a comma-separated
