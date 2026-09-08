@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-ci-cloud-sizing/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-transient-capacity-refusals/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Right-size the CI test clouds - Shaken Fist</title>
+        <title>A capacity refusal is transient - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#right-size-the-ci-test-clouds" class="md-skip">
+        <a href="#a-capacity-refusal-is-transient" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Right-size the CI test clouds
+              A capacity refusal is transient
             
           </span>
         </div>
@@ -13693,10 +13693,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-actually-binds-is-the-admission-ledger" class="md-nav__link">
+  <a href="#the-cost" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What actually binds is the admission ledger
+        The cost
       
     </span>
   </a>
@@ -13704,10 +13704,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#the-three-node-topology-is-demonstrably-too-small" class="md-nav__link">
+  <a href="#what-the-refusal-actually-is" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The three-node topology is demonstrably too small
+        What the refusal actually is
       
     </span>
   </a>
@@ -13715,10 +13715,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#how-full-the-clouds-actually-get" class="md-nav__link">
+  <a href="#three-real-mechanisms-that-are-not-the-driver" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How full the clouds actually get
+        Three real mechanisms that are not the driver
       
     </span>
   </a>
@@ -13726,10 +13726,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#the-cluster-wide-figure-hides-the-node-that-refuses" class="md-nav__link">
+  <a href="#what-has-been-tried" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The cluster-wide figure hides the node that refuses
+        What has been tried
       
     </span>
   </a>
@@ -13737,98 +13737,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#does-utilisation-predict-the-failure" class="md-nav__link">
+  <a href="#what-this-is-not" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Does utilisation predict the failure?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-the-refusals-say-per-stage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the refusals say, per stage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#memory-does-not-bind-but-is-not-spare-either" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Memory does not bind, but is not spare either
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#allocation-is-roughly-double-actual-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Allocation is roughly double actual usage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#a-node-can-record-twice-its-own-ledger-and-sizing-would-hide-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A node can record twice its own ledger, and sizing would hide it
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-under-cloud-budget-this-spends" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The under-cloud budget this spends
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-headroom-band-with-numbers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The headroom band, with numbers
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-the-baseline-does-not-know" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the baseline does not know
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reproducing-the-measurements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reproducing the measurements
+        What this is not
       
     </span>
   </a>
@@ -13849,34 +13761,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Mission and problem statement">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#yes-the-tier-should-get-bigger-with-a-condition" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Yes, the tier should get bigger -- with a condition
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#candidate-shapes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Candidate shapes
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -13888,25 +13772,14 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Execution">
+    <nav class="md-nav" aria-label="Open questions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#phase-0-decisions-and-scarcity-inventory" class="md-nav__link">
+  <a href="#1-where-does-the-retry-live" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 0 -- Decisions and scarcity inventory
+        1. Where does the retry live?
       
     </span>
   </a>
@@ -13914,10 +13787,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-1-headroom-instrumentation" class="md-nav__link">
+  <a href="#2-does-a-retry-hide-the-problem" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 1 -- Headroom instrumentation
+        2. Does a retry hide the problem?
       
     </span>
   </a>
@@ -13925,198 +13798,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-2-baseline-measurement-window" class="md-nav__link">
+  <a href="#3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 2 -- Baseline measurement window
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-3-explicit-saturation-coverage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 3 -- Explicit saturation coverage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-4-re-shape-the-topologies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 4 -- Re-shape the topologies
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-5-guardrails" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 5 -- Guardrails
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#phase-6-documentation-and-downstream-propagation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phase 6 -- Documentation and downstream propagation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution model
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#planning-effort" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planning effort
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-level guidance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#model-choice" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Model choice
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#management-session-review-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Management session review checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        3. Why is allocation less reliable in the first minutes, and can the window be shortened?
       
     </span>
   </a>
@@ -14149,7 +13834,7 @@
   
 
 
-<h1 id="right-size-the-ci-test-clouds">Right-size the CI test clouds<a class="headerlink" href="#right-size-the-ci-test-clouds" title="Permanent link">&para;</a></h1>
+<h1 id="a-capacity-refusal-is-transient">A capacity refusal is transient<a class="headerlink" href="#a-capacity-refusal-is-transient" title="Permanent link">&para;</a></h1>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the shakenfist codebase thoroughly. Read
@@ -14163,29 +13848,38 @@ instead. Where a question touches on external concepts
 (KVM/libvirt, VXLAN networking, MariaDB/Galera, gRPC/protobuf),
 research as needed to give a confident answer. Flag any
 uncertainty explicitly rather than guessing.</p>
-<p>This plan additionally spans the <code>shakenfist/actions</code>
-repository, where the CI topologies and the reusable
-<code>smoke-cluster</code> workflow live, and reads two external data
-sources: GitHub Actions job and step timings (via <code>gh api</code> or
-the <code>ci-status</code> helper), and the private-ci conductor's
-per-instance resource samples. Both are described under
-<em>Reproducing the measurements</em> below. Do not restate a number
-from this document without checking it still holds -- the whole
-point of the plan is that these numbers were never being
-watched.</p>
+<p>This plan spans three repositories: this one (the scheduler, the
+cluster and resources daemons, and the <code>shakenfist_ci</code> functional
+suite), <code>client-python</code> (<code>shakenfist_client.apiclient</code>, which is
+what the suite and every operator script calls), and, for one
+step only, <code>shakenfist/actions</code> (where the reusable
+<code>smoke-cluster</code> workflow collects the per-run summary this plan
+adds). It is a sibling of
+<a href="../PLAN-ci-cloud-sizing/">Right-size the CI test clouds</a> and
+<a href="../PLAN-scheduler-reservations/">Atomic scheduling via reservations</a>,
+and deliberately does not own anything either of those already
+owns: topology shape belongs to the first, the admission ledger
+and claims to the second. What is left, and what this plan is, is
+the piece both of them explicitly deferred -- that nothing in the
+system treats "no capacity right now" as the transient condition
+it is.</p>
 <p>Consult <code>ARCHITECTURE.md</code> for the system architecture
 overview, object types, and daemon structure. Consult
 <code>CLAUDE.md</code> for build commands, project conventions, and
 database access patterns. Consult <code>GOALS.md</code> for current
 development priorities. Key references inside the repo
-include <code>shakenfist/scheduler.py</code> (the admission filters whose
-arithmetic this plan is about), <code>shakenfist/mariadb.py</code>
-(<code>_derive_cpu_memory_limits</code>, the capacity counters and the
-demand guard), <code>shakenfist/config.py</code> (<code>CPU_OVERCOMMIT_RATIO</code>,
-<code>NODE_CPU_RESERVATION_THREADS</code>), <code>examples/_shared/site.yml</code>
-(where the per-host reservation defaults are computed at deploy
-time) and <code>shakenfist/deploy/shakenfist_ci/</code> (the functional
-suites the clouds exist to run).</p>
+include <code>shakenfist/scheduler.py</code> (<code>_has_sufficient_cpu</code>, the
+pre-filter that raises the refusal this plan is about),
+<code>shakenfist/external_api/instance.py</code> (the two <code>507</code> branches of
+<code>POST /instances</code>), <code>shakenfist/daemons/cluster/main.py</code>
+(<code>_force_capacity_reconcile_if_unguarded</code> and the anchored
+reconcile), <code>shakenfist/daemons/resources/main.py</code> (the 60 s
+metrics cadence that <code>measured_cpus</code> comes from),
+<code>shakenfist/deploy/shakenfist_ci/base.py</code> and <code>retries.py</code> (the
+suite's await and retry helpers), and
+<code>shakenfist/deploy/shakenfist_ci/load_budget.py</code>
+(<code>HARNESS_DRIVEN_PAIRS</code>, which any new suite-side polling must be
+declared in).</p>
 <!-- shared-block: plan-file-conventions v1 -->
 <p>Plan file conventions (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
@@ -14228,1002 +13922,480 @@ copy lives in shakenfist/development at
 <!-- shared-block-end -->
 
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>The nested test clouds that merge-queue CI builds are sized by a
-decision nobody recorded. Five hypervisors plus a primary, each
-node 4 vCPU and 12 GB, is what <code>ci-topology-slim-primary.yml</code> has
-always said. Until phase 1 there was no measurement either way, and
-no mechanism that would notice if the sizing stopped being right.</p>
-<p>There is now, and this section is written from it. Every figure
-below is either measured, with the sample it was measured over
-stated beside it, or marked as <strong>not measured</strong>. Nothing in it is
-hand-collected without saying so.</p>
-<p>The measured figures come from the phase 2 baseline, which is
-committed under
-<a href="../data/ci-cloud-sizing-baseline/"><code>docs/plans/data/ci-cloud-sizing-baseline/</code></a>:
-217 harvested records over <strong>55 merge runs</strong> between
-2026-08-30T07:48:03Z and 2026-09-05T07:15:07Z, of which <strong>204 carry
-a usable committed-CPU series</strong>. The harvest tool is
-<code>tools/ci_headroom_harvest.py</code> and the exact command is in that
-directory's README. Three caveats on the sample apply everywhere
-below and are not repeated:</p>
+<h3 id="the-cost">The cost<a class="headerlink" href="#the-cost" title="Permanent link">&para;</a></h3>
+<p>Issue #3772 is the signature in essentially every failing merge
+group. Over the sixteen days to 2026-09-08 the <code>Functional tests</code>
+workflow's <code>merge_group</code> runs split <strong>108 failures, 45 successes,
+14 cancelled</strong>. Of the thirty most recent failing runs, twenty-four
+failed the <code>Debian 12 tier</code> job (the <code>slim-tier</code> topology). Of
+eighteen of those runs whose failed-job logs were read, <strong>all
+eighteen contain</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>shakenfist_client.apiclient.InsufficientResourcesException: ('API request failed', 'POST',
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>'http://localhost:13000/instances', 507,
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>'{"error": "No nodes remaining at scheduling stage sufficient_idle_cpu", "status": 507}')
+</code></pre></div>
+<p>and in fourteen a known victim of that refusal is the test that
+failed: <code>test_network_plumbing_lifecycle</code> (8),
+<code>test_disappearing_source_instance</code> (3),
+<code>test_stray_torn_down_while_a_hosted_network_survives</code> (3), then
+<code>test_artifact_show</code>, <code>test_lifecycle_power_cycle</code> and the
+affinity tests. The next-largest cause, the database load-budget
+check, appeared in seven of the eighteen -- and in six of those a
+507 was in the same run, so fixing the budget family alone would
+not have turned one of them green.</p>
+<h3 id="what-the-refusal-actually-is">What the refusal actually is<a class="headerlink" href="#what-the-refusal-actually-is" title="Permanent link">&para;</a></h3>
+<p>The evidence below comes from the full CI bundles -- the 15 s
+headroom series, the Loki refusal census and every node's
+<code>journalctl -u 'sf-*'</code> export -- of six failing merge runs after
+PR #4106 landed (34163288637, 34171977552, 34178278720,
+34119030297, 34125365386 on <code>slim-tier</code>; 34168326220 on
+<code>slim-primary</code>), two before it (33991296717, 33948911843), and the
+50 usable <code>slim-tier</code> records of the sizing plan's baseline
+dataset. The reproduction recipe and the analysis script are under
+<a href="../data/transient-capacity-refusals/"><code>docs/plans/data/transient-capacity-refusals/</code></a>.
+<code>+Ns</code> is seconds after the <code>Run functional tests</code> step started.</p>
+<p><strong>Every <code>sufficient_idle_cpu</code> abort in the six post-#4106 runs was
+a <code>force_placement</code> single-candidate create onto a node whose
+capacity ledger was genuinely at its limit, while the cluster as a
+whole held 3-9 of its 12 vCPU.</strong> The ledger reconstructed from the
+<code>instance placed</code> and <code>instance placement released</code> events in
+every node's journal matched the pre-filter's <code>committed_cpus</code>
+exactly in all ten cases. It is not over-counting, not a race, and
+not the warm-up window.</p>
+<table>
+<thead>
+<tr>
+<th>run</th>
+<th>topology</th>
+<th>first capacity row</th>
+<th>cpu abort(s)</th>
+<th>after first row</th>
+<th>forced onto</th>
+<th>measured / committed / limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>34163288637</td>
+<td>tier</td>
+<td>+181s</td>
+<td>+309s</td>
+<td>+128s</td>
+<td>sf1</td>
+<td>2 / 3 / 3</td>
+</tr>
+<tr>
+<td>34171977552</td>
+<td>tier</td>
+<td>+166s</td>
+<td>+512s</td>
+<td>+346s</td>
+<td>primary</td>
+<td>3 / 3 / 3</td>
+</tr>
+<tr>
+<td>34178278720</td>
+<td>tier</td>
+<td>+181s</td>
+<td>+200, +201, +202, +314s</td>
+<td>+20..+133s</td>
+<td>sf1, sf1, sf2, sf1</td>
+<td>0/3/3, 0/3/3, 1/6/6, 3/3/3</td>
+</tr>
+<tr>
+<td>34119030297</td>
+<td>tier</td>
+<td>+165s</td>
+<td>+481s</td>
+<td>+316s</td>
+<td>sf1</td>
+<td><strong>6 / 0 / 3</strong></td>
+</tr>
+<tr>
+<td>34125365386</td>
+<td>tier</td>
+<td>+166s</td>
+<td>+696s</td>
+<td>+530s</td>
+<td>sf2</td>
+<td>3 / 6 / 6</td>
+</tr>
+<tr>
+<td>34168326220</td>
+<td>primary</td>
+<td>+166s</td>
+<td>+824s</td>
+<td>+658s</td>
+<td>sf1</td>
+<td>3 / 3 / 3</td>
+</tr>
+<tr>
+<td>33991296717 (pre)</td>
+<td>tier</td>
+<td>+166s</td>
+<td>+519, +542, +565, +725s</td>
+<td>+354..+559s</td>
+<td><em>none: all three nodes</em></td>
+<td>sf2 6/6, sf1 3/3, primary 3/3</td>
+</tr>
+<tr>
+<td>33948911843 (pre)</td>
+<td>tier</td>
+<td>+181s</td>
+<td>+176, +177, +523s</td>
+<td>-5s, -4s, +342s</td>
+<td>primary, primary, primary</td>
+<td><strong>0 / 6 / 3</strong>, 0/6/3, 3/3/3</td>
+</tr>
+</tbody>
+</table>
+<p>(The +200 s trio and the +176 s pair are
+<code>test_duplicate_network_work_is_coalesced</code>, which pins a burst of
+six across the hypervisors and tolerates its own create errors; the
+test that failed each run was a later one.)</p>
+<p>Three things follow from the table.</p>
+<ol>
+<li><strong>The binding constraint is the 3 vCPU ledger on the two
+   infra hypervisors.</strong> <code>primary</code> (hypervisor, network node and
+   database node) and <code>sf1</code> (hypervisor and database node) are
+   4-thread VMs carrying the deploy-time reservation of 4 threads
+   (<code>examples/_shared/site.yml</code>, <code>(1 + infra_role) * 2</code>), so
+   <code>cpu_schedulable = max(1, 4 - 4) = 1</code>
+   (<code>shakenfist/daemons/resources/main.py:126</code>) and
+   <code>limit_cpus = floor(1 x 3.0) = 3</code> (<code>shakenfist/mariadb.py</code>,
+   <code>_derive_cpu_memory_limits</code>). <code>sf2</code> gets 6. Cluster 12,
+   confirmed at exactly 12.0 in all 50 baseline records.</li>
+<li><strong>The victim tests pick those nodes deterministically.</strong>
+   <code>test_network_plumbing_lifecycle</code> takes the first two
+   non-network hypervisors (<code>sf1</code>, <code>sf2</code>);
+   <code>test_disappearing_source_instance</code> the first hypervisor;
+   <code>test_stray_torn_down_while_a_hosted_network_survives</code> the first
+   non-network hypervisor (<code>sf1</code>); <code>test_artifact_show</code> its first
+   instance's node. Five stestr workers queue their pinned creates
+   on a node three 1-vCPU instances fill, and the instances that
+   fill it are still fetching images (measured 0, committed 3) when
+   the next one is refused.</li>
+<li><strong>The refusals are not concentrated in the warm-up.</strong> They land
+   between +176 s and +824 s, through the first fourteen minutes
+   of a 25-35 minute step, after the ledger rows exist. In the
+   baseline, the ledger-3 nodes sat at 100% of ledger at p90 in
+   <strong>65%</strong> of node-records (peak at or above 1.0 in 96%); 33 of the
+   37 <code>slim-tier</code> failures had at least one abort; <code>slim-tier</code>
+   passed 13 of 50.</li>
+</ol>
+<p>Per-node saturation across the six post-#4106 runs
+(<code>max(measured, committed) &gt;= limit</code>):</p>
+<table>
+<thead>
+<tr>
+<th>node (ledger)</th>
+<th>share of the run at ledger</th>
+<th>longest stretch</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>sf1 (3)</td>
+<td>7-23%</td>
+<td>90-330 s</td>
+</tr>
+<tr>
+<td>primary (3)</td>
+<td>1-12%</td>
+<td>15-255 s</td>
+</tr>
+<tr>
+<td>sf2 (6)</td>
+<td>0-15%</td>
+<td>0-240 s</td>
+</tr>
+</tbody>
+</table>
+<h3 id="three-real-mechanisms-that-are-not-the-driver">Three real mechanisms that are not the driver<a class="headerlink" href="#three-real-mechanisms-that-are-not-the-driver" title="Permanent link">&para;</a></h3>
+<p><strong>The warm-up window is still open.</strong> Issue #4087 found that
+<code>scheduler_node_capacity</code> has no rows until the reconciler's first
+pass, so every early placement takes P7's fail-open branch and the
+first pass then writes the accumulated ground truth onto a row
+whose limit it exceeds. PR #4106 anchored the reconcile to
+election and added a one-shot
+<code>_force_capacity_reconcile_if_unguarded()</code>
+(<code>shakenfist/daemons/cluster/main.py:741-778</code>, called at <code>:879</code>).
+In all six post-#4106 runs that one-shot fired 130-150 s <em>before</em>
+the test step, and the pass it forced logged <code>nodes=0
+nodes_added=0</code>: no hypervisor had published metrics yet. The table
+then stayed empty until the five-minute cadence created rows at
++155..+181 s, exactly the 135-210 s the baseline measured before
+the fix. Ten to seventeen placements per run were admitted
+<code>node_not_sized</code>, and the first real pass recorded <code>drift_cpus</code> of
+2-8 (34178278720: sf1 +6 on a limit of 3). The bold rows above are
+this residue. It is real, it is the whole of the sub-three-minute
+exposure, and it is not what fails the runs.</p>
+<p><strong>Measurement lags a delete burst by a metrics period.</strong> The
+34119030297 refusal was <code>measured 6 / committed 0 / limit 3</code>: six
+warm-up instances had been deleted and released 32 s earlier and
+the ledger was correctly zero, but <code>cpu_total_instance_vcpus</code> is
+republished every 60 s (<code>resources/main.py:645, 704</code>) and still
+counted six running domains. The next sample read zero. Because
+<code>_has_sufficient_cpu()</code> charges <code>max(measured, committed)</code>, a node
+refuses forced creates for up to a minute after a teardown even
+though it is empty. The same rule is why "release the ledger
+earlier in <code>Instance.delete()</code>" -- a proposal the research
+considered -- would not help: the measured side keeps charging the
+node until the domain is actually gone, and the journals show no
+deleted instance holding ledger at any refusal.</p>
+<p><strong>The demand guard is pure overhead on this topology.</strong> 114-140
+<code>schedule candidate refused by capacity guard</code> events per run,
+<strong>100% demand-only</strong>: the D13 bound is <code>0.75 x cpu_schedulable</code>,
+which is 0.75 on a 1-thread node against a <code>cpu_load_1</code> near 3.
+Every one was waived on the second walk, so roughly 40% of creates
+pay two guarded transactions at the moment the cluster is busiest.
+It never produced a 507 in these runs. It is owned by the
+scheduler-reservations plan and recorded there.</p>
+<h3 id="what-has-been-tried">What has been tried<a class="headerlink" href="#what-has-been-tried" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Only <strong>four</strong> jobs carry the phase 1 probe (phase 2, D17):
-  <code>Debian 12 cluster</code>, <code>Ubuntu 24.04 cluster</code> and <code>Guests</code> on
-  <code>slim-primary</code>, and <code>Debian 12 tier</code> on <code>slim-tier</code>. <code>Node
-  lifecycle</code> and <code>Ansible modules</code> are unmeasured, for the two
-  different structural reasons D17 records.</li>
-<li>Roughly <strong>10.6%</strong> of samples (2,276 of 21,517) had every node's
-  capacity row read as absent at once, and are excluded from every
-  committed-CPU figure. This is why an <code>n</code> quoted in samples is
-  smaller than the sample count. Whether those are failed reads or
-  an unpopulated table is <strong>not known</strong> for this window; phase 2's
-  D19 publishes the flag that answers it, prospectively.</li>
-<li>Capacity <strong>guard</strong> refusals were never collected in this window,
-  because the census filter did not match their messages (phase 2,
-  D20). They are <strong>unknown</strong>, not zero, everywhere below.</li>
+<li><strong>#3724</strong> added the committed-vCPU ledger so placed-but-unbooted
+  instances are charged immediately. Admission became more
+  accurate; an accurate "no" is still a failed test. Three
+  recurrences followed and the six per-test issues were absorbed
+  into #3772.</li>
+<li><strong>#3722</strong> reordered the load-shedding filters below affinity.
+  Cannot help: the node is removed at admission before ranking.</li>
+<li><strong>#4106</strong> closed #4087 in principle and, as above, not in CI.</li>
+<li><strong>#3813</strong> made the demand guard satisfiable; the waiver rate fell
+  from 62% to 4%. Not a 507 cause.</li>
+<li><strong>#3907</strong> and <strong>#3565</strong> were closed test-side, by tolerating the
+  transient refusal and by skipping when the candidate set had
+  collapsed. Both are precedents for the shape of this plan and
+  neither generalised.</li>
 </ul>
-<p>Two sources remain hand-collected because this instrument cannot
-reach them: the private-ci conductor's per-instance CPU and memory
-samples, and the under-cloud's own capacity. Both are labelled
-where they are used.</p>
-<h3 id="what-actually-binds-is-the-admission-ledger">What actually binds is the admission ledger<a class="headerlink" href="#what-actually-binds-is-the-admission-ledger" title="Permanent link">&para;</a></h3>
-<p>The scheduler admits a create only if
-<code>max(measured, committed) + requested &lt;= cpu_schedulable x CPU_OVERCOMMIT_RATIO</code>
-(<code>Scheduler._has_sufficient_cpu</code>, <code>shakenfist/scheduler.py</code>), and
-the resources daemon publishes
-<code>cpu_schedulable = max(1, threads - reservation)</code>
-(<code>shakenfist/daemons/resources/main.py</code>). <code>examples/_shared/site.yml</code>
-defaults that reservation to <strong>2 threads, or 4 on a network or
-database node</strong>.</p>
-<p>On a 4 vCPU CI node that is 2 schedulable threads, so a ledger of
-<strong>6 admitted vCPU</strong>; on a 4 vCPU <em>network</em> node it floors at 1
-thread, so <strong>3</strong>. The reservation is a fixed per-node tax, which
-makes small nodes disproportionately expensive: a 4 vCPU node
-gives away half its threads, a 6 vCPU node a third.</p>
-<table>
-<thead>
-<tr>
-<th>Topology</th>
-<th>VMs</th>
-<th>Under-cloud cost</th>
-<th>Inner ledger</th>
-<th>Measured over</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>slim-primary</code></td>
-<td>6 (1 database + 5 hypervisors)</td>
-<td>24 vCPU / 64 GB</td>
-<td><strong>27 vCPU</strong> (1x3 + 4x6)</td>
-<td>154 job-runs, every one</td>
-</tr>
-<tr>
-<td><code>slim-tier</code></td>
-<td>3 (all hypervisors)</td>
-<td>12 vCPU / 36 GB</td>
-<td><strong>12 vCPU</strong> (3+3+6)</td>
-<td>50 job-runs, every one</td>
-</tr>
-</tbody>
-</table>
-<p>Those ledgers are not derived on paper. Across the whole baseline
-window the cluster ledger read exactly 27.0 in all 154
-<code>slim-primary</code> job-runs and exactly 12.0 in all 50 <code>slim-tier</code>
-job-runs, with no job-run in which the figure moved during the run;
-the per-node limits were 6.0 in 616 <code>slim-primary</code> node-job-runs
-and 3.0 in the other 154, and 3.0 in 100 <code>slim-tier</code> node-job-runs
-and 6.0 in the other 50. The under-cloud cost column is <strong>not
-measured</strong> -- it is read off the topology files.</p>
-<p>This document previously recorded the tier's ledger as "12 by
-derivation, 10 by observation", on the strength of issue #3907
-reporting the <code>cluster_capacity</code> singleton at <code>limit 10</code>. <strong>That
-discrepancy no longer exists and the tier's ledger is 12.</strong> #3907
-closed COMPLETED on 2026-08-27, and its final recurrence comment
-quotes the singleton itself refusing a claim with <code>cpus (limit 12,
-used 9, requested 4)</code>. Phase 0's D7 asked phase 2 to confirm the
-fallback count across a whole window, because a node without a
-capacity row would change what the ledger column means. It is
-confirmed: of <strong>85,563</strong> node-samples whose ledger was readable,
-<strong>zero</strong> fell back to <code>cpu_hard_max</code> and <strong>zero</strong> had no ledger at
-all. Every node in both topologies carried a real capacity row for
-the entire window. D7 is closed.</p>
-<p>The one qualification is that the singleton's own total is not
-published by <code>/admin/resources</code> -- <code>summarize_resources()</code> builds
-<code>total</code> from per-node arithmetic only -- so the 12 above is the sum
-of the rows, and the singleton is cited from #3907 rather than
-measured here.</p>
-<h3 id="the-three-node-topology-is-demonstrably-too-small">The three-node topology is demonstrably too small<a class="headerlink" href="#the-three-node-topology-is-demonstrably-too-small" title="Permanent link">&para;</a></h3>
-<p>Over the 66 merge runs the baseline harvest enumerated, counting
-only the ones in which a job actually ran:</p>
-<table>
-<thead>
-<tr>
-<th>Job</th>
-<th>Topology</th>
-<th>Passed</th>
-<th>Instrumented</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Ansible modules</td>
-<td><code>slim-primary</code></td>
-<td>53 / 55 (96%)</td>
-<td>no</td>
-</tr>
-<tr>
-<td>Node lifecycle</td>
-<td><code>slim-primary</code></td>
-<td>51 / 54 (94%)</td>
-<td>no</td>
-</tr>
-<tr>
-<td>Guests</td>
-<td><code>slim-primary</code></td>
-<td>47 / 54 (87%)</td>
-<td>yes</td>
-</tr>
-<tr>
-<td>Ubuntu 24.04 cluster</td>
-<td><code>slim-primary</code></td>
-<td>43 / 54 (80%)</td>
-<td>yes</td>
-</tr>
-<tr>
-<td>Debian 12 cluster</td>
-<td><code>slim-primary</code></td>
-<td>42 / 54 (78%)</td>
-<td>yes</td>
-</tr>
-<tr>
-<td><strong>Debian 12 tier</strong></td>
-<td><strong><code>slim-tier</code></strong></td>
-<td><strong>13 / 54 (24%)</strong></td>
-<td><strong>yes</strong></td>
-</tr>
-</tbody>
-</table>
-<p>Only 14 of the 66 merge groups merged (21%). This table previously
-held five rows measured over a different, earlier window of 98 runs;
-it now holds the same six jobs a merge run actually builds, measured
-over the window the rest of this section is measured over, and the
-ordering and the spread are unchanged. <code>Ansible modules</code> was missing
-from it before, which is also why phase 2's D17 describes it as a
-six-job table when it had five rows.</p>
-<p>The tier's failures are not spread across causes. That was
-established from sampled logs -- 69 of the earlier window's tier
-failures died in the <code>Run functional tests</code> step, showing <code>507 No
-nodes remaining at scheduling stage sufficient_idle_cpu</code> with
-<code>current_cpus: 3</code> against <code>limit_cpus: 3</code>, nodes genuinely at their
-ledger. <strong>The step attribution is not re-measured here</strong>, but the
-refusal itself now is: <code>sufficient_idle_cpu</code> aborted in 35 of the
-tier's 50 instrumented job-runs, and 33 of those 35 failed. This is
-the same failure family as the #3772 umbrella and #3907.</p>
-<p>One claim in the same paragraph does <strong>not</strong> survive measurement.
-This document previously said the sampled <code>slim-primary</code> failures
-"contain no such refusal at all". They do. Across 154 instrumented
-<code>slim-primary</code> job-runs the CPU stage dropped 676 candidates in 110
-of them, and aborted outright in 14. <code>slim-primary</code> refuses work
-routinely; it just has four other hypervisors to fall through to,
-which is exactly the difference the per-node subsection below is
-about.</p>
-<p>Two things this is <em>not</em>:</p>
-<ul>
-<li>It is not slowness. The functional-test step's probe window --
-  which brackets the suite itself, not the deploy -- has a median of
-  <strong>28.8 minutes</strong> on the tier (n=50) against <strong>29.3</strong> for the
-  Debian 12 cluster (n=52) and <strong>25.0</strong> for Ubuntu (n=51). The tier
-  is, if anything, marginally the faster of the two Debian jobs.
-  Within the tier, failing job-runs are not longer than passing ones
-  (28.8 against 29.3 minutes). The <code>test_timeout_minutes: 70</code> and
-  the comment in <code>functional-tests.yml</code> claiming the tier "runs
-  slower" are not borne out.</li>
-<li>It is not the #3813 demand guard, which was fixed on 2026-08-22.
-  This claim is <strong>not re-measured</strong>: the baseline window lies
-  entirely after that fix, so it cannot split on it. The earlier
-  hand-collected window put the tier at 17% before and 23% after,
-  unchanged within noise, and the 24% measured here is consistent
-  with that.</li>
-</ul>
-<h3 id="how-full-the-clouds-actually-get">How full the clouds actually get<a class="headerlink" href="#how-full-the-clouds-actually-get" title="Permanent link">&para;</a></h3>
-<p>Committed vCPU as a fraction of the cluster ledger, one figure per
-job-run, <code>n</code> in job-runs. <code>p90</code> and <code>peak</code> are computed within a
-job-run across its samples; the columns then report the median and
-the extremes of those per-run figures across the window.</p>
-<table>
-<thead>
-<tr>
-<th>Job</th>
-<th>Topology</th>
-<th>n</th>
-<th>p90 fraction (med / max)</th>
-<th>peak fraction (med / max)</th>
-<th>peak vCPU (med / max)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Guests</td>
-<td><code>slim-primary</code></td>
-<td>51</td>
-<td>0.296 / 0.370</td>
-<td>0.370 / 0.519</td>
-<td>10 / 14</td>
-</tr>
-<tr>
-<td>Debian 12 cluster</td>
-<td><code>slim-primary</code></td>
-<td>52</td>
-<td>0.333 / 0.444</td>
-<td>0.444 / 0.593</td>
-<td>12 / 16</td>
-</tr>
-<tr>
-<td>Ubuntu 24.04 cluster</td>
-<td><code>slim-primary</code></td>
-<td>51</td>
-<td>0.333 / 0.519</td>
-<td>0.444 / 0.593</td>
-<td>12 / 16</td>
-</tr>
-<tr>
-<td><strong>Debian 12 tier</strong></td>
-<td><strong><code>slim-tier</code></strong></td>
-<td><strong>50</strong></td>
-<td><strong>0.750 / 1.000</strong></td>
-<td><strong>0.917 / 1.000</strong></td>
-<td><strong>11 / 12</strong></td>
-</tr>
-</tbody>
-</table>
-<p>Pooled by topology: <code>slim-primary</code> (n=154) has a median p90 fraction
-of 0.333 and <strong>never once exceeded 0.519</strong> in 154 job-runs;
-<code>slim-tier</code> (n=50) has a median of 0.750 and <strong>never once fell below
-0.500</strong>. The two distributions overlap only in the interval
-[0.500, 0.519].</p>
-<p>The three <code>slim-primary</code> jobs differ from each other by less than
-they differ from the tier, which is the answer to the question D17
-was written to make askable: the gap is the <em>shape</em>, not the suite.
-<code>Guests</code> is the lightest of the three and <code>Debian 12 cluster</code> and
-<code>Ubuntu 24.04 cluster</code> are indistinguishable.</p>
-<p>The tier reached a cluster-wide p90 of <strong>1.000</strong> in one job-run
-(33613379424, failed): every node at its ledger for ninety percent
-of the run.</p>
-<p>The window is stationary. Splitting each job's records into an
-earlier and a later half and comparing shifts nothing at any
-conventional threshold (smallest p = 0.08, on the per-node maximum
-for <code>Guests</code>), so the 55 head SHAs the window spans did not move the
-numbers.</p>
-<h3 id="the-cluster-wide-figure-hides-the-node-that-refuses">The cluster-wide figure hides the node that refuses<a class="headerlink" href="#the-cluster-wide-figure-hides-the-node-that-refuses" title="Permanent link">&para;</a></h3>
-<p>This is D21, and the pattern the phase 2 survey saw in two runs
-<strong>holds across the window</strong>.</p>
-<p>The scheduler admits against one node's ledger at a time and never
-against an average, so the statistic that matters is the highest
-committed-over-ledger ratio any single node stood at. Per job-run,
-that per-node maximum exceeds the cluster-wide figure by a median
-of <strong>0.412</strong> and a median <em>ratio</em> of <strong>2.25x</strong> (n=204, max 3.38x).</p>
-<table>
-<thead>
-<tr>
-<th>Topology</th>
-<th>n</th>
-<th>job-runs with a node at 1.000 (peak)</th>
-<th>with a node at 1.000 (p90)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>slim-primary</code></td>
-<td>154</td>
-<td>100 (65%)</td>
-<td>74 (48%)</td>
-</tr>
-<tr>
-<td><code>slim-tier</code></td>
-<td>50</td>
-<td>50 (100%)</td>
-<td>50 (100%)</td>
-</tr>
-</tbody>
-</table>
-<p>Read cluster-wide, <code>slim-primary</code> looks comfortable at a median p90
-of 0.333. Read per node, <strong>two out of three of its job-runs contain
-a node that was completely full</strong>, and half contain one that was
-full for ninety percent of the run. On the tier every single
-job-run does.</p>
-<p>It is disproportionately, but not only, the small node.
-<code>slim-primary</code>'s 3 vCPU network node peaked at or above its ledger
-in 68 of 154 node-job-runs (44%); its four 6 vCPU nodes did so in
-59 of 616 (10%).</p>
-<p><strong>D21 is defended, with one correction that matters for phase 5.</strong>
-The per-node maximum is the right statistic and the cluster-wide
-one is genuinely misleading -- but the per-node maximum is
-<em>saturated</em>, sitting at its ceiling in 48% of <code>slim-primary</code> and
-100% of <code>slim-tier</code> job-runs, including plenty that passed. It
-cannot discriminate a bad run from a good one at the top of its
-range; all of its information is in its lower tail. A per-node band
-has to be read as a statement about what a topology <em>should</em>
-achieve, not as a per-run alarm the current clouds could pass.</p>
-<h3 id="does-utilisation-predict-the-failure">Does utilisation predict the failure?<a class="headerlink" href="#does-utilisation-predict-the-failure" title="Permanent link">&para;</a></h3>
-<p>This is the central claim of this plan, and it is now testable. The
-answer is more precise than the claim was, and it is partly a null
-result.</p>
-<p><strong>What this is computed over.</strong> 204 job-runs of <strong>four</strong> jobs:
-<code>Debian 12 cluster</code>, <code>Ubuntu 24.04 cluster</code>, <code>Guests</code> and <code>Debian 12
-tier</code>. It is <strong>not</strong> computed over the six-job table above. <code>Node
-lifecycle</code>, the best performer in that table at 94%, carries no
-probe, so no claim of the form "utilisation explains the pass-rate
-spread across the fleet" is made or supportable here.</p>
-<p>Pooled across all four jobs, failing job-runs are much fuller than
-passing ones: a median cluster-wide p90 fraction of 0.667 against
-0.333 (Mann-Whitney, p &lt; 0.001). <strong>That comparison is confounded
-and should not be quoted.</strong> Three of the four jobs share a topology,
-and the fourth -- the tier -- is simultaneously the fullest cloud
-and the one that fails three times out of four, so the pooled test
-is measuring the topology, not the utilisation.</p>
-<p>Within each job, where the topology and the suite are held fixed,
-the cluster-wide committed fraction separates passing from failing
-job-runs <strong>not at all</strong>:</p>
-<table>
-<thead>
-<tr>
-<th>Job</th>
-<th>pass / fail n</th>
-<th>median p90 fraction, pass vs fail</th>
-<th>p</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Debian 12 cluster</td>
-<td>39 / 12</td>
-<td>0.333 vs 0.370</td>
-<td>0.27</td>
-</tr>
-<tr>
-<td>Ubuntu 24.04 cluster</td>
-<td>40 / 11</td>
-<td>0.333 vs 0.370</td>
-<td>0.59</td>
-</tr>
-<tr>
-<td>Guests</td>
-<td>44 / 7</td>
-<td>0.296 vs 0.296</td>
-<td>0.92</td>
-</tr>
-<tr>
-<td>Debian 12 tier</td>
-<td>13 / 37</td>
-<td>0.750 vs 0.750</td>
-<td>0.74</td>
-</tr>
-</tbody>
-</table>
-<p>The per-node maximum does no better within a job (smallest p =
-0.09), for the saturation reason above.</p>
-<p>What <em>does</em> separate them, in every job and strongly, is whether the
-scheduler ran out of candidates at all -- a <code>sufficient_idle_cpu</code>
-<strong>abort</strong>, which is the event a 507 is raised from, as opposed to a
-drop that merely removed one node from a list which still had
-others:</p>
-<table>
-<thead>
-<tr>
-<th>Job</th>
-<th>job-runs with an abort</th>
-<th>of those, failed</th>
-<th>of those without, failed</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Debian 12 cluster</td>
-<td>6 / 52</td>
-<td>4 (67%)</td>
-<td>8 / 46 (17%)</td>
-</tr>
-<tr>
-<td>Ubuntu 24.04 cluster</td>
-<td>1 / 51</td>
-<td>1 (100%)</td>
-<td>10 / 50 (20%)</td>
-</tr>
-<tr>
-<td>Guests</td>
-<td>7 / 51</td>
-<td>6 (86%)</td>
-<td>1 / 44 (2%)</td>
-</tr>
-<tr>
-<td>Debian 12 tier</td>
-<td>35 / 50</td>
-<td>33 (94%)</td>
-<td>4 / 15 (27%)</td>
-</tr>
-<tr>
-<td><strong>All four</strong></td>
-<td><strong>49 / 204</strong></td>
-<td><strong>44 (90%)</strong></td>
-<td><strong>23 / 155 (15%)</strong></td>
-</tr>
-</tbody>
-</table>
-<p>So the honest form of this plan's central claim is: <strong>how full a
-cloud gets does not predict whether its job fails; the cloud
-actually running out does, overwhelmingly.</strong> The two are not the
-same statement. The first would say the tier, at a median p90 of
-0.75, is at risk throughout; the measurement says a tier job-run
-which never aborted passed 11 times out of 15, and one which aborted
-failed 33 times out of 35. What sizing has to move is the abort
-rate, and utilisation is a lagging proxy for it -- useful for
-choosing a shape, useless as a per-run verdict.</p>
-<h3 id="what-the-refusals-say-per-stage">What the refusals say, per stage<a class="headerlink" href="#what-the-refusals-say-per-stage" title="Permanent link">&para;</a></h3>
-<p>Aggregated over the 204 job-runs, counting the four capacity stages
-separately as phase 0's D5 requires. <code>sufficient_free_disk</code> is disk
-<em>space</em>; <code>sufficient_idle_disk</code> is disk <em>bandwidth</em>, a rate
-predicate that no amount of sizing can address. They are never
-merged.</p>
-<table>
-<thead>
-<tr>
-<th>Stage</th>
-<th><code>slim-primary</code> evaluations / drops</th>
-<th><code>slim-tier</code> evaluations / drops</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>sufficient_idle_cpu</code></td>
-<td>16,421 / <strong>676</strong></td>
-<td>6,749 / <strong>1,189</strong></td>
-</tr>
-<tr>
-<td><code>sufficient_idle_memory</code></td>
-<td>16,407 / 0</td>
-<td>6,684 / 0</td>
-</tr>
-<tr>
-<td><code>sufficient_free_disk</code></td>
-<td>16,407 / 0</td>
-<td>6,684 / 0</td>
-</tr>
-<tr>
-<td><code>sufficient_idle_disk</code></td>
-<td>16,330 / 0</td>
-<td>6,647 / 0</td>
-</tr>
-</tbody>
-</table>
-<p>Every capacity refusal in the entire window happened at
-<code>sufficient_idle_cpu</code>, and every one of the 1,865 of them gave the
-reason <code>would exceed hard max CPUs</code>. Memory, disk space and disk
-bandwidth refused <strong>nothing at all</strong> in 23,091, 23,091 and 22,977
-evaluations respectively. Aborts, again only at CPU: 14 across 154
-<code>slim-primary</code> job-runs, 65 across 50 <code>slim-tier</code> job-runs.</p>
-<p>Two non-capacity stages are worth recording so that nobody counts
-them as capacity later. <code>is_hypervisor</code> dropped 7,326 candidates on
-<code>slim-primary</code> and <strong>none</strong> on <code>slim-tier</code>: <code>slim-primary</code> carries a
-node the roster names and <code>/admin/resources</code> reports as not a
-hypervisor, in all 154 of its job-runs, and the tier's three nodes
-are all hypervisors. That is structural, not scarcity. <code>affinity_constraints</code> aborted in 114
-job-runs with the reason <code>no co-located instance carries a required
-tag</code>, which is <code>test_affinity</code> reaching its documented skip after
-the 2026-09-01 correction below, not a capacity event.</p>
-<p>Capacity <strong>guard</strong> refusals -- <code>instance placement denied</code> and
-<code>placement admitted over namespace capacity claim</code> -- are
-<strong>unknown</strong> for this window. The census query never matched them.
-This is a hole in the measurement, not a zero.</p>
-<h3 id="memory-does-not-bind-but-is-not-spare-either">Memory does not bind, but is not spare either<a class="headerlink" href="#memory-does-not-bind-but-is-not-spare-either" title="Permanent link">&para;</a></h3>
-<p>Phase 0's D5 decided memory was "a real second dimension" on one
-observed <code>sufficient_idle_memory</code> refusal. <strong>That rationale does not
-survive the window: memory refused nothing in 23,091 stage
-evaluations across 204 job-runs.</strong> Not one drop, on either topology,
-in either direction.</p>
-<p>The reason is arithmetic. A node's memory ledger is
-<code>memory_max x RAM_OVERCOMMIT_RATIO</code>, and that ratio defaults to
-<strong>3.0</strong>, so a 12 GB CI node carries a 35,880 MB ledger over 11,960 MB
-of physical RAM. Committed memory against that ledger looks tiny --
-a median per-job-run p90 of 0.125 on <code>slim-primary</code> (n=154) and
-0.216 on the tier (n=50). Against the node's <em>physical</em> RAM it does
-not:</p>
-<p>Each node's own p90 committed vRAM, summarised across node-job-runs
-(770 on <code>slim-primary</code>, 150 on the tier):</p>
-<table>
-<thead>
-<tr>
-<th>Topology</th>
-<th>per-node p90 committed vRAM (med / p90 / max)</th>
-<th>as a share of that node's physical RAM</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>slim-primary</code></td>
-<td>5,120 / 8,028 / 9,052 MB</td>
-<td>43% / 67% / 76%</td>
-</tr>
-<tr>
-<td><code>slim-tier</code></td>
-<td>8,028 / 9,052 / 12,124 MB</td>
-<td>67% / 76% / 101%</td>
-</tr>
-</tbody>
-</table>
-<p>The tier's worst node committed <strong>more vRAM than it physically
-has</strong>, which the 3x overcommit permits. That is committed
-allocation, not memory in use; the conductor's hand-collected
-7.5-10.2 GB actually in use on a tier node sits below it, as it
-should.</p>
-<p><strong>So D5 narrows, and its operative clause survives.</strong> Memory is not
-a binding <em>admission</em> dimension in either current shape and phase 3
-does not need a memory dimension in its saturation test. But per-node
-RAM is not headroom to reclaim: the measured per-node p90 commitment
-is 8.0 GB on <code>slim-primary</code> and 9.1 GB on the tier, and D5's rule
-that no topology drops per-node RAM below the measured p90 plus a
-margin now has those numbers behind it.</p>
-<h3 id="allocation-is-roughly-double-actual-usage">Allocation is roughly double actual usage<a class="headerlink" href="#allocation-is-roughly-double-actual-usage" title="Permanent link">&para;</a></h3>
-<p>This subsection has two sources and they measure different things.</p>
-<p><strong>Hand-collected, and not re-measured here.</strong> From the conductor's
-per-instance samples (<code>workflow_cost_samples</code>, filtered to
-<code>is_runner = 0</code>, n ~ 550 VMs per job), gathered 2026-08-27:</p>
-<ul>
-<li><strong>CPU</strong>: a 4 vCPU cluster VM averages <strong>0.71 cores</strong> across a
-  <code>slim-primary</code> run (p90 1.03, max 1.46) -- about 18% of its
-  allocation. The same VM in the tier averages 1.22 cores.</li>
-<li><strong>Memory</strong>: peak memory in use on a 12 GB node is
-  <strong>4.9-7.6 GB</strong> on <code>slim-primary</code> and <strong>7.5-10.2 GB</strong> on the
-  tier. Swap-out is <strong>zero on every node of every job</strong>.</li>
-<li>The 4 GB primary in <code>slim-primary</code> is the tightest node in the
-  fleet at 3.9 GB in use. It never swaps, but it has no slack.</li>
-</ul>
-<p>The probe cannot reproduce these: it publishes vCPU counts, not
-core-seconds. They are the reason to believe real CPU is idle, and
-they remain the only such evidence.</p>
-<p><strong>Measured, from the baseline bundles.</strong> What the probe <em>can</em>
-answer is which of the scheduler's two ledgers refuses. Over 85,563
-ledgered node-samples, summed committed vCPU is only <strong>1.04x</strong>
-summed measured vCPU -- the capacity counters charge barely more
-than the running-domain census does. Committed exceeded measured in
-12.4% of node-samples and measured exceeded committed in 10.3%. Of
-the 1,965 <code>sufficient_idle_cpu</code> refusals whose payload could be
-classified, <strong>30.6% would have been admitted on the measurement
-alone</strong>, 27.4% would have been admitted on the counters alone, and
-42.0% were refused by both. In 15.1% the node measured <em>exactly
-zero</em> running vCPU at the moment it refused.</p>
-<p>(Both of these are computed from the raw series and census inside
-the bundles rather than from the committed summary records, which do
-not carry the underlying fields. The 1,965 exceeds the 1,865 counted
-in the stage table above because it is taken over all 217 bundles,
-including the thirteen whose series was absent but whose census was
-not.)</p>
-<p>Read together, the finding of this subsection is unchanged but
-sharper. What runs out is an allocation figure and not real CPU --
-both <code>measured</code> and <code>committed</code> count vCPU, and the conductor says
-those vCPU are 82% idle. But it is <strong>not</strong> specifically the
-capacity counters: nearly seven refusals in ten would have happened
-without them, from the running-domain count alone. Both are compared
-against the same <code>cpu_schedulable x CPU_OVERCOMMIT_RATIO</code>, so a
-wider node relieves both, and no fix to the counters would relieve
-either.</p>
-<h3 id="a-node-can-record-twice-its-own-ledger-and-sizing-would-hide-it">A node can record twice its own ledger, and sizing would hide it<a class="headerlink" href="#a-node-can-record-twice-its-own-ledger-and-sizing-would-hide-it" title="Permanent link">&para;</a></h3>
-<p>The instrument found one thing the plan was not looking for. A
-capacity row can record a node as committing more vCPU than its own
-limit allows. Because <code>_has_sufficient_cpu()</code> admits on
-<code>max(measured, committed) + requested &lt;= limit</code>, a node in that
-state refuses <strong>every</strong> subsequent create no matter how idle it is,
-and the cluster silently loses a hypervisor. That is the #3772 507
-signature arrived at from the counters rather than from real
-exhaustion, and it is a defect a bigger cloud would mask rather than
-fix.</p>
-<p>Quantified over the window, it is <strong>real, reproducible, and rare</strong>:</p>
-<ul>
-<li><strong>18 of 85,563</strong> ledgered node-samples (0.021%) recorded a node
-  above its own limit.</li>
-<li>All 18 fall in <strong>2 of 204</strong> job-runs (1.0%), both <code>Debian 12 tier</code>
-  on <code>slim-tier</code>. The node's limit did not move in either run.</li>
-<li>Run 33752413862 (2026-09-03): node <code>750651c4</code>, limit 3.0
-  throughout, committed p90 <strong>6.0</strong> and peak <strong>7.0</strong> -- a fraction
-  of 2.0 and 2.33, held for most of the run. <strong>That job passed.</strong></li>
-<li>Run 33948911843 (2026-09-05): node <code>2060c55b</code>, limit 3.0
-  throughout, committed peak <strong>6.0</strong>. That job failed.</li>
-<li>3 of the 18 samples had <code>cpu_measured</code> of exactly zero.</li>
-</ul>
-<p>It is therefore not a driver of the 507 family's <em>frequency</em>: at one
-percent of job-runs it cannot explain a 76% tier failure rate, and
-the phase 2 survey's expectation that it might be the most
-decision-relevant number in the dataset is not borne out. It remains
-a real defect, and phase 2 files it rather than fixing it.</p>
-<p><strong>Step 2f established the mechanism, and it is not a breach of the
-guarded UPDATE.</strong> All 18 node-samples are the <em>first</em> samples after
-the capacity rows appear, and the journals put the reconciler's
-first pass between the last no-row sample and the first over-limit
-one, to within seconds, in both runs. <code>scheduler_node_capacity</code> has
-no rows until that pass, which is registered
-<code>schedule.every(5).minutes</code> (<code>daemons/cluster/main.py:750</code>) and so
-first runs five minutes after the cluster daemon starts. Until then
-<code>admit_instance_placement()</code> takes P7's fail-open branch on every
-node at once -- it writes the placement and the <code>instance_location</code>
-row and touches no counter -- and the CPU pre-filter charges
-<code>committed_cpus</code> zero, leaving only <code>cpu_total_instance_vcpus</code>,
-which counts <em>running</em> domains and republishes once a minute. So a
-burst of concurrent creates that are still fetching images all
-measure zero and all land. The first reconcile pass then recomputes
-<code>used_cpus</code> from those reference rows and faithfully writes 6 or 7
-onto a row whose <code>limit_cpus</code> is 3. The counter is a correct reading
-of an incorrect placement.</p>
-<p>That window is universal, not rare: in <strong>all 204</strong> job-runs the
-capacity table is empty for a contiguous prefix of <strong>135 to 210
-seconds</strong> (median 165), and in <strong>176 of 204 (86%)</strong> instances were
-already running before any capacity row existed. What is rare is the
-overshoot, and its rarity is the ledger's size -- both occurrences
-are <code>slim-tier</code>, whose network node has a <code>limit_cpus</code> of 3.
-Ruled out with the same evidence: the P5 forced ground-truth write
-(its <code>placement recorded despite exceeding capacity guard</code> event
-appears in neither bundle), a lowered limit, <code>_reconcile_placement()</code>'s
-documented restart overcount, and a mid-run loss of the rows.</p>
-<p><strong>PR #4106 did not close the window in CI.</strong> Six failing merge
-runs after it landed (34163288637, 34171977552, 34178278720,
-34119030297, 34125365386 on <code>slim-tier</code>, 34168326220 on
-<code>slim-primary</code>; journals read 2026-09-08) all show the one-shot
-<code>_force_capacity_reconcile_if_unguarded()</code> firing at election
-130-150 s <em>before</em> the test step and its forced pass logging
-<code>nodes=0 nodes_added=0</code>, because no hypervisor had published
-metrics yet. Rows then appeared on the five-minute cadence at
-+155..+181 s -- the same 135-210 s prefix as before -- with 10-17
-<code>node_not_sized</code> placements per run and a first-pass <code>drift_cpus</code>
-of 2-8. The same reading found that every post-#4106
-<code>sufficient_idle_cpu</code> refusal was a <code>force_placement</code> create onto
-an infra hypervisor whose ledger of 3 was genuinely full while the
-cluster held 3-9 of 12 vCPU, which is direct evidence for the
-shape phase 4 must choose (see that phase). The window fix and the
-suite-side handling are owned by
-<a href="../PLAN-transient-capacity-refusals/">A capacity refusal is transient</a>,
-whose Situation section carries the per-run table.</p>
-<h3 id="the-under-cloud-budget-this-spends">The under-cloud budget this spends<a class="headerlink" href="#the-under-cloud-budget-this-spends" title="Permanent link">&para;</a></h3>
-<p><strong>Not measured by this instrument.</strong> These figures are read from
-<code>sfcbr</code>'s own capacity and from the topology files, and the probe
-runs inside the nested clouds rather than the under-cloud.</p>
-<p><code>sfcbr</code> publishes a 234 vCPU admission ledger across six
-hypervisors and has 376 GB of physical RAM. One merge run builds
-<strong>six</strong> nested clouds (<code>Debian 12 cluster</code>, <code>Ubuntu 24.04
-cluster</code>, <code>Guests</code>, <code>Ansible modules</code> and <code>Node lifecycle</code> on
-<code>slim-primary</code>; <code>Debian 12 tier</code> on <code>slim-tier</code>), so it allocates
-about 132 vCPU and 356 GB of guest RAM, plus a 1 vCPU / 2 GB
-runner apiece.</p>
-<p>That is ~95% of the under-cloud's physical memory for a single
-merge run, which is why the queue is throttled to two parallel
-builds and why contention shows up as unrelated-looking flakes.
-<strong>RAM, not vCPU, is the scarce under-cloud resource</strong>, and the CI
-clouds are the largest consumer of it. Closing the loop with the
-measured figures above: an inner node's committed vRAM reaches
-43-76% of its <em>physical</em> RAM on <code>slim-primary</code> and 67-101% on the
-tier, so that 356 GB is not obviously over-provisioned per node --
-any saving has to come from having fewer nodes, which is what phase
-4 will weigh.</p>
-<h3 id="the-headroom-band-with-numbers">The headroom band, with numbers<a class="headerlink" href="#the-headroom-band-with-numbers" title="Permanent link">&para;</a></h3>
-<p>Phase 0's D3 fixed the band's <em>form</em> and left its numbers to this
-phase, with provisional bounds of 0.35 and 0.70. Phase 2's D21 added
-a per-node component. Both are now set from the distribution.</p>
-<p><strong>Cluster-wide upper bound: keep 0.70.</strong> In 154 <code>slim-primary</code>
-job-runs the cluster-wide p90 fraction never reached it -- the
-maximum observed is 0.519 -- and 37 of 50 <code>slim-tier</code> job-runs
-exceed it. It separates the cloud this plan agrees is too small from
-the ones it does not, with no false positives in the window.</p>
-<p><strong>Cluster-wide lower bound: 0.35 is numerically right and
-operationally awkward.</strong> 104 of 154 <code>slim-primary</code> job-runs fall
-below it, and none of the tier's do. That is the correct <em>finding</em>
--- <code>slim-primary</code> really is running at a third of its ledger -- but
-a per-run warning that fires on two runs in three is noise. The
-number stands; phase 5 has to decide whether the lower bound is
-evaluated per run or against a job's median across a window, and
-this phase does not decide that for it.</p>
-<p><strong>Per-node upper bound: 0.85, as a first proposal.</strong> Taking the
-p90 of the per-node maximum, job-runs which recorded <em>no</em> capacity
-refusal at all (n=44) sit at a median of 0.667 and exceed 0.85 in
-only <strong>1 of 44</strong> cases; job-runs which recorded at least one
-(n=160) sit at a median of 1.000 and exceed 0.85 in <strong>123 of 160</strong>.
-That is the cleanest separation any statistic in the dataset
-achieves, and 0.85 is where it falls. It fires on 48% of
-<code>slim-primary</code> and 100% of <code>slim-tier</code> job-runs today, which is the
-point of proposing it: the cluster-wide figure says those clouds
-are fine and they are not.</p>
-<p><strong>No per-node lower bound is proposable from this window.</strong> The
-statistic is saturated at the top, so its distribution says nothing
-about what "too empty per node" would look like.</p>
-<h3 id="what-the-baseline-does-not-know">What the baseline does not know<a class="headerlink" href="#what-the-baseline-does-not-know" title="Permanent link">&para;</a></h3>
-<p>One thing, stated once more because it is easy to read as zero and
-is not:</p>
-<ul>
-<li><strong>Capacity guard refusals: unknown.</strong> Not collected in this
-  window, because the census filter matched only the scheduler's
-  stage events. Phase 2's D20 fixes it and phase 2's step 2g
-  re-measures over a short post-fix window.</li>
-</ul>
-<p>The second entry that stood here -- the ledger-unreadable samples --
-<strong>is now known</strong>, and step 2f answered it from the shape of the data
-rather than from D19's flag. 2,276 of 21,517 usable samples (10.6%),
-in every one of the 204 job-runs, have every node's capacity row read
-as absent at once; every committed-CPU figure above excludes them. In
-<strong>every</strong> job-run those samples are exactly a contiguous <em>prefix</em> of
-the series, 9 to 14 samples long, ending at the reconciler's first
-pass -- never mid-run, never scattered, never twice. A failed gRPC
-read is an independent per-sample event and would not land only on
-the head of 204 independent job-runs. So this is an <strong>unpopulated
-table during cluster warm-up, not a failing read</strong>, and there is no
-read-reliability defect to file.</p>
-<p>What the window does expose is the other side of the same fact: for
-those 135 to 210 seconds the admission guard does not exist, which is
-where the 18 refusal payloads that fired with <code>capacity_row_present</code>
-false come from, and which is #4087, recorded in <em>Bugs fixed
-during this work</em> below. Step 2g should confirm the classification
-prospectively once D19's flag is running -- <code>capacity_degraded</code>
-should read false throughout the prefix -- but that is a
-confirmation, not an open question.</p>
-<h3 id="reproducing-the-measurements">Reproducing the measurements<a class="headerlink" href="#reproducing-the-measurements" title="Permanent link">&para;</a></h3>
-<p>The measured figures now come from a tool we own, which is what
-this plan existed to fix. The hand-collected ones still do not.</p>
-<ul>
-<li><strong>The baseline itself</strong>: <code>tools/ci_headroom_harvest.py</code>, with the
-  exact command and window in
-  <a href="../data/ci-cloud-sizing-baseline/"><code>docs/plans/data/ci-cloud-sizing-baseline/README.md</code></a>.
-  The dataset in that directory is the source for every figure above
-  marked as measured, except the two named as coming from the raw
-  bundles.</li>
-<li><strong>A single job's own numbers</strong>: <code>tools/ci_headroom_report.py</code>
-  against the <code>traces/headroom.jsonl</code> and
-  <code>traces/headroom-census.json</code> in that job's bundle, or <code>--json</code> for
-  the machine-readable record the harvest consumes. Every cluster job
-  also prints the prose summary into its own log.</li>
-<li><strong>Job pass rates</strong>: <code>gh api
-  "repos/shakenfist/shakenfist/actions/workflows/functional-tests.yml/runs?event=merge_group"</code>
-  then <code>.../runs/&lt;id&gt;/jobs</code>. The job names the API returns are not
-  the matrix names -- the reusable workflow contributes its own, so
-  <code>Debian 12 cluster</code> arrives as <code>Debian 12 cluster (collection) /
-  Smoke tests (collection)</code>.</li>
-<li><strong>Ledger and refusal evidence for one run</strong>: <code>ci-status
-  shakenfist/shakenfist logs &lt;job id&gt;</code>, then grep for
-  <code>cpu_schedulable</code>, <code>limit_cpus</code> and <code>No nodes remaining at
-  scheduling stage</code>. The scheduler's per-candidate audit payload is
-  written on <em>every</em> schedule, not only failing ones:
-  <code>_log_and_raise_on_error()</code> emits <code>schedule at stage {stage}</code>
-  carrying <code>extra['dropped']</code> whenever candidates survived, and
-  <code>schedule has no candidates at stage {stage}, aborting</code> when none
-  did. A green run therefore does record its refusals.</li>
-<li><strong>Per-instance utilisation (hand-collected)</strong>: the conductor
-  database, copied as described in the private-ci access notes; join
-  <code>workflow_cost_samples</code> to <code>workflow_costs</code> on <code>namespace</code> and
-  filter <code>is_runner = 0</code>. The conductor's own published <em>sizing
-  recommendations</em> remain untrustworthy (they aggregate a whole
-  nested cloud into the runner's namespace and read a guest's RSS
-  as its working set); the raw per-instance samples used here are
-  not affected by that, because they are not aggregated.</li>
-<li><strong>Live under-cloud capacity (hand-collected)</strong>: <code>GET
-  /admin/resources</code> on <code>sfcbr</code>, which is also the endpoint phase 1
-  makes CI sample from inside each nested cloud.</li>
-</ul>
+<h3 id="what-this-is-not">What this is not<a class="headerlink" href="#what-this-is-not" title="Permanent link">&para;</a></h3>
+<p>Claims are not the answer to a forced placement. A namespace claim
+is cluster-wide and carries no node affinity (scheduler-reservations
+D14), <code>shakenfist/scheduler.py</code> never reads <code>namespace_claims</code>, and
+the stage that refuses is per-node. Per-test namespaces holding
+claims would starve one another's unclaimed pool, and phase 5's
+hard ceiling caps the holder rather than helping it. The one
+legitimate claim in CI is the conductor holding one per run against
+<em>other</em> merge groups on the under-cloud, which is
+scheduler-reservations phase 4c. Node-scoped claims are considered
+under open question 5 below and declined for now.</p>
 <h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Make the size of a CI test cloud a measured, continuously-checked
-property rather than a historical accident, and re-shape the
-topologies so that every job has enough admission ledger for its
-assertions to mean what they say -- at lower under-cloud memory
-cost than today.</p>
-<p>The problem has three parts, and they must be solved in this
-order:</p>
-<ol>
-<li><strong>We cannot see headroom.</strong> No CI job records how full its
-   cloud got. A topology can drift into being too small, or stay
-   twice as large as it needs to be, and the only symptom is a
-   flake attributed to whichever test drew the short straw. That
-   ambiguity is what turned one capacity shortage into six
-   per-test issues before #3772 unified them.</li>
-<li><strong>We would lose coverage by growing.</strong> A cloud that is too
-   small exercises the system's behaviour under exhaustion for
-   free. Some of what it catches are real defects -- #3772's own
-   verdict is that "nothing in the system, server or client,
-   treats 'no capacity right now' as the transient condition it
-   is". Growing the clouds would silence that without fixing it.</li>
-<li><strong>The shape is wrong before the count is.</strong> Fewer, wider nodes
-   buy more ledger for the same spend, and 12 GB per node buys
-   nothing at all on a five-hypervisor topology.</li>
-</ol>
-<h3 id="yes-the-tier-should-get-bigger-with-a-condition">Yes, the tier should get bigger -- with a condition<a class="headerlink" href="#yes-the-tier-should-get-bigger-with-a-condition" title="Permanent link">&para;</a></h3>
-<p><code>slim-tier</code> exists to give multi-instance <code>sf-database</code> coverage:
-two <code>database_node</code> members, and <code>test_database_tier</code> asserting
-both see a share of inbound gRPC. Being the smallest cloud in the
-fleet is incidental to that purpose, and at a 19% pass rate it is
-not delivering the coverage it was built for -- a job that fails
-four runs in five teaches the reader to ignore it, and every
-merge it ejects costs a full rebuild of six clouds.</p>
-<p>Spending more per run to lower the failure rate is the right call
-here, and it is cheap: three 6 vCPU nodes double the tier's ledger
-to 24 for <strong>+6 vCPU and no extra RAM</strong>. But it is only defensible
-with a condition attached, so this plan makes that condition
-structural rather than a promise:</p>
-<blockquote>
-<p><strong>Phase 3 must land before phase 4.</strong> Every failure signature
-the small clouds currently produce is either (a) reproduced by
-an explicit test that fills a cluster deliberately and asserts
-the documented behaviour, or (b) written down as a known defect
-with an open issue, before any topology grows.</p>
-</blockquote>
-<p>Concretely, the coverage at risk is: the <code>507
-sufficient_idle_cpu</code> path itself (#3772); the claim-admission
-refusal path (#3907, now tolerated by a retry wrapper); and
-<code>test_affinity</code>, which is the most frequent <code>slim-primary</code> failure
-and whose signature -- "instances that should share a node do
-not" -- is exactly what a full cluster produces when affinity
-loses to load ordering (#3565). Growing the cloud will make that
-test greener without anyone having decided whether the scheduler
-was right. That is the lemon squeezed too far, and phase 3 is
-where we stop squeezing and start asserting.</p>
-<p>That "greener" claim needs a caveat, though. A 2026-08-26 comment
-on #3565 corrects the earlier diagnosis on the same run: the
-affinity target node survived <code>sufficient_idle_cpu</code> and was then
-dropped at <code>sufficient_idle_memory</code>, so the most recent
-fully-traced occurrence is memory-bound, not CPU-bound. The
-candidate shapes below buy their RAM saving by consolidating onto
-fewer, larger hypervisors, which raises instances per node even
-with per-node RAM unchanged -- so the same reshape can relax the
-CPU filter while tightening the memory one. Whether the test
-actually gets greener is therefore not settled by this plan; it is
-one more thing phase 2's per-stage refusal counts must show.</p>
-<p><em>Those counts are now in, and they answer the memory half of it:</em>
-across 204 instrumented job-runs the <code>sufficient_idle_memory</code> stage
-was evaluated 23,091 times and dropped <strong>nothing</strong>, on either
-topology -- see <em>What the refusals say, per stage</em> above. The
-tightening this paragraph worried about is not visible in the
-current shapes; whether a reshape creates it is phase 4's to check
-against the same counts.</p>
-<p><em>Correction (2026-09-01), from scheduler-reservations phase 6:</em>
-the worry above is discharged, and <code>test_affinity</code> should be
-dropped from the corpus of signatures this plan has to worry
-about masking. It no longer asserts co-location at all. #3565's
-disposition established that the traced failure had the candidate
-set collapsing to a single node before affinity was scored, so the
-test was asserting a guarantee the product never made; it now
-asserts that the scheduler <em>scored</em> the affine node highest among
-the candidates it had, and <strong>skips</strong> when the affine node was
-ejected by an admission filter before scoring. That skip is
-exactly the condition a small cloud produces, so growing the
-cloud can no longer turn this test green by hiding the question --
-the question has been answered, and the test reports "no
-information" rather than passing. #3772 and #3907 are unaffected
-and remain the live masking risk.</p>
-<h3 id="candidate-shapes">Candidate shapes<a class="headerlink" href="#candidate-shapes" title="Permanent link">&para;</a></h3>
-<p>Illustrative only. Phase 2 has now supplied the peak-demand figure
--- <em>How full the clouds actually get</em> and <em>The cluster-wide figure
-hides the node that refuses</em> above -- and deliberately does <strong>not</strong>
-turn it into a proposal. Phase 4 chooses a shape, and phase 3 gates
-phase 4.</p>
-<table>
-<thead>
-<tr>
-<th>Topology</th>
-<th>Ledger</th>
-<th>vCPU</th>
-<th>RAM GB</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>slim-primary</code> today</td>
-<td>27</td>
-<td>24</td>
-<td>64</td>
-</tr>
-<tr>
-<td><code>slim-tier</code> today</td>
-<td>~12</td>
-<td>12</td>
-<td>36</td>
-</tr>
-<tr>
-<td>primary as 4 x 5 vCPU plus a database node</td>
-<td>30</td>
-<td>24</td>
-<td>54</td>
-</tr>
-<tr>
-<td>primary as 3 x 6 vCPU plus a database node</td>
-<td>30</td>
-<td>22</td>
-<td>42</td>
-</tr>
-<tr>
-<td>tier as 3 x 6 vCPU</td>
-<td>24</td>
-<td>18</td>
-<td>36</td>
-</tr>
-<tr>
-<td>tier as 3 x 8 vCPU</td>
-<td>42</td>
-<td>24</td>
-<td>36</td>
-</tr>
-</tbody>
-</table>
-<p>A plausible landing point -- <code>slim-primary</code> at four 5 vCPU
-hypervisors with the database node bumped to 6 GB, <code>slim-tier</code> at
-three 6 vCPU nodes -- costs a merge run <strong>+6 vCPU and -50 GB of
-RAM</strong>, raises every cloud's ledger, and spends the saving on the
-resource the under-cloud actually runs out of.</p>
+<p>Make a capacity refusal something a caller can wait out rather
+than a failure it has to report, without hiding the refusal from
+the people who need to see it. Concretely:</p>
+<ul>
+<li>A cluster's first guarded placement should happen within seconds
+  of its hypervisors publishing metrics, not five minutes after its
+  cluster daemon started.</li>
+<li>A node should stop charging for instances that no longer exist
+  within seconds of their deletion, not within a metrics period.</li>
+<li>The functional suite should treat a 507 at <code>create_instance</code> as
+  "not yet" -- waiting, informed by the cluster's own published
+  headroom, for the node it needs -- and should say, per test and
+  per run, how long it waited, so that a topology that makes the
+  suite wait is visible rather than merely slower.</li>
+<li>The API should tell a client that a refusal is transient and
+  when to try again, and the Python client should be able to act
+  on that when asked to.</li>
+<li>Whether the server itself should queue a create until it fits is
+  decided from measurement, not argued from first principles, and
+  the decision is written down either way.</li>
+</ul>
+<p>The merge-queue outcome this is measured by is the <code>Debian 12
+tier</code> job's pass rate, which is 24% in the baseline and should be
+comparable to the other cluster jobs (78-96%) once this plan and
+the sizing plan's phase 4 have both landed.</p>
 <h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>These were the phase 0 agenda, and phase 0 has answered them.
-Each is kept with its reasoning intact and a pointer to the
-decision that settled it, in
-<a href="../PLAN-ci-cloud-sizing-phase-00-decisions/">PLAN-ci-cloud-sizing-phase-00-decisions.md</a>;
-two of the six had a premise the phase 0 survey corrected, and
-those are corrected here as well.</p>
-<ol>
-<li><strong>Widen the nodes, or lower the reservation?</strong>
-   <code>examples/_shared/site.yml</code> honours a pre-set
-   <code>node_cpu_reservation_threads</code>, so lowering it to 1 would gain
-   50% more ledger. It is not free, though: CI's inventory is
-   generated by <code>tools/ci-make-inventory.py</code> in
-   <code>shakenfist/actions</code>, whose <code>render_node_vars()</code> emits a fixed
-   block with no hook for arbitrary host vars, so the override
-   needs a generator change or a cluster-wide <code>--extra-vars</code>. The
-   deeper cost is that CI would stop exercising the production
-   reservation arithmetic, which is precisely where #3813 lived.
-   <strong>Decided in phase 0 as D1: widen the nodes, keep the default.</strong></li>
-<li><strong>What is <code>slim-tier</code> for?</strong> If it is <code>sf-database</code> tier
-   coverage, it should be sized for parity and stop being the
-   scarcity topology. If it is deliberately the small one, that
-   should be written down and its suite trimmed to what a small
-   cloud can run.
-   <strong>Decided in phase 0 as D2: it is database-tier coverage, sized
-   for parity.</strong></li>
-<li><strong>What is the right headroom band?</strong> Proposed starting point:
-   peak committed vCPU at or below 70% of ledger at p90 across a
-   run, and zero <code>sufficient_idle_cpu</code> refusals in a green run.
-   Phase 2 supplies the distribution that makes those numbers
-   honest, or replaces them. <strong>Decided in phase 0 as D3: the form
-   now, the numbers in phase 2.</strong> <em>Answered by the phase 2
-   baseline: the cluster-wide upper bound of 0.70 is defended, the
-   lower bound of 0.35 is kept with an open question about how it
-   is evaluated, and a per-node upper bound of 0.85 is proposed for
-   the first time -- see</em> The headroom band, with numbers <em>above.</em></li>
-<li><strong>Does anything still need five hypervisors?</strong>
-   <code>nodelifecycletests.sh</code> needs a script host, a network node and
-   two distinct victims, and <code>functional-tests.yml</code> hardcodes
-   <code>10.0.0.20</code>-<code>10.0.0.24</code> when picking a random upload target.
-   That job may keep its current shape while the others shrink.
-   <strong>Decided in phase 0 as D4: it keeps five hypervisors; the
-   hardcoded IP list goes anyway.</strong></li>
-<li><strong>Is memory a second binding constraint?</strong> One post-#3813 run
-   refused with <code>sufficient_idle_memory</code>, which <code>_has_sufficient_ram</code>
-   measures against live available memory rather than against a
-   ledger. The suspicion that page cache inflates that denominator
-   does not survive checking: the resources daemon publishes
-   <code>psutil.virtual_memory().available</code>, which is <code>MemAvailable</code> and
-   already excludes reclaimable cache, so the refusal was honest.
-   <strong>Decided in phase 0 as D5: memory is a real second dimension.</strong>
-   <em>Narrowed by the phase 2 baseline: memory refused nothing in
-   23,091 stage evaluations across 204 job-runs, so it is not a
-   binding admission dimension in either current shape. D5's
-   operative clause survives and now has numbers -- committed vRAM
-   already reaches 76% of a <code>slim-primary</code> node's physical RAM and
-   101% of a tier node's -- see</em> Memory does not bind, but is not
-   spare either <em>above.</em></li>
-<li><strong>How much of the phantom stays?</strong> <code>slim-primary</code> deliberately
-   lists an unreachable <code>sf-absent</code> hypervisor as the regression
-   guard for the 2026-07-20 absent-node deploy failure. Any
-   reshaping keeps it; the phase plans must say so explicitly so
-   that nobody "tidies" it away. <strong>Decided in phase 0 as D6.</strong></li>
-</ol>
+<p>These were settled at planning time from the research recorded in
+the Situation section; the reasoning is kept so that a later
+reader can disagree with it on the evidence rather than
+re-deriving it.</p>
+<h3 id="1-where-does-the-retry-live">1. Where does the retry live?<a class="headerlink" href="#1-where-does-the-retry-live" title="Permanent link">&para;</a></h3>
+<p><strong>In the suite first, in the client second, in the server only
+if the data says so.</strong> The scheduler-reservations plan left this
+undecided ("the client SDK, the CI base class, or server-side
+admission queueing") and deliberately held it until #3772 had soak
+data from a <code>develop</code> carrying atomic admission. That soak data
+now exists -- the phase 2 baseline and the journals above -- and
+it says the refusals are correct against the ledger. A suite-side
+wait is the smallest change that stops the bleeding, it is where
+<code>retry_while_transient</code> already lives, and it is the only place a
+wait can be <em>informed</em>: <code>GET /admin/resources</code> publishes per node
+<code>cpu_available = cpu_hard_max - max(measured, committed)</code>, which is
+the pre-filter's own arithmetic, so a pinned test can wait for the
+node it needs rather than for the cluster. The client change is
+next because it is what makes the behaviour available to operators
+and to the downstream repositories' suites. A server-side queue
+reverses scheduler-reservations D8 and is phase 5's decision.</p>
+<h3 id="2-does-a-retry-hide-the-problem">2. Does a retry hide the problem?<a class="headerlink" href="#2-does-a-retry-hide-the-problem" title="Permanent link">&para;</a></h3>
+<p><strong>Only if it is silent, so it will not be.</strong> Both sibling plans
+say a retry would mask whether a bigger cloud or atomic admission
+actually changed the failure rate. The wrapper in phase 2 therefore
+records every wait as a test detail (how long, on which node, what
+the headroom looked like) and the run publishes a summary -- total
+seconds waited, waits per test, longest wait -- through the same
+bundle the headroom probe uses, so the sizing plan's phase 5
+guardrails can warn on it. A cloud that makes the suite wait
+becomes a number in every run instead of a flake in some. The
+sizing plan's phase 3 saturation tests, which assert what a full
+cluster does <em>today</em>, call the raw client and are exempt from the
+wrapper by an explicit marker.</p>
+<h3 id="3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened">3. Why is allocation less reliable in the first minutes, and can the window be shortened?<a class="headerlink" href="#3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened" title="Permanent link">&para;</a></h3>
+<p><strong>Because the one-shot fires before there is anything to
+reconcile; yes, from 135-210 s to roughly a
+minute.</strong> <code>_force_capacity_reconcile_if_unguarded()</code>
+runs once, on the election path, and tests <code>if rows:</code>. On a fresh
+cluster the cluster daemon wins its election within 2.5-7.5 s of
+starting, before <code>sf-resources</code> on any hypervisor has published --
+the pass finds nothing, and nothing re-checks. Phase 1 makes the
+check a property of the elected loop rather than of election:
+compare the set of active hypervisors that have published metrics
+against the set with a capacity row, and make the reconcile due
+when they differ. That also closes the narrower hole</p>
+<h1 id="4106-left-a-node-that-publishes-late-or-whose-row-the">4106 left -- a node that publishes late, or whose row the<a class="headerlink" href="#4106-left-a-node-that-publishes-late-or-whose-row-the" title="Permanent link">&para;</a></h1>
+<p>reconciler removed on stale metrics, admits unguarded for up to
+five minutes today.</p>
+<p>Note what bounds the improvement, because an earlier draft of this
+section claimed seconds. The elected loop polls every
+<code>ELECTED_LOOP_POLL_SECONDS = 5</code>
+(<code>shakenfist/daemons/cluster/main.py:63</code>) but its maintenance body
+sits behind <code>if now - last_loop_run &gt;= 60</code> (<code>:912</code>), and
+<code>_run_due_scheduled_jobs()</code> is inside that gate (<code>:918</code>). Marking
+the job due does not run it any sooner than the next 60 s tick, so
+a check placed inside the gate closes the window to about a
+minute. Closing it faster means running the comparison outside the
+gate on the 5 s poll, which is a fixed-rate database read and is
+not free. Phase 1 decides between those two; see its plan.</p>
+<h3 id="4-why-does-a-node-refuse-for-a-minute-after-its-instances-are-deleted">4. Why does a node refuse for a minute after its instances are deleted?<a class="headerlink" href="#4-why-does-a-node-refuse-for-a-minute-after-its-instances-are-deleted" title="Permanent link">&para;</a></h3>
+<p><strong>Because measurement is a 60 s poll of libvirt and the pre-filter
+charges the larger of measurement and ledger.</strong> The rule is right:
+it is what makes the ledger safe against instances the reconciler
+has not yet counted. What is wrong is the cadence. Phase 3 has
+<code>sf-resources</code> notice a change in the running-domain set cheaply
+(a <code>listAllDomains</code> every few seconds costs nothing and touches no
+database) and publish immediately when it changes, keeping the
+full 60 s publish for everything else. That is activity-coupled
+rather than fixed-rate, so it does not move the database load
+budget's idle figure, and it is declared in
+<code>database_load_budget.yaml</code> as such.</p>
+<h3 id="5-should-there-be-node-scoped-claims">5. Should there be node-scoped claims?<a class="headerlink" href="#5-should-there-be-node-scoped-claims" title="Permanent link">&para;</a></h3>
+<p><strong>Not now, and not for this problem.</strong> The question was raised at
+planning time because a claim "on hypervisor X for N vCPU" is the
+shape a pinned test would want: hold the reservation, then create
+against it, with no window between "the node has room" and "my
+create landed" for another worker to take it. Against that:</p>
+<ul>
+<li>For CI it buys one thing over an informed wait -- closing that
+  window -- and the window is small at concurrency 5. Every other
+  property (waiting for the right node, bounded by a deadline,
+  visible in the run) the phase 2 wrapper has already.</li>
+<li>It is a second ledger dimension on every <code>scheduler_node_capacity</code>
+  row (<code>claimed_cpus</code> beside <code>used_cpus</code>, with the unclaimed
+  admission guarded against <code>limit - claimed</code>), which the guarded
+  UPDATE, the reconciler, the cluster singleton's migration on
+  claim create and delete, and the pre-filter all have to learn.
+  That is scheduler-reservations phases 3 and 4 again, one level
+  down, while phase 5 has not decided what enforcement of the
+  existing claims even means.</li>
+<li>The pre-filter is claim-blind today; a node claim only works if
+  <code>_has_sufficient_cpu()</code> consults it, which makes the pre-filter a
+  ledger reader in a way D1 chose not to.</li>
+</ul>
+<p>Where it <em>would</em> earn its place is an operator need, not a test
+need: evacuating or draining a node (#1364) has to know there is
+room on the destinations before it starts moving instances, and a
+live migration wants the same guarantee. When that lifecycle is
+built, a per-node reservation is the primitive it needs, and it
+should be designed then, against the claim machinery as it stands
+after phase 5. Recorded under Future work in the
+scheduler-reservations plan so it is not lost.</p>
+<h3 id="6-should-the-demand-guard-be-changed-here">6. Should the demand guard be changed here?<a class="headerlink" href="#6-should-the-demand-guard-be-changed-here" title="Permanent link">&para;</a></h3>
+<p><strong>No; it is scheduler-reservations' and is recorded there.</strong> The
+bound of <code>0.75 x cpu_schedulable</code> cannot be met on a 1- or 2-thread
+node under any real load, so on the CI topologies the first walk
+never admits and the waiver walk always does. Rescaling or waiving
+it below some <code>cpu_schedulable</code> is a one-line change to the demand
+clause, but it is phase 4a's clause and the load it saves is the
+scheduler-reservations plan's to measure. This plan cites the
+evidence and moves on.</p>
+<h3 id="7-should-the-topology-change-here">7. Should the topology change here?<a class="headerlink" href="#7-should-the-topology-change-here" title="Permanent link">&para;</a></h3>
+<p><strong>No; it is the sizing plan's phase 4, and the evidence here
+sharpens what that phase must choose.</strong> Any shape that leaves an
+infra hypervisor at <code>limit_cpus</code> 3 leaves this failure in place,
+because the pinned tests select those nodes. The sizing plan's
+candidate "tier as 3 x 6 vCPU" gives <code>primary</code> and <code>sf1</code> a ledger
+of 6 each and <code>sf2</code> 12, which is the smallest shape in its table
+that changes the number that binds. The sizing plan is updated to
+say so.</p>
+<h3 id="8-should-the-server-queue-a-create-that-does-not-fit">8. Should the server queue a create that does not fit?<a class="headerlink" href="#8-should-the-server-queue-a-create-that-does-not-fit" title="Permanent link">&para;</a></h3>
+<p><strong>Decide in phase 5, from phase 2's wait data.</strong> The machinery
+exists -- <code>BaseClusterOperation.defer_with_backoff()</code> already
+re-enqueues with a delay for artifact fetches and network
+operations -- and a <code>202</code> with the instance held in <code>initial</code> (or a
+new <code>scheduling</code> state) until placement succeeds or a deadline
+passes is a contained change. Against it: it is exactly the
+"hold-until-fittable" that scheduler-reservations D8 rejected as
+queue-state surface the project does not want; it has no fairness
+model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
+ones, and a pinned create starves worst); waiting instances hold
+IPAM allocations, so a CPU shortage can become an address shortage;
+and the client's <code>_await_instance_create</code> has a 900 s ceiling that
+bounds any useful deadline. If phase 2 shows the suite waits are
+short and few once the topology is right, the answer is no and the
+phase closes as Abandoned with the numbers. If they are long or
+many, the phase designs the queue -- FIFO by request time, pinned
+placements admitted against their node only -- and reverses D8 in
+writing.</p>
+<h3 id="9-what-should-the-api-say">9. What should the API say?<a class="headerlink" href="#9-what-should-the-api-say" title="Permanent link">&para;</a></h3>
+<p><strong>That it is transient, and when to try again.</strong> Both <code>507</code>
+bodies from <code>POST /instances</code> (<code>external_api/instance.py:906</code> for
+the pre-filter, <code>:976-981</code> for the guard) are bare strings. Phase 4
+adds a <code>Retry-After</code> header and a machine-readable <code>stage</code> and
+<code>transient: true</code> to the error body, so a client does not have to
+parse prose to know which refusal it got. The honest hint is a
+fixed conservative constant (15 s, matching <code>defer()</code>'s default)
+rather than a computed one: the server has no pending-release
+horizon and a number that implies knowledge it lacks is worse than
+one that does not. The client's opt-in retry reuses the shape of
+its existing 406 loop and is bounded by the same deadline. The
+affinity <code>409</code> is deliberately ordered first in the handler and
+must never be retried.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<!-- shared-block: plan-status-vocabulary v1 -->
+<p>Plan status vocabulary (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+<code>templates/shared-blocks/plan-status-vocabulary.md</code>):</p>
+<p>A status cell -- in the master plan's own Execution phase table, and
+in the row <code>docs/plans/index.md</code> carries for the plan -- holds
+exactly one of these terms and nothing else:</p>
+<ul>
+<li><code>Proposed</code> -- written down as a concept, not yet scheduled.</li>
+<li><code>Not started</code> -- scheduled, but no work has begun.</li>
+<li><code>In progress</code> -- work has begun and has not finished.</li>
+<li><code>Blocked</code> -- cannot proceed until something outside the plan
+  changes. Say what, in the plan.</li>
+<li><code>Complete</code> -- the work is done.</li>
+<li><code>Abandoned</code> -- deliberately dropped without being done.</li>
+<li><code>Superseded</code> -- replaced by another plan, which the plan names.</li>
+</ul>
+<p>The term is the whole cell. No dates, no phase arithmetic, no
+parenthetical qualifiers, no summary of what happened: a status is
+read to decide whether a plan still wants attention, and prose in
+that column has repeatedly grown until it could no longer be read
+either by a person scanning the table or by tooling. Detail belongs
+in the plan file, and a one-line summary belongs in the index's own
+Intent column.</p>
+<p>Matching is case-insensitive, so <code>In Progress</code> is accepted, but the
+spelling above is the one to write.</p>
+<!-- shared-block-end -->
+
 <div class="admonition note">
 <p class="admonition-title">In this project</p>
-<p>A status cell holds exactly one term from the vocabulary in
-<code>PLAN-TEMPLATE.md</code> and nothing else. The same term is written
-twice: once in the phase table below, and once in the row this
-plan carries in <code>docs/plans/index.md</code>. Keep them in step --
-the index row is the whole-plan status, so it only reaches
-<code>Complete</code> once every phase has been completed, abandoned or
-superseded.</p>
+<p>The same term is written twice: once in the phase table
+below, and once in the row this plan carries in
+<code>docs/plans/index.md</code>. Keep them in step -- the index row is
+the whole-plan status, so it only reaches <code>Complete</code> once
+every phase has been completed, abandoned or superseded.</p>
 </div>
 <table>
 <thead>
@@ -15235,156 +14407,212 @@ superseded.</p>
 </thead>
 <tbody>
 <tr>
-<td>0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches</td>
-<td><a href="../PLAN-ci-cloud-sizing-phase-00-decisions/">PLAN-ci-cloud-sizing-phase-00-decisions.md</a></td>
-<td>Complete</td>
-</tr>
-<tr>
-<td>1. Headroom instrumentation: sample <code>/admin/resources</code> through every cluster job and publish the series</td>
-<td><a href="../PLAN-ci-cloud-sizing-phase-01-headroom-probe/">PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</a></td>
-<td>Complete</td>
-</tr>
-<tr>
-<td>2. Baseline measurement window: the peak-demand distribution that has never existed</td>
-<td><a href="../PLAN-ci-cloud-sizing-phase-02-baseline/">PLAN-ci-cloud-sizing-phase-02-baseline.md</a></td>
-<td>In progress</td>
-</tr>
-<tr>
-<td>3. Explicit saturation coverage, so that growing a cloud cannot silence a defect</td>
-<td>PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md</td>
+<td>1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row</td>
+<td>PLAN-transient-capacity-refusals-phase-01-warm-up.md</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>4. Re-shape the topologies against the phase 2 data</td>
-<td>PLAN-ci-cloud-sizing-phase-04-topologies.md</td>
+<td>2. The suite waits, and says so: an informed <code>create_instance</code> wrapper and a per-run wait summary</td>
+<td>PLAN-transient-capacity-refusals-phase-02-suite-wait.md</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger</td>
-<td>PLAN-ci-cloud-sizing-phase-05-guardrails.md</td>
+<td>3. Publish metrics when the running-domain set changes</td>
+<td>PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md</td>
 <td>Not started</td>
 </tr>
 <tr>
-<td>6. Documentation and downstream propagation</td>
-<td>PLAN-ci-cloud-sizing-phase-06-docs.md</td>
+<td>4. <code>Retry-After</code> and a machine-readable transient refusal, with an opt-in client retry</td>
+<td>PLAN-transient-capacity-refusals-phase-04-retry-after.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>5. Decide on server-side queued placement from the phase 2 data</td>
+<td>PLAN-transient-capacity-refusals-phase-05-queue-decision.md</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>6. Documentation and close-out</td>
+<td>PLAN-transient-capacity-refusals-phase-06-docs.md</td>
 <td>Not started</td>
 </tr>
 </tbody>
 </table>
-<h3 id="phase-0-decisions-and-scarcity-inventory">Phase 0 -- Decisions and scarcity inventory<a class="headerlink" href="#phase-0-decisions-and-scarcity-inventory" title="Permanent link">&para;</a></h3>
-<p>Settle the open questions above, and produce the inventory that
-phase 3 is built from: every distinct failure signature the
-current clouds produce because they are small, each classified as
-<em>defect we must fix</em>, <em>behaviour we must assert</em>, or <em>test bug</em>.
-The #3772 umbrella, #3907, #3565 and the closed #3813 are the
-starting corpus; the merge-CI triage history is the source.</p>
-<p>Deliverable: the decisions written into this plan, and a table of
-signatures with a disposition each.</p>
-<h3 id="phase-1-headroom-instrumentation">Phase 1 -- Headroom instrumentation<a class="headerlink" href="#phase-1-headroom-instrumentation" title="Permanent link">&para;</a></h3>
-<p>Sample <code>GET /admin/resources</code> (admin-only, already implemented by
-<code>AdminResourcesEndpoint</code> -&gt; <code>Scheduler.summarize_resources()</code>)
-throughout the functional-test step, and emit a per-run summary:
-peak and p90 committed vCPU cluster-wide and per node, both as
-absolute numbers and as a fraction of ledger; the same for memory;
-and a per-stage count of candidate refusals. Upload the raw series
-as a job artifact and print the summary in the log.</p>
-<p>There are four capacity stages, not three: <code>sufficient_idle_cpu</code>,
-<code>sufficient_idle_memory</code>, <code>sufficient_free_disk</code> (disk <em>space</em>)
-and <code>sufficient_idle_disk</code> (disk <em>bandwidth</em>, a rate predicate).
-Phase 1's survey found this plan and phase 0 naming only three,
-with the bandwidth stage standing in for disk capacity.</p>
-<p>No gating, no topology change. The endpoint publishes
-<code>cpu_measured</code>, <code>cpu_committed</code> and <code>cpu_hard_max</code>, so "this node
-measures idle but is refusing work" is answerable, which is what
-makes it the right probe. It does <em>not</em> publish the capacity row's
-<code>limit_cpus</code>, which is what admission actually compares against
-and which D7 needs; phase 1 adds it.</p>
-<p>Most of the work lives in the main repository's <code>tools/</code>, following
-<code>ci_wait_schedulable.py</code>; the invocation lives in
-<code>shakenfist/actions</code> (the reusable <code>smoke-cluster</code> workflow and
-<code>build-smoke-cluster</code>), so it still needs an operator push and a
-real CI run to prove.</p>
-<h3 id="phase-2-baseline-measurement-window">Phase 2 -- Baseline measurement window<a class="headerlink" href="#phase-2-baseline-measurement-window" title="Permanent link">&para;</a></h3>
-<p>Publish the distribution: what peak utilisation actually is per
-job, on both topologies, and how it correlates with the failures.
-This is the number that has never existed, and it is what turns
-the candidate shapes above into a decision.</p>
-<p>This section previously described phase 2 as leaving phase 1
-running for an agreed number of merge runs and waiting. <strong>The
-waiting is already done.</strong> The phase 2 survey counted 66
-<code>merge_group</code> runs of <code>functional-tests.yml</code> banked since the
-census fix merged on 2026-08-30, each carrying five cluster
-bundles, all still inside the 90 day artifact retention. Phase 2
-harvests them retrospectively (phase 2, D16) rather than opening a
-new window, because waiting adds weeks and no information while
-the early part of the window expires.</p>
-<p>Two things the phase 1 output already changes about what phase 2
-must look for. The cluster-wide committed fraction and the
-<em>per-node maximum</em> can disagree by a factor of two -- one sampled
-<code>slim-primary</code> run sat at a cluster-wide p90 of 0.407 with one node
-pinned at 1.000 and twelve real <code>sufficient_idle_cpu</code> refusals --
-so D3's band gains a per-node component (phase 2, D21). And open
-question 5's expected answer has flipped: memory recorded zero
-drops and a p90 of 0.14-0.20 of ledger in both sampled runs, so
-phase 2 is testing whether D5 should be <em>narrowed</em>, not whether it
-holds.</p>
-<p>The tier's ledger question (D7) is closed by evidence already in
-hand -- see the Situation section above -- so phase 2 confirms the
-fallback count across its window rather than reconciling two
-figures. It is confirmed at zero over 85,563 ledgered node-samples.</p>
-<p>The baseline is now published: the <em>Situation</em> section above is
-written entirely from it, and the dataset it was computed from is
-committed under
-<a href="../data/ci-cloud-sizing-baseline/"><code>docs/plans/data/ci-cloud-sizing-baseline/</code></a>.
-Its headline findings, including the ones that corrected this
-plan's expectations, are recorded in the phase 2 plan.</p>
-<h3 id="phase-3-explicit-saturation-coverage">Phase 3 -- Explicit saturation coverage<a class="headerlink" href="#phase-3-explicit-saturation-coverage" title="Permanent link">&para;</a></h3>
-<p><strong>Gate on this phase before phase 4.</strong> Convert the scarcity
-coverage we get by accident into coverage we get on purpose: a
-functional test that deliberately fills a cluster to its ledger
-and asserts the documented behaviour at the boundary, and issues
-filed for every signature phase 0 classified as a defect. Where
-the documented behaviour is itself wrong -- #3772 argues a bare
-507 is the wrong answer to a transient condition -- the test
-asserts what the system does today and the issue records what it
-should do, so growing the clouds cannot quietly close it.</p>
-<h3 id="phase-4-re-shape-the-topologies">Phase 4 -- Re-shape the topologies<a class="headerlink" href="#phase-4-re-shape-the-topologies" title="Permanent link">&para;</a></h3>
-<p>Apply the phase 2 decision to <code>ci-topology-slim-primary.yml</code> and
-<code>ci-topology-slim-tier.yml</code> (and the <code>-released</code> variants), keeping
-the <code>sf-absent</code> phantom, honouring the structural minimums
-(<code>test_network_lifecycle</code> needs two hypervisors that are not the
-network node; <code>test_affinity</code> needs three nodes;
-<code>test_database_tier</code> needs two database nodes), and updating any
-hardcoded node lists in <code>functional-tests.yml</code>. Land one topology
-at a time so a regression is attributable.</p>
-<p>The number that binds is per node, not per cluster. The 2026-09-08
-journal reading recorded in <em>A node can record twice its own
-ledger</em> found every post-#4106 <code>sufficient_idle_cpu</code> refusal on
-<code>slim-tier</code> was a pinned create onto <code>primary</code> or <code>sf1</code>, whose
-4-thread reservation leaves <code>cpu_schedulable</code> 1 and a ledger of 3,
-while <code>sf2</code> and the cluster had room. The victim tests select
-those nodes deterministically ("first non-network hypervisor").
-So the shape this phase chooses has to raise the <em>infra
-hypervisors'</em> ledger, not only the total: of the candidate shapes
-above, "tier as 3 x 6 vCPU" is the smallest that does (6 / 6 /
-12), and any shape that leaves an infra hypervisor at a ledger of
-3 leaves the failure in place. The
-<a href="../PLAN-transient-capacity-refusals/">transient-capacity-refusals</a>
-plan's phase 2 wait summary is the instrument that will say
-whether the chosen shape was enough.</p>
-<h3 id="phase-5-guardrails">Phase 5 -- Guardrails<a class="headerlink" href="#phase-5-guardrails" title="Permanent link">&para;</a></h3>
-<p>Turn phase 1's summary into a check: warn outside the agreed
-headroom band, and add a cluster-CI assertion on the deployed
-topology's hypervisor count and total ledger so that a future
-topology edit which halves capacity fails as itself rather than as
-a flake in an unrelated test. Follow the warn-window-then-gate
-pattern the API-validation plan used.</p>
-<h3 id="phase-6-documentation-and-downstream-propagation">Phase 6 -- Documentation and downstream propagation<a class="headerlink" href="#phase-6-documentation-and-downstream-propagation" title="Permanent link">&para;</a></h3>
-<p>Document the sizing model in <code>docs/developer_guide/ci.md</code> --
-the ledger arithmetic, the band, and how to re-measure -- and
-propagate the reshaped topologies to the downstream repositories
-that consume the reusable workflow, per the copy-paste-drift
-finding in <code>project-sf-ecosystem-ci</code>.</p>
+<p>Phases 1, 2 and 3 are independent of one another and can run in
+parallel. Phase 4 follows 2, because the client retry should match
+the semantics the suite has already proven. Phase 5 needs phase 2
+to have reported over a window of merge runs <em>after</em> the sizing
+plan's phase 4 has reshaped <code>slim-tier</code>; until then its data would
+be measuring the wrong cloud. Phase 6 is last.</p>
+<p>The ordering against the sibling plans: the sizing plan's phase 3
+(saturation coverage) does not gate any phase here, because none
+of them changes what a full cluster does -- but its phase 4
+(reshape) should land before phase 5 here reads its numbers.
+Nothing here touches the demand guard, the pre-filters, claim
+enforcement or the guarded UPDATE, all of which are
+scheduler-reservations' (D11, phase 5).</p>
+<h3 id="phase-1-close-the-warm-up-window">Phase 1 -- Close the warm-up window<a class="headerlink" href="#phase-1-close-the-warm-up-window" title="Permanent link">&para;</a></h3>
+<p>Make <code>_force_capacity_reconcile_if_unguarded()</code> a check the
+elected loop repeats rather than a one-shot at election
+(<code>shakenfist/daemons/cluster/main.py:741</code>, called once at <code>:879</code>).
+The check itself is the same comparison either way: if any active
+hypervisor has published metrics and has no capacity row, make the
+reconcile due now. Keep the
+distinction between a degraded read and an empty result that the
+existing code is careful about (<code>rows</code> is empty for both; only
+<code>degraded</code> says which).</p>
+<p><strong>The decision this phase owns is where the check runs</strong>, and the
+master plan does not pre-empt it. Inside the elected loop's 60 s
+maintenance gate (<code>:912</code>) the check costs nothing new -- it rides
+a pass that already reads the database -- and closes the warm-up
+window to about a minute. Outside the gate, on the
+<code>ELECTED_LOOP_POLL_SECONDS = 5</code> poll, it closes the window to
+seconds but adds a fixed-rate ~0.2/s read that needs a
+<code>cluster_base_qps</code> entry in
+<code>shakenfist/data/database_load_budget.yaml</code>, or
+<code>test_no_unbudgeted_fixed_rate_database_polling</code> fails. The phase
+plan picks one and says why; both are defensible and the 60 s
+version is the smaller change.</p>
+<p>Be accurate about the stability gate rather than repeating the
+elected loop's shorthand comment. <code>cluster_stable()</code>
+(<code>shakenfist/daemons/daemon.py:377</code>) compares object versions
+across nodes and reads no metric freshness at all; it catches a
+just-restarted cluster only incidentally, because no node has
+recorded a version yet and <code>minimum</code> is <code>inf</code>. The pass still
+belongs behind it -- issue #4087's second correction explains why
+a pass with no fresh metrics deletes rows -- but the protection is
+a side effect of the version check, not a freshness check, and the
+phase plan should not assume otherwise.</p>
+<p>Prove it two ways. A unit test in <code>shakenfist/tests/</code> drives the
+elected loop with a fake capacity table and a fake node roster and
+asserts the reconcile becomes due on the iteration a hypervisor
+first appears without a row, and not on later iterations where
+every hypervisor has one. A functional assertion in the CI
+harness reads the headroom probe's own series and requires that
+<code>cpu_committed_row_present</code> is true for every hypervisor before
+the first <code>instance placed</code> event of the run -- the field already
+exists end to end (published at <code>shakenfist/scheduler.py:1073</code>,
+harvested by <code>tools/ci_headroom_harvest.py</code>, reported by
+<code>tools/ci_headroom_report.py:319</code>) and the baseline dataset
+already carries it, so the assertion's premise can be checked
+against it before it is written. That assertion also retires a
+<code>skipTest</code>: <code>cluster_ci_tests/test_nodes.py:136</code> currently skips
+when a node has no capacity row, which is exactly the condition
+this phase makes impossible after start-up. Remove the skip in the
+same change rather than leaving unreachable code behind it. Phase
+1 also comments on #4087 with the finding and reopens it if that
+is the convention the tracker follows for an incomplete fix.</p>
+<p>Small, server-side, one file plus tests. Plan at high effort: the
+placement decision above, the interaction with the stability gate
+and the degraded-read distinction are the kind of thing a light
+brief gets wrong.</p>
+<h3 id="phase-2-the-suite-waits-and-says-so">Phase 2 -- The suite waits, and says so<a class="headerlink" href="#phase-2-the-suite-waits-and-says-so" title="Permanent link">&para;</a></h3>
+<p>Add <code>BaseTestCase.create_instance()</code> to
+<code>shakenfist/deploy/shakenfist_ci/base.py</code>, route every raw
+<code>test_client.create_instance(...)</code> call site in <code>cluster_ci_tests/</code>
+and <code>guest_ci_tests/</code> through it (there are 115 call sites across
+39 files; a list is a mechanical <code>grep</code>), and add a unit test in
+<code>shakenfist/tests/</code> that walks the suite's source with <code>ast</code> and
+fails on any raw call outside an explicit allowlist marker, the way
+<code>test_ci_claims_headroom.py</code> already asserts call sites by name.</p>
+<p>The wrapper: on <code>InsufficientResourcesException</code>, if the deadline
+(420 s, the claims suite's <code>CLUSTER_HEADROOM_WAIT</code>) has not passed,
+emit a tracing event, then wait <em>informed</em>: poll
+<code>system_client.get_cluster_resources()</code> at 10 s and proceed when
+<code>per_node[target]['cpu_available'] &gt;= cpus</code> for a <code>force_placement</code>
+create, or <code>total['cpu_available'] &gt;= cpus</code> otherwise, falling back
+to a blind sleep when <code>total['capacity_degraded']</code> is set. Re-create
+with a fresh uniquified name, because the refused instance is
+<code>enqueue_delete_due_error</code>'d and its name is not reusable
+synchronously. Reuse <code>retries.retry_while_transient</code> by converting
+the exception to a <code>(status, body)</code> pair so the loop stays
+unit-testable against a fake clock. Every wait is attached to the
+test as a detail: seconds waited, the node waited for, and the
+<code>per_node</code> headroom at the first refusal and at admission.</p>
+<p>The run summary: total seconds waited, number of waits, longest
+wait and its test, written to the bundle beside the headroom
+probe's output and printed in the job log. The collection step is
+in <code>shakenfist/actions</code> (the reusable <code>smoke-cluster</code> workflow),
+so this phase carries the same operator-push obligation the
+sizing plan's phase 1 did, and the summary is designed so that the
+sizing plan's phase 5 guardrail can read it.</p>
+<p>Budget the poll. <code>GET /admin/resources</code> reads <code>GetNodeMetrics</code> from
+the <code>api</code> caller, which is already in <code>HARNESS_DRIVEN_PAIRS</code>
+(<code>load_budget.py:309-323</code>) -- but that exemption's prose names the
+headroom probe as the producer and
+<code>test_the_suite_still_probes_cluster_headroom</code> holds it up. Extend
+the comment to name the wrapper as a second, activity-coupled
+producer (it polls only while a create is being retried), or the
+load-budget test's premise rots silently.</p>
+<p>Two test-side changes ride along because they are cheap and reduce
+the number of pinned creates: <code>test_commandline_artifacts.py</code>'s
+second instance and <code>test_imagefetch.py</code>'s first are pinned for
+convenience rather than for the assertion, and can target
+<code>inst1['node']</code> only where co-location is actually load-bearing.
+And <code>test_system_namespace.py</code> subclasses <code>BaseTestCase</code> rather than
+the namespaced base, so a failure between its inline create and
+delete strands a charged instance in the system namespace for the
+rest of the run; give it an <code>addCleanup</code>.</p>
+<p>The sizing plan's phase 3 saturation tests must call the raw client
+and assert the refusal; the allowlist marker exists for them.</p>
+<p>Plan at high effort. The wrapper is straightforward; the AST guard,
+the load-budget declaration and the bundle plumbing across two
+repositories are where a light brief goes wrong.</p>
+<h3 id="phase-3-publish-metrics-when-the-running-domain-set-changes">Phase 3 -- Publish metrics when the running-domain set changes<a class="headerlink" href="#phase-3-publish-metrics-when-the-running-domain-set-changes" title="Permanent link">&para;</a></h3>
+<p>In <code>shakenfist/daemons/resources/main.py</code>, beside the 60 s publish,
+poll libvirt's domain list every few seconds (no database access)
+and, when the set of running domains or their vCPU total differs
+from what was last published, publish immediately. Keep the 60 s
+full publish unchanged. Declare the new publish rate in
+<code>shakenfist/data/database_load_budget.yaml</code> as <code>activity_coupled</code>
+so the load-budget check models it correctly, and add a unit test
+that a domain disappearing between polls produces a publish before
+the 60 s tick.</p>
+<p>This is what makes "the node is empty" true within seconds of a
+teardown rather than within a minute, and it is the only change in
+this plan that touches a daemon other than the cluster daemon.
+Plan at medium effort; the pattern is the existing loop.</p>
+<h3 id="phase-4-retry-after-and-a-machine-readable-transient-refusal">Phase 4 -- <code>Retry-After</code> and a machine-readable transient refusal<a class="headerlink" href="#phase-4-retry-after-and-a-machine-readable-transient-refusal" title="Permanent link">&para;</a></h3>
+<p>Server: on both <code>507</code> branches of <code>POST /instances</code>
+(<code>external_api/instance.py:906</code>, <code>:976-981</code>), set <code>Retry-After: 15</code>
+and extend the error body with <code>stage</code> (<code>sufficient_idle_cpu</code>, or
+<code>capacity_guard</code>) and <code>transient: true</code>. <code>sf_api.error()</code> returns
+a bare <code>flask.Response</code>, so the header is set on the returned
+object. The <code>409</code> affinity branch is untouched. Update the OpenAPI
+declaration and the API-validation plan's error contract if it
+describes the body shape.</p>
+<p>Client (<code>client-python</code>): carry response headers on
+<code>APIException</code>, and add an opt-in retry policy for <code>507</code> bodies
+carrying <code>transient: true</code>, bounded by the existing async-strategy
+deadline and reusing the shape of the 406 loop in <code>_request_url</code>.
+Off by default; the suite turns it on, and its phase 2 wrapper then
+becomes the <em>informed</em> layer over the client's blind one.</p>
+<p>Plan at medium effort; each half is small, and the coordination is
+a version pin between the two repositories.</p>
+<h3 id="phase-5-decide-on-server-side-queued-placement">Phase 5 -- Decide on server-side queued placement<a class="headerlink" href="#phase-5-decide-on-server-side-queued-placement" title="Permanent link">&para;</a></h3>
+<p>A decision phase, not a build phase. Read the phase 2 wait
+summaries over at least twenty merge runs after the sizing plan's
+phase 4 has landed. If total wait per run is small and no test
+waits near its deadline, close this phase as Abandoned with the
+numbers and the reasoning in the phase file. Otherwise, design the
+queue against open question 8's constraints -- FIFO by request
+time, pinned creates admitted against their node only, IPAM
+allocated at placement rather than at request, a deadline the
+client's 900 s create ceiling can contain -- and record the
+reversal of scheduler-reservations D8 in that plan's decisions
+file before any code is written.</p>
+<p>Plan at high effort if it goes ahead; the state-machine and
+fairness questions are the expensive kind.</p>
+<h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
+<p>Document the transient-refusal contract in
+<code>docs/operator_guide/scheduler.md</code> and the API reference, the suite
+wrapper and its allowlist marker in <code>docs/developer_guide/ci.md</code>,
+and the wait summary beside the headroom probe's documentation.
+Update <code>docs/plans/index.md</code> and the sibling plans' cross-references
+to their final state. Comment on #3772 with the before-and-after
+pass rate and close it only if the <code>Debian 12 tier</code> job's failures
+are no longer <code>sufficient_idle_cpu</code>; otherwise leave it open with
+the numbers.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-execution-model v1 -->
@@ -15418,16 +14646,6 @@ unsatisfactory. For safe, well-understood changes, sub-agents can
 work directly in the main tree.</p>
 <!-- shared-block-end -->
 
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>Phases 1, 4 and 6 touch <code>shakenfist/actions</code>, which only the
-operator pushes, and which cannot be proven green except by a
-real CI run. Those phases follow the pattern
-<code>PLAN-remove-primary-phase-06-step5b-ci-design.md</code>
-established: design and review the change in full here, hand
-the operator a reviewed diff, then verify against a live run
-rather than treating a merged commit as done.</p>
-</div>
 <h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
 <!-- shared-block: plan-planning-effort v1 -->
 <p>Planning effort (shared block; do not edit -- the canonical copy
@@ -15446,11 +14664,12 @@ codebase, can be planned at medium effort.</p>
 
 <div class="admonition note">
 <p class="admonition-title">In this project</p>
-<p>Phases 0, 2, 3 and 5 are high effort: they turn on judgment
-about what CI is for and what a failure means. Phases 1, 4 and
-6 are medium -- the arithmetic is settled by then and the
-edits are mechanical, but they are cross-repository, so the
-brief must name the files in <code>shakenfist/actions</code> explicitly.</p>
+<p>Phases 1, 2 and 5 are planned at high effort: the first for
+its interaction with the stability gate and the degraded-read
+distinction, the second for its two-repository plumbing and
+the load-budget declaration, the fifth because it may be a
+state-machine design. Phases 3, 4 and 6 follow patterns that
+already exist and are planned at medium effort.</p>
 </div>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-step-guidance v1 -->
@@ -15518,20 +14737,23 @@ lighter the model that can succeed.</p>
 
 <div class="admonition note">
 <p class="admonition-title">In this project</p>
-<p>A worked brief for this plan: instead of "sample cluster
-capacity during the test run", write "add a step to
-<code>.github/workflows/smoke-cluster.yml</code> in <code>shakenfist/actions</code>
-which, before the <code>Run functional tests</code> step, starts a
-background poller on the primary that curls
-<code>http://localhost:13000/admin/resources</code> with a system-namespace
-bearer token every 15 seconds into
-<code>/srv/ci/headroom.jsonl</code>; the endpoint is
-<code>AdminResourcesEndpoint</code> in
-<code>shakenfist/external_api/admin.py</code> and its shape is whatever
-<code>Scheduler.summarize_resources()</code>
-(<code>shakenfist/scheduler.py</code>) returns, so read that for the
-field names rather than guessing. Summarise the series in a
-step after the tests and upload it with the other artifacts."</p>
+<p>The invariants a brief in this plan must carry, because none
+of them is inferable from the code being edited:</p>
+<ul>
+<li>Placement transactions open with a guarded <code>UPDATE</code>, never a
+  <code>SELECT</code> (the snapshot-isolation invariant, <code>AGENTS.md</code>).
+  No phase here touches one, and a brief should say so
+  explicitly so a sub-agent does not "improve" one in passing.</li>
+<li>Attribute writes carry a field mask (<code>CLAUDE.md</code>, common
+  pitfall 3).</li>
+<li>Any new suite-side or daemon-side polling is declared in
+  <code>shakenfist/data/database_load_budget.yaml</code> or
+  <code>HARNESS_DRIVEN_PAIRS</code>, with prose naming the producer, or
+  <code>test_no_unbudgeted_fixed_rate_database_polling</code> will fail
+  the next merge group (#3975, #4028).</li>
+<li>The reconcile pass stays behind <code>cluster_stable()</code>.</li>
+<li>The <code>409</code> affinity refusal is never retried.</li>
+</ul>
 </div>
 <h3 id="model-choice">Model choice<a class="headerlink" href="#model-choice" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-model-roster v1 -->
@@ -15607,11 +14829,11 @@ the canonical copy lives in shakenfist/development at
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The code passes <code>pre-commit run --all-files</code> (flake8,
       stestr unit tests, mypy).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> If proto files changed, stubs were regenerated with
-      <code>tox -e genprotos</code> and committed.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Any claim about a pass rate, a duration or a ledger was
-      recomputed, not copied from this document. Every number
-      here has a date on it for that reason.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>python3 tools/check-plan-status.py</code> passes after any
+      edit to a plan or to <code>docs/plans/index.md</code>.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A change that adds polling has its budget entry, and
+      <code>test_no_unbudgeted_fixed_rate_database_polling</code> has
+      been reasoned about, not merely run.</li>
 </ul>
 </div>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
@@ -15619,183 +14841,103 @@ the canonical copy lives in shakenfist/development at
 <p>We will know when this plan has been successfully implemented
 because the following statements will be true:</p>
 <ul>
-<li>Every merge-queue cluster job publishes, as a job artifact and
-  a log summary, how full its cloud got -- peak and p90 committed
-  vCPU and memory against ledger, and a count of capacity
-  refusals.</li>
-<li>A topology change that materially reduces a cloud's ledger
-  fails a check that names the ledger, rather than surfacing as a
-  flake in an unrelated test.</li>
+<li>In every merge-run bundle, every hypervisor has a capacity row
+  before the run's first <code>instance placed</code> event, and no first
+  reconcile pass records a <code>drift_cpus</code> above zero.</li>
+<li>A node's published <code>cpu_total_instance_vcpus</code> falls within ten
+  seconds of its last instance being undefined.</li>
+<li>No functional test fails with <code>507 sufficient_idle_cpu</code> at
+  <code>create_instance</code>; a test that waits for capacity records how
+  long, and the run's summary reports it.</li>
+<li><code>POST /instances</code> refusals for capacity carry <code>Retry-After</code>,
+  <code>stage</code> and <code>transient: true</code>, and <code>shakenfist_client</code> can be
+  told to honour them.</li>
+<li>The decision on server-side queued placement is written down in
+  the phase 5 file with the data it was made from, whichever way
+  it went.</li>
 <li>The <code>Debian 12 tier</code> job's pass rate is comparable to the other
   cluster jobs, and its remaining failures are not
   <code>sufficient_idle_cpu</code>.</li>
-<li>Every capacity-related failure signature that the pre-change
-  clouds produced is either covered by an explicit test or has an
-  open issue naming it. No issue was closed merely because a
-  bigger cloud stopped reproducing it.</li>
-<li>A merge run's under-cloud memory footprint is lower than the
-  356 GB it was on 2026-08-27, and the sizing of each topology is
-  justified in <code>docs/developer_guide/ci.md</code> by a measurement
-  rather than by history.</li>
 <li>The code passes <code>pre-commit run --all-files</code> (flake8, stestr
   unit tests, and mypy type checking).</li>
 <li>Lines are wrapped at 120 characters, single quotes for strings,
   double quotes for docstrings.</li>
 <li>Documentation in <code>docs/</code> has been updated. <code>ARCHITECTURE.md</code>
   and <code>AGENTS.md</code> are updated only if a convention or the shape
-  of the system changed -- a CI sizing model is a <code>docs/</code> matter.</li>
+  of the system changed; a transient-refusal contract is an
+  operator-guide and API-reference matter.</li>
 </ul>
 <h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
 <p>This plan is registered in <code>docs/plans/index.md</code> (one row, in the
 <em>Master plans</em> table) and in <code>docs/plans/order.yml</code>. Phase files
 are linked from the Execution table above and appear in neither,
 which is what <code>tools/check-plan-status.py</code> enforces.</p>
+<!-- shared-block: plan-closeout-sections v1 -->
+<p>Plan close-out sections (shared block; do not edit -- the
+canonical copy lives in shakenfist/development at
+<code>templates/shared-blocks/plan-closeout-sections.md</code>):</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<p>We should list obvious extensions, known issues, unrelated bugs we
+encountered, and anything else we should one day do but have
+chosen to defer to here, so that we do not forget them.</p>
 <ul>
-<li><strong>Sample the under-cloud too.</strong> This plan measures the <em>inner</em>
-  cloud's headroom. The outer one -- <code>sfcbr</code> -- is the resource
-  actually being competed for, and the same probe pointed at it
-  would say whether a merge run is contending with a deploy or
-  with another merge run. That is the mechanism behind the
-  redeploy-races-merge-CI family, so it is worth doing once the
-  inner probe exists.</li>
-<li><strong>Per-suite concurrency rather than a fleet-wide 5.</strong>
-  <code>test_concurrency</code> is 5 for every cluster job regardless of
-  topology. Demand and ledger could be reconciled from the other
-  end: derive the worker count from the deployed ledger instead of
-  hardcoding it. Deferred because it makes runs less comparable
-  across topologies, which phase 2 needs.</li>
-<li><strong><code>test_coalescing</code> is the peak.</strong> It bursts <code>BURST = 6</code>
-  instances at once, which is a whole node's ledger on the current
-  shape, while four other workers are creating. If phase 2 shows
-  it dominates the peak, isolating it (or lowering <code>BURST</code> and
-  raising it again once the topology grows) is a cheap lever.</li>
-<li><strong>Retire the <code>test_timeout_minutes: 70</code> special case.</strong> The
-  tier's extra ten minutes was granted for slowness the data does
-  not show. It is harmless, but it encodes a belief that is
-  false, and beliefs like that are why the sizing went unexamined.</li>
-<li><strong>The merge queue's throttle counts groups, not clouds.</strong> #3696
-  records two merge groups forming for the same PR sixty seconds
-  apart, both running their full matrix, for roughly eleven nested
-  clusters on the under-cloud at once. The throttle is set to two
-  parallel builds, but each build launches five or six clouds, so the
-  quantity actually bounded is not the one that exhausts the
-  under-cloud. Reducing per-cloud footprint helps; bounding the right
-  quantity would help more, and is a change to queue configuration
-  rather than to anything in this plan.</li>
-<li><strong>Generalise to the other repositories' clouds.</strong> The
-  downstream repositories fork these topologies. Phase 6
-  propagates the shapes; making the headroom probe part of the
-  reusable workflow means they inherit the measurement too. Same
-  structural cause as the entry below: a cloud built by something
-  other than the workflow the probe steps live in is unmeasured.</li>
-<li><strong>Instrument the two cluster jobs the probe cannot see.</strong> Phase
-  2's D17 found that only four of the six clouds a merge run builds
-  carry the phase 1 probe, for two different reasons. <code>Ansible
-  modules</code> runs through the reusable <code>smoke-cluster</code> workflow but
-  with <code>test_kind: ansible-modules</code>
-  (<code>functional-tests.yml:514</code>), and every probe step is gated <code>if:
-  inputs.test_kind == 'functional'</code>; widening that gate is the whole
-  fix. <code>Node lifecycle</code> never reaches that workflow at all -- it
-  calls the <code>build-smoke-cluster</code> composite action directly
-  (<code>functional-tests.yml:554-557</code>), and the probe steps live in the
-  workflow rather than in the action, so moving them into (or
-  duplicating them beside) the action is a change to how <em>every</em>
-  caller deploys. That is the same seam as the entry above, and the
-  two should be done together. The cost of leaving it is concrete
-  and already paid: <code>Node lifecycle</code> is the best performer in the
-  failure table, and the baseline's utilisation-versus-failure
-  correlation cannot speak to it.</li>
+<li><strong>Stop re-scheduling an already-charged placement.</strong>
+  <code>NodeInstNetdescOp._instance_preflight()</code>
+  (<code>shakenfist/operations/node_inst_netdesc_op.py:156-162</code>)
+  constructs a fresh <code>Scheduler</code> -- a full <code>refresh_metrics()</code>,
+  one <code>get_node_metrics</code> RPC per node -- and re-runs
+  <code>find_candidates(inst, candidates=[config.NODE_UUID])</code> for an
+  instance the API already admitted on this node. The ledger term
+  cannot refuse it (the self-charge is subtracted), but the
+  60-second-old <code>measured_cpus</code> can, and when it does the op
+  redirects to another node and re-enqueues the artifact fetches.
+  Replacing that with "is my placement still recorded here and is
+  the node healthy" removes a distinct CI failure family (<code>Too
+  many start attempts</code>) and halves per-create scheduler load. Not
+  a 507 cause, so not in this plan.</li>
+<li><strong>Suite concurrency denominated in ledger.</strong> The sizing plan's
+  Future work already records this; phase 2's wait summary is the
+  measurement that would justify it.</li>
+<li><strong>The queue-depth stage.</strong> <code>_has_reasonable_queue_state</code>
+  refuses any node with more than twenty waiting jobs. Under
+  suite concurrency queue depth is exactly what spikes; it did not
+  fire in the runs read here but it is untracked and worth a
+  census line.</li>
+<li><strong>Every refused create is a full create-and-delete.</strong>
+  <code>enqueue_delete_due_error</code> at the 507 site means each refusal
+  costs an object, IPAM allocations, an event trail and a delete
+  op, at the moment the cluster is busiest. Phase 5's queue, if it
+  is built, removes this; if it is not, the cost stands and should
+  be measured.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>Related issues to resolve or be aware of while planning. None of
-these is closed by growing a cloud, and phase 3 exists to make
-sure none of them is closed by accident:</p>
+<p>This section should list any bugs we encounter during development
+that we fixed. You should also scan the project's issue tracker,
+where one exists, for directly related issues that we should
+either resolve as part of this master plan or at least be aware of
+while planning it.</p>
 <ul>
-<li><strong>#3772</strong> (open, umbrella) -- instance creates refused with
-  <code>507 sufficient_idle_cpu</code> under suite concurrency. Its own
-  verdict is that a bare 507 is the wrong answer to a transient
-  condition. Growing the clouds reduces how often it fires without
-  addressing that; the issue must stay open and gain an explicit
-  test. The transient-condition half is now
-  <a href="../PLAN-transient-capacity-refusals/">its own plan</a>; the
-  2026-09-08 reading that plan is built on found every post-#4106
-  refusal was a pinned create onto a ledger-3 infra hypervisor with
-  the cluster not full, which is why phase 4 above now names the
-  per-node ledger as the number to change.</li>
-<li><strong>#3907</strong> (closed 2026-08-26) -- the claims suite asserted
-  cluster headroom it never reserved. Fixed by tolerating the
-  transient refusal, which is the right fix for the test and is
-  also evidence that <code>slim-tier</code> is at its ledger routinely.</li>
-<li><strong>#3813</strong> (closed 2026-08-22) -- the demand guard was
-  arithmetically unsatisfiable below four schedulable threads.
-  Directly caused by the CI node shape this plan is changing, and
-  the reason open question 1 leans towards widening nodes rather
-  than lowering the reservation.</li>
-<li><strong>#3565</strong> (closed 2026-08-31) -- <code>test_affinity</code>. Its title
-  said "soft affinity loses to resource filters under suite
-  concurrency". The most frequent <code>slim-primary</code> failure in the
-  sampled window, always the same signature: instances that
-  should share a node do not. Its most recent traced occurrence
-  binds at the memory stage rather than the CPU one, so a bigger
-  cloud may quieten it, may not, and either way decides nothing
-  about whether the scheduler was right. <strong>Its disposition is
-  written</strong>, by scheduler-reservations phase 6, and the title was
-  wrong: in the traced run the candidate set had collapsed to one
-  node before affinity was scored, so affinity lost no tiebreak
-  and was never consulted. It closed on a test change rather than
-  a scheduler change. This plan's requirement that it get a
-  disposition in phase 0 before phase 4 is therefore satisfied,
-  and nothing here waits on it.</li>
-<li><strong>#3975</strong> (closed) -- the phase 1 headroom probe failed a merge
-  queue build. Its per-sample <code>GET /nodes</code> and <code>GET
-  /admin/resources</code> read node state once per node, so at the default
-  15s interval it produces N/15 per second of <code>GetNode</code>,
-  <code>GetNodeAttributes</code>, <code>GetAllNodeDaemonStates</code> and <code>GetNodeMetrics</code>
-  from the <code>api</code> caller, which clears the idle-load check's
-  unbudgeted ceiling from four nodes upwards. D15 said nothing in
-  this phase can fail a build; that was true of the phase's own
-  verdicts and false of its traffic. Fixed by exempting the pairs in
-  <code>HARNESS_DRIVEN_PAIRS</code>, not by lengthening the interval or
-  widening the budget -- in two steps, because the #3975 fix
-  exempted only the three RPCs that issue's body named, and the
-  <code>GetNode</code> the roster iterator's hydration issues came back as
-  #4028. <strong>This carries an obligation into whichever phase retires
-  the probe: trim those four pairs from
-  <code>shakenfist/deploy/shakenfist_ci/load_budget.py</code> at the same
-  time.</strong> Nothing enforces it, because the launcher and the workflow
-  steps are in <code>shakenfist/actions</code> and a decommission done there
-  leaves this repository untouched.</li>
-<li><strong>#3882</strong> (open) -- reconciler drift is not provable from logs.
-  Phase 2 wants to compare the live ledger derivation against the
-  reconciled <code>cluster_capacity</code> figure; if they disagree, this is
-  why it is hard to tell which is wrong.</li>
-<li><strong>Unguarded placements in a cluster's first minutes</strong>
-  (<strong>#4087</strong>, filed by phase 2 step 2f).
-  <code>scheduler_node_capacity</code> has no rows until the
-  reconciler's first pass, which <code>schedule.every(5).minutes</code> puts
-  five minutes after the cluster daemon starts, so for a measured
-  135 to 210 seconds of every one of the 204 job-runs in the
-  baseline window every admission takes P7's fail-open branch and
-  the CPU pre-filter sees only a once-a-minute count of <em>running</em>
-  domains. The first pass then recomputes <code>used_cpus</code> from the
-  placement rows that accumulated and writes a node above its own
-  <code>limit_cpus</code>, after which that node refuses every create while
-  measuring idle -- the #3772 signature without exhaustion. This is
-  the mechanism behind <em>A node can record twice its own ledger</em>
-  above, it is not a breach of the guarded UPDATE, and <strong>growing
-  the cloud would mask it rather than fix it</strong>, which is exactly
-  what phase 3 exists to prevent. Closed by PR #4106, but the fix
-  is a one-shot at election that fires before any hypervisor has
-  published, so in CI the window is unchanged (six post-fix runs
-  read on 2026-09-08, all with the prefix intact); reopening it
-  and repeating the check in the elected loop is
-  transient-capacity-refusals phase 1.</li>
+<li><strong>#3772</strong> (open, umbrella) -- the refusal this plan is about.
+  Stays open until phase 6 has the before-and-after numbers.</li>
+<li><strong>#4087</strong> (closed by #4106, incompletely) -- the warm-up window.
+  Phase 1 reopens or comments, and fixes it.</li>
+<li><strong>#3498, #3602, #3670, #3728, #3749, #3767</strong> (closed into #3772)
+  -- the per-test victims. Do not file another; the umbrella exists
+  because per-test tracking stopped paying for itself.</li>
+<li><strong>#3907, #3565</strong> (closed test-side) -- precedents for tolerating
+  a transient refusal in the suite; phase 2 generalises what they
+  did once.</li>
+<li><strong>#3975, #4028</strong> (closed) -- the headroom probe failing the
+  load-budget check. The obligation they left is why phase 2 and
+  phase 3 each carry a budget declaration.</li>
+<li><strong>#1364</strong> (open) -- lame-duck and evacuate. Where node-scoped
+  reservations would earn their place; see open question 5.</li>
 </ul>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you
 intend to do aligns with that plan.</p>
+<!-- shared-block-end -->
 
 
 
@@ -15816,7 +14958,7 @@ intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-ci-cloud-sizing.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-ci-cloud-sizing.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-ci-cloud-sizing/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-transient-capacity-refusals.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-transient-capacity-refusals.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-transient-capacity-refusals/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

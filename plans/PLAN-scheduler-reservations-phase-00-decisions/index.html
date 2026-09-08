@@ -14140,7 +14140,14 @@ show what was on offer.</em></p>
 <p>Two things that look like they should help and do not.
 Namespace claims (D14) guarantee aggregate capacity and
 explicitly carry no node affinity, so they close the 3772
-507 family without touching this. And the CPU committed
+507 family without touching this. <em>Correction, 2026-09-08:</em>
+they do not close it. Every post-#4106 member of that family
+read from CI journals was a pinned (<code>force_placement</code>) create
+refused by the per-node <code>sufficient_idle_cpu</code> pre-filter,
+which never consults <code>namespace_claims</code>; a claim with no node
+affinity cannot help a create that has only one node. The
+family is owned by
+<a href="../PLAN-transient-capacity-refusals/">A capacity refusal is transient</a>. And the CPU committed
 ledger (PR 3724) made admission <em>more</em> accurate, which moves
 this failure mode in the wrong direction.</p>
 <p>Independently of the decision above, the CI tier topology is

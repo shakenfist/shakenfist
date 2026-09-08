@@ -15070,7 +15070,18 @@ because the following statements will be true:</p>
   creates only. Deliberately <em>not</em> bundled with phase 3: a
   retry would mask whether atomic admission actually reduced
   the failure rate, so this should wait until issue #3772 has
-  soak data from a <code>develop</code> carrying that phase.</li>
+  soak data from a <code>develop</code> carrying that phase. <strong>That soak
+  data now exists</strong> -- the ci-cloud-sizing phase 2 baseline and
+  a 2026-09-08 journal reading of six post-#4106 failing runs --
+  and it says atomic admission did what it promised: every
+  refusal reconciled exactly with the ledger, and the ledger was
+  genuinely full on the node the create was pinned to. The retry
+  question is therefore answered and owned by
+  <a href="../PLAN-transient-capacity-refusals/">A capacity refusal is transient</a>:
+  suite first (informed by <code>/admin/resources</code>, and reported),
+  client second, server-side queueing only if the measured waits
+  say so -- which would be a reversal of D8 and is written down as
+  such there.</li>
 <li><strong>CI tier topology and sizing as a capacity consumer.</strong> The
   Debian 12 tier runs three "hypervisors", of which <code>primary</code>
   is also the network <em>and</em> database node and <code>sf1</code> is also a
@@ -15088,7 +15099,35 @@ because the following statements will be true:</p>
   instances at all in CI, whether the tier needs a fourth
   node, and whether suite concurrency should be denominated in
   cluster capacity rather than runner cores. Tracked with the
-  bullet above under issue #3772.</li>
+  bullet above under issue #3772. The 2026-09-08 reading confirmed
+  this paragraph in detail: all ten post-#4106 refusals were pinned
+  creates onto <code>primary</code> or <code>sf1</code> at <code>committed == limit == 3</code>, with
+  <code>sf2</code> and the cluster not full. The topology answer is
+  ci-cloud-sizing phase 4's; the transient-refusal answer is the
+  plan linked above.</li>
+<li><strong>The demand clause is pure overhead on small nodes.</strong> In the
+  same six runs, 114-140 <code>schedule candidate refused by capacity
+  guard</code> events per run were <strong>100% demand-only</strong> -- the bound is
+  <code>0.75 x cpu_schedulable</code>, which is 0.75 on a 1-thread node
+  against a <code>cpu_load_1</code> near 3 -- and every one was waived on the
+  second walk, so roughly 40% of creates paid two guarded
+  transactions at the busiest moment of the run. Never a 507 (the
+  waiver works), but it doubles admission load exactly when it
+  hurts and it makes the guard-refusal census read as alarming.
+  Waiving or rescaling the clause below some <code>cpu_schedulable</code> is a
+  one-line change to phase 4a's clause; it belongs to this plan
+  because the load it saves is this plan's to measure.</li>
+<li><strong>Node-scoped claims.</strong> Considered on 2026-09-08 for the pinned
+  CI creates and declined for that use (the transient-refusals
+  plan's open question 5 has the reasoning: it closes only the
+  small window between "the node has room" and "my create landed",
+  at the cost of a second ledger dimension on every capacity row
+  and a claim-reading pre-filter, before phase 5 has decided what
+  enforcement means). The use that would justify it is an
+  operator's: a lame-duck or evacuate lifecycle (#1364) needs to
+  know there is room on the destinations before it starts moving
+  instances, and so does a live migration. Design it then, against
+  the claims as they stand after phase 5, not before.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during
