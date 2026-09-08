@@ -2340,8 +2340,13 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
     # Issue 4051: the tolerated capacity conditions (P5, P7 and the two
     # clamp sites) log WARNING in the daemon log, so their event echoes
     # must not land in the log stream at ERROR beside them. Only the
-    # two genuine failures echo as errors, matching their .error()
-    # daemon-log lines.
+    # genuine failures echo as errors, matching their .error()
+    # daemon-log lines. Issue 4132 moved a failed placement release on
+    # the deleted path into the tolerated set: the reconciler stops
+    # counting a deleted instance within one pass and hard_delete()
+    # releases again, so only the error-path release failure -- whose
+    # placement row nothing repairs before hard delete -- still
+    # qualifies as genuine.
     #
 
     def _event_echoes_as_error(self, add_event, message):
@@ -2419,17 +2424,67 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertTrue(self._event_echoes_as_error(
             add_event, 'instance placement write failed'))
 
-    def test_a_failed_placement_release_echoes_as_an_error(self):
-        self.inst.place_instance(self.node2)
-        failure = {
-            'success': False, 'error': 'database unavailable',
-            'released': False, 'clamped': False}
+    _RELEASE_FAILURE = {
+        'success': False, 'error': 'database unavailable',
+        'released': False, 'clamped': False}
+
+    def _release_failure_severities(self, method):
+        """Run ``method`` with the release RPC failing.
+
+        Returns the event echo's log_as_error flag and the lists of
+        daemon-log messages logged at warning and at error.
+        """
         with mock.patch('shakenfist.mariadb.release_instance_placement',
-                        return_value=failure):
+                        return_value=self._RELEASE_FAILURE):
             with mock.patch.object(self.inst, 'add_event') as add_event:
-                self.inst._delete_globally()
-        self.assertTrue(self._event_echoes_as_error(
-            add_event, 'instance placement release failed'))
+                with mock.patch.object(self.inst, 'log') as log:
+                    method()
+        echoed = self._event_echoes_as_error(
+            add_event, 'instance placement release failed')
+        fielded = log.with_fields.return_value
+        warnings = [c.args[0] for c in fielded.warning.call_args_list]
+        errors = [c.args[0] for c in fielded.error.call_args_list]
+        return echoed, warnings, errors
+
+    def test_a_failed_release_on_the_deleted_path_is_a_warning(self):
+        # Tolerated: the instance goes to state deleted, so the
+        # reconciler stops counting it within one pass and hard_delete()
+        # releases again.
+        self.inst.place_instance(self.node2)
+        echoed, warnings, errors = self._release_failure_severities(
+            self.inst._delete_globally)
+        self.assertFalse(echoed)
+        self.assertIn(
+            'Instance placement release failed; capacity will be '
+            'recomputed by the next reconciler pass', warnings)
+        self.assertNotIn('Instance placement release failed', errors)
+
+    def test_a_failed_release_on_the_error_path_echoes_as_an_error(self):
+        # Not tolerated: an errored instance stays in the reconciler's
+        # ground truth (which only excludes state deleted), so nothing
+        # repairs the ledger or the placement row until hard delete.
+        self.inst.place_instance(self.node2)
+        self.inst.state = instance.Instance.STATE_CREATED_ERROR
+        echoed, warnings, errors = self._release_failure_severities(
+            self.inst._delete_globally)
+        self.assertTrue(echoed)
+        self.assertIn('Instance placement release failed', errors)
+        self.assertEqual([], warnings)
+
+    def test_a_failed_release_at_hard_delete_is_a_warning(self):
+        # hard_delete() removes the instance's static row immediately
+        # after the release, and the reconciler's ground truth joins
+        # placement rows to that row, so even an errored instance stops
+        # being counted. The startup reference reconciliation clears the
+        # stale placement row.
+        self.inst.place_instance(self.node2)
+        self.inst.state = instance.Instance.STATE_CREATED_ERROR
+        self.inst.state = instance.Instance.STATE_ERROR
+        echoed, warnings, errors = self._release_failure_severities(
+            self.inst.hard_delete)
+        self.assertFalse(echoed)
+        self.assertEqual(1, len(warnings))
+        self.assertEqual([], errors)
 
     def test_hard_delete_releases_before_deleting_the_rows(self):
         # The release needs the instance's cpus, memory and disk spec,
