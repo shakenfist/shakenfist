@@ -13646,6 +13646,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#conditions-logged-once-per-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditions logged once per worker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#events-vs-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14078,6 +14089,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#conditions-logged-once-per-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditions logged once per worker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#events-vs-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14436,6 +14458,22 @@ generalises: it emits a token of the credential shape first and
 requires the query to find <em>that</em> before it will assert that
 nothing else matched. A detector which has never been observed
 firing is not evidence of anything.</p>
+<h2 id="conditions-logged-once-per-worker">Conditions logged once per worker<a class="headerlink" href="#conditions-logged-once-per-worker" title="Permanent link">&para;</a></h2>
+<p>A few warnings describe a condition of the process rather than of
+a request, and those are logged at most once for the lifetime of
+that process. <code>Failed to resolve node UUID in API worker</code> is the
+one you are most likely to meet: an <code>sf-api</code> gunicorn worker
+resolves this node's UUID lazily on its first non-probe request,
+from the persisted UUID file or from the node's FQDN in the
+database, and warns if neither answers.</p>
+<p>Seeing that line once does <strong>not</strong> mean the condition has since
+cleared. The worker keeps retrying on every subsequent request --
+a node absent from the database now may be present later -- but
+it does not repeat the warning, because a per-request copy of it
+would bury every other line the worker emits. Confirm the
+condition is resolved by looking for the matching
+<code>Resolved node UUID in API worker</code> line (which carries the
+<code>node_uuid</code> field), not by the absence of further warnings.</p>
 <h2 id="events-vs-logs">Events vs logs<a class="headerlink" href="#events-vs-logs" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist has two structured-record streams, and they are not
 the same thing:</p>
