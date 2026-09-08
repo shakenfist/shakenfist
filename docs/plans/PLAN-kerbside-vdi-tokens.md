@@ -399,11 +399,27 @@ and is the authoritative list of what this plan actually merged:
 | shakenfist | 11 (#4009) | #4016 | `5ef83c065` |
 | shakenfist | 11 (#4003) | #4018 | `913411586` |
 | shakenfist | 11 (#4004) | #4024 | `f2df423d8` |
+| shakenfist | 10 (audit, its three medium fixes, the `.vv` functional test) | #4099 | `2d585cd1a` |
+| shakenfist | 10 closeout (docs) | #4137 | `ccc1b5ff2` |
 | client-python | 4 | #350 | `b426e1f` |
 | kerbside | 5, 6, 7, 8 (kerbside half) | #167 | `f50ea59` |
 | kerbside | 9 (SF end-to-end lane) | #194 | `115416c` |
 | kerbside | post-phase-9 scrape fix | #201 | `7803368` |
+| kerbside | 10 (F-B1 part 1: a key fetch no longer errors the source) | #412 | `e2a493ea6` |
+| kerbside | 10 (F-B1 part 2: cleanup narrowed to enumerated sources) | #413 | `29323fb85` |
 | ryll | 3 | #190 | `fa7ee21` |
+| ryll | 10 (F8: SPICE TLS trust anchors) | #358 | `aac25cf3c` |
+| ryll | 10 follow-up (redundant `app.js` test assertion removed) | #366 | `0113f0ff7` |
+
+Rows are grouped by repository and ordered by merge within each, which
+is why phase 10 trails phase 11 in the Shaken Fist block: the
+post-completion defects were fixed before the audit ran. Phase 10
+appears six times because the audit did not merge as one change. Its
+findings were fixed in whichever repository owned them, and the
+blocking one took two attempts. The fourteen advisory findings are
+deliberately *not* rows here -- they were filed as issues in their own
+repositories and land on their own schedule, so a list would go stale.
+Follow those from the disposition table in phase 10's plan.
 
 ### Phase 0: Decisions and token format
 
