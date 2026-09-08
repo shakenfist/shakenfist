@@ -56,8 +56,13 @@ zero would poison the baseline. It fails loudly instead.
 
 Example:
 
-    tools/ci_headroom_harvest.py --since 2026-08-30 \\
+    tools/ci_headroom_harvest.py --since 2026-08-30 --until 2026-09-05 \\
         --output docs/plans/data/ci-cloud-sizing-baseline/harvest.jsonl
+
+Name both ends of any window whose output is going to be committed. A
+window with only a start grows with every merge, and one bounded with
+``--limit`` moves with the day it is run on, so neither reproduces the file
+it produced.
 """
 
 import argparse
@@ -344,7 +349,33 @@ def parse_timestamp(value):
     return parsed
 
 
-def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, limit=None):
+def github_created_filter(since, until):
+    """The ``created=`` qualifier for a window, or '' for an unbounded one.
+
+    Both boundaries are normalised to UTC before they are formatted.
+    parse_since() keeps whatever offset the operator wrote and strftime
+    ignores tzinfo, so stamping a +10:00 wall clock with a 'Z' would ask
+    the API for a boundary ten hours later than the one requested. The
+    server side filter is applied before anything reaches the client side
+    one, so those ten hours could not be recovered: the same silently
+    narrowed window list_runs() exists to prevent, arriving this time
+    through the operator's own timezone.
+    """
+    def stamp(value):
+        return value.astimezone(
+            datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    if since is not None and until is not None:
+        return '%s..%s' % (stamp(since), stamp(until))
+    if since is not None:
+        return '>=' + stamp(since)
+    if until is not None:
+        return '<=' + stamp(until)
+    return ''
+
+
+def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, until=None,
+              limit=None):
     """The merge_group runs of one workflow, newest first.
 
     Only completed runs. A run still in flight has some of its bundles
@@ -352,14 +383,22 @@ def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, limit=None):
     tell "this job has not finished" from "this job produced no bundle", so
     including one would put a spurious probe-absent record in the dataset.
 
-    ``since`` is inclusive and compared against the run's creation time,
-    which is the field D16's window is defined in terms of (the census fix
-    merged on 2026-08-30, and runs created before that carry a census which
-    could not have collected the guard events). It is applied twice, on
-    purpose: as a ``created=>=`` filter on the API call, so that a window
-    never walks the whole of the repository's history, and again here, so
-    that a ``--since`` carrying a time of day is honoured exactly rather
-    than to the day the API filter rounds to.
+    ``since`` and ``until`` are both inclusive and both compared against
+    the run's creation time, which is the field D16's window is defined in
+    terms of (the census fix merged on 2026-08-30, and runs created before
+    that carry a census which could not have collected the guard events).
+    They are applied twice, on purpose: as a ``created=`` filter on the API
+    call, so that a window never walks the whole of the repository's
+    history, and again here, so that a boundary carrying a time of day is
+    honoured exactly rather than to the day the API filter rounds to.
+
+    ``until`` is what makes a harvested window *reproducible*. A window
+    bounded only at its start grows with every merge, and one bounded by
+    ``--limit`` moves with the day it is run on: the command step 2g's
+    README first quoted, ``--since 2026-09-07 --limit 10``, stopped
+    reproducing its own dataset the moment two more runs merged. A dataset
+    committed to this repository outlives the week it was harvested in and
+    has to name both ends of what it covers.
 
     **Nothing in here may assume the order the listing arrives in.** The
     first version of this function did -- it read runs until it met one
@@ -380,21 +419,27 @@ def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, limit=None):
     outside the limit is downloaded.
     """
     path = 'actions/workflows/%s/runs?event=merge_group&status=completed' % workflow
-    if since is not None:
-        path += '&created=%s' % urllib.parse.quote(
-            '>=' + since.strftime('%Y-%m-%dT%H:%M:%SZ'), safe='')
+    created_filter = github_created_filter(since, until)
+    if created_filter:
+        path += '&created=%s' % urllib.parse.quote(created_filter, safe='')
 
     runs = []
     for page in github.paginate(path, 'workflow_runs'):
         for run in page:
             created = parse_timestamp(run.get('created_at'))
-            if since is not None and created is not None and created < since:
-                continue
+            if created is not None:
+                if since is not None and created < since:
+                    continue
+                if until is not None and created > until:
+                    continue
             runs.append(run)
 
-    # Newest first, whatever order they arrived in. A run with an
-    # unparseable creation time sorts oldest rather than being dropped:
-    # --limit should never be the thing that silently discards a run.
+    # Newest first, whatever order they arrived in. A run whose creation
+    # time will not parse is kept by the --since filter above rather than
+    # dropped, and sorts oldest here, so a --limit prefers the runs whose
+    # dates can actually be read. A --limit small enough can still leave
+    # such a run out, which is the right way round: an undated run is the
+    # least likely of the listing to belong to a recent window.
     runs.sort(key=lambda run: (parse_timestamp(run.get('created_at'))
                                or datetime.datetime.min.replace(
                                    tzinfo=datetime.timezone.utc),
@@ -724,9 +769,17 @@ def build_parser(default_census_limit):
               '2 window starts at 2026-08-30, the day the census filter fix '
               'merged.'))
     parser.add_argument(
+        '--until', type=parse_since, default=None,
+        help=('Only runs created at or before this date (ISO 8601). Give it '
+              'whenever the harvest is going to be committed: a window with '
+              'no end grows with every merge, so only one naming both ends '
+              'reproduces the dataset it produced.'))
+    parser.add_argument(
         '--limit', type=int, default=None,
         help=('Stop after this many runs, newest first. Useful for proving '
-              'the tool before committing to the whole window.'))
+              'the tool before committing to the whole window, but it moves '
+              'with the day it is run on: prefer --until for anything whose '
+              'output is kept.'))
     parser.add_argument(
         '--cache-dir', default=default_cache_dir(),
         help=('Where downloaded bundle zips are kept, keyed by artifact id. '
@@ -752,9 +805,33 @@ def build_parser(default_census_limit):
 
 
 def harvest(github, args, report):
-    """Enumerate, download, summarise and write. Returns the record count."""
+    """Enumerate, download, summarise and write. Returns the record count.
+
+    An empty result is an error at both of the points it can arise. The
+    ordering defect this tool was fixed for presented as a harvest which
+    enumerated nothing, wrote an empty file over the dataset and exited
+    zero; fixing that one cause does not close the symptom, because a
+    renamed workflow file, a changed event name, a ``created`` filter
+    syntax the API stops honouring or a token whose scope has lapsed all
+    reach it by a different road. The module docstring's promise is that
+    this tool fails loudly rather than half completing, so:
+
+    * an enumeration which found no runs raises **before** ``--output`` is
+      opened, leaving whatever dataset was already there untouched, and
+    * a set of runs which yielded no records raises after the write, and
+      says that the output has been truncated.
+    """
     runs = list_runs(github, workflow=args.workflow, since=args.since,
-                     limit=args.limit)
+                     until=args.until, limit=args.limit)
+    if not runs:
+        raise HarvestError(
+            'no completed merge_group runs of %s matched (since=%s, '
+            'until=%s, limit=%s). Nothing has been written to %s. A window '
+            'with no runs in it is possible, but so is a renamed workflow, '
+            'a changed event name or a listing this tool could not read, '
+            'and those are indistinguishable from here.'
+            % (args.workflow, args.since, args.until, args.limit,
+               args.output))
     if not args.quiet:
         print('Harvesting %d merge_group %s of %s'
               % (len(runs), 'run' if len(runs) == 1 else 'runs',
@@ -778,6 +855,14 @@ def harvest(github, args, report):
                     workdir)
             written += write_records(records, handle)
             handle.flush()
+
+    if not written:
+        raise HarvestError(
+            '%d %s enumerated but none carried a headroom bundle, so %s is '
+            'now empty. Expired artifacts read this way, and so does a '
+            'bundle naming change this tool has not been told about.'
+            % (len(runs), 'run was' if len(runs) == 1 else 'runs were',
+               args.output))
     return written
 
 
@@ -794,13 +879,14 @@ def main(argv=None):
     if os.path.abspath(args.report) != os.path.abspath(default_report_path()):
         report = load_report(args.report)
 
-    if args.since is None and args.limit is None:
+    if args.since is None and args.until is None and args.limit is None:
         # Refused rather than defaulted. Without a bound this walks the whole
         # of artifact retention and downloads every bundle in it, and the
         # operator who wanted the whole window should say which window that
         # is so the README step 2d writes can quote a reproducible command.
-        parser.error('give at least one of --since or --limit; an unbounded '
-                     'harvest downloads the entire 90 day retention window')
+        parser.error('give at least one of --since, --until or --limit; an '
+                     'unbounded harvest downloads the entire 90 day '
+                     'retention window')
 
     github = GitHubCLI(repo=args.repo, verbose=not args.quiet)
     written = harvest(github, args, report)

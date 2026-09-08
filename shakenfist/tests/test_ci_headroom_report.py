@@ -107,11 +107,17 @@ def roster_entry(uuid, fqdn, is_hypervisor=True):
     }
 
 
-def sample(per_node, nodes=None, sampled_at=1756000000.0):
+def sample(per_node, nodes=None, sampled_at=1756000000.0,
+           capacity_degraded=None):
     total = {
         'cpu_available': sum(n['cpu_available'] for n in per_node.values()),
         'ram_available': sum(n['ram_available'] for n in per_node.values()),
     }
+    # Absent by default, which is what a bundle built before step 2a
+    # published the flag looks like. Pass True or False to be one of the
+    # builds which does.
+    if capacity_degraded is not None:
+        total['capacity_degraded'] = capacity_degraded
     record = {
         'sampled_at': sampled_at,
         'resources': {'total': total, 'per_node': per_node},
@@ -404,6 +410,124 @@ class LedgerUnreadableTestCase(HeadroomReportTestCase):
             'The memory figures were discarded along with the CPU ones for a '
             'ledger-unreadable sample, but ram_max and ram_available come '
             'from node metrics and are unaffected by a capacity read.')
+
+
+class CapacityDegradedTestCase(HeadroomReportTestCase):
+    """Which of the two readings an unreadable ledger was (issue 4087).
+
+    An all-absent capacity map means either a table which could not be read
+    or a table which is not populated yet, and the count of unreadable
+    samples cannot tell them apart. Step 2a's ``capacity_degraded`` and the
+    shape of the run can: a warm-up is an unbroken prefix at the start of
+    the series with a healthy read throughout, a fault is neither. Phase 2's
+    confirmation window had to read both facts out of raw series inside
+    bundles which expire ninety days after their run, and D22 does not
+    commit those series, so they are counted into the record instead.
+    """
+
+    def _blind(self, sampled_at, capacity_degraded=None):
+        per_node = {
+            NODE_ONE: node_payload(cpu_measured=0, cpu_committed=0,
+                                   cpu_limit=None, row_present=False),
+            NODE_TWO: node_payload(cpu_measured=0, cpu_committed=0,
+                                   cpu_limit=None, row_present=False),
+        }
+        return sample(per_node, sampled_at=sampled_at,
+                      capacity_degraded=capacity_degraded)
+
+    def _busy(self, sampled_at, capacity_degraded=None):
+        per_node = {
+            NODE_ONE: node_payload(cpu_measured=8, cpu_committed=8),
+            NODE_TWO: node_payload(cpu_measured=8, cpu_committed=8),
+        }
+        return sample(per_node, sampled_at=sampled_at,
+                      capacity_degraded=capacity_degraded)
+
+    def test_a_warm_up_prefix_is_counted_and_measured(self):
+        path = self._series([
+            self._blind(1756000000.0, capacity_degraded=False),
+            self._blind(1756000015.0, capacity_degraded=False),
+            self._blind(1756000030.0, capacity_degraded=False),
+            self._busy(1756000045.0, capacity_degraded=False),
+            self._busy(1756000060.0, capacity_degraded=False)])
+        series = report.summary_record(path)['series']
+        self.assertEqual(3, series['ledger_unreadable_samples'])
+        self.assertEqual(3, series['ledger_unreadable_prefix_samples'])
+        self.assertEqual(30.0, series['ledger_unreadable_prefix_seconds'])
+        self.assertEqual(0, series['capacity_degraded_samples'])
+        self.assertEqual(0, series['capacity_degraded_absent_samples'])
+
+    def test_a_warm_up_is_named_in_the_printed_report(self):
+        path = self._series([
+            self._blind(1756000000.0, capacity_degraded=False),
+            self._busy(1756000015.0, capacity_degraded=False)])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'empty table rather than a failed read', output,
+            'The report flagged an unreadable ledger without saying which of '
+            'the two it was, when capacity_degraded says so directly.')
+
+    def test_a_failing_read_is_not_reported_as_a_warm_up(self):
+        path = self._series([
+            self._busy(1756000000.0, capacity_degraded=False),
+            self._blind(1756000015.0, capacity_degraded=True),
+            self._busy(1756000030.0, capacity_degraded=False)])
+        record = report.summary_record(path)
+        series = record['series']
+        self.assertEqual(1, series['ledger_unreadable_samples'])
+        self.assertEqual(1, series['capacity_degraded_samples'])
+        # Nothing at the start of the series, so nothing in the prefix. This
+        # is the assertion that keeps the prefix from being a second name
+        # for the count.
+        self.assertEqual(0, series['ledger_unreadable_prefix_samples'])
+        self.assertIsNone(series['ledger_unreadable_prefix_seconds'])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'THE CAPACITY READ WAS FAILING', output,
+            'A sample which reported capacity_degraded was folded in with '
+            'the warm-up samples, which is the reading issue 4087 was closed '
+            'against.')
+
+    def test_the_prefix_stops_at_the_first_readable_sample(self):
+        # Unreadable, readable, unreadable: two unreadable samples but a
+        # prefix of one. A run shaped like this is a fault, not a warm-up,
+        # even though every sample reports a healthy read.
+        path = self._series([
+            self._blind(1756000000.0, capacity_degraded=False),
+            self._busy(1756000015.0, capacity_degraded=False),
+            self._blind(1756000030.0, capacity_degraded=False)])
+        series = report.summary_record(path)['series']
+        self.assertEqual(2, series['ledger_unreadable_samples'])
+        self.assertEqual(1, series['ledger_unreadable_prefix_samples'])
+        # One sample spans no time. Null rather than zero: a prefix of one
+        # has no measurable duration, and a zero would read as one which
+        # lasted no time at all.
+        self.assertIsNone(series['ledger_unreadable_prefix_seconds'])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'that is not all of them: 1 more is unreadable', output,
+            'The report described a series with unreadable samples after '
+            'the prefix as though the prefix accounted for all of them.')
+
+    def test_a_bundle_predating_the_flag_says_so_rather_than_guessing(self):
+        # The retrospective half of the baseline. Reading an absent flag as
+        # a healthy read would put a confirmation that step 2a's instrument
+        # never made into the dataset.
+        path = self._series([
+            self._blind(1756000000.0), self._busy(1756000015.0)])
+        record = report.summary_record(path)
+        self.assertEqual(0, record['series']['capacity_degraded_samples'])
+        self.assertEqual(
+            2, record['series']['capacity_degraded_absent_samples'])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'predate the capacity_degraded flag', output,
+            'A bundle with no capacity_degraded flag was reported as though '
+            'the read had been confirmed healthy.')
 
 
 class MemoryTestCase(HeadroomReportTestCase):

@@ -60,7 +60,8 @@ which calls `summary_record()` from `tools/ci_headroom_report.py`
 (step 2b) on each bundle it extracts.
 
 ```
-python3 tools/ci_headroom_harvest.py --since 2026-08-30 \
+python3 tools/ci_headroom_harvest.py \
+    --since 2026-08-30 --until 2026-09-05T07:15:07Z \
     --cache-dir /var/tmp/ci-headroom-harvest-cache \
     --output records.jsonl
 ```
@@ -70,9 +71,16 @@ That took 331 `gh api` calls and downloaded 217 bundles totalling
 cache directory is keyed by artifact id and anything already in it
 is reused, so a re-run is cheap; any writable directory outside the
 repository will do, and the run above used a scratch directory
-rather than the path shown. Re-running it today will produce a
-longer file than this one, because the window grows with every merge
-run -- `--since` fixes only the start.
+rather than the path shown.
+
+The harvest was run with `--since` alone; `--until` was added to the
+tool afterwards, and the command above carries it because a window
+with no end is not reproducible -- it grows with every merge run, so
+the command as originally run enumerates more today than it did on
+the day it was run. The boundary shown is the last run in the
+dataset, and the two together name exactly the window this file
+covers. Re-running it will still produce a shorter file eventually:
+these bundles expire ninety days after their run.
 
 ## What was changed before committing
 
@@ -87,6 +95,14 @@ made the dataset gratuitously irreproducible: two harvests of the same
 window would differ on 408 fields and agree on every number. The
 harvest tool itself is unchanged and still emits them; only this
 committed copy is normalised.
+
+`records-addendum.jsonl` was re-harvested once, after the report tool
+gained the four series counters described below, so that the two
+things step 2g concluded about the ledger-unreadable samples could be
+recomputed from the committed records instead of from bundles which
+expire. The re-harvest was verified record by record against the file
+it replaced: same 32 records, same 8 runs, and no field different
+except `record_version` and the four new counters.
 
 Nothing else was pruned. D22 budgeted 2 MB and allowed
 `absences.classifications[].nodes` and the guard block to be dropped
@@ -117,7 +133,8 @@ Inside `summary`:
 
 | Field | Meaning |
 |---|---|
-| `series` | Sample counts (usable, failed, unparseable), the window start/end/duration, and `ledger_unreadable_samples`. |
+| `record_version` | Schema version of the report record. `records.jsonl` is **1**; `records-addendum.jsonl` is **2**, which adds the four series counters below. A consumer that reads both must expect the older shape. |
+| `series` | Sample counts (usable, failed, unparseable), the window start/end/duration, `ledger_unreadable_samples`, and -- from record version 2 -- `ledger_unreadable_prefix_samples`, `ledger_unreadable_prefix_seconds`, `capacity_degraded_samples` and `capacity_degraded_absent_samples`. The last four are what say whether an unreadable ledger was a warm-up or a fault. |
 | `ledger_provenance` | Node-samples with a real capacity row, with a fallback to `cpu_hard_max`, with a fallback inside an unreadable sample, and with no ledger at all. |
 | `cluster` | Committed vCPU and committed memory MB, cluster-wide: `n`, `p90`, `peak`, `ledger_min`, `ledger_max`, and the two as fractions of ledger. |
 | `per_node` | The same, keyed by node uuid, each carrying that node's own ledger. |
@@ -173,17 +190,32 @@ drafted -- `scheduler_node_capacity` has no rows for the first 135 to
 it. See *A node can record twice its own ledger, and sizing would hide
 it* in the master plan, and **#4087**.
 
-**Step 2g confirmed it directly.** `/admin/resources` now publishes
-`total.capacity_degraded`, and across all 3,359 samples of the
-confirmation window the flag is present and **false in every one** --
-including in all 367 of the samples whose capacity rows read as absent.
-A failed capacity read would have set it. The prefix pattern also
-repeats exactly: contiguous from sample zero in all 32 job-runs, 9 to
-14 samples, spanning 120 to 195 seconds between its first and last
-sample, so 135 to 210 seconds of wall clock at the 15 second interval.
-That is the same figure #4087 was filed with, measured a second time
-from a different window with an instrument that can now tell a failing
-read from an empty table.
+**Step 2g confirmed it directly**, and the confirmation is in the
+records rather than in bundles which expire. `/admin/resources` now
+publishes `total.capacity_degraded`, and the report counts it:
+summing `series.capacity_degraded_samples` over
+`records-addendum.jsonl` gives **0** across all 3,359 samples, and
+`series.capacity_degraded_absent_samples` is **0** as well, so the
+flag was present on every sample and false on every sample --
+including in all 367 whose capacity rows read as absent. A failed
+capacity read would have set it.
+
+The prefix pattern repeats exactly, and is counted the same way:
+`series.ledger_unreadable_prefix_samples` equals
+`series.ledger_unreadable_samples` in all 32 records, so every
+unreadable sample is in the run the series opens with and none
+follows it. The prefix is 9 to 14 samples and
+`series.ledger_unreadable_prefix_seconds` spans 120 to 195 seconds
+between its first and last sample, so 135 to 210 seconds of wall
+clock at the 15 second interval. That is the same figure #4087 was
+filed with, measured a second time from a different window with an
+instrument that can now tell a failing read from an empty table.
+
+The baseline's own 204 job-runs were classified before those counters
+existed, from the raw series inside the bundles. `records.jsonl` is
+record version 1 and does not carry them, so the contiguity claim
+made about the baseline is not recomputable from this directory --
+which is the reason the counters were added.
 
 ## The confirmation window
 
@@ -192,9 +224,9 @@ read from an empty table.
 | | |
 |---|---|
 | Why | Close the baseline's two blind spots against runs that used the fixed instrument |
-| Nominal window | runs created at or after **2026-09-07** |
+| Nominal window | runs created between **2026-09-07T10:00:00Z** and **2026-09-08T02:00:00Z** |
 | Effective window | **2026-09-07T10:25:26Z** to **2026-09-08T01:55:33Z** |
-| Merge runs asked for | 10 (`--limit`) |
+| Merge runs enumerated | 10 |
 | Merge runs contributing a bundle | 8 (two had every functional job skipped by `Check paths`) |
 | Records | **32**, all four instrumented jobs in every run |
 | Records carrying a usable series | **32** |
@@ -205,10 +237,20 @@ to `develop` at 2026-09-06T06:17Z and step 2e's census filter merged to
 `shakenfist/actions` at 2026-09-06T00:09Z.
 
 ```
-python3 tools/ci_headroom_harvest.py --since 2026-09-07 --limit 10 \
+python3 tools/ci_headroom_harvest.py \
+    --since 2026-09-07T10:00:00Z --until 2026-09-08T02:00:00Z \
     --cache-dir /var/tmp/ci-headroom-harvest-cache \
     --output records-addendum.jsonl
 ```
+
+This window was first harvested as `--since 2026-09-07 --limit 10`,
+which is not a window at all: `--limit` takes the newest runs *as of
+the day it runs*, and two more merge runs landed within hours of the
+harvest, after which the same command enumerated a different ten. The
+boundaries above are the same eight runs, named. The file was
+re-harvested with them, and every record came back identical to the
+one it replaced apart from the four series counters record version 2
+adds.
 
 ### The guard census, which the baseline could not see
 
@@ -284,12 +326,19 @@ tier = [r['summary']['cluster']['committed_cpu']['p90_fraction']
         for r in usable if r['topology'] == 'slim-tier']
 ```
 
-Two figures in the master plan's *Situation* section are **not** in
-this file, because the summary record does not carry them, and are
-recomputed from the bundles themselves rather than from here: the
+Three figures in the master plan's *Situation* section are **not**
+recomputable from this directory, and are named as such where they are
+used. Two are not in the summary record at all: the
 measured-versus-committed vCPU comparison, and the classification of
 each `sufficient_idle_cpu` refusal by which of the two ledgers
-actually refused. Both come from `cpu_measured`/`cpu_committed` in the
+actually refused. They come from `cpu_measured`/`cpu_committed` in the
 raw series and from the `measured_cpus`/`committed_cpus` fields of the
-refusal payloads in the raw census. Both are named as such where they
-are used.
+refusal payloads in the raw census.
+
+The third is in the record now but was not when the baseline was
+harvested: the shape of the ledger-unreadable samples in
+`records.jsonl`'s 204 job-runs -- a contiguous prefix, 9 to 14
+samples, never mid-run. That classification was made by reading the
+raw series. `records-addendum.jsonl` carries the counters which state
+it, so the same claim about the confirmation window is recomputable
+from the file, and a future re-measure will be too.

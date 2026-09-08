@@ -168,7 +168,15 @@ BAND_UPPER = 0.70
 # 5's guardrail both read it from files written by builds older than
 # themselves, so it is versioned: a consumer which cannot read version 2 can
 # say so rather than silently misreading a renamed field as an absent one.
-RECORD_VERSION = 1
+#
+# Version 2 added series.capacity_degraded_samples,
+# series.capacity_degraded_absent_samples,
+# series.ledger_unreadable_prefix_samples and
+# series.ledger_unreadable_prefix_seconds. Phase 2's confirmation window
+# had to read those four facts out of the raw series inside the bundles,
+# which expire; a dataset harvested from version 2 records carries them.
+# The committed baseline (records.jsonl) is version 1 and does not.
+RECORD_VERSION = 2
 
 # Loki's own max_entries_limit_per_query, and the value
 # tools/ci_headroom_collect.sh in shakenfist/actions issues its query with. A
@@ -370,6 +378,18 @@ class Sample:
         self.ledger_unreadable = all_absent and len(flags) > 1
         self.sole_node_without_row = all_absent and len(flags) == 1
 
+        # Step 2a's flag, and the only thing which separates the two
+        # readings of an all-absent capacity map: a table which could not
+        # be read publishes True here, a table which is merely still empty
+        # publishes False. Tri-state on purpose -- None is a bundle from a
+        # build older than 2a, which is a different fact from a healthy
+        # read and must not be counted as one.
+        total = resources.get('total')
+        if isinstance(total, dict) and 'capacity_degraded' in total:
+            self.capacity_degraded = bool(total['capacity_degraded'])
+        else:
+            self.capacity_degraded = None
+
     def absences(self):
         """Classify every node the roster names but per_node does not.
 
@@ -489,6 +509,25 @@ class Series:
     @property
     def ledger_unreadable_samples(self):
         return [s for s in self.samples if s.ledger_unreadable]
+
+    @property
+    def ledger_unreadable_prefix(self):
+        """The unbroken run of unreadable samples the series opens with.
+
+        A cluster whose capacity table is simply not populated yet reads as
+        unreadable from the first sample until the reconciler's first pass,
+        and then never again. A cluster whose capacity read is actually
+        failing has no reason to confine itself to the start of the series.
+        The distinction is the whole of issue 4087's evidence, so it is a
+        counted field rather than something a reader has to eyeball off a
+        raw series which expires with its artifact.
+        """
+        prefix = []
+        for sample in self.samples:
+            if not sample.ledger_unreadable:
+                break
+            prefix.append(sample)
+        return prefix
 
 
 def read_series(path):
@@ -1077,6 +1116,23 @@ def series_record(series):
     record['ledger_unreadable_samples'] = len(series.ledger_unreadable_samples)
     record['sole_node_without_row_samples'] = sum(
         1 for s in series.samples if s.sole_node_without_row)
+
+    # The four fields which say what an unreadable ledger actually was.
+    # Without them the count above has two readings -- a warm-up window
+    # against an empty table, or a capacity read which is failing -- and
+    # the only thing that could tell them apart was the raw series inside
+    # a bundle which expires ninety days after its run. D22 does not commit
+    # those series, so what separates the readings is counted here instead.
+    prefix = series.ledger_unreadable_prefix
+    prefix_stamps = [s.sampled_at for s in prefix if s.sampled_at is not None]
+    record['ledger_unreadable_prefix_samples'] = len(prefix)
+    record['ledger_unreadable_prefix_seconds'] = (
+        (max(prefix_stamps) - min(prefix_stamps))
+        if len(prefix_stamps) > 1 else None)
+    record['capacity_degraded_samples'] = sum(
+        1 for s in series.samples if s.capacity_degraded is True)
+    record['capacity_degraded_absent_samples'] = sum(
+        1 for s in series.samples if s.capacity_degraded is None)
     return record
 
 
@@ -1572,6 +1628,35 @@ def print_series_summary(record):
         print('    That is NOT that the cluster was idle.')
         print('    Those samples are excluded from the committed CPU figures')
         print('    below. Memory is unaffected: it comes from node metrics.')
+
+        # Which of the two readings it was. Absent on a bundle built before
+        # step 2a published the flag, and said so rather than guessed.
+        degraded = series.get('capacity_degraded_samples')
+        absent = series.get('capacity_degraded_absent_samples')
+        prefix = series.get('ledger_unreadable_prefix_samples')
+        span = series.get('ledger_unreadable_prefix_seconds')
+        if absent:
+            print('    %d %s predate the capacity_degraded flag, so which of'
+                  % (absent, plural(absent, 'sample')))
+            print('    the two this was cannot be said from this bundle.')
+        elif degraded:
+            print('    THE CAPACITY READ WAS FAILING: %d %s reported'
+                  % (degraded, plural(degraded, 'sample')))
+            print('    capacity_degraded. That is a fault, not a warm-up.')
+        elif degraded == 0:
+            print('    The capacity read reported healthy throughout, so this')
+            print('    was an empty table rather than a failed read.')
+        if prefix:
+            print('    The prefix the series opens with is %d %s long%s'
+                  % (prefix, plural(prefix, 'sample'),
+                     '' if span is None else ', spanning %.0f seconds' % span))
+            if prefix == unreadable:
+                print('    and nothing after it was unreadable (issue 4087).')
+            else:
+                later = unreadable - prefix
+                print('    but that is not all of them: %d more %s unreadable,'
+                      % (later, 'is' if later == 1 else 'are'))
+                print('    which a warm-up would not be (issue 4087).')
 
 
 def print_ledger_provenance(record):

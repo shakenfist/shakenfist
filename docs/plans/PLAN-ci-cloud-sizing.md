@@ -693,6 +693,16 @@ kept, rather than deleted, because anyone reading
   seconds of wall clock. There is no read-reliability defect to
   file.
 
+  Both of those are counted in the record as of report version 2 --
+  `series.capacity_degraded_samples` and
+  `series.ledger_unreadable_prefix_samples`/`_seconds` -- so the
+  confirmation is recomputable from `records-addendum.jsonl` rather
+  than from bundles which expire ninety days after their run. The
+  baseline's own prefix classification predates those counters and
+  was read from the raw series; it is one of the three figures the
+  dataset README names as not recomputable from the committed
+  records.
+
 What the window does expose is the other side of the same fact: for
 those 135 to 210 seconds the admission guard does not exist, which is
 where the 18 refusal payloads that fired with `capacity_row_present`
@@ -710,8 +720,8 @@ this plan existed to fix. The hand-collected ones still do not.
   exact command and window in
   [`docs/plans/data/ci-cloud-sizing-baseline/README.md`](data/ci-cloud-sizing-baseline/README.md).
   The dataset in that directory is the source for every figure above
-  marked as measured, except the two named as coming from the raw
-  bundles. Two files: `records.jsonl` is the baseline, and
+  marked as measured, except the three the README names as coming
+  from the raw bundles. Two files: `records.jsonl` is the baseline, and
   `records-addendum.jsonl` is the confirmation window the guard
   census and the `capacity_degraded` confirmation come from. The
   addendum is a classification, not a distribution -- do not
@@ -1506,6 +1516,33 @@ sure none of them is closed by accident:
   was checked rather than assumed: asking the API today for the
   completed `merge_group` runs created in the baseline's window
   returns 66, exactly the number step 2d enumerated.
+- **Two more in the same listing, found reviewing that fix** (phase
+  2, no issue filed, same reasoning). The `created=>=` boundary was
+  formatted with `strftime`, which ignores `tzinfo`, while
+  `parse_since()` deliberately keeps whatever offset the operator
+  wrote: a `--since 2026-09-07T00:00:00+10:00` asked the API for
+  `2026-09-07T00:00:00Z`, ten hours *later* than requested, and
+  because the server-side filter runs first those ten hours could
+  not be recovered by the client-side one. The harmful direction is
+  a positive offset, which is this project's own timezone. Both
+  boundaries are now normalised to UTC before they are formatted,
+  and a test pins the shifted stamp. Separately, the harvest could
+  still write an empty file over a committed dataset and exit zero
+  by any *other* road to an empty enumeration -- a renamed workflow,
+  a changed event name, a lapsed token scope -- so an enumeration
+  which finds no runs now raises before `--output` is opened, and a
+  set of runs which yields no records raises after it, saying the
+  file was truncated.
+- **A harvested window that could not be reproduced** (phase 2, same
+  review). A window bounded only by `--since` grows with every
+  merge, and one bounded by `--limit` moves with the day it runs on:
+  the command step 2g's README quoted, `--since 2026-09-07 --limit
+  10`, stopped naming its own dataset within hours, when two more
+  runs merged and the newest ten became a different ten. The tool
+  now takes `--until`, both boundaries are pushed down to the API as
+  a `created=A..B` range, and both datasets' commands name both
+  ends. The addendum was re-harvested with the pinned window and
+  came back identical record for record.
 - **Unguarded placements in a cluster's first minutes**
   (**#4087**, filed by phase 2 step 2f).
   `scheduler_node_capacity` has no rows until the

@@ -232,6 +232,7 @@ class Args:
         self.cache_dir = cache_dir
         self.workflow = 'functional-tests.yml'
         self.since = None
+        self.until = None
         self.limit = None
         self.census_limit = report.DEFAULT_CENSUS_LIMIT
         self.quiet = True
@@ -504,6 +505,57 @@ class RecordTestCase(HarvestTestCase):
         self.assertIsNone(by_name[TIER_BUNDLE]['summary'])
 
 
+class LoudFailureTestCase(HarvestTestCase):
+    """An empty harvest is an error, whatever emptied it.
+
+    The ordering defect was one road to a harvest which wrote an empty file
+    over the dataset and exited zero. Fixing it closes that road and not the
+    symptom: a renamed workflow file, a changed event name, a created=
+    filter the API stops honouring or a token whose scope has lapsed all
+    arrive at the same place. The module docstring promises this tool fails
+    loudly instead.
+    """
+
+    def test_an_empty_enumeration_is_an_error(self):
+        github = FakeGitHub([], {}, {}, {})
+        self.assertRaises(harvest.HarvestError, self._harvest, github)
+
+    def test_an_empty_enumeration_does_not_truncate_the_dataset(self):
+        # The output is opened for writing before anything is downloaded, so
+        # the check has to come first. Re-running a harvest whose window has
+        # gone wrong must not be the thing that destroys the last good copy.
+        with open(self.output, 'w') as f:
+            f.write('{"run_id":1}\n')
+        github = FakeGitHub([], {}, {}, {})
+        self.assertRaises(harvest.HarvestError, self._harvest, github)
+        with open(self.output) as f:
+            self.assertEqual('{"run_id":1}\n', f.read())
+
+    def test_runs_which_carry_no_bundle_are_an_error_too(self):
+        # Distinct from the case above: the window had runs in it, and every
+        # one of them yielded nothing. A bundle naming change reads this
+        # way, and so does a workflow which stopped uploading them.
+        run = self._run_payload()
+        github = FakeGitHub(
+            [run], {run['id']: [{'id': 9800, 'name': 'coverage',
+                                 'expired': False}]},
+            {run['id']: []}, {})
+        self.assertRaises(harvest.HarvestError, self._harvest, github)
+
+    def test_a_harvest_which_produced_a_record_is_not_an_error(self):
+        # The guard must not fire on a harvest which worked, including one
+        # whose only record is an absence: an expired artifact is a fact
+        # about the window and is written rather than dropped.
+        run = self._run_payload()
+        github = FakeGitHub(
+            [run], {run['id']: [{'id': 9801, 'name': PRIMARY_BUNDLE,
+                                 'expired': True}]},
+            {run['id']: []}, {})
+        count, lines = self._harvest(github)
+        self.assertEqual(1, count)
+        self.assertIn('expired', json.loads(lines[0])['absent_reason'])
+
+
 class CacheTestCase(HarvestTestCase):
     def test_a_cached_artifact_is_not_downloaded_twice(self):
         # The full window is roughly 1.3 GB, and step 2d will not get the
@@ -601,6 +653,64 @@ class RunListingTestCase(HarvestTestCase):
         github = self._listing(['2026-09-02T00:00:00Z', None])
         runs = harvest.list_runs(github, since=harvest.parse_since('2026-08-30'))
         self.assertEqual([1000, 1001], [r['id'] for r in runs])
+
+    def test_until_bounds_the_far_end_of_the_window(self):
+        # A window with only a start grows with every merge. The command
+        # step 2g's README first quoted (--since with --limit) stopped
+        # reproducing its own dataset within a day, when two more runs
+        # merged and the newest ten became a different ten.
+        github = self._listing([
+            '2026-09-06T00:00:00Z', '2026-09-07T00:00:00Z',
+            '2026-09-08T00:00:00Z', '2026-09-09T00:00:00Z'])
+        runs = harvest.list_runs(
+            github, since=harvest.parse_since('2026-09-07'),
+            until=harvest.parse_since('2026-09-08T12:00:00Z'))
+        self.assertEqual([1002, 1001], [r['id'] for r in runs])
+
+    def test_both_boundaries_are_pushed_down_to_the_api(self):
+        github = self._listing(['2026-09-07T00:00:00Z'])
+        harvest.list_runs(
+            github, since=harvest.parse_since('2026-09-07'),
+            until=harvest.parse_since('2026-09-08T02:00:00Z'))
+        self.assertIn(
+            'created=2026-09-07T00%3A00%3A00Z..2026-09-08T02%3A00%3A00Z',
+            github.paths[0])
+
+    def test_until_alone_is_pushed_down_as_an_upper_bound(self):
+        github = self._listing(['2026-09-07T00:00:00Z'])
+        harvest.list_runs(
+            github, until=harvest.parse_since('2026-09-08T02:00:00Z'))
+        self.assertIn('created=%3C%3D2026-09-08T02%3A00%3A00Z',
+                      github.paths[0])
+
+    def test_a_since_with_an_offset_is_pushed_down_in_utc(self):
+        # parse_since() keeps the offset the operator wrote, and strftime
+        # ignores tzinfo, so formatting the parsed value directly would
+        # stamp a +10:00 wall clock with a Z and ask the API for a boundary
+        # ten hours *later* than the one requested. The server-side filter
+        # runs first, so those hours never reach the client-side one: the
+        # window narrows silently, in the maintainer's own timezone.
+        github = self._listing(['2026-09-02T00:00:00Z'])
+        harvest.list_runs(
+            github, since=harvest.parse_since('2026-08-30T00:00:00+10:00'))
+        self.assertIn('created=%3E%3D2026-08-29T14%3A00%3A00Z',
+                      github.paths[0])
+
+    def test_no_since_leaves_the_listing_unfiltered(self):
+        # A created= filter which leaked into an unbounded listing would
+        # bound it to whatever the last window was.
+        github = self._listing(['2026-09-02T00:00:00Z'])
+        harvest.list_runs(github, limit=1)
+        self.assertNotIn('created=', github.paths[0])
+
+    def test_since_and_limit_together_take_the_newest_in_the_window(self):
+        # The form the addendum was actually harvested with.
+        github = self._listing([
+            '2026-08-28T00:00:00Z', '2026-09-02T00:00:00Z',
+            '2026-08-31T00:00:00Z', '2026-09-01T00:00:00Z'])
+        runs = harvest.list_runs(
+            github, since=harvest.parse_since('2026-08-30'), limit=2)
+        self.assertEqual([1001, 1003], [r['id'] for r in runs])
 
     def test_a_naive_since_is_read_as_utc(self):
         # GitHub reports created_at in UTC. A window boundary which moved

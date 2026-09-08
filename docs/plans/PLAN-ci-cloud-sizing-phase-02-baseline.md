@@ -757,6 +757,21 @@ inference from the baseline's shape is confirmed by direct
 measurement, no read-reliability issue is filed, and **#4087** now
 rests on two independent windows.
 
+Both halves of that are **counted into the summary record** rather
+than left in the bundles. Review of this step pointed out that the
+two figures which close blind spot 2 were the only claims here not
+recomputable from the committed dataset: they came from raw series
+which expire ninety days after their run, and D22 does not commit
+those. `series.capacity_degraded_samples`,
+`series.capacity_degraded_absent_samples`,
+`series.ledger_unreadable_prefix_samples` and
+`series.ledger_unreadable_prefix_seconds` were added to
+`summary_record()` at `RECORD_VERSION` 2, the printed report now
+names which of the two readings an unreadable ledger was, and
+`records-addendum.jsonl` was re-harvested to carry them. The
+baseline stays at version 1: its own prefix classification remains a
+raw-bundle figure, and the dataset README names it as one.
+
 **The window is comparable to the baseline**, which is what licenses
 reading the two together. Cluster-wide committed-CPU p90 fraction:
 median 0.333 on `slim-primary` (n=24, max 0.481) against the
@@ -785,6 +800,24 @@ was checked rather than assumed: asking the API today for the
 completed `merge_group` runs created in the baseline's window returns
 **66**, which is exactly the number step 2d enumerated, so nothing
 was silently missed from it.
+
+Review of that fix found three more in the same few lines, all fixed
+here and each pinned by a test. The `created=>=` boundary was
+formatted with `strftime`, which ignores `tzinfo` while
+`parse_since()` deliberately preserves an offset, so a `--since`
+written in this project's own timezone asked the API for a boundary
+ten hours later than the one requested -- and, the server-side filter
+running first, those hours could not be recovered. An empty
+enumeration could still write an empty file over a committed dataset
+and exit zero by any road other than the ordering one, so it now
+raises before `--output` is opened, and a set of runs which yields no
+records raises after it. And the window itself was not reproducible:
+`--since 2026-09-07 --limit 10` named a different ten runs within
+hours of the harvest, so the tool gained `--until`, both boundaries
+are pushed down as a `created=A..B` range, and both datasets' README
+commands now name both ends. The re-harvest under the pinned window
+returned the same 32 records, field for field, which is also the
+check that the version 2 counters changed nothing else.
 
 **What this leaves for 2h.** Definition of done item 10 asks the
 operator to confirm a real post-fix run prints a *Capacity guard
