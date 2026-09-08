@@ -5,6 +5,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.schema.operations.baseclusteroperation import dependency
 from shakenfist.eventlog import add_event_multi
+from shakenfist.exceptions import CandidateNodeNotFoundException
 from shakenfist.exceptions import CapacityAdmissionDenied
 from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
@@ -155,6 +156,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
         s = scheduler.Scheduler()
         affinity_failure = False
         affinity_message = ''
+        node_unavailable = False
         try:
             s.find_candidates(inst, candidates=[config.NODE_UUID])
             return None
@@ -172,6 +174,22 @@ class NodeInstNetdescOp(BaseClusterOperation):
             affinity_failure = isinstance(e, AffinityConstraintUnsatisfiable)
             affinity_message = str(e)
 
+        except CandidateNodeNotFoundException as e:
+            # This node is missing from the scheduler's active-node
+            # metrics, most likely because it is restarting: sentinel-last
+            # holds the node's lifecycle state at "stopping" until every
+            # other daemon is up, so a node is invisible to the active
+            # prefilter while its queue daemon is already dequeuing
+            # placement work. That is an unsuccessful placement, not an
+            # unhandled error: fall through to the redirect below so the
+            # instance the cluster just placed here lands on another node
+            # rather than being deleted (issue 4113).
+            inst.add_event(
+                EVENT_TYPE_AUDIT,
+                'schedule failed, this node cannot currently schedule for '
+                'itself', extra={'message': str(e)})
+            node_unavailable = True
+
         # Unsuccessful placement, check if reached placement attempt limit
         db_placement = inst.placement
         if db_placement['placement_attempts'] > 3:
@@ -188,6 +206,9 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 raise AbortInstanceStart(
                     self, 'Requested node does not satisfy the requested '
                     'affinity constraints: %s' % affinity_message)
+            if node_unavailable:
+                raise AbortInstanceStart(
+                    self, 'Requested node is not currently an active node')
             raise AbortInstanceStart(self, 'Requested node lacks resources')
 
         # Try placing on another node

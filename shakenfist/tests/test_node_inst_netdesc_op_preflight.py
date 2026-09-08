@@ -386,6 +386,60 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         self.assertIn('Unable to find suitable node', str(raised))
         self.assertNotIn('affinity', str(raised))
 
+    def test_inactive_self_redirects_rather_than_deletes(self):
+        # A restarting node is invisible to the active-node prefilter
+        # until sentinel-last returns it to an active state, so its own
+        # preflight raises CandidateNodeNotFoundException -- while its
+        # queue daemon is already dequeuing placement work. That used to
+        # escape into dispatch_task's catch-all and delete the instance
+        # the cluster had just placed; it must redirect to another node
+        # instead (issue 4113).
+        inst = FakeInstance('created')
+        target_node = str(uuid4())
+
+        raised = self._redirect_raising(
+            inst,
+            exceptions.CandidateNodeNotFoundException(
+                'candidate node barry is not in the active node list, or '
+                'its metrics were unreadable'),
+            candidates=[target_node])
+
+        self.assertIsNone(raised)
+        self.assertEqual([target_node], inst.placed_on)
+        self.assertEqual([], inst.delete_errors)
+
+    def test_requested_placement_abort_names_unavailable_node(self):
+        # An operator who pinned a node that is mid-restart is otherwise
+        # told it lacks resources when what it lacks is an active
+        # lifecycle state.
+        inst = FakeInstance('created')
+        inst.requested_placement = str(uuid4())
+
+        raised = self._redirect_raising(
+            inst,
+            exceptions.CandidateNodeNotFoundException(
+                'candidate node barry is not in the active node list, or '
+                'its metrics were unreadable'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('not currently an active node', str(raised))
+        self.assertNotIn('lacks resources', str(raised))
+
+    def test_attempt_limit_abort_for_unavailable_node(self):
+        # The attempt-limit guard runs before the redirect, so it must
+        # tolerate the carried node_unavailable flag too.
+        inst = FakeInstance('created')
+        inst.placement = {'placement_attempts': 4}
+
+        raised = self._redirect_raising(
+            inst,
+            exceptions.CandidateNodeNotFoundException(
+                'candidate node barry is not in the active node list, or '
+                'its metrics were unreadable'))
+
+        self.assertIsNotNone(raised)
+        self.assertIn('Too many start attempts', str(raised))
+
     def test_the_redirect_itself_is_unchanged_by_the_subclass(self):
         # AffinityConstraintUnsatisfiable subclasses
         # LowResourceException precisely so this keeps working: another

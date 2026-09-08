@@ -604,11 +604,22 @@ class Scheduler:
                     extra={'candidates': candidates})
                 for n in candidates:
                     if n not in self.metrics:
+                        # The metrics dict carries a key for every node
+                        # the active prefilter returned, even one whose
+                        # metrics were stale or empty, so a missing key
+                        # means the candidate was not in the active-node
+                        # list at all (or its metrics row was
+                        # unreadable). Say so: the exception's message
+                        # is recorded against the user's instance, and a
+                        # bare node UUID explains nothing (issue 4113).
                         add_event_multi(
                             EVENT_TYPE_AUDIT, related_objects,
-                            f'schedule candidate {n} lacks metrics, aborting',
+                            f'schedule candidate {n} is not an active node, '
+                            'aborting',
                             extra={'candidates': candidates})
-                        raise exceptions.CandidateNodeNotFoundException(n)
+                        raise exceptions.CandidateNodeNotFoundException(
+                            f'candidate node {n} is not in the active node '
+                            'list, or its metrics were unreadable')
             else:
                 candidates = []
                 for n in self.metrics.keys():
