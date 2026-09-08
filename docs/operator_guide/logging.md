@@ -168,33 +168,69 @@ metrics endpoint:
 ## API request validation findings
 
 After upgrading you may see `API request validation finding` lines
-from `sf-api` in your log stream. These are **informational**: they
-record a request which did not match its endpoint's published
-parameter declarations, and while `API_VALIDATION_MODE` is `warn`
-(the default) they change no response — the request was answered
-exactly as it always was. Do not set `enforce` yet; it only makes
-sense once the warn log for your own callers has been read and
-understood. See
-[PLAN-api-input-validation](../plans/PLAN-api-input-validation.md). If
-the lines themselves become a problem — a chatty caller sending an
-undeclared key on every request is an extra line per request —
-`API_VALIDATION_MODE` can be set to `off`, which disables the layer
-entirely.
+from `sf-api` in your log stream. Each records a request which did not
+match its endpoint's published parameter declarations.
+
+`API_VALIDATION_MODE` decides what happens to such a request, and
+since v0.8.0 it defaults to **`enforce`**: a finding other than
+`missing-required` refuses the request with a 400 in the usual
+`{"error": "<parameter>: <reason>", "status": 400}` shape, and the
+finding line records the refusal. A refusal names the first finding
+only, so a request with several problems is fixed one round trip at a
+time — but every finding is logged, so the log has the whole picture
+even when the caller does not. A parameter declared required but not
+supplied is recorded and never enforced.
+
+The other two modes are the rollback, in order of severity:
+
+* `warn` restores the pre-v0.8.0 behaviour: findings are recorded and
+  change no response, so the request is answered exactly as it always
+  was. Set this if a caller of yours breaks against enforcement while
+  you fix it — the finding lines tell you which parameter to fix.
+* `off` disables the layer entirely, including the log lines. This is
+  the valve for the lines themselves becoming a problem: a chatty
+  caller sending an undeclared key on every request is an extra line
+  per request.
+
+The caller-visible consequences of enforcement — including requests
+which used to answer 404 or 403 and now answer 400 — are described in
+the [v0.7 to v0.8 release notes](../release_notes/v07-v08.md), and the
+design in
+[PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
 
 Each line carries:
 
 | Field | Meaning |
 |---|---|
 | `validation-reason` | Which rule the request missed: `unknown-parameter` (a body key the endpoint does not declare), `type-mismatch` (a declared parameter with a value of the wrong type), `missing-required` (a declared-required parameter that was not supplied), or `body-path-collision` (a body key with the same name as a URL path parameter). |
-| `validation-parameter` | The parameter concerned, truncated to 64 characters. |
+| `validation-parameter` | The parameter concerned, truncated to 64 characters. When the wrong value is inside a container the offending element is named — `disk[0]` for the first entry of the disk array, `disk.size` for a sub-field. |
 | `validation-detail` | The specific rule that was missed — for a `type-mismatch`, the validation message (for example `Not a valid integer.`). |
-| `validation-value-type` | The Python type of the offending value. The value itself is never logged. |
+| `validation-value-type` | The Python type of the offending value — of the named element, where one was named. The value itself is never logged. |
 | `route` | The route template (for example `/instances/<instance_ref>`), so findings aggregate by endpoint; `path` carries the concrete request path. |
-| `validation-response-status` | The status the request went on to return anyway, which is what separates a rejection enforcement would introduce from a status code it would merely change. |
+| `validation-response-status` | The status the request returned. In `enforce` this is the 400 the finding itself produced; in `warn` it is what the request returned anyway, which is what separates a rejection enforcement would introduce from a status code it would merely change. |
 | `validation-mode` | The active `API_VALIDATION_MODE`. |
 
+The number of findings one request can produce is bounded, because a
+request body is not: at most 20 `unknown-parameter` findings and 20
+`type-mismatch` findings, each followed by a single `(overflow)`
+finding carrying the count of the rest. A caller sending a thousand
+malformed disk specifications therefore costs a bounded number of log
+lines.
+
 The reason codes and the measurement they feed are described in
-`docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md`.
+`docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md`,
+and the reading which supported turning enforcement on in
+`docs/plans/PLAN-api-input-validation-phase-04-enforce.md`.
+
+A refused request never reaches its handler, so it does not produce
+the `token used to authenticate request` audit event a well formed
+request would. It writes a `request refused by input validation` audit
+event against the caller's namespace instead, carrying the same key
+name, method, path and remote address, plus the reason and parameter
+the refusal named. As in the log line, the parameter name is replaced
+with `*****` on the `/auth` routes: the name comes from the caller, so
+a buggy one can put secret-bearing material in a key position, and a
+namespace event is readable by anyone who can read the namespace.
 
 ## Secrets in the log stream
 

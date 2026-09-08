@@ -406,6 +406,103 @@ Checked before committing to it: the official client's
 shipped caller is affected. Two of the seven metadata delete handlers
 were cleaned up already, so the pattern is proven.
 
+### Review round 1 on [#4141](https://github.com/shakenfist/shakenfist/pull/4141)
+
+Eleven items: 2 `fix`, 3 `document`, 5 `consider`, 1 `none`. Both
+fixes and all three documentation items were taken, as were four of
+the five `consider` items. The round is against the flip itself
+rather than against machinery an earlier round added, which is the
+first review this branch has had.
+
+**Both `fix` items were in the element-naming commit**, which is the
+one piece of the branch that was not a plan step -- it was written
+because enforcement turned a finding's detail into the caller's error
+message. Neither defect existed before that commit, and both are the
+same kind of mistake: the code walked marshmallow's error structure
+correctly and then handled the *result* of the walk carelessly.
+
+* **The fan-out was unbounded.** `check()` has capped
+  unknown-parameter findings since phase 3 because a body key is
+  bounded only by what a caller sends and each finding is a log line.
+  Naming elements individually gave type mismatches exactly that
+  property -- a thousand-element disk array became a thousand
+  findings, of which the caller saw one. `MAX_TYPE_MISMATCH_FINDINGS`
+  now bounds them in the same shape, with the same `(overflow)`
+  summary finding. The leaves are sliced before their values are
+  resolved, so the elements past the bound cost a tuple each.
+* **Indices sorted lexically**, so `disk[10]` was reported ahead of
+  `disk[2]`. Since a refusal names the first finding only, a caller
+  with two bad disks was told about the wrong one. `_sort_key` keeps
+  integers in numeric order ahead of sub-field names, and the ordering
+  test now uses twelve elements, because two cannot tell the two
+  orders apart -- which is why the test named "in order" did not catch
+  this.
+
+**The audit gap was taken as a fix rather than as documentation.**
+The reviewer offered either. A refusal returns from outside every
+per-method decorator, so `log_token_use` never runs and an
+authenticated caller could send malformed requests indefinitely
+leaving nothing in the namespace's own audit trail -- only sf-api's
+log, which carries neither key name nor remote address. Preserving
+event coverage is a standing goal of this project, so enforcement now
+writes a `request refused by input validation` audit event carrying
+the same fields plus the reason and parameter. It is deliberately a
+different message from `token used to authenticate request`, because
+it is a different fact: this request reached no handler. Failures are
+swallowed -- an unavailable database must not upgrade a malformed
+request into a 503 -- but the swallow logs.
+
+**The rollback path is now asserted rather than promised.** Six
+comments added by the flip said a handler's own guard "remains and
+still answers when API_VALIDATION_MODE is not enforce", while every
+test that covered those messages had been rewritten to assert the
+validator's wording. `set_validation_mode()` on the test base restores
+the mode on cleanup, and six warn-mode tests now assert those guards'
+own messages -- one of the six covers the three claim bounds, which
+are three guards in one handler. Mutating the helper into a no-op fails them, so they are
+about the mode rather than incidentally passing at it.
+
+**Writing the audit event turned up a leak of its own**, which is the
+reason the reviewer's item 11 was worth recording even though it asked
+for no change. It observed that a refusal puts the parameter name --
+which `log_validation_findings` redacts on `/auth` routes, because a
+buggy caller can put secret-bearing material in a key position -- into
+the response body, and that this is safe only because
+`log_response_info` drops the whole body on the same predicate. A
+namespace event has no such protection and is readable by anyone who
+can read the namespace, so the new audit event redacts the name on the
+same predicate. `REDACTED_PARAMETER` is now one constant used by both
+sites, so the two records of one refusal cannot disagree about what is
+safe to say, and the coupling between the two redactions is written
+down where the predicate lives.
+
+**Verification.** Eleven mutations over the new assertions, each caught
+by the test that names the property: lexical index sorting, an
+unbounded fan-out, a missing overflow finding, the container's type
+reported instead of the element's, an unresolvable path answering None
+rather than falling back, the raw-body skip removed, the audit event
+removed, the audit helper allowed to raise on a `@public` endpoint,
+the last enforceable finding reported instead of the first, the
+parameter name left unredacted on a credential route, and the
+warn-mode helper turned into a no-op. A twelfth mutation --
+validating a raw body against its schema -- was **not** caught, and
+should not be: a raw body declaration cannot be combined with named
+body parameters, so a raw-body route's compiled body schema is always
+None and the guard is unobservable belt-and-braces. A test for it
+would be a test that cannot fail. The first attempt at the raw-body
+test *was* that test -- it sent bytes with an octet-stream content
+type, which no scan could have reported on whether the route was
+skipped or not; it earns its place only because the body it now sends
+is JSON the scan would otherwise refuse.
+
+The one `consider` not taken is the cluster CI test's base class.
+`TestUndeclaredParameterRefused` keeps `BaseNamespacedTestCase`
+because the property has to hold for an ordinary caller rather than
+for an admin -- the namespaced client is the point, not incidental --
+and the teardown loops it pays for break out immediately on empty
+lists. The reason is now in the class docstring, along with why the
+private `_request_url` is the right call there.
+
 ### Review round 2 on [#4101](https://github.com/shakenfist/shakenfist/pull/4101)
 
 Ten items: 1 `fix`, 2 `document`, 5 `consider`, 2 `none` — down from
@@ -611,6 +708,13 @@ run, so absence is evidence rather than silence.
 13. `UNDECLARED_BY_DESIGN` in `test_parameter_declarations.py` is
     empty, and the five metadata delete handlers no longer accept a
     `value` kwarg they never read.
+14. The findings one request can produce are bounded whatever it
+    sends, in every reason, and a test proves it.
+15. A refused request writes an audit event against the caller's
+    namespace, so enforcement costs no audit coverage.
+16. Each handler guard which enforcement now answers ahead of has a
+    warn-mode test asserting the guard's own message, so the
+    documented rollback path is exercised rather than described.
 
 ## Back brief
 

@@ -1,3 +1,5 @@
+# Copyright 2019 Michael Still and contributors
+
 import json
 
 from testtools import content
@@ -11,6 +13,15 @@ from shakenfist_client import apiclient
 # with something like "AuthEndpoint.post() got an unexpected keyword
 # argument 'zzz'" -- issue #3612 in its purest form. The enforced shape is
 # {"error": "<name>: not declared by this endpoint", "status": 400} instead.
+#
+# This is a subset of INTERPRETER_TEXT in
+# shakenfist/tests/external_api/test_request_validation.py, which asserts
+# the same property against the same responses in the unit suite. The list
+# is repeated rather than imported because this suite runs from an
+# installed shakenfist_ci package against a remote cluster and cannot
+# import the server's test tree; the entries dropped here are the ones
+# which describe a Python source layout the client cannot see anyway. Add
+# a marker to both, or the two will drift.
 _INTERPRETER_TEXT_MARKERS = (
     'got an unexpected keyword argument',
     'Traceback',
@@ -25,6 +36,10 @@ class TestUndeclaredParameterRefused(base.BaseNamespacedTestCase):
     on webargs' unknown=RAISE for a body key no declaration names: the
     request is refused with a 400 rather than reaching a handler that
     would raise a TypeError of its own.
+
+    Namespaced rather than admin on purpose: the refusal has to hold for
+    an ordinary caller, which is the one that would otherwise have been
+    handed a class and method name it has no other way to learn.
     """
 
     def __init__(self, *args, **kwargs):
@@ -35,6 +50,12 @@ class TestUndeclaredParameterRefused(base.BaseNamespacedTestCase):
         # GET /instances declares exactly one body parameter, "all". An
         # additional, undeclared key must be refused before the handler
         # is ever called.
+        #
+        # _request_url is private, and used deliberately: no public
+        # client method sends a key the API does not declare, which is
+        # the whole point of the property under test. A client refactor
+        # which renames it must update this test rather than assume
+        # nothing depends on it.
         try:
             self.test_client._request_url(
                 'GET', '/instances',

@@ -309,10 +309,19 @@ request. `API_VALIDATION_MODE` defaults to `enforce`: a finding other
 than `missing-required` answers `400` in the usual
 `{"error": "<parameter>: <reason>", "status": ...}` shape, naming the
 offending parameter, before the handler or any of its per-method
-decorators ever run. `warn` is the operator's rollback for a caller
-that breaks — it logs what would have been refused and changes no
-response — and `off` disables the layer entirely, as a further safety
-valve against unexpected log volume.
+decorators ever run. A refusal names the **first** finding only, so a
+request with several problems is fixed one round trip at a time; every
+finding is logged either way, so an operator sees the rest. `warn` is
+the operator's rollback for a caller that breaks — it logs what would
+have been refused and changes no response — and `off` disables the
+layer entirely, as a further safety valve against unexpected log
+volume.
+
+Because a refusal is answered from outside every per-method decorator,
+`log_token_use` never runs for one. The refusal writes its own
+`request refused by input validation` audit event against the caller's
+namespace instead, so a namespace's audit trail still shows the
+credential being used.
 
 A validation record carries the endpoint, the parameter, the reason,
 the offending value's **type** — never its value — and, in `warn`
