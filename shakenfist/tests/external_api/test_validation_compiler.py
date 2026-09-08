@@ -376,6 +376,67 @@ class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
              ('disk[1]', 'Not a valid mapping type.')],
             self._findings({'disk': ['one', 'two']}))
 
+    def test_indices_are_ordered_numerically_not_lexically(self):
+        """Eleven elements, because two cannot tell the difference.
+
+        marshmallow keys a sequence error by integer index, and
+        sorting those as strings gives 0, 1, 10, 2 -- so a caller whose
+        third and eleventh disks are both malformed would be told about
+        `disk[10]`, since enforcement answers with the first finding
+        only. The count here is deliberately past ten.
+        """
+        self.assertEqual(
+            ['disk[%d]' % index for index in range(12)],
+            [parameter for parameter, _ in
+             self._findings({'disk': ['x'] * 12})])
+
+    def test_the_findings_one_container_can_produce_are_bounded(self):
+        """Nothing bounds a request body, so something must bound this.
+
+        Each finding is a log line shipped to centralised logging, and
+        naming elements individually is precisely what turns one bad
+        parameter into one line per element. The unknown-parameter scan
+        has had this bound since phase 3 for the same reason; element
+        naming gave type mismatches the same unbounded property.
+        """
+        findings = self._findings(
+            {'disk': ['x'] * (validation.MAX_TYPE_MISMATCH_FINDINGS + 500)})
+
+        self.assertEqual(
+            validation.MAX_TYPE_MISMATCH_FINDINGS + 1, len(findings))
+        self.assertEqual(
+            ('(overflow)',
+             '500 further mismatching values not reported individually'),
+            findings[-1])
+        # The bound is on findings, not on which ones: the reported
+        # elements are still the first ones, in order.
+        self.assertEqual(
+            ['disk[%d]' % index
+             for index in range(validation.MAX_TYPE_MISMATCH_FINDINGS)],
+            [parameter for parameter, _ in findings[:-1]])
+
+    def test_a_finding_carries_the_element_type_not_the_containers(self):
+        """Decision D5 makes the type the only thing a finding says
+        about a value, so it must be the type of the value that failed.
+        `disk[0]` reported as a list describes the array around it."""
+        schema = self._Schema(unknown=marshmallow.EXCLUDE)
+        findings = validation._schema_findings(
+            schema, {'disk': ['a string'], 'tags': [{'a': 1}]})
+
+        self.assertEqual(
+            [('disk[0]', 'str'), ('tags[0]', 'dict')],
+            sorted((f.parameter, f.value_type) for f in findings))
+
+    def test_an_unresolvable_path_falls_back_to_the_container(self):
+        # marshmallow can key an error by something the supplied value
+        # has no entry for. The container's type is still true of what
+        # the caller sent, which beats reporting nothing.
+        self.assertEqual(
+            'list',
+            validation.Finding(
+                validation.TYPE_MISMATCH, 'disk[3]', 'nope',
+                validation._element_value(['only one'], (3,))).value_type)
+
     def test_a_scalar_field_is_unchanged(self):
         # The flattening must not disturb the shape the rest of the
         # phase's tests pin, which is the common case by far.
