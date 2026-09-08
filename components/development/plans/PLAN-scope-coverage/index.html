@@ -3033,6 +3033,78 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="5. Push audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the survey found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -3041,7 +3113,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#risks-and-mitigations" class="md-nav__link">
+  <a href="#risks-and-mitigations_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Risks and mitigations
@@ -3108,7 +3180,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
+  <a href="#back-brief_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Back brief
@@ -14156,6 +14228,78 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="5. Push audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the survey found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -14164,7 +14308,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#risks-and-mitigations" class="md-nav__link">
+  <a href="#risks-and-mitigations_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Risks and mitigations
@@ -14231,7 +14375,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
+  <a href="#back-brief_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Back brief
@@ -14511,27 +14655,32 @@ already defaulted to <code>develop</code>.</p>
 <tr>
 <td>2. Reconcile the scope lists</td>
 <td>Complete</td>
-<td></td>
+<td>8b77b32</td>
 </tr>
 <tr>
 <td>3. Lift the scope parsing into <code>audit/scope.py</code></td>
 <td>Complete</td>
-<td></td>
+<td>8b77b32</td>
 </tr>
 <tr>
 <td>4. Add the <code>scope-coverage</code> check</td>
 <td>Complete</td>
-<td></td>
+<td>8b77b32</td>
 </tr>
 <tr>
 <td>5. Push audit</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 </tbody>
 </table>
-<p>Phases 2 to 4 ship as a single pull request, so the <code>Merged</code> record
-will be the same merge commit for all three.</p>
+<p>Phases 2 to 4 shipped as a single pull request, so the <code>Merged</code>
+record is the same merge commit for all three: <code>8b77b32</code>, the merge
+of pull request 93 on 2026-09-04, whose diff against its first
+parent is the whole of this plan's work. That record was
+reconstructed in phase 5 rather than written as the phases landed;
+it comes from <code>gh pr view 93</code>, not from a path-filtered <code>git log</code>,
+which cannot say which commits arrived under a merge.</p>
 <h3 id="1-develop-branches-for-the-onboarding-repositories">1. <code>develop</code> branches for the onboarding repositories<a class="headerlink" href="#1-develop-branches-for-the-onboarding-repositories" title="Permanent link">&para;</a></h3>
 <p><code>uncalibrated-sextant</code> and <code>visual-digest-rust</code> renamed <code>main</code> to
 <code>develop</code> on GitHub, which moved the default branch with it. Local
@@ -14597,10 +14746,421 @@ catching and re-raising, or by asserting on the exception text.</p>
   repository that is not <code>development</code> skips without an API call.</li>
 </ul>
 <h3 id="5-push-audit">5. Push audit<a class="headerlink" href="#5-push-audit" title="Permanent link">&para;</a></h3>
-<p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of phases 2 to 4 against
-<code>main</code>, using the merge commit recorded in the Execution table.
-Findings land as their own pull request.</p>
-<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<p><strong>Planning effort:</strong> medium. The runbook is written and phases 2 to
+4 landed as one reviewed pull request, so the judgement in this
+phase is about scoping it correctly rather than about design.
+<strong>Review effort:</strong> high for the wave 2 agents, which is what the
+runbook already specifies for 2d and what the size of the diff
+justifies for 2a and 2c.</p>
+<p>In scope: running <code>PUSH-AUDIT.md</code> over the accumulated diff of
+phases 2 to 4, repairing the two places in that runbook which no
+longer describe this repository, and closing out the three records
+this plan left blank. Out of scope: the 43 onboarding issues, which
+are <code>standards-alignment</code> work and were declared so in D3; porting
+kerbside's <code>tools/audit/plan-range.sh</code> here; and fixing anything
+wave 2 finds -- findings land as their own pull request, and this
+plan is not complete until each is resolved or declined in writing
+in this section. If the audit finds nothing, that is recorded here
+in one sentence.</p>
+<h4 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h4>
+<p>The deliverables of phases 2 to 4 are all present and the criterion
+works in production: <code>scripts/audit/scope.py</code> and
+<code>docs/audits/scope-coverage.md</code> exist, <code>ScopeCoverage</code> is
+registered at <code>scripts/audit/registry.py:79</code>, the three onboarded
+repositories are in the workflow matrix and on the in-scope list,
+the three dead <code>*-testdata</code> exclusions are gone, and
+<code>docs/audits/compliance.md</code> reports <code>scope-coverage</code> as <code>compliant</code>
+on <code>development</code> with all other repositories <code>N/A</code>. That is the
+success criterion "passes on the first run after merge", met by the
+daily run rather than by a local dry run.</p>
+<p>It also answers the question <code>03046b2</code> left open -- whether
+<code>AUDIT_TOKEN</code> can see private repositories. A compliant verdict is
+only reachable if <code>performance</code>, <code>private-ci</code> and <code>jenkins-private</code>
+resolved, so the token can. The degradation path built for the case
+where it cannot is still right to keep; it is no longer the path
+being taken.</p>
+<p>Four things the section did not say, all corrected at source in
+this phase's commit so the next reader does not re-derive them:</p>
+<p><strong>The <code>Merged</code> column was never filled.</strong> Phases 2 to 4 landed in
+pull request 93, merged 2026-09-04, as merge commit <code>8b77b32</code>. The
+section instructs the audit to use "the merge commit recorded in
+the Execution table" and the table recorded nothing, which is
+exactly the failure <code>plan-push-audit-phase</code> describes: once the
+phases have merged, a diff against <code>main</code> is empty and reads as a
+clean audit. The record was reconstructed from <code>gh pr view 93</code>
+rather than from a path-filtered <code>git log</code>, per the block, and the
+answer is unambiguous here because one pull request carries all
+three phases.</p>
+<p><strong><code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> were not unchanged.</strong> The
+Documentation index maintenance section predicted that no
+convention moved and the shape of the system did not change. Both
+predictions were wrong, and correctly so: D4 moved the scope parse
+out of a test and into a module, which is a convention change
+(<code>AGENTS.md</code> now names <code>audit/scope.py</code> and <code>ScopeParseError</code> where
+it named <code>AuditScopeIsStatedOnceTest</code>) and a new component
+(<code>ARCHITECTURE.md</code> gained the <code>audit/scope.py</code> entry). The prose is
+corrected to describe what happened.</p>
+<p><strong>Bugs fixed during this work still said "To be filled in".</strong> Two
+review rounds on pull request 93 fixed real defects, and they are
+now recorded below.</p>
+<p><strong><code>PUSH-AUDIT.md</code> no longer describes this repository in two
+places, both of which bear on this plan specifically.</strong> The 2a
+brief states the four-file rule as "a check function in
+<code>scripts/audit-check.py</code>, metadata in <code>scripts/audit_common.py</code>
+(<code>AUDIT_METADATA</code> and <code>ISSUE_TITLES</code>)". Neither is true since
+<code>PLAN-audit-scripts-restructure</code> landed: <code>scripts/audit-check.py</code>
+is 71 lines and contains no check functions, and
+<code>scripts/audit_common.py:48-50</code> <em>derives</em> <code>AUDIT_METADATA</code> and
+<code>ISSUE_TITLES</code> from the registry rather than declaring them. The
+wave 1 grep at <code>PUSH-AUDIT.md:64-67</code>, which watches
+<code>scripts/audit_common.py</code> for changes to the issue-title interface,
+is dead for the same reason -- adding a criterion now touches
+<code>scripts/audit/checks/</code>, <code>scripts/audit/registry.py</code> and the frozen
+lists in <code>scripts/tests/test_metadata.py</code>, and never that file. The
+restructure updated the <strong>Duplicated logic.</strong> bullet to say
+<code>scripts/audit/checks/</code> and missed these two. Line numbers in this
+section are as of <code>8b77b32</code>; 5a's edit has since moved them. This
+plan added a criterion, so it is the work those two paragraphs
+exist to review.</p>
+<p>Nothing else in the runbook disagreed with the tree.
+<code>scripts/audit_common.py</code> still exists, so the grep is not
+referencing a deleted file; the shared blocks embedded in
+<code>PUSH-AUDIT.md</code> are unrelated to the stale prose and none of them
+needs a version bump; and this repository has no
+<code>tools/audit/plan-range.sh</code>, so the range is supplied by hand.</p>
+<h4 id="decisions_1">Decisions<a class="headerlink" href="#decisions_1" title="Permanent link">&para;</a></h4>
+<p><strong>D5.1. The audit range is <code>8b77b32^1..8b77b32</code>.</strong> Phase 1 changed
+GitHub settings and produced no commit, so the merge of pull
+request 93 against its first parent is the whole of this plan's
+work: 20 files, 1,270 insertions, 295 deletions. Every diff command
+in <code>PUSH-AUDIT.md</code> is written <code>main...HEAD</code>, which is empty here
+because the work is already on <code>main</code>; each is read with
+<code>$AUDIT_BASE $AUDIT_HEAD</code> substituted, exported once at the top of
+the phase. The audit is retrospective and cannot gate a push that
+already happened -- what it can still do is find what two rounds of
+automated review did not, before the criterion has been running
+long enough for anyone to trust it.</p>
+<p><strong>D5.2. <code>tools/audit/plan-range.sh</code> is not ported in this phase.</strong>
+kerbside derives <code>AUDIT_RANGE</code>/<code>AUDIT_PATHS</code> from a plan's recorded
+merge commits, which is the right shape and is why the <code>Merged</code>
+column is worth filling. Building it here would be a second plan's
+worth of work sitting inside an audit phase, and this phase needs
+one range that fits on a line. Recorded under Future work.</p>
+<p><strong>D5.3. The two stale <code>PUSH-AUDIT.md</code> paragraphs are fixed here,
+before wave 1 runs.</strong> This is the decision most likely to be argued
+with, because an audit phase's job is to find findings, not to
+repair the tool it is holding, and the staleness is
+<code>PLAN-audit-scripts-restructure</code>'s leftover rather than this plan's.
+The argument for fixing it here is that the two paragraphs are
+precisely the ones that review a criterion addition, which is what
+this plan did: leaving them stale spends the 2a agent's whole
+budget checking a rule that no longer exists, and produces a
+confident report about files the change could not have touched. The
+edit is three lines of local prose and one grep. Neither sits
+inside a shared block, so no version bumps and nothing in the fleet
+becomes non-compliant overnight. Anything else wave 2 finds in the
+runbook is reported, not fixed.</p>
+<p><strong>D5.4. This plan's own closeout gaps are corrected in the planning
+commit, not treated as audit findings.</strong> The blank <code>Merged</code> column,
+the false unchanged-documentation claim and the empty bugs section
+are records this plan owes regardless of what the audit finds, and
+the first of them is an input the audit cannot run without.</p>
+<p><strong>D5.5. One brief addition beyond the runbook, for 2a and 2d.</strong>
+<code>ScopeCoverage.run()</code> had its failure classification rewritten
+twice under review -- a 404 read as a deletion, then a 404 read as
+invisibility -- and its suggested fix for the wrong branch is
+destructive: delete the entry. Both agents are told to read that
+resolution path as the highest-value part of the diff, and to
+consider what the check reports when the token degrades mid-run
+rather than at the start.</p>
+<h4 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5a</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Correct the two stale passages in <code>PUSH-AUDIT.md</code>, and nothing else in that file. First, the four-file rule in the 2a brief at lines 125-127: it says a criterion spans a check function in <code>scripts/audit-check.py</code> and metadata in <code>scripts/audit_common.py</code> (<code>AUDIT_METADATA</code> and <code>ISSUE_TITLES</code>). Since <code>PLAN-audit-scripts-restructure</code> landed, a criterion spans a <code>Check</code> subclass in <code>scripts/audit/checks/&lt;family&gt;.py</code>, its registration in <code>CHECKS</code> in <code>scripts/audit/registry.py</code>, a spec in <code>docs/audits/&lt;name&gt;.md</code>, a row in <code>docs/audits/README.md</code>, and its frozen lines in <code>FROZEN_METADATA</code> and <code>FROZEN_ISSUE_TITLES</code> in <code>scripts/tests/test_metadata.py</code>. Read <code>scripts/audit_common.py:35-50</code> before writing: <code>AUDIT_METADATA</code> and <code>ISSUE_TITLES</code> are now derived from the registry by <code>_metadata()</code> and <code>_issue_titles()</code>, so they cannot be edited directly and the issue title is still the fleet-wide idempotency key -- keep that warning, move it to where the title is now declared. Second, the wave 1 grep at lines 64-67 watches <code>scripts/audit_common.py</code> for <code>ISSUE_TITLES</code> changes and can no longer fire for the case it was written for; retarget it at <code>scripts/tests/test_metadata.py</code>. The <strong>Duplicated logic.</strong> bullet already says <code>scripts/audit/checks/</code> and is correct -- do not touch it. Every line number in this brief is as of <code>8b77b32</code>, before 5a's own edit moved them. Do not touch any <code>&lt;!-- shared-block: --&gt;</code> region: a bump files issues fleet-wide. Wrap at the file's existing width. Commit subject: "Correct the push audit runbook after the restructure."</td>
+</tr>
+<tr>
+<td>5b</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Wave 1 of <code>PUSH-AUDIT.md</code>, over the recorded range. Export <code>AUDIT_BASE=8b77b32^1</code> and <code>AUDIT_HEAD=8b77b32</code> and read every <code>git diff main...HEAD</code> in the runbook as <code>git diff $AUDIT_BASE $AUDIT_HEAD</code>; a plain <code>main...HEAD</code> is empty here because this work is already merged, which would read as a clean audit. Run <code>pre-commit run --all-files</code> on the current tree first -- it is the whole of lint and test -- and run it with the tree clean, because <code>review-tracking.py stamp</code> takes its SHAs from the git <strong>index</strong>: an unstaged edit is attested at the staged content, not at what is on disk. An earlier draft of this caution named <code>test_every_stamp_matches_the_content_it_attests_to</code> as what gives the false pass; that assertion was deleted from this repository in <code>6b132a4</code> on 2026-08-29 for taxing every Renovate bump, and the name reached this brief from <code>PLAN-audit-compliance-split</code>'s record of the round that hit it. The clean-tree advice outlived the test. Then run each of the seven greps in the wave 1 block with the substituted range and report every hit with a verdict: hit, looked at, accepted or blocking, and why. Expect and explain rather than ignore: <code>docs/audits/compliance.md</code> is not in this range; <code>REVIEWS.md</code> is, and the pruning it records is the convention working. Report, do not fix.</td>
+</tr>
+<tr>
+<td>5c</td>
+<td>high</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Wave 2a, code quality, per the brief in <code>PUSH-AUDIT.md</code> -- but read the corrected four-file rule from step 5a, not a cached copy. Diff is <code>git diff 8b77b32^1 8b77b32</code>. Take 5b's grep report as input and triage each hit. The highest-value reading is <code>ScopeCoverage.run()</code> and its name-resolution path in <code>scripts/audit/checks/github_config.py</code>: the classification of a failed lookup was rewritten twice under review, once because every non-zero return landed in "no longer exists" whose suggested fix is destructive, and once because a token that cannot see private repositories answers 404 for all of them. Ask what the check reports when the token degrades part-way through the resolution loop rather than before it, and whether the undecided set -- the half that needs no API access -- survives every failure path. Also check <code>scripts/audit/scope.py</code> against <code>scripts/tests/test_registry.py</code>: D4 says the parse exists once, so a second copy or a divergent guard is a finding.</td>
+</tr>
+<tr>
+<td>5d</td>
+<td>high</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Wave 2b, test review, per the brief in <code>PUSH-AUDIT.md</code>, over <code>git diff 8b77b32^1 8b77b32</code>. <code>scripts/tests/test_github_config.py</code> gained 318 lines and <code>scripts/tests/test_registry.py</code> lost 179; establish that the second is a move to <code>scripts/audit/scope.py</code>'s own tests and not a loss of coverage, naming each assertion that did not survive. The five behaviours D1 and the risks section promised tests for are: a clean scope passes, an unlisted repository fails, a listed name that does not resolve fails, a truncated listing is caught before it is believed, and a repository that is not <code>development</code> skips without an API call. Verify each exists and actually tests what its name says on <code>FakeGitHub</code>. The truncation test is the one to read hardest -- the risk is a listing cut at the limit being read as eight repositories deleted from the organisation.</td>
+</tr>
+<tr>
+<td>5e</td>
+<td>high</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Wave 2c, documentation review, per the brief in <code>PUSH-AUDIT.md</code>, over <code>git diff 8b77b32^1 8b77b32</code>. Four documents moved together and the question is whether they now say the same thing: <code>docs/audits/scope-coverage.md</code> (new, 135 lines), <code>docs/audits/README.md</code> (the two scope lists and the criterion index row), <code>AGENTS.md</code> (the parsed-prose convention) and <code>ARCHITECTURE.md</code> (the <code>audit/scope.py</code> entry). Check specifically that the excluded list's widened rationale sentence, per D3, actually covers <code>divergulent-reviews</code> and <code>homebrew-tap</code> rather than still saying "internal only tooling or historical archive repositories"; that no criterion spec has grown a generated status table; that <code>docs/consistency-audits.md</code> really did need no change, as the plan claims, by reading its "Adding a criterion" and "Bringing a repository into scope" sections against what phases 2 to 4 did; and that the <code>README.md</code> and <code>docs/ci-review-automation.md</code> deletions of the imago claim left no dangling reference.</td>
+</tr>
+<tr>
+<td>5f</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Wave 2d, security review, per the brief in <code>PUSH-AUDIT.md</code>, over <code>git diff 8b77b32^1 8b77b32</code>. Read the actual code. This diff adds a check that runs with <code>AUDIT_TOKEN</code> and reaches the GitHub API, so the surface is: what reaches a subprocess argument list in <code>scripts/audit/github.py</code> and <code>scripts/audit/checks/github_config.py</code>, whether any organisation-supplied string (a repository name from the listing) reaches a shell, a path or a URL without validation, and whether a token or any part of one can reach a log line, an issue body or the compliance page on a failure path. <code>scripts/audit/scope.py</code> parses <code>docs/audits/README.md</code> by literal phrase; consider what a crafted document does to it, bearing in mind the file is in this repository and changing it needs a merged pull request. Apply the <code>path-traversal-review</code> shared block.</td>
+</tr>
+<tr>
+<td>5g</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Management triage, in the session rather than a sub-agent: read all five reports, decide each finding blocking, advisory or declined, and write the outcome into this section under an <strong>Outcome</strong> heading -- what wave 1 found, what each wave 2 agent found, and for every finding either where it was fixed or why it was declined, in writing. Work the <code>PUSH-AUDIT.md</code> management checklist. Fixes land as their own pull request against <code>main</code>, not on this branch, per the shared block; this branch carries the plan record. Then set phase 5 to <code>Complete</code> in the Execution table with its own merge commit, and set the plan's <code>docs/plans/index.md</code> status to <code>Complete</code> once the findings pull request has merged -- not before, because the plan is not complete until each finding is resolved or declined.</td>
+</tr>
+</tbody>
+</table>
+<p>Steps 5a and 5b are sequential -- 5c reads the runbook 5a
+corrects, and 5b's grep report is 5c's input. Steps 5c to 5f are
+independent and are spawned in parallel once 5b passes; the runbook
+requires wave 1 to pass before wave 2 is worth spending on. All
+steps run in this phase's worktree; <code>Isolation</code> says <code>none</code> because
+none of them is risky enough to want a discardable tree, and 5b to
+5f write no code at all.</p>
+<h4 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>A retrospective audit has no gate.</strong> The work is on <code>main</code> and
+  the criterion has been filing and closing real issues since
+  2026-09-04, so a blocking finding is a bug in production rather
+  than a push that does not happen. Mitigation: 5g treats a
+  blocking finding as a same-day pull request, and the check's
+  blast radius is bounded -- <code>applies()</code> restricts it to
+  <code>development</code>, so a defect files or withholds issues on this
+  repository only.</li>
+<li><strong>Wave 1 read against the wrong range.</strong> <code>main...HEAD</code> is empty
+  on this branch and every grep would return nothing, which reads
+  identically to a clean audit. Mitigation: 5b exports the range
+  explicitly and its report is required to state the range it used
+  and the file count it saw; 5g rejects a report whose file count
+  is not 20.</li>
+<li><strong>5a's edit widens.</strong> <code>PUSH-AUDIT.md</code> embeds eight shared blocks,
+  and an edit inside one bumps nothing but makes every embedding
+  repository's copy stale on the next daily run without the version
+  changing. Mitigation: the brief names the exact line ranges and
+  forbids touching a <code>&lt;!-- shared-block: --&gt;</code> region; 5g diffs
+  <code>PUSH-AUDIT.md</code> and confirms no line inside a block moved.</li>
+<li><strong>The audit re-litigates D3.</strong> The 43 onboarding issues are
+  visible in <code>docs/audits/compliance.md</code> and an agent reading the
+  fleet's state may report them as a regression this plan caused.
+  Mitigation: they are declared out of scope in this section and in
+  D3, and 5g declines any finding that amounts to "these three
+  repositories fail many criteria" with that reference.</li>
+</ul>
+<h4 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h4>
+<ul>
+<li>The Execution table records <code>8b77b32</code> for phases 2, 3 and 4, and
+  the reconstruction is stated as a reconstruction.</li>
+<li><code>git diff --stat 8b77b32^1 8b77b32 | tail -1</code> reports 20 files
+  changed, and 5b's report states that same figure as the range it
+  audited.</li>
+<li><code>grep -n 'audit-check.py\|audit_common' PUSH-AUDIT.md</code> returns no
+  line claiming a criterion declares a check function or its
+  metadata in either file.</li>
+<li>No line inside a <code>&lt;!-- shared-block: --&gt;</code> region of
+  <code>PUSH-AUDIT.md</code> differs from <code>templates/shared-blocks/</code>:
+  <code>python3 scripts/audit-check.py --repo-path . --repo-name
+  development</code> still reports <code>push-audit</code> passing.</li>
+<li>Every wave 2 finding appears in the Outcome below with a
+  disposition, and every disposition that is "declined" says why.</li>
+<li>The Documentation index maintenance section describes the
+  <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> edits that happened, and Bugs
+  fixed during this work is not a placeholder.</li>
+<li><code>pre-commit run --all-files</code> passes.</li>
+</ul>
+<h4 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h4>
+<p>One gate, before 5a edits anything: the sub-agent restates the
+current four-file rule in its own words, from having read
+<code>scripts/audit_common.py</code> and <code>scripts/audit/registry.py</code>, and
+names which file the issue title is declared in now. Getting that
+wrong writes a new wrong rule over an old one, and every later
+audit in the fleet reads it. The rest of the phase is cheap to
+redo, and 5b to 5f produce reports rather than edits.</p>
+<p><strong>Outcome.</strong> Run 2026-09-07 over <code>8b77b32^1..8b77b32</code>, the range D5.1
+names. Wave 1 passed and the diffstat matched the figure this section
+recorded in advance -- 20 files, 1,270 insertions, 295 deletions --
+which is the check that the audit read the merged range rather than an
+empty <code>main...HEAD</code>. <code>pre-commit</code> was clean on a verified-clean tree.
+Of the seven greps, five returned nothing and two hit and were
+accepted: the new imports are stdlib or this repository's own <code>audit</code>
+package, and the one <code># noqa: E402</code> is a pre-existing suppression that
+the diff only added a name to. <code>templates/shared-blocks/</code> is untouched,
+so nothing in the fleet became non-compliant from this work. <code>REVIEWS.md</code>
+was regenerated correctly: 13 stale marks pruned and none re-stamped,
+172 of 174 becoming 159 of 174 as the two newly in-scope files arrived
+unreviewed.</p>
+<p>Wave 2 found one blocking defect, five low-severity security findings,
+and four advisories. No critical or high security findings.</p>
+<p><strong>2a-1, blocking: an unhandled <code>UnicodeDecodeError</code> in
+<code>scripts/audit/scope.py:63</code>.</strong> <code>scope.read()</code> opens with a bare
+<code>open()</code>. <code>ScopeCoverage.run()</code> catches <code>ScopeParseError</code> and <code>OSError</code>;
+<code>UnicodeDecodeError</code> subclasses <code>ValueError</code>, so it escapes, and
+<code>registry.run_all()</code> has no per-check exception handling. One non-UTF-8
+byte in <code>docs/audits/README.md</code> or the audit workflow would abort the
+whole <code>development</code> leg of the daily run and take issue filing and the
+compliance page with it. What makes this more than theoretical is that
+<code>Repo.read()</code> at <code>repo.py:124</code> already reads with <code>errors='replace'</code>
+and its docstring gives the reason -- "a check that crashes on one file
+reports nothing about any of the other criteria." The new module did
+not follow the convention its own package had already written down. It
+is the same defect class as the <code>describe_failure()</code> <code>IndexError</code> the
+review rounds caught, in a second place, which is the argument for
+auditing an accumulated range rather than trusting the review that
+looked at each commit.</p>
+<p><strong>2d-3.1, low, and the one worth more than its rating: the rename
+suppression is owner-blind.</strong> <code>github_config.py:459</code> subtracts
+<code>canonical.split('/')[-1]</code>, discarding the owner. A repository
+transferred out of the organisation still redirects, so its canonical
+name can be <code>otherowner/target</code>; if <code>shakenfist/target</code> exists and is
+in neither list, its genuine finding is silently suppressed. That is
+the third state this criterion exists to remove, reappearing inside the
+criterion.</p>
+<p><strong>2d-3.2, low: a transfer out of the organisation is reported as a
+rename</strong>, and told to write the new name into the matrix -- which
+<code>consistency-audit.yml:52</code> cannot express, because it clones
+<code>shakenfist/${{ matrix.repo }}</code>. The correct advice there is to remove
+the entry.</p>
+<p><strong>Two stale documentation references, found by the sweep 2c was asked
+to run rather than by the diff.</strong> <code>docs/consistency-audits.md:24</code> still
+calls a criterion "a function" in <code>scripts/audit-check.py</code> and
+contradicts its own "Adding a criterion" section further down the same
+page; and <code>templates/ci-review-automation/README.md:428</code> still names
+imago in the present tense, after the rename to instar. Neither was
+introduced by this work. Both are the same staleness class that step 5a
+fixed in <code>PUSH-AUDIT.md</code>, which says the restructure's sweep was
+narrower than it looked.</p>
+<p>Those four are fixed on <code>scope-coverage-audit-findings</code>, branched from
+<code>main</code> rather than from this phase's branch, because the shared block
+requires findings to land as their own pull request. Four commits, one
+per fix; the three code fixes each carry a regression test confirmed to
+fail against the unfixed code, and the documentation fix carries none,
+being prose. <code>scope.read()</code> now replaces undecodable bytes the way
+<code>Repo.read()</code> does; the rename classification sorts three ways --
+invisible, renamed inside the organisation, moved out of it -- which
+makes the suppression safe by construction rather than by a guard, and
+gives a transfer out the advice that fits it; and the two stale
+documentation references are corrected. At <code>812d87a</code>, <code>pre-commit</code> was
+clean, <code>scope-coverage</code> still passed on this repository, and the audit
+package suite ran 874 tests. The 871 first recorded here was <code>main</code>'s
+count rather than the branch's -- the same class of unchecked figure
+this phase exists to catch, found by re-running it. Six review marks
+were pruned, each in the commit that invalidated it, which is why
+<code>review-coverage</code> reported 22 files needing review rather than 16.</p>
+<p>The automated review of that pull request added three more commits, and
+one of them is a finding in its own right. Two review marks had lost
+their stamps: two of the four fixes pruned by hand, deleting the
+sidecar entry and leaving the <code>auditedFiles</code> entry behind. Nothing
+could see it -- <code>prune</code> only removes a mark whose stamp is stale and
+there was no stamp to be stale, and <code>regen</code> reproduces the blank
+attestation columns faithfully, so the reproducibility test compared
+equal -- while <code>REVIEWS.md</code> counted both files as reviewed and
+<code>review-tracking.py status</code> counted them as needing review. The marks
+are dropped, and a test now fails when any mark carries no stamp. The
+other two commits take the review's suggestions: the stale
+<code>REPO_OVERRIDES</code> reference it found in <code>docs/consistency-audits.md</code> is
+corrected together with two more of the same class that a grep turned
+up, and the organisation-prefix comparison and the succeed half of the
+<code>errors='replace'</code> promise each gain the test that pins them.</p>
+<p>The remainder were declined, in writing, here:</p>
+<ul>
+<li><strong>2d-2.1, private repository names reach a public issue.</strong> When the
+  check fails, the names of undecided repositories -- private ones
+  included -- land in a public issue on this repository, in the public
+  workflow log, and in a 30-day artifact. Contents never leak, only
+  names. Accepted as a deliberate design consequence rather than
+  fixed: the excluded list in <code>docs/audits/README.md</code> is itself public
+  and already names <code>jenkins-private</code>, <code>private-ci</code> and <code>deploy</code>, so
+  the edit the check asks for publishes the name anyway. Filtering the
+  names out while keeping the count would make the issue harder to act
+  on and would not change what the fix discloses. That argument covers
+  a repository already named in a public list; it does not cover the
+  case this criterion exists for, a repository created and in neither
+  list, whose name reaches the public issue automatically at the next
+  06:00 UTC run before anyone has decided anything about it. The
+  declination still holds, because every resolution the criterion can
+  ask for -- a matrix row or an excluded-list entry -- publishes the
+  name in a public document, so the audit shortens the delay rather
+  than creating the disclosure; a repository whose existence must stay
+  quiet needs its decision recorded before it is created. If that ever
+  stops being acceptable, the alternative is reporting undecided
+  repositories by count in the issue and by name only in the workflow
+  log.</li>
+<li><strong>2d-4.1, un-neutralised subprocess stderr into an issue body.</strong>
+  Real, and shared with five pre-existing checks rather than introduced
+  here; the compliance page path is already protected by <code>defuse()</code> in
+  <code>audit-update-docs.py</code>. Fixing one instance of a fleet-wide pattern
+  inside an audit phase would leave the other five and misrepresent the
+  problem as solved. Declined here and worth its own sweep.</li>
+<li><strong>2d-7.1, a fine-grained token can still reach the destructive
+  branch.</strong> <code>sees_private</code> is a bulk signal and cannot distinguish a
+  token that sees all private repositories from one that sees some, so
+  a fine-grained PAT scoped to selected repositories would 404 on the
+  rest and report them as deleted. Declined as a code change: it needs
+  someone to rotate <code>AUDIT_TOKEN</code> to a fine-grained PAT, no
+  attacker-influenced path reaches it, and <code>audit-manage-issues.py</code>
+  acts on none of this -- the destructive recommendation is prose a
+  person reads. Recorded under Future work.</li>
+<li><strong>2b, <code>scripts/audit/scope.py</code> has no <code>test_scope.py</code>.</strong> Declined.
+  Its behaviour is covered across <code>test_registry.py</code> and
+  <code>test_github_config.py</code>, and 2b confirmed that coverage by mutation
+  rather than by reading. This is a file-naming convention note, not a
+  gap.</li>
+<li><strong>2a-2 and 2a-3, two duplicated-logic notes.</strong> Both declined, and 2a
+  argued against acting on them itself. <code>matrix_repos()</code> deliberately
+  does not reuse the indentation-agnostic <code>indented_block()</code>, because
+  this module wants a reindent to raise rather than to keep working;
+  and <code>gh_canonical_repo()</code> cannot be reused because it silently falls
+  back to the input name on any failure, which is precisely the
+  ambiguity between a 404, a rate limit and a deletion that this check
+  exists to resolve.</li>
+</ul>
+<p>Two things the audit confirmed that are worth recording because they
+were the plan's own risks. The truncation guard is real: 2b mutated it
+to count unique names instead of raw entries, and only the test written
+for its pre-deduplication property caught the change. And the
+<code>applies()</code> guard genuinely costs nothing on the other nineteen
+repositories -- neutering it made the test fail, because <code>FakeGitHub</code>
+records every call and the test asserts there were none.</p>
+<p>The 179-line reduction in <code>scripts/tests/test_registry.py</code> was checked
+assertion by assertion and is a faithful move into
+<code>scripts/audit/scope.py</code>, with the phrase-anchoring guards intact and
+now raising <code>ScopeParseError</code> rather than asserting. All five
+regression tests from the review rounds kill their mutants. 868 tests
+pass.</p>
+<p>Editing <code>PUSH-AUDIT.md</code> staled its own review mark, and 5a did not
+prune it -- the sibling findings branch pruned six marks in the commits
+that invalidated them, and this branch should have done the same.
+Pruned here instead, so <code>PUSH-AUDIT.md</code> now needs re-reading.
+<code>prune-reviews.yml</code> reaps a stale mark on the next push to <code>main</code>
+either way, so the end state was never in doubt; what a missing prune
+costs is that the pull request does not show its reviewer that a
+reviewed file has changed under them.</p>
+<h2 id="risks-and-mitigations_1">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_1" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong><code>gh repo list</code> truncates at 30 by default.</strong> The organisation has
   38 repositories, so the default limit silently loses eight and the
@@ -14643,10 +15203,18 @@ Findings land as their own pull request.</p>
 <p><code>docs/audits/README.md</code> gains the criterion's index line in phase 4 and
 its scope changes in phase 2. <code>docs/consistency-audits.md</code> needs no
 change: "Adding a criterion" and "Bringing a repository into scope"
-both already describe what these phases do. <code>AGENTS.md</code> and
-<code>ARCHITECTURE.md</code> are unchanged -- no convention moves and the shape of
-the system does not change, a criterion is added to a registry that
-already exists.</p>
+both already describe what these phases do.</p>
+<p>This section originally predicted that <code>AGENTS.md</code> and
+<code>ARCHITECTURE.md</code> would be unchanged, on the grounds that no
+convention moves and the shape of the system does not change. Both
+predictions were wrong, and D4 is why. Lifting the scope parse out of
+<code>AuditScopeIsStatedOnceTest</code> and into <code>scripts/audit/scope.py</code> moved a
+convention -- <code>AGENTS.md</code> now tells an agent that <code>audit/scope.py</code>
+reads the scope lists and raises <code>ScopeParseError</code>, where it named the
+test -- and added a component, so <code>ARCHITECTURE.md</code> gained the
+<code>audit/scope.py</code> entry beside <code>audit/registry.py</code>. Both edits landed
+in <code>8b77b32</code> and both belong where they are; it is the prediction that
+was wrong, corrected here in phase 5.</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The dry runs measured <code>uncalibrated-sextant</code> and <code>visual-digest-rust</code>
@@ -14658,10 +15226,71 @@ already exists.</p>
 <li>Nothing checks the <em>private</em> GitLab projects the same way. The same
   blindness exists there and the fix does not transfer, since the
   audit only knows about GitHub.</li>
+<li>This repository has no <code>tools/audit/plan-range.sh</code>. kerbside built
+  one, turning a plan's recorded merge commits into <code>AUDIT_RANGE</code> and
+  <code>AUDIT_PATHS</code>, which is what makes auditing an accumulated merged
+  range a script's input rather than a note for a reader. Phase 5
+  supplies its range by hand instead; see D5.2 for why porting it is
+  not this plan's work.</li>
+<li>Every diff command in <code>PUSH-AUDIT.md</code> is still written
+  <code>main...HEAD</code>, so a stale local <code>main</code> silently widens the audit and
+  a merged range produces an empty diff that reads as a clean audit.
+  Recorded first under Future work in <code>PLAN-audit-compliance-split.md</code>
+  and still owed; phase 5 is the second audit to work around it by
+  hand. Phase 5 deliberately does not fix it -- D5.3 fixes only the
+  two passages that describe this repository incorrectly, and the
+  <code>main...HEAD</code> question belongs with whoever ports <code>plan-range.sh</code>.</li>
+<li><code>sees_private</code> is a bulk signal. A fine-grained token scoped to
+  selected repositories sees at least one private repository, so the
+  guard passes, and then 404s on every repository it was not scoped
+  to -- which the check reports as deleted. Nobody can reach this from
+  outside; it needs <code>AUDIT_TOKEN</code> rotated to a fine-grained PAT. Worth
+  answering before that rotation happens rather than after.</li>
+<li>Un-neutralised subprocess stderr reaches an issue body from six
+  checks, of which <code>scope-coverage</code> is one. The compliance page is
+  already protected by <code>defuse()</code> in <code>audit-update-docs.py</code>; the issue
+  path is not. A sweep of all six, rather than a fix to one.</li>
+<li><code>REPO_NAME</code> in <code>scripts/audit/scope.py</code> rejects uppercase letters and
+  underscores, both of which are legal in a GitHub repository name. No
+  repository in the organisation uses either today, so the check
+  measures correctly; the first one that does would make the criterion
+  fail and the unit test error rather than report anything useful.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>To be filled in as the work proceeds.</p>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
+<p>All five were found by the two rounds of automated review on pull
+request 93 and fixed in <code>a7a100b</code> and <code>03046b2</code>, before the criterion
+had ever run for real.</p>
+<ul>
+<li><strong>Every failed name resolution was classified as a deletion.</strong> A
+  non-zero return from the API landed in "this repository no longer
+  exists", whose suggested fix -- delete the entry from the list -- is
+  the one destructive action the check can recommend. GitHub answers
+  404 rather than 403 for a private repository a token cannot see, so
+  an expired token, a rate limit and a genuinely deleted repository
+  all arrived as the same finding.</li>
+<li><strong>A 404 was still read as a deletion when the token could see no
+  private repositories at all.</strong> In that state a 404 carries no
+  information, because the token answers 404 for every private
+  repository in the organisation; the check would have reported the
+  three private exclusions as dead every morning, with no edit to the
+  lists that could clear it. Those names are now reported as
+  unresolvable, and the finding names the token.</li>
+<li><strong><code>describe_failure()</code> raised <code>IndexError</code> on whitespace-only
+  stderr.</strong> The guard tested <code>result.stderr</code> for truthiness and then
+  indexed the first line of its stripped form, which is empty for
+  <code>'   \n'</code>. <code>registry.run_all()</code> has no per-check exception handling,
+  so this would have aborted the whole <code>development</code> leg of the daily
+  run and taken issue filing and the compliance page with it.</li>
+<li><strong>One slow API call discarded the undecided set.</strong> The resolution
+  loop caught exceptions around the whole loop rather than per name,
+  so a single failure threw away the half of the result that needs no
+  API access -- which is the half the criterion exists for.</li>
+<li><strong>An empty listing was reported as every name being invisible</strong>
+  rather than refused, and a renamed repository whose new name is in
+  neither list was reported twice, once as a rename and once as
+  undecided, when both findings ask for the same single edit.</li>
+</ul>
+<h3 id="back-brief_1">Back brief<a class="headerlink" href="#back-brief_1" title="Permanent link">&para;</a></h3>
 <p>Before phase 2 begins, confirm the D3 table is still what Mikal wants:
 it is the only part of this plan that cannot be derived from the
 repository, and every later phase assumes it.</p>

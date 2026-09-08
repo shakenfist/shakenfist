@@ -13964,8 +13964,8 @@ why each rule exists, is in
 </tr>
 <tr>
 <td>Check</td>
-<td><code>scripts/audit-check.py</code></td>
-<td>The runner. A function returning <code>pass</code>, <code>fail</code> or <code>not_applicable</code> with a reason.</td>
+<td><code>scripts/audit/checks/&lt;family&gt;.py</code></td>
+<td>The runner. A <code>Check</code> subclass returning <code>self.ok()</code>, <code>self.fail()</code> or <code>self.skip()</code> with a reason, registered in <code>CHECKS</code> in <code>scripts/audit/registry.py</code>. <code>scripts/audit-check.py</code> is the entry point that runs the schedule and prints the results.</td>
 </tr>
 </tbody>
 </table>
@@ -14125,7 +14125,7 @@ before you commit:</p>
 </code></pre></div>
 <p>Repository properties that cannot be detected from a clone -- docs-only
 repositories, repositories where Python is incidental -- are declared in
-<code>REPO_OVERRIDES</code> in <code>scripts/audit-check.py</code>.</p>
+<code>REPO_OVERRIDES</code> in <code>scripts/audit/repo.py</code>.</p>
 <p>A repository that should be audited for some checks but not others
 takes an <code>only_checks</code> list in the same place. <code>private-ci</code> is the
 worked example: it is internal tooling and exempt from the conventions,

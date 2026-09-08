@@ -14000,15 +14000,22 @@ between them they say so in two places a reader can see.</p>
   decision with a reason attached rather than an omission.</li>
 </ul>
 <p>For a name that is not in the listing, the check asks GitHub about it
-directly rather than assuming, and says which of four things happened:</p>
+directly rather than assuming, and says which of five things happened:</p>
 <ul>
 <li><strong>It no longer exists</strong> -- the API answered 404. The entry goes with
   it, subject to the caveat below.</li>
-<li><strong>It was renamed.</strong> The finding names the new name; write that in
-  the matrix or the list. The API follows a rename redirect while
-  issue listing and search do not, which is why a stale name is worth
-  fixing rather than tolerating: <code>audit-manage-issues.py</code> has its own
-  warning for the same trap.</li>
+<li><strong>It was renamed inside the organisation.</strong> The finding names the
+  new name; write that in the matrix or the list. The API follows a
+  rename redirect while issue listing and search do not, which is why
+  a stale name is worth fixing rather than tolerating:
+  <code>audit-manage-issues.py</code> has its own warning for the same trap.</li>
+<li><strong>It moved out of the organisation.</strong> A transfer redirects exactly
+  as a rename does, but the entry cannot be edited to follow it. The
+  audit clones <code>shakenfist/${{ matrix.repo }}</code>, so a repository under
+  another owner has no name that fits in the matrix, and the excluded
+  list is a list of repositories here. The finding says to remove the
+  entry, which is the only edit available -- and the two are told
+  apart so that nobody is asked for one that is not.</li>
 <li><strong>It exists but the listing did not return it.</strong> Then the lists are
   right and the listing is short. Nothing about the scope is wrong,
   and the finding says to check the token, because a listing that

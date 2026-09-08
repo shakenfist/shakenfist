@@ -13832,7 +13832,7 @@ archive with Python helper scripts, not a Python project). Rust
 projects need no declaration -- the check reads a <code>Cargo.toml</code> at the
 root of the clone and exempts the repository on that alone. The rest
 are declared <code>not_python</code> or <code>is_docs_only</code> in <code>REPO_OVERRIDES</code> in
-<code>scripts/audit-check.py</code>.</p>
+<code>scripts/audit/repo.py</code>.</p>
 <p>Note that <code>requirements.txt</code> / <code>test-requirements.txt</code> removal is
 covered by the <a href="/components/development/audits/release-process/">release process audit</a>, and the
 generated version file rules are covered by the

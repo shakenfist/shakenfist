@@ -14734,7 +14734,7 @@ verdict, and see
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-09-07T11:54:31.870844+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-09-08T10:52:37.746658+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -17346,8 +17346,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/43" title="GitHub Issue: shakenfist/actions #43">actions#43</a></td>
+<td>N/A</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -17386,8 +17386,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/556" title="GitHub Issue: shakenfist/instar #556">instar#556</a></td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -17448,7 +17448,7 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): 4 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): .github/workflows/smoke-cluster.yml:268 -&gt; docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:14 -&gt; docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md, tools/ci_headroom_collect.sh:35 -&gt; docs/plans/PLAN-ci-cloud-sizing-phase-02-baseline.md, tools/ci_headroom_launch.sh:13 -&gt; docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</li>
+<li><strong>instar</strong> (Status): 2 of 204 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): scripts/create-vhd-testdata.sh:46 -&gt; docs/plans/PLAN-extra-coverage.md, scripts/create-vhd-testdata.sh:463 -&gt; instar-testdata/docs/plans/PLAN-extra-coverage.md</li>
 <li><strong>visual-digest-rust</strong> (Status): 1 of 1 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist-visual-digest/tests/qr.rs:7 -&gt; PLAN-test-harness-phase-01-digest-crate.md</li>
 </ul>
 <h2 id="plan-template">plan-template<a class="headerlink" href="#plan-template" title="Permanent link">&para;</a></h2>
@@ -18625,8 +18625,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): 0 of 98 in-scope files reviewed at HEAD; 98 need review (threshold 5)</li>
-<li><strong>development</strong> (Status): 169 of 176 in-scope files reviewed at HEAD; 7 need review (threshold 5)</li>
+<li><strong>actions</strong> (Status): 63 of 98 in-scope files reviewed at HEAD; 35 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 161 of 179 in-scope files reviewed at HEAD; 18 need review (threshold 5)</li>
 <li><strong>kerbside</strong> (Status): 117 of 229 in-scope files reviewed at HEAD; 112 need review (threshold 5)</li>
 <li><strong>ryll</strong> (Status): 83 of 195 in-scope files reviewed at HEAD; 112 need review (threshold 5)</li>
 </ul>
@@ -19299,8 +19299,8 @@ does.</p>
 </tr>
 <tr>
 <td>private-ci</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/23" title="GitHub Issue: shakenfist/private-ci #23">private-ci#23</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>ryll</td>
@@ -19332,7 +19332,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>private-ci</strong> (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
 <li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
 </ul>
 <h2 id="undeclared-direct-dependency">undeclared-direct-dependency<a class="headerlink" href="#undeclared-direct-dependency" title="Permanent link">&para;</a></h2>
