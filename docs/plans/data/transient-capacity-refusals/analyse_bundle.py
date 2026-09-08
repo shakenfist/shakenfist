@@ -55,6 +55,7 @@ def main(bdir):
             if i >= 0:
                 names[line[i + 9:i + 45]] = n
                 break
+
     def short(u):
         return names.get(u, u[:8]) if u else '-'
 
@@ -94,8 +95,9 @@ def main(bdir):
             if c > (v.get('instances_total') or 0):
                 over += 1
         stats[n] = (tot, full, meas_full, over)
-        print('  %-8s ledgered samples %3d  at-ledger %3d (%2.0f%%)  measured-at-ledger %3d  committed>instances_total %3d' % (
-            short(n), tot, full, 100 * full / tot if tot else 0, meas_full, over))
+        print('  %-8s ledgered samples %3d  at-ledger %3d (%2.0f%%)  measured-at-ledger %3d  '
+              'committed>instances_total %3d' % (
+                  short(n), tot, full, 100 * full / tot if tot else 0, meas_full, over))
 
     # Journal on primary (sf-api lives there).
     J = os.path.join(b, 'primary/_commands/journalctl-sf-units')
@@ -149,10 +151,14 @@ def main(bdir):
         m = r.get('message')
         if m == 'instance placed':
             ex = r['extra']
-            placed[ex.get('node')].append((parse_ts(r['ts']), r.get('instance'), ex.get('cpus'), 'placed', ex.get('node_used_cpus'), ex.get('enforce')))
+            placed[ex.get('node')].append((
+                parse_ts(r['ts']), r.get('instance'), ex.get('cpus'), 'placed',
+                ex.get('node_used_cpus'), ex.get('enforce')))
         elif m == 'instance placement released':
             ex = r['extra']
-            placed[ex.get('node')].append((parse_ts(r['ts']), r.get('instance'), -(ex.get('cpus') or 0), 'released', ex.get('node_used_cpus'), None))
+            placed[ex.get('node')].append((
+                parse_ts(r['ts']), r.get('instance'), -(ex.get('cpus') or 0), 'released',
+                ex.get('node_used_cpus'), None))
     print('ABORTS:')
     for r in rows:
         m = r.get('message', '')
@@ -186,10 +192,13 @@ def main(bdir):
         near = min(samples, key=lambda s: abs(s['sampled_at'] - t))
         pn = near['resources']['per_node']
         print('    nearest sample %s: ' % iso(near['sampled_at']) + '  '.join(
-            '%s meas/comm/lim/inst=%s/%s/%s/%s' % (short(n), v.get('cpu_measured'), v.get('cpu_committed'), v.get('cpu_limit'), v.get('instances_total'))
+            '%s meas/comm/lim/inst=%s/%s/%s/%s' % (
+                short(n), v.get('cpu_measured'), v.get('cpu_committed'),
+                v.get('cpu_limit'), v.get('instances_total'))
             for n, v in sorted(pn.items())))
         print('    cluster committed sum %s, instances_total sum %s, ledger sum %s' % (
-            sum(v.get('cpu_committed') or 0 for v in pn.values()), sum(v.get('instances_total') or 0 for v in pn.values()),
+            sum(v.get('cpu_committed') or 0 for v in pn.values()),
+            sum(v.get('instances_total') or 0 for v in pn.values()),
             sum(v.get('cpu_limit') or 0 for v in pn.values())))
 
     # Distribution of requested cpus in placements.
