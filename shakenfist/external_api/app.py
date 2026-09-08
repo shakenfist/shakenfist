@@ -191,6 +191,15 @@ def _is_health_probe():
 # instead of redacted, is documented on api_base.handles_credentials.
 # It lives in base.py because base.py's log_request needs the same
 # answer, and two copies of this predicate would eventually disagree.
+#
+# Two redactions hang off this one predicate, and since phase 4 of
+# PLAN-api-input-validation they hold each other up. A validation
+# refusal puts the offending parameter's *name* -- which a buggy
+# caller can put secret-bearing material into, which is why
+# log_validation_findings redacts it on these routes -- verbatim into
+# the response body. The name stays out of the log stream only because
+# log_response_info below drops the whole body on the same predicate.
+# Narrowing either redaction without the other reopens the leak.
 _handles_credentials = api_base.handles_credentials
 REDACTED_BODY = api_base.REDACTED_BODY
 
@@ -689,7 +698,7 @@ def log_validation_findings(response):
     for finding in findings:
         fields = finding.fields()
         if redact:
-            fields['validation-parameter'] = '*****'
+            fields['validation-parameter'] = api_base.REDACTED_PARAMETER
         fields.update({
             'request-id': flask.request.environ.get(
                 'FLASK_REQUEST_ID', 'none'),

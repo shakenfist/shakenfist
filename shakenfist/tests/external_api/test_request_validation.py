@@ -77,7 +77,14 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         existed: the 400 log_request's merge has always produced, with
         the interpreter's own text. That interpreter text is the defect
         this plan exists to remove, so an operator who rolls back to
-        'warn' gets the old behaviour back in full, warts included.
+        'warn' gets the old behaviour back, warts included.
+
+        With one exception, which the release note states: the five
+        metadata delete handlers no longer accept the `value` kwarg
+        they used to ignore, in any mode, so a caller which sends one
+        gets a TypeError-shaped 400 in 'warn' where enforcement would
+        have named the parameter. That was UNDECLARED_BY_DESIGN's last
+        entry, and removing it is what emptied the set.
         """
         config.API_VALIDATION_MODE = 'warn'
 
@@ -694,6 +701,11 @@ class AuthenticatedValidationTestCase(AuthenticatedStackTestCase):
 # Each entry names a distinct kind of leak: the TypeError text itself,
 # a stack, an exception class, an endpoint class name, a repr, and a
 # source path.
+#
+# shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_api_validation.py
+# asserts the same property against a real cluster and carries a subset
+# of this list, because that suite runs from an installed package and
+# cannot import this one. A marker added here belongs there too.
 INTERPRETER_TEXT = [
     'got an unexpected keyword argument',
     'unexpected keyword',
@@ -869,3 +881,187 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
 
         self.assertEqual(unvalidated.status_code, enforced.status_code)
         self.assertEqual(unvalidated.get_data(), enforced.get_data())
+
+    def test_a_raw_body_endpoint_is_not_validated(self):
+        """The upload path must stay out of the validator's way.
+
+        A raw body is bytes of arbitrary size and structure, so
+        CompiledEndpoint marks the route raw_body and check() skips
+        both the unknown-parameter scan and the schema. Nothing pinned
+        that under the new default, and enforcement is exactly where
+        getting it wrong would break the API's bulk transfer route.
+
+        The 404 is the proof: it comes from arg_is_upload_uuid, which
+        is a per-method decorator and therefore only reachable when
+        validation has let the request through.
+
+        The body is JSON an ordinary route would refuse outright --
+        `banana` is declared nowhere -- and is sent with a JSON content
+        type, because bytes which cannot be parsed as a body would make
+        this test pass whether the route was skipped or merely
+        unparseable. Uploads really do carry arbitrary bytes; what is
+        being pinned is that the route is skipped, so the body has to
+        be one the scan could otherwise see.
+        """
+        findings, patcher = self._spy_on_check()
+
+        with patcher, mock.patch(
+                'shakenfist.external_api.base.Upload.from_db',
+                return_value=None):
+            response = self.client.post(
+                '/upload/6a9b0f4e-0b2f-4a5e-bd0e-000000000000',
+                data=json.dumps({'banana': 'yellow'}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual([], findings)
+        self.assertEqual(404, response.status_code, response.get_json())
+        self.assertEqual({'error': 'upload not found', 'status': 404},
+                         response.get_json())
+
+    def test_more_undeclared_keys_than_the_bound_refuse_a_real_one(self):
+        """The overflow finding must never be what a caller is told.
+
+        check() bounds unknown-parameter findings and summarises the
+        rest in one '(overflow)' finding. That finding names no
+        parameter the caller sent, so if it were ever the first
+        enforceable one the refusal would be useless to them.
+        """
+        body = {'key%03d' % index: 1 for index in
+                range(validation.MAX_UNKNOWN_PARAMETER_FINDINGS + 5)}
+        findings, patcher = self._spy_on_check()
+
+        with patcher:
+            response = self.client.get(
+                '/instances', data=json.dumps(body),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(
+            validation.MAX_UNKNOWN_PARAMETER_FINDINGS + 1, len(findings))
+        self.assertEqual('(overflow)', findings[-1].parameter)
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {'error': 'key000: not declared by this endpoint', 'status': 400},
+            response.get_json())
+        self.assertNoInterpreterText(response)
+
+    def test_a_metadata_delete_with_no_body_still_works(self):
+        """The five metadata delete handlers lost their `value` kwarg.
+
+        It was accepted and ignored, and UNDECLARED_BY_DESIGN carried
+        it until enforcement could refuse it instead. The shipped
+        client sends no body at all on a metadata delete, so this is
+        that caller.
+        """
+        response = self.client.delete(
+            '/auth/namespaces/system/metadata/foo',
+            headers={'Authorization': self.token})
+
+        self.assertEqual(200, response.status_code, response.get_json())
+
+    def test_a_metadata_delete_carrying_a_value_is_refused_by_name(self):
+        """And the caller which does send one is told which key it is.
+
+        In 'warn' or 'off' this same request is a TypeError in the
+        kwargs merge, because the kwarg is gone from the handler
+        whatever the mode -- which the release note states, since it is
+        the one thing the rollback does not undo.
+        """
+        response = self.client.delete(
+            '/auth/namespaces/system/metadata/foo',
+            data=json.dumps({'value': 'bar'}),
+            content_type='application/json',
+            headers={'Authorization': self.token})
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {'error': 'value: not declared by this endpoint', 'status': 400},
+            response.get_json())
+        self.assertNoInterpreterText(response)
+
+    def test_a_refusal_is_audited_against_the_namespace(self):
+        """Enforcement must not cost the namespace its audit trail.
+
+        A refusal is returned from outside every per-method decorator,
+        so log_token_use never runs and the namespace would otherwise
+        see nothing at all -- an authenticated caller could send
+        malformed requests indefinitely and appear in sf-api's log
+        alone, which carries neither the key name nor the remote
+        address.
+        """
+        events = []
+        with mock.patch('shakenfist.eventlog.add_event',
+                        side_effect=lambda event_type, object_type, object_uuid,
+                        message, duration=None, extra=None, **kwargs:
+                        events.append((message, extra or {}))):
+            response = self.client.get(
+                '/instances',
+                data=json.dumps({'banana': 'yellow'}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(400, response.status_code)
+        refusals = [extra for message, extra in events
+                    if message == 'request refused by input validation']
+        self.assertEqual(1, len(refusals), events)
+        self.assertEqual('key1', refusals[0]['keyname'])
+        self.assertEqual('GET', refusals[0]['method'])
+        self.assertEqual('/instances', refusals[0]['path'])
+        self.assertEqual(validation.UNKNOWN_PARAMETER,
+                         refusals[0]['validation-reason'])
+        self.assertEqual('banana', refusals[0]['validation-parameter'])
+        # And the credential itself is not in the event, in any field.
+        self.assertNotIn(self.token, json.dumps(refusals[0]))
+
+    def test_a_refusal_on_a_credential_route_redacts_the_parameter(self):
+        """The audit event obeys the same redaction the log does.
+
+        A parameter name is client supplied, so a buggy caller can put
+        secret-bearing material in a key position -- which is why
+        log_validation_findings replaces it on /auth routes. A
+        namespace event is readable by anyone who can read the
+        namespace, so a second record of the same refusal must not be
+        the one that says it.
+        """
+        events = []
+        with mock.patch('shakenfist.eventlog.add_event',
+                        side_effect=lambda event_type, object_type, object_uuid,
+                        message, duration=None, extra=None, **kwargs:
+                        events.append((message, extra or {}))):
+            response = self.client.post(
+                '/auth/namespaces/system/keys',
+                data=json.dumps({'sekrit-looking-key-name': 'x'}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(400, response.status_code)
+        refusals = [extra for message, extra in events
+                    if message == 'request refused by input validation']
+        self.assertEqual(1, len(refusals), events)
+        self.assertEqual(api_base.REDACTED_PARAMETER,
+                         refusals[0]['validation-parameter'])
+        self.assertNotIn('sekrit-looking-key-name', json.dumps(refusals[0]))
+        # The reason survives, which is what an audit reader needs.
+        self.assertEqual(validation.UNKNOWN_PARAMETER,
+                         refusals[0]['validation-reason'])
+
+    def test_a_refusal_of_an_unauthenticated_request_is_still_a_refusal(self):
+        """The audit event has no token to attribute a @public
+        endpoint's refusal to, and must not turn the 400 into anything
+        else while discovering that."""
+        events = []
+        with mock.patch('shakenfist.eventlog.add_event',
+                        side_effect=lambda *args, **kwargs:
+                        events.append(args[3])):
+            response = self.client.post(
+                '/auth',
+                data=json.dumps({'namespace': 'system', 'key': 'key1',
+                                 'banana': 'yellow'}),
+                content_type='application/json')
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {'error': 'banana: not declared by this endpoint', 'status': 400},
+            response.get_json())
+        self.assertNotIn('request refused by input validation', events)
