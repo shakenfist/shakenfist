@@ -305,19 +305,28 @@ enumerate is a shape nothing checks.
 
 The declarations are compiled into marshmallow schemas at startup
 (`shakenfist/external_api/validation.py`) and checked against every
-request. **Nothing is rejected**: `API_VALIDATION_MODE` defaults to
-`warn`, which logs what would have been refused and changes no
-response. Setting it to `enforce` answers `400` in the usual
-`{"error": ..., "status": ...}` shape, and is the switch to throw once
-the warn log is understood.
+request. `API_VALIDATION_MODE` defaults to `enforce`: a finding other
+than `missing-required` answers `400` in the usual
+`{"error": "<parameter>: <reason>", "status": ...}` shape, naming the
+offending parameter, before the handler or any of its per-method
+decorators ever run. `warn` is the operator's rollback for a caller
+that breaks — it logs what would have been refused and changes no
+response — and `off` disables the layer entirely, as a further safety
+valve against unexpected log volume.
 
-A warn record carries the endpoint, the parameter, the reason, the
-offending value's **type** — never its value — and the status the
-request went on to return anyway. That last field is the interesting
-one: a finding on a request which returned 200 is a rejection
-enforcement would introduce, while one on a request which returned 404
-is a status code enforcement would merely change, because validation
-runs ahead of the per-method decorators which produce those.
+A validation record carries the endpoint, the parameter, the reason,
+the offending value's **type** — never its value — and, in `warn`
+mode, the status the request went on to return anyway. That last
+field is what told `enforce` and `warn` apart before the default was
+flipped: a finding on a request that returned 200 was a rejection
+enforcement would introduce, while one on a request that returned 404
+or 403 was a status code enforcement would merely change, because
+validation runs ahead of the per-method decorators which produce
+those. That second case is now the enforced default's own contract
+change: a request that is both malformed and refers to a missing or
+unauthorised object answers 400 rather than 404 or 403 — see the
+[v0.7 to v0.8 release notes](../release_notes/v07-v08.md) for the
+caller-visible shape of it.
 
 Reasons are counted separately because they answer different
 questions: `unknown-parameter`, `type-mismatch`, `missing-required`
@@ -325,9 +334,9 @@ and `body-path-collision`.
 
 Two things it deliberately does not do. `required` is recorded but
 never enforced — not even in `enforce` mode, where missing-required
-findings are filtered out of the rejection decision. Several
-parameters are declared required while omitting them has always
-worked, and what to do about that is still open — see [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
+findings are filtered out of the rejection decision before the 400 is
+built. Several parameters are declared required while omitting them
+has always worked, and what to do about that is still open — see [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
 And the prose `format` on a type token is documentation: `netblock`,
 `uuidorname`, `namespace`, `node`, `url` and `ipv4` compile to plain
 strings, because semantic validation of them is not built yet. Only
@@ -335,9 +344,13 @@ strings, because semantic validation of them is not built yet. Only
 
 ## What is not checked yet
 
-Enforcement is off, so a correct declaration still does not stop a
-caller sending something else. Six known gaps in the derivation
-itself:
+Enforcement checks every request against its published declarations,
+but a declaration is only as good as what the derivation could see
+when it was written or audited. None of the six known gaps below are
+about whether enforcement runs — they are about a kwarg the derivation
+cannot yet turn into a declaration in the first place, so a handler
+carrying one of these shapes can still accept something undeclared and
+unchecked:
 
 (The published specification itself *is* checked:
 `shakenfist/tests/external_api/test_openapi_spec.py` validates the
