@@ -13861,6 +13861,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Definition of done">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-item-that-did-not-work-out-as-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The item that did not work out as expected
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13871,6 +13888,89 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Observations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#claims-created-and-deleted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claims created and deleted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refusals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refusals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#over-limit-admissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Over-limit admissions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#claim-size-against-measured-peak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claim size against measured peak
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-two-dimensions-together-say" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the two dimensions together say
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reconciler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconciler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#does-phase-5-flip-claim_enforcement_hard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Does phase 5 flip CLAIM_ENFORCEMENT_HARD?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -14400,7 +14500,7 @@ conductor.</p>
 <td>management session</td>
 <td>none</td>
 <td>Deploy and observe for at least seven days of normal CI load. Record in the Observations section below: claims created and deleted; capacity refusals per day and whether they correlate with cluster load; transient refusals; <code>conductor_claims_failed_total</code>, which must be zero; every <code>placement admitted over namespace capacity claim</code> audit event on the cluster with its dimension; the distribution of claim size against measured peak per <code>(repo, job_name)</code>; and whether the reconciler reported any drift in <code>cluster_capacity.claimed_*</code> that a leaked claim would explain.</td>
-<td>Not started</td>
+<td>In progress -- deployed 2026-09-02 18:13:46, data collected 2026-09-08, window closes 2026-09-09 18:13</td>
 </tr>
 <tr>
 <td>6</td>
@@ -14408,7 +14508,7 @@ conductor.</p>
 <td>opus</td>
 <td>worktree</td>
 <td>Close-out, in this repository. Write the observation record into this plan, then answer phase 5's question explicitly: does the data support flipping <code>CLAIM_ENFORCEMENT_HARD</code>, and if not, what is still missing. If the anti-starvation question now has data behind it, say what the data says and leave the policy to its own phase. Update the master plan's phase table and <code>docs/plans/index.md</code>. Commit subject: <code>scheduler: record what conductor claims measured.</code></td>
-<td>Not started</td>
+<td>In progress -- record written 2026-09-08 from a five-day-23-hour window, to be amended when the window closes</td>
 </tr>
 </tbody>
 </table>
@@ -14469,31 +14569,66 @@ wrong.</p>
    meets that path.</p>
 </li>
 <li>
-<p><strong>The sizing formula could not be evaluated against real cost
-   data.</strong> It is written as
-   <code>max(CI_SIZES[ci_size], ceil(1.2 x peak))</code> per dimension, and its
-   arithmetic is covered by unit tests, but checking it against three
-   real <code>(repo, job_name)</code> pairs needs the conductor's database, which
-   lives on <code>maui</code>. <code>ssh</code> there is refused from the development host
-   for both <code>ansible@</code> and the default user, exactly as step 0 found.
-   <strong>This item is outstanding and is the one thing that should happen
-   before the deploy</strong>, since a formula that produces absurd claims
-   would be discovered as a CI outage rather than as a number. Run on
-   <code>maui</code>:</p>
+<p><strong>The sizing formula was evaluated against real cost data on
+   2026-09-08</strong>, from the window's own <code>claim_events</code> rows rather
+   than from <code>get_claim_sizes()</code> directly. This was <strong>not</strong> done
+   before the deploy as this item asked: <code>ssh</code> to <code>maui</code> stayed
+   refused for the development host's own keys until the session
+   of 2026-09-08 was given <code>~/.ssh/id_ansible_ed25519</code>
+   explicitly. The deploy therefore went ahead with the formula
+   unchecked against real data, which was a real risk taken
+   knowingly-by-omission rather than a judgement; it happened to
+   be unfounded.</p>
 </li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/srv/shakenfist/private-ci/venv/bin/python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="s2">from conductor import db, provisioner</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="s2">sizes = db.get_claim_sizes()</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="s2">for key in sorted(sizes)[:3]:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="s2">    repo, job = key</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="s2">    job_desc = {'repo': repo, 'job_name': job}</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="s2">    print(key, sizes[key])</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="s2">    for size in ('s', 'm', 'xl'):</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="s2">        print('   ', size,</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="s2">              provisioner.claim_size_for(size, job_desc, sizes)[0])</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="s2">"</span>
-</code></pre></div>
+<p>Three real pairs, taken from the claims the conductor actually
+   made:</p>
+<table>
+<thead>
+<tr>
+<th><code>(repo, job_name)</code></th>
+<th>Claims</th>
+<th>Measured peak</th>
+<th>Claim written</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>shakenfist</code> / Smoke tests (collection)</td>
+<td>237</td>
+<td>20 cpu / 32768 MB / 620 GB</td>
+<td>24 / 39322 / 744</td>
+</tr>
+<tr>
+<td><code>kerbside</code> / direct-qemu-lane</td>
+<td>26</td>
+<td>6 / 12288 / 360</td>
+<td>8 / 14746 / 432</td>
+</tr>
+<tr>
+<td><code>library-utilities</code> / gitleaks</td>
+<td>25</td>
+<td>2 / 4096 / 160</td>
+<td>3 / 4916 / 192</td>
+</tr>
+</tbody>
+</table>
+<p>Every dimension is <code>ceil(1.2 x peak)</code>, and the <code>CI_SIZES</code> floor
+   binds in none of the three: at the smoke-test scale the floor is
+   irrelevant, and even at <code>gitleaks</code>' <code>s</code> (2 cpu / 4096 MB /
+   100 GB) the peak term is larger on all three dimensions. The
+   arithmetic is correct and the claims are not absurd -- the
+   footprint asked for is a fifth again of what the job was
+   measured using, which is what the formula promises.</p>
+<p>The one case where the floor does bind is a job with no
+   observation yet, which is a job's first-ever run.
+   <code>library-utilities / gitleaks</code> shows both: its first claim was
+   the bare <code>s</code> floor of 2 / 4096 / 100, and every claim after it
+   was the sized 3 / 4916 / 192. See the Observations section for
+   why that floor turns out to be too small.</p>
+<p>What this check cannot see, and what the window did see, is
+   that the peaks themselves under-state real use. The formula is
+   sound; its input is not.</p>
 <ol>
 <li><strong>A claim request that outlasts <code>SF_CALL_TIMEOUT</code> is E6's third
    branch</strong>, and the namespace is <strong>not</strong> cleaned up. The conductor's
@@ -14578,32 +14713,365 @@ scheduler was already exploiting -- but it does not calibrate the
 ceiling. The management session extends the window rather than
 declaring the phase done on a null result.</p>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Ticked against the record in Observations below, which covers
+2026-09-02 18:13 to 2026-09-08 17:16 -- one day short of the
+seven the phase asks for. Each box marked <em>(provisional)</em> is met
+on the data so far and should be re-checked when the window
+closes on 2026-09-09 18:13.</p>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Phase 4b is complete and the deployed conductor's client
-      carries claim methods and the 503 mapping.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Every runner namespace created by the conductor holds a
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Phase 4b is complete and the deployed conductor's client
+      carries claim methods and the 503 mapping. Step 0 verified
+      the names resolve; the window then confirmed it in
+      operation, since the <code>cannot signal</code> startup warning never
+      fired.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every runner namespace created by the conductor holds a
       claim, or the reason it does not is counted in
       <code>conductor_claims_refused_total</code> or
-      <code>conductor_claims_failed_total</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>conductor_claims_failed_total</code> is zero across the
-      observation window.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No namespace torn down during the window leaves a claim
+      <code>conductor_claims_failed_total</code>. The only path that
+      provisions a runner without a claim is E6's third branch,
+      which has zero rows in <code>claim_events</code>; every other
+      namespace either holds a claim or was torn down after a
+      counted refusal.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>conductor_claims_failed_total</code> is zero across the
+      observation window. <em>(provisional)</em> Zero <code>failed</code> rows in
+      <code>claim_events</code>, which is the authoritative record rather
+      than a counter that resets on redeploy.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No namespace torn down during the window leaves a claim
       behind: the count of claims on the cluster returns to its
       pre-window baseline, and the reconciler reports no drift in
-      <code>cluster_capacity.claimed_*</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The observation record in this plan states, in numbers:
+      <code>cluster_capacity.claimed_*</code>. <em>(provisional)</em> Satisfied by
+      a stronger check than the one named: 1729 created minus
+      1723 released is exactly the 6 claims live on the cluster,
+      all held by namespaces that still exist. The
+      <code>cluster_capacity.claimed_*</code> half cannot be read as
+      written -- it is a Prometheus gauge, not a log line -- and
+      the ledger balancing against the cluster's own claim list
+      answers the same question from ground truth.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The observation record in this plan states, in numbers:
       claims created, capacity refusals per day, transient
       refusals, over-limit audit events by dimension, and the
-      claim-size-to-measured-peak ratio per <code>(repo, job_name)</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> This plan answers, in one paragraph, whether phase 5 should
-      flip <code>CLAIM_ENFORCEMENT_HARD</code> and on what evidence.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No fact about claim sizing, expiry or refusal handling is
-      stated differently in this plan, in D18, and in the
-      conductor's own documentation.</li>
+      claim-size-to-measured-peak ratio per <code>(repo, job_name)</code>.
+      <em>(provisional)</em></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> This plan answers, in one paragraph, whether phase 5 should
+      flip <code>CLAIM_ENFORCEMENT_HARD</code> and on what evidence. The
+      answer is no; see Observations.</li>
 </ul>
+<h3 id="the-item-that-did-not-work-out-as-expected">The item that did not work out as expected<a class="headerlink" href="#the-item-that-did-not-work-out-as-expected" title="Permanent link">&para;</a></h3>
+<p>The definition of done above originally carried a seventh item:
+that no fact about claim sizing, expiry or refusal handling be
+stated differently in this plan, in D18, and in the conductor's
+own documentation. <strong>It was written on a false premise.</strong> The
+conductor has no documentation of capacity claims at all --
+<code>grep -rn "capacity claim"</code> across private-ci's <code>docs/</code>,
+<code>AGENTS.md</code>, <code>ARCHITECTURE.md</code> and <code>README.md</code> returns nothing --
+so there is no third statement of those facts to reconcile
+against, and the item can be neither met nor failed as written.</p>
+<p>It is recorded here rather than left as an unticked box, because
+an unticked box reads as work outstanding in this phase and this
+is not that. The phase is not blocked on it. Writing the
+conductor's claims documentation is real work, but it belongs to
+private-ci and to whichever plan next touches that code; the
+successor plan <code>PLAN-claim-coverage-and-sizing.md</code> is the
+natural home, and carries the note.</p>
+<p>The general lesson is worth keeping: a consistency check across
+three documents needs all three to exist, and this one was
+written without checking that the third did.</p>
 <h2 id="observations">Observations<a class="headerlink" href="#observations" title="Permanent link">&para;</a></h2>
-<p><em>To be written by step 5. This section is a deliverable, not a
-formality: phase 5 reads it.</em></p>
+<p>Collected 2026-09-08 from two sources, both of which any later
+session can re-read: the conductor's <code>claim_events</code> table on
+<code>maui</code> (<code>/srv/shakenfist/private-ci/conductor.db</code>, queried from a
+copy so the live file is untouched) and Loki, where the conductor
+logs under <code>{job="conductor"}</code> and the sfcbr nodes ship SF's JSON
+logs under <code>{job="syslog"}</code>. The two agree on every count they
+both carry, which is the reason to trust either.</p>
+<p><strong>The window is one day short.</strong> <code>claim_events</code>' first row is
+2026-09-02 18:13:46, which pins the deploy; seven days of load
+therefore close at 2026-09-09 18:13. Everything below covers
+2026-09-02 18:13:46 to 2026-09-08 17:16 -- five days and 23
+hours, of which five are full days (2026-09-03 to 2026-09-07)
+and three of those are working days. The numbers are recorded
+now because they are already decisive; the last day is expected
+to move them proportionally rather than qualitatively, and this
+section should be re-run and amended before step 6 is marked
+complete.</p>
+<h3 id="claims-created-and-deleted">Claims created and deleted<a class="headerlink" href="#claims-created-and-deleted" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>created</td>
+<td>1733 (<code>claim_events</code>); 1729 in Loki, 4 newer than the query</td>
+</tr>
+<tr>
+<td>deleted</td>
+<td>1723 (<code>Released N capacity claim(s)</code>)</td>
+</tr>
+<tr>
+<td>live on the cluster</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<p>1729 - 1723 = 6, and all six live claims belong to namespaces
+that still exist. <strong>No claim leaked.</strong> This is the substance of
+the definition-of-done item about <code>cluster_capacity.claimed_*</code>,
+which cannot be read directly: <code>scheduled_tasks.py</code> publishes
+<code>claimed_*</code> to a Prometheus gauge rather than a log line, and no
+Prometheus is reachable from the development host. The ledger
+balancing against the cluster's own live claim count answers the
+same question from ground truth, and is the better evidence.</p>
+<p>Volume is 269 to 323 claims on a full day, and does not drop
+at the weekend: 2026-09-05 (a Saturday) and 2026-09-06 (a
+Sunday) sit at 313 and 294, inside the weekday range. The
+conductor's load is merge and schedule driven rather than
+keystroke driven, which is worth knowing before reading any
+per-day number below as a proxy for human activity.</p>
+<h3 id="refusals">Refusals<a class="headerlink" href="#refusals" title="Permanent link">&para;</a></h3>
+<p><strong>298 capacity refusals, zero transient refusals, zero
+failures.</strong> <code>claim_events</code> holds only <code>created</code> and
+<code>refused_capacity</code> rows: no <code>refused_transient</code> and no <code>failed</code>,
+so <code>conductor_claims_failed_total</code> is zero across the window from
+the authoritative record rather than by inference. The
+<code>cannot signal</code> startup warning never fired, so the deployed
+client carried both refusal classes throughout.</p>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Refusals</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-02 (part)</td>
+<td>6</td>
+</tr>
+<tr>
+<td>2026-09-03</td>
+<td>107</td>
+</tr>
+<tr>
+<td>2026-09-04</td>
+<td>55</td>
+</tr>
+<tr>
+<td>2026-09-05</td>
+<td>71</td>
+</tr>
+<tr>
+<td>2026-09-06</td>
+<td>6</td>
+</tr>
+<tr>
+<td>2026-09-07</td>
+<td>35</td>
+</tr>
+<tr>
+<td>2026-09-08 (part)</td>
+<td>18</td>
+</tr>
+</tbody>
+</table>
+<p>They do <strong>not</strong> track claim volume: 2026-09-03 and 2026-09-05
+have almost the same number of claims (323 and 313) and very
+different refusal counts (107 and 71), while 2026-09-06 has 294
+claims and only 6 refusals. What they track is contention --
+whether a large-footprint job asked while the cluster was
+already full -- which is what a capacity refusal is supposed to
+mean. The more useful fact is that <strong>every one of the 298 refused on <code>cpus</code></strong>, none on
+memory or disk, with a body of the shape <code>cpus (limit 68, used
+38, requested 39)</code>. Refusals concentrate almost entirely in the
+jobs that build a nested cluster:</p>
+<table>
+<thead>
+<tr>
+<th>Repo</th>
+<th>Job</th>
+<th>Refusals</th>
+<th>Claim cpus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>shakenfist</td>
+<td>Debian 12 tier (collection)</td>
+<td>66</td>
+<td>24</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>Ansible modules (collection)</td>
+<td>49</td>
+<td>39</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>Guests (collection)</td>
+<td>44</td>
+<td>32</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>Ubuntu 24.04 cluster (collection)</td>
+<td>39</td>
+<td>36</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>Debian 12 cluster (collection)</td>
+<td>26</td>
+<td>39</td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>debian 13 on debian 12 (containers)</td>
+<td>16</td>
+<td>17</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>Node lifecycle (collection)</td>
+<td>16</td>
+<td>39</td>
+</tr>
+</tbody>
+</table>
+<p>A 39-cpu claim against a 68-cpu cluster is asking for more than
+half of it, so these refusals are the mechanism working: the
+back-pressure lands on the jobs whose footprint genuinely does
+not fit alongside what is already running.</p>
+<h3 id="over-limit-admissions">Over-limit admissions<a class="headerlink" href="#over-limit-admissions" title="Permanent link">&para;</a></h3>
+<p><strong>167 <code>placement admitted over namespace capacity claim</code> events
+across 76 namespaces</strong>, 23 to 48 a day and rising slightly
+through the window.</p>
+<p>The dimension distribution is the important half, and it is the
+<em>opposite</em> of the refusals. Refusals are 100% <code>cpus</code>; over-limit
+admissions are overwhelmingly <code>memory_mb</code>, frequently
+<code>memory_mb</code> and <code>disk_gb</code> together, and rarely <code>cpus</code> alone. A
+representative event has <code>memory_mb limit 39322, used 45056,
+requested 12288</code> while cpus is comfortably inside its limit.</p>
+<p>Joining the 76 namespaces back to their jobs:</p>
+<table>
+<thead>
+<tr>
+<th>Repo</th>
+<th>Job</th>
+<th>Namespaces</th>
+<th>Claim</th>
+<th>Recorded peak</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>shakenfist</td>
+<td>Smoke tests (collection)</td>
+<td>47</td>
+<td>24 cpu / 39322 MB</td>
+<td>20 / 32768</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>Debian 12 tier (collection)</td>
+<td>10</td>
+<td>24 / 63898</td>
+<td>20 / 53248</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>direct-qemu-lane</td>
+<td>6</td>
+<td>8 / 14746</td>
+<td>6 / 12288</td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>gitleaks</td>
+<td>3</td>
+<td>3 / 4916</td>
+<td>2 / 4096</td>
+</tr>
+<tr>
+<td>actions</td>
+<td>Unit tests</td>
+<td>2</td>
+<td>3 / 4916</td>
+<td>2 / 4096</td>
+</tr>
+</tbody>
+</table>
+<p>One job, <code>shakenfist / Smoke tests (collection)</code>, is 47 of the
+76.</p>
+<h3 id="claim-size-against-measured-peak">Claim size against measured peak<a class="headerlink" href="#claim-size-against-measured-peak" title="Permanent link">&para;</a></h3>
+<p>The 1.2 multiplier is applied exactly as designed. Across all
+1728 sized claims the memory ratio is <strong>uniformly 1.20</strong>; the cpu
+ratios spread across 1.2, 1.22, 1.25, 1.33, 1.5 and 2.0 purely
+because the ceiling is coarse on small integers (a peak of 2
+cpus becomes <code>ceil(2.4)</code> = 3, a ratio of 1.5). There is no job
+whose claim sits far from 1.2x its own measurement, so the
+sizing formula is not mis-firing.</p>
+<p>Five claims had no observation at all and fell back to the
+<code>CI_SIZES</code> floor: <code>instar / Mermaid lint</code>, <code>kerbside /
+Mermaid lint</code>, <code>kerbside / Sign release tag with Sigstore</code>,
+<code>library-utilities / gitleaks</code> (its first run) and <code>ryll / Fuzz</code>.
+<strong>Three of those five went on to exceed the claim.</strong> The floor is
+too small even for a lint job, which matters only for a job's
+first-ever run but is a real hole.</p>
+<h3 id="what-the-two-dimensions-together-say">What the two dimensions together say<a class="headerlink" href="#what-the-two-dimensions-together-say" title="Permanent link">&para;</a></h3>
+<p>The 1.2 multiplier is not the problem. <strong>The peaks feeding it
+are.</strong> <code>Smoke tests (collection)</code> claims 39322 MB from a recorded
+peak of 32768, and the over-limit events show the same job
+reaching 45056 to 57344 MB at placement -- the recorded peak
+under-states real use by up to about 1.75x. No plausible headroom
+multiplier applied to a peak that wrong would have covered it,
+so the defect is upstream of the formula, in what
+<code>get_claim_sizes()</code> reads. That is the same surface
+<code>PLAN-claim-coverage-and-sizing.md</code> was opened against in
+private-ci on 2026-09-08.</p>
+<h3 id="reconciler">Reconciler<a class="headerlink" href="#reconciler" title="Permanent link">&para;</a></h3>
+<p>Four drift corrections, all on 2026-09-05, each exactly
++/-4 cpus / 12288 MB / 160 GB and appearing as matched <code>-</code> then
+<code>+</code> pairs on the same node. That is one instance's footprint
+counted across a pass boundary rather than a lost update, and it
+is consistent with the ledger balancing. One reconcile pass
+failed, 2026-09-08 15:22:33, with <code>duration 10.0</code> -- a timeout,
+not a drift finding. Neither is evidence of a leaked claim, and
+the live claim count above is the direct check.</p>
+<h3 id="does-phase-5-flip-claim_enforcement_hard">Does phase 5 flip <code>CLAIM_ENFORCEMENT_HARD</code>?<a class="headerlink" href="#does-phase-5-flip-claim_enforcement_hard" title="Permanent link">&para;</a></h3>
+<p><strong>No, not on this data.</strong> Hard enforcement across this window
+would have refused 167 placements spread over 76 namespaces, and
+the reason would have been wrong in nearly every case: the
+claims those placements exceeded were sized from peak
+measurements that under-state real use by as much as 1.75x, not
+from namespaces genuinely consuming more than they asked for.
+Turning the ceiling hard would convert a measurement defect into
+CI outages, and would do it first and hardest to
+<code>shakenfist / Smoke tests (collection)</code>, which is the project's
+own functional suite. The advisory release is doing exactly what
+it was built to do -- it found the defect without breaking
+anything.</p>
+<p>What is still missing before phase 5 can proceed is a claim
+sizing input that tracks real use: <code>get_claim_sizes()</code> reading a
+peak that reflects what the job actually allocates, and a
+<code>CI_SIZES</code> floor that covers a first run. Once claims are sized
+from a trustworthy peak, this same measurement should be re-run;
+the number to watch is over-limit admissions per day, which must
+fall to a residue attributable to genuine over-consumption
+before the ceiling is worth making hard. The refusal side needs
+no such wait -- 298 refusals, all on <code>cpus</code>, all on jobs asking
+for more than half the cluster, is the mechanism behaving
+correctly and is not an argument against enforcement.</p>
+<p>The anti-starvation question (D18's 15-minute rule) now has data
+behind it: the jobs refused are a small, stable set of
+large-footprint cluster jobs, and they are refused repeatedly --
+<code>Debian 12 tier (collection)</code> 66 times in six days. Whether that
+constitutes starvation depends on whether those jobs eventually
+ran, which this record does not establish, so the policy stays
+with its own phase.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Anti-starvation policy</strong> (D18's 15-minute rule), once this

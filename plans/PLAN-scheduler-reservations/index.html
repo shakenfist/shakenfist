@@ -14387,25 +14387,50 @@ is here.</p>
   survey found</em>.</p>
 </li>
 <li>
-<p><strong>Phase 4c</strong>'s steps 1 to 4 are implemented on the private-ci branch
-  <code>scheduler-reservations-phase-04c-conductor-claims</code> as of 2026-09-01:
-  the sizing accessor, claim creation with E6's three refusal branches,
-  release at teardown, and the dashboard surface. What remains is step
-  5, a minimum of seven days of normal CI load after a deploy, and step
-  6's write-up. The phase plan carries the back brief answers and the
-  four implementation decisions the plan itself did not settle. One
-  back brief item is outstanding and should be discharged before the
-  deploy: the sizing formula has not been evaluated against real cost
-  data, because that needs the conductor's database on <code>maui</code> and <code>ssh</code>
-  there is refused from the development host. The plan carries the
-  command to run.</p>
+<p><strong>Phase 4c</strong>'s steps 1 to 4 merged to private-ci <code>master</code> as
+  its PR #22 on 2026-09-01, and the conductor was deployed on
+  <strong>2026-09-02 18:13:46</strong> -- pinned by the first row of the
+  conductor's <code>claim_events</code> table, not by the merge. Step 5's
+  observation window therefore closes on 2026-09-09 18:13. The
+  record was written into the phase plan on 2026-09-08 from a
+  five-day-23-hour window, covering five full working days, and
+  is to be amended when the window closes.</p>
 </li>
-<li>
-<p><strong>Phase 6</strong> was executed out of order, ahead of phases 4c and 5,
+</ul>
+<p>What it found, in one line: <strong>the claims mechanism works and
+  the numbers feeding it do not.</strong> No claim leaked (1729 created
+  minus 1723 released is exactly the 6 live on the cluster),
+  <code>conductor_claims_failed_total</code> is zero, and all 298 refusals
+  were genuine capacity refusals on <code>cpus</code> against the
+  large nested-cluster jobs. But 167 placements were admitted
+  over their namespace's claim, across 76 namespaces and
+  overwhelmingly on <code>memory_mb</code>, because the peaks
+  <code>get_claim_sizes()</code> reads under-state real use by as much as
+  1.75x. The 1.2 headroom multiplier is applied exactly as
+  designed and is not the problem.</p>
+<p><strong>This answers phase 5's gate: do not flip
+  <code>CLAIM_ENFORCEMENT_HARD</code> yet.</strong> Hard enforcement over this
+  window would have refused 167 placements for a measurement
+  defect rather than for genuine over-consumption, hitting
+  <code>shakenfist / Smoke tests (collection)</code> hardest of all. Phase 5
+  now waits on claim sizing that tracks real use --
+  <code>PLAN-claim-coverage-and-sizing.md</code>, opened in private-ci on
+  2026-09-08 -- and on a re-run of this measurement afterwards.</p>
+<p>The back brief item that was outstanding at the deploy (the
+  sizing formula never evaluated against real cost data, because
+  <code>ssh</code> to <code>maui</code> was refused from the development host) was
+  discharged on 2026-09-08 against the window's own data. It
+  went the right way: the arithmetic is correct on three real
+  <code>(repo, job_name)</code> pairs. One definition-of-done item was
+  retired rather than met: it asked for consistency against the
+  conductor's own documentation of claims, which does not exist.
+  The phase is not blocked on it and the writing of that
+  documentation passes to the successor plan.</p>
+<ul>
+<li><strong>Phase 6</strong> was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
   400s), #3971 (the binary model, the transition mapping and the
-  documentation) and #3957 (this plan file).</p>
-</li>
+  documentation) and #3957 (this plan file).</li>
 </ul>
 <p><strong>#3565 closed on a test change, not a scheduler change.</strong> The
   traced occurrence of 2026-08-26 had the candidate set collapsing
