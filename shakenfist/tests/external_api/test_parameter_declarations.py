@@ -26,19 +26,22 @@ REPO_ROOT = os.path.abspath(os.path.join(
 
 # Handler kwargs which are deliberately not part of the published API.
 #
-# The metadata delete endpoints accept `value` and none of them read it.
-# It should be removed from the signatures rather than documented, but not
-# until phase 4 of PLAN-api-input-validation: today, removing it means a
-# caller who sends it gets `delete() got an unexpected keyword argument`
-# as a 400, which is the leak that plan exists to remove. Once the schema
-# layer rejects unknown parameters cleanly, this list should be empty.
-UNDECLARED_BY_DESIGN = {
-    ('ArtifactMetadataEndpoint', 'delete', 'value'),
-    ('AuthMetadataEndpoint', 'delete', 'value'),
-    ('BlobMetadataEndpoint', 'delete', 'value'),
-    ('InterfaceMetadataEndpoint', 'delete', 'value'),
-    ('NodeMetadataEndpoint', 'delete', 'value'),
-}
+# Empty, and phase 4 of PLAN-api-input-validation is what emptied it.
+# Its five entries were the `value` kwarg the metadata delete handlers
+# accepted and none of them read. Removing them could not be done while
+# validation was warn-only, because a caller who sent `value` on a
+# metadata delete would then have received `delete() got an unexpected
+# keyword argument` as a 400 -- the exact leak that plan exists to
+# remove. With enforcement on, decision D14 answers `value: not
+# declared by this endpoint` before the handler either way, so the
+# signatures were cleaned up in the same commit as the flip.
+#
+# An entry here is a kwarg a handler's signature names and the handler
+# ignores. It is not an escape hatch for a parameter a caller can
+# actually use: a kwarg a decorator pops has no opt-out at all, which
+# test_accepted_parameters_are_declared explains where it enforces it.
+# Keep this empty if you can.
+UNDECLARED_BY_DESIGN: set[tuple[str, str, str]] = set()
 
 # Not deferred to phase 4 after all, though it long said it was:
 # InstanceSnapshotEndpoint.post treats an explicit `thin: false` as

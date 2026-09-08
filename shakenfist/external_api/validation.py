@@ -301,14 +301,15 @@ def build_registry(app: Any) -> dict[tuple[str, str], CompiledEndpoint]:
 
 
 # ---------------------------------------------------------------------
-# Warn-only checking.
+# Checking.
 #
-# Nothing below rejects anything while API_VALIDATION_MODE is 'warn',
-# which is the default and is what phase 3 ships. The findings are
-# recorded on flask.g and emitted once the response status is known,
-# because "what did this request return anyway" is what separates a
-# rejection enforcement would introduce from a status code it would
-# merely change -- and at validation time that is not yet known.
+# Nothing below rejects anything: check() is pure and returns findings,
+# and validate_request in base.py is the only place which decides what
+# to do with them. The findings are recorded on flask.g and emitted
+# once the response status is known, because "what did this request
+# return anyway" is what separates a rejection enforcement introduced
+# from a status code it merely changed -- and at validation time that
+# is not yet known.
 
 # The request-scoped hand-offs, named like base.py's
 # _RECORDED_EXCEPTION_FIELDS because they are the same pattern.

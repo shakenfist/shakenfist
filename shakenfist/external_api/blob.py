@@ -458,7 +458,7 @@ class BlobMetadataEndpoint(api_base.Resource):
         requires_admin=True))
     @arg_is_blob_uuid
     @api_base.log_token_use
-    def delete(self, blob_uuid=None, key=None, value=None, blob_from_db=None):
+    def delete(self, blob_uuid=None, key=None, blob_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
         blob_from_db.add_event(

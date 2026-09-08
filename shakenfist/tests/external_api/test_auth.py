@@ -79,12 +79,17 @@ class AuthTestCase(base.ShakenFistTestCase):
         self.assertEqual(400, resp.status_code)
 
     def test_post_auth_key_non_string(self):
+        # Phase 4 of PLAN-api-input-validation: the declared type is
+        # what refuses this now, so the wording is the validator's
+        # rather than the handler's. The handler's own guard is still
+        # there and still answers when API_VALIDATION_MODE is not
+        # 'enforce'.
         resp = self.client.post(
             '/auth', data=json.dumps({'namespace': 'banana', 'key': 1234}))
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
-                'error': 'key is not a string',
+                'error': 'key: Not a valid string.',
                 'status': 400
             },
             resp.get_json())
@@ -563,10 +568,14 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
                          resp.get_json()['error'])
 
     def test_add_key_rejects_a_non_numeric_expiry(self):
+        # The declared type refuses this ahead of the handler's own
+        # guard now that validation enforces, so the message is the
+        # validator's. Both still say 400 and both still name expiry.
         resp = self._add_key('bogus', 'sekrit', expiry='tomorrow')
 
         self.assertEqual(400, resp.status_code)
-        self.assertEqual('expiry is not a number', resp.get_json()['error'])
+        self.assertEqual('expiry: Not a valid number.',
+                         resp.get_json()['error'])
 
     def test_add_key_rejects_a_boolean_expiry(self):
         # bool is a subclass of int, so "expiry": true would otherwise
@@ -574,7 +583,8 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         resp = self._add_key('boolean', 'sekrit', expiry=True)
 
         self.assertEqual(400, resp.status_code)
-        self.assertEqual('expiry is not a number', resp.get_json()['error'])
+        self.assertEqual('expiry: Not a valid number.',
+                         resp.get_json()['error'])
 
     # The key update endpoint had two bugs which meant it never worked:
     # it tested membership against the wrong level of the keys dict, and
@@ -784,10 +794,13 @@ class ExternalApiTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.locks.ClusterLock')
     def test_put_namespace_metadata(self, mock_get_lock):
+        # The key rides in the URL. Sending it in the body as well is
+        # a body-path collision, which decision D18 of
+        # PLAN-api-input-validation refuses; shakenfist_client's
+        # _set_metadata sends {'value': ...} and nothing else.
         resp = self.client.put('/auth/namespaces/system/metadata/foo',
                                headers={'Authorization': self.auth_token},
                                data=json.dumps({
-                                   'key': 'foo',
                                    'value': 'bar'
                                }))
         self.assertEqual(None, resp.get_json())

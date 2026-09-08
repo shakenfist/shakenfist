@@ -319,11 +319,14 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     def test_put_instance_metadata(self):
         self.mock_mariadb.create_instance('banana')
+        # The key rides in the URL. Sending it in the body as well is
+        # a body-path collision, which decision D18 of
+        # PLAN-api-input-validation refuses; shakenfist_client's
+        # _set_metadata sends {'value': ...} and nothing else.
         resp = self.client.put(
             '/instances/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token},
             data=json.dumps({
-                'key': 'foo',
                 'value': 'bar'
             }))
         self.assertEqual(None, resp.get_json())
@@ -399,11 +402,13 @@ class ExternalApiGeneralTestCase(ExternalApiTestCase):
 
     def test_put_network_metadata(self):
         self.mock_mariadb.create_network('banana', namespace='foo')
+        # As with the instance metadata test above: the key rides in
+        # the URL, and repeating it in the body is a body-path
+        # collision decision D18 refuses.
         resp = self.client.put(
             '/networks/12345678-1234-4321-8234-000000000001/metadata/foo',
             headers={'Authorization': self.auth_token},
             data=json.dumps({
-                'key': 'foo',
                 'value': 'bar'
             }))
         self.assertEqual(None, resp.get_json())
@@ -577,8 +582,11 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'placed_on': None,
                                     'namespace': None,
                                 }))
+        # Phase 4 of PLAN-api-input-validation: the declared arrayofdict
+        # refuses this ahead of the handler's own guard, which remains
+        # and answers when API_VALIDATION_MODE is not 'enforce'.
         self.assertEqual(
-            {'error': 'disk specification should contain JSON objects', 'status': 400},
+            {'error': "disk: {0: ['Not a valid mapping type.']}", 'status': 400},
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
@@ -598,8 +606,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'placed_on': None,
                                     'namespace': None,
                                 }))
+        # As above: the declared arrayofdict answers first now.
         self.assertEqual(
-            {'error': 'network specification should contain JSON objects', 'status': 400},
+            {'error': "network: {0: ['Not a valid mapping type.']}", 'status': 400},
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 

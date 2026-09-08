@@ -1677,13 +1677,15 @@ def _enforce_scope(func, resource_class, override):
 def validate_request(func):
     """Check a request against its published parameter declarations.
 
-    Phase 3 of PLAN-api-input-validation. While API_VALIDATION_MODE is
-    'warn' -- the default, and what phase 3 ships -- this changes
-    nothing about any request: it records what it would have refused
-    and calls through. app.py emits those records once the response
-    status is known, because whether a finding represents a rejection
-    enforcement would *introduce* or a status code it would merely
-    *change* depends on what the request returned anyway.
+    PLAN-api-input-validation. While API_VALIDATION_MODE is 'enforce'
+    -- the default since phase 4 -- a finding other than
+    missing-required answers 400 in the API error shape, naming the
+    parameter. 'warn' is the operator's rollback and changes nothing
+    about any request: it records what it would have refused and calls
+    through. app.py emits those records once the response status is
+    known in both modes, because whether a finding represents a
+    rejection enforcement *introduced* or a status code it merely
+    *changed* depends on what the request returned anyway.
 
     First in Resource.method_decorators and so innermost, which puts it
     after authentication (an unauthenticated caller cannot probe the

@@ -1,11 +1,15 @@
 # Copyright 2019 Michael Still and contributors
 
-"""Warn-only request validation.
+"""Request validation, in both of its modes.
 
-Phase 3 PR 3. The property that matters most here is a negative one:
-with API_VALIDATION_MODE at its default of 'warn', no request behaves
-differently than it did before this layer existed. The findings are
-recorded and logged; nothing acts on them until phase 4.
+Phase 3 built the layer and rejected nothing; phase 4 flipped
+API_VALIDATION_MODE's default to 'enforce', which is what the
+EnforcedValidationTestCase class at the bottom of this file pins.
+The warn-mode properties above it are still worth keeping -- 'warn'
+is the operator's rollback, and its promise is that no request behaves
+differently than it did before the layer existed -- so each of those
+tests now sets the mode it is about rather than relying on a default
+which has moved.
 """
 
 import json
@@ -66,14 +70,17 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         return response, findings
 
     def test_warn_mode_changes_no_response(self):
-        """The whole point of the phase.
+        """The promise 'warn' still makes, now that it is the rollback.
 
         A body carrying an undeclared key produces a finding, and the
         response is byte for byte what it was before validation
         existed: the 400 log_request's merge has always produced, with
-        the interpreter's own text. Phase 4 replaces that message; phase
-        3 must not.
+        the interpreter's own text. That interpreter text is the defect
+        this plan exists to remove, so an operator who rolls back to
+        'warn' gets the old behaviour back in full, warts included.
         """
+        config.API_VALIDATION_MODE = 'warn'
+
         response, findings = self._post_auth(
             {'namespace': 'sys', 'key': 'k', 'zzz': 1})
 
@@ -109,6 +116,8 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
             [(f.reason, f.parameter) for f in findings])
 
     def test_a_wrong_type_is_reported(self):
+        config.API_VALIDATION_MODE = 'warn'
+
         response, findings = self._post_auth(
             {'namespace': 'sys', 'key': 5})
 
@@ -440,6 +449,8 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         carrying what the request returned anyway is what separates a
         rejection enforcement would introduce from a status code it
         would merely change."""
+        config.API_VALIDATION_MODE = 'warn'
+
         with mock.patch.object(external_api, 'LOG') as log:
             response, findings = self._post_auth(
                 {'namespace': 'sys', 'key': 'k', 'zzz': 1})
@@ -516,21 +527,32 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual([], emitted)
 
 
-class AuthenticatedValidationTestCase(base.ShakenFistTestCase):
-    """Request-level properties which need the full decorator stack.
+class AuthenticatedStackTestCase(base.ShakenFistTestCase):
+    """A real authenticated client against the whole decorator stack.
 
-    The first review round found the deployed behaviour and the
-    behaviour of a handler tested in isolation were different answers:
-    _webargs_error built a perfect 400 which
-    suppress_exceptions_to_client then swallowed into a 500. Everything
-    here therefore drives a real authenticated request end to end and
-    asserts only what a client sees or what actually reached a spy.
+    The first review round of phase 3 found the deployed behaviour and
+    the behaviour of a handler tested in isolation were different
+    answers: _webargs_error built a perfect 400 which
+    suppress_exceptions_to_client then swallowed into a 500. Phase 4's
+    step 4 brief repeats the rule for the enforcement tests, so both
+    subclasses below drive a real request end to end and assert only
+    what a client sees or what actually reached a spy.
+
+    Carries no tests of its own: the two subclasses are the same
+    fixture at the two modes that do something.
     """
+
+    #: The mode this class's requests run in.
+    mode = 'warn'
 
     def setUp(self):
         super().setUp()
         external_api.TESTING = True
         external_api.app.testing = True
+
+        self.saved_mode = config.API_VALIDATION_MODE
+        self.addCleanup(self._restore_mode)
+        config.API_VALIDATION_MODE = self.mode
 
         self.mock_mariadb = MockMariaDB(self, node_count=1)
         self.mock_mariadb.setup()
@@ -542,6 +564,29 @@ class AuthenticatedValidationTestCase(base.ShakenFistTestCase):
             data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
         self.token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def _restore_mode(self):
+        config.API_VALIDATION_MODE = self.saved_mode
+
+    def _spy_on_check(self):
+        """Collect the findings check() produced, without changing them."""
+        findings = []
+        real = validation.check
+
+        def spy(*args, **kwargs):
+            out = real(*args, **kwargs)
+            findings.extend(out)
+            return out
+
+        return findings, mock.patch.object(validation, 'check', spy)
+
+
+class AuthenticatedValidationTestCase(AuthenticatedStackTestCase):
+    """The properties 'warn' still promises, now that it is the
+    rollback rather than the default: a finding changes nothing about
+    the response."""
+
+    mode = 'warn'
 
     def test_a_webargs_failure_answers_400_through_the_real_stack(self):
         """The whole journey: use_kwargs raises, _webargs_error aborts
@@ -591,20 +636,18 @@ class AuthenticatedValidationTestCase(base.ShakenFistTestCase):
         finding by construction and a no-op by construction, so the
         response must be byte for byte the response of the same
         request without the body.
-        """
-        findings = []
-        real = validation.check
 
-        def spy(*args, **kwargs):
-            out = real(*args, **kwargs)
-            findings.extend(out)
-            return out
+        EnforcedValidationTestCase runs the same request the other way
+        up: in 'enforce' this is the population that starts being
+        refused, which is the whole contract change.
+        """
+        findings, patcher = self._spy_on_check()
 
         headers = {'Authorization': self.token}
         clean = self.client.get('/auth/namespaces/system', headers=headers)
         self.assertEqual(200, clean.status_code)
 
-        with mock.patch.object(validation, 'check', spy):
+        with patcher:
             response = self.client.get(
                 '/auth/namespaces/system',
                 data=json.dumps({'namespace': 'system'}),
@@ -622,15 +665,9 @@ class AuthenticatedValidationTestCase(base.ShakenFistTestCase):
         CompiledEndpoint: a body key shadowing a path parameter is
         recorded where the overwrite happens and reported by the
         validator which runs after it."""
-        findings = []
-        real = validation.check
+        findings, patcher = self._spy_on_check()
 
-        def spy(*args, **kwargs):
-            out = real(*args, **kwargs)
-            findings.extend(out)
-            return out
-
-        with mock.patch.object(validation, 'check', spy):
+        with patcher:
             response = self.client.delete(
                 '/instances/nosuchinstance',
                 data=json.dumps({'instance_ref': 'adifferentinstance'}),
@@ -642,3 +679,193 @@ class AuthenticatedValidationTestCase(base.ShakenFistTestCase):
             [(f.reason, f.parameter) for f in findings])
         # And warn mode changed nothing: the handler's own 404 answered.
         self.assertEqual(404, response.status_code)
+
+
+# Text which can only have come from the Python interpreter rather than
+# from this API's own vocabulary. The motivating defect of
+# PLAN-api-input-validation is
+# `{"error": "InstancesEndpoint.get() got an unexpected keyword argument
+# 'banana'", "status": 400}` -- a caller learning a class name, a method
+# name and the fact that kwargs are merged into a call. Asserted as an
+# explicit list rather than by reading the message, because "I looked at
+# it and it seemed fine" is not a check that survives a refactor, and
+# the leak this closes has now been re-read as acceptable twice.
+#
+# Each entry names a distinct kind of leak: the TypeError text itself,
+# a stack, an exception class, an endpoint class name, a repr, and a
+# source path.
+INTERPRETER_TEXT = [
+    'got an unexpected keyword argument',
+    'unexpected keyword',
+    'positional argument',
+    'Traceback',
+    'TypeError',
+    'Endpoint',
+    'object at 0x',
+    '.py',
+    'shakenfist/',
+]
+
+
+class EnforcedValidationTestCase(AuthenticatedStackTestCase):
+    """What enforcement means, at request level.
+
+    Decision D16 made 'enforce' the default, so this is the behaviour
+    every deployment gets. Every test here drives a real authenticated
+    request through the whole decorator stack for the reason the parent
+    class documents: phase 3's review found two defects which unit
+    tests missed because they exercised components in isolation.
+    """
+
+    mode = 'enforce'
+
+    def assertNoInterpreterText(self, response):
+        """The absence, asserted positively.
+
+        Against the whole response body rather than the error string,
+        so a leak into any other field is caught too.
+        """
+        body = response.get_data(as_text=True)
+        for fragment in INTERPRETER_TEXT:
+            self.assertNotIn(
+                fragment, body,
+                'the refusal leaked interpreter text: %s' % body)
+
+    def test_an_undeclared_body_key_is_refused_by_name(self):
+        """Decision D14, and the defect the whole plan exists to close.
+
+        This is the exact request the confirmatory reading of D22 sent
+        to sfcbr on 2026-09-08, which answered
+        `InstancesEndpoint.get() got an unexpected keyword argument
+        'banana'`. The response asserted here is what replaces it.
+        """
+        findings, patcher = self._spy_on_check()
+
+        with patcher:
+            response = self.client.get(
+                '/instances',
+                data=json.dumps({'banana': 'yellow'}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(
+            [(validation.UNKNOWN_PARAMETER, 'banana')],
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {'error': 'banana: not declared by this endpoint', 'status': 400},
+            response.get_json())
+        self.assertNoInterpreterText(response)
+
+    def test_an_omitted_required_parameter_still_reaches_the_handler(self):
+        """Decision D17, and the one filter in the enforce branch.
+
+        `shared` on POST /artifacts is declared required and has always
+        been optional in fact -- the handler's signature defaults it to
+        False. Enforcing required-ness is phase 6's decision and would
+        break working callers, so a missing-required finding is
+        telemetry and never grounds for rejection.
+
+        The finding is asserted as well as the 200: without it this
+        test would pass just as happily if `shared` stopped being
+        declared required, which would make it a check of nothing.
+        """
+        findings, patcher = self._spy_on_check()
+
+        with patcher:
+            response = self.client.post(
+                '/artifacts',
+                data=json.dumps({'url': 'http://example.com/image.qcow2'}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(
+            [(validation.MISSING_REQUIRED, 'shared')],
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(200, response.status_code, response.get_json())
+        # And the handler really ran, rather than something upstream
+        # answering 200 for it.
+        self.assertEqual(
+            'http://example.com/image.qcow2',
+            response.get_json()['source_url'])
+
+    def test_a_body_key_colliding_with_a_path_parameter_is_refused(self):
+        """Decision D18. The window observed none of these, so this is
+        the one piece of enforcement switched on without a population
+        behind it -- which makes a test the only evidence it works.
+
+        In 'warn' this same request reaches the handler and answers the
+        404 that AuthenticatedValidationTestCase pins. Enforcement
+        answers first, which is the status code change the release note
+        has to state.
+        """
+        findings, patcher = self._spy_on_check()
+
+        with patcher:
+            response = self.client.delete(
+                '/instances/nosuchinstance',
+                data=json.dumps({'instance_ref': 'adifferentinstance'}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertIn(
+            (validation.BODY_PATH_COLLISION, 'instance_ref'),
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {'error': 'instance_ref: a body key of this name overwrote the '
+                      'URL path parameter',
+             'status': 400},
+            response.get_json())
+        self.assertNoInterpreterText(response)
+
+    def test_a_finding_on_a_request_which_would_have_succeeded_refuses_it(self):
+        """The contract change, pinned on a 2xx.
+
+        Its warn-mode twin above proves this exact request answers 200
+        with the body unchanged, so the clean 200 asserted first is not
+        an assumption -- it is the same request without the offending
+        body key, taken in the same fixture.
+        """
+        headers = {'Authorization': self.token}
+        clean = self.client.get('/auth/namespaces/system', headers=headers)
+        self.assertEqual(200, clean.status_code)
+
+        findings, patcher = self._spy_on_check()
+        with patcher:
+            response = self.client.get(
+                '/auth/namespaces/system',
+                data=json.dumps({'namespace': 'system'}),
+                content_type='application/json', headers=headers)
+
+        self.assertEqual(
+            [(validation.BODY_PATH_COLLISION, 'namespace')],
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(400, response.status_code)
+        self.assertNotEqual(clean.get_data(), response.get_data())
+        self.assertNoInterpreterText(response)
+
+    def test_a_request_with_no_findings_is_untouched(self):
+        """The other half of the promise: enforcement must be invisible
+        to a well formed request.
+
+        Byte for byte against the same request with the layer switched
+        off, so this cannot pass by the layer having quietly rewritten
+        every response in some harmless-looking way.
+        """
+        headers = {'Authorization': self.token}
+
+        findings, patcher = self._spy_on_check()
+        with patcher:
+            enforced = self.client.get('/auth/namespaces/system',
+                                       headers=headers)
+
+        self.assertEqual([], findings)
+        self.assertEqual(200, enforced.status_code)
+
+        config.API_VALIDATION_MODE = 'off'
+        unvalidated = self.client.get('/auth/namespaces/system',
+                                      headers=headers)
+
+        self.assertEqual(unvalidated.status_code, enforced.status_code)
+        self.assertEqual(unvalidated.get_data(), enforced.get_data())

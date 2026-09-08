@@ -151,12 +151,19 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
 
     def test_a_deadline_above_the_operator_ceiling_is_refused(self):
         # Issue #4074: the ceiling published as the parameter's maximum
-        # is backed by a 400 from the handler, like the minimum.
+        # is backed by a 400, like the minimum. Since phase 4 of
+        # PLAN-api-input-validation that 400 comes from the published
+        # bound itself rather than from the handler's guard, which is
+        # the stronger version of the same property -- the two can no
+        # longer disagree. The handler's guard remains and answers when
+        # API_VALIDATION_MODE is not 'enforce'.
         resp, new = self._execute(
             deadline_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)
         self.assertEqual(400, resp.status_code, resp.get_json())
         self.assertIn(
-            'AGENT_OPERATION_MAX_DEADLINE', resp.get_json()['error'])
+            'deadline_seconds: Must be greater than or equal to 0 and less '
+            'than or equal to %d' % config.AGENT_OPERATION_MAX_DEADLINE,
+            resp.get_json()['error'])
         new.assert_not_called()
 
     def test_an_unparsable_deadline_is_a_400_not_a_500(self):
@@ -167,12 +174,17 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
                 new.assert_not_called()
 
     def test_execute_does_not_accept_a_progress_timeout(self):
-        # Pins decision 4 in code rather than in prose. An undeclared
-        # body key becomes an unexpected keyword argument in the kwargs
-        # merge, which is a 400 -- so this asserts the parameter is
-        # genuinely absent, not merely undocumented.
+        # Pins decision 4 in code rather than in prose. Since phase 4 of
+        # PLAN-api-input-validation an undeclared body key is refused by
+        # name before the handler runs -- so this asserts the parameter
+        # is genuinely absent, not merely undocumented, and that the
+        # refusal says so in the API's own words rather than the
+        # interpreter's.
         resp, new = self._execute(progress_timeout_seconds=30)
         self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(
+            'progress_timeout_seconds: not declared by this endpoint',
+            resp.get_json()['error'])
         new.assert_not_called()
 
     def test_get_accepts_both_parameters(self):
