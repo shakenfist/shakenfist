@@ -388,7 +388,14 @@ Three positions, for phase 6 to choose between:
 Two things that look like they should help and do not.
 Namespace claims (D14) guarantee aggregate capacity and
 explicitly carry no node affinity, so they close the 3772
-507 family without touching this. And the CPU committed
+507 family without touching this. *Correction, 2026-09-08:*
+they do not close it. Every post-#4106 member of that family
+read from CI journals was a pinned (`force_placement`) create
+refused by the per-node `sufficient_idle_cpu` pre-filter,
+which never consults `namespace_claims`; a claim with no node
+affinity cannot help a create that has only one node. The
+family is owned by
+[A capacity refusal is transient](PLAN-transient-capacity-refusals.md). And the CPU committed
 ledger (PR 3724) made admission *more* accurate, which moves
 this failure mode in the wrong direction.
 

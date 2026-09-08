@@ -45,3 +45,4 @@
 - PLAN-agent-operation-dependencies.md: Dependency-aware agent operations
 - PLAN-grpc-bounded-replies.md: Bound the size of DatabaseService gRPC replies
 - PLAN-ci-cloud-sizing.md: Right-size the CI test clouds
+- PLAN-transient-capacity-refusals.md: A capacity refusal is transient
