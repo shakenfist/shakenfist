@@ -12,6 +12,12 @@ magnitude of an absolute timestamp. None of them is about how many seconds
 something took. CI hardware is contended and shared, so a test which asserts
 that an operation expired "within ten seconds" is a flake written on
 purpose; see decision 5 of that phase plan.
+
+The retry and attempt-bound tests were added by issue #4077, the plan's
+phase 8 push audit. Both stand on the same controlled stall: a get-file of
+a FIFO wedges the agent's blocking open() in the guest kernel (the issue
+#3516 wedge shape), which stalls an attempt deterministically without this
+suite ever asserting an elapsed duration.
 """
 
 import json
@@ -35,6 +41,36 @@ AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT = 30
 # timing parameters (issue #4074), for the same cannot-read-it-from-the-
 # cluster reason as the pair above.
 AGENT_OPERATION_MAX_DEADLINE = 86400
+
+# Mirror of AGENT_OPERATION_MAX_ATTEMPTS (shakenfist/config.py), again
+# because nothing publishes it. The exhaustion test asserts equality
+# against this, so a retuned cap fails that test until this moves too --
+# which is the mirror working, not the mirror being a maintenance trap.
+AGENT_OPERATION_MAX_ATTEMPTS = 3
+
+# The progress timeout handed to the operations below which are meant to
+# stall. Half the server default, because the exhaustion test pays for
+# AGENT_OPERATION_MAX_ATTEMPTS of these back to back on every pull
+# request. Not lower than that: the window has to comfortably cover the
+# agent answering a stat before it wedges, or a slow guest expires an
+# attempt that was about to stall properly anyway and the assertion
+# about *which* attempt saw what gets murky.
+STALL_PROGRESS_TIMEOUT_SECONDS = 15
+
+# What the rescuer in the retry test writes over the stall target's
+# path once the first attempt has provably wedged on it. Deliberately
+# free of spaces and shell metacharacters, because it travels as a
+# printf argument inside an already-quoted guest command line.
+RETRY_RESCUE_CONTENT = 'rescued-after-a-stall'
+
+# How long the rescuer holds the FIFO's write end open after the first
+# get-file attempt attaches to it. It only has to outlive that
+# attempt's progress timeout: close it earlier and the wedged read
+# returns EOF, which *completes* the transfer as an empty file instead
+# of stalling it, and the retry this test exists to observe never
+# happens. Six times what is strictly needed, in the same insurance
+# spirit as BLOCKER_SECONDS.
+RETRY_RESCUE_HOLD_SECONDS = 120
 
 # How far a freshly created operation's deadline may sit from where this
 # test's own clock says it should. The deadline is an absolute timestamp
@@ -355,3 +391,131 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
         self._await_agentop_complete(
             inst['uuid'], blocker, AGENTOP_STATE_TIMEOUT,
             f'sleep {BLOCKER_SECONDS}')
+
+    def test_stalled_transfer_is_retried_to_completion(self):
+        # Phase 5's central behavioural claim, previously only covered
+        # at the unit level (issue #4077): an attempt which stalls is
+        # requeued (the EXECUTING -> QUEUED edge) and a later dispatch
+        # of the same operation succeeds, from the same place in line.
+        inst = self._create_ready_instance('test-aop-deadline-retry')
+
+        # Arm the guest with a get-file target which wedges exactly one
+        # attempt, without this test having to time anything. The
+        # target starts as a FIFO, so the agent's open() blocks in the
+        # guest kernel -- the issue #3516 wedge shape. That is also
+        # what lets the rescuer be event-driven rather than a timer:
+        # its own open of the FIFO's write end (exec 9>) blocks until a
+        # reader attaches, and the only reader there will ever be is
+        # the first get-file attempt. The moment that attempt attaches,
+        # the rescuer replaces the path with a regular file for the
+        # next attempt to find -- while holding the original FIFO's
+        # write end open and silent, so the attached attempt can see
+        # neither data nor EOF and provably stalls. The subshell's fds
+        # are all redirected because the agent collects execute output
+        # with communicate(), which would otherwise wait on the
+        # inherited pipes for the length of the rescuer's sleep.
+        target = '/tmp/sf-retry-target'
+        arm = (
+            f'mkfifo {target}; '
+            f'( exec 9>{target}; rm -f {target}; '
+            f'printf {RETRY_RESCUE_CONTENT} > {target}; '
+            f'sleep {RETRY_RESCUE_HOLD_SECONDS} ) >/dev/null 2>&1 </dev/null &'
+        )
+        armed = self.nonblocking_client.instance_execute(inst['uuid'], arm)
+        self._await_agentop_complete(
+            inst['uuid'], armed, AGENTOP_STATE_TIMEOUT,
+            'arming the stall-then-rescue fixture')
+
+        # No deadline_seconds, so the server default (ten minutes)
+        # applies and what is being shown is that a stall well inside
+        # the caller's wall-clock budget is retried rather than fatal.
+        aop = self.nonblocking_client.instance_get(
+            inst['uuid'], target,
+            progress_timeout_seconds=STALL_PROGRESS_TIMEOUT_SECONDS)
+        aop = self._await_agentop_complete(
+            inst['uuid'], aop, AGENTOP_STATE_TIMEOUT,
+            f'get {target} across a stalled first attempt')
+
+        # Completing in more than one dispatch is the retry claim
+        # itself. attempts is written by the executor as it moves the
+        # operation to executing, so two means: dispatched, abandoned,
+        # dispatched again -- and _await_agentop_complete() has already
+        # asserted the second life ended in complete, not expired.
+        self.assertGreaterEqual(
+            aop['attempts'], 2,
+            f'Operation completed on its first attempt, so the stall this '
+            f'test depends on never happened: {aop}')
+        self.assertLessEqual(
+            aop['attempts'], AGENT_OPERATION_MAX_ATTEMPTS,
+            f'Operation was dispatched more times than the attempt cap '
+            f'permits: {aop}')
+        self.assertIsNone(
+            aop['expiry_reason'],
+            f'Completed operation carries an expiry reason: {aop}')
+
+        # And the caller gets the rescuer's file, not flotsam from the
+        # wedged attempt -- requeueing clears the abandoned attempt's
+        # results precisely so a caller can never read a blob from an
+        # attempt which went nowhere.
+        self.assertIn(
+            '0', aop['results'],
+            f'Completed get-file has no result at index 0: {aop}')
+        content_blob = aop['results']['0'].get('content_blob')
+        self.assertIsNotNone(
+            content_blob,
+            f'Completed get-file result names no content blob: {aop}')
+        b = self.test_client.get_blob(content_blob)
+        self.assertEqual(
+            len(RETRY_RESCUE_CONTENT), b['size'],
+            f'Fetched blob is not the rescue file: {b}')
+
+    def test_attempt_exhaustion_reaches_a_terminal_state(self):
+        # The attempt bound, previously only covered at the unit level
+        # (issue #4077): an operation whose every attempt stalls is
+        # dispatched AGENT_OPERATION_MAX_ATTEMPTS times and then
+        # expires, rather than retrying forever or wedging in
+        # executing.
+        inst = self._create_ready_instance('test-aop-deadline-attempts')
+
+        # A FIFO nothing ever writes to or rescues: every attempt's
+        # open() blocks in the guest kernel and every attempt stalls.
+        target = '/tmp/sf-attempts-fifo'
+        armed = self.nonblocking_client.instance_execute(
+            inst['uuid'], f'mkfifo {target}')
+        self._await_agentop_complete(
+            inst['uuid'], armed, AGENTOP_STATE_TIMEOUT, f'mkfifo {target}')
+
+        # deadline_seconds=0 is the licensed sentinel (decision 3 of
+        # the plan): no wall-clock deadline at all, with the progress
+        # timeout still bounding each attempt. The attempt cap is
+        # therefore the only thing standing between this operation and
+        # retrying forever, which is exactly what this test is about --
+        # with a deadline the retry loop would eventually be cut short
+        # by the wrong budget and the cap would go unexercised.
+        aop = self.nonblocking_client.instance_get(
+            inst['uuid'], target, deadline_seconds=0,
+            progress_timeout_seconds=STALL_PROGRESS_TIMEOUT_SECONDS)
+
+        aop = self._await_agentop_state(
+            inst['uuid'], aop, ('expired',), AGENTOP_STATE_TIMEOUT,
+            'the operation expected to exhaust its attempt cap')
+
+        # Exactly the cap: the final stall found attempts at the bound
+        # and expired instead of requeueing. More would mean the bound
+        # leaks; fewer would mean something else ended the operation
+        # and this test proved nothing about the cap.
+        self.assertEqual(
+            AGENT_OPERATION_MAX_ATTEMPTS, aop['attempts'],
+            f'Operation did not exhaust exactly the attempt cap: {aop}')
+
+        # A stall is an exhausted progress budget, and staying that way
+        # through the terminal transition is what issue #4075's field
+        # is for. The 'after N attempts' prose lives on the state
+        # message and the audit event, neither of which is in the view.
+        self.assertEqual(
+            'progress', aop['expiry_reason'],
+            f'Expired operation does not blame the progress budget: {aop}')
+        self.assertEqual(
+            {}, aop['results'],
+            f'No attempt ever transferred anything, yet the operation has '
+            f'results: {aop}')

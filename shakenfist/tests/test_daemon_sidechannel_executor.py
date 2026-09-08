@@ -6,12 +6,15 @@ import shutil
 import tempfile
 import time
 from unittest import mock
+from uuid import uuid4
 
 from shakenfist import constants
 from shakenfist import exceptions
+from shakenfist.config import SFConfig
 from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
+from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class _FakeState:
@@ -770,6 +773,103 @@ class ExecutorBudgetTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'the operation deadline passed while executing',
             agentop.expired_reason)
+
+
+class ExecutorNoBudgetBackstopTestCase(base.ShakenFistTestCase):
+    """The no-budget combination, driven through the real budget resolution.
+
+    deadline_seconds=0 stores an explicit 0.0 deadline, and the
+    agent/execute endpoint always stores a 0.0 progress timeout, so one
+    request parameter disables both caller budgets at once. Before the
+    issue #4074 fix nothing ever ended such an operation, and it parked
+    its instance's single executor slot for as long as the guest
+    command ran -- partly because no test drove expire_if_out_of_budget()
+    with both sentinels at once (issue #4077). The budget fakes in
+    ExecutorBudgetTestCase cannot close that gap: their deadline
+    resolution is predetermined, so they would have passed against the
+    parked behaviour too. This case runs the executor's check over a
+    real AgentOperation, so the whole chain from the stored sentinels
+    through effective_deadline()'s AGENT_OPERATION_MAX_DEADLINE
+    backstop to the expired state is what is asserted.
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch(
+            'shakenfist.operations.agentoperation.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid4())
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
+
+    def _make_executing_no_budget_op(self):
+        op = AgentOperation.new(
+            str(uuid4()), 'unittest', self.instance_uuid,
+            [{'command': 'execute', 'commandline': 'true'}],
+            deadline=0.0, progress_timeout=0.0)
+        op.state = AgentOperation.STATE_QUEUED
+        op.state = AgentOperation.STATE_EXECUTING
+        return op
+
+    def _make_executor(self, agentop):
+        job = sidechannel.SideChannelExecutorJob.__new__(
+            sidechannel.SideChannelExecutorJob)
+        job.agentop = agentop
+        job.in_flight_handler = _SilentHandler()
+        job.ready = False
+        job._last_progress = 0.0
+        job._last_budget_check = 0.0
+        job._deadline_anchor = None
+        job.commands = []
+        job._blob_partial_file = None
+        job.log = mock.MagicMock()
+        return job
+
+    def test_no_budget_operation_expires_at_the_operator_ceiling(self):
+        op = self._make_executing_no_budget_op()
+        job = self._make_executor(op)
+        anchor = op.state.update_time
+        backstop = self.mock_config.AGENT_OPERATION_MAX_DEADLINE
+
+        # Inside the ceiling nothing expires it. With both caller
+        # budgets off there is deliberately no tighter bound -- the
+        # licensed use of the sentinel is work too large to put a
+        # number on -- so surviving here is as much the contract as
+        # expiring below is.
+        with mock.patch('time.time', return_value=anchor + backstop - 5):
+            self.assertFalse(job.expire_if_out_of_budget())
+        self.assertEqual(AgentOperation.STATE_EXECUTING, op.state.value)
+        self.assertIsNone(op.expiry_reason)
+
+        # Past it the operation expires and the executor is told to
+        # stop, which is what frees the instance's single slot. What a
+        # client reads back is an ordinary deadline expiry: the
+        # backstop is an operator ceiling on the same budget, not a
+        # third kind of ending.
+        with mock.patch('time.time', return_value=anchor + backstop + 5):
+            self.assertTrue(job.expire_if_out_of_budget())
+        self.assertEqual(AgentOperation.STATE_EXPIRED, op.state.value)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE, op.expiry_reason)
+        self.assertEqual(
+            'the operation deadline passed while executing',
+            op.state.message)
 
 
 class ExecutorProgressPersistenceTestCase(base.ShakenFistTestCase):
