@@ -381,7 +381,7 @@ Recommendations are recorded inline.
 | 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete |
 | 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete |
 | 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete |
-| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | In progress |
+| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | Complete |
 | 11. Close out the post-completion defects (#4003, #4009) | shakenfist | See *Post-completion defects* below | Complete |
 
 The table above names plan files rather than pull requests, which
@@ -625,11 +625,15 @@ defect from the one configuration no phase ever tested (after
 high-severity finding in ryll's SPICE TLS verifier, which
 trusted the public WebPKI root set even when a `.vv` supplied
 a private cluster CA -- the mechanism this plan's whole
-`host_subject` story depends on. The kerbside fix merged as
-kerbside#412 (`e2a493ea6`), though not yet into a tagged
-release, so Shaken Fist's own operator guide and release notes
-carry the provisioning order which avoids it. ryll#358 is still
-open, and this phase stays In progress until it merges.
+`host_subject` story depends on. The kerbside fix took two
+pull requests: kerbside#412 (`e2a493ea6`) stopped the key
+fetch erroring the source but left the cleanup itself
+untouched, so every other early-exit path still deleted the
+inventory, and kerbside#413 (`29323fb85`) narrowed that
+cleanup to the sources a pass actually enumerated. Both ship
+in Kerbside v0.6.0; Shaken Fist's own operator guide and
+release notes carry the provisioning order which avoids the
+hazard on earlier releases. ryll#358 merged as `aac25cf3c`.
 Alongside those came three medium security findings and the audit's own discovery
 that the `.vv` type collapse, though covered by a unit test,
 had no functional coverage -- in a project that prefers
@@ -638,6 +642,8 @@ Fourteen advisory findings were filed as issues across the
 four repositories. Full detail, with what each heading
 examined and the management session's spot-checks and
 mutation tests, is in the phase plan's *Findings* section.
+No blocking or high-severity finding remains open, so this
+phase is Complete.
 
 ### Phase 11: Close out the post-completion defects
 

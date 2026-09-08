@@ -516,6 +516,19 @@ state, and genuine faults still warn. Verified by the management
 session rather than taken on report -- reinstating `self.errored = True;
 return` fails exactly six tests and nothing else; restored, 279 pass.
 
+That fix removed the trigger, not the defect. The cleanup machinery was
+untouched -- `git diff e2a493ea6^1 e2a493ea6 -- kerbside/main.py` is
+empty -- so every *other* path which gives up on a source early still
+deleted that source's whole inventory: an unknown source type, an
+exception raised part way through the generator, or
+`get_cluster_cacert()` at `sources/shakenfist.py:69`, which sits outside
+any `try` and so turns a network blip into data loss. kerbside#413 fixed
+that, replacing "delete everything the scrape did not touch" with an
+explicit set of sources enumerated to exhaustion this pass; anything
+else retains its consoles and logs one line per source saying why. It
+also removed a latent `KeyError` for a source dropped from
+`sources.yaml`. Six new tests cover the early-exit paths individually.
+
 ### 2a, code quality (10d)
 
 Examined R1, R4-R10 across three repositories: `mariadb.py`'s v4
@@ -810,9 +823,9 @@ majority.
 
 | Finding | Grade | Disposition |
 |---------|-------|-------------|
-| F-B1 console deletion on key-fetch failure | Blocking | Fixed, kerbside#412 (merged `e2a493ea6`) |
-| F8 ryll SPICE TLS trust anchors | High | Fix open as ryll#358 |
-| F5 unauthenticated `audit_events` write | Medium | Fixed, kerbside#412 (merged `e2a493ea6`) |
+| F-B1 console deletion on key-fetch failure | Blocking | Fixed, kerbside#412 (`e2a493ea6`) and kerbside#413 (`29323fb85`); released in v0.6.0 |
+| F8 ryll SPICE TLS trust anchors | High | Fixed, ryll#358 (merged `aac25cf3c`) |
+| F5 unauthenticated `audit_events` write | Medium | Fixed, kerbside#412 (`e2a493ea6`); released in v0.6.0 |
 | F1 signing key in every daemon's environ | Medium | Fixed, this PR |
 | F9 `host_subject` fails open silently | Medium | SF half fixed, this PR; kerbside half shakenfist#4097 |
 | SF-2 `.vv` type collapse uncovered | Advisory | Fixed, this PR (mutation-verified) |
@@ -832,24 +845,29 @@ majority.
 | client-python `tox -e cover` misconfiguration | Advisory | Pre-existing since 2020, out of scope, recorded |
 | kerbside logs source password at INFO | Advisory | Out of range, recorded above |
 
-**The blocking finding is fixed.** kerbside#412 merged as `e2a493ea6`
-on 2026-09-06, carrying both F-B1 and F5. The fix is on kerbside's
-`develop` branch and is not yet in a tagged release -- v0.5.0 and
-earlier are affected -- so Shaken Fist's own operator guide and release
-notes tell operators to provision the signing key before rolling
-daemons on a cluster Kerbside already scrapes. That was added after
-review pointed out that a Shaken Fist operator reads
+**The blocking finding is fixed, and it took two pull requests.**
+kerbside#412 merged as `e2a493ea6` on 2026-09-06, carrying F5 and the
+trigger half of F-B1. Checking what it actually changed showed it had
+not touched `main.py` at all, so the destructive cleanup was still
+reachable by every other early-exit path; kerbside#413 merged as
+`29323fb85` on 2026-09-07 and fixed that. Both are in **Kerbside
+v0.6.0**, released 2026-09-07 -- the first tagged release carrying
+either, so v0.5.0 and earlier are affected. Shaken Fist's own operator
+guide and release notes tell operators to provision the signing key
+before rolling daemons on a cluster Kerbside already scrapes, and now
+name the release which removes the hazard. That was added after review
+pointed out that a Shaken Fist operator reads
 `docs/operator_guide/vdi_console_tokens.md`, not kerbside's issue
 tracker.
 
-**One high-severity finding remains open**, so this phase stays In
-progress. Decision 7 says a fix lands in the repository that owns it,
+**No blocking or high-severity finding remains open, so this phase is
+Complete.** Decision 7 says a fix lands in the repository that owns it,
 and the Definition of done requires each disposition to name a merged
 fix, an issue, or a written declination -- a branch satisfies none of
-those, and neither does an open pull request. F8 is ryll#358; when it
-merges, this table records its merge reference and phase 10 becomes
-Complete. Recorded after review pointed out that the status was ahead
-of the evidence, which it was.
+those, and neither does an open pull request. F8 was ryll#358, which
+merged as `aac25cf3c` on 2026-09-07 and is recorded in the table above.
+The status was previously held at In progress after review pointed out
+it was ahead of the evidence, which it was.
 
 ### Spot-checks
 

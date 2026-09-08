@@ -154,11 +154,17 @@ prints private material and does nothing if a key already exists.
     rebuilt from Shaken Fist, so the loss is an outage rather than
     permanent damage.
 
-    The Kerbside-side fix downgrades a missing key to "this source has no
-    token consoles yet" rather than failing the source. It merged as
-    [kerbside#412](https://github.com/shakenfist/kerbside/pull/412) and is
-    on Kerbside's `develop` branch; it is not in a tagged release yet, so
-    provision the key first whatever Kerbside version you run.
+    **Kerbside v0.6.0 fixes this**, in two parts. A missing key is
+    downgraded to "this source has no token consoles yet" rather than
+    failing the source
+    ([kerbside#412](https://github.com/shakenfist/kerbside/pull/412)), and
+    the cleanup pass no longer removes consoles belonging to a source it
+    did not successfully enumerate
+    ([kerbside#413](https://github.com/shakenfist/kerbside/pull/413)). The
+    second half matters on its own: before it, *any* early exit from a
+    scrape — an unreachable cluster, an error fetching the cluster CA —
+    deleted that source's consoles, whether or not tokens were involved.
+    On v0.5.0 and earlier, provision the key before you upgrade.
 
 ## Publishing the public keys
 
