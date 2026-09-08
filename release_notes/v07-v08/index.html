@@ -14398,7 +14398,10 @@
   Kerbside v0.5.0 and earlier abandon a scrape whose signing-key fetch
   fails, and the cleanup pass which follows then deletes every console
   recorded for the cluster — including the direct and proxy routes, which
-  have nothing to do with console tokens. See the
+  have nothing to do with console tokens. Kerbside v0.6.0 fixes both
+  halves of that — the fetch failure no longer errors the source, and the
+  cleanup no longer touches a source it did not enumerate — so it is the
+  release to upgrade to. See the
   <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
 <li>There are now API calls for managing trusted issuers
   (<code>GET</code>/<code>POST /auth/issuers</code>, <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/issuers/...issuerref...</code>).

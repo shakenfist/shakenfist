@@ -14392,7 +14392,7 @@ Recommendations are recorded inline.</p>
 <td>10. Push audit</td>
 <td>all</td>
 <td><a href="../PLAN-kerbside-vdi-tokens-phase-10-push-audit/">PLAN-kerbside-vdi-tokens-phase-10-push-audit.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>11. Close out the post-completion defects (#4003, #4009)</td>
@@ -14696,11 +14696,15 @@ defect from the one configuration no phase ever tested (after</p>
 <p>high-severity finding in ryll's SPICE TLS verifier, which
 trusted the public WebPKI root set even when a <code>.vv</code> supplied
 a private cluster CA -- the mechanism this plan's whole
-<code>host_subject</code> story depends on. The kerbside fix merged as
-<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> (<code>e2a493ea6</code>), though not yet into a tagged
-release, so Shaken Fist's own operator guide and release notes
-carry the provisioning order which avoids it. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/358" title="GitHub Issue: shakenfist/ryll #358">ryll#358</a> is still
-open, and this phase stays In progress until it merges.
+<code>host_subject</code> story depends on. The kerbside fix took two
+pull requests: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> (<code>e2a493ea6</code>) stopped the key
+fetch erroring the source but left the cleanup itself
+untouched, so every other early-exit path still deleted the
+inventory, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/413" title="GitHub Issue: shakenfist/kerbside #413">kerbside#413</a> (<code>29323fb85</code>) narrowed that
+cleanup to the sources a pass actually enumerated. Both ship
+in Kerbside v0.6.0; Shaken Fist's own operator guide and
+release notes carry the provisioning order which avoids the
+hazard on earlier releases. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/358" title="GitHub Issue: shakenfist/ryll #358">ryll#358</a> merged as <code>aac25cf3c</code>.
 Alongside those came three medium security findings and the audit's own discovery
 that the <code>.vv</code> type collapse, though covered by a unit test,
 had no functional coverage -- in a project that prefers
@@ -14708,7 +14712,9 @@ functional coverage where it can only have one.
 Fourteen advisory findings were filed as issues across the
 four repositories. Full detail, with what each heading
 examined and the management session's spot-checks and
-mutation tests, is in the phase plan's <em>Findings</em> section.</p>
+mutation tests, is in the phase plan's <em>Findings</em> section.
+No blocking or high-severity finding remains open, so this
+phase is Complete.</p>
 <h3 id="phase-11-close-out-the-post-completion-defects">Phase 11: Close out the post-completion defects<a class="headerlink" href="#phase-11-close-out-the-post-completion-defects" title="Permanent link">&para;</a></h3>
 <p>Phases 1-9 all closed, and the feature works on a cluster that
 runs Kerbside. But two defects found on 2026-09-01 against

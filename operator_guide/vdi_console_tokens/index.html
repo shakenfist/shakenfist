@@ -13893,11 +13893,17 @@ users lose consoles which have nothing to do with this feature.</p>
 it, provision the key and let Kerbside scrape again — the inventory is
 rebuilt from Shaken Fist, so the loss is an outage rather than
 permanent damage.</p>
-<p>The Kerbside-side fix downgrades a missing key to "this source has no
-token consoles yet" rather than failing the source. It merged as
-<a href="https://github.com/shakenfist/kerbside/pull/412">kerbside#412</a> and is
-on Kerbside's <code>develop</code> branch; it is not in a tagged release yet, so
-provision the key first whatever Kerbside version you run.</p>
+<p><strong>Kerbside v0.6.0 fixes this</strong>, in two parts. A missing key is
+downgraded to "this source has no token consoles yet" rather than
+failing the source
+(<a href="https://github.com/shakenfist/kerbside/pull/412">kerbside#412</a>), and
+the cleanup pass no longer removes consoles belonging to a source it
+did not successfully enumerate
+(<a href="https://github.com/shakenfist/kerbside/pull/413">kerbside#413</a>). The
+second half matters on its own: before it, <em>any</em> early exit from a
+scrape — an unreachable cluster, an error fetching the cluster CA —
+deleted that source's consoles, whether or not tokens were involved.
+On v0.5.0 and earlier, provision the key before you upgrade.</p>
 </div>
 <h2 id="publishing-the-public-keys">Publishing the public keys<a class="headerlink" href="#publishing-the-public-keys" title="Permanent link">&para;</a></h2>
 <p>Kerbside verifies tokens with the <strong>public</strong> half of the signing key, which

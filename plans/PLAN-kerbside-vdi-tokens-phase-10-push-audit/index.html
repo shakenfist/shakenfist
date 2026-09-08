@@ -14472,6 +14472,18 @@ errors the source, a 404 or <code>AttributeError</code> logs at info as a normal
 state, and genuine faults still warn. Verified by the management
 session rather than taken on report -- reinstating <code>self.errored = True;
 return</code> fails exactly six tests and nothing else; restored, 279 pass.</p>
+<p>That fix removed the trigger, not the defect. The cleanup machinery was
+untouched -- <code>git diff e2a493ea6^1 e2a493ea6 -- kerbside/main.py</code> is
+empty -- so every <em>other</em> path which gives up on a source early still
+deleted that source's whole inventory: an unknown source type, an
+exception raised part way through the generator, or
+<code>get_cluster_cacert()</code> at <code>sources/shakenfist.py:69</code>, which sits outside
+any <code>try</code> and so turns a network blip into data loss. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/413" title="GitHub Issue: shakenfist/kerbside #413">kerbside#413</a> fixed
+that, replacing "delete everything the scrape did not touch" with an
+explicit set of sources enumerated to exhaustion this pass; anything
+else retains its consoles and logs one line per source saying why. It
+also removed a latent <code>KeyError</code> for a source dropped from
+<code>sources.yaml</code>. Six new tests cover the early-exit paths individually.</p>
 <h3 id="2a-code-quality-10d">2a, code quality (10d)<a class="headerlink" href="#2a-code-quality-10d" title="Permanent link">&para;</a></h3>
 <p>Examined R1, R4-R10 across three repositories: <code>mariadb.py</code>'s v4
 migration and the whole <code>node_attributes</code> field path,
@@ -14747,17 +14759,17 @@ majority.</p>
 <tr>
 <td>F-B1 console deletion on key-fetch failure</td>
 <td>Blocking</td>
-<td>Fixed, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> (merged <code>e2a493ea6</code>)</td>
+<td>Fixed, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> (<code>e2a493ea6</code>) and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/413" title="GitHub Issue: shakenfist/kerbside #413">kerbside#413</a> (<code>29323fb85</code>); released in v0.6.0</td>
 </tr>
 <tr>
 <td>F8 ryll SPICE TLS trust anchors</td>
 <td>High</td>
-<td>Fix open as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/358" title="GitHub Issue: shakenfist/ryll #358">ryll#358</a></td>
+<td>Fixed, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/358" title="GitHub Issue: shakenfist/ryll #358">ryll#358</a> (merged <code>aac25cf3c</code>)</td>
 </tr>
 <tr>
 <td>F5 unauthenticated <code>audit_events</code> write</td>
 <td>Medium</td>
-<td>Fixed, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> (merged <code>e2a493ea6</code>)</td>
+<td>Fixed, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> (<code>e2a493ea6</code>); released in v0.6.0</td>
 </tr>
 <tr>
 <td>F1 signing key in every daemon's environ</td>
@@ -14851,23 +14863,28 @@ majority.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>The blocking finding is fixed.</strong> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> merged as <code>e2a493ea6</code>
-on 2026-09-06, carrying both F-B1 and F5. The fix is on kerbside's
-<code>develop</code> branch and is not yet in a tagged release -- v0.5.0 and
-earlier are affected -- so Shaken Fist's own operator guide and release
-notes tell operators to provision the signing key before rolling
-daemons on a cluster Kerbside already scrapes. That was added after
-review pointed out that a Shaken Fist operator reads
+<p><strong>The blocking finding is fixed, and it took two pull requests.</strong>
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a> merged as <code>e2a493ea6</code> on 2026-09-06, carrying F5 and the
+trigger half of F-B1. Checking what it actually changed showed it had
+not touched <code>main.py</code> at all, so the destructive cleanup was still
+reachable by every other early-exit path; <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/413" title="GitHub Issue: shakenfist/kerbside #413">kerbside#413</a> merged as
+<code>29323fb85</code> on 2026-09-07 and fixed that. Both are in <strong>Kerbside
+v0.6.0</strong>, released 2026-09-07 -- the first tagged release carrying
+either, so v0.5.0 and earlier are affected. Shaken Fist's own operator
+guide and release notes tell operators to provision the signing key
+before rolling daemons on a cluster Kerbside already scrapes, and now
+name the release which removes the hazard. That was added after review
+pointed out that a Shaken Fist operator reads
 <code>docs/operator_guide/vdi_console_tokens.md</code>, not kerbside's issue
 tracker.</p>
-<p><strong>One high-severity finding remains open</strong>, so this phase stays In
-progress. Decision 7 says a fix lands in the repository that owns it,
+<p><strong>No blocking or high-severity finding remains open, so this phase is
+Complete.</strong> Decision 7 says a fix lands in the repository that owns it,
 and the Definition of done requires each disposition to name a merged
 fix, an issue, or a written declination -- a branch satisfies none of
-those, and neither does an open pull request. F8 is <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/358" title="GitHub Issue: shakenfist/ryll #358">ryll#358</a>; when it
-merges, this table records its merge reference and phase 10 becomes
-Complete. Recorded after review pointed out that the status was ahead
-of the evidence, which it was.</p>
+those, and neither does an open pull request. F8 was <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/358" title="GitHub Issue: shakenfist/ryll #358">ryll#358</a>, which
+merged as <code>aac25cf3c</code> on 2026-09-07 and is recorded in the table above.
+The status was previously held at In progress after review pointed out
+it was ahead of the evidence, which it was.</p>
 <h3 id="spot-checks">Spot-checks<a class="headerlink" href="#spot-checks" title="Permanent link">&para;</a></h3>
 <p>Per decision 8 and the risk register, the management session verified
 findings against the tree rather than accepting the reports. Confirmed:
