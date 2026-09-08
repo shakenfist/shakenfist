@@ -166,6 +166,19 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
             resp.get_json()['error'])
         new.assert_not_called()
 
+    def test_the_ceiling_is_enforced_by_the_handler_in_warn_mode(self):
+        # The rollback path: with validation warning rather than
+        # enforcing, the handler's own guard is what refuses this, and
+        # it names the configuration option an operator has to change.
+        self.set_validation_mode('warn')
+
+        resp, new = self._execute(
+            deadline_seconds=config.AGENT_OPERATION_MAX_DEADLINE + 1)
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn(
+            'AGENT_OPERATION_MAX_DEADLINE', resp.get_json()['error'])
+        new.assert_not_called()
+
     def test_an_unparsable_deadline_is_a_400_not_a_500(self):
         for value in ('soon', ['60'], {'seconds': 60}, True):
             with self.subTest(value=value):

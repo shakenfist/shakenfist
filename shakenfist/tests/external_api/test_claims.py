@@ -163,6 +163,30 @@ class ClaimCreateTestCase(ClaimEndpointTestCase):
                 'expires_in_seconds: Must be greater than or equal to 1',
                 resp.get_json()['error'])
 
+    def test_the_handlers_own_guards_answer_in_warn_mode(self):
+        """The rollback path for the three refusals above.
+
+        Enforcement answers ahead of these guards, so in the default
+        configuration their messages are unreachable and nothing else
+        in the tree asserts them (the 'cannot be negative' hits in
+        test_mariadb_capacity_claims.py are the database layer's own
+        guard, not this one). An operator who sets 'warn' gets these
+        answers back, so they are pinned at that mode.
+        """
+        self.set_validation_mode('warn')
+
+        resp = self._create(limit_cpus=-1)
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('cannot be negative', resp.get_json()['error'])
+
+        resp = self._create(limit_cpus=True)
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('not an integer', resp.get_json()['error'])
+
+        resp = self._create(expires_in_seconds=0)
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('must be positive', resp.get_json()['error'])
+
     def test_an_unknown_namespace_is_not_found(self):
         resp = self._create(namespace='nosuchnamespace')
         self.assertEqual(404, resp.status_code)

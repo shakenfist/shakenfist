@@ -78,6 +78,22 @@ class AuthTestCase(base.ShakenFistTestCase):
             '/auth', data=json.dumps({'namespace': 'banana', 'keyyy': 'pwd'}))
         self.assertEqual(400, resp.status_code)
 
+    def test_post_auth_key_non_string_in_warn_mode(self):
+        # The handler's guard is what answers on the rollback path, so
+        # it is asserted at the mode where it is reachable rather than
+        # only described in a comment.
+        self.set_validation_mode('warn')
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'banana', 'key': 1234}))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'key is not a string',
+                'status': 400
+            },
+            resp.get_json())
+
     def test_post_auth_key_non_string(self):
         # Phase 4 of PLAN-api-input-validation: the declared type is
         # what refuses this now, so the wording is the validator's
@@ -576,6 +592,17 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         self.assertEqual(400, resp.status_code)
         self.assertEqual('expiry: Not a valid number.',
                          resp.get_json()['error'])
+
+    def test_add_key_rejects_a_non_numeric_expiry_in_warn_mode(self):
+        # The handler's own guard, which is what answers once an
+        # operator rolls back. Enforcement hides it, so without this
+        # test nothing exercises the rollback path at all.
+        self.set_validation_mode('warn')
+
+        resp = self._add_key('bogus', 'sekrit', expiry='tomorrow')
+
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('expiry is not a number', resp.get_json()['error'])
 
     def test_add_key_rejects_a_boolean_expiry(self):
         # bool is a subclass of int, so "expiry": true would otherwise

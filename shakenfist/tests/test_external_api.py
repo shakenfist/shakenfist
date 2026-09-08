@@ -590,6 +590,58 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
+    def test_post_instance_invalid_disk_in_warn_mode(self):
+        # The handler's own guard, which is what answers on the
+        # rollback path. Enforcement hides it in the default
+        # configuration, and a guard nothing exercises is a guard that
+        # rots between here and the next operator who sets 'warn'.
+        self.set_validation_mode('warn')
+
+        resp = self.client.post('/instances',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'name': 'test-instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': [],
+                                    'disk': ['8@cirros'],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                }))
+        self.assertEqual(
+            {'error': 'disk specification should contain JSON objects',
+             'status': 400},
+            resp.get_json())
+        self.assertEqual(400, resp.status_code)
+
+    @mock.patch('shakenfist.artifact.Artifact.from_url')
+    def test_post_instance_invalid_network_in_warn_mode(
+            self, mock_get_artifact):
+        # As above, for the network specification's guard.
+        self.set_validation_mode('warn')
+
+        resp = self.client.post('/instances',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'name': 'test-instance',
+                                    'cpus': 1,
+                                    'memory': 1024,
+                                    'network': ['87c15186-5f73-4947-a9fb-2183c4951efc'],
+                                    'disk': [{'size': 8,
+                                              'base': 'cirros'}],
+                                    'ssh_key': None,
+                                    'user_data': None,
+                                    'placed_on': None,
+                                    'namespace': None,
+                                }))
+        self.assertEqual(
+            {'error': 'network specification should contain JSON objects',
+             'status': 400},
+            resp.get_json())
+        self.assertEqual(400, resp.status_code)
+
     @mock.patch('shakenfist.artifact.Artifact.from_url')
     def test_post_instance_invalid_network(self, mock_get_artifact):
         resp = self.client.post('/instances',
