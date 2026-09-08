@@ -5,6 +5,7 @@
 from collections import defaultdict
 import datetime
 import os
+import random
 import time
 
 from prometheus_client import start_http_server
@@ -61,6 +62,21 @@ SCHEDULED_TASK_LAST_RUN_PREFIX = 'SCHEDULED_TASK_LAST_RUN_'
 # constant rather than restating the number.
 ELECTED_LOOP_POLL_SECONDS = 5
 
+# The candidate election poll: how long an unelected cluster daemon waits
+# between attempts to acquire the cluster maintenance lock. The wait is
+# drawn uniformly from this range rather than being a fixed five seconds
+# because a fixed cadence made the election unfair: candidates whose
+# daemons start together (the deployer restarts sf-cluster on every node
+# in one parallel task) keep an almost stable relative poll order for
+# minutes, so a freed lock always went to whichever candidate's standing
+# phase came next -- the same one or two nodes every time, never a fair
+# draw (issue 3663). The jitter re-randomises the order on every cycle.
+# The mean of the range must stay at five seconds: the
+# AcquireLock/cluster entry in shakenfist/data/database_load_budget.yaml
+# is arithmetic over one attempt per candidate per five seconds.
+ELECTION_POLL_MINIMUM_SECONDS = 2.5
+ELECTION_POLL_MAXIMUM_SECONDS = 7.5
+
 
 class Monitor(daemon.Daemon):
     # Set by _run_inner() when the maintenance schedule is registered.
@@ -98,15 +114,26 @@ class Monitor(daemon.Daemon):
         self.lock = None
 
         while daemon.check_abort_path(self.abort_path):
-            self.lock = locks.ClusterLock(
-                'cluster', None, None, timeout=10, op='Cluster maintenance')
-            result = self.lock.acquire()
-            if result:
-                self.is_elected = True
+            # Idle before the first attempt as well as between attempts.
+            # A daemon entering the election -- freshly restarted, or the
+            # just-unseated holder re-entering after a lease loss -- must
+            # not race ahead of the established candidates, which are on
+            # average half a poll interval away from their next attempt.
+            # Without this a restarted holder's immediate first acquire
+            # won the lock straight back often enough that restarting it
+            # was nearly a no-op as a way of moving the role (issue
+            # 3663).
+            self.idle(random.uniform(
+                ELECTION_POLL_MINIMUM_SECONDS, ELECTION_POLL_MAXIMUM_SECONDS))
+            self.check_daemon_state()
+            if not daemon.check_abort_path(self.abort_path):
                 return
 
-            self.idle(5)
-            self.check_daemon_state()
+            self.lock = locks.ClusterLock(
+                'cluster', None, None, timeout=10, op='Cluster maintenance')
+            if self.lock.acquire():
+                self.is_elected = True
+                return
 
     def _cluster_wide_cleanup(self, last_loop_run):
         # Bail out before doing anything destructive if our lease has

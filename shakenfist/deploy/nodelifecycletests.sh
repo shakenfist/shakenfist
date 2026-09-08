@@ -295,12 +295,21 @@ while [[ "${maintainer}" == "${script_host}" || "${maintainer}" == "${network_no
         exit 1
     fi
     log "Maintainer ${maintainer} is the script host or network node; forcing re-election"
-    if [ "${maintainer}" == "${script_host}" ]; then
-        sudo systemctl restart sf-cluster
-    else
-        sudo ssh -o StrictHostKeyChecking=no debian@${maintainer} \
-            "sudo systemctl restart sf-cluster"
-    fi
+    # Restart sf-cluster on BOTH ineligible nodes, not just the current
+    # holder. A restarted daemon re-enters the election a couple of
+    # seconds behind the standing candidates, so taking both ineligible
+    # nodes out of the race at once means the freed lock almost always
+    # lands on an eligible node -- restarting only the holder re-raced
+    # the same draw with the other ineligible node still holding its
+    # standing attempt cadence (issue 3663).
+    for ineligible in $(echo -e "${script_host}\n${network_node}" | sort -u); do
+        if [ "${ineligible}" == "${script_host}" ]; then
+            sudo systemctl restart sf-cluster
+        else
+            sudo ssh -o StrictHostKeyChecking=no debian@${ineligible} \
+                "sudo systemctl restart sf-cluster"
+        fi
+    done
     log "Pausing for cluster lock to expire and be re-acquired..."
     sleep 90
     maintainer=$(sf-client --json node list | jq --raw-output '.[] | select(.is_cluster_maintainer) | .name')
