@@ -323,20 +323,31 @@ wrapper by an explicit marker.
 ### 3. Why is allocation less reliable in the first minutes, and can the window be shortened?
 
 **Because the one-shot fires before there is anything to
-reconcile; yes, to seconds.** `_force_capacity_reconcile_if_unguarded()`
+reconcile; yes, from 135-210 s to roughly a
+minute.** `_force_capacity_reconcile_if_unguarded()`
 runs once, on the election path, and tests `if rows:`. On a fresh
 cluster the cluster daemon wins its election within 2.5-7.5 s of
 starting, before `sf-resources` on any hypervisor has published --
 the pass finds nothing, and nothing re-checks. Phase 1 makes the
-check a property of the elected loop rather than of election: on
-each iteration, compare the set of active hypervisors that have
-published metrics against the set with a capacity row, and make the
-reconcile due when they differ. That also closes the narrower hole
+check a property of the elected loop rather than of election:
+compare the set of active hypervisors that have published metrics
+against the set with a capacity row, and make the reconcile due
+when they differ. That also closes the narrower hole
 #4106 left -- a node that publishes late, or whose row the
 reconciler removed on stale metrics, admits unguarded for up to
-five minutes today. The stability gate stays in front of the pass,
-because a pass with no fresh metrics deletes rows rather than
-creating them (issue #4087, correction 2).
+five minutes today.
+
+Note what bounds the improvement, because an earlier draft of this
+section claimed seconds. The elected loop polls every
+`ELECTED_LOOP_POLL_SECONDS = 5`
+(`shakenfist/daemons/cluster/main.py:63`) but its maintenance body
+sits behind `if now - last_loop_run >= 60` (`:912`), and
+`_run_due_scheduled_jobs()` is inside that gate (`:918`). Marking
+the job due does not run it any sooner than the next 60 s tick, so
+a check placed inside the gate closes the window to about a
+minute. Closing it faster means running the comparison outside the
+gate on the 5 s poll, which is a fixed-rate database read and is
+not free. Phase 1 decides between those two; see its plan.
 
 ### 4. Why does a node refuse for a minute after its instances are deleted?
 
@@ -511,15 +522,38 @@ scheduler-reservations' (D11, phase 5).
 ### Phase 1 -- Close the warm-up window
 
 Make `_force_capacity_reconcile_if_unguarded()` a check the
-elected loop repeats rather than a one-shot at election. On each
-iteration inside the stability gate, read the capacity rows and
-the node metrics; if any active hypervisor has published metrics
-and has no capacity row, make the reconcile due now. Keep the
+elected loop repeats rather than a one-shot at election
+(`shakenfist/daemons/cluster/main.py:741`, called once at `:879`).
+The check itself is the same comparison either way: if any active
+hypervisor has published metrics and has no capacity row, make the
+reconcile due now. Keep the
 distinction between a degraded read and an empty result that the
 existing code is careful about (`rows` is empty for both; only
-`degraded` says which), and keep the pass itself behind
-`cluster_stable()` -- issue #4087's second correction explains why
-a pass with no fresh metrics deletes rows.
+`degraded` says which).
+
+**The decision this phase owns is where the check runs**, and the
+master plan does not pre-empt it. Inside the elected loop's 60 s
+maintenance gate (`:912`) the check costs nothing new -- it rides
+a pass that already reads the database -- and closes the warm-up
+window to about a minute. Outside the gate, on the
+`ELECTED_LOOP_POLL_SECONDS = 5` poll, it closes the window to
+seconds but adds a fixed-rate ~0.2/s read that needs a
+`cluster_base_qps` entry in
+`shakenfist/data/database_load_budget.yaml`, or
+`test_no_unbudgeted_fixed_rate_database_polling` fails. The phase
+plan picks one and says why; both are defensible and the 60 s
+version is the smaller change.
+
+Be accurate about the stability gate rather than repeating the
+elected loop's shorthand comment. `cluster_stable()`
+(`shakenfist/daemons/daemon.py:377`) compares object versions
+across nodes and reads no metric freshness at all; it catches a
+just-restarted cluster only incidentally, because no node has
+recorded a version yet and `minimum` is `inf`. The pass still
+belongs behind it -- issue #4087's second correction explains why
+a pass with no fresh metrics deletes rows -- but the protection is
+a side effect of the version check, not a freshness check, and the
+phase plan should not assume otherwise.
 
 Prove it two ways. A unit test in `shakenfist/tests/` drives the
 elected loop with a fake capacity table and a fake node roster and
@@ -528,15 +562,23 @@ first appears without a row, and not on later iterations where
 every hypervisor has one. A functional assertion in the CI
 harness reads the headroom probe's own series and requires that
 `cpu_committed_row_present` is true for every hypervisor before
-the first `instance placed` event of the run -- the baseline
-dataset already carries both fields, so the assertion's premise
-can be checked against it before it is written. Phase 1 also
-comments on #4087 with the finding and reopens it if that is the
-convention the tracker follows for an incomplete fix.
+the first `instance placed` event of the run -- the field already
+exists end to end (published at `shakenfist/scheduler.py:1073`,
+harvested by `tools/ci_headroom_harvest.py`, reported by
+`tools/ci_headroom_report.py:319`) and the baseline dataset
+already carries it, so the assertion's premise can be checked
+against it before it is written. That assertion also retires a
+`skipTest`: `cluster_ci_tests/test_nodes.py:136` currently skips
+when a node has no capacity row, which is exactly the condition
+this phase makes impossible after start-up. Remove the skip in the
+same change rather than leaving unreachable code behind it. Phase
+1 also comments on #4087 with the finding and reopens it if that
+is the convention the tracker follows for an incomplete fix.
 
 Small, server-side, one file plus tests. Plan at high effort: the
-interaction with the stability gate and the degraded-read
-distinction are the kind of thing a light brief gets wrong.
+placement decision above, the interaction with the stability gate
+and the degraded-read distinction are the kind of thing a light
+brief gets wrong.
 
 ### Phase 2 -- The suite waits, and says so
 
