@@ -288,6 +288,13 @@ merge until:
   run is not evidence, and phase 3's log records three separate
   occasions where a quiet channel was mistaken for a quiet system.
 
+Read this condition as "any JSON-valued metadata write", not as
+k3s specifically: the declaration is per route, so any such write
+exercises the same schema, and the traffic named here turned out to be
+`client-python-k3s` run by hand rather than anything scheduled. The
+measurement log records the reading actually taken, and why waiting on
+that traffic would have been waiting on nothing in particular.
+
 Whatever watches this window is exercised by hand before it is
 trusted — phase 3's notifier failed silently for its last three runs
 because cron's `PATH` could not find `sops`. If a notifier is used at
@@ -619,5 +626,129 @@ gathered and shown before the switch, not after.
 
 ## Measurement log
 
-*(D22's confirmatory reading goes here, in the format phase 3's log
-established: the reading command, what ran, and the signature table.)*
+**2026-09-08 -- D22's confirmatory reading. Both conditions met; the
+switch may be thrown.** Steps 1 to 3 merged as [#4101][pr] on
+2026-09-07 (three review rounds; #3739 closed by the merge). sfcbr
+redeployed between 07:48 and 08:48 UTC the same day at
+`shakenfist=f5cf6a3fa`, which carries the phase's head `5168935b8`.
+
+The deploy was confirmed *live* rather than merely installed, because
+a mirror sha only says what was written to disk: the running server
+reports `0.8.0rc5.dev1236+gf5cf6a3fa.d20260907`, and its published
+specification carries both fixes -- fourteen metadata `value`
+parameters rendered as `format: any JSON value` with no `type`
+(including `PUT /auth/namespaces/{namespace}/metadata/{key}`), and
+`POST /networks/{network_ref}/dns` still `string`/ipv4 as D15
+requires. Body `namespace` declarations went 14 to 65 across the
+package, the +51 matching the 51 problems the audit reported when run
+against unmodified `develop`.
+
+### Reading 1 -- the functional CI run. Nine to zero.
+
+[Run 34074436494][run] (the `merge_group` run of #4101 itself, so the
+first full suite over the merged code; all jobs green). Graded from
+the per-node journals in the six bundles, since the central Loki dump
+in each bundle is still zero bytes -- actions repo issue #16 is not
+fixed and the phase 3 note about it still applies.
+
+| n | signature | 2026-08-13 | classification |
+|---|-----------|-----------|----------------|
+| 21 | missing-required, `POST /auth/federated`, 400 | 21 | Intended rejection: the federation suite's deliberately malformed bodies. Unchanged. |
+| 0 | **unknown-parameter `namespace`, artifact ref, 200/404** | **9** | **Fixed.** The #3739 population, gone. |
+| 6 | type-mismatch `length`, consoledata, 400 | 6 | Intended rejection. Unchanged. |
+| 6 | type-mismatch `key_ttl`, rules create, 400 | 6 | Intended rejection. Unchanged. |
+| **33** | **total** | **42** | Only the nine moved. |
+
+Both of phase 3's guards against a false negative were re-run, because
+a zero that is not proven to be capable of being non-zero is not a
+reading. The apparatus was live: `Compiled API parameter declarations`
+with `handlers: 139` appears in all six bundles. And the generator ran:
+`test_artifact_system_creds_namespace_scoped` and
+`test_same_name_different_namespace` -- the two cluster CI tests that
+drive a system-credentialed lookup with an explicit `namespace=` --
+both executed and passed at 02:11.
+
+### Reading 2 -- the metadata `value` type mismatch. Probed, not waited out.
+
+D22 asked for 72 hours of absence "during which the k3s orchestration
+traffic that produced it has actually run". That wording named the
+wrong thing, and the correction matters more than the wait:
+
+* The traffic is not a running k3s cluster. It is `client-python-k3s`
+  exercised by hand, storing its state in namespace metadata under
+  `orchestrated_k3s_*` keys. It appears on the days that library is
+  worked on (08-09, 08-17, 08-22 to 08-24, 08-28, 08-30, 09-04, 09-05)
+  and stops otherwise -- it last ran 2026-09-05 21:00 UTC, some 35
+  hours *before* the fix deployed. Waiting for it would have been
+  waiting on an unscheduled human activity.
+* Nothing about k3s is load-bearing. The declaration is per route, not
+  per key: `value` on that route compiles to `fields.Raw`, so **any**
+  JSON-valued metadata write exercises the identical schema. The
+  requirement should read "any JSON-valued metadata write", and does
+  from here.
+
+So the reading was taken by probe on 2026-09-08 at 07:05:50 UTC. A
+scratch namespace took a dict-valued and a list-valued metadata write
+-- the exact `_set_metadata` shape (`PUT .../metadata/<key>` with
+`{'value': ...}`) behind all 294 of the historical findings -- both
+stored and read back verbatim, and the namespace was deleted.
+
+The probe carried its own positive control, for the same reason the
+apparatus is hand-verified: an undeclared body key on `GET /instances`
+in the same second, which **must** still be reported. Reading, 35
+seconds later:
+
+    loki-query '{job="shakenfist"} |= "API request validation finding"' \
+        --tenant sfcbr --since 15m --limit 200
+
+| n | signature | meaning |
+|---|-----------|---------|
+| 1 | unknown-parameter `banana`, `GET /instances`, 400 | Control fired. The pipeline is alive and findings reach Loki. |
+| **0** | **type-mismatch `value`, metadata, 200** | **Fixed.** Two writes that would each have produced one. |
+
+A silent channel would have produced neither line. This is positive
+evidence rather than an absence, which is what 72 hours of quiet could
+not have given us.
+
+### What thirty days of sfcbr says about the flip's blast radius
+
+Widening the query to the whole warn window, and splitting on the
+status the request *actually* got, isolates what enforcement changes:
+
+| n | response | signature |
+|---|----------|-----------|
+| 294 | **200** | type-mismatch `value`, namespace metadata |
+| 40 | 400 | type-mismatch, namespace claims |
+| 12 | 400 | missing-required, `POST /auth` |
+| 8 | 400 | missing-required, namespace claims |
+| 2 | 400 | type-mismatch `limit`, instance events |
+| 1 | 400 | unknown-parameter `banana` (the 08-13 hand probe) |
+
+Every finding on a request that *succeeded* is the metadata one, and
+it is fixed. Everything else already answers 400 and answers 400 after
+the flip, so the enforceable surface on sfcbr is now empty.
+
+Two of those signatures postdate phase 3's reading and are classified
+here for the first time. Both are the `key_ttl` pattern -- the
+published bound and the server already agree, so validation only
+restates a refusal the handler was already making:
+
+* **Namespace claims, 48 findings on 2026-08-24 and 08-25.** The
+  scheduler-reservations phase 4 suite: `Must be greater than or equal
+  to 1`, `Must be greater than or equal to 0`, and `Not a valid
+  integer` against a bool. All 400 already.
+* **Instance events `limit`, 2 findings on 2026-08-25.** A string
+  where the declared bound wants 1..1000. Already 400.
+
+### The remaining caveat, stated rather than buried
+
+The control's own response is the phase's motivating defect, still
+visible: `GET /instances` with an undeclared key answered
+`{"error": "InstancesEndpoint.get() got an unexpected keyword argument
+'banana'", "status": 400}` -- interpreter text, leaked to the caller.
+Step 4 replaces exactly that with `banana: not declared by this
+endpoint`, and its tests assert the absence of interpreter text
+positively.
+
+[pr]: https://github.com/shakenfist/shakenfist/pull/4101
+[run]: https://github.com/shakenfist/shakenfist/actions/runs/34074436494
