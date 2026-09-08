@@ -948,7 +948,7 @@ those are corrected here as well.
 |-------|------|--------|
 | 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete |
 | 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete |
-| 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | In progress |
+| 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete |
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md | Not started |
 | 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started |
