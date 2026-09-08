@@ -534,6 +534,25 @@ Ruled out with the same evidence: the P5 forced ground-truth write
 appears in neither bundle), a lowered limit, `_reconcile_placement()`'s
 documented restart overcount, and a mid-run loss of the rows.
 
+**PR #4106 did not close the window in CI.** Six failing merge
+runs after it landed (34163288637, 34171977552, 34178278720,
+34119030297, 34125365386 on `slim-tier`, 34168326220 on
+`slim-primary`; journals read 2026-09-08) all show the one-shot
+`_force_capacity_reconcile_if_unguarded()` firing at election
+130-150 s *before* the test step and its forced pass logging
+`nodes=0 nodes_added=0`, because no hypervisor had published
+metrics yet. Rows then appeared on the five-minute cadence at
++155..+181 s -- the same 135-210 s prefix as before -- with 10-17
+`node_not_sized` placements per run and a first-pass `drift_cpus`
+of 2-8. The same reading found that every post-#4106
+`sufficient_idle_cpu` refusal was a `force_placement` create onto
+an infra hypervisor whose ledger of 3 was genuinely full while the
+cluster held 3-9 of 12 vCPU, which is direct evidence for the
+shape phase 4 must choose (see that phase). The window fix and the
+suite-side handling are owned by
+[A capacity refusal is transient](PLAN-transient-capacity-refusals.md),
+whose Situation section carries the per-run table.
+
 ### The under-cloud budget this spends
 
 **Not measured by this instrument.** These figures are read from
@@ -980,6 +999,22 @@ network node; `test_affinity` needs three nodes;
 hardcoded node lists in `functional-tests.yml`. Land one topology
 at a time so a regression is attributable.
 
+The number that binds is per node, not per cluster. The 2026-09-08
+journal reading recorded in *A node can record twice its own
+ledger* found every post-#4106 `sufficient_idle_cpu` refusal on
+`slim-tier` was a pinned create onto `primary` or `sf1`, whose
+4-thread reservation leaves `cpu_schedulable` 1 and a ledger of 3,
+while `sf2` and the cluster had room. The victim tests select
+those nodes deterministically ("first non-network hypervisor").
+So the shape this phase chooses has to raise the *infra
+hypervisors'* ledger, not only the total: of the candidate shapes
+above, "tier as 3 x 6 vCPU" is the smallest that does (6 / 6 /
+12), and any shape that leaves an infra hypervisor at a ledger of
+3 leaves the failure in place. The
+[transient-capacity-refusals](PLAN-transient-capacity-refusals.md)
+plan's phase 2 wait summary is the instrument that will say
+whether the chosen shape was enough.
+
 ### Phase 5 -- Guardrails
 
 Turn phase 1's summary into a check: warn outside the agreed
@@ -1329,7 +1364,12 @@ sure none of them is closed by accident:
   verdict is that a bare 507 is the wrong answer to a transient
   condition. Growing the clouds reduces how often it fires without
   addressing that; the issue must stay open and gain an explicit
-  test.
+  test. The transient-condition half is now
+  [its own plan](PLAN-transient-capacity-refusals.md); the
+  2026-09-08 reading that plan is built on found every post-#4106
+  refusal was a pinned create onto a ledger-3 infra hypervisor with
+  the cluster not full, which is why phase 4 above now names the
+  per-node ledger as the number to change.
 - **#3907** (closed 2026-08-26) -- the claims suite asserted
   cluster headroom it never reserved. Fixed by tolerating the
   transient refusal, which is the right fix for the test and is
@@ -1392,7 +1432,12 @@ sure none of them is closed by accident:
   the mechanism behind *A node can record twice its own ledger*
   above, it is not a breach of the guarded UPDATE, and **growing
   the cloud would mask it rather than fix it**, which is exactly
-  what phase 3 exists to prevent.
+  what phase 3 exists to prevent. Closed by PR #4106, but the fix
+  is a one-shot at election that fires before any hypervisor has
+  published, so in CI the window is unchanged (six post-fix runs
+  read on 2026-09-08, all with the prefix intact); reopening it
+  and repeating the check in the elected loop is
+  transient-capacity-refusals phase 1.
 
 ### Back brief
 
