@@ -343,3 +343,58 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([], list(length.validators))
         self.assertEqual(-1, length.deserialize(-1))
+
+
+class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
+    """A container's element errors must name the element, not a dict.
+
+    marshmallow answers validate() with a list of strings when a field
+    is wrong and a dict keyed by index when a container's *elements*
+    are wrong. Phase 4's enforce flip turned the finding detail from a
+    log line into the caller's error message, so rendering that dict
+    with str() would answer `disk: {0: ['Not a valid mapping type.']}`.
+    """
+
+    class _Schema(marshmallow.Schema):
+        disk = fields.List(fields.Dict())
+        tags = fields.List(fields.String())
+        name = fields.String()
+
+    def _findings(self, supplied):
+        schema = self._Schema(unknown=marshmallow.EXCLUDE)
+        return [(f.parameter, f.detail)
+                for f in validation._schema_findings(schema, supplied)]
+
+    def test_a_bad_element_names_its_index(self):
+        self.assertEqual(
+            [('disk[0]', 'Not a valid mapping type.')],
+            self._findings({'disk': ['not a dict']}))
+
+    def test_every_bad_element_is_reported_in_order(self):
+        self.assertEqual(
+            [('disk[0]', 'Not a valid mapping type.'),
+             ('disk[1]', 'Not a valid mapping type.')],
+            self._findings({'disk': ['one', 'two']}))
+
+    def test_a_scalar_field_is_unchanged(self):
+        # The flattening must not disturb the shape the rest of the
+        # phase's tests pin, which is the common case by far.
+        self.assertEqual(
+            [('name', 'Not a valid string.')], self._findings({'name': 5}))
+
+    def test_a_whole_container_of_the_wrong_type_is_unchanged(self):
+        # marshmallow answers a plain list here, not a dict, so this
+        # never went through the nested path at all.
+        self.assertEqual(
+            [('disk', 'Not a valid list.')],
+            self._findings({'disk': 'not a list'}))
+
+    def test_no_detail_renders_a_python_repr(self):
+        # The property the fix exists for, stated directly: whatever
+        # marshmallow nests, no finding may carry a dict or list repr
+        # into the caller's error message.
+        for supplied in ({'disk': ['x']}, {'tags': [{'a': 1}]},
+                         {'disk': ['x', 'y']}, {'name': 5}):
+            for parameter, detail in self._findings(supplied):
+                self.assertNotIn('{', detail, parameter)
+                self.assertNotIn('[', detail, parameter)

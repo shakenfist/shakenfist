@@ -377,6 +377,38 @@ class Finding:
         }
 
 
+def _flatten_messages(parameter: str, messages: Any) -> list[tuple[str, str]]:
+    """Flatten marshmallow's error structure into (name, detail) leaves.
+
+    validate() answers a list of strings when a field itself is wrong,
+    but a dict keyed by index or sub-field when a *container's elements*
+    are wrong -- `{0: ['Not a valid mapping type.']}` for a bad entry in
+    an arrayofdict. Rendering that with str() puts a Python dict repr in
+    the detail, which the enforce flip of phase 4 turned from a log line
+    into the caller's error message: `disk: {0: ['Not a valid mapping
+    type.']}`. Naming the offending element instead gives
+    `disk[0]: Not a valid mapping type.`
+
+    Integer keys index a sequence and render as `name[0]`; anything else
+    is a sub-field and renders as `name.key`. The recursion terminates
+    because marshmallow's leaves are always lists of strings, and the
+    non-list, non-dict branch keeps a malformed leaf from raising inside
+    the validator -- which _schema_findings' caller must never do.
+    """
+    if isinstance(messages, dict):
+        flattened = []
+        for key, nested in sorted(messages.items(), key=lambda kv: str(kv[0])):
+            if isinstance(key, int):
+                name = '%s[%d]' % (parameter, key)
+            else:
+                name = '%s.%s' % (parameter, key)
+            flattened.extend(_flatten_messages(name, nested))
+        return flattened
+    if isinstance(messages, list):
+        return [(parameter, '; '.join(str(m) for m in messages))]
+    return [(parameter, str(messages))]
+
+
 def _schema_findings(schema: Optional[marshmallow.Schema],
                      supplied: dict[str, Any]) -> list[Finding]:
     if schema is None:
@@ -398,11 +430,9 @@ def _schema_findings(schema: Optional[marshmallow.Schema],
             'Request validation raised internally; no findings reported')
         return []
     for parameter, messages in mismatches.items():
-        findings.append(Finding(
-            TYPE_MISMATCH, str(parameter),
-            '; '.join(messages) if isinstance(messages, list)
-            else str(messages),
-            known.get(parameter)))
+        for name, detail in _flatten_messages(str(parameter), messages):
+            findings.append(Finding(
+                TYPE_MISMATCH, name, detail, known.get(parameter)))
     return findings
 
 

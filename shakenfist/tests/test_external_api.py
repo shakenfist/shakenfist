@@ -586,7 +586,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         # refuses this ahead of the handler's own guard, which remains
         # and answers when API_VALIDATION_MODE is not 'enforce'.
         self.assertEqual(
-            {'error': "disk: {0: ['Not a valid mapping type.']}", 'status': 400},
+            {'error': 'disk[0]: Not a valid mapping type.', 'status': 400},
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
@@ -608,7 +608,7 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                 }))
         # As above: the declared arrayofdict answers first now.
         self.assertEqual(
-            {'error': "network: {0: ['Not a valid mapping type.']}", 'status': 400},
+            {'error': 'network[0]: Not a valid mapping type.', 'status': 400},
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
