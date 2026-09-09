@@ -13963,6 +13963,13 @@ in v0.8.</p>
   standard MTU of 1,500 bytes would result in fragmentation. I generally
   select 9,000 bytes.</li>
 <li>Has at least 1 gigabit connectivity on the "mesh interface".</li>
+<li>Has the iptables connection tracking match (<code>xt_conntrack</code>, what
+  <code>iptables -m conntrack</code> loads) available if it will be a network node. It
+  is present in any stock Ubuntu or Debian kernel, so this only bites a
+  custom or heavily stripped kernel. A network node without it cannot bring
+  up a NAT providing virtual network at all, rather than degrading -- see
+  the floating IP discussion in <a href="../networking/overview/">the networking overview</a>
+  for why the rule needs it.</li>
 </ul>
 <p>Your ansible control node needs <code>ansible-core &gt;= 2.15</code>.</p>
 <h2 id="deploying-against-your-own-infrastructure">Deploying against your own infrastructure<a class="headerlink" href="#deploying-against-your-own-infrastructure" title="Permanent link">&para;</a></h2>

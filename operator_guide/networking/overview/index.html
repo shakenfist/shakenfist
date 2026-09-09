@@ -14120,6 +14120,7 @@ implemented with routing and iptables like this:</p>
 <a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>Chain<span class="w"> </span>POSTROUTING<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
 <a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
 <a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>MASQUERADE<span class="w">  </span>all<span class="w">  </span>--<span class="w">  </span><span class="m">172</span>.16.0.0/24<span class="w">        </span>anywhere
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>MASQUERADE<span class="w">  </span>all<span class="w">  </span>--<span class="w">  </span><span class="m">172</span>.16.0.0/24<span class="w">        </span>anywhere<span class="w">             </span>ctstate<span class="w"> </span>DNAT
 </code></pre></div>
 <p>So, the default route is via the egress veth at <code>egr-e2300f-i</code> (inside the
 namespace), which comes out on <code>egr-br-eth0</code> (outside the namespace) to be routed
@@ -14129,9 +14130,11 @@ namespace) which comes out on the <code>br-vxlan-e2300f</code> (outside the name
 which is wired to the linux kernel VXLAN interface at <code>vxlan-e2300f</code>. Finally,
 traffic to other floating IPs on <code>192.168.15.0/24</code> is routed to the egress
 bridge as well.</p>
-<p>The iptables <code>MASQUERADE</code> entry is there to convert internal addresses to the
-external <code>192.168.15.194</code> "floating gateway" address so instances can talk outside
-their virtual network.</p>
+<p>The first iptables <code>MASQUERADE</code> entry is there to convert internal addresses to
+the external <code>192.168.15.194</code> "floating gateway" address so instances can talk
+outside their virtual network. The second one, which only matches connections
+whose destination has been rewritten, is for floating IP traffic which turns
+around here instead of leaving -- see the floating IP section below.</p>
 <p>Perhaps a diagram would help!</p>
 <p><img alt="SF single node networking with no instances" src="../sf-single-node-networking-no-instances.png" /></p>
 <h2 id="single-node-install-one-network-and-one-instance-with-no-floating-ip">Single node install, one network and one instance with no floating IP<a class="headerlink" href="#single-node-install-one-network-and-one-instance-with-no-floating-ip" title="Permanent link">&para;</a></h2>
@@ -14231,10 +14234,46 @@ the traffic to the instance:</p>
 <a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>Chain<span class="w"> </span>POSTROUTING<span class="w"> </span><span class="o">(</span>policy<span class="w"> </span>ACCEPT<span class="o">)</span>
 <a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>target<span class="w">     </span>prot<span class="w"> </span>opt<span class="w"> </span><span class="nb">source</span><span class="w">               </span>destination
 <a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>MASQUERADE<span class="w">  </span>all<span class="w">  </span>--<span class="w">  </span><span class="m">172</span>.16.0.0/24<span class="w">        </span>anywhere
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>MASQUERADE<span class="w">  </span>all<span class="w">  </span>--<span class="w">  </span><span class="m">172</span>.16.0.0/24<span class="w">        </span>anywhere<span class="w">             </span>ctstate<span class="w"> </span>DNAT
 </code></pre></div>
 <p>So our floating IP of <code>192.168.15.29</code> is DNAT'ed to the instance's IP of
-<code>172.16.0.37</code>. This means floating IP traffic "bounces" off the network namespace.
-To make that work, the inside of the veth is configured with the floating IP:</p>
+<code>172.16.0.37</code>. This means floating IP traffic "bounces" off the network namespace.</p>
+<p>The second <code>MASQUERADE</code> rule above handles the case where the client is
+itself an instance on the same virtual network. That traffic is DNAT'ed by
+the same rule and then sent straight back out the veth it arrived on, so the
+reply would travel directly over the virtual network's own layer 2 and never
+return through the namespace -- which means it would never have its source
+rewritten back to the floating address, and the client would discard it.
+Masquerading those u-turned connections to the network's gateway address puts
+the namespace back on the return path, where conntrack can undo the
+destination rewrite.</p>
+<p>The two matches on that rule each exclude something different, and both are
+needed. The <code>-s</code> match confines the rule to connections which started inside
+the virtual network, which is what preserves the real source address for
+clients outside the cluster -- their traffic is DNAT'ed here too, so without
+<code>-s</code> it would be masqueraded as well. The <code>--ctstate DNAT</code> match confines the
+rule to connections whose destination was rewritten, which is what excludes a
+routed IP turning around in the same namespace, since a routed IP is never
+DNAT'ed and its whole point is that it arrives unrewritten.</p>
+<p>The cost is that the instance holding the floating IP sees such a connection
+as coming from the network's gateway rather than from the calling instance;
+if the destination needs to know who is calling, use a routed IP, which is
+not rewritten at all.</p>
+<p>The network daemon's maintenance pass checks each cycle that this rule is
+present in the namespace, and rebuilds the network on the network node if it
+is not. That check is how a cluster which was upgraded while all of its
+networks were healthy acquires the rule at all -- nothing else re-runs the
+namespace's iptables setup for a network which is otherwise working.</p>
+<p><code>--ctstate DNAT</code> means a network node now needs the iptables conntrack match
+(<code>xt_conntrack</code>, which is present in any stock Ubuntu or Debian kernel and is
+what <code>iptables -m conntrack</code> loads). This is a hard requirement rather than a
+degradation: a node which cannot install the rule fails the whole
+<code>enable_nat</code> step, so a NAT-providing network will not come up there at all
+rather than coming up without in-network floating IPs. The error reported
+against the failed operation carries iptables' own complaint about the rule
+it refused.</p>
+<p>To make the DNAT bounce work, the inside of the veth is configured with
+the floating IP:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>debian@test:~$<span class="w"> </span>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3<span class="w"> </span>ip<span class="w"> </span>a
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>...
 <a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="m">18</span>:<span class="w"> </span>flt-c0a80f1d-i@if19:<span class="w"> </span>&lt;BROADCAST,MULTICAST&gt;<span class="w"> </span>mtu<span class="w"> </span><span class="m">1500</span><span class="w"> </span>qdisc<span class="w"> </span>noop<span class="w"> </span>state<span class="w"> </span>DOWN<span class="w"> </span>group<span class="w"> </span>default<span class="w"> </span>qlen<span class="w"> </span><span class="m">1000</span>
@@ -14277,11 +14316,47 @@ other hand, an interface with a routed address can tell that the traffic was
 intended for a specific floating IP, but in return must have been configured
 to use that floating IP.</p>
 </details>
-<p>The implementation of routed IPs is relatively trivial. For each routed IP, a
-route on the network node into the relevant virtual network bridge is created.
-Such a route might look like this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ip route add 192.168.15.29/32 dev br-vxlan-e2300f
+<p>The implementation of routed IPs is relatively trivial. For each routed IP,
+two routes are created on the network node, one in each of the two routing
+tables which decide where the address's traffic goes.</p>
+<p>The first is in the network node's own routing table, and is how traffic
+from outside the cluster arrives. It puts the address onto the virtual
+network's bridge, where whichever interface was configured to answer ARP for
+it picks it up:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ip route replace 192.168.15.29/32 dev br-vxlan-e2300f
 </code></pre></div>
+<p>The second is inside the virtual network's own network namespace, and is how
+an instance <em>on</em> that network reaches the address:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>ip netns exec 17be6538-8f96-4ccb-b71e-a7e3022fead3 \
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    ip route replace 192.168.15.29/32 dev veth-e2300f-i
+</code></pre></div>
+<p>That second route is needed because a routed IP comes from the floating pool,
+and as the routing table above shows, the namespace has the whole floating
+block on link on its egress veth. Without a more specific route an instance's
+packet reaches its default gateway and the namespace then ARPs for the address
+out on the egress bridge, where nothing answers -- unlike a floating IP, a
+routed IP is not configured on an interface anywhere on the network node, it
+exists only as a route. The <code>/32</code> turns that into a u-turn back into the
+network, which is the same delivery the network node performs for everybody
+else, and it means a routed address behaves identically whether the client is
+on the virtual network the address is routed to, or outside the cluster
+entirely (github issue #3662).</p>
+<p>A client on a <em>different</em> Shaken Fist virtual network is not covered by
+either route, and remains unsupported. That namespace also has the whole
+floating block on link on its egress veth, so it ARPs for the routed address
+on the egress bridge -- and unlike a floating IP, which the namespace owning
+it answers for from its egress veth, a routed IP is configured on no
+interface there and nothing replies. Reach a routed address from another
+virtual network the same way anything outside the cluster does, by way of the
+network node.</p>
+<p>Both routes use <code>ip route replace</code> rather than <code>ip route add</code> because they are
+re-applied: the network daemon's maintenance pass restores a network's routed
+addresses whenever it rebuilds the network on the network node, and also
+checks each maintenance pass that both routes are still there -- the one in
+the root namespace and the one inside the network's namespace. An address
+missing either is re-routed, which installs both, so a network which is
+otherwise healthy is not dragged through a rebuild to recover one route.
+Removing a routed IP deletes both routes, and tolerates either being absent.</p>
 <h2 id="interface-naming-conventions">Interface naming conventions<a class="headerlink" href="#interface-naming-conventions" title="Permanent link">&para;</a></h2>
 <p>The interface names in the examples above are a contract, not a
 coincidence: the privexec daemon derives them independently when adding
@@ -14413,7 +14488,7 @@ never-ending <code>Extra vxlan present!</code> warning was, in effect, the
 standing notification that this residue existed; now the single audit
 event is the only record, so if you see a <code>reaped stray vxlan</code> event on
 your network node, check for a leftover namespace:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span>list
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span>list
 </code></pre></div>
 <p>Namespaces are named with the virtual network's UUID, so any name which
 does not correspond to a network in <code>sf-client network list</code> is residue
@@ -14629,8 +14704,8 @@ It also checks whether each rung of the back-off ladder was actually
 honoured, and reports whether any part of the window it read hit
 Loki's 5000 line query ceiling, since a truncated window otherwise
 looks exactly like a complete one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>tools/operation-timeline.py --tenant sfcbr \
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    --start 2026-08-29T00:00:00Z --end 2026-08-30T00:00:00Z
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>tools/operation-timeline.py --tenant sfcbr \
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    --start 2026-08-29T00:00:00Z --end 2026-08-30T00:00:00Z
 </code></pre></div>
 
 
