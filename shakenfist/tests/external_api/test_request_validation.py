@@ -432,8 +432,10 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
     def test_a_non_object_body_is_still_a_400(self):
         """A JSON body which is not an object has always been a 400.
 
-        The per-key merge this phase replaced raised TypeError for one,
-        which handle_authorization_exceptions answers as 400.
+        The per-key merge phase 3 replaced raised TypeError for one,
+        which handle_authorization_exceptions used to answer as 400.
+        Phase 5 deleted that arm, so log_request returns the 400
+        itself and this test holds across both.
         dict.update would instead raise ValueError for most of these
         (a 500, since nothing catches ValueError) -- and would silently
         merge a list of two-character strings as key/value pairs, which

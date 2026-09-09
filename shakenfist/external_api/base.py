@@ -1368,14 +1368,16 @@ def log_request(func):
         if j:
             # Only a JSON object can merge into kwargs. Any other JSON
             # document -- a list, a string, a number -- has always been
-            # refused as a 400 (previously by the per-key merge raising
-            # TypeError on the lookup), and this guard keeps it that
-            # way: dict.update would raise ValueError for most of them,
-            # which nothing in the decorator chain catches, and would
-            # silently merge a list of two-character strings as key
-            # value pairs.
+            # refused as a 400 and still is, but it is refused here
+            # directly rather than by raising a TypeError and depending
+            # on a catch two decorators further out. That catch is gone
+            # as of phase 5 of PLAN-api-input-validation, and this guard
+            # had to stop leaning on it first: dict.update would
+            # raise ValueError for most of them, which nothing in the
+            # decorator chain catches, and would silently merge a list
+            # of two-character strings as key value pairs.
             if not isinstance(j, dict):
-                raise TypeError('the request body must be a JSON object')
+                return sf_api.error(400, 'the request body must be a JSON object')
 
             # A body key with the same name as a URL path parameter
             # overwrites it. Recorded here rather than in the validator
