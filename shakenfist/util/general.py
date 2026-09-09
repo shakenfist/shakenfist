@@ -86,12 +86,16 @@ def get_version() -> str:
 
 def get_user_agent() -> str:
     architecture = cpuinfo.get_cpu_info()
+    # py-cpuinfo probes through several mechanisms and returns whatever it managed to
+    # collect, so neither key below is guaranteed to be present. A partial probe used to
+    # raise a KeyError here, which propagated out of a request handler as an opaque 500
+    # to the API caller (issue 3523), so fall back to 'unknown' instead.
     return ('Mozilla/5.0 (%(distribution)s; %(vendor)s %(architecture)s) '
             'Shaken Fist/%(version)s'
             % {
                 'distribution': distro.name(pretty=True),
-                'architecture': architecture['arch_string_raw'],
-                'vendor': architecture['vendor_id_raw'],
+                'architecture': architecture.get('arch_string_raw', 'unknown'),
+                'vendor': architecture.get('vendor_id_raw', 'unknown'),
                 'version': get_version()
             })
 
