@@ -301,21 +301,27 @@ has the most open questions. Phase 0 will resolve at least:
 
 Provisional, to be re-cut after phase 0.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Research and decisions document | PLAN-network-carrier-model-phase-00-decisions.md | Not started |
-| 1. Carrier pool configuration and node-capability declaration | PLAN-network-carrier-model-phase-01-pool.md | Not started |
-| 2. Per-network carrier lease primitive | PLAN-network-carrier-model-phase-02-lease.md | Not started |
-| 3. Carrier renderer process | PLAN-network-carrier-model-phase-03-renderer.md | Not started |
-| 4. SNAT and floating-IP programming via the renderer | PLAN-network-carrier-model-phase-04-snat.md | Not started |
-| 5. DNAT'd service ports via the renderer (carrier-side hookup) | PLAN-network-carrier-model-phase-05-service-ports.md | Not started |
-| 6. DHCP state persisted and rebuilt on carrier change | PLAN-network-carrier-model-phase-06-dhcp.md | Not started |
-| 7. DNS state via the renderer | PLAN-network-carrier-model-phase-07-dns.md | Not started |
-| 8. BGP advertisement mode | PLAN-network-carrier-model-phase-08-bgp.md | Not started |
-| 9. L2 / GARP advertisement mode | PLAN-network-carrier-model-phase-09-l2.md | Not started |
-| 10. Migration from singleton network node | PLAN-network-carrier-model-phase-10-migration.md | Not started |
-| 11. Operator documentation for VIP failover and pool sizing | PLAN-network-carrier-model-phase-11-docs.md | Not started |
-| 12. Push audit | PLAN-network-carrier-model-phase-12-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Research and decisions document | PLAN-network-carrier-model-phase-00-decisions.md | Not started | — |
+| 1. Carrier pool configuration and node-capability declaration | PLAN-network-carrier-model-phase-01-pool.md | Not started | — |
+| 2. Per-network carrier lease primitive | PLAN-network-carrier-model-phase-02-lease.md | Not started | — |
+| 3. Carrier renderer process | PLAN-network-carrier-model-phase-03-renderer.md | Not started | — |
+| 4. SNAT and floating-IP programming via the renderer | PLAN-network-carrier-model-phase-04-snat.md | Not started | — |
+| 5. DNAT'd service ports via the renderer (carrier-side hookup) | PLAN-network-carrier-model-phase-05-service-ports.md | Not started | — |
+| 6. DHCP state persisted and rebuilt on carrier change | PLAN-network-carrier-model-phase-06-dhcp.md | Not started | — |
+| 7. DNS state via the renderer | PLAN-network-carrier-model-phase-07-dns.md | Not started | — |
+| 8. BGP advertisement mode | PLAN-network-carrier-model-phase-08-bgp.md | Not started | — |
+| 9. L2 / GARP advertisement mode | PLAN-network-carrier-model-phase-09-l2.md | Not started | — |
+| 10. Migration from singleton network node | PLAN-network-carrier-model-phase-10-migration.md | Not started | — |
+| 11. Operator documentation for VIP failover and pool sizing | PLAN-network-carrier-model-phase-11-docs.md | Not started | — |
+| 12. Push audit | PLAN-network-carrier-model-phase-12-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 **Phase 12 — push audit.** Runs `PUSH-AUDIT.md` over the
 accumulated diff of every phase in this plan against

@@ -1009,19 +1009,28 @@ finds that out only after it has read the codebase. Every
 row names the repository its work lands in, and work does
 not land anywhere else.
 
-| Phase | Repo | Plan | Status |
-|-------|------|------|--------|
-| 0. Research and decisions | shakenfist | TBD | Not started |
-| 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded |
-| 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded |
-| 3. OIDC discovery | shakenfist | TBD | Not started |
-| 4. Claim-driven namespace authorisation, including multi-namespace | shakenfist | TBD | Not started |
-| 5. Admin as a claim | shakenfist | TBD | Not started |
-| 6. Service-account framing of namespace keys | shakenfist, client-python | TBD | Not started |
-| 7. Interactive CLI flows and token cache | client-python | TBD | Not started |
-| 8. Worked operator examples for Keycloak and Authentik | shakenfist | TBD | Not started |
-| 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started |
-| 10. Push audit | shakenfist | PLAN-oidc-authentication-phase-10-push-audit.md | Not started |
+| Phase | Repo | Plan | Status | Merged |
+|-------|------|------|--------|--------|
+| 0. Research and decisions | shakenfist | TBD | Not started | — |
+| 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- the work landed under `PLAN-auth-federation.md` phase 3 |
+| 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- the work landed under `PLAN-auth-federation.md` phase 3 |
+| 3. OIDC discovery | shakenfist | TBD | Not started | — |
+| 4. Claim-driven namespace authorisation, including multi-namespace | shakenfist | TBD | Not started | — |
+| 5. Admin as a claim | shakenfist | TBD | Not started | — |
+| 6. Service-account framing of namespace keys | shakenfist, client-python | TBD | Not started | — |
+| 7. Interactive CLI flows and token cache | client-python | TBD | Not started | — |
+| 8. Worked operator examples for Keycloak and Authentik | shakenfist | TBD | Not started | — |
+| 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started | — |
+| 10. Push audit | shakenfist | PLAN-oidc-authentication-phase-10-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet. Phases 1 and 2 are the exception: they were
+superseded rather than abandoned, so the cell names the plan
+whose phases did the work and whose merges an audit of that
+code should read.
 
 **Phase 0 — research and decisions.** Settles open question
 13, direct-bearer versus exchange-based human sessions, and
