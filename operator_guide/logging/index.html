@@ -14343,18 +14343,33 @@ metrics endpoint:</p>
 </table>
 <h2 id="api-request-validation-findings">API request validation findings<a class="headerlink" href="#api-request-validation-findings" title="Permanent link">&para;</a></h2>
 <p>After upgrading you may see <code>API request validation finding</code> lines
-from <code>sf-api</code> in your log stream. These are <strong>informational</strong>: they
-record a request which did not match its endpoint's published
-parameter declarations, and while <code>API_VALIDATION_MODE</code> is <code>warn</code>
-(the default) they change no response — the request was answered
-exactly as it always was. Do not set <code>enforce</code> yet; it only makes
-sense once the warn log for your own callers has been read and
-understood. See
-<a href="../../plans/PLAN-api-input-validation/">PLAN-api-input-validation</a>. If
-the lines themselves become a problem — a chatty caller sending an
-undeclared key on every request is an extra line per request —
-<code>API_VALIDATION_MODE</code> can be set to <code>off</code>, which disables the layer
-entirely.</p>
+from <code>sf-api</code> in your log stream. Each records a request which did not
+match its endpoint's published parameter declarations.</p>
+<p><code>API_VALIDATION_MODE</code> decides what happens to such a request, and
+since v0.8.0 it defaults to <strong><code>enforce</code></strong>: a finding other than
+<code>missing-required</code> refuses the request with a 400 in the usual
+<code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": 400}</code> shape, and the
+finding line records the refusal. A refusal names the first finding
+only, so a request with several problems is fixed one round trip at a
+time — but every finding is logged, so the log has the whole picture
+even when the caller does not. A parameter declared required but not
+supplied is recorded and never enforced.</p>
+<p>The other two modes are the rollback, in order of severity:</p>
+<ul>
+<li><code>warn</code> restores the pre-v0.8.0 behaviour: findings are recorded and
+  change no response, so the request is answered exactly as it always
+  was. Set this if a caller of yours breaks against enforcement while
+  you fix it — the finding lines tell you which parameter to fix.</li>
+<li><code>off</code> disables the layer entirely, including the log lines. This is
+  the valve for the lines themselves becoming a problem: a chatty
+  caller sending an undeclared key on every request is an extra line
+  per request.</li>
+</ul>
+<p>The caller-visible consequences of enforcement — including requests
+which used to answer 404 or 403 and now answer 400 — are described in
+the <a href="../../release_notes/v07-v08/">v0.7 to v0.8 release notes</a>, and the
+design in
+<a href="../../plans/PLAN-api-input-validation/">PLAN-api-input-validation</a>.</p>
 <p>Each line carries:</p>
 <table>
 <thead>
@@ -14370,7 +14385,7 @@ entirely.</p>
 </tr>
 <tr>
 <td><code>validation-parameter</code></td>
-<td>The parameter concerned, truncated to 64 characters.</td>
+<td>The parameter concerned, truncated to 64 characters. When the wrong value is inside a container the offending element is named — <code>disk[0]</code> for the first entry of the disk array, <code>disk.size</code> for a sub-field.</td>
 </tr>
 <tr>
 <td><code>validation-detail</code></td>
@@ -14378,7 +14393,7 @@ entirely.</p>
 </tr>
 <tr>
 <td><code>validation-value-type</code></td>
-<td>The Python type of the offending value. The value itself is never logged.</td>
+<td>The Python type of the offending value — of the named element, where one was named. The value itself is never logged.</td>
 </tr>
 <tr>
 <td><code>route</code></td>
@@ -14386,7 +14401,7 @@ entirely.</p>
 </tr>
 <tr>
 <td><code>validation-response-status</code></td>
-<td>The status the request went on to return anyway, which is what separates a rejection enforcement would introduce from a status code it would merely change.</td>
+<td>The status the request returned. In <code>enforce</code> this is the 400 the finding itself produced; in <code>warn</code> it is what the request returned anyway, which is what separates a rejection enforcement would introduce from a status code it would merely change.</td>
 </tr>
 <tr>
 <td><code>validation-mode</code></td>
@@ -14394,8 +14409,25 @@ entirely.</p>
 </tr>
 </tbody>
 </table>
+<p>The number of findings one request can produce is bounded, because a
+request body is not: at most 20 <code>unknown-parameter</code> findings and 20
+<code>type-mismatch</code> findings, each followed by a single <code>(overflow)</code>
+finding carrying the count of the rest. A caller sending a thousand
+malformed disk specifications therefore costs a bounded number of log
+lines.</p>
 <p>The reason codes and the measurement they feed are described in
-<code>docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md</code>.</p>
+<code>docs/plans/PLAN-api-input-validation-phase-03-compile-and-warn.md</code>,
+and the reading which supported turning enforcement on in
+<code>docs/plans/PLAN-api-input-validation-phase-04-enforce.md</code>.</p>
+<p>A refused request never reaches its handler, so it does not produce
+the <code>token used to authenticate request</code> audit event a well formed
+request would. It writes a <code>request refused by input validation</code> audit
+event against the caller's namespace instead, carrying the same key
+name, method, path and remote address, plus the reason and parameter
+the refusal named. As in the log line, the parameter name is replaced
+with <code>*****</code> on the <code>/auth</code> routes: the name comes from the caller, so
+a buggy one can put secret-bearing material in a key position, and a
+namespace event is readable by anyone who can read the namespace.</p>
 <h2 id="secrets-in-the-log-stream">Secrets in the log stream<a class="headerlink" href="#secrets-in-the-log-stream" title="Permanent link">&para;</a></h2>
 <p>Shaken Fist treats a credential reaching the log stream as a bug.
 The configuration options which carry secrets are typed so that

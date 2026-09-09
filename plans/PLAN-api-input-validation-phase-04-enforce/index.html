@@ -13886,6 +13886,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#review-round-1-on-4141" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review round 1 on #4141
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#review-round-2-on-4101" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13953,6 +13964,56 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Measurement log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-1-the-functional-ci-run-nine-to-zero" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading 1 -- the functional CI run. Nine to zero.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-2-the-metadata-value-type-mismatch-probed-not-waited-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading 2 -- the metadata value type mismatch. Probed, not waited out.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-thirty-days-of-sfcbr-says-about-the-flips-blast-radius" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What thirty days of sfcbr says about the flip's blast radius
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-remaining-caveat-stated-rather-than-buried" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The remaining caveat, stated rather than buried
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -14251,6 +14312,12 @@ merge until:</p>
   run is not evidence, and phase 3's log records three separate
   occasions where a quiet channel was mistaken for a quiet system.</li>
 </ul>
+<p>Read this condition as "any JSON-valued metadata write", not as
+k3s specifically: the declaration is per route, so any such write
+exercises the same schema, and the traffic named here turned out to be
+<code>client-python-k3s</code> run by hand rather than anything scheduled. The
+measurement log records the reading actually taken, and why waiting on
+that traffic would have been waiting on nothing in particular.</p>
 <p>Whatever watches this window is exercised by hand before it is
 trusted — phase 3's notifier failed silently for its last three runs
 because cron's <code>PATH</code> could not find <code>sops</code>. If a notifier is used at
@@ -14402,6 +14469,96 @@ correct rather than dangerous.</p>
 <code>_delete_metadata</code> (<code>apiclient.py:514</code>) sends no body at all, so no
 shipped caller is affected. Two of the seven metadata delete handlers
 were cleaned up already, so the pattern is proven.</p>
+<h3 id="review-round-1-on-4141">Review round 1 on <a href="https://github.com/shakenfist/shakenfist/pull/4141">#4141</a><a class="headerlink" href="#review-round-1-on-4141" title="Permanent link">&para;</a></h3>
+<p>Eleven items: 2 <code>fix</code>, 3 <code>document</code>, 5 <code>consider</code>, 1 <code>none</code>. Both
+fixes and all three documentation items were taken, as were four of
+the five <code>consider</code> items. The round is against the flip itself
+rather than against machinery an earlier round added, which is the
+first review this branch has had.</p>
+<p><strong>Both <code>fix</code> items were in the element-naming commit</strong>, which is the
+one piece of the branch that was not a plan step -- it was written
+because enforcement turned a finding's detail into the caller's error
+message. Neither defect existed before that commit, and both are the
+same kind of mistake: the code walked marshmallow's error structure
+correctly and then handled the <em>result</em> of the walk carelessly.</p>
+<ul>
+<li><strong>The fan-out was unbounded.</strong> <code>check()</code> has capped
+  unknown-parameter findings since phase 3 because a body key is
+  bounded only by what a caller sends and each finding is a log line.
+  Naming elements individually gave type mismatches exactly that
+  property -- a thousand-element disk array became a thousand
+  findings, of which the caller saw one. <code>MAX_TYPE_MISMATCH_FINDINGS</code>
+  now bounds them in the same shape, with the same <code>(overflow)</code>
+  summary finding. The leaves are sliced before their values are
+  resolved, so the elements past the bound cost a tuple each.</li>
+<li><strong>Indices sorted lexically</strong>, so <code>disk[10]</code> was reported ahead of
+  <code>disk[2]</code>. Since a refusal names the first finding only, a caller
+  with two bad disks was told about the wrong one. <code>_sort_key</code> keeps
+  integers in numeric order ahead of sub-field names, and the ordering
+  test now uses twelve elements, because two cannot tell the two
+  orders apart -- which is why the test named "in order" did not catch
+  this.</li>
+</ul>
+<p><strong>The audit gap was taken as a fix rather than as documentation.</strong>
+The reviewer offered either. A refusal returns from outside every
+per-method decorator, so <code>log_token_use</code> never runs and an
+authenticated caller could send malformed requests indefinitely
+leaving nothing in the namespace's own audit trail -- only sf-api's
+log, which carries neither key name nor remote address. Preserving
+event coverage is a standing goal of this project, so enforcement now
+writes a <code>request refused by input validation</code> audit event carrying
+the same fields plus the reason and parameter. It is deliberately a
+different message from <code>token used to authenticate request</code>, because
+it is a different fact: this request reached no handler. Failures are
+swallowed -- an unavailable database must not upgrade a malformed
+request into a 503 -- but the swallow logs.</p>
+<p><strong>The rollback path is now asserted rather than promised.</strong> Six
+comments added by the flip said a handler's own guard "remains and
+still answers when API_VALIDATION_MODE is not enforce", while every
+test that covered those messages had been rewritten to assert the
+validator's wording. <code>set_validation_mode()</code> on the test base restores
+the mode on cleanup, and six warn-mode tests now assert those guards'
+own messages -- one of the six covers the three claim bounds, which
+are three guards in one handler. Mutating the helper into a no-op fails them, so they are
+about the mode rather than incidentally passing at it.</p>
+<p><strong>Writing the audit event turned up a leak of its own</strong>, which is the
+reason the reviewer's item 11 was worth recording even though it asked
+for no change. It observed that a refusal puts the parameter name --
+which <code>log_validation_findings</code> redacts on <code>/auth</code> routes, because a
+buggy caller can put secret-bearing material in a key position -- into
+the response body, and that this is safe only because
+<code>log_response_info</code> drops the whole body on the same predicate. A
+namespace event has no such protection and is readable by anyone who
+can read the namespace, so the new audit event redacts the name on the
+same predicate. <code>REDACTED_PARAMETER</code> is now one constant used by both
+sites, so the two records of one refusal cannot disagree about what is
+safe to say, and the coupling between the two redactions is written
+down where the predicate lives.</p>
+<p><strong>Verification.</strong> Eleven mutations over the new assertions, each caught
+by the test that names the property: lexical index sorting, an
+unbounded fan-out, a missing overflow finding, the container's type
+reported instead of the element's, an unresolvable path answering None
+rather than falling back, the raw-body skip removed, the audit event
+removed, the audit helper allowed to raise on a <code>@public</code> endpoint,
+the last enforceable finding reported instead of the first, the
+parameter name left unredacted on a credential route, and the
+warn-mode helper turned into a no-op. A twelfth mutation --
+validating a raw body against its schema -- was <strong>not</strong> caught, and
+should not be: a raw body declaration cannot be combined with named
+body parameters, so a raw-body route's compiled body schema is always
+None and the guard is unobservable belt-and-braces. A test for it
+would be a test that cannot fail. The first attempt at the raw-body
+test <em>was</em> that test -- it sent bytes with an octet-stream content
+type, which no scan could have reported on whether the route was
+skipped or not; it earns its place only because the body it now sends
+is JSON the scan would otherwise refuse.</p>
+<p>The one <code>consider</code> not taken is the cluster CI test's base class.
+<code>TestUndeclaredParameterRefused</code> keeps <code>BaseNamespacedTestCase</code>
+because the property has to hold for an ordinary caller rather than
+for an admin -- the namespaced client is the point, not incidental --
+and the teardown loops it pays for break out immediately on empty
+lists. The reason is now in the class docstring, along with why the
+private <code>_request_url</code> is the right call there.</p>
 <h3 id="review-round-2-on-4101">Review round 2 on <a href="https://github.com/shakenfist/shakenfist/pull/4101">#4101</a><a class="headerlink" href="#review-round-2-on-4101" title="Permanent link">&para;</a></h3>
 <p>Ten items: 1 <code>fix</code>, 2 <code>document</code>, 5 <code>consider</code>, 2 <code>none</code> — down from
 2 <code>fix</code>, and every remaining item is against code this branch added
@@ -14588,6 +14745,13 @@ run, so absence is evidence rather than silence.</p>
 <li><code>UNDECLARED_BY_DESIGN</code> in <code>test_parameter_declarations.py</code> is
     empty, and the five metadata delete handlers no longer accept a
     <code>value</code> kwarg they never read.</li>
+<li>The findings one request can produce are bounded whatever it
+    sends, in every reason, and a test proves it.</li>
+<li>A refused request writes an audit event against the caller's
+    namespace, so enforcement costs no audit coverage.</li>
+<li>Each handler guard which enforcement now answers ahead of has a
+    warn-mode test asserting the guard's own message, so the
+    documented rollback path is exercised rather than described.</li>
 </ol>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step, back brief the operator on the
@@ -14599,8 +14763,198 @@ for it rests on two signatures having gone quiet after steps 1 to 3.
 That evidence is cheap to gather and expensive to fake, so it is
 gathered and shown before the switch, not after.</p>
 <h2 id="measurement-log">Measurement log<a class="headerlink" href="#measurement-log" title="Permanent link">&para;</a></h2>
-<p><em>(D22's confirmatory reading goes here, in the format phase 3's log
-established: the reading command, what ran, and the signature table.)</em></p>
+<p><strong>2026-09-08 -- D22's confirmatory reading. Both conditions met; the
+switch may be thrown.</strong> Steps 1 to 3 merged as <a href="https://github.com/shakenfist/shakenfist/pull/4101">#4101</a> on
+2026-09-07 (three review rounds; #3739 closed by the merge). sfcbr
+redeployed between 07:48 and 08:48 UTC the same day at
+<code>shakenfist=f5cf6a3fa</code>, which carries the phase's head <code>5168935b8</code>.</p>
+<p>The deploy was confirmed <em>live</em> rather than merely installed, because
+a mirror sha only says what was written to disk: the running server
+reports <code>0.8.0rc5.dev1236+gf5cf6a3fa.d20260907</code>, and its published
+specification carries both fixes -- fourteen metadata <code>value</code>
+parameters rendered as <code>format: any JSON value</code> with no <code>type</code>
+(including <code>PUT /auth/namespaces/{namespace}/metadata/{key}</code>), and
+<code>POST /networks/{network_ref}/dns</code> still <code>string</code>/ipv4 as D15
+requires. Body <code>namespace</code> declarations went 14 to 65 across the
+package, the +51 matching the 51 problems the audit reported when run
+against unmodified <code>develop</code>.</p>
+<h3 id="reading-1-the-functional-ci-run-nine-to-zero">Reading 1 -- the functional CI run. Nine to zero.<a class="headerlink" href="#reading-1-the-functional-ci-run-nine-to-zero" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/shakenfist/shakenfist/actions/runs/34074436494">Run 34074436494</a> (the <code>merge_group</code> run of #4101 itself, so the
+first full suite over the merged code; all jobs green). Graded from
+the per-node journals in the six bundles, since the central Loki dump
+in each bundle is still zero bytes -- actions repo issue #16 is not
+fixed and the phase 3 note about it still applies.</p>
+<table>
+<thead>
+<tr>
+<th>n</th>
+<th>signature</th>
+<th>2026-08-13</th>
+<th>classification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>21</td>
+<td>missing-required, <code>POST /auth/federated</code>, 400</td>
+<td>21</td>
+<td>Intended rejection: the federation suite's deliberately malformed bodies. Unchanged.</td>
+</tr>
+<tr>
+<td>0</td>
+<td><strong>unknown-parameter <code>namespace</code>, artifact ref, 200/404</strong></td>
+<td><strong>9</strong></td>
+<td><strong>Fixed.</strong> The #3739 population, gone.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>type-mismatch <code>length</code>, consoledata, 400</td>
+<td>6</td>
+<td>Intended rejection. Unchanged.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>type-mismatch <code>key_ttl</code>, rules create, 400</td>
+<td>6</td>
+<td>Intended rejection. Unchanged.</td>
+</tr>
+<tr>
+<td><strong>33</strong></td>
+<td><strong>total</strong></td>
+<td><strong>42</strong></td>
+<td>Only the nine moved.</td>
+</tr>
+</tbody>
+</table>
+<p>Both of phase 3's guards against a false negative were re-run, because
+a zero that is not proven to be capable of being non-zero is not a
+reading. The apparatus was live: <code>Compiled API parameter declarations</code>
+with <code>handlers: 139</code> appears in all six bundles. And the generator ran:
+<code>test_artifact_system_creds_namespace_scoped</code> and
+<code>test_same_name_different_namespace</code> -- the two cluster CI tests that
+drive a system-credentialed lookup with an explicit <code>namespace=</code> --
+both executed and passed at 02:11.</p>
+<h3 id="reading-2-the-metadata-value-type-mismatch-probed-not-waited-out">Reading 2 -- the metadata <code>value</code> type mismatch. Probed, not waited out.<a class="headerlink" href="#reading-2-the-metadata-value-type-mismatch-probed-not-waited-out" title="Permanent link">&para;</a></h3>
+<p>D22 asked for 72 hours of absence "during which the k3s orchestration
+traffic that produced it has actually run". That wording named the
+wrong thing, and the correction matters more than the wait:</p>
+<ul>
+<li>The traffic is not a running k3s cluster. It is <code>client-python-k3s</code>
+  exercised by hand, storing its state in namespace metadata under
+  <code>orchestrated_k3s_*</code> keys. It appears on the days that library is
+  worked on (08-09, 08-17, 08-22 to 08-24, 08-28, 08-30, 09-04, 09-05)
+  and stops otherwise -- it last ran 2026-09-05 21:00 UTC, some 35
+  hours <em>before</em> the fix deployed. Waiting for it would have been
+  waiting on an unscheduled human activity.</li>
+<li>Nothing about k3s is load-bearing. The declaration is per route, not
+  per key: <code>value</code> on that route compiles to <code>fields.Raw</code>, so <strong>any</strong>
+  JSON-valued metadata write exercises the identical schema. The
+  requirement should read "any JSON-valued metadata write", and does
+  from here.</li>
+</ul>
+<p>So the reading was taken by probe on 2026-09-08 at 07:05:50 UTC. A
+scratch namespace took a dict-valued and a list-valued metadata write
+-- the exact <code>_set_metadata</code> shape (<code>PUT .../metadata/&lt;key&gt;</code> with
+<code>{'value': ...}</code>) behind all 294 of the historical findings -- both
+stored and read back verbatim, and the namespace was deleted.</p>
+<p>The probe carried its own positive control, for the same reason the
+apparatus is hand-verified: an undeclared body key on <code>GET /instances</code>
+in the same second, which <strong>must</strong> still be reported. Reading, 35
+seconds later:</p>
+<div class="highlight"><pre><span></span><code>loki-query '{job="shakenfist"} |= "API request validation finding"' \
+    --tenant sfcbr --since 15m --limit 200
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>n</th>
+<th>signature</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>unknown-parameter <code>banana</code>, <code>GET /instances</code>, 400</td>
+<td>Control fired. The pipeline is alive and findings reach Loki.</td>
+</tr>
+<tr>
+<td><strong>0</strong></td>
+<td><strong>type-mismatch <code>value</code>, metadata, 200</strong></td>
+<td><strong>Fixed.</strong> Two writes that would each have produced one.</td>
+</tr>
+</tbody>
+</table>
+<p>A silent channel would have produced neither line. This is positive
+evidence rather than an absence, which is what 72 hours of quiet could
+not have given us.</p>
+<h3 id="what-thirty-days-of-sfcbr-says-about-the-flips-blast-radius">What thirty days of sfcbr says about the flip's blast radius<a class="headerlink" href="#what-thirty-days-of-sfcbr-says-about-the-flips-blast-radius" title="Permanent link">&para;</a></h3>
+<p>Widening the query to the whole warn window, and splitting on the
+status the request <em>actually</em> got, isolates what enforcement changes:</p>
+<table>
+<thead>
+<tr>
+<th>n</th>
+<th>response</th>
+<th>signature</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>294</td>
+<td><strong>200</strong></td>
+<td>type-mismatch <code>value</code>, namespace metadata</td>
+</tr>
+<tr>
+<td>40</td>
+<td>400</td>
+<td>type-mismatch, namespace claims</td>
+</tr>
+<tr>
+<td>12</td>
+<td>400</td>
+<td>missing-required, <code>POST /auth</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>400</td>
+<td>missing-required, namespace claims</td>
+</tr>
+<tr>
+<td>2</td>
+<td>400</td>
+<td>type-mismatch <code>limit</code>, instance events</td>
+</tr>
+<tr>
+<td>1</td>
+<td>400</td>
+<td>unknown-parameter <code>banana</code> (the 08-13 hand probe)</td>
+</tr>
+</tbody>
+</table>
+<p>Every finding on a request that <em>succeeded</em> is the metadata one, and
+it is fixed. Everything else already answers 400 and answers 400 after
+the flip, so the enforceable surface on sfcbr is now empty.</p>
+<p>Two of those signatures postdate phase 3's reading and are classified
+here for the first time. Both are the <code>key_ttl</code> pattern -- the
+published bound and the server already agree, so validation only
+restates a refusal the handler was already making:</p>
+<ul>
+<li><strong>Namespace claims, 48 findings on 2026-08-24 and 08-25.</strong> The
+  scheduler-reservations phase 4 suite: <code>Must be greater than or equal
+  to 1</code>, <code>Must be greater than or equal to 0</code>, and <code>Not a valid
+  integer</code> against a bool. All 400 already.</li>
+<li><strong>Instance events <code>limit</code>, 2 findings on 2026-08-25.</strong> A string
+  where the declared bound wants 1..1000. Already 400.</li>
+</ul>
+<h3 id="the-remaining-caveat-stated-rather-than-buried">The remaining caveat, stated rather than buried<a class="headerlink" href="#the-remaining-caveat-stated-rather-than-buried" title="Permanent link">&para;</a></h3>
+<p>The control's own response is the phase's motivating defect, still
+visible: <code>GET /instances</code> with an undeclared key answered
+<code>{"error": "InstancesEndpoint.get() got an unexpected keyword argument
+'banana'", "status": 400}</code> -- interpreter text, leaked to the caller.
+Step 4 replaces exactly that with <code>banana: not declared by this
+endpoint</code>, and its tests assert the absence of interpreter text
+positively.</p>
 
 
 

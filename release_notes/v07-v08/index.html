@@ -14450,16 +14450,17 @@
   offsets are published as non-negative integers, and <code>user_data</code> is
   published as base64 content. A rule's <code>key_ttl</code> also documents its real
   bounds of 1 to 86400 seconds, which the server has always enforced.
-  These are documentation — requests are not yet rejected against them.
-  The API now checks every request against these declarations, but in
-  <strong>warn-only</strong> mode: it logs what it would have refused and changes no
-  response. The new <code>API_VALIDATION_MODE</code> setting controls this and
-  defaults to <code>warn</code>; <code>enforce</code> answers 400 instead (except for
-  parameters declared required but omitted, which are recorded and
-  never enforced), and is not recommended until you have read your
-  own warn logs; <code>off</code> disables the layer entirely, as a safety
-  valve against unexpected log volume. Three related
-  behaviour changes did ship:<ul>
+  These were documentation only at first: the API checked every
+  request against these declarations, but in a <strong>warn-only</strong> mode that
+  logged what it would have refused and changed no response. The new
+  <code>API_VALIDATION_MODE</code> setting controls this, and — see the
+  validation enforcement entry below — now defaults to <code>enforce</code>, which
+  answers 400 instead (except for parameters declared required but
+  omitted, which are recorded and never enforced); <code>warn</code> restores the
+  original logging-only behaviour and <code>off</code> disables the layer
+  entirely, as a safety valve against unexpected log volume. Three
+  related behaviour changes shipped with the original, warn-only
+  rollout:<ul>
 <li>A webargs validation failure (a malformed query parameter on the
   four endpoints which parse one) now returns <code>400</code> in the usual
   <code>{"error": ..., "status": ...}</code> shape. It previously returned a
@@ -14477,8 +14478,8 @@
   <code>passed_uuid</code> before being merged into the handler's arguments.
   No handler accepted that name, so sending <code>uuid</code> in a body was a
   guaranteed 400 on every endpoint in the API; it is now treated as
-  an ordinary undeclared parameter, which in warn mode means the
-  request behaves as it always did and the occurrence is logged.
+  an ordinary undeclared parameter, which <code>API_VALIDATION_MODE=warn</code>
+  merely logs and <code>enforce</code> refuses outright.
   Separately, two of the newly published bounds are backed by the
   server's own handlers rather than waiting for enforcement -- both
   cases where publishing a bound the server did not back would have
@@ -14528,6 +14529,55 @@
   have always been able to be dictionaries and lists as well —
   <code>sf-client</code> sends whatever JSON it is given and the server stores it.
   A regenerated client may bind that parameter more loosely.</li>
+<li><strong>Behaviour change:</strong> <code>API_VALIDATION_MODE</code> now defaults to
+  <code>enforce</code>. A request that does not match its endpoint's published
+  parameter declarations -- an undeclared body key, a value of the
+  wrong type, or a body key that overwrites a path parameter, such as
+  sending <code>key</code> in the body of
+  <code>PUT /auth/namespaces/...namespace.../metadata/...key...</code> -- is
+  refused with a 400 in the usual
+  <code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": 400}</code> shape, naming
+  the parameter and why. A refusal names the <em>first</em> problem found, so
+  a request with several of them is fixed one round trip at a time;
+  <code>sf-api</code> logs every finding, so an operator sees the rest. Where the
+  offending value is inside a container the element is named --
+  <code>disk[0]: Not a valid mapping type.</code> rather than the whole array.
+  Validation runs after authentication but
+  before every per-method decorator, including the ones that look up
+  and authorise access to an object, so <strong>a request that is both
+  malformed and refers to a missing or unauthorised object now answers
+  400 where it previously answered 404 or 403</strong> -- this is not an
+  information leak, since the caller was already authenticated and
+  learns only that its own request was malformed, nothing about the
+  object it named. <code>required</code> is still recorded and never enforced: a
+  parameter declared required can still be omitted, exactly as before.
+  If a caller breaks against this, set <code>API_VALIDATION_MODE=warn</code> to
+  log findings without refusing anything while you fix it, or <code>off</code> to
+  disable the layer entirely.
+  Two narrower changes come with the flip. Eleven refusals that a
+  handler's own guard already produced now speak with validation's
+  wording instead, because validation answers first: <code>key is not a
+  string</code> becomes <code>key: Not a valid string.</code>, and <code>expiry is not a
+  number</code> becomes <code>expiry: Not a valid number.</code>, for example. Those
+  handler guards are unchanged and still answer whenever
+  <code>API_VALIDATION_MODE</code> is not <code>enforce</code>. And a body key that repeats a
+  path parameter -- the <code>key</code> example above -- is now refused as a
+  body/path collision; the shipped <code>shakenfist_client</code> never sends one,
+  but a caller that does will need to stop.
+  One change is not undone by the rollback: a <code>value</code> key in the body
+  of a metadata <code>DELETE</code> is refused in every mode after this release.
+  It was previously accepted and ignored, and the handlers no longer
+  accept it at all, so <code>warn</code> and <code>off</code> answer 400 for it too -- with
+  the interpreter's wording rather than validation's. The shipped
+  client sends no body on a metadata delete, so this reaches
+  hand-rolled callers only.
+  Finally, a refused request never reaches its handler, so it does not
+  produce the <code>token used to authenticate request</code> audit event a well
+  formed request would. It writes a <code>request refused by input
+  validation</code> audit event against the caller's namespace instead,
+  carrying the same key name, method, path and remote address, plus
+  the reason and the parameter the refusal named (the parameter name
+  is redacted on the <code>/auth</code> routes, as it already is in the log).</li>
 <li>Malformed values inside the reserved <code>affinity</code> instance metadata key
   are now refused with a 400 instead of returning a 500. A list, a
   dictionary, <code>null</code> or <code>Infinity</code> used as the <em>value</em> of an affinity
