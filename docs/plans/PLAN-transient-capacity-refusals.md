@@ -495,23 +495,32 @@ spelling above is the one to write.
     the whole-plan status, so it only reaches `Complete` once
     every phase has been completed, abandoned or superseded.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete |
-| 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Not started |
-| 3. Publish metrics when the running-domain set changes | PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md | Not started |
-| 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started |
-| 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started |
-| 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started |
-| 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete | `7cc93750d` (#4147), `e20dd7d4b` (#4153) |
+| 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Not started | — |
+| 3. Publish metrics when the running-domain set changes | PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md | Not started | — |
+| 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started | — |
+| 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started | — |
+| 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
+| 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`: the
+merge commit of its pull request, or an explicit `first..last`
+range where the phase landed directly. It is filled in as each
+phase lands, so `—` means the phase has not landed yet, even
+where its phase plan is already written and linked above. Phase 1
+took two: the implementation, and the close-out which recorded its
+measurement.
 
 Phases 1, 2 and 3 are independent of one another and can run in
 parallel. Phase 4 follows 2, because the client retry should match
 the semantics the suite has already proven. Phase 5 needs phase 2
 to have reported over a window of merge runs *after* the sizing
 plan's phase 4 has reshaped `slim-tier`; until then its data would
-be measuring the wrong cloud. Phase 6 follows everything else, and
-the phase 7 push audit is last.
+be measuring the wrong cloud. Phase 6 is the last of the
+implementation phases; phase 7 is the push audit, which reads
+all of them.
 
 The ordering against the sibling plans: the sizing plan's phase 3
 (saturation coverage) does not gate any phase here, because none
@@ -762,10 +771,27 @@ the numbers.
 ### Phase 7 -- Push audit
 
 Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in
-this plan against `develop`, not the last phase's diff alone.
-Findings land as their own pull request, and the plan is not
-complete until each is resolved or declined in writing here. If
-the audit finds nothing, that is recorded in one sentence.
+this plan, not the last phase's diff alone. Auditing one phase at a
+time would miss what the phases did to each other, which matters
+here more than it looks: phases 1, 2 and 3 are explicitly allowed
+to run in parallel, and phase 4's client retry is meant to carry
+the same semantics phase 2 proved, so a divergence between them is
+exactly the kind of defect no single phase can see.
+
+By the time this runs its phases will have merged, and a diff
+against `develop` will be empty and would read as a clean audit.
+The baseline is therefore the `Merged` column in the Execution
+table above, not `develop...HEAD`. Findings land as their own pull
+request, and the plan is not complete until each is resolved or
+declined in writing here. If the audit finds nothing, that is
+recorded in one sentence.
+
+Two of this plan's phases may land outside this repository -- phase
+2's suite wrapper touches the CI harness, and phase 5 may not
+produce code at all -- so where a phase landed elsewhere its row
+names the repository, and it is audited against that repository's
+default branch as part of the pull request that lands it, with this
+phase citing that audit rather than re-running it.
 
 ## Agent guidance
 
