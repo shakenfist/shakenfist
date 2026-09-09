@@ -356,7 +356,7 @@ table entirely (decision D8).
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
 | 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete |
-| 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | In progress |
+| 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete |
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete |
@@ -429,31 +429,55 @@ is here.
   its PR #22 on 2026-09-01, and the conductor was deployed on
   **2026-09-02 18:13:46** -- pinned by the first row of the
   conductor's `claim_events` table, not by the merge. Step 5's
-  observation window therefore closes on 2026-09-09 18:13. The
-  record was written into the phase plan on 2026-09-08 from a
-  five-day-23-hour window, covering five full working days, and
-  is to be amended when the window closes.
+  seven-day observation window therefore closed on 2026-09-09
+  18:13. A first record was written on 2026-09-08 from a
+  five-day-23-hour window; it was re-collected over the closed
+  window on 2026-09-10 and the phase completed then.
 
   What it found, in one line: **the claims mechanism works and
-  the numbers feeding it do not.** No claim leaked (1729 created
-  minus 1723 released is exactly the 6 live on the cluster),
-  `conductor_claims_failed_total` is zero, and all 298 refusals
-  were genuine capacity refusals on `cpus` against the
-  large nested-cluster jobs. But 167 placements were admitted
-  over their namespace's claim, across 76 namespaces and
-  overwhelmingly on `memory_mb`, because the peaks
-  `get_claim_sizes()` reads under-state real use by as much as
-  1.75x. The 1.2 headroom multiplier is applied exactly as
-  designed and is not the problem.
+  the numbers feeding it do not.** No claim leaked -- 2038
+  created minus 2033 released is exactly the 5 claims live on the
+  cluster -- `conductor_claims_failed_total` is zero, there were
+  no transient refusals, and all 303 refusals were genuine
+  capacity refusals on `cpus`, concentrated on the large
+  nested-cluster jobs -- the median refused request asks for 52%
+  of the cluster. But 234 placements were admitted over their namespace's
+  claim, across 101 namespaces, because the peaks
+  `get_claim_sizes()` reads under-state real use by 2.12x to 5x.
+  The 1.2 headroom multiplier is applied exactly as designed and
+  is not the problem.
+
+  The full window revised four of the partial record's findings
+  and withdrew one reading, all marked as such in the phase plan.
+  Over-limit admissions are not "overwhelmingly `memory_mb`":
+  memory leads at 223 of 234, but `disk_gb` is close behind at 208
+  and `cpus` is involved in 109. The reconciler's drift was not
+  one episode of matched pairs but two of different character, the
+  second being three simultaneous all-negative corrections across
+  three nodes.
+  And the floor-only claims are a larger hole than they looked --
+  **eight of ten** first runs exceeded their claim, including
+  three new *cluster* jobs that each received the lint-sized 2 cpu
+  / 4096 MB floor. The window also found a second failure mode
+  invisible at five days: in 24 of the 101 namespaces a **single
+  instance was larger than the entire claim**, so the recorded
+  peak is smaller than the runner the conductor itself creates.
 
   **This answers phase 5's gate: do not flip
   `CLAIM_ENFORCEMENT_HARD` yet.** Hard enforcement over this
-  window would have refused 167 placements for a measurement
+  window would have refused 234 placements for a measurement
   defect rather than for genuine over-consumption, hitting
-  `shakenfist / Smoke tests (collection)` hardest of all. Phase 5
-  now waits on claim sizing that tracks real use --
-  `PLAN-claim-coverage-and-sizing.md`, opened in private-ci on
-  2026-09-08 -- and on a re-run of this measurement afterwards.
+  `shakenfist / Smoke tests (collection)` hardest of all -- 63 of
+  the 101 affected namespaces. Phase 5 now waits on claim sizing
+  that tracks real use -- `PLAN-claim-coverage-and-sizing.md`,
+  opened in private-ci on 2026-09-08 -- and on a re-run of this
+  measurement afterwards. One further gate emerged from the
+  refusal bodies: the cluster's advertised capacity varied between
+  46 and 99 cpus during the window and the median refusal happened
+  at 70% fullness, so
+  [PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md)
+  should land before the re-run or it will not be able to separate
+  a warm-up artefact from genuine contention either.
 
   The back brief item that was outstanding at the deploy (the
   sizing formula never evaluated against real cost data, because
