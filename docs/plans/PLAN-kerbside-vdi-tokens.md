@@ -369,27 +369,40 @@ Recommendations are recorded inline.
 
 ## Execution
 
-| Phase | Repo | Plan | Status |
-|-------|------|------|--------|
-| 0. Decisions and token format | shakenfist | Folded into this document (no separate plan file) | Complete |
-| 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Complete |
-| 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | Complete |
-| 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Complete |
-| 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Complete |
-| 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Complete |
-| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Complete |
-| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete |
-| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete |
-| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete |
-| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | Complete |
-| 11. Close out the post-completion defects (#4003, #4009) | shakenfist | See *Post-completion defects* below | Complete |
+| Phase | Repo | Plan | Status | Merged |
+|-------|------|------|--------|--------|
+| 0. Decisions and token format | shakenfist | Folded into this document (no separate plan file) | Complete | shakenfist `9d41a1716` (#3491) |
+| 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Complete | shakenfist `9d41a1716` (#3491) |
+| 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | Complete | shakenfist `9d41a1716` (#3491) |
+| 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Complete | ryll `fa7ee21` (#190) |
+| 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Complete | client-python `b426e1f` (#350) |
+| 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Complete | kerbside `f50ea59` (#167) |
+| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59` (#167) |
+| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59` (#167) |
+| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59` (#167) |
+| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete | kerbside `115416c` (#194), `7803368` (#201); shakenfist `07d7081b7` (#3580) |
+| 11. Close out the post-completion defects (#4003, #4009) | shakenfist | See *Post-completion defects* below | Complete | shakenfist `5ef83c065` (#4016), `913411586` (#4018), `f2df423d8` (#4024) |
+| 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | Complete | shakenfist `2d585cd1a` (#4099), `ccc1b5ff2` (#4137); kerbside `e2a493ea6` (#412), `29323fb85` (#413); ryll `aac25cf3c` (#358), `0113f0ff7` (#366) |
 
-The table above names plan files rather than pull requests, which
-meant phase 10 had to reconstruct the merge history from `git log` in
-four working copies before it could audit anything. That
-reconstruction is recorded once, in
+The push audit is the last row of the table, and phase 11 sits above
+it, because that is the order the work actually happened in: the
+post-completion defects were fixed first and the audit read them. The
+phase *numbers* record when each phase was planned and are left alone,
+since the phase 10 plan file, and kerbside's and ryll's own pull
+requests, all name it by that number.
+
+The `Merged` column records what put each phase on its repository's
+default branch. A phase that landed elsewhere names the repository, as
+the shared block asks. The column was reconstructed after the fact --
+the table originally named plan files rather than pull requests, which
+meant phase 10 had to rebuild the merge history in four working copies
+before it could audit anything. That reconstruction is recorded once,
+in
 [phase 10's decision 1](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md),
-and is the authoritative list of what this plan actually merged:
+and the table below is it: the same merges as the column, grouped by
+pull request rather than by phase, which is the only way to show the
+six pull requests phase 10 took and the work that belongs to no phase
+at all.
 
 | Repo | Phases | PR | Merge |
 |------|--------|----|-------|
