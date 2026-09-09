@@ -301,14 +301,15 @@ def build_registry(app: Any) -> dict[tuple[str, str], CompiledEndpoint]:
 
 
 # ---------------------------------------------------------------------
-# Warn-only checking.
+# Checking.
 #
-# Nothing below rejects anything while API_VALIDATION_MODE is 'warn',
-# which is the default and is what phase 3 ships. The findings are
-# recorded on flask.g and emitted once the response status is known,
-# because "what did this request return anyway" is what separates a
-# rejection enforcement would introduce from a status code it would
-# merely change -- and at validation time that is not yet known.
+# Nothing below rejects anything: check() is pure and returns findings,
+# and validate_request in base.py is the only place which decides what
+# to do with them. The findings are recorded on flask.g and emitted
+# once the response status is known, because "what did this request
+# return anyway" is what separates a rejection enforcement introduced
+# from a status code it merely changed -- and at validation time that
+# is not yet known.
 
 # The request-scoped hand-offs, named like base.py's
 # _RECORDED_EXCEPTION_FIELDS because they are the same pattern.
@@ -341,6 +342,18 @@ MAX_PARAMETER_NAME = 64
 # logging. The overflow is summarised in one finding carrying the
 # count, so the measurement still learns the request happened.
 MAX_UNKNOWN_PARAMETER_FINDINGS = 20
+
+# The most type-mismatch findings one schema check can produce. A
+# container's elements are each reported separately (see
+# _flatten_messages), so a single declared parameter carrying a large
+# enough array puts one log line per bad element into centralised
+# logging -- exactly the property MAX_UNKNOWN_PARAMETER_FINDINGS exists
+# to bound, arriving by a different route once phase 4 taught the
+# flattener to name elements. Nothing bounds a request body's size, so
+# a thousand-element disk list is a thousand findings without this.
+# The overflow is summarised in one finding carrying the count, in the
+# same shape as the unknown-parameter overflow above.
+MAX_TYPE_MISMATCH_FINDINGS = 20
 
 
 class Finding:
@@ -376,13 +389,94 @@ class Finding:
         }
 
 
+def _sort_key(key: Any) -> tuple[int, int, str]:
+    """Order marshmallow's error keys the way a caller reads them.
+
+    Sequence indices are integers and must stay in numeric order:
+    sorting them as strings gives 0, 1, 10, 11, 2, and since
+    enforcement answers with the first finding only, a caller whose
+    third and eleventh disk specifications are both malformed would be
+    told about `disk[10]`. Integers sort ahead of sub-field names,
+    which cannot collide with them because marshmallow keys a mapping
+    error by field name and a sequence error by index.
+    """
+    if isinstance(key, int):
+        return (0, key, '')
+    return (1, 0, str(key))
+
+
+def _flatten_messages(parameter: str, messages: Any,
+                      path: tuple[Any, ...] = ()
+                      ) -> list[tuple[str, str, tuple[Any, ...]]]:
+    """Flatten marshmallow's error structure into (name, detail, path) leaves.
+
+    validate() answers a list of strings when a field itself is wrong,
+    but a dict keyed by index or sub-field when a *container's elements*
+    are wrong -- `{0: ['Not a valid mapping type.']}` for a bad entry in
+    an arrayofdict. Rendering that with str() puts a Python dict repr in
+    the detail, which the enforce flip of phase 4 turned from a log line
+    into the caller's error message: `disk: {0: ['Not a valid mapping
+    type.']}`. Naming the offending element instead gives
+    `disk[0]: Not a valid mapping type.`
+
+    Integer keys index a sequence and render as `name[0]`; anything else
+    is a sub-field and renders as `name.key`. The recursion terminates
+    because marshmallow's leaves are always lists of strings, and the
+    non-list, non-dict branch keeps a malformed leaf from raising inside
+    the validator -- which _schema_findings' caller must never do.
+
+    Each leaf also carries the sequence of keys walked to reach it, so
+    the caller can index back into the supplied value and report the
+    *element's* type rather than the container's. That path is the
+    only reason a finding built from a leaf can say anything true
+    about the value at all, since the parameter name has by then been
+    rewritten into a display form which cannot be looked up.
+    """
+    if isinstance(messages, dict):
+        flattened = []
+        for key, nested in sorted(messages.items(),
+                                  key=lambda kv: _sort_key(kv[0])):
+            if isinstance(key, int):
+                name = '%s[%d]' % (parameter, key)
+            else:
+                name = '%s.%s' % (parameter, key)
+            flattened.extend(_flatten_messages(name, nested, path + (key,)))
+        return flattened
+    if isinstance(messages, list):
+        return [(parameter, '; '.join(str(m) for m in messages), path)]
+    return [(parameter, str(messages), path)]
+
+
+def _element_value(container: Any, path: tuple[Any, ...]) -> Any:
+    """The value at `path` inside `container`, or the container itself.
+
+    A finding carries the offending value's type and never its value
+    (decision D5), so this exists purely to make that type describe
+    what actually failed: `disk[0]` reported as a `list` -- the type of
+    the whole array -- is the telemetry being confidently wrong about
+    the one case element naming was added for.
+
+    Falls back to the container when the path does not resolve, which
+    is the honest answer rather than None: marshmallow can key an error
+    by a name the supplied value has no entry for (a required sub-field
+    that is absent), and "the container's type" is still true of
+    something the caller sent.
+    """
+    value = container
+    for key in path:
+        try:
+            value = value[key]
+        except (TypeError, KeyError, IndexError):
+            return container
+    return value
+
+
 def _schema_findings(schema: Optional[marshmallow.Schema],
                      supplied: dict[str, Any]) -> list[Finding]:
     if schema is None:
         return []
     known = {name: value for name, value in supplied.items()
              if name in schema.fields}
-    findings = []
     try:
         mismatches = schema.validate(known)
     except Exception:
@@ -396,12 +490,26 @@ def _schema_findings(schema: Optional[marshmallow.Schema],
             'parameters': sorted(known)}).exception(
             'Request validation raised internally; no findings reported')
         return []
+    leaves = []
     for parameter, messages in mismatches.items():
+        for name, detail, path in _flatten_messages(str(parameter), messages):
+            leaves.append((name, detail, parameter, path))
+
+    # Sliced before the values are resolved, so the elements past the
+    # bound cost a tuple each and nothing more. marshmallow has already
+    # built its own entry per bad element by this point, so the leaves
+    # add no order of magnitude to what a large body costs; what the
+    # bound is protecting is the log stream, where each finding is a
+    # line.
+    findings = [Finding(TYPE_MISMATCH, name, detail,
+                        _element_value(known.get(parameter), path))
+                for name, detail, parameter, path
+                in leaves[:MAX_TYPE_MISMATCH_FINDINGS]]
+    if len(leaves) > MAX_TYPE_MISMATCH_FINDINGS:
         findings.append(Finding(
-            TYPE_MISMATCH, str(parameter),
-            '; '.join(messages) if isinstance(messages, list)
-            else str(messages),
-            known.get(parameter)))
+            TYPE_MISMATCH, '(overflow)',
+            '%d further mismatching values not reported individually'
+            % (len(leaves) - MAX_TYPE_MISMATCH_FINDINGS)))
     return findings
 
 

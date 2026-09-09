@@ -286,7 +286,7 @@ class NodeMetadataEndpoint(api_base.Resource):
         requires_admin=True))
     @api_base.caller_is_admin
     @api_base.log_token_use
-    def delete(self, node=None, key=None, value=None):
+    def delete(self, node=None, key=None):
         if not key:
             return sf_api.error(400, 'no key specified')
         n = Node.from_db(node, suppress_failure_audit=True)

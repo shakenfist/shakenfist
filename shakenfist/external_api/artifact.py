@@ -1003,7 +1003,7 @@ class ArtifactMetadataEndpoint(api_base.Resource):
     @arg_is_artifact_ref
     @requires_artifact_ownership
     @api_base.log_token_use
-    def delete(self, artifact_ref=None, key=None, value=None, artifact_from_db=None):
+    def delete(self, artifact_ref=None, key=None, artifact_from_db=None):
         if not key:
             return sf_api.error(400, 'no key specified')
         artifact_from_db.add_event(

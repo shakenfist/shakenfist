@@ -65,6 +65,15 @@ HEALTH_PROBE_PATHS = ('/', '/livez', '/readyz', '/healthz')
 
 REDACTED_BODY = '...body not logged as this route handles credentials...'
 
+# What a validation finding's parameter name is replaced with on a
+# credential-carrying route. The name is client supplied, so a buggy
+# caller can put secret-bearing material in a key position; the reason
+# code is what a reader of either the log or the namespace's events
+# actually needs. app.py's log_validation_findings and
+# _record_refused_token_use below both use it, so the two records of
+# one refusal cannot disagree about what is safe to say.
+REDACTED_PARAMETER = '*****'
+
 
 # Request and response bodies are logged verbatim by app.py, and the
 # parsed body is logged again as kwargs by log_request below. That is
@@ -888,6 +897,25 @@ def verify_token(func):
     return wrapper
 
 
+def _token_use_event(ns, keyname: str, message: str,
+                     extra: Optional[dict[str, Any]] = None) -> None:
+    """Record a use of a token against the namespace which owns it.
+
+    NOTE(mikal): the presented token must never appear in the event.
+    The key name identifies which credential was used, which is what
+    an audit reader actually needs; the token itself would be
+    replayable by anyone who can read the namespace's events.
+    """
+    fields = {
+        'keyname': keyname,
+        'method': flask.request.environ['REQUEST_METHOD'],
+        'path': flask.request.environ['PATH_INFO'],
+        'remote-address': flask.request.remote_addr
+    }
+    fields.update(extra or {})
+    ns.add_event(EVENT_TYPE_AUDIT, message, extra=fields)
+
+
 def log_token_use(func):
     def wrapper(*args, **kwargs):
         namespace, keyname = parse_jwt_identity()
@@ -896,22 +924,70 @@ def log_token_use(func):
         if not ns:
             return sf_api.error(401, 'authenticated namespace not known')
 
-        # NOTE(mikal): the presented token must never appear in the
-        # event. The key name identifies which credential was used,
-        # which is what an audit reader actually needs; the token
-        # itself would be replayable by anyone who can read the
-        # namespace's events.
-        ns.add_event(
-            EVENT_TYPE_AUDIT, 'token used to authenticate request',
-            extra={
-                'keyname': keyname,
-                'method': flask.request.environ['REQUEST_METHOD'],
-                'path': flask.request.environ['PATH_INFO'],
-                'remote-address': flask.request.remote_addr
-            })
-
+        _token_use_event(ns, keyname, 'token used to authenticate request')
         return func(*args, **kwargs)
     return wrapper
+
+
+def _record_refused_token_use(finding) -> None:
+    """Audit a request validation refused, since no handler will.
+
+    log_token_use is the innermost per-method decorator, so a refusal
+    returned from validate_request -- which sits outside all of them --
+    means the namespace never sees the 'token used to authenticate
+    request' event it would have seen had the request been well formed.
+    Without this an authenticated caller could send malformed requests
+    indefinitely and leave no trace in the namespace's own audit trail,
+    only in sf-api's log stream, which carries neither the key name nor
+    the remote address. Preserving event coverage is a standing goal of
+    this project, and enforcement is not a licence to lose it.
+
+    The event names the refusal rather than borrowing log_token_use's
+    message, because the two are different facts: this request did not
+    reach a handler. It is recorded on every refusal, including for the
+    handlers which carry no log_token_use of their own -- what the
+    reader needs is that the credential was used, and a decorator the
+    request never reached cannot tell them.
+
+    The parameter name is redacted on a credential-carrying route, for
+    the reason handles_credentials() gives and app.py's
+    log_validation_findings already acts on: the name is client
+    supplied, a buggy caller can put secret-bearing material in a key
+    position, and a namespace event is readable by anyone who can read
+    the namespace. The reason code carries what an audit reader needs.
+
+    Nothing here may turn a 400 into anything else, so every failure is
+    swallowed. An unauthenticated caller (a @public endpoint has no JWT
+    to parse) is the ordinary case rather than an error, and the
+    database being unavailable must not upgrade a malformed request
+    into a 503.
+    """
+    try:
+        namespace, keyname = parse_jwt_identity()
+    except Exception:
+        # No JWT to attribute this to: a @public endpoint, which
+        # _authenticate_unless_public let through without one.
+        return
+
+    try:
+        ns = Namespace.from_db(namespace)
+        if not ns:
+            return
+        _token_use_event(
+            ns, keyname, 'request refused by input validation',
+            extra={
+                'validation-reason': finding.reason,
+                'validation-parameter': (
+                    REDACTED_PARAMETER if handles_credentials()
+                    else finding.parameter)
+            })
+    except Exception:
+        # Logged rather than swallowed silently: an audit event which
+        # cannot be written is worth knowing about, and this is the
+        # only remaining record that the request happened at all.
+        LOG.with_fields({
+            'namespace': namespace
+        }).exception('Failed to record audit event for a refused request')
 
 
 # The four descriptions of the `namespace` body parameter which the ref
@@ -1677,13 +1753,28 @@ def _enforce_scope(func, resource_class, override):
 def validate_request(func):
     """Check a request against its published parameter declarations.
 
-    Phase 3 of PLAN-api-input-validation. While API_VALIDATION_MODE is
-    'warn' -- the default, and what phase 3 ships -- this changes
-    nothing about any request: it records what it would have refused
-    and calls through. app.py emits those records once the response
-    status is known, because whether a finding represents a rejection
-    enforcement would *introduce* or a status code it would merely
-    *change* depends on what the request returned anyway.
+    PLAN-api-input-validation. While API_VALIDATION_MODE is 'enforce'
+    -- the default since phase 4 -- a finding other than
+    missing-required answers 400 in the API error shape, naming the
+    parameter. 'warn' is the operator's rollback and changes nothing
+    about any request: it records what it would have refused and calls
+    through. app.py emits those records once the response status is
+    known in both modes, because whether a finding represents a
+    rejection enforcement *introduced* or a status code it merely
+    *changed* depends on what the request returned anyway.
+
+    A refusal names the **first** enforceable finding only, so a
+    request with several problems is fixed one round trip at a time.
+    Every finding is emitted to the log either way, so an operator sees
+    the whole picture even when the caller does not. Answering with all
+    of them would mean deciding on a wire format for a list of errors,
+    which is a change to the API's error shape rather than to this
+    layer; phase 6 can have that argument if callers ask for it.
+
+    A refused request never reaches a per-method decorator, and
+    log_token_use is one of those, so the namespace audit event that a
+    well formed request would have written is recorded here instead --
+    see _record_refused_token_use.
 
     First in Resource.method_decorators and so innermost, which puts it
     after authentication (an unauthenticated caller cannot probe the
@@ -1758,6 +1849,7 @@ def validate_request(func):
                            if f.reason != validation.MISSING_REQUIRED]
             if enforceable:
                 first = enforceable[0]
+                _record_refused_token_use(first)
                 return sf_api.error(
                     400, '%s: %s' % (first.parameter, first.detail))
 

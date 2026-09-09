@@ -45,20 +45,39 @@ class ConfigTestCase(base.ShakenFistTestCase):
     def test_bogus_override(self):
         self.assertRaises(ValueError, SFConfig)
 
+    @mock.patch.dict('os.environ')
+    def test_validation_mode_defaults_to_enforce(self):
+        # Decision D16 of PLAN-api-input-validation: enforcement is the
+        # default rather than an operator opt-in, because leaving it at
+        # 'warn' would mean the defect class stays open in every
+        # deployment while the machinery to close it sits unused.
+        # Asserted here rather than only in the plan, so a well meant
+        # revert to the safer looking value has to argue with a test.
+        #
+        # The override is removed first: this asserts the default, and
+        # a developer who happens to run the suite with the setting
+        # exported would otherwise be testing their shell.
+        os.environ.pop('SHAKENFIST_API_VALIDATION_MODE', None)
+
+        self.assertEqual('enforce', SFConfig().API_VALIDATION_MODE)
+
     @mock.patch.dict('os.environ',
                      {'SHAKENFIST_API_VALIDATION_MODE': 'enforced'})
     def test_bogus_validation_mode_fails_at_load(self):
-        # The setting exists to be flipped to 'enforce' in phase 4 of
-        # PLAN-api-input-validation. A typo silently meaning warn is no
-        # validation and no signal anything is wrong, so anything other
-        # than the two literals must refuse to load.
+        # A typo silently meaning something other than what the
+        # operator wrote is no signal anything is wrong, so anything
+        # other than the three literals must refuse to load. This is
+        # the rollback path's safety net: an operator reaching for
+        # 'warn' in an incident must not get enforcement because they
+        # typed 'Warn'.
         self.assertRaises(ValueError, SFConfig)
 
     @mock.patch.dict('os.environ',
-                     {'SHAKENFIST_API_VALIDATION_MODE': 'enforce'})
+                     {'SHAKENFIST_API_VALIDATION_MODE': 'warn'})
     def test_valid_validation_mode_loads(self):
-        conf = SFConfig()
-        self.assertEqual('enforce', conf.API_VALIDATION_MODE)
+        # 'warn' rather than 'enforce', so this cannot pass by
+        # accidentally reading the default back.
+        self.assertEqual('warn', SFConfig().API_VALIDATION_MODE)
 
 
 class AgentOperationAttemptCapTestCase(base.ShakenFistTestCase):

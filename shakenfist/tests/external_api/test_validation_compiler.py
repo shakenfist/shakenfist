@@ -343,3 +343,119 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([], list(length.validators))
         self.assertEqual(-1, length.deserialize(-1))
+
+
+class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
+    """A container's element errors must name the element, not a dict.
+
+    marshmallow answers validate() with a list of strings when a field
+    is wrong and a dict keyed by index when a container's *elements*
+    are wrong. Phase 4's enforce flip turned the finding detail from a
+    log line into the caller's error message, so rendering that dict
+    with str() would answer `disk: {0: ['Not a valid mapping type.']}`.
+    """
+
+    class _Schema(marshmallow.Schema):
+        disk = fields.List(fields.Dict())
+        tags = fields.List(fields.String())
+        name = fields.String()
+
+    def _findings(self, supplied):
+        schema = self._Schema(unknown=marshmallow.EXCLUDE)
+        return [(f.parameter, f.detail)
+                for f in validation._schema_findings(schema, supplied)]
+
+    def test_a_bad_element_names_its_index(self):
+        self.assertEqual(
+            [('disk[0]', 'Not a valid mapping type.')],
+            self._findings({'disk': ['not a dict']}))
+
+    def test_every_bad_element_is_reported_in_order(self):
+        self.assertEqual(
+            [('disk[0]', 'Not a valid mapping type.'),
+             ('disk[1]', 'Not a valid mapping type.')],
+            self._findings({'disk': ['one', 'two']}))
+
+    def test_indices_are_ordered_numerically_not_lexically(self):
+        """Eleven elements, because two cannot tell the difference.
+
+        marshmallow keys a sequence error by integer index, and
+        sorting those as strings gives 0, 1, 10, 2 -- so a caller whose
+        third and eleventh disks are both malformed would be told about
+        `disk[10]`, since enforcement answers with the first finding
+        only. The count here is deliberately past ten.
+        """
+        self.assertEqual(
+            ['disk[%d]' % index for index in range(12)],
+            [parameter for parameter, _ in
+             self._findings({'disk': ['x'] * 12})])
+
+    def test_the_findings_one_container_can_produce_are_bounded(self):
+        """Nothing bounds a request body, so something must bound this.
+
+        Each finding is a log line shipped to centralised logging, and
+        naming elements individually is precisely what turns one bad
+        parameter into one line per element. The unknown-parameter scan
+        has had this bound since phase 3 for the same reason; element
+        naming gave type mismatches the same unbounded property.
+        """
+        findings = self._findings(
+            {'disk': ['x'] * (validation.MAX_TYPE_MISMATCH_FINDINGS + 500)})
+
+        self.assertEqual(
+            validation.MAX_TYPE_MISMATCH_FINDINGS + 1, len(findings))
+        self.assertEqual(
+            ('(overflow)',
+             '500 further mismatching values not reported individually'),
+            findings[-1])
+        # The bound is on findings, not on which ones: the reported
+        # elements are still the first ones, in order.
+        self.assertEqual(
+            ['disk[%d]' % index
+             for index in range(validation.MAX_TYPE_MISMATCH_FINDINGS)],
+            [parameter for parameter, _ in findings[:-1]])
+
+    def test_a_finding_carries_the_element_type_not_the_containers(self):
+        """Decision D5 makes the type the only thing a finding says
+        about a value, so it must be the type of the value that failed.
+        `disk[0]` reported as a list describes the array around it."""
+        schema = self._Schema(unknown=marshmallow.EXCLUDE)
+        findings = validation._schema_findings(
+            schema, {'disk': ['a string'], 'tags': [{'a': 1}]})
+
+        self.assertEqual(
+            [('disk[0]', 'str'), ('tags[0]', 'dict')],
+            sorted((f.parameter, f.value_type) for f in findings))
+
+    def test_an_unresolvable_path_falls_back_to_the_container(self):
+        # marshmallow can key an error by something the supplied value
+        # has no entry for. The container's type is still true of what
+        # the caller sent, which beats reporting nothing.
+        self.assertEqual(
+            'list',
+            validation.Finding(
+                validation.TYPE_MISMATCH, 'disk[3]', 'nope',
+                validation._element_value(['only one'], (3,))).value_type)
+
+    def test_a_scalar_field_is_unchanged(self):
+        # The flattening must not disturb the shape the rest of the
+        # phase's tests pin, which is the common case by far.
+        self.assertEqual(
+            [('name', 'Not a valid string.')], self._findings({'name': 5}))
+
+    def test_a_whole_container_of_the_wrong_type_is_unchanged(self):
+        # marshmallow answers a plain list here, not a dict, so this
+        # never went through the nested path at all.
+        self.assertEqual(
+            [('disk', 'Not a valid list.')],
+            self._findings({'disk': 'not a list'}))
+
+    def test_no_detail_renders_a_python_repr(self):
+        # The property the fix exists for, stated directly: whatever
+        # marshmallow nests, no finding may carry a dict or list repr
+        # into the caller's error message.
+        for supplied in ({'disk': ['x']}, {'tags': [{'a': 1}]},
+                         {'disk': ['x', 'y']}, {'name': 5}):
+            for parameter, detail in self._findings(supplied):
+                self.assertNotIn('{', detail, parameter)
+                self.assertNotIn('[', detail, parameter)

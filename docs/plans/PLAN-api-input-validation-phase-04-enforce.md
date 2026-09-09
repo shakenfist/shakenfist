@@ -288,6 +288,13 @@ merge until:
   run is not evidence, and phase 3's log records three separate
   occasions where a quiet channel was mistaken for a quiet system.
 
+Read this condition as "any JSON-valued metadata write", not as
+k3s specifically: the declaration is per route, so any such write
+exercises the same schema, and the traffic named here turned out to be
+`client-python-k3s` run by hand rather than anything scheduled. The
+measurement log records the reading actually taken, and why waiting on
+that traffic would have been waiting on nothing in particular.
+
 Whatever watches this window is exercised by hand before it is
 trusted — phase 3's notifier failed silently for its last three runs
 because cron's `PATH` could not find `sops`. If a notifier is used at
@@ -398,6 +405,103 @@ Checked before committing to it: the official client's
 `_delete_metadata` (`apiclient.py:514`) sends no body at all, so no
 shipped caller is affected. Two of the seven metadata delete handlers
 were cleaned up already, so the pattern is proven.
+
+### Review round 1 on [#4141](https://github.com/shakenfist/shakenfist/pull/4141)
+
+Eleven items: 2 `fix`, 3 `document`, 5 `consider`, 1 `none`. Both
+fixes and all three documentation items were taken, as were four of
+the five `consider` items. The round is against the flip itself
+rather than against machinery an earlier round added, which is the
+first review this branch has had.
+
+**Both `fix` items were in the element-naming commit**, which is the
+one piece of the branch that was not a plan step -- it was written
+because enforcement turned a finding's detail into the caller's error
+message. Neither defect existed before that commit, and both are the
+same kind of mistake: the code walked marshmallow's error structure
+correctly and then handled the *result* of the walk carelessly.
+
+* **The fan-out was unbounded.** `check()` has capped
+  unknown-parameter findings since phase 3 because a body key is
+  bounded only by what a caller sends and each finding is a log line.
+  Naming elements individually gave type mismatches exactly that
+  property -- a thousand-element disk array became a thousand
+  findings, of which the caller saw one. `MAX_TYPE_MISMATCH_FINDINGS`
+  now bounds them in the same shape, with the same `(overflow)`
+  summary finding. The leaves are sliced before their values are
+  resolved, so the elements past the bound cost a tuple each.
+* **Indices sorted lexically**, so `disk[10]` was reported ahead of
+  `disk[2]`. Since a refusal names the first finding only, a caller
+  with two bad disks was told about the wrong one. `_sort_key` keeps
+  integers in numeric order ahead of sub-field names, and the ordering
+  test now uses twelve elements, because two cannot tell the two
+  orders apart -- which is why the test named "in order" did not catch
+  this.
+
+**The audit gap was taken as a fix rather than as documentation.**
+The reviewer offered either. A refusal returns from outside every
+per-method decorator, so `log_token_use` never runs and an
+authenticated caller could send malformed requests indefinitely
+leaving nothing in the namespace's own audit trail -- only sf-api's
+log, which carries neither key name nor remote address. Preserving
+event coverage is a standing goal of this project, so enforcement now
+writes a `request refused by input validation` audit event carrying
+the same fields plus the reason and parameter. It is deliberately a
+different message from `token used to authenticate request`, because
+it is a different fact: this request reached no handler. Failures are
+swallowed -- an unavailable database must not upgrade a malformed
+request into a 503 -- but the swallow logs.
+
+**The rollback path is now asserted rather than promised.** Six
+comments added by the flip said a handler's own guard "remains and
+still answers when API_VALIDATION_MODE is not enforce", while every
+test that covered those messages had been rewritten to assert the
+validator's wording. `set_validation_mode()` on the test base restores
+the mode on cleanup, and six warn-mode tests now assert those guards'
+own messages -- one of the six covers the three claim bounds, which
+are three guards in one handler. Mutating the helper into a no-op fails them, so they are
+about the mode rather than incidentally passing at it.
+
+**Writing the audit event turned up a leak of its own**, which is the
+reason the reviewer's item 11 was worth recording even though it asked
+for no change. It observed that a refusal puts the parameter name --
+which `log_validation_findings` redacts on `/auth` routes, because a
+buggy caller can put secret-bearing material in a key position -- into
+the response body, and that this is safe only because
+`log_response_info` drops the whole body on the same predicate. A
+namespace event has no such protection and is readable by anyone who
+can read the namespace, so the new audit event redacts the name on the
+same predicate. `REDACTED_PARAMETER` is now one constant used by both
+sites, so the two records of one refusal cannot disagree about what is
+safe to say, and the coupling between the two redactions is written
+down where the predicate lives.
+
+**Verification.** Eleven mutations over the new assertions, each caught
+by the test that names the property: lexical index sorting, an
+unbounded fan-out, a missing overflow finding, the container's type
+reported instead of the element's, an unresolvable path answering None
+rather than falling back, the raw-body skip removed, the audit event
+removed, the audit helper allowed to raise on a `@public` endpoint,
+the last enforceable finding reported instead of the first, the
+parameter name left unredacted on a credential route, and the
+warn-mode helper turned into a no-op. A twelfth mutation --
+validating a raw body against its schema -- was **not** caught, and
+should not be: a raw body declaration cannot be combined with named
+body parameters, so a raw-body route's compiled body schema is always
+None and the guard is unobservable belt-and-braces. A test for it
+would be a test that cannot fail. The first attempt at the raw-body
+test *was* that test -- it sent bytes with an octet-stream content
+type, which no scan could have reported on whether the route was
+skipped or not; it earns its place only because the body it now sends
+is JSON the scan would otherwise refuse.
+
+The one `consider` not taken is the cluster CI test's base class.
+`TestUndeclaredParameterRefused` keeps `BaseNamespacedTestCase`
+because the property has to hold for an ordinary caller rather than
+for an admin -- the namespaced client is the point, not incidental --
+and the teardown loops it pays for break out immediately on empty
+lists. The reason is now in the class docstring, along with why the
+private `_request_url` is the right call there.
 
 ### Review round 2 on [#4101](https://github.com/shakenfist/shakenfist/pull/4101)
 
@@ -604,6 +708,13 @@ run, so absence is evidence rather than silence.
 13. `UNDECLARED_BY_DESIGN` in `test_parameter_declarations.py` is
     empty, and the five metadata delete handlers no longer accept a
     `value` kwarg they never read.
+14. The findings one request can produce are bounded whatever it
+    sends, in every reason, and a test proves it.
+15. A refused request writes an audit event against the caller's
+    namespace, so enforcement costs no audit coverage.
+16. Each handler guard which enforcement now answers ahead of has a
+    warn-mode test asserting the guard's own message, so the
+    documented rollback path is exercised rather than described.
 
 ## Back brief
 
@@ -619,5 +730,129 @@ gathered and shown before the switch, not after.
 
 ## Measurement log
 
-*(D22's confirmatory reading goes here, in the format phase 3's log
-established: the reading command, what ran, and the signature table.)*
+**2026-09-08 -- D22's confirmatory reading. Both conditions met; the
+switch may be thrown.** Steps 1 to 3 merged as [#4101][pr] on
+2026-09-07 (three review rounds; #3739 closed by the merge). sfcbr
+redeployed between 07:48 and 08:48 UTC the same day at
+`shakenfist=f5cf6a3fa`, which carries the phase's head `5168935b8`.
+
+The deploy was confirmed *live* rather than merely installed, because
+a mirror sha only says what was written to disk: the running server
+reports `0.8.0rc5.dev1236+gf5cf6a3fa.d20260907`, and its published
+specification carries both fixes -- fourteen metadata `value`
+parameters rendered as `format: any JSON value` with no `type`
+(including `PUT /auth/namespaces/{namespace}/metadata/{key}`), and
+`POST /networks/{network_ref}/dns` still `string`/ipv4 as D15
+requires. Body `namespace` declarations went 14 to 65 across the
+package, the +51 matching the 51 problems the audit reported when run
+against unmodified `develop`.
+
+### Reading 1 -- the functional CI run. Nine to zero.
+
+[Run 34074436494][run] (the `merge_group` run of #4101 itself, so the
+first full suite over the merged code; all jobs green). Graded from
+the per-node journals in the six bundles, since the central Loki dump
+in each bundle is still zero bytes -- actions repo issue #16 is not
+fixed and the phase 3 note about it still applies.
+
+| n | signature | 2026-08-13 | classification |
+|---|-----------|-----------|----------------|
+| 21 | missing-required, `POST /auth/federated`, 400 | 21 | Intended rejection: the federation suite's deliberately malformed bodies. Unchanged. |
+| 0 | **unknown-parameter `namespace`, artifact ref, 200/404** | **9** | **Fixed.** The #3739 population, gone. |
+| 6 | type-mismatch `length`, consoledata, 400 | 6 | Intended rejection. Unchanged. |
+| 6 | type-mismatch `key_ttl`, rules create, 400 | 6 | Intended rejection. Unchanged. |
+| **33** | **total** | **42** | Only the nine moved. |
+
+Both of phase 3's guards against a false negative were re-run, because
+a zero that is not proven to be capable of being non-zero is not a
+reading. The apparatus was live: `Compiled API parameter declarations`
+with `handlers: 139` appears in all six bundles. And the generator ran:
+`test_artifact_system_creds_namespace_scoped` and
+`test_same_name_different_namespace` -- the two cluster CI tests that
+drive a system-credentialed lookup with an explicit `namespace=` --
+both executed and passed at 02:11.
+
+### Reading 2 -- the metadata `value` type mismatch. Probed, not waited out.
+
+D22 asked for 72 hours of absence "during which the k3s orchestration
+traffic that produced it has actually run". That wording named the
+wrong thing, and the correction matters more than the wait:
+
+* The traffic is not a running k3s cluster. It is `client-python-k3s`
+  exercised by hand, storing its state in namespace metadata under
+  `orchestrated_k3s_*` keys. It appears on the days that library is
+  worked on (08-09, 08-17, 08-22 to 08-24, 08-28, 08-30, 09-04, 09-05)
+  and stops otherwise -- it last ran 2026-09-05 21:00 UTC, some 35
+  hours *before* the fix deployed. Waiting for it would have been
+  waiting on an unscheduled human activity.
+* Nothing about k3s is load-bearing. The declaration is per route, not
+  per key: `value` on that route compiles to `fields.Raw`, so **any**
+  JSON-valued metadata write exercises the identical schema. The
+  requirement should read "any JSON-valued metadata write", and does
+  from here.
+
+So the reading was taken by probe on 2026-09-08 at 07:05:50 UTC. A
+scratch namespace took a dict-valued and a list-valued metadata write
+-- the exact `_set_metadata` shape (`PUT .../metadata/<key>` with
+`{'value': ...}`) behind all 294 of the historical findings -- both
+stored and read back verbatim, and the namespace was deleted.
+
+The probe carried its own positive control, for the same reason the
+apparatus is hand-verified: an undeclared body key on `GET /instances`
+in the same second, which **must** still be reported. Reading, 35
+seconds later:
+
+    loki-query '{job="shakenfist"} |= "API request validation finding"' \
+        --tenant sfcbr --since 15m --limit 200
+
+| n | signature | meaning |
+|---|-----------|---------|
+| 1 | unknown-parameter `banana`, `GET /instances`, 400 | Control fired. The pipeline is alive and findings reach Loki. |
+| **0** | **type-mismatch `value`, metadata, 200** | **Fixed.** Two writes that would each have produced one. |
+
+A silent channel would have produced neither line. This is positive
+evidence rather than an absence, which is what 72 hours of quiet could
+not have given us.
+
+### What thirty days of sfcbr says about the flip's blast radius
+
+Widening the query to the whole warn window, and splitting on the
+status the request *actually* got, isolates what enforcement changes:
+
+| n | response | signature |
+|---|----------|-----------|
+| 294 | **200** | type-mismatch `value`, namespace metadata |
+| 40 | 400 | type-mismatch, namespace claims |
+| 12 | 400 | missing-required, `POST /auth` |
+| 8 | 400 | missing-required, namespace claims |
+| 2 | 400 | type-mismatch `limit`, instance events |
+| 1 | 400 | unknown-parameter `banana` (the 08-13 hand probe) |
+
+Every finding on a request that *succeeded* is the metadata one, and
+it is fixed. Everything else already answers 400 and answers 400 after
+the flip, so the enforceable surface on sfcbr is now empty.
+
+Two of those signatures postdate phase 3's reading and are classified
+here for the first time. Both are the `key_ttl` pattern -- the
+published bound and the server already agree, so validation only
+restates a refusal the handler was already making:
+
+* **Namespace claims, 48 findings on 2026-08-24 and 08-25.** The
+  scheduler-reservations phase 4 suite: `Must be greater than or equal
+  to 1`, `Must be greater than or equal to 0`, and `Not a valid
+  integer` against a bool. All 400 already.
+* **Instance events `limit`, 2 findings on 2026-08-25.** A string
+  where the declared bound wants 1..1000. Already 400.
+
+### The remaining caveat, stated rather than buried
+
+The control's own response is the phase's motivating defect, still
+visible: `GET /instances` with an undeclared key answered
+`{"error": "InstancesEndpoint.get() got an unexpected keyword argument
+'banana'", "status": 400}` -- interpreter text, leaked to the caller.
+Step 4 replaces exactly that with `banana: not declared by this
+endpoint`, and its tests assert the absence of interpreter text
+positively.
+
+[pr]: https://github.com/shakenfist/shakenfist/pull/4101
+[run]: https://github.com/shakenfist/shakenfist/actions/runs/34074436494

@@ -212,7 +212,7 @@ class InterfaceMetadataEndpoint(api_base.Resource):
          (404, 'Interface not found.', None)],
         requires_admin=True))
     @api_base.log_token_use
-    def delete(self, interface_uuid=None, key=None, value=None):
+    def delete(self, interface_uuid=None, key=None):
         ni, n, err = api_util.safe_get_network_interface(interface_uuid)
         if err:
             return err

@@ -131,17 +131,26 @@ class ClaimCreateTestCase(ClaimEndpointTestCase):
             self.assertEqual(400, resp.status_code, field)
             self.assertIn(field, resp.get_json()['error'])
 
+    # The three refusals below are now made by the published parameter
+    # declarations rather than by the handler's own guards, because
+    # phase 4 of PLAN-api-input-validation runs validation ahead of
+    # every per-method decorator. The guards remain and still answer
+    # when API_VALIDATION_MODE is not 'enforce', so what is asserted
+    # here is the bound rather than either wording.
+
     def test_a_negative_limit_is_refused(self):
         resp = self._create(limit_cpus=-1)
         self.assertEqual(400, resp.status_code)
-        self.assertIn('cannot be negative', resp.get_json()['error'])
+        self.assertIn('limit_cpus: Must be greater than or equal to 0',
+                      resp.get_json()['error'])
 
     def test_a_boolean_limit_is_refused(self):
         # bool is an int in Python, so "limit_cpus": true would
         # otherwise quietly claim one cpu.
         resp = self._create(limit_cpus=True)
         self.assertEqual(400, resp.status_code)
-        self.assertIn('not an integer', resp.get_json()['error'])
+        self.assertIn('limit_cpus: Not a valid integer',
+                      resp.get_json()['error'])
 
     def test_a_non_positive_expiry_is_refused(self):
         # A claim that is expired the moment it exists holds capacity
@@ -150,7 +159,33 @@ class ClaimCreateTestCase(ClaimEndpointTestCase):
         for value in [0, -60]:
             resp = self._create(expires_in_seconds=value)
             self.assertEqual(400, resp.status_code, value)
-            self.assertIn('must be positive', resp.get_json()['error'])
+            self.assertIn(
+                'expires_in_seconds: Must be greater than or equal to 1',
+                resp.get_json()['error'])
+
+    def test_the_handlers_own_guards_answer_in_warn_mode(self):
+        """The rollback path for the three refusals above.
+
+        Enforcement answers ahead of these guards, so in the default
+        configuration their messages are unreachable and nothing else
+        in the tree asserts them (the 'cannot be negative' hits in
+        test_mariadb_capacity_claims.py are the database layer's own
+        guard, not this one). An operator who sets 'warn' gets these
+        answers back, so they are pinned at that mode.
+        """
+        self.set_validation_mode('warn')
+
+        resp = self._create(limit_cpus=-1)
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('cannot be negative', resp.get_json()['error'])
+
+        resp = self._create(limit_cpus=True)
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('not an integer', resp.get_json()['error'])
+
+        resp = self._create(expires_in_seconds=0)
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('must be positive', resp.get_json()['error'])
 
     def test_an_unknown_namespace_is_not_found(self):
         resp = self._create(namespace='nosuchnamespace')

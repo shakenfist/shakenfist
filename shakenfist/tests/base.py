@@ -5,6 +5,8 @@ from unittest import mock
 from pydantic import SecretStr
 import testtools
 
+from shakenfist.config import config
+
 
 class ShakenFistTestCase(testtools.TestCase):
     def _reject_secret_operand(self, needle, haystack, method):
@@ -81,6 +83,26 @@ class ShakenFistTestCase(testtools.TestCase):
             return_value=None)
         self.mock_record_exception = self.mock_record_exception_patcher.start()
         self.addCleanup(self.mock_record_exception_patcher.stop)
+
+    def set_validation_mode(self, mode):
+        """Run the rest of this test with API_VALIDATION_MODE at `mode`.
+
+        The mode defaults to 'enforce' since phase 4 of
+        PLAN-api-input-validation, which means several handlers' own
+        input guards are no longer reachable in the default
+        configuration -- request validation answers ahead of them. They
+        are still what answers when an operator rolls back to 'warn',
+        so the tests which assert their messages say which mode they
+        are about rather than depending on a default. A rollback path
+        asserted only in prose is a rollback path that rots.
+
+        Restored on cleanup: config is a process-wide singleton, so a
+        test which leaves it changed changes every test that runs
+        after it in the same worker.
+        """
+        saved = config.API_VALIDATION_MODE
+        self.addCleanup(setattr, config, 'API_VALIDATION_MODE', saved)
+        config.API_VALIDATION_MODE = mode
 
 
 class SpoolRootMixin:
