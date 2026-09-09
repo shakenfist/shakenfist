@@ -450,3 +450,66 @@ implement -- clause by clause, against
 your reading of the reconciler differs from finding 5 in any
 respect, stop and say so: the finding is what the rest of this plan
 is built on.
+
+## Outcome
+
+Complete. Steps 1a-1c merged as
+[#4147](https://github.com/shakenfist/shakenfist/pull/4147); steps 1d
+and 1e are recorded here.
+
+### The measurement (definition of done item 9)
+
+Two `slim-tier` bundles from 2026-09-09, same tier and same probe,
+read with the time-to-first-capacity-row figure step 1b added to
+`tools/ci_headroom_report.py`:
+
+| Run | Commit | Phase 1 present | Time to full capacity-row coverage |
+|-----|--------|-----------------|------------------------------------|
+| [34338417787](https://github.com/shakenfist/shakenfist/actions/runs/34338417787) | `459e22835` | no | 165 s |
+| [34345875271](https://github.com/shakenfist/shakenfist/actions/runs/34345875271) | `7cc93750d` | yes | 0 s |
+
+The item asked for under 60 s and got 0 s, but read the zero
+carefully: it means the window had already closed before the probe's
+first sample, so it bounds the window rather than measuring it. The
+probe starts after the readiness gate, not at cluster start, and
+cannot see anything earlier. The 165 s baseline is the more
+informative number -- it lands inside the 135-210 s band the master
+plan predicted from journal readings, which is the survey's
+characterisation of the defect confirmed against a real run rather
+than against logs.
+
+### #4087 (definition of done item 11)
+
+Closed, but not by this phase, and not for the right reason. The
+autofixer opened [#4144](https://github.com/shakenfist/shakenfist/pull/4144)
+against the issue on 2026-09-08 and it merged on 2026-09-09 carrying
+`Fixes #4087`, which auto-closed it. #4144 is a sound change --
+it tallies the forced-write guard event in the headroom census -- but
+it touches only `tools/ci_headroom_report.py` and its tests, and its
+description asserts that #4106 had already fixed the core of the
+issue. Finding 6 of the survey above is that #4106 did not: its
+one-shot ran at election, before any hypervisor had published
+metrics, and its predicate only asked whether the capacity table was
+entirely empty.
+
+The issue is therefore in the right state for the wrong reason. Step
+1d posted the comment it owed --
+[issuecomment-5607329096](https://github.com/shakenfist/shakenfist/issues/4087#issuecomment-5607329096)
+-- recording what #4106 covered, what it did not, what actually
+closed the window, and the two measurements above. The issue was left
+closed rather than reopened and re-closed, since the end state is
+correct and the churn would buy nothing.
+
+This is the second time the issue-fix workflow has raced a planned
+phase to the same issue. Nothing in this phase's scope addresses
+that; it is noted here because the next phase to file or claim an
+issue should expect it.
+
+### Deviations from this plan
+
+Two, both recorded above at their source rather than only here:
+definition of done item 2 (two pre-existing tests were modified, for
+the reasons under that item) and D6 (the readiness gate does not
+cover the condition the assertion makes, so the assertion waits --
+see the amendment under D6). Both were found in review of #4147, not
+during implementation.
