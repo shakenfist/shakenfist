@@ -13843,9 +13843,9 @@ is the <code>plan-push-audit-phase</code> shared block, and this criterion is wh
 holds it in place: the phase reached the fleet's plans as a hand-driven
 sweep, and until this check existed nothing stopped the next plan from
 omitting it.</p>
-<p>For every master plan <code>docs/plans/index.md</code> links whose status is not
-terminal -- that is, anything other than <code>Complete</code>, <code>Abandoned</code> or
-<code>Superseded</code>:</p>
+<p>For every master plan <code>docs/plans/index.md</code> links whose entry records a
+status, and whose status is not terminal -- that is, anything other
+than <code>Complete</code>, <code>Abandoned</code> or <code>Superseded</code>:</p>
 <ul>
 <li>the plan <strong>names <code>PUSH-AUDIT.md</code></strong>, and</li>
 <li>the <strong>last</strong> of its phases is the push audit phase.</li>
@@ -13935,6 +13935,10 @@ to judge, and the broken links are <code>docs-external-links</code>' finding
 rather than this one's. A plan the check could not find is <em>named</em> in
 the result either way, because a plan silently walked past looks
 exactly like a plan that passed.</p>
+<p>A repository whose linked plans are all <em>statusless</em> is not N/A,
+though. It links plans, and every one of them is named in the result;
+reporting it as N/A would say the index links none, which is the
+opposite of what a reader has to be told.</p>
 <h2 id="what-this-deliberately-does-not-cover">What this deliberately does not cover<a class="headerlink" href="#what-this-deliberately-does-not-cover" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Whether the audit was run.</strong> A plan can carry the phase, never run
@@ -13949,13 +13953,11 @@ exactly like a plan that passed.</p>
   the handful of plans still able to act on a finding and one that
   files an issue against every plan the fleet has ever closed.</li>
 </ul>
-<p>The block words the carve-out as <code>Complete</code> alone. The check applies
-  it to all three terminal terms of the status vocabulary, because
-  <code>Abandoned</code> and <code>Superseded</code> are terminal for the same reason and
-  the block's silence about them is a gap rather than a decision.
-  Rewording the block bumps its version and stales every embedded copy
-  across the fleet, which is a sweep; it is scheduled as one, in
-  <code>docs/plans/PLAN-push-audit-phase.md</code>.
+<p>The block names all three terminal terms of the status vocabulary
+  from v3 onwards. The check applied to all three before the block
+  caught up, because <code>Abandoned</code> and <code>Superseded</code> are terminal for
+  the same reason and the block's earlier silence about them was a
+  gap rather than a decision.
 * <strong>Plans with a terminal status that do carry the phase.</strong> Not
   inspected either. Whether the audit ran is a judgement about the
   plan's own record, and the presence of a heading cannot settle it.
@@ -13978,7 +13980,40 @@ exactly like a plan that passed.</p>
   plans, which are legitimately unphased -- but a verdict that hides
   them is how the next <code>PLAN-release-1.0.md</code> stays hidden. The names
   are there so a person can read the handful by hand.
-* <strong>Repositories with no plan practice.</strong> No index, no finding.</p>
+* <strong>Repositories with no plan practice.</strong> No index, no finding.
+* <strong>Plans the index links without recording a status.</strong> They are not
+  judged, and they are named. The carve-out above turns on the status,
+  so a plan the index never placed on either side of it cannot be put
+  there by this check: judging it would demand a push audit phase for a
+  plan nobody has said is still open, and if that plan is finished the
+  shared block's carve-out says explicitly not to reopen it. The check
+  cannot tell which, so it declines rather than guessing, and the
+  decision is recorded as decision 2 of
+  <code>docs/plans/PLAN-push-audit-phase.md</code>.</p>
+<p>This covers more than an empty cell in a status table. A plan linked
+  from prose, or from a bullet list in an index that is not a table
+  yet, records no status either, and the verdict says so in those terms
+  -- "N plan(s) the index links without recording a status" -- rather
+  than naming a row that may not exist.</p>
+<p>The criterion that speaks to the index's shape is <code>plan-index</code>, and
+  it requires a <em>table</em>, not a status column:
+  <a href="/components/development/audits/plan-index/"><code>plan-index.md</code></a> says a <code>Status</code> column is optional,
+  because a standalone plan listing that tracks no status is
+  registered, just not tracked. So a repository can satisfy
+  <code>plan-index</code> with a <code>Date | Plan | Intent</code> table and never enter
+  this criterion's scope, and a row of a table that <em>does</em> carry the
+  column can stop before reaching it -- <code>| 2026-01-01 |
+  [One](/components/development/audits/PLAN-one/) | Do one |</code> under a four-column header -- which
+  drops that one plan from judgement while every other row keeps
+  working. Those two shapes are an opt-out that nothing detects.</p>
+<p>A cell that is present but empty is not one of them. <code>plan-index</code>
+  reads it, and the empty string is not in the shared vocabulary, so
+  <code>| 2026-01-01 | [One](/components/development/audits/PLAN-one/) | Do one | |</code> fails there as a
+  status cell outside the vocabulary even while this criterion
+  declines to judge the plan. Only the omitted cell and the absent
+  column escape. Naming every statusless plan in the verdict is the
+  whole of the mitigation for those two: a repository opting out says
+  so on the compliance page every morning rather than quietly passing.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template of its own. The canonical wording of the phase is the
 <code>plan-push-audit-phase</code> shared block in

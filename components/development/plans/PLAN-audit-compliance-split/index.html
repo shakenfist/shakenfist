@@ -14439,29 +14439,33 @@ this repository's convention.</p>
 <tr>
 <td>1. Split the generated output out</td>
 <td>Complete</td>
-<td></td>
+<td>7843932</td>
 </tr>
 <tr>
 <td>2. Bring the specifications into review scope</td>
 <td>Complete</td>
-<td></td>
+<td>7843932</td>
 </tr>
 <tr>
 <td>3. Documentation and runbooks</td>
 <td>Complete</td>
-<td></td>
+<td>7843932</td>
 </tr>
 <tr>
 <td>4. Push audit</td>
 <td>Complete</td>
-<td></td>
+<td>7843932</td>
 </tr>
 </tbody>
 </table>
-<p>The <code>Merged</code> column stays empty until the branch lands; all four
-phases ship as one pull request rather than one each, because phase 2
-cannot be reviewed without phase 1 in the tree and phase 3 corrects
-prose that phase 1 makes wrong.</p>
+<p>All four phases shipped as one pull request rather than one each,
+because phase 2 cannot be reviewed without phase 1 in the tree and
+phase 3 corrects prose that phase 1 makes wrong: <code>7843932</code> is the
+merge commit of pull request 57, whose diff against its first
+parent is the whole of this plan's work. The <code>Merged</code> cells were
+filled by backfill, in step 4b of
+<code>docs/plans/PLAN-push-audit-phase.md</code>, rather than as the phases
+landed.</p>
 <p>Phases 1 and 2 have a hard ordering dependency:
 <code>test_review_tracking.py</code> asserts that every pattern in
 <code>review-scope.toml</code> matches a path that exists unless it carries an

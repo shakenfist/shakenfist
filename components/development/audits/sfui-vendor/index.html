@@ -13837,8 +13837,9 @@ verbatim copies downstream, and this audit to catch drift.</p>
 <p>private-ci, the first sfui consumer, is internal tooling excluded from
 the conventions audits, but this check runs against it anyway. It is in
 the workflow matrix scoped by <code>only_checks</code> in <code>REPO_OVERRIDES</code> to this
-check alone, so it collects no issues about packaging, release
-workflows or branch naming. The reason for the exception is that
+check and the four plan criteria, so it collects no issues about
+packaging, release workflows or branch naming. <code>docs/audits/README.md</code>
+holds the current list. The reason for the exception is that
 vendored drift produces no symptom: private-ci kept working perfectly
 for five days with a copy two canonical merges behind, and only a
 hand-run of <code>tools/vendor.sh --check</code> -- which nobody is scheduled to

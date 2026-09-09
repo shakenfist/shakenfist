@@ -14142,11 +14142,13 @@ worse than none.</p>
 roster is separate, and what stays project-specific. Registered in
 <code>audits/README.md</code> and <code>PROJECT-CONSISTENCY-AUDITS.md</code>.</p>
 <h2 id="migration-separate-commits-one-per-repository">Migration (separate commits, one per repository)<a class="headerlink" href="#migration-separate-commits-one-per-repository" title="Permanent link">&para;</a></h2>
-<p>Landed in four of the eight repositories: instar, kerbside, ryll
-and shakenfist are <code>compliant</code> on the <code>plan-template</code> check.
-Outstanding for client-python-k3s, divergulent and occystrap
-(sfui has no template and is N/A). For each remaining repository,
-in its own branch:</p>
+<p>Landed in five of the eight repositories: client-python-k3s,
+divergulent, instar, kerbside and ryll are <code>compliant</code> on the
+<code>plan-template</code> check. Outstanding for occystrap (sfui has no
+template and is N/A). shakenfist, one of the original four, is now
+non-compliant on <code>plan-template</code> for missing the
+<code>plan-push-audit-phase</code> block (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/3892" title="GitHub Issue: shakenfist/shakenfist #3892">shakenfist#3892</a>). For each remaining
+repository, in its own branch:</p>
 <ol>
 <li>Restructure <code>PLAN-TEMPLATE.md</code> so no section mixes generic and
    project-specific text. In practice: move the project-specific

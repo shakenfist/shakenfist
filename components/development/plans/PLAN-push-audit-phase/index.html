@@ -15003,8 +15003,10 @@ on the basis decision 1 actually states.</p>
 branch, using the check's own <code>plan_index_entries</code> and
 <code>plan_audit_phase_state</code> rather than a grep, so that the scope is the
 one the criterion enforces. The <code>development</code> row was re-measured on
-2026-09-05 and moved; the bullet below says why, and it is the third
-time this section's arithmetic has been corrected:</p>
+2026-09-05 and moved, then corrected again on 2026-09-09 once
+<code>PLAN-scope-coverage.md</code>'s own closeout (PR #107) filled the cells
+this section had counted as missing; the bullet below says why, and
+it is the fourth time this section's arithmetic has been corrected:</p>
 <table>
 <thead>
 <tr>
@@ -15062,7 +15064,7 @@ time this section's arithmetic has been corrected:</p>
 <td>10</td>
 <td>8</td>
 <td>not mentioned</td>
-<td>2</td>
+<td>1</td>
 <td>0</td>
 </tr>
 </tbody>
@@ -15198,12 +15200,16 @@ described, so the sweep there appends the phase in the plan file and
 extends the cell rather than adding a table row.</p>
 <p><strong>development was never listed, and is not compliant yet.</strong> Six of
 its eight carriers record landing commits, one of them in a shape
-decision 8 accepts; <code>PLAN-audit-compliance-split.md</code> and
-<code>PLAN-scope-coverage.md</code> have landed phases whose <code>Merged</code> cells are
-empty, and step 4b fills them. That is why this repository carries a
-backfill of its own rather than only the block bump, and it is the
-one place where this phase's own repository is in the set it sweeps.
-Two plans a phrase grep flags are correctly untouched:
+decision 8 accepts; <code>PLAN-audit-compliance-split.md</code> has four landed
+phases whose <code>Merged</code> cells are empty, and step 4b fills them. That
+is why this repository carries a backfill of its own rather than
+only the block bump, and it is the one place where this phase's own
+repository is in the set it sweeps. <code>PLAN-scope-coverage.md</code> had the
+same gap at measurement time, but its own closeout filled its three
+empty cells in PR #107 (commits <code>31411ad</code> and <code>0cb5a0e</code>) before step
+4b ran, so it needs nothing further and step 4b leaves it alone --
+one plan and four cells, not two plans and seven. Two plans a phrase
+grep flags are correctly untouched:
 <code>PLAN-stestr-testtools.md</code> carries a <code>## Push audit</code> section but has
 no phases, so there is no range to record, and
 <code>PLAN-llm-doc-structure.md</code> names <code>PUSH-AUDIT.md</code> only in prose, has
@@ -15458,7 +15464,7 @@ Future work with the criterion.</p>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td>Sweep divergulent: three incomplete plans (<code>PLAN-published-cache.md</code>, <code>PLAN-release-1.0.md</code>, <code>PLAN-patch-classification.md</code>) that carry no push audit phase at all. Append the phase to each and extend its <code>index.md</code> row -- its index tracks phases as an inline <code>✓</code>/<code>◐</code> list in a <code>Phases</code> cell, so the phase is appended in the plan file and the cell extended, not added as a table row (decision 3 of phase 3). divergulent has no <code>PUSH-AUDIT.md</code>; per the shared block the phase is still carried, and it says the runbook does not exist yet and what was done instead. All three then name <code>PUSH-AUDIT.md</code>, so they join the backfill set: reconstruct a landing commit for each of their already-merged phases by the same rules as 4c, or say per phase that the range is unrecoverable and name the paths. <code>PLAN-curation-cli-ergonomics.md</code> has no phases the check can read -- leave it, and say in the pull request that it was left and why. Install the <code>plan-push-audit-phase</code> v3 block in its <code>PLAN-TEMPLATE.md</code> -- divergulent carries a template but not this block, so this is an install rather than a refresh -- which closes <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/79" title="GitHub Issue: shakenfist/divergulent #79">divergulent#79</a> as a side effect of being in that file already. One pull request.</td>
+<td>Sweep divergulent: three incomplete plans (<code>PLAN-published-cache.md</code>, <code>PLAN-release-1.0.md</code>, <code>PLAN-patch-classification.md</code>) that carry no push audit phase at all. Append the phase to each and extend its <code>index.md</code> row -- its index tracks phases as an inline <code>✓</code>/<code>◐</code> list in a <code>Phases</code> cell, so the phase is appended in the plan file and the cell extended, not added as a table row (decision 3 of phase 3). divergulent has no <code>PUSH-AUDIT.md</code>; per the shared block the phase is still carried, and it says the runbook does not exist yet and what was done instead. All three then name <code>PUSH-AUDIT.md</code>, so they join the backfill set: reconstruct a landing commit for each of their already-merged phases by the same rules as 4c, or say per phase that the range is unrecoverable and name the paths. <code>PLAN-curation-cli-ergonomics.md</code> has no phases the check can read -- leave it, and say in the pull request that it was left and why. Refresh the <code>plan-push-audit-phase</code> block to v3 in its <code>PLAN-TEMPLATE.md</code>. An earlier draft of this step called that an install, on the strength of <code>PLAN-plan-template-blocks.md</code>'s Migration section listing divergulent as outstanding; that entry was stale and is corrected in step 4b's pull request. <code>docs/audits/compliance.md</code> has divergulent <code>compliant</code> on <code>plan-template</code>, and <code>plan-push-audit-phase</code> is a required member of <code>PLAN_TEMPLATE_BLOCKS</code>, so the block is already there at v2 and this step bumps the version marker and the carve-out sentence. Re-check the compliance page before starting rather than trusting either statement. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/79" title="GitHub Issue: shakenfist/divergulent #79">divergulent#79</a> is therefore not this step's to close: it was the audit's missing-block issue and it is already closed, which is how the block got there. One pull request.</td>
 </tr>
 <tr>
 <td>4e</td>
