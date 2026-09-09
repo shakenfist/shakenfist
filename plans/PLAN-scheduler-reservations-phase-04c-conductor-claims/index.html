@@ -14500,7 +14500,7 @@ conductor.</p>
 <td>management session</td>
 <td>none</td>
 <td>Deploy and observe for at least seven days of normal CI load. Record in the Observations section below: claims created and deleted; capacity refusals per day and whether they correlate with cluster load; transient refusals; <code>conductor_claims_failed_total</code>, which must be zero; every <code>placement admitted over namespace capacity claim</code> audit event on the cluster with its dimension; the distribution of claim size against measured peak per <code>(repo, job_name)</code>; and whether the reconciler reported any drift in <code>cluster_capacity.claimed_*</code> that a leaked claim would explain.</td>
-<td>In progress -- deployed 2026-09-02 18:13:46, data collected 2026-09-08, window closes 2026-09-09 18:13</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>6</td>
@@ -14508,7 +14508,7 @@ conductor.</p>
 <td>opus</td>
 <td>worktree</td>
 <td>Close-out, in this repository. Write the observation record into this plan, then answer phase 5's question explicitly: does the data support flipping <code>CLAIM_ENFORCEMENT_HARD</code>, and if not, what is still missing. If the anti-starvation question now has data behind it, say what the data says and leave the policy to its own phase. Update the master plan's phase table and <code>docs/plans/index.md</code>. Commit subject: <code>scheduler: record what conductor claims measured.</code></td>
-<td>In progress -- record written 2026-09-08 from a five-day-23-hour window, to be amended when the window closes</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>
@@ -14713,17 +14713,19 @@ scheduler was already exploiting -- but it does not calibrate the
 ceiling. The management session extends the window rather than
 declaring the phase done on a null result.</p>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
-<p>Ticked against the record in Observations below, which covers
-2026-09-02 18:13 to 2026-09-08 17:16 -- one day short of the
-seven the phase asks for. Each box marked <em>(provisional)</em> is met
-on the data so far and should be re-checked when the window
-closes on 2026-09-09 18:13.</p>
+<p>Ticked against the record in Observations below, which covers the
+full seven-day window from 2026-09-02 18:13:46 to 2026-09-09
+18:13:46. An earlier version of this list marked four boxes
+<em>(provisional)</em> against a five-day-23-hour window; all four have
+been re-checked against the closed window and none of them
+changed sign, though two of the findings behind them changed in
+magnitude and are called out in Observations.</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Phase 4b is complete and the deployed conductor's client
       carries claim methods and the 503 mapping. Step 0 verified
       the names resolve; the window then confirmed it in
       operation, since the <code>cannot signal</code> startup warning never
-      fired.</li>
+      fired across the seven days.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every runner namespace created by the conductor holds a
       claim, or the reason it does not is counted in
       <code>conductor_claims_refused_total</code> or
@@ -14733,25 +14735,28 @@ closes on 2026-09-09 18:13.</p>
       namespace either holds a claim or was torn down after a
       counted refusal.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>conductor_claims_failed_total</code> is zero across the
-      observation window. <em>(provisional)</em> Zero <code>failed</code> rows in
-      <code>claim_events</code>, which is the authoritative record rather
-      than a counter that resets on redeploy.</li>
+      observation window. Zero <code>failed</code> rows in <code>claim_events</code>
+      across the entire table, which is the authoritative record
+      rather than a counter that resets on redeploy. Zero
+      <code>refused_transient</code> rows as well.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No namespace torn down during the window leaves a claim
       behind: the count of claims on the cluster returns to its
       pre-window baseline, and the reconciler reports no drift in
-      <code>cluster_capacity.claimed_*</code>. <em>(provisional)</em> Satisfied by
-      a stronger check than the one named: 1729 created minus
-      1723 released is exactly the 6 claims live on the cluster,
+      <code>cluster_capacity.claimed_*</code>. Satisfied by a stronger check
+      than the one named: at 2026-09-10 05:20, 2038 claims
+      created minus 2033 released is exactly the 5 claims
+      <code>sf-client namespace claim list</code> finds live on the cluster,
       all held by namespaces that still exist. The
       <code>cluster_capacity.claimed_*</code> half cannot be read as
       written -- it is a Prometheus gauge, not a log line -- and
       the ledger balancing against the cluster's own claim list
-      answers the same question from ground truth.</li>
+      answers the same question from ground truth. The seven drift
+      corrections the reconciler did report are all in
+      <code>scheduler_node_capacity.used_*</code>, not in <code>claimed_*</code>.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The observation record in this plan states, in numbers:
       claims created, capacity refusals per day, transient
       refusals, over-limit audit events by dimension, and the
-      claim-size-to-measured-peak ratio per <code>(repo, job_name)</code>.
-      <em>(provisional)</em></li>
+      claim-size-to-measured-peak ratio per <code>(repo, job_name)</code>.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> This plan answers, in one paragraph, whether phase 5 should
       flip <code>CLAIM_ENFORCEMENT_HARD</code> and on what evidence. The
       answer is no; see Observations.</li>
@@ -14777,116 +14782,170 @@ natural home, and carries the note.</p>
 three documents needs all three to exist, and this one was
 written without checking that the third did.</p>
 <h2 id="observations">Observations<a class="headerlink" href="#observations" title="Permanent link">&para;</a></h2>
-<p>Collected 2026-09-08 from two sources, both of which any later
-session can re-read: the conductor's <code>claim_events</code> table on
-<code>maui</code> (<code>/srv/shakenfist/private-ci/conductor.db</code>, queried from a
-copy so the live file is untouched) and Loki, where the conductor
-logs under <code>{job="conductor"}</code> and the sfcbr nodes ship SF's JSON
-logs under <code>{job="syslog"}</code>. The two agree on every count they
-both carry, which is the reason to trust either.</p>
-<p><strong>The window is one day short.</strong> <code>claim_events</code>' first row is
-2026-09-02 18:13:46, which pins the deploy; seven days of load
-therefore close at 2026-09-09 18:13. Everything below covers
-2026-09-02 18:13:46 to 2026-09-08 17:16 -- five days and 23
-hours, of which five are full days (2026-09-03 to 2026-09-07)
-and three of those are working days. The numbers are recorded
-now because they are already decisive; the last day is expected
-to move them proportionally rather than qualitatively, and this
-section should be re-run and amended before step 6 is marked
-complete.</p>
+<p>Collected 2026-09-08 and re-collected 2026-09-10 over the closed
+window, from two sources which any later session can re-read: the
+conductor's <code>claim_events</code> table on <code>maui</code>
+(<code>/srv/shakenfist/private-ci/conductor.db</code>, queried from a copy so
+the live file is untouched) and Loki, where the conductor logs
+under <code>{job="conductor"}</code> and the sfcbr nodes ship SF's JSON logs
+under <code>{job="syslog"}</code>.</p>
+<p><strong>The window is now complete.</strong> <code>claim_events</code>' first row is
+2026-09-02 18:13:46 AEST, which pins the deploy, so seven days of
+load closed at 2026-09-09 18:13:46. Everything below covers
+exactly that interval. An earlier version of this section was
+written on 2026-09-08 from a five-day-23-hour window; where the
+full window changed a finding, the change is called out inline.
+Four changed materially and one reading was withdrawn, so the
+partial record should not be relied on where the two differ.</p>
+<p>Two cautions for whoever re-runs this. Loki's own query log ships
+under <code>{job="syslog"}</code> from <code>maui</code>, so a filter on the text of an
+event matches the record of the previous session asking for it;
+every query below excludes <code>caller=metrics.go</code>, <code>caller=engine.go</code>
+and <code>maui loki[</code>. And the event <em>message</em> in <code>instance.py</code>
+(<code>Placement admitted over the namespace capacity claim</code>) is worded
+differently from the audit <em>event</em> it writes, so searching for the
+event text returns nothing.</p>
 <h3 id="claims-created-and-deleted">Claims created and deleted<a class="headerlink" href="#claims-created-and-deleted" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
 <th></th>
-<th></th>
+<th>Window</th>
+<th>At 2026-09-10 05:20</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>created</td>
-<td>1733 (<code>claim_events</code>); 1729 in Loki, 4 newer than the query</td>
+<td>created (<code>claim_events</code>)</td>
+<td>1934</td>
+<td>2037</td>
 </tr>
 <tr>
-<td>deleted</td>
-<td>1723 (<code>Released N capacity claim(s)</code>)</td>
+<td>created (Loki <code>Claimed</code>)</td>
+<td>1934</td>
+<td>2038</td>
 </tr>
 <tr>
-<td>live on the cluster</td>
+<td>released (Loki <code>Released N capacity claim(s)</code>)</td>
+<td>1928</td>
+<td>2033</td>
+</tr>
+<tr>
+<td>difference</td>
 <td>6</td>
+<td>5</td>
+</tr>
+<tr>
+<td>claims live on the cluster</td>
+<td>--</td>
+<td>5</td>
 </tr>
 </tbody>
 </table>
-<p>1729 - 1723 = 6, and all six live claims belong to namespaces
-that still exist. <strong>No claim leaked.</strong> This is the substance of
-the definition-of-done item about <code>cluster_capacity.claimed_*</code>,
-which cannot be read directly: <code>scheduled_tasks.py</code> publishes
-<code>claimed_*</code> to a Prometheus gauge rather than a log line, and no
-Prometheus is reachable from the development host. The ledger
-balancing against the cluster's own live claim count answers the
-same question from ground truth, and is the better evidence.</p>
-<p>Volume is 269 to 323 claims on a full day, and does not drop
-at the weekend: 2026-09-05 (a Saturday) and 2026-09-06 (a
-Sunday) sit at 313 and 294, inside the weekday range. The
-conductor's load is merge and schedule driven rather than
-keystroke driven, which is worth knowing before reading any
-per-day number below as a proxy for human activity.</p>
-<h3 id="refusals">Refusals<a class="headerlink" href="#refusals" title="Permanent link">&para;</a></h3>
-<p><strong>298 capacity refusals, zero transient refusals, zero
-failures.</strong> <code>claim_events</code> holds only <code>created</code> and
-<code>refused_capacity</code> rows: no <code>refused_transient</code> and no <code>failed</code>,
-so <code>conductor_claims_failed_total</code> is zero across the window from
-the authoritative record rather than by inference. The
-<code>cannot signal</code> startup warning never fired, so the deployed
-client carried both refusal classes throughout.</p>
+<p><strong>No claim leaked.</strong> The two independent sources agree exactly on
+the window's creation count, which is the reason to trust either.
+The ledger then balances against ground truth: 2038 created minus
+2033 released is 5, and <code>sf-client namespace claim list</code> across
+all nine namespaces finds exactly 5 live claims, every one held by
+an <code>sfcbr-*</code> runner namespace that still exists.</p>
+<p>This is the substance of the definition-of-done item about
+<code>cluster_capacity.claimed_*</code>, which cannot be read as that item
+was written: <code>scheduled_tasks.py</code> publishes <code>claimed_*</code> to a
+Prometheus gauge rather than a log line, and no Prometheus is
+reachable from the development host. Balancing the ledger against
+the cluster's own claim list answers the same question from ground
+truth, and is the better evidence.</p>
+<p>Volume per day:</p>
 <table>
 <thead>
 <tr>
 <th>Day</th>
-<th>Refusals</th>
+<th>Created</th>
+<th>Refused</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>2026-09-02 (part)</td>
+<td>2026-09-02 (from 18:13)</td>
+<td>78</td>
 <td>6</td>
 </tr>
 <tr>
 <td>2026-09-03</td>
+<td>323</td>
 <td>107</td>
 </tr>
 <tr>
 <td>2026-09-04</td>
+<td>272</td>
 <td>55</td>
 </tr>
 <tr>
 <td>2026-09-05</td>
+<td>313</td>
 <td>71</td>
 </tr>
 <tr>
 <td>2026-09-06</td>
+<td>294</td>
 <td>6</td>
 </tr>
 <tr>
 <td>2026-09-07</td>
+<td>269</td>
 <td>35</td>
 </tr>
 <tr>
-<td>2026-09-08 (part)</td>
+<td>2026-09-08</td>
+<td>270</td>
 <td>18</td>
+</tr>
+<tr>
+<td>2026-09-09 (to 18:13)</td>
+<td>115</td>
+<td>5</td>
 </tr>
 </tbody>
 </table>
-<p>They do <strong>not</strong> track claim volume: 2026-09-03 and 2026-09-05
+<p>Volume is 269 to 323 on a full day and does not drop at the
+weekend: 2026-09-05 (a Saturday) and 2026-09-06 (a Sunday) sit at
+313 and 294, inside the weekday range. The conductor's load is
+merge and schedule driven rather than keystroke driven, which is
+worth knowing before reading any per-day number as a proxy for
+human activity.</p>
+<h3 id="refusals">Refusals<a class="headerlink" href="#refusals" title="Permanent link">&para;</a></h3>
+<p><strong>303 capacity refusals, zero transient refusals, zero failures.</strong>
+<code>claim_events</code> holds only <code>created</code> and <code>refused_capacity</code> rows
+across the entire table -- no <code>refused_transient</code> and no <code>failed</code> --
+so <code>conductor_claims_failed_total</code> is zero across the window from
+the authoritative record rather than by inference. The
+<code>cannot signal</code> startup warning never fired, so the deployed client
+carried both refusal classes throughout.</p>
+<p>Refusals do <strong>not</strong> track claim volume: 2026-09-03 and 2026-09-05
 have almost the same number of claims (323 and 313) and very
 different refusal counts (107 and 71), while 2026-09-06 has 294
-claims and only 6 refusals. What they track is contention --
-whether a large-footprint job asked while the cluster was
-already full -- which is what a capacity refusal is supposed to
-mean. The more useful fact is that <strong>every one of the 298 refused on <code>cpus</code></strong>, none on
-memory or disk, with a body of the shape <code>cpus (limit 68, used
-38, requested 39)</code>. Refusals concentrate almost entirely in the
-jobs that build a nested cluster:</p>
+claims and only 6 refusals. What they track is contention between
+a large request and what is already placed.</p>
+<p><strong>Every one of the 303 refused on <code>cpus</code></strong>, none on memory or
+disk, with a body of the shape
+<code>cpus (limit 68, used 40, requested 39)</code>. Two things about that
+body are worth recording, and neither was visible in the partial
+window:</p>
+<ul>
+<li>The cluster's advertised <code>limit</code> ranged from <strong>46 to 99 cpus</strong>
+  across the 303 refusals, with 68 the mode. sfcbr does not change
+  size that much. This is the capacity total moving as nodes
+  publish or fail to publish metrics, which is the surface
+  <a href="../PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals.md</a>
+  was opened against; a refusal issued against a 46-cpu view of an
+  otherwise larger cluster is a refusal the claim did not deserve.</li>
+<li>The cluster was <strong>not full</strong> in the median refusal. Fullness at
+  refusal (<code>used / limit</code>) has a minimum of 0.46, a median of
+  <strong>0.70</strong> and a maximum of 0.94. A refusal is usually a large
+  claim not fitting in the remaining third, not the last cpu being
+  taken -- see the size distribution below.</li>
+</ul>
+<p>Refusals concentrate in the jobs that build a nested cluster:</p>
 <table>
 <thead>
 <tr>
@@ -14899,37 +14958,37 @@ jobs that build a nested cluster:</p>
 <tbody>
 <tr>
 <td>shakenfist</td>
-<td>Debian 12 tier (collection)</td>
+<td>Debian 12 tier (collection) / Smoke tests (collection)</td>
 <td>66</td>
 <td>24</td>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>Ansible modules (collection)</td>
+<td>Ansible modules (collection) / Smoke tests (collection)</td>
 <td>49</td>
 <td>39</td>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>Guests (collection)</td>
-<td>44</td>
+<td>Guests (collection) / Smoke tests (collection)</td>
+<td>47</td>
 <td>32</td>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>Ubuntu 24.04 cluster (collection)</td>
+<td>Ubuntu 24.04 cluster (collection) / Smoke tests (collection)</td>
 <td>39</td>
 <td>36</td>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>Debian 12 cluster (collection)</td>
+<td>Debian 12 cluster (collection) / Smoke tests (collection)</td>
 <td>26</td>
 <td>39</td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
-<td>debian 13 on debian 12 (containers)</td>
+<td>master debian 13 images on debian 12 all-in-one using debian containers</td>
 <td>16</td>
 <td>17</td>
 </tr>
@@ -14939,146 +14998,456 @@ jobs that build a nested cluster:</p>
 <td>16</td>
 <td>39</td>
 </tr>
+<tr>
+<td>kerbside-patches</td>
+<td>master debian 13 images on debian 12 all-in-one with no kerbside</td>
+<td>14</td>
+<td>16</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>oVirt 4.5 on Rocky 8</td>
+<td>7</td>
+<td>22</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>OpenStack via Kolla-Ansible master on Debian 12</td>
+<td>6</td>
+<td>20</td>
+</tr>
 </tbody>
 </table>
-<p>A 39-cpu claim against a 68-cpu cluster is asking for more than
-half of it, so these refusals are the mechanism working: the
-back-pressure lands on the jobs whose footprint genuinely does
-not fit alongside what is already running.</p>
+<p>Eighteen <code>(repo, job_name)</code> pairs were refused at all, requesting
+between 8 and 42 cpus. Measured against the cluster total in the
+same refusal body, the request was more than <strong>half</strong> the cluster
+in 54% of refusals and more than a <strong>third</strong> in 83%; the median
+refused request is 52% of the cluster and the smallest is 11%.
+So this half of the mechanism is largely working -- the
+back-pressure lands on the jobs whose footprint genuinely does not
+fit alongside what is already running -- but the 17% tail asking
+for a third or less is where the varying <code>limit</code> above should be
+suspected before contention is.</p>
 <h3 id="over-limit-admissions">Over-limit admissions<a class="headerlink" href="#over-limit-admissions" title="Permanent link">&para;</a></h3>
-<p><strong>167 <code>placement admitted over namespace capacity claim</code> events
-across 76 namespaces</strong>, 23 to 48 a day and rising slightly
-through the window.</p>
-<p>The dimension distribution is the important half, and it is the
-<em>opposite</em> of the refusals. Refusals are 100% <code>cpus</code>; over-limit
-admissions are overwhelmingly <code>memory_mb</code>, frequently
-<code>memory_mb</code> and <code>disk_gb</code> together, and rarely <code>cpus</code> alone. A
-representative event has <code>memory_mb limit 39322, used 45056,
-requested 12288</code> while cpus is comfortably inside its limit.</p>
-<p>Joining the 76 namespaces back to their jobs:</p>
+<p><strong>234 <code>placement admitted over namespace capacity claim</code> events
+across 101 namespaces.</strong> The first is on 2026-09-04, two days
+after the deploy; there are none on 2026-09-02 or 2026-09-03.</p>
+<table>
+<thead>
+<tr>
+<th>Day</th>
+<th>Events</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-04</td>
+<td>23</td>
+</tr>
+<tr>
+<td>2026-09-05</td>
+<td>36</td>
+</tr>
+<tr>
+<td>2026-09-06</td>
+<td>39</td>
+</tr>
+<tr>
+<td>2026-09-07</td>
+<td>48</td>
+</tr>
+<tr>
+<td>2026-09-08</td>
+<td>58</td>
+</tr>
+<tr>
+<td>2026-09-09 (to 18:13)</td>
+<td>30</td>
+</tr>
+</tbody>
+</table>
+<p><em>Changed by the full window.</em> The partial record said 167 events
+across 76 namespaces, "23 to 48 a day and rising slightly". The
+true count is 234 across 101, and the rise is steeper than
+"slightly": 23 to 58 over five full days.</p>
+<p><strong>The dimension distribution is where the partial window was
+wrong.</strong> It said over-limit admissions were "overwhelmingly
+<code>memory_mb</code> ... and rarely <code>cpus</code> alone". Memory does dominate,
+but disk is nearly as prevalent and cpus is involved in almost
+half:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Exceeded in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>memory_mb</code></td>
+<td>223 of 234</td>
+</tr>
+<tr>
+<td><code>disk_gb</code></td>
+<td>208 of 234</td>
+</tr>
+<tr>
+<td><code>cpus</code></td>
+<td>109 of 234</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Combination exceeded</th>
+<th>Events</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disk_gb</code> + <code>memory_mb</code></td>
+<td>99</td>
+</tr>
+<tr>
+<td><code>cpus</code> + <code>disk_gb</code> + <code>memory_mb</code></td>
+<td>98</td>
+</tr>
+<tr>
+<td><code>memory_mb</code> alone</td>
+<td>15</td>
+</tr>
+<tr>
+<td><code>disk_gb</code> alone</td>
+<td>11</td>
+</tr>
+<tr>
+<td><code>cpus</code> + <code>memory_mb</code></td>
+<td>11</td>
+</tr>
+</tbody>
+</table>
+<p><code>cpus</code> is never exceeded alone, which is the grain of truth in the
+withdrawn claim, but "rarely <code>cpus</code>" was wrong: it is exceeded in
+47% of events. The opposite-dimension reading still holds at the
+level that matters -- refusals are 100% <code>cpus</code> at the <em>cluster</em>
+scale while over-limit admissions are led by <code>memory_mb</code> and
+<code>disk_gb</code> at the <em>namespace</em> scale -- but it is a difference of
+emphasis, not the clean split the partial record described.</p>
+<p>How far over, as <code>(used + requested) / limit</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Median</th>
+<th>Maximum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>memory_mb</code></td>
+<td>1.46x</td>
+<td>14.50x</td>
+</tr>
+<tr>
+<td><code>disk_gb</code></td>
+<td>1.43x</td>
+<td>33.60x</td>
+</tr>
+<tr>
+<td><code>cpus</code></td>
+<td>1.08x</td>
+<td>18.00x</td>
+</tr>
+</tbody>
+</table>
+<p>All three maxima are the same namespace,
+<code>sfcbr-3hZrDS5CTZ0QV1DG</code>, holding a 2 cpu / 4096 MB / 100 GB claim
+while using 32 cpus, 55296 MB and 2960 GB. Its job is
+<code>kerbside-patches / master debian 13 images on debian 13 multinode
+using debian containers</code>, and it has no recorded peak at all: a
+floor-only claim on a namespace that went on to build a multinode
+cluster. See <em>Claim size against measured peak</em> below.</p>
+<p>Joining the 101 namespaces back to their jobs. The eight largest
+are below; six further jobs contribute one namespace each
+(<code>client-python-k3s / agent context</code>, <code>ryll / Fuzz</code>, <code>instar /
+Mermaid lint</code>, and three <code>kerbside</code> jobs):</p>
 <table>
 <thead>
 <tr>
 <th>Repo</th>
 <th>Job</th>
 <th>Namespaces</th>
-<th>Claim</th>
+<th>Events</th>
+<th>Claim (cpu/MB/GB)</th>
 <th>Recorded peak</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>shakenfist</td>
-<td>Smoke tests (collection)</td>
-<td>47</td>
-<td>24 cpu / 39322 MB</td>
-<td>20 / 32768</td>
+<td>Smoke tests (collection) / Smoke tests (collection)</td>
+<td>63</td>
+<td>159</td>
+<td>24 / 39322 / 744</td>
+<td>20 / 32768 / 620</td>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>Debian 12 tier (collection)</td>
-<td>10</td>
-<td>24 / 63898</td>
-<td>20 / 53248</td>
+<td>Debian 12 tier (collection) / Smoke tests (collection)</td>
+<td>11</td>
+<td>11</td>
+<td>24 / 63898 / 1128</td>
+<td>20 / 53248 / 940</td>
 </tr>
 <tr>
 <td>kerbside</td>
 <td>direct-qemu-lane</td>
 <td>6</td>
-<td>8 / 14746</td>
-<td>6 / 12288</td>
+<td>6</td>
+<td>8 / 14746 / 432</td>
+<td>6 / 12288 / 360</td>
 </tr>
 <tr>
 <td>library-utilities</td>
 <td>gitleaks</td>
 <td>3</td>
-<td>3 / 4916</td>
-<td>2 / 4096</td>
+<td>10</td>
+<td>3 / 4916 / 192</td>
+<td>2 / 4096 / 160</td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>master debian 13 images on debian 13 (three variants)</td>
+<td>6</td>
+<td>24</td>
+<td>2 / 4096 / 100</td>
+<td><em>none</em></td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>Lint shell scripts and workflows</td>
+<td>2</td>
+<td>2</td>
+<td>3 / 4916 / 192</td>
+<td>2 / 4096 / 160</td>
 </tr>
 <tr>
 <td>actions</td>
 <td>Unit tests</td>
 <td>2</td>
-<td>3 / 4916</td>
-<td>2 / 4096</td>
+<td>2</td>
+<td>3 / 4916 / 192</td>
+<td>2 / 4096 / 160</td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>master debian 13 / ubuntu 24.04 images on debian 12</td>
+<td>2</td>
+<td>14</td>
+<td>17 / 24576 / 672</td>
+<td>14 / 20480 / 560</td>
 </tr>
 </tbody>
 </table>
-<p>One job, <code>shakenfist / Smoke tests (collection)</code>, is 47 of the
-76.</p>
+<p>One job, <code>shakenfist / Smoke tests (collection)</code>, is 63 of the 101
+namespaces and 159 of the 234 events.</p>
 <h3 id="claim-size-against-measured-peak">Claim size against measured peak<a class="headerlink" href="#claim-size-against-measured-peak" title="Permanent link">&para;</a></h3>
-<p>The 1.2 multiplier is applied exactly as designed. Across all
-1728 sized claims the memory ratio is <strong>uniformly 1.20</strong>; the cpu
-ratios spread across 1.2, 1.22, 1.25, 1.33, 1.5 and 2.0 purely
-because the ceiling is coarse on small integers (a peak of 2
-cpus becomes <code>ceil(2.4)</code> = 3, a ratio of 1.5). There is no job
-whose claim sits far from 1.2x its own measurement, so the
-sizing formula is not mis-firing.</p>
-<p>Five claims had no observation at all and fell back to the
-<code>CI_SIZES</code> floor: <code>instar / Mermaid lint</code>, <code>kerbside /
+<p>The 1.2 multiplier is applied exactly as designed. Across all 1924
+sized claims in the window the memory ratio is <strong>uniformly 1.20</strong>;
+the cpu ratios spread across 1.2, 1.214, 1.219, 1.222, 1.231,
+1.25, 1.333, 1.5 and 2.0 purely because the ceiling is coarse on
+small integers (a peak of 2 cpus becomes <code>ceil(2.4)</code> = 3, a ratio
+of 1.5). No job's claim sits far from 1.2x its own measurement, so
+the sizing formula is not mis-firing.</p>
+<p><strong>Ten claims had no observation at all</strong> and fell back to the
+<code>CI_SIZES</code> floor -- <code>instar / Mermaid lint</code>, <code>kerbside /
 Mermaid lint</code>, <code>kerbside / Sign release tag with Sigstore</code>,
-<code>library-utilities / gitleaks</code> (its first run) and <code>ryll / Fuzz</code>.
-<strong>Three of those five went on to exceed the claim.</strong> The floor is
-too small even for a lint job, which matters only for a job's
-first-ever run but is a real hole.</p>
+<code>library-utilities / gitleaks</code> (its first run), <code>ryll / Fuzz</code>, and
+five runs across three new <code>kerbside-patches / master debian 13
+images on debian 13 ...</code> variants that appeared during the window.
+<strong>Eight of the ten went on to exceed the claim.</strong> The partial
+window saw five such claims and three exceedances, and read the
+floor as "a real hole" that "matters only for a job's first-ever
+run". The full window is worse than that: the three new
+<code>debian 13 on debian 13</code> variants are <em>cluster</em> jobs, and each got
+the 2 cpu / 4096 MB / 100 GB lint floor, then used up to 32 cpus.
+A new large job's first run is not a rounding error -- it is
+unclaimed capacity the size of a nested cloud.</p>
 <h3 id="what-the-two-dimensions-together-say">What the two dimensions together say<a class="headerlink" href="#what-the-two-dimensions-together-say" title="Permanent link">&para;</a></h3>
 <p>The 1.2 multiplier is not the problem. <strong>The peaks feeding it
-are.</strong> <code>Smoke tests (collection)</code> claims 39322 MB from a recorded
-peak of 32768, and the over-limit events show the same job
-reaching 45056 to 57344 MB at placement -- the recorded peak
-under-states real use by up to about 1.75x. No plausible headroom
-multiplier applied to a peak that wrong would have covered it,
-so the defect is upstream of the formula, in what
-<code>get_claim_sizes()</code> reads. That is the same surface
+are</strong>, and the full window shows two distinct ways they are wrong.</p>
+<p><strong>The aggregate is under-measured.</strong> <code>Smoke tests (collection)</code>
+claims 39322 MB from a recorded peak of 32768, and the over-limit
+events show the same job's namespace reaching 69632 MB -- the
+recorded peak under-states real use by <strong>2.12x</strong>, not the 1.75x
+the partial window suggested. Other jobs are worse: <code>sanity_checks</code>
+3.00x, the <code>debian 12 all-in-one</code> image jobs 3.22x, and several
+small jobs 5.00x. No plausible headroom multiplier applied to a
+peak that wrong would have covered it.</p>
+<p><strong>In a quarter of cases the claim does not cover a single
+instance.</strong> In <strong>24 of the 101 namespaces</strong>, at least one
+exceedance had <code>requested &gt; limit</code> on its own -- one instance
+larger than the entire claim, before any other instance in the
+namespace is counted. The clearest shape is a claim of 3 cpus /
+4916 MB / 192 GB, sized from a recorded peak of 2 / 4096 / 160,
+against which the conductor then requests a 12 cpu / 16384 MB /
+400 GB runner. The recorded peak is smaller than the runner the
+conductor itself creates.</p>
+<p>These are two failure modes, not one. The dominant job
+(<code>Smoke tests</code>, 63 namespaces) is in the first group only: its
+claim covers each instance but not their sum. The small jobs are
+in the second: no multiplier on that peak can ever be enough,
+because the measurement is not of the thing being sized.</p>
+<p>Both are upstream of the formula, in what <code>get_claim_sizes()</code>
+reads. That is the same surface
 <code>PLAN-claim-coverage-and-sizing.md</code> was opened against in
-private-ci on 2026-09-08.</p>
+private-ci on 2026-09-08, and its sixth finding -- that
+<code>collect_namespace_costs()</code> cannot see instances hard-deleted
+before teardown -- is the mechanism for the first mode. The second
+mode, a peak smaller than one runner, is additional evidence for
+the same plan and is recorded there.</p>
 <h3 id="reconciler">Reconciler<a class="headerlink" href="#reconciler" title="Permanent link">&para;</a></h3>
-<p>Four drift corrections, all on 2026-09-05, each exactly
-+/-4 cpus / 12288 MB / 160 GB and appearing as matched <code>-</code> then
-<code>+</code> pairs on the same node. That is one instance's footprint
-counted across a pass boundary rather than a lost update, and it
-is consistent with the ledger balancing. One reconcile pass
-failed, 2026-09-08 15:22:33, with <code>duration 10.0</code> -- a timeout,
-not a drift finding. Neither is evidence of a leaked claim, and
-the live claim count above is the direct check.</p>
+<p><strong>Seven drift corrections</strong>, in two episodes of different
+character. The partial window saw only the first and read it as
+the whole story.</p>
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>Node</th>
+<th>delta cpus / MB / GB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-05 12:05:42</td>
+<td><code>f6b7e913</code></td>
+<td>-4 / -12288 / -160</td>
+</tr>
+<tr>
+<td>2026-09-05 12:05:42</td>
+<td><code>7ce66641</code></td>
+<td>-4 / -12288 / -160</td>
+</tr>
+<tr>
+<td>2026-09-05 12:53:58</td>
+<td><code>963d4df9</code></td>
+<td>-4 / -12288 / -160</td>
+</tr>
+<tr>
+<td>2026-09-05 21:26:13</td>
+<td><code>963d4df9</code></td>
+<td>+4 / +12288 / +160</td>
+</tr>
+<tr>
+<td>2026-09-09 08:07:13</td>
+<td><code>6046afdf</code></td>
+<td>-6 / -8192 / -320</td>
+</tr>
+<tr>
+<td>2026-09-09 08:07:13</td>
+<td><code>963d4df9</code></td>
+<td>-4 / -12288 / -160</td>
+</tr>
+<tr>
+<td>2026-09-09 08:07:13</td>
+<td><code>f6b7e913</code></td>
+<td>-12 / -36864 / -480</td>
+</tr>
+</tbody>
+</table>
+<p>The 2026-09-05 four are uniform <code>4 / 12288 / 160</code> steps, including
+a matched <code>-</code> then <code>+</code> pair on <code>963d4df9</code>: one instance's
+footprint counted across a pass boundary, not a lost update.</p>
+<p>The 2026-09-09 three are not that. They land in the same
+millisecond on three different nodes and they are all negative,
+so nothing cancels. Two are whole multiples of the same
+<code>4 / 12288 / 160</code> unit -- one instance on <code>963d4df9</code>, three on
+<code>f6b7e913</code> -- but <code>6046afdf</code>'s <code>-6 / -8192 / -320</code> is not a
+multiple of it in any dimension, so at least one hypervisor was
+over-counting something other than a whole number of the standard
+runner. The ledger was over-counting on three hypervisors at once
+and the reconciler took it back in a single pass. Over-counting is
+the direction that produces refusals the cluster did not deserve,
+which connects this to the varying <code>limit</code> seen in the refusal
+bodies above.</p>
+<p><em>Withdrawn:</em> the partial record's "four drift corrections, all on
+2026-09-05, each exactly +/-4 cpus / 12288 MB / 160 GB and
+appearing as matched <code>-</code> then <code>+</code> pairs" is true of the first
+episode only. Neither episode is evidence of a leaked claim --
+these are <code>scheduler_node_capacity.used_*</code> counters, not
+<code>claimed_*</code> -- and the live claim count above is the direct check.</p>
+<p>The <code>Failed to release claims</code> warnings number <strong>41, across 37
+namespaces</strong>, and all are the same benign shape: a 404
+<code>namespace not found</code> on the GET that precedes the delete, because
+the namespace was already gone. A wasted call, not a leaked claim.</p>
 <h3 id="does-phase-5-flip-claim_enforcement_hard">Does phase 5 flip <code>CLAIM_ENFORCEMENT_HARD</code>?<a class="headerlink" href="#does-phase-5-flip-claim_enforcement_hard" title="Permanent link">&para;</a></h3>
-<p><strong>No, not on this data.</strong> Hard enforcement across this window
-would have refused 167 placements spread over 76 namespaces, and
-the reason would have been wrong in nearly every case: the
-claims those placements exceeded were sized from peak
-measurements that under-state real use by as much as 1.75x, not
-from namespaces genuinely consuming more than they asked for.
-Turning the ceiling hard would convert a measurement defect into
-CI outages, and would do it first and hardest to
-<code>shakenfist / Smoke tests (collection)</code>, which is the project's
-own functional suite. The advisory release is doing exactly what
-it was built to do -- it found the defect without breaking
-anything.</p>
-<p>What is still missing before phase 5 can proceed is a claim
-sizing input that tracks real use: <code>get_claim_sizes()</code> reading a
-peak that reflects what the job actually allocates, and a
-<code>CI_SIZES</code> floor that covers a first run. Once claims are sized
-from a trustworthy peak, this same measurement should be re-run;
-the number to watch is over-limit admissions per day, which must
-fall to a residue attributable to genuine over-consumption
-before the ceiling is worth making hard. The refusal side needs
-no such wait -- 298 refusals, all on <code>cpus</code>, all on jobs asking
-for more than half the cluster, is the mechanism behaving
-correctly and is not an argument against enforcement.</p>
+<p><strong>No, not on this data</strong>, and the full window strengthens the
+answer rather than softening it.</p>
+<p>Hard enforcement across this window would have refused 234
+placements spread over 101 namespaces -- 40% more than the partial
+window projected -- and the reason would have been wrong in nearly
+every case. The claims those placements exceeded were sized from
+peak measurements that under-state real use by 2.12x to 5x, and in
+24 namespaces by enough that a single instance did not fit. That
+is a measurement defect, not a namespace consuming more than it
+asked for. Turning the ceiling hard would convert it into CI
+outages, and would do it first and hardest to
+<code>shakenfist / Smoke tests (collection)</code>, which is the project's own
+functional suite and 63 of the 101 affected namespaces.</p>
+<p>The advisory release is doing exactly what it was built to do: it
+found the defect without breaking anything, and it found a second
+one -- the <code>CI_SIZES</code> floor -- that eight of ten first runs walked
+straight through.</p>
+<p>What is still missing before phase 5 can proceed:</p>
+<ol>
+<li>A claim sizing input that tracks real use, so that
+   <code>get_claim_sizes()</code> reads a peak reflecting what a job
+   actually allocates concurrently.</li>
+<li>A <code>CI_SIZES</code> floor that covers a first run of a <em>cluster</em> job,
+   not just a lint job.</li>
+<li>A re-run of this measurement afterwards. The number to watch is
+   over-limit admissions per day, which must fall to a residue
+   attributable to genuine over-consumption before the ceiling is
+   worth making hard.</li>
+</ol>
+<p>The refusal side needs no such wait. 303 refusals, all on <code>cpus</code>,
+the median of them asking for 52% of the cluster, is broadly the
+mechanism behaving correctly and is not an argument against
+enforcement. Two caveats belong on it: 17% of the refusals were
+for a third of the cluster or less, and the cluster's advertised
+capacity varied between 46 and 99 cpus during the window while the
+median refusal happened at only 70% fullness. Some fraction of the
+303 is therefore the warm-up artefact
+<a href="../PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals.md</a>
+addresses rather than genuine contention. That plan should land
+before this measurement is re-run, or the re-run will not be able
+to tell the two apart either.</p>
 <p>The anti-starvation question (D18's 15-minute rule) now has data
-behind it: the jobs refused are a small, stable set of
-large-footprint cluster jobs, and they are refused repeatedly --
-<code>Debian 12 tier (collection)</code> 66 times in six days. Whether that
+behind it: the jobs refused are a small, stable set of eighteen
+large-footprint pairs, and they are refused repeatedly --
+<code>Debian 12 tier (collection)</code> 66 times in seven days. Whether that
 constitutes starvation depends on whether those jobs eventually
 ran, which this record does not establish, so the policy stays
 with its own phase.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Anti-starvation policy</strong> (D18's 15-minute rule), once this
-  phase's window shows whether large-claim jobs actually starve.</li>
+<li><strong>Anti-starvation policy</strong> (D18's 15-minute rule). The window
+  has closed and did <strong>not</strong> settle this. It established the
+  population -- eighteen <code>(repo, job_name)</code> pairs were refused at
+  all, and refusals concentrate on a stable handful of
+  large-footprint cluster jobs, <code>Debian 12 tier (collection)</code> 66
+  times in seven days -- but not the outcome, because neither
+  <code>claim_events</code> nor the SF audit events record whether a refused
+  job went on to run. Answering it needs a retry-outcome link the
+  conductor does not currently write; that belongs to the policy's
+  own phase, and is the first thing it should add.</li>
 <li><strong>Claims for <code>ci-images</code> and the static runners</strong>, so that the
   conductor's whole footprint is claimed rather than just its
-  runners.</li>
+  runners. Confirmed still outstanding at window close: of the
+  nine namespaces on sfcbr, <code>ci-images</code>, <code>static-ci</code>,
+  <code>static-runners</code> and <code>system</code> hold no claim.</li>
 <li><strong>Delegated claim creation</strong>, so a namespace could hold a claim
   without a cluster administrator making it. Named as future work
   by D15 and unchanged by this phase.</li>

@@ -14295,7 +14295,7 @@ table entirely (decision D8).</p>
 <tr>
 <td>4c. Conductor claim integration</td>
 <td><a href="../PLAN-scheduler-reservations-phase-04c-conductor-claims/">PLAN-scheduler-reservations-phase-04c-conductor-claims.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>5. Caller migration and hard ceiling</td>
@@ -14391,31 +14391,54 @@ is here.</p>
   its PR #22 on 2026-09-01, and the conductor was deployed on
   <strong>2026-09-02 18:13:46</strong> -- pinned by the first row of the
   conductor's <code>claim_events</code> table, not by the merge. Step 5's
-  observation window therefore closes on 2026-09-09 18:13. The
-  record was written into the phase plan on 2026-09-08 from a
-  five-day-23-hour window, covering five full working days, and
-  is to be amended when the window closes.</p>
+  seven-day observation window therefore closed on 2026-09-09
+  18:13. A first record was written on 2026-09-08 from a
+  five-day-23-hour window; it was re-collected over the closed
+  window on 2026-09-10 and the phase completed then.</p>
 </li>
 </ul>
 <p>What it found, in one line: <strong>the claims mechanism works and
-  the numbers feeding it do not.</strong> No claim leaked (1729 created
-  minus 1723 released is exactly the 6 live on the cluster),
-  <code>conductor_claims_failed_total</code> is zero, and all 298 refusals
-  were genuine capacity refusals on <code>cpus</code> against the
-  large nested-cluster jobs. But 167 placements were admitted
-  over their namespace's claim, across 76 namespaces and
-  overwhelmingly on <code>memory_mb</code>, because the peaks
-  <code>get_claim_sizes()</code> reads under-state real use by as much as
-  1.75x. The 1.2 headroom multiplier is applied exactly as
-  designed and is not the problem.</p>
+  the numbers feeding it do not.</strong> No claim leaked -- 2038
+  created minus 2033 released is exactly the 5 claims live on the
+  cluster -- <code>conductor_claims_failed_total</code> is zero, there were
+  no transient refusals, and all 303 refusals were genuine
+  capacity refusals on <code>cpus</code>, concentrated on the large
+  nested-cluster jobs -- the median refused request asks for 52%
+  of the cluster. But 234 placements were admitted over their namespace's
+  claim, across 101 namespaces, because the peaks
+  <code>get_claim_sizes()</code> reads under-state real use by 2.12x to 5x.
+  The 1.2 headroom multiplier is applied exactly as designed and
+  is not the problem.</p>
+<p>The full window revised four of the partial record's findings
+  and withdrew one reading, all marked as such in the phase plan.
+  Over-limit admissions are not "overwhelmingly <code>memory_mb</code>":
+  memory leads at 223 of 234, but <code>disk_gb</code> is close behind at 208
+  and <code>cpus</code> is involved in 109. The reconciler's drift was not
+  one episode of matched pairs but two of different character, the
+  second being three simultaneous all-negative corrections across
+  three nodes.
+  And the floor-only claims are a larger hole than they looked --
+  <strong>eight of ten</strong> first runs exceeded their claim, including
+  three new <em>cluster</em> jobs that each received the lint-sized 2 cpu
+  / 4096 MB floor. The window also found a second failure mode
+  invisible at five days: in 24 of the 101 namespaces a <strong>single
+  instance was larger than the entire claim</strong>, so the recorded
+  peak is smaller than the runner the conductor itself creates.</p>
 <p><strong>This answers phase 5's gate: do not flip
   <code>CLAIM_ENFORCEMENT_HARD</code> yet.</strong> Hard enforcement over this
-  window would have refused 167 placements for a measurement
+  window would have refused 234 placements for a measurement
   defect rather than for genuine over-consumption, hitting
-  <code>shakenfist / Smoke tests (collection)</code> hardest of all. Phase 5
-  now waits on claim sizing that tracks real use --
-  <code>PLAN-claim-coverage-and-sizing.md</code>, opened in private-ci on
-  2026-09-08 -- and on a re-run of this measurement afterwards.</p>
+  <code>shakenfist / Smoke tests (collection)</code> hardest of all -- 63 of
+  the 101 affected namespaces. Phase 5 now waits on claim sizing
+  that tracks real use -- <code>PLAN-claim-coverage-and-sizing.md</code>,
+  opened in private-ci on 2026-09-08 -- and on a re-run of this
+  measurement afterwards. One further gate emerged from the
+  refusal bodies: the cluster's advertised capacity varied between
+  46 and 99 cpus during the window and the median refusal happened
+  at 70% fullness, so
+  <a href="../PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals.md</a>
+  should land before the re-run or it will not be able to separate
+  a warm-up artefact from genuine contention either.</p>
 <p>The back brief item that was outstanding at the deploy (the
   sizing formula never evaluated against real cost data, because
   <code>ssh</code> to <code>maui</code> was refused from the development host) was
