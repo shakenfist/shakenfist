@@ -954,16 +954,32 @@ those are corrected here as well.
     `Complete` once every phase has been completed, abandoned or
     superseded.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete |
-| 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete |
-| 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete |
-| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | In progress |
-| 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started |
-| 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started |
-| 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started |
-| 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete | `d03ab340e` (#3939) |
+| 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete | `078772504` (#3940) |
+| 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete | `e951ee42d` (#4089), `3546fabed` (#4138) |
+| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | In progress | `ead1ccba5` (#4152) |
+| 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started | — |
+| 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started | — |
+| 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started | — |
+| 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`. These
+entries were reconstructed after the fact, because the plan did not
+record them as its phases landed; they come from the repository's
+merged pull request list cross-checked against the first-parent
+history, and not from a path-filtered `git log` alone, which cannot
+say which commits arrived inside a pull request. Every SHA is the
+merge commit of the pull request named beside it, so
+`<sha>^1..<sha>` is the whole of what that pull request put on
+`develop`. A phase which has not landed reads `—`.
+
+The master plan itself landed as `ab2158cb2` (#3938), ahead of
+phase 0. Phase 1's other half -- the invocation in the reusable
+`smoke-cluster` workflow -- lives in `shakenfist/actions`, and is
+not in this repository's history at all; phase 7 reads it against
+that repository's default branch.
 
 ### Phase 0 -- Decisions and scarcity inventory
 
@@ -1127,10 +1143,26 @@ finding in `project-sf-ecosystem-ci`.
 ### Phase 7 -- Push audit
 
 Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in
-this plan against `develop`, not the last phase's diff alone.
-Findings land as their own pull request, and the plan is not
-complete until each is resolved or declined in writing here. If
-the audit finds nothing, that is recorded in one sentence.
+this plan, not the last phase's diff alone. By the time it runs
+most of those phases will have merged, so the baseline is the
+`Merged` column above rather than `develop...HEAD`, which will be
+empty. Findings land as their own pull request, and the plan is
+not complete until each is resolved or declined in writing here.
+If the audit finds nothing, that is recorded in one sentence.
+
+Two things make this plan's audit unusual and are worth planning
+for rather than discovering. The work is split across
+repositories -- the probe and its tooling live here, the
+invocation lives in `shakenfist/actions` -- so the audit of the
+half that landed elsewhere runs against that repository's default
+branch, as part of the pull request that lands it, and this phase
+cites that audit rather than re-running it. And most of the
+change is CI configuration and measurement tooling rather than
+product code, so the wave 2 code-quality and security lenses have
+less to read than usual while the documentation lens has more:
+the sizing model, the ledger arithmetic and the band all have to
+say the same thing in `docs/developer_guide/ci.md` as the
+topology files do.
 
 ## Agent guidance
 
