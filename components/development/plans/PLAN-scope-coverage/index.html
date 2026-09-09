@@ -14669,8 +14669,8 @@ already defaulted to <code>develop</code>.</p>
 </tr>
 <tr>
 <td>5. Push audit</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>c24636a, 0759e46</td>
 </tr>
 </tbody>
 </table>
@@ -14681,6 +14681,17 @@ parent is the whole of this plan's work. That record was
 reconstructed in phase 5 rather than written as the phases landed;
 it comes from <code>gh pr view 93</code>, not from a path-filtered <code>git log</code>,
 which cannot say which commits arrived under a merge.</p>
+<p>Phase 5 landed across two pull requests, and the <code>Merged</code> cell
+records both because a later audit of this plan needs both ranges.
+<code>c24636a</code> is the merge of pull request 106 on 2026-09-08, carrying
+the four fixes the audit found; <code>0759e46</code> is the merge of pull
+request 107 the same day, carrying the plan record and 5a's
+correction to <code>PUSH-AUDIT.md</code>. The split is the shared block's rule
+that findings land as their own pull request against <code>main</code> rather
+than on the audit branch. Setting the two status cells could not
+ride in either merge, since both merges are what those cells
+attest to, so the closeout is a third pull request that changes
+nothing else.</p>
 <h3 id="1-develop-branches-for-the-onboarding-repositories">1. <code>develop</code> branches for the onboarding repositories<a class="headerlink" href="#1-develop-branches-for-the-onboarding-repositories" title="Permanent link">&para;</a></h3>
 <p><code>uncalibrated-sextant</code> and <code>visual-digest-rust</code> renamed <code>main</code> to
 <code>develop</code> on GitHub, which moved the default branch with it. Local
