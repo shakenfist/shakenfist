@@ -13714,22 +13714,83 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-thing-this-dataset-does-not-know" class="md-nav__link">
+  <a href="#what-this-dataset-does-not-know" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One thing this dataset does not know
+        What this dataset does not know
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="One thing this dataset does not know">
+    <nav class="md-nav" aria-label="What this dataset does not know">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resolved-capacity-guard-refusals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolved: capacity guard refusals
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#resolved-the-ledger-unreadable-samples" class="md-nav__link">
     <span class="md-ellipsis">
       
         Resolved: the ledger-unreadable samples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-confirmation-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The confirmation window
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The confirmation window">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-guard-census-which-the-baseline-could-not-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guard census, which the baseline could not see
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-census-still-cannot-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the census still cannot see
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comparability-with-the-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparability with the baseline
       
     </span>
   </a>
@@ -13781,6 +13842,15 @@ step 2d of
 (D16, D17, D22). Every figure in the master plan's <em>Situation</em> section
 that is described as measured is traceable to a record in
 <code>records.jsonl</code>.</p>
+<p>There are <strong>two</strong> files here, with the same record schema and different
+jobs to do. <code>records.jsonl</code> is the baseline: the retrospective window,
+and the source of every distribution the plan reasons about.
+<code>records-addendum.jsonl</code> is step 2g's confirmation window, harvested
+after the two instrument fixes this phase made had merged, and it exists
+to close the two things the baseline could not see. It is a
+classification, not a second baseline, and no distribution should be
+recomputed from it -- it is an eighth the size and covers a day and a
+half.</p>
 <p>The bundles this was computed from expire ninety days after their
 merge run, so this directory is the only durable copy. The raw series
 and census are deliberately <em>not</em> committed -- D22 -- only the per-job
@@ -13857,18 +13927,25 @@ what could not be measured is itself in the dataset.</p>
 <p><code>tools/ci_headroom_harvest.py</code> in this repository (added in step 2c),
 which calls <code>summary_record()</code> from <code>tools/ci_headroom_report.py</code>
 (step 2b) on each bundle it extracts.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3 tools/ci_headroom_harvest.py --since 2026-08-30 \
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    --cache-dir /var/tmp/ci-headroom-harvest-cache \
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    --output records.jsonl
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3 tools/ci_headroom_harvest.py \
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    --since 2026-08-30 --until 2026-09-05T07:15:07Z \
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    --cache-dir /var/tmp/ci-headroom-harvest-cache \
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    --output records.jsonl
 </code></pre></div>
 <p>That took 331 <code>gh api</code> calls and downloaded 217 bundles totalling
 <strong>1.1 GB</strong>, which took a little over two hours of wall clock. The
 cache directory is keyed by artifact id and anything already in it
 is reused, so a re-run is cheap; any writable directory outside the
 repository will do, and the run above used a scratch directory
-rather than the path shown. Re-running it today will produce a
-longer file than this one, because the window grows with every merge
-run -- <code>--since</code> fixes only the start.</p>
+rather than the path shown.</p>
+<p>The harvest was run with <code>--since</code> alone; <code>--until</code> was added to the
+tool afterwards, and the command above carries it because a window
+with no end is not reproducible -- it grows with every merge run, so
+the command as originally run enumerates more today than it did on
+the day it was run. The boundary shown is the last run in the
+dataset, and the two together name exactly the window this file
+covers. Re-running it will still produce a shorter file eventually:
+these bundles expire ninety days after their run.</p>
 <h2 id="what-was-changed-before-committing">What was changed before committing<a class="headerlink" href="#what-was-changed-before-committing" title="Permanent link">&para;</a></h2>
 <p>One normalisation, and only one. <code>summary.series.path</code> and
 <code>summary.census.path</code> were <strong>removed</strong> from every record. They held
@@ -13881,6 +13958,13 @@ made the dataset gratuitously irreproducible: two harvests of the same
 window would differ on 408 fields and agree on every number. The
 harvest tool itself is unchanged and still emits them; only this
 committed copy is normalised.</p>
+<p><code>records-addendum.jsonl</code> was re-harvested once, after the report tool
+gained the four series counters described below, so that the two
+things step 2g concluded about the ledger-unreadable samples could be
+recomputed from the committed records instead of from bundles which
+expire. The re-harvest was verified record by record against the file
+it replaced: same 32 records, same 8 runs, and no field different
+except <code>record_version</code> and the four new counters.</p>
 <p>Nothing else was pruned. D22 budgeted 2 MB and allowed
 <code>absences.classifications[].nodes</code> and the guard block to be dropped
 if that was exceeded; at just under one megabyte it was not, so both
@@ -13953,8 +14037,12 @@ output, minus the two path fields above.</p>
 </thead>
 <tbody>
 <tr>
+<td><code>record_version</code></td>
+<td>Schema version of the report record. <code>records.jsonl</code> is <strong>1</strong>; <code>records-addendum.jsonl</code> is <strong>2</strong>, which adds the four series counters below. A consumer that reads both must expect the older shape.</td>
+</tr>
+<tr>
 <td><code>series</code></td>
-<td>Sample counts (usable, failed, unparseable), the window start/end/duration, and <code>ledger_unreadable_samples</code>.</td>
+<td>Sample counts (usable, failed, unparseable), the window start/end/duration, <code>ledger_unreadable_samples</code>, and -- from record version 2 -- <code>ledger_unreadable_prefix_samples</code>, <code>ledger_unreadable_prefix_seconds</code>, <code>capacity_degraded_samples</code> and <code>capacity_degraded_absent_samples</code>. The last four are what say whether an unreadable ledger was a warm-up or a fault.</td>
 </tr>
 <tr>
 <td><code>ledger_provenance</code></td>
@@ -13990,17 +14078,23 @@ output, minus the two path fields above.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="one-thing-this-dataset-does-not-know">One thing this dataset does not know<a class="headerlink" href="#one-thing-this-dataset-does-not-know" title="Permanent link">&para;</a></h2>
-<p>It is a blind spot of the retrospective window, and it is not zero.</p>
-<p><strong>Capacity guard refusals are unknown.</strong> The census filter in
-<code>shakenfist/actions</code> matches the scheduler's per-candidate stage
-events and nothing else, so neither <code>instance placement denied</code> nor
-<code>placement admitted over namespace capacity claim</code> was ever collected.
-<code>summary.guard.state</code> reads <code>not_collected</code> on all 204 summarised
-records. That is a fact about the query, not about the cluster. Step
-2e fixes the filter and step 2g re-measures; until then, no count of
-guard refusals over this window exists, and none should be inferred
-from the absence of one.</p>
+<h2 id="what-this-dataset-does-not-know">What this dataset does not know<a class="headerlink" href="#what-this-dataset-does-not-know" title="Permanent link">&para;</a></h2>
+<p><strong>Nothing, now.</strong> Both entries that stood here are answered, one by
+step 2f from the shape of the baseline itself and one by step 2g's
+confirmation window. They are kept below because a reader of
+<code>records.jsonl</code> alone will meet both and should not have to rediscover
+them.</p>
+<h3 id="resolved-capacity-guard-refusals">Resolved: capacity guard refusals<a class="headerlink" href="#resolved-capacity-guard-refusals" title="Permanent link">&para;</a></h3>
+<p><code>summary.guard.state</code> reads <code>not_collected</code> on all 204 summarised
+records in <code>records.jsonl</code>, and that is a fact about the LogQL query,
+not about the cluster: the census filter in <code>shakenfist/actions</code>
+matched the scheduler's per-candidate stage events and neither
+<code>instance placement denied</code> nor <code>placement admitted over namespace
+capacity claim</code>. <strong>No count of guard refusals over the baseline window
+exists, and none may be inferred from the absence of one.</strong></p>
+<p>Step 2e widened the filter and step 2g re-measured. In
+<code>records-addendum.jsonl</code> the state is <code>collected</code> on all 32 records,
+and what it holds is in <em>The confirmation window</em> below.</p>
 <h3 id="resolved-the-ledger-unreadable-samples">Resolved: the ledger-unreadable samples<a class="headerlink" href="#resolved-the-ledger-unreadable-samples" title="Permanent link">&para;</a></h3>
 <p>This section was written listing a second unknown, and step 2f
 resolved it from the data's shape rather than needing step 2a's flag.
@@ -14020,28 +14114,192 @@ independent runs.</p>
 drafted -- <code>scheduler_node_capacity</code> has no rows for the first 135 to
 210 seconds of a cluster's life, so admission is unguarded throughout
 it. See <em>A node can record twice its own ledger, and sizing would hide
-it</em> in the master plan. Step 2g now confirms this rather than deciding
-it.</p>
+it</em> in the master plan, and <strong>#4087</strong>.</p>
+<p><strong>Step 2g confirmed it directly</strong>, and the confirmation is in the
+records rather than in bundles which expire. <code>/admin/resources</code> now
+publishes <code>total.capacity_degraded</code>, and the report counts it:
+summing <code>series.capacity_degraded_samples</code> over
+<code>records-addendum.jsonl</code> gives <strong>0</strong> across all 3,359 samples, and
+<code>series.capacity_degraded_absent_samples</code> is <strong>0</strong> as well, so the
+flag was present on every sample and false on every sample --
+including in all 367 whose capacity rows read as absent. A failed
+capacity read would have set it.</p>
+<p>The prefix pattern repeats exactly, and is counted the same way:
+<code>series.ledger_unreadable_prefix_samples</code> equals
+<code>series.ledger_unreadable_samples</code> in all 32 records, so every
+unreadable sample is in the run the series opens with and none
+follows it. The prefix is 9 to 14 samples and
+<code>series.ledger_unreadable_prefix_seconds</code> spans 120 to 195 seconds
+between its first and last sample, so 135 to 210 seconds of wall
+clock at the 15 second interval. That is the same figure #4087 was
+filed with, measured a second time from a different window with an
+instrument that can now tell a failing read from an empty table.</p>
+<p>The baseline's own 204 job-runs were classified before those counters
+existed, from the raw series inside the bundles. <code>records.jsonl</code> is
+record version 1 and does not carry them, so the contiguity claim
+made about the baseline is not recomputable from this directory --
+which is the reason the counters were added.</p>
+<h2 id="the-confirmation-window">The confirmation window<a class="headerlink" href="#the-confirmation-window" title="Permanent link">&para;</a></h2>
+<p><code>records-addendum.jsonl</code>, harvested by step 2g on 2026-09-08.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Why</td>
+<td>Close the baseline's two blind spots against runs that used the fixed instrument</td>
+</tr>
+<tr>
+<td>Nominal window</td>
+<td>runs created between <strong>2026-09-07T10:00:00Z</strong> and <strong>2026-09-08T02:00:00Z</strong></td>
+</tr>
+<tr>
+<td>Effective window</td>
+<td><strong>2026-09-07T10:25:26Z</strong> to <strong>2026-09-08T01:55:33Z</strong></td>
+</tr>
+<tr>
+<td>Merge runs enumerated</td>
+<td>10</td>
+</tr>
+<tr>
+<td>Merge runs contributing a bundle</td>
+<td>8 (two had every functional job skipped by <code>Check paths</code>)</td>
+</tr>
+<tr>
+<td>Records</td>
+<td><strong>32</strong>, all four instrumented jobs in every run</td>
+</tr>
+<tr>
+<td>Records carrying a usable series</td>
+<td><strong>32</strong></td>
+</tr>
+<tr>
+<td>Distinct head SHAs</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<p>Both fixes were live throughout: step 2a's <code>capacity_degraded</code> merged
+to <code>develop</code> at 2026-09-06T06:17Z and step 2e's census filter merged to
+<code>shakenfist/actions</code> at 2026-09-06T00:09Z.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3 tools/ci_headroom_harvest.py \
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    --since 2026-09-07T10:00:00Z --until 2026-09-08T02:00:00Z \
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    --cache-dir /var/tmp/ci-headroom-harvest-cache \
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    --output records-addendum.jsonl
+</code></pre></div>
+<p>This window was first harvested as <code>--since 2026-09-07 --limit 10</code>,
+which is not a window at all: <code>--limit</code> takes the newest runs <em>as of
+the day it runs</em>, and two more merge runs landed within hours of the
+harvest, after which the same command enumerated a different ten. The
+boundaries above are the same eight runs, named. The file was
+re-harvested with them, and every record came back identical to the
+one it replaced apart from the four series counters record version 2
+adds.</p>
+<h3 id="the-guard-census-which-the-baseline-could-not-see">The guard census, which the baseline could not see<a class="headerlink" href="#the-guard-census-which-the-baseline-could-not-see" title="Permanent link">&para;</a></h3>
+<p><strong>3,480 denials over 32 job-runs</strong> -- a median of 121 per
+<code>slim-primary</code> job-run and 134.5 per <code>slim-tier</code> one. The CPU
+pre-filter, over the same 32 runs, dropped 283 candidates in 3,862
+evaluations and aborted 11 times. The composition of the denials is
+almost entirely one thing:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Denials whose sole exceeded dimension is <code>demand</code></td>
+<td>3,477</td>
+</tr>
+<tr>
+<td>Denials whose sole exceeded dimension is <code>cpus</code></td>
+<td>3 (one at the <code>node</code> stage, two at <code>cluster</code>)</td>
+</tr>
+<tr>
+<td>... of the demand denials, <code>demand_measured_alone</code></td>
+<td>1,789</td>
+</tr>
+<tr>
+<td>... <code>demand_estimate_tipped</code></td>
+<td>1,688</td>
+</tr>
+<tr>
+<td><code>malformed</code>, <code>unenforced</code>, <code>empty_dimensions</code>, <code>nothing_exceeded</code>, <code>demand_unsplit</code></td>
+<td>0 each</td>
+</tr>
+<tr>
+<td>Unrecognised stages, unrecognised dimensions</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p><strong>A denial is not a failed create.</strong> Both placement walks
+(<code>external_api/instance.py</code> and <code>operations/node_inst_netdesc_op.py</code>)
+catch <code>CapacityAdmissionDenied</code>, try the next candidate, and -- when
+nothing admitted and every refusal was demand-only, which is what
+3,477 of 3,480 of these are -- re-walk with the demand clause waived.
+So this is overwhelmingly a count of the walk absorbing a refusal, not
+of work the cluster refused.</p>
+<p>There were also <strong>24 claim exceedances</strong>, one per namespace across 24
+distinct <code>ci-claimaccount-*</code> namespaces, on all three dimensions. Those
+are <em>admitted</em> placements reported over an advisory claim
+(<code>CLAIM_ENFORCEMENT_HARD</code> is false), never refusals, and they are the
+claims suite exercising exactly the path it was written for.</p>
+<p>The widened filter did not cost the census its completeness:
+<code>summary.census.truncated</code> is false on all 32 records, which is the
+empirical form of the argument made when the filter was widened.</p>
+<h3 id="what-the-census-still-cannot-see">What the census still cannot see<a class="headerlink" href="#what-the-census-still-cannot-see" title="Permanent link">&para;</a></h3>
+<p>Named because it is the same shape of mistake the baseline made once.
+The filter matches the two guard messages and the stage events; it does
+<strong>not</strong> match the two events that say what became of a denial --
+<code>no candidate admitted and some refused on demand alone, waiving demand
+guard</code>, and <code>schedule failed, every candidate refused by capacity
+guard</code>. So the number of creates that actually failed on the guard
+cannot be derived from this file. It is not zero, and it is not 3,480.</p>
+<h3 id="comparability-with-the-baseline">Comparability with the baseline<a class="headerlink" href="#comparability-with-the-baseline" title="Permanent link">&para;</a></h3>
+<p>Stated so that a reader does not mistake the addendum for a shift.
+Committed-CPU medians land where <code>records.jsonl</code> left them: cluster-wide
+p90 fraction 0.333 median on <code>slim-primary</code> (n=24, max 0.481) against
+0.296-0.333 per job in the baseline, and 0.792 on <code>slim-tier</code> (n=8, max
+0.833) against 0.750. Memory dropped nothing in 3,851 evaluations, so
+D5's narrowing holds. Ledger provenance is zero fallbacks and zero
+missing ledgers over another 13,274 ledgered node-samples, so D7 stays
+closed at zero. Of the 7 job-runs with a <code>sufficient_idle_cpu</code> abort,
+<strong>7 failed</strong>, and 7 of the window's 8 job failures had one -- the same
+relationship the baseline found over 204 runs, at a sample size that
+could not have established it alone.</p>
 <h2 id="reproducing-an-analysis-over-this-file">Reproducing an analysis over this file<a class="headerlink" href="#reproducing-an-analysis-over-this-file" title="Permanent link">&para;</a></h2>
 <p>The dataset is deliberately plain: each line is one JSON object and
 nothing needs to be joined. To recover, say, the per-topology
 distribution of the cluster-wide committed-CPU p90 fraction:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">records</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s1">'records.jsonl'</span><span class="p">)]</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">usable</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">records</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>          <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">]</span> <span class="ow">and</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'n'</span><span class="p">]]</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">tier</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'p90_fraction'</span><span class="p">]</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">usable</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'topology'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'slim-tier'</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">records</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s1">'records.jsonl'</span><span class="p">)]</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">usable</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">records</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>          <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">]</span> <span class="ow">and</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'n'</span><span class="p">]]</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">tier</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'p90_fraction'</span><span class="p">]</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">usable</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'topology'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'slim-tier'</span><span class="p">]</span>
 </code></pre></div>
-<p>Two figures in the master plan's <em>Situation</em> section are <strong>not</strong> in
-this file, because the summary record does not carry them, and are
-recomputed from the bundles themselves rather than from here: the
+<p>Three figures in the master plan's <em>Situation</em> section are <strong>not</strong>
+recomputable from this directory, and are named as such where they are
+used. Two are not in the summary record at all: the
 measured-versus-committed vCPU comparison, and the classification of
 each <code>sufficient_idle_cpu</code> refusal by which of the two ledgers
-actually refused. Both come from <code>cpu_measured</code>/<code>cpu_committed</code> in the
+actually refused. They come from <code>cpu_measured</code>/<code>cpu_committed</code> in the
 raw series and from the <code>measured_cpus</code>/<code>committed_cpus</code> fields of the
-refusal payloads in the raw census. Both are named as such where they
-are used.</p>
+refusal payloads in the raw census.</p>
+<p>The third is in the record now but was not when the baseline was
+harvested: the shape of the ledger-unreadable samples in
+<code>records.jsonl</code>'s 204 job-runs -- a contiguous prefix, 9 to 14
+samples, never mid-run. That classification was made by reading the
+raw series. <code>records-addendum.jsonl</code> carries the counters which state
+it, so the same claim about the confirmation window is recomputable
+from the file, and a future re-measure will be too.</p>
 
 
 

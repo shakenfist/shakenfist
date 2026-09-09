@@ -13759,6 +13759,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#what-the-guard-refuses-measured-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the guard refuses, measured separately
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#memory-does-not-bind-but-is-not-spare-either" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14714,7 +14725,46 @@ the 2026-09-01 correction below, not a capacity event.</p>
 <p>Capacity <strong>guard</strong> refusals -- <code>instance placement denied</code> and
 <code>placement admitted over namespace capacity claim</code> -- are
 <strong>unknown</strong> for this window. The census query never matched them.
-This is a hole in the measurement, not a zero.</p>
+This is a hole in the measurement, not a zero. Phase 2's step 2e
+widened the filter and step 2g measured them over a separate
+confirmation window; what they contain is <em>What the guard refuses</em>
+below.</p>
+<h3 id="what-the-guard-refuses-measured-separately">What the guard refuses, measured separately<a class="headerlink" href="#what-the-guard-refuses-measured-separately" title="Permanent link">&para;</a></h3>
+<p>From the confirmation window, not the baseline: 32 job-runs over
+2026-09-07T10:25:26Z to 2026-09-08T01:55:33Z, harvested into
+<code>records-addendum.jsonl</code> and described in
+<a href="../data/ci-cloud-sizing-baseline/">the dataset README</a>. It is
+a classification of what the guard emits, deliberately not a second
+distribution.</p>
+<p>The guard denies far more often than the pre-filter drops: <strong>3,480
+denials</strong> across those 32 job-runs (median 121 per <code>slim-primary</code>
+job-run, 134.5 per <code>slim-tier</code> one) against 283 <code>sufficient_idle_cpu</code>
+drops in 3,862 evaluations, and 11 aborts, in the same runs. It is one dimension almost to the
+exclusion of the others -- <strong>3,477 of the 3,480 exceed <code>demand</code> and
+nothing else</strong>, split 1,789 measured-alone against 1,688
+estimate-tipped; the remaining three exceed <code>cpus</code> alone, two of
+them at the <code>cluster</code> stage. Nothing was malformed, unenforced or
+dimensionless, and the report met no stage or dimension name it did
+not recognise.</p>
+<p><strong>A denial is not a refused create, and this number must not be
+read as one.</strong> Both placement walks catch
+<code>CapacityAdmissionDenied</code>, move to the next candidate, and -- when
+nothing admitted and every refusal was demand-only, which describes
+3,477 of these 3,480 -- re-walk with the demand clause waived. So
+what the number mostly measures is the walk absorbing a refusal,
+either because a later candidate took the instance or because the
+second pass did. The events which would say how
+often it did <em>not</em> work -- <code>no candidate admitted and some refused
+on demand alone, waiving demand guard</code> and <code>schedule failed, every
+candidate refused by capacity guard</code> -- are still outside the census
+filter, so the count of creates that actually failed on the guard
+remains unmeasured. It is not zero and it is not 3,480; see <em>Future
+work</em>.</p>
+<p>The 24 claim exceedances in the same window, one each across 24
+distinct <code>ci-claimaccount-*</code> namespaces and on all three dimensions,
+are <strong>admitted</strong> placements reported over an advisory claim, exactly
+as <code>CLAIM_ENFORCEMENT_HARD</code> being false intends. They are the claims
+suite exercising the path, and they are not refusals.</p>
 <h3 id="memory-does-not-bind-but-is-not-spare-either">Memory does not bind, but is not spare either<a class="headerlink" href="#memory-does-not-bind-but-is-not-spare-either" title="Permanent link">&para;</a></h3>
 <p>Phase 0's D5 decided memory was "a real second dimension" on one
 observed <code>sufficient_idle_memory</code> refusal. <strong>That rationale does not
@@ -14933,34 +14983,54 @@ are fine and they are not.</p>
 statistic is saturated at the top, so its distribution says nothing
 about what "too empty per node" would look like.</p>
 <h3 id="what-the-baseline-does-not-know">What the baseline does not know<a class="headerlink" href="#what-the-baseline-does-not-know" title="Permanent link">&para;</a></h3>
-<p>One thing, stated once more because it is easy to read as zero and
-is not:</p>
+<p><strong>Both entries that stood here are now answered</strong>, one by phase 2's
+step 2f from the shape of the baseline itself and one by step 2g
+against a confirmation window run on the fixed instrument. They are
+kept, rather than deleted, because anyone reading
+<code>records.jsonl</code> alone will meet both.</p>
 <ul>
-<li><strong>Capacity guard refusals: unknown.</strong> Not collected in this
+<li><strong>Capacity guard refusals</strong> were not collected in the baseline
   window, because the census filter matched only the scheduler's
-  stage events. Phase 2's D20 fixes it and phase 2's step 2g
-  re-measures over a short post-fix window.</li>
+  stage events. <code>guard.state</code> reads <code>not_collected</code> on all 204
+  summarised records and <strong>no count may be inferred from that</strong>.
+  Step 2e widened the filter; step 2g measured 3,480 denials over 32
+  post-fix job-runs, reported in <em>What the guard refuses</em> above.</li>
+<li><strong>The ledger-unreadable samples</strong> -- 2,276 of 21,517 usable
+  samples (10.6%), in every one of the 204 job-runs, where every
+  node's capacity row reads as absent at once and which every
+  committed-CPU figure above excludes. In <strong>every</strong> job-run they are
+  exactly a contiguous <em>prefix</em> of the series, 9 to 14 samples long,
+  ending at the reconciler's first pass -- never mid-run, never
+  scattered, never twice. A failed gRPC read is an independent
+  per-sample event and would not land only on the head of 204
+  independent job-runs, which is how step 2f classified this as an
+  <strong>unpopulated table during cluster warm-up, not a failing read</strong>,
+  before the flag that could say so directly existed.</li>
 </ul>
-<p>The second entry that stood here -- the ledger-unreadable samples --
-<strong>is now known</strong>, and step 2f answered it from the shape of the data
-rather than from D19's flag. 2,276 of 21,517 usable samples (10.6%),
-in every one of the 204 job-runs, have every node's capacity row read
-as absent at once; every committed-CPU figure above excludes them. In
-<strong>every</strong> job-run those samples are exactly a contiguous <em>prefix</em> of
-the series, 9 to 14 samples long, ending at the reconciler's first
-pass -- never mid-run, never scattered, never twice. A failed gRPC
-read is an independent per-sample event and would not land only on
-the head of 204 independent job-runs. So this is an <strong>unpopulated
-table during cluster warm-up, not a failing read</strong>, and there is no
-read-reliability defect to file.</p>
+<p><strong>Step 2g confirmed it directly.</strong> With D19's flag published,
+  <code>total.capacity_degraded</code> is present on all 3,359 samples of the
+  confirmation window and <strong>false on every one of them</strong>, including
+  all 367 whose capacity rows read as absent. The prefix repeats
+  exactly: contiguous from sample zero in all 32 job-runs, 9 to 14
+  samples, 120 to 195 seconds between first and last, so 135 to 210
+  seconds of wall clock. There is no read-reliability defect to
+  file.</p>
+<p>Both of those are counted in the record as of report version 2 --
+  <code>series.capacity_degraded_samples</code> and
+  <code>series.ledger_unreadable_prefix_samples</code>/<code>_seconds</code> -- so the
+  confirmation is recomputable from <code>records-addendum.jsonl</code> rather
+  than from bundles which expire ninety days after their run. The
+  baseline's own prefix classification predates those counters and
+  was read from the raw series; it is one of the three figures the
+  dataset README names as not recomputable from the committed
+  records.</p>
 <p>What the window does expose is the other side of the same fact: for
 those 135 to 210 seconds the admission guard does not exist, which is
 where the 18 refusal payloads that fired with <code>capacity_row_present</code>
-false come from, and which is #4087, recorded in <em>Bugs fixed
-during this work</em> below. Step 2g should confirm the classification
-prospectively once D19's flag is running -- <code>capacity_degraded</code>
-should read false throughout the prefix -- but that is a
-confirmation, not an open question.</p>
+false come from, and which is <strong>#4087</strong>, recorded in <em>Bugs fixed
+during this work</em> below. The confirmation window measures that
+interval a second time, from a different window and with an
+instrument that can now tell a failing read from an empty table.</p>
 <h3 id="reproducing-the-measurements">Reproducing the measurements<a class="headerlink" href="#reproducing-the-measurements" title="Permanent link">&para;</a></h3>
 <p>The measured figures now come from a tool we own, which is what
 this plan existed to fix. The hand-collected ones still do not.</p>
@@ -14969,8 +15039,12 @@ this plan existed to fix. The hand-collected ones still do not.</p>
   exact command and window in
   <a href="../data/ci-cloud-sizing-baseline/"><code>docs/plans/data/ci-cloud-sizing-baseline/README.md</code></a>.
   The dataset in that directory is the source for every figure above
-  marked as measured, except the two named as coming from the raw
-  bundles.</li>
+  marked as measured, except the three the README names as coming
+  from the raw bundles. Two files: <code>records.jsonl</code> is the baseline, and
+  <code>records-addendum.jsonl</code> is the confirmation window the guard
+  census and the <code>capacity_degraded</code> confirmation come from. The
+  addendum is a classification, not a distribution -- do not
+  recompute a band from it.</li>
 <li><strong>A single job's own numbers</strong>: <code>tools/ci_headroom_report.py</code>
   against the <code>traces/headroom.jsonl</code> and
   <code>traces/headroom-census.json</code> in that job's bundle, or <code>--json</code> for
@@ -15247,7 +15321,7 @@ superseded.</p>
 <tr>
 <td>2. Baseline measurement window: the peak-demand distribution that has never existed</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-02-baseline/">PLAN-ci-cloud-sizing-phase-02-baseline.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. Explicit saturation coverage, so that growing a cloud cannot silence a defect</td>
@@ -15689,6 +15763,19 @@ which is what <code>tools/check-plan-status.py</code> enforces.</p>
   reusable workflow means they inherit the measurement too. Same
   structural cause as the entry below: a cloud built by something
   other than the workflow the probe steps live in is unmeasured.</li>
+<li><strong>Count what became of a guard denial, not just the denial.</strong>
+  Step 2g measured 3,480 denials over 32 job-runs and cannot say how
+  many of them ended in a failed create, because the census filter
+  matches the denial but not the two events that resolve it: <code>no
+  candidate admitted and some refused on demand alone, waiving demand
+  guard</code> and <code>schedule failed, every candidate refused by capacity
+  guard</code>. Both are one more alternation in the same LogQL filter in
+  <code>shakenfist/actions</code>, and the second is the event that actually
+  says "the cluster refused this create at the guard". Deliberately
+  not done in phase 2, which had already re-measured once and must
+  not become a rolling measurement window; phase 3 wants it, because
+  a saturation test asserting guard behaviour needs to observe the
+  outcome and not only the denial.</li>
 <li><strong>Instrument the two cluster jobs the probe cannot see.</strong> Phase
   2's D17 found that only four of the six clouds a merge run builds
   carry the phase 1 probe, for two different reasons. <code>Ansible
@@ -15770,6 +15857,50 @@ sure none of them is closed by accident:</p>
   Phase 2 wants to compare the live ledger derivation against the
   reconciled <code>cluster_capacity</code> figure; if they disagree, this is
   why it is hard to tell which is wrong.</li>
+<li><strong>A harvest that could enumerate nothing and exit zero</strong> (found
+  and fixed by phase 2 step 2g, no issue filed -- it never reached a
+  release). <code>tools/ci_headroom_harvest.py</code>'s run listing stopped at
+  the first run created before the window, documented as safe
+  because "the listing is newest first". The runs API does not
+  promise an order and on 2026-09-08 served this workflow's
+  <code>merge_group</code> runs <strong>oldest</strong> first, so the first run was outside
+  any recent window and 2g's first harvest wrote zero records,
+  reported "Harvesting 0 merge_group runs" and exited zero -- the
+  silently half-completed harvest the tool's own docstring says it
+  must never be. The window is now bounded by a <code>created=&gt;=</code> filter
+  on the API call, nothing infers an order, and <code>--limit</code> sorts
+  explicitly; two tests pin an oldest-first listing and one pins the
+  API filter. The baseline in <code>records.jsonl</code> is unaffected, and that
+  was checked rather than assumed: asking the API today for the
+  completed <code>merge_group</code> runs created in the baseline's window
+  returns 66, exactly the number step 2d enumerated.</li>
+<li><strong>Two more in the same listing, found reviewing that fix</strong> (phase
+  2, no issue filed, same reasoning). The <code>created=&gt;=</code> boundary was
+  formatted with <code>strftime</code>, which ignores <code>tzinfo</code>, while
+  <code>parse_since()</code> deliberately keeps whatever offset the operator
+  wrote: a <code>--since 2026-09-07T00:00:00+10:00</code> asked the API for
+  <code>2026-09-07T00:00:00Z</code>, ten hours <em>later</em> than requested, and
+  because the server-side filter runs first those ten hours could
+  not be recovered by the client-side one. The harmful direction is
+  a positive offset, which is this project's own timezone. Both
+  boundaries are now normalised to UTC before they are formatted,
+  and a test pins the shifted stamp. Separately, the harvest could
+  still write an empty file over a committed dataset and exit zero
+  by any <em>other</em> road to an empty enumeration -- a renamed workflow,
+  a changed event name, a lapsed token scope -- so an enumeration
+  which finds no runs now raises before <code>--output</code> is opened, and a
+  set of runs which yields no records raises after it, saying the
+  file was truncated.</li>
+<li><strong>A harvested window that could not be reproduced</strong> (phase 2, same
+  review). A window bounded only by <code>--since</code> grows with every
+  merge, and one bounded by <code>--limit</code> moves with the day it runs on:
+  the command step 2g's README quoted, <code>--since 2026-09-07 --limit
+  10</code>, stopped naming its own dataset within hours, when two more
+  runs merged and the newest ten became a different ten. The tool
+  now takes <code>--until</code>, both boundaries are pushed down to the API as
+  a <code>created=A..B</code> range, and both datasets' commands name both
+  ends. The addendum was re-harvested with the pinned window and
+  came back identical record for record.</li>
 <li><strong>Unguarded placements in a cluster's first minutes</strong>
   (<strong>#4087</strong>, filed by phase 2 step 2f).
   <code>scheduler_node_capacity</code> has no rows until the
@@ -15787,9 +15918,12 @@ sure none of them is closed by accident:</p>
   the cloud would mask it rather than fix it</strong>, which is exactly
   what phase 3 exists to prevent. Closed by PR #4106, but the fix
   is a one-shot at election that fires before any hypervisor has
-  published, so in CI the window is unchanged (six post-fix runs
-  read on 2026-09-08, all with the prefix intact); reopening it
-  and repeating the check in the elected loop is
+  published, so in CI the window is unchanged: step 2g re-measured
+  the interval over 32 post-fix job-runs and found the same 135 to
+  210 seconds, with <code>capacity_degraded</code> false throughout, so the
+  issue now rests on two independent windows and on a flag which
+  can tell an empty table from a failing read. Reopening it and
+  repeating the check in the elected loop is
   transient-capacity-refusals phase 1.</li>
 </ul>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>

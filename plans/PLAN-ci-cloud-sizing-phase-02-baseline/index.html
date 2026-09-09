@@ -13819,6 +13819,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-the-confirmation-window-added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the confirmation window added
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#risks-and-mitigations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14589,7 +14600,7 @@ the shape of the data:</strong> in every one of the 204 job-runs those
 samples are exactly a contiguous <em>prefix</em>, 9 to 14 samples long,
 ending at the reconciler's first pass -- so it is an unpopulated
 table during cluster warm-up, not a failing read, and no issue is
-filed for it. Step 2g confirms rather than decides. The 18 refusal
+filed for it. <strong>Step 2g confirmed it</strong>, below. The 18 refusal
 payloads that fired with <code>capacity_row_present</code> false are the same
 window seen from the refusal path.</p>
 <p><strong>An error in the master plan that the data caught.</strong> Its
@@ -14622,6 +14633,138 @@ census that was present and readable in twelve of those thirteen
 records (about 100 <code>sufficient_idle_cpu</code> drops). Nothing in this
 phase needs them, and changing it would change the record schema, so
 it is left alone.</p>
+<h2 id="what-the-confirmation-window-added">What the confirmation window added<a class="headerlink" href="#what-the-confirmation-window-added" title="Permanent link">&para;</a></h2>
+<p>Step 2g, run on 2026-09-08. Its whole job is to close the two things
+the retrospective window could not see, against runs that used the
+instrument this phase fixed: step 2a's <code>capacity_degraded</code> (merged to
+<code>develop</code> 2026-09-06T06:17Z) and step 2e's widened census filter
+(merged to <code>shakenfist/actions</code> 2026-09-06T00:09Z). <strong>It is a
+classification, not a second baseline</strong>, and nothing in <em>What the
+baseline measured</em> above is recomputed from it.</p>
+<p><strong>The sample.</strong> Ten merge runs asked for, <strong>8 contributing a bundle</strong>,
+<strong>32 records</strong> -- all four instrumented jobs in every one of the eight
+runs, every record carrying a usable series -- over
+2026-09-07T10:25:26Z to 2026-09-08T01:55:33Z. Committed to
+<code>docs/plans/data/ci-cloud-sizing-baseline/records-addendum.jsonl</code>. This
+is the five-to-ten runs the step was scoped to and it stops there.</p>
+<p><strong>Blind spot 1 is closed: the guard census contains a count.</strong>
+<code>guard.state</code> is <code>collected</code> on all 32 records, against
+<code>not_collected</code> on all 204 baseline ones, and D20's fix therefore
+works in the deployed CI. What it counts is lopsided in a way worth
+recording:</p>
+<ul>
+<li><strong>3,480 denials</strong> over 32 job-runs -- median 121 per <code>slim-primary</code>
+  job-run, 134.5 per <code>slim-tier</code> one. In the same 32 runs the CPU
+  pre-filter dropped 283 candidates in 3,862 evaluations and aborted
+  11 times, so the guard refuses a node the scheduler had already
+  chosen an order of magnitude more often than the pre-filter drops
+  one from the list.</li>
+<li><strong>3,477 of the 3,480 exceed <code>demand</code> and nothing else</strong>, split
+  1,789 <code>demand_measured_alone</code> to 1,688 <code>demand_estimate_tipped</code>.
+  The other three exceed <code>cpus</code> alone, two of them at the <code>cluster</code>
+  stage rather than the <code>node</code> one.</li>
+<li>Zero malformed, zero unenforced, zero with empty dimensions, zero
+  with nothing exceeded, and no unrecognised stage or dimension
+  name. The report's vocabulary matches what the guard actually
+  emits, so the census is not merely present but fully classified.</li>
+<li>24 claim exceedances, one each across 24 distinct
+  <code>ci-claimaccount-*</code> namespaces and on all three dimensions. These
+  are <strong>admitted</strong> placements over an advisory claim, never
+  refusals, and they are the claims suite exercising the path.</li>
+<li><code>census.truncated</code> is false on all 32, so widening the filter did
+  not push the query into the 5000-entry limit -- the empirical
+  form of the argument made in <code>shakenfist/actions</code> when the filter
+  was widened.</li>
+</ul>
+<p><strong>A denial is not a refused create</strong>, and the master plan says so
+where it reports the number. Both placement walks catch
+<code>CapacityAdmissionDenied</code>, try the next candidate, and -- when
+nothing admitted and every refusal was demand-only, which describes
+3,477 of these 3,480 -- re-walk with the demand clause waived. The
+count therefore mostly measures the walk absorbing a refusal, by a
+later candidate taking the instance or by the second pass.</p>
+<p><strong>What is still not counted, named so it is not mistaken for zero
+twice.</strong> The filter matches the denial but neither event that
+resolves it -- <code>no candidate admitted and some refused on demand
+alone, waiving demand guard</code> and <code>schedule failed, every candidate
+refused by capacity guard</code>. So how often the guard actually failed a
+create is unmeasured. Widening the filter once more is one
+alternation and is left to phase 3, as a <em>Future work</em> entry in the
+master plan, rather than turning this step into a third measurement
+window.</p>
+<p><strong>Blind spot 2 is closed: the warm-up prefix is an empty table.</strong>
+<code>total.capacity_degraded</code> is present on <strong>all 3,359 samples</strong> of the
+window and <strong>false on every one</strong>, including all 367 whose capacity
+rows read as absent. A failed capacity read sets it; nothing set it.
+The prefix pattern repeats exactly -- contiguous from sample zero in
+all 32 job-runs, 9 to 14 samples, 120 to 195 seconds between first
+and last sample, so 135 to 210 seconds of wall clock. Step 2f's
+inference from the baseline's shape is confirmed by direct
+measurement, no read-reliability issue is filed, and <strong>#4087</strong> now
+rests on two independent windows.</p>
+<p>Both halves of that are <strong>counted into the summary record</strong> rather
+than left in the bundles. Review of this step pointed out that the
+two figures which close blind spot 2 were the only claims here not
+recomputable from the committed dataset: they came from raw series
+which expire ninety days after their run, and D22 does not commit
+those. <code>series.capacity_degraded_samples</code>,
+<code>series.capacity_degraded_absent_samples</code>,
+<code>series.ledger_unreadable_prefix_samples</code> and
+<code>series.ledger_unreadable_prefix_seconds</code> were added to
+<code>summary_record()</code> at <code>RECORD_VERSION</code> 2, the printed report now
+names which of the two readings an unreadable ledger was, and
+<code>records-addendum.jsonl</code> was re-harvested to carry them. The
+baseline stays at version 1: its own prefix classification remains a
+raw-bundle figure, and the dataset README names it as one.</p>
+<p><strong>The window is comparable to the baseline</strong>, which is what licenses
+reading the two together. Cluster-wide committed-CPU p90 fraction:
+median 0.333 on <code>slim-primary</code> (n=24, max 0.481) against the
+baseline's 0.296-0.333 per job, and 0.792 on <code>slim-tier</code> (n=8, max
+0.833) against 0.750. Memory dropped nothing in 3,851 evaluations, so
+D5's narrowing stands. Ledger provenance is zero fallbacks and zero
+missing ledgers over another 13,274 ledgered node-samples, so D7
+stays closed at zero. Seven job-runs had a <code>sufficient_idle_cpu</code>
+abort and <strong>all seven failed</strong>; seven of the window's eight job
+failures had one. That is the baseline's own relationship, at a
+sample size which could not have established it alone.</p>
+<p><strong>A defect in this phase's own tooling, found by running it.</strong>
+<code>tools/ci_headroom_harvest.py</code> enumerated runs by reading until it
+met one created before the window, on the documented belief that the
+runs listing arrives newest first. The API does not promise an order
+and on 2026-09-08 served this workflow's <code>merge_group</code> runs <em>oldest</em>
+first, so 2g's first harvest wrote zero records, printed <code>Harvesting
+0 merge_group runs</code> and exited zero -- precisely the silently
+half-completed harvest the tool's module docstring says it must never
+be. Fixed here: the window is bounded by a <code>created=&gt;=</code> filter on the
+API call, no code path infers an order, and <code>--limit</code> sorts
+explicitly. Three tests were added, including one that pins an
+oldest-first listing. The baseline in <code>records.jsonl</code> is unaffected, and this
+was checked rather than assumed: asking the API today for the
+completed <code>merge_group</code> runs created in the baseline's window returns
+<strong>66</strong>, which is exactly the number step 2d enumerated, so nothing
+was silently missed from it.</p>
+<p>Review of that fix found three more in the same few lines, all fixed
+here and each pinned by a test. The <code>created=&gt;=</code> boundary was
+formatted with <code>strftime</code>, which ignores <code>tzinfo</code> while
+<code>parse_since()</code> deliberately preserves an offset, so a <code>--since</code>
+written in this project's own timezone asked the API for a boundary
+ten hours later than the one requested -- and, the server-side filter
+running first, those hours could not be recovered. An empty
+enumeration could still write an empty file over a committed dataset
+and exit zero by any road other than the ordering one, so it now
+raises before <code>--output</code> is opened, and a set of runs which yields no
+records raises after it. And the window itself was not reproducible:
+<code>--since 2026-09-07 --limit 10</code> named a different ten runs within
+hours of the harvest, so the tool gained <code>--until</code>, both boundaries
+are pushed down as a <code>created=A..B</code> range, and both datasets' README
+commands now name both ends. The re-harvest under the pinned window
+returned the same 32 records, field for field, which is also the
+check that the version 2 counters changed nothing else.</p>
+<p><strong>What this leaves for 2h.</strong> Definition of done item 10 asks the
+operator to confirm a real post-fix run prints a <em>Capacity guard
+census</em> with a count in it, which the 32 records above are the
+harvested form of. Nothing in this section changes a conclusion of
+step 2d; every one of them is confirmed or extended.</p>
 <h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>The harvest measures a moving target.</strong> Sixty-six merge runs
@@ -14721,7 +14864,11 @@ it is left alone.</p>
   first chance to see whether the frequencies match.</li>
 <li>A working capacity guard census, from D20, so a test which fills
   a cluster to its ledger can assert on the guard's own events and
-  not only on the pre-filter's.</li>
+  not only on the pre-filter's -- proven working, with 3,480 denials
+  counted over 32 job-runs in <em>What the confirmation window added</em>.
+  Phase 3 should widen the filter by the two events which say what
+  became of a denial before writing that test; the master plan's
+  <em>Future work</em> carries the entry.</li>
 <li>An answer on whether memory binds, which decides whether phase
   3's saturation test needs a memory dimension at all.</li>
 <li>The knowledge that the cluster-wide fraction and the per-node
