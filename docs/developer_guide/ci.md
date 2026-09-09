@@ -196,8 +196,8 @@ through the `gh` CLI (which supplies the credentials), unpacks the
 trace files -- an artifact download is a zip whose single member is
 `bundle.zip`, and the traces are inside *that* -- calls
 `summary_record()` on each, and writes one compact JSON object per job
-per run. It needs at least one of `--since` and `--limit`, because an
-unbounded harvest downloads the whole ninety day retention window;
+per run. It needs at least one of `--since`, `--until` and `--limit`, because
+an unbounded harvest downloads the whole ninety day retention window;
 bundles are cached by artifact id under `~/.cache/shakenfist-ci-headroom`
 by default, outside any checkout, and an already-cached bundle is never
 re-fetched. Two things about it are deliberate and worth knowing before
@@ -210,6 +210,25 @@ a job to the merge matrix stops the harvest until someone says what the
 new job is. A bundle with no series is written out with a reason
 instead of being dropped, because a harvest that silently shrinks its
 own window is the failure mode that looks most like success.
+
+That last principle has been tested once. `--since` and `--until` are
+applied as a `created=` filter on the API call *and* again on the
+returned runs, and nothing in the tool infers anything from the order
+the listing arrives in -- an earlier version stopped at the first
+out-of-window run on the belief that the runs API returns newest
+first, which it does not promise and on at least one occasion did not
+do, so a harvest of a perfectly good window enumerated nothing and
+exited zero. If you add another listing to this tool, filter it server
+side and sort what comes back. Three rules fell out of that, and each
+is pinned by a test: a boundary is normalised to UTC before it is
+formatted, because `strftime` ignores `tzinfo` and a `+10:00` stamped
+with a `Z` moves the window ten hours in the direction this project's
+own timezone lies; an enumeration which finds no runs raises *before*
+`--output` is opened, so re-running a harvest whose window has gone
+wrong cannot be the thing that empties the last good dataset; and any
+harvest whose output is going to be committed names both ends of its
+window, because `--since` alone grows with every merge and `--limit`
+moves with the day it is run on.
 
 ### The series record format
 
