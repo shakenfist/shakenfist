@@ -1500,17 +1500,30 @@ def _authorization_failure_log(e: Exception):
 
 
 def handle_authorization_exceptions(func):
-    # NOTE(mikal): like _reject_token, these are logged at INFO. Every
-    # rejection here is caused by the credential the client presented,
-    # which is an expected client condition and not a cluster fault, so
-    # none of them should be paging anyone (issue 3606).
+    # NOTE(mikal): this wrapper catches authorization conditions and
+    # nothing else -- the ten JWT exception classes below, covering a
+    # token which cannot be decoded, one which has expired, and the
+    # assorted ways flask_jwt_extended reports a token which is
+    # structurally fine but not acceptable. Like _reject_token, they
+    # are all logged at INFO: every rejection here is caused by the
+    # credential the client presented, which is an expected client
+    # condition and not a cluster fault, so none of them should be
+    # paging anyone (issue 3606).
+    #
+    # TypeError used to be caught here too, and answered as a 400
+    # carrying str(e). It is not an authorization condition, and
+    # nothing in flask_jwt_extended or PyJWT signals one with it: the
+    # arm existed because a handler called with a body key it does not
+    # accept raises TypeError, and a 400 was a better answer than a
+    # 500 in the absence of a validation layer. Phases 1 to 4 of
+    # PLAN-api-input-validation built that layer, so an undeclared body
+    # key is now refused by name before the handler is reached, and the
+    # workaround has been deleted (decision D23). What is left behind
+    # it is a genuine handler-internal TypeError, which is a server
+    # fault and is now recorded and answered as one.
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-
-        except TypeError as e:
-            _authorization_failure_log(e).info('API request rejected as malformed')
-            return sf_api.error(400, str(e), suppress_traceback=False)
 
         except DecodeError as e:
             # Send a more informative message than 'Not enough segments'. If this

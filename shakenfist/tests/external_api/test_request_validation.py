@@ -7,9 +7,15 @@ API_VALIDATION_MODE's default to 'enforce', which is what the
 EnforcedValidationTestCase class at the bottom of this file pins.
 The warn-mode properties above it are still worth keeping -- 'warn'
 is the operator's rollback, and its promise is that no request behaves
-differently than it did before the layer existed -- so each of those
-tests now sets the mode it is about rather than relying on a default
-which has moved.
+differently than it does with the layer switched off -- so each of
+those tests now sets the mode it is about rather than relying on a
+default which has moved.
+
+Phase 5 then deleted the `except TypeError` arm which used to answer a
+handler's rejected kwargs as a 400 in the interpreter's own words, so
+that promise is now kept against a 500 rather than against that 400.
+The mode did not change; what a request the mode declines to intervene
+in answers did.
 """
 
 import json
@@ -72,19 +78,32 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
     def test_warn_mode_changes_no_response(self):
         """The promise 'warn' still makes, now that it is the rollback.
 
-        A body carrying an undeclared key produces a finding, and the
-        response is byte for byte what it was before validation
-        existed: the 400 log_request's merge has always produced, with
-        the interpreter's own text. That interpreter text is the defect
-        this plan exists to remove, so an operator who rolls back to
-        'warn' gets the old behaviour back, warts included.
+        A body carrying an undeclared key produces a finding and the
+        layer then stands aside: the response is whatever the same
+        request produces with the layer switched off, which
+        test_off_mode_disables_the_layer asserts is this same 500.
+        Warn observes and never answers, and that is unchanged -- which
+        is why this test still carries the name it does.
 
-        With one exception, which the release note states: the five
-        metadata delete handlers no longer accept the `value` kwarg
-        they used to ignore, in any mode, so a caller which sends one
-        gets a TypeError-shaped 400 in 'warn' where enforcement would
-        have named the parameter. That was UNDECLARED_BY_DESIGN's last
-        entry, and removing it is what emptied the set.
+        What the underlying request answers *did* change, in phase 5.
+        Until then an undeclared key reached the handler, failed the
+        kwargs merge with a TypeError, and
+        handle_authorization_exceptions turned that into a 400 carrying
+        the interpreter's own words. That is the defect of issue 3612,
+        and leaving it in the one mode an operator can reach by rolling
+        enforcement back would have preserved it behind a flag. The arm
+        is gone (decision D23), so a request whose kwargs its handler
+        cannot accept is now answered as what it has always been
+        underneath: an unhandled server side exception, recorded on
+        disk and answered as a 500 (decision D25). An operator rolling
+        back is buying "requests that were working keep working", not a
+        tidier error for requests that were already being refused.
+
+        The five metadata delete handlers are the one thing the
+        rollback does not undo at all: they no longer accept the
+        `value` kwarg they used to ignore, in any mode. That was
+        UNDECLARED_BY_DESIGN's last entry, and removing it is what
+        emptied the set.
         """
         config.API_VALIDATION_MODE = 'warn'
 
@@ -93,9 +112,14 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(
             [validation.UNKNOWN_PARAMETER], [f.reason for f in findings])
-        self.assertEqual(400, response.status_code)
-        self.assertIn(
-            'unexpected keyword argument', response.get_json()['error'])
+        self.assertEqual(500, response.status_code)
+        body = response.get_json()
+        self.assertEqual(500, body['status'])
+        # And the layer itself did not answer. Its refusal names the
+        # parameter, so the absence of that is what separates "warn
+        # observed and stood aside" from "warn rejected" -- which a
+        # status code on its own cannot say.
+        self.assertNotIn('not declared by this endpoint', body['error'])
 
     def test_a_clean_request_produces_no_findings(self):
         """Otherwise every request is a finding and the log says nothing."""
@@ -185,17 +209,28 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         """The operator's safety valve: if the layer itself becomes the
         problem -- log volume being the foreseeable case -- it can be
         turned off without a downgrade. Off means check() never runs,
-        not merely that findings are discarded."""
+        not merely that findings are discarded.
+
+        So the response is the request's own, with nothing of the layer
+        in it. Phase 5 changed what that is: deleting the `except
+        TypeError` arm (decision D23) means a body key the handler
+        cannot accept is no longer converted into a 400 carrying the
+        interpreter's words, and is instead recorded and answered as
+        the 500 it always was underneath (decision D25). The status
+        asserted here is identical to warn's, which is the point --
+        warn observes and off does not look, and neither answers.
+        """
         config.API_VALIDATION_MODE = 'off'
 
         response, findings = self._post_auth(
             {'namespace': 'sys', 'key': 'k', 'zzz': 1})
 
         self.assertEqual([], findings)
-        # And the request itself behaved exactly as it always did.
-        self.assertEqual(400, response.status_code)
-        self.assertIn(
-            'unexpected keyword argument', response.get_json()['error'])
+        self.assertEqual(500, response.status_code)
+        body = response.get_json()
+        self.assertEqual(500, body['status'])
+        # Nothing from the layer reached the caller, in either mode.
+        self.assertNotIn('not declared by this endpoint', body['error'])
 
     def test_the_validator_does_not_refetch_the_body(self):
         """The validator reads the body log_request stashed, so it
@@ -457,14 +492,20 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         """The after_request hook is the deliverable: a finding line
         carrying what the request returned anyway is what separates a
         rejection enforcement would introduce from a status code it
-        would merely change."""
+        would merely change.
+
+        The status recorded here is the request's own, whatever it is.
+        Since phase 5 that is a 500 for this input rather than the 400
+        the deleted `except TypeError` arm used to manufacture, which
+        is precisely the sort of movement the field exists to make
+        visible."""
         config.API_VALIDATION_MODE = 'warn'
 
         with mock.patch.object(external_api, 'LOG') as log:
             response, findings = self._post_auth(
                 {'namespace': 'sys', 'key': 'k', 'zzz': 1})
 
-        self.assertEqual(400, response.status_code)
+        self.assertEqual(500, response.status_code)
         self.assertEqual(1, len(findings))
 
         emitted = [c.args[0] for c in log.with_fields.call_args_list
@@ -472,7 +513,7 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(emitted))
         self.assertEqual(
             validation.UNKNOWN_PARAMETER, emitted[0]['validation-reason'])
-        self.assertEqual(400, emitted[0]['validation-response-status'])
+        self.assertEqual(500, emitted[0]['validation-response-status'])
         self.assertEqual('warn', emitted[0]['validation-mode'])
 
     def test_enforced_rejections_still_emit_their_findings(self):
@@ -770,6 +811,73 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
             {'error': 'banana: not declared by this endpoint', 'status': 400},
             response.get_json())
         self.assertNoInterpreterText(response)
+
+    def test_a_handler_internal_type_error_is_a_recorded_500(self):
+        """Decision D30: the removal, asserted.
+
+        Phase 5 deleted the `except TypeError` arm from
+        handle_authorization_exceptions (decision D23). A deletion is
+        the change a suite is least likely to notice, and restoring
+        that arm would silently reinstate the leak four phases were
+        spent closing, so the property it establishes is pinned here:
+        a TypeError raised inside a handler is a server fault, recorded
+        and answered as a 500, and never a 400 telling the caller
+        something about the call it made.
+
+        The request itself is well formed and produces no findings --
+        this is not the validation layer's path. The TypeError is a
+        real one from the interpreter rather than one constructed for
+        the test, raised where a handler's own bug would raise it, so
+        the message being asserted about is the shape a handler
+        actually produces.
+
+        On what the body carries. Every INTERPRETER_TEXT marker is
+        asserted absent except the exception class name, which
+        suppress_exceptions_to_client still puts in the body itself via
+        `repr(e)` in its `server error: %s` message -- a separate leak
+        on the generic 500 path, common to every exception class and
+        not something the deleted arm was responsible for. What matters
+        for D23 is asserted in full: the caller learns no endpoint
+        class, no method name, no traceback and no source path, and is
+        told this was a server error rather than their bad request.
+        """
+        findings, patcher = self._spy_on_check()
+
+        def raise_a_real_type_error(*args, **kwargs):
+            # Not TypeError('...') by hand: comparing incomparable
+            # types is how a handler bug actually reaches this path,
+            # and the interpreter writes the message.
+            return sorted(['a', 1])
+
+        with patcher, mock.patch(
+                'shakenfist.external_api.instance.instance.Instances',
+                side_effect=raise_a_real_type_error), \
+                mock.patch.object(
+                    api_base.util_exceptions, 'record_exception',
+                    return_value={'exception-record': 'test'}) as recorded:
+            response = self.client.get(
+                '/instances', headers={'Authorization': self.token})
+
+        self.assertEqual([], findings)
+        self.assertEqual(500, response.status_code, response.get_json())
+        body = response.get_json()
+        self.assertEqual(500, body['status'])
+        self.assertTrue(
+            body['error'].startswith('server error: '), body['error'])
+
+        # Recorded rather than swallowed: the operator gets a file
+        # under /srv/shakenfist/exceptions/ for a fault the caller is
+        # told nothing useful about, which is the trade decision D25
+        # makes.
+        self.assertEqual(1, recorded.call_count)
+
+        raw = response.get_data(as_text=True)
+        for fragment in INTERPRETER_TEXT:
+            if fragment == 'TypeError':
+                continue
+            self.assertNotIn(
+                fragment, raw,
+                'the server error leaked interpreter text: %s' % raw)
 
     def test_an_omitted_required_parameter_still_reaches_the_handler(self):
         """Decision D17, and the one filter in the enforce branch.
