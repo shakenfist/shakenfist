@@ -146,11 +146,13 @@ roster is separate, and what stays project-specific. Registered in
 
 ## Migration (separate commits, one per repository)
 
-Landed in four of the eight repositories: instar, kerbside, ryll
-and shakenfist are `compliant` on the `plan-template` check.
-Outstanding for client-python-k3s, divergulent and occystrap
-(sfui has no template and is N/A). For each remaining repository,
-in its own branch:
+Landed in five of the eight repositories: client-python-k3s,
+divergulent, instar, kerbside and ryll are `compliant` on the
+`plan-template` check. Outstanding for occystrap (sfui has no
+template and is N/A). shakenfist, one of the original four, is now
+non-compliant on `plan-template` for missing the
+`plan-push-audit-phase` block (shakenfist#3892). For each remaining
+repository, in its own branch:
 
 1. Restructure `PLAN-TEMPLATE.md` so no section mixes generic and
    project-specific text. In practice: move the project-specific

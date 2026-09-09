@@ -83,13 +83,21 @@ The following projects are subject to consistency audits:
 
 One project is in scope for part of the audit only:
 
-- private-ci -- the `sfui-vendor` check, and nothing else. It is
-  internal tooling and excluded from the conventions, but it vendors
-  sfui and a vendored copy drifts silently: nothing in the consumer
-  fails when the copy falls behind, or when someone edits it in place
-  and the next sync discards the edit. It is not expected to grow a
-  `pyproject.toml`, a renovate config, release workflows, or a
-  `develop` branch.
+- private-ci is audited for the `plan-phase-references`,
+  `plan-source-references`, `plan-index`, `plan-template` and
+  `sfui-vendor` checks, and nothing else. It is internal tooling and
+  excluded from the conventions, but it vendors sfui and a vendored
+  copy drifts silently: nothing in the consumer fails when the copy
+  falls behind, or when someone edits it in place and the next sync
+  discards the edit. It plans like the rest of the fleet too, so the
+  four criteria that report a defect in a plan as written apply. The
+  two that do not are `plan-audit-phase`, because the plans written
+  there before it adopted the template track progress as checkpoint
+  sections rather than as a phase table and enabling it would file an
+  issue for a retrofit nobody has decided to do, and `push-audit`,
+  which has no `PUSH-AUDIT.md` to read until that changes. It is not
+  expected to grow a `pyproject.toml`, a renovate config, release
+  workflows, or a `develop` branch.
 
 ### Excluded projects
 

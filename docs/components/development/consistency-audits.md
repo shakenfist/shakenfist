@@ -218,17 +218,23 @@ repositories, repositories where Python is incidental -- are declared in
 A repository that should be audited for some checks but not others
 takes an `only_checks` list in the same place. `private-ci` is the
 worked example: it is internal tooling and exempt from the conventions,
-but it vendors sfui, and a vendored copy drifts silently. Checks outside
-the list report `not_applicable` **with a reason** rather than being
-omitted -- `audit-update-docs.py` renders a check it cannot find as
+but it vendors sfui, and a vendored copy drifts silently. The list is
+expected to grow as a repository adopts more of the fleet's
+conventions -- private-ci started at `sfui-vendor` alone and picked up
+the four plan criteria when it adopted the plan template and index --
+so widening it is a normal edit rather than a sign the scoping was
+wrong. Each addition is still a decision that has to be stated in the
+comment above the override, and checked against a real clone first.
+Checks outside the list report `not_applicable` **with a reason**
+rather than being omitted -- `audit-update-docs.py` renders a check it cannot find as
 `unknown`, and "we decided not to" must not read as "we did not
 measure".
 
 A scoped repository does not follow the steps above. It goes in the
 matrix, but stays *off* the in-scope list in `docs/audits/README.md`
 and *on* the excluded list on the same page: both statements are true
-of it, because it is excluded from the conventions and audited for one
-thing anyway.
+of it, because it is excluded from the conventions and audited for a
+few criteria anyway.
 `test_matrix_matches_the_documented_scope` in
 `scripts/tests/test_registry.py` subtracts the scoped repositories before
 comparing, so onboarding one the way the steps above say will fail that
