@@ -270,6 +270,16 @@ SCHEDULER_CAPACITY_PASSES = Counter(
 SCHEDULER_CAPACITY_FAILURES = Counter(
     'scheduler_capacity_reconcile_failures_total',
     'Scheduler capacity reconcile passes that failed.')
+# Incremented by the elected cluster daemon, not by the pass itself: it
+# counts how often the maintenance loop found placement unguarded and
+# pulled the reconcile forward off its cadence. A cluster which keeps
+# forcing is one where this check and the reconciler disagree about
+# which nodes should have a row, which is otherwise only visible by
+# grepping logs.
+SCHEDULER_CAPACITY_FORCED = Counter(
+    'scheduler_capacity_reconcile_forced_total',
+    'Scheduler capacity reconcile passes forced because one or more nodes '
+    'were admitting placements unguarded.')
 SCHEDULER_CAPACITY_LAST_SUCCESS = Gauge(
     'scheduler_capacity_reconcile_last_success_timestamp',
     'Unix timestamp of the last successful scheduler capacity reconcile '

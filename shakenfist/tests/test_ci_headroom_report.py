@@ -503,6 +503,150 @@ class NodeAbsenceTestCase(HeadroomReportTestCase):
             'it is what the samples could see rather than the cluster size.')
 
 
+class CapacityCoverageTestCase(HeadroomReportTestCase):
+    """Time-to-first-capacity-row (PLAN-transient-capacity-refusals D6).
+
+    The offset from the first sample to the first sample in which every
+    hypervisor in the roster carries cpu_committed_row_present true. The
+    case the plan calls out by name is the one where that never happens:
+    reporting zero there would read as an instant window, which is exactly
+    backwards, so it must be reported as absent instead.
+    """
+
+    def test_full_coverage_in_the_first_sample_is_near_zero(self):
+        roster = [roster_entry(NODE_ONE, 'sf1'), roster_entry(NODE_TWO, 'sf2')]
+        path = self._series([
+            sample({NODE_ONE: node_payload(row_present=True),
+                    NODE_TWO: node_payload(row_present=True)}, nodes=roster),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            '0 seconds after the first sample', output,
+            'Every hypervisor already had a capacity row in the first '
+            'sample, so the figure should read as an (almost) instant '
+            'window rather than as absent.')
+        self.assertNotIn('NEVER OBSERVED', output)
+
+    def test_a_row_which_never_appears_is_reported_as_absent_not_zero(self):
+        """This is the trap the figure exists to avoid.
+
+        A row which never appears must never render as 0 seconds -- that
+        would read as "the window was instant" when the truth is the
+        opposite: the window never closed for the whole series.
+        """
+        roster = [roster_entry(NODE_ONE, 'sf1'), roster_entry(NODE_TWO, 'sf2')]
+        path = self._series([
+            sample({NODE_ONE: node_payload(row_present=True),
+                    NODE_TWO: node_payload(row_present=False)},
+                   nodes=roster, sampled_at=1756000000.0 + 15 * i)
+            for i in range(4)
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'NEVER OBSERVED', output,
+            'A hypervisor which never got a capacity row was not reported '
+            'as absent.')
+        self.assertNotIn('0 seconds after the first sample', output)
+
+    def test_the_offset_is_measured_from_the_first_sample(self):
+        """The figure is an offset from the series start, not from the row's own timestamp."""
+        roster = [roster_entry(NODE_ONE, 'sf1')]
+        path = self._series([
+            sample({NODE_ONE: node_payload(row_present=False)},
+                   nodes=roster, sampled_at=1756000000.0),
+            sample({NODE_ONE: node_payload(row_present=False)},
+                   nodes=roster, sampled_at=1756000015.0),
+            sample({NODE_ONE: node_payload(row_present=True)},
+                   nodes=roster, sampled_at=1756000045.0),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            '45 seconds after the first sample', output,
+            'The offset must be measured from the first sample in the '
+            'series, not from whichever sample first achieved coverage.')
+
+    def test_a_hypervisor_absent_from_per_node_is_not_covered(self):
+        """A missing node is not the same as a present-but-unguarded one.
+
+        summarize_resources() omits a hypervisor entirely when its metrics
+        are stale, its queue is too long, or it is gone -- it does not
+        publish cpu_committed_row_present false for it. A roster logic
+        which only checked the flag on nodes present in per_node, and
+        never checked whether a rostered hypervisor was there at all,
+        would read this sample as fully covered.
+        """
+        roster = [roster_entry(NODE_ONE, 'sf1'), roster_entry(NODE_TWO, 'sf2')]
+        path = self._series([
+            # NODE_TWO is a hypervisor per the roster but never appears in
+            # per_node at all.
+            sample({NODE_ONE: node_payload(row_present=True)}, nodes=roster),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'NEVER OBSERVED', output,
+            'A rostered hypervisor missing from per_node entirely was '
+            'silently treated as covered, making the figure optimistic.')
+
+    def test_a_sample_with_no_roster_does_not_count_as_covered(self):
+        """Mirrors how absences() treats a sample with no roster recorded.
+
+        Without a roster there is no way to confirm every hypervisor has a
+        row, so the sample must not count towards coverage.
+        """
+        path = self._series([sample({NODE_ONE: node_payload(row_present=True)})])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn('NEVER OBSERVED', output)
+
+    def test_a_bundle_predating_the_flag_is_unknown_not_never(self):
+        """An old bundle must not read as a permanent regression.
+
+        A cluster whose /admin/resources predates
+        cpu_committed_row_present publishes the key nowhere, so every
+        sample parses as not covered. Scoring that as NEVER OBSERVED
+        would report the warm-up window as never having closed, when the
+        truth is that this bundle cannot answer the question at all.
+        """
+        roster = [roster_entry(NODE_ONE, 'sf1')]
+        payload = node_payload()
+        del payload['cpu_committed_row_present']
+        path = self._series([
+            sample({NODE_ONE: payload}, nodes=roster,
+                   sampled_at=1756000000.0 + 15 * i)
+            for i in range(3)
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'NOT MEASURABLE', output,
+            'A bundle which never carried cpu_committed_row_present was '
+            'scored as if the row never appeared, which reads as a '
+            'regression rather than as an unmeasurable payload.')
+        self.assertNotIn('NEVER OBSERVED', output)
+
+    def test_a_flag_present_and_false_is_still_never_observed(self):
+        """The other side of the distinction above.
+
+        A payload which carries the flag and says false is a real
+        measurement of a real unguarded node, and must keep reading as
+        NEVER OBSERVED rather than being softened into "unmeasurable".
+        """
+        roster = [roster_entry(NODE_ONE, 'sf1')]
+        path = self._series([
+            sample({NODE_ONE: node_payload(row_present=False)}, nodes=roster,
+                   sampled_at=1756000000.0 + 15 * i)
+            for i in range(3)
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn('NEVER OBSERVED', output)
+        self.assertNotIn('NOT MEASURABLE', output)
+
+
 class CensusTestCase(HeadroomReportTestCase):
     def test_an_unknown_stage_string_is_tallied_and_printed(self):
         """No hardcoded stage list (D10).

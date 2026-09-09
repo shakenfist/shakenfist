@@ -62,6 +62,11 @@ SCHEDULED_TASK_LAST_RUN_PREFIX = 'SCHEDULED_TASK_LAST_RUN_'
 # constant rather than restating the number.
 ELECTED_LOOP_POLL_SECONDS = 5
 
+# Marks the "no capacity rows at all" half of a forced-reconcile
+# condition, so that state can never compare equal to the partly
+# populated one. See _force_capacity_reconcile().
+CAPACITY_TABLE_EMPTY = 'capacity-table-empty'
+
 # The candidate election poll: how long an unelected cluster daemon waits
 # between attempts to acquire the cluster maintenance lock. The wait is
 # drawn uniformly from this range rather than being a fixed five seconds
@@ -80,10 +85,17 @@ ELECTION_POLL_MAXIMUM_SECONDS = 7.5
 
 class Monitor(daemon.Daemon):
     # Set by _run_inner() when the maintenance schedule is registered.
-    # Declared here as well because the election hook which forces a
+    # Declared here as well because the maintenance hook which forces a
     # capacity pass reads it, and a Monitor built by a test which never
     # registers a schedule would otherwise raise rather than no-op.
     _capacity_reconcile_job = None
+
+    # The unguarded condition the last forced capacity reconcile was
+    # issued for, so the same one is not forced again on every
+    # maintenance pass. Process-local and reset on election; a daemon
+    # restart re-forcing once is correct rather than a bug, which is why
+    # this is never persisted.
+    _forced_capacity_reconcile_for = None
 
     def __init__(self, name):
         super().__init__(name)
@@ -739,17 +751,41 @@ class Monitor(daemon.Daemon):
                 }).warning('Ignoring unusable scheduled task last-run stamp')
 
     def _force_capacity_reconcile_if_unguarded(self):
-        """Make the capacity reconcile due now if nothing is guarding placement.
+        """Make the capacity reconcile due now if placement is not guarded.
 
-        An empty scheduler_node_capacity table means every admission in
-        this cluster is failing open, because a node with no row is
-        admitted against nothing at all (P7). Anchoring the reconcile
-        covers the case which produced issue 4087 -- a fresh cluster,
-        whose stamp is missing, waiting out a five minute process-local
-        timer -- but a stamp is a proxy for the condition rather than
-        the condition itself. A cluster whose MariaDB outlived its
-        nodes has a recent stamp and no row for any node uuid which now
-        exists. Read the table and act on what it says.
+        A node with no scheduler_node_capacity row is admitted against
+        nothing at all (P7), so every placement onto it fails open.
+        Anchoring the reconcile covers the case which produced issue
+        4087 -- a fresh cluster, whose stamp is missing, waiting out a
+        five minute process-local timer -- but a stamp is a proxy for
+        the condition rather than the condition itself. A cluster whose
+        MariaDB outlived its nodes has a recent stamp and no row for any
+        node uuid which now exists. Read the table and act on what it
+        says.
+
+        Both an empty table and a partly populated one matter, which is
+        why this is no longer only an election-time check. Election
+        happens before any hypervisor on a cold cluster has published
+        metrics, so the pass it forced had nothing to size and the table
+        stayed empty until the next cadence tick anyway. Asking the
+        sharper question -- is there an active hypervisor with fresh
+        metrics and still no row? -- from the maintenance pass closes
+        the window about a minute after the first metrics appear.
+
+        The unguarded set deliberately mirrors the predicate
+        _direct_reconcile_scheduler_capacity() applies when it decides
+        which nodes get a row, because a check which asks a *broader*
+        question than the pass can answer would demand a pass on every
+        cycle for the life of the cluster. The active-node intersection
+        is the clause which cannot be dropped: a node_metrics row which
+        outlived its node reads as a fresh hypervisor forever (the
+        phantom the reconciler's own comment describes), and without
+        that clause it would silently turn a five minute job into a
+        sixty second one. The reconciler's fourth clause -- a row in the
+        nodes table -- is not restated here because
+        Nodes([], prefilter='active') hydrates each node from that table
+        and drops anything it cannot find, so a stateless zombie is
+        already excluded.
 
         A failed read is not an empty table, and this must not confuse
         the two: get_scheduler_node_capacity() reports which it was, and
@@ -757,6 +793,13 @@ class Monitor(daemon.Daemon):
         read leaves the anchored cadence alone rather than scheduling
         work on a guess -- and if the database service is unreachable
         the reconcile RPC would fail anyway.
+
+        Finally, a forced pass which does not clear the condition must
+        not be re-forced every minute forever, so the condition last
+        forced for is remembered and the same one is never forced twice.
+        If some node qualifies here but the reconciler declines to size
+        it anyway, that costs one pass rather than a permanent load
+        regression; the ordinary five minute cadence still runs.
         """
         if self._capacity_reconcile_job is None:
             return
@@ -769,12 +812,154 @@ class Monitor(daemon.Daemon):
                 'capacity reconcile on its anchored cadence')
             return
 
-        if degraded or rows:
+        if degraded:
             return
 
-        LOG.warning(
-            'No scheduler capacity rows exist, so every placement is being '
-            'admitted unguarded; reconciling capacity now')
+        unguarded = self._unguarded_hypervisors(rows)
+
+        if not rows:
+            # Nothing at all is guarded, which is worth saying in the
+            # words it has always been said in. The condition still
+            # carries the unguarded set, because a cold cluster forces a
+            # pass here before any hypervisor has published metrics: the
+            # pass finds nothing to size, the table stays empty, and
+            # without the set in the condition the arrival of the first
+            # hypervisor would look like the same condition and force
+            # nothing. A failed metrics read reads as the empty set,
+            # which is the right answer for this branch -- the empty
+            # table alone justifies the pass.
+            self._force_capacity_reconcile(
+                (CAPACITY_TABLE_EMPTY, frozenset(unguarded or set())),
+                'No scheduler capacity rows exist, so every placement is '
+                'being admitted unguarded; reconciling capacity now',
+                fields={'nodes': sorted(unguarded)} if unguarded else None)
+            return
+
+        if unguarded is None:
+            return
+
+        if not unguarded:
+            self._forced_capacity_reconcile_for = None
+            return
+
+        self._force_capacity_reconcile(
+            frozenset(unguarded),
+            'Active hypervisors have no scheduler capacity row, so their '
+            'placements are being admitted unguarded; reconciling capacity '
+            'now',
+            fields={'nodes': sorted(unguarded)})
+
+    def _unguarded_hypervisors(self, rows):
+        """Active hypervisors with fresh metrics and no capacity row.
+
+        Returns None if a read failed or could not be trusted, which is a
+        different answer from the empty set for the same reason
+        ``degraded`` is different from an empty table: it means this
+        process does not know.
+        """
+        try:
+            metrics = mariadb.get_all_node_metrics()  # nopushdown: every node wanted
+        except Exception as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read node metrics, leaving the capacity '
+                'reconcile on its anchored cadence')
+            return None
+
+        if not metrics:
+            # An empty list is not an authoritative "this cluster has no
+            # nodes". Neither transport raises on a failed read: both
+            # _grpc_get_all_node_metrics() (on RpcError) and
+            # _direct_get_all_node_metrics() (on OperationalError) log
+            # and return []. And sf-resources publishes from every node
+            # whatever its roles, so a running cluster with no
+            # node_metrics rows at all is a cluster whose metrics could
+            # not be read rather than one with nothing to report.
+            #
+            # Reading that as the empty set would clear the
+            # once-per-condition memory below, so a cluster with a
+            # genuine unguarded hypervisor and an intermittently failing
+            # metrics read would forget what it had forced and re-force
+            # the five minute pass every time the read flapped -- the
+            # load regression the memory exists to bound.
+            LOG.warning(
+                'Read no node metrics at all, which a running cluster '
+                'does not produce; treating it as an unknown answer and '
+                'leaving the capacity reconcile on its anchored cadence')
+            return None
+
+        # is_hypervisor lives inside the metrics blob rather than being a
+        # top level field of the record, and is compared against True
+        # rather than tested for truth: the reconciler leaves a node
+        # whose value is missing or NULL (mid-upgrade, before the
+        # resources daemon repopulates the column) out of both its
+        # hypervisor set and its non-hypervisor set, and so do we.
+        #
+        # The two do read the fact from different storage. The
+        # reconciler filters on the typed is_hypervisor column projected
+        # at upsert time by NODE_METRICS_EXTRACTION_SPEC; this reads the
+        # JSON blob that column is derived from. They agree because
+        # sf-resources re-derives the column from this same JSON on every
+        # publication cycle, so a row whose column is still NULL from
+        # before the projection existed disagrees for at most one cycle.
+        # In that window this can qualify a node the reconciler will not
+        # size, which the once-per-condition memory bounds to a single
+        # forced pass.
+        #
+        # RECONCILE_METRICS_MAX_AGE_SECONDS is imported rather than
+        # restated because a check carrying its own copy of that number
+        # would drift from the pass it is trying to trigger.
+        fresh_after = time.time() - mariadb.RECONCILE_METRICS_MAX_AGE_SECONDS
+        candidates = set()
+        for record in metrics:
+            if (record.get('metrics') or {}).get('is_hypervisor') is not True:
+                continue
+            if (record.get('timestamp') or 0) <= fresh_after:
+                continue
+            candidates.add(str(record.get('node_uuid')))
+
+        candidates -= {str(row.get('node_uuid')) for row in rows}
+        if not candidates:
+            return set()
+
+        # Only now is the active node set worth reading. In the steady
+        # state every fresh hypervisor already has a row, so this costs
+        # nothing on the overwhelming majority of maintenance passes.
+        #
+        # Note what the once-per-condition memory does and does not
+        # bound. It suppresses the forced pass and its warning, not this
+        # read: while a disagreement persists (a phantom row, a node the
+        # reconciler declines to size) this hydration runs on every
+        # maintenance pass for the life of the condition. At one read a
+        # minute that sits well under the unbudgeted ceiling
+        # test_no_unbudgeted_fixed_rate_database_polling enforces, but do
+        # not read the memory as making the whole check go quiet.
+        try:
+            active = {str(n.uuid) for n in Nodes([], prefilter='active')}
+        except Exception as e:
+            LOG.with_fields({'error': str(e)}).warning(
+                'Could not read the active node set, leaving the capacity '
+                'reconcile on its anchored cadence')
+            return None
+
+        return candidates & active
+
+    def _force_capacity_reconcile(self, condition, message, fields=None):
+        """Mark the capacity reconcile due, once per distinct condition.
+
+        ``condition`` is the thing observed -- the empty table paired
+        with whatever was unguarded at the time, or the frozenset of
+        unguarded node uuids on their own -- and forcing is skipped when
+        it has not changed since the last force. That bounds a
+        disagreement between this check and the reconciler to one pass
+        and one log line rather than one of each per minute.
+        """
+        if self._forced_capacity_reconcile_for == condition:
+            return
+
+        self._forced_capacity_reconcile_for = condition
+        log = LOG.with_fields(fields) if fields else LOG
+        log.warning(message)
+        scheduled_tasks.SCHEDULER_CAPACITY_FORCED.inc()
         self._capacity_reconcile_job.next_run = datetime.datetime.now()
 
     def _run_due_scheduled_jobs(self):
@@ -810,6 +995,15 @@ class Monitor(daemon.Daemon):
 
     def _run_inner(self):
         last_defer_message = 0
+
+        # Initialised here, outside the election loop below, and the
+        # unguarded-capacity check now depends on that: the first
+        # maintenance pass after any election finds
+        # now - last_loop_run >= 60 true and therefore runs immediately,
+        # which is the only reason it is safe for
+        # _force_capacity_reconcile_if_unguarded() to live in that pass
+        # rather than on the election path. Do not move it inside the
+        # loop.
         last_loop_run = 0
 
         # Set up the maintenance schedule once, for the life of the
@@ -876,7 +1070,13 @@ class Monitor(daemon.Daemon):
             # shutdown.
             if self.is_elected:
                 self._anchor_scheduled_jobs()
-                self._force_capacity_reconcile_if_unguarded()
+
+                # Forget which unguarded condition we last forced a
+                # capacity reconcile for. A node taking over maintenance
+                # has no reason to trust the previous holder's
+                # observations, and the check itself runs from the
+                # maintenance pass below rather than from here.
+                self._forced_capacity_reconcile_for = None
 
             # And then do regular cluster maintenance things
             while self.is_elected and not os.path.exists(self.abort_path):
@@ -911,6 +1111,23 @@ class Monitor(daemon.Daemon):
                 else:
                     now = time.time()
                     if now - last_loop_run >= 60:
+                        # Placement onto a node with no capacity row is
+                        # admitted against nothing, so re-ask that
+                        # question every maintenance pass rather than
+                        # once per election -- on a cold cluster no
+                        # hypervisor has published metrics by the time
+                        # election happens. This sits ahead of
+                        # _run_due_scheduled_jobs() so a pass forced
+                        # here runs in this same maintenance pass. Note
+                        # it is now behind cluster_stable(), which
+                        # compares object versions across nodes and
+                        # reads no metric freshness at all, so it defers
+                        # this check during a mixed-version upgrade.
+                        try:
+                            self._force_capacity_reconcile_if_unguarded()
+                        except Exception as e:
+                            util_exceptions.ignore_exception('cluster', e)
+
                         try:
                             with util_general.RecordedOperation(
                                     'scheduled cluster operations',
