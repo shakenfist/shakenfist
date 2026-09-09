@@ -32,7 +32,7 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: phases 0 to 4 planned; 0, 1, 2 and 3 complete.**
+**Status: phases 0 to 5 planned; 0, 1, 2, 3 and 4 complete.**
 The open questions at the bottom are answered in the Decisions
 section; see
 [`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
@@ -45,8 +45,11 @@ recorded, and
 [`PLAN-api-input-validation-phase-03-compile-and-warn.md`](PLAN-api-input-validation-phase-03-compile-and-warn.md)
 for the measurement that closed it, and
 [`PLAN-api-input-validation-phase-04-enforce.md`](PLAN-api-input-validation-phase-04-enforce.md)
-for the phase now ready to start. Phases 5 onward are not yet cut
-into per-phase files.
+for the reading that unlocked the flip and what the flip changed for
+callers, and
+[`PLAN-api-input-validation-phase-05-narrow.md`](PLAN-api-input-validation-phase-05-narrow.md)
+for the phase now ready to start. Phases 6 and 7 are not yet cut into
+per-phase files.
 
 ## Situation
 
@@ -297,8 +300,8 @@ declarations are good enough to compile.
 | 1: Declaration audit | Complete | Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. `sshkey`/`userdata` in the published OpenAPI) and 20 undeclared parameters; make `swagger_helper()` reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See [phase 1](PLAN-api-input-validation-phase-01-declaration-audit.md) |
 | 2: Type vocabulary | Complete | The specification-validation test (#3626) plus `schemes`/`securityDefinitions` template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; `unsignedinteger`/`macaddr`/`base64`/`netblock` tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events `limit` cap are visible to callers. See [phase 2](PLAN-api-input-validation-phase-02-type-vocabulary.md) |
 | 3: Compile and warn | Complete | Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is *already* a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared `namespace` of #3739 and fourteen metadata `value` declarations narrower than their handlers — which phase 4 fixes before it enforces. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) |
-| 4: Enforce | In progress | Fix the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), teach the derivation to see decorator-consumed kwargs so that class cannot recur, then turn on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moves to Future work: read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) |
-| 5: Narrow the handlers | Not started | Narrow `except TypeError` to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below |
+| 4: Enforce | Complete | Landed 2026-09-09 via [#4141](https://github.com/shakenfist/shakenfist/pull/4141). Fixed the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moved to Future work as [#4098](https://github.com/shakenfist/shakenfist/issues/4098): read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) |
+| 5: Narrow the handlers | In progress | Delete the `except TypeError` arm from `handle_authorization_exceptions`, which is the second half of the #3612 mechanism and could not be removed until phase 4 was refusing the input it absorbed. Three of the four attribution issues closed independently while phases 3 and 4 ran (#3615, #3606 via PR #3714, #3371), so the phase is the narrowing plus #3523 — whose raising frame the phase 5 survey identified as an unguarded `cpuinfo` lookup in `util/general.py`. See [phase 5](PLAN-api-input-validation-phase-05-narrow.md) |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
 | 7: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
@@ -312,9 +315,10 @@ the plan was scoped against.
 2026-08-07), #3626 (specification validation in CI), #3616
 (`base.py` under mypy), #3642 (variadic handlers in the audit),
 #3629 (body-supplied `all`, see D6 below), #3615 (`log_request`
-discarding headers). #3739 (the ref decorators' undeclared
-`namespace`) is fixed by phase 4 and closes when that branch
-merges.
+discarding headers), #3739 (the ref decorators' undeclared
+`namespace`, closed when phase 4 merged 2026-09-09), #3606 (JWT
+rejection attribution, PR #3714, merged 2026-08-12) and #3371
+(`record_exception` tracebacks only at DEBUG).
 
 **Filed by phase 4, and deliberately not fixed by it:** #4098 (the
 `get_args` fold, see the carried section below) and #4100 (an
@@ -324,21 +328,21 @@ injects, so no phase of this plan unblocks it; it needs a client
 release which omits the key).
 
 **Still open and still owned by this plan:** #528 (parent), #3612
-(the mechanism), #936, #534, #3269, #323, #3523, #3371, #2094;
-#3606 is in flight as PR #3714.
+(the mechanism), #936, #534, #3269, #323, #3523, #2094.
 
-**Phase 5 is being overtaken from outside.** Two of its four
-attribution issues have been picked up by the automated issue
-fixer rather than by this plan. That is fine — they are genuinely
-independent of phases 3 and 4, which is why they were grouped
-rather than sequenced. It is recorded because it changes what
-phase 5 *is*: by the time phases 3 and 4 land, phase 5 is likely
-to be the single item that actually depends on them — narrowing
+**Phase 5 was overtaken from outside, as predicted.** Three of
+its four attribution issues were picked up by the automated issue
+fixer rather than by this plan — #3615, #3606 and #3371, leaving
+only #3523. That is fine: they were genuinely independent of
+phases 3 and 4, which is why they were grouped rather than
+sequenced. It is recorded because it changed what phase 5 *is*.
+The forecast written here was that phase 5 would reduce to the
+single item which actually depends on phases 3 and 4 — narrowing
 `except TypeError` to JWT errors, which cannot happen until a
 validation layer is rejecting the malformed input that broad
-catch currently absorbs. Nobody picks that up incidentally,
-because on its own it looks like a regression risk with no
-visible benefit.
+catch absorbs. That is now the fact rather than the forecast.
+Nobody picks that item up incidentally, because on its own it
+looks like a regression risk with no visible benefit.
 
 ### Carried into phase 2 from phase 1
 
