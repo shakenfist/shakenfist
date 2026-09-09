@@ -13972,8 +13972,40 @@ capacity from <code>node_metrics</code> directly. The tables are consumed for
 admission as of phase 3
 (<code>docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md</code>), and
 <code>namespace_claims</code> became writable in phase 4 — see <a href="#the-claim-admission-transaction">The claim admission
-transaction</a> below.
-The SQL itself is covered by
+transaction</a> below.</p>
+<p>A capacity row is created only by a reconcile pass, so a hypervisor
+with none is admitted against nothing at all (the placement fail-open
+described above). Waiting out the five-minute cadence for that first
+row was issue 4087; the elected cluster node's maintenance loop now
+closes most of the gap itself. Each maintenance pass
+(<code>_force_capacity_reconcile_if_unguarded()</code> and
+<code>_unguarded_hypervisors()</code> in <code>shakenfist/daemons/cluster/main.py</code>)
+mirrors three of the four filters above — fresh, <code>is_hypervisor</code>
+metrics on a node in the active set — and, if it finds one with no
+<code>scheduler_node_capacity</code> row, marks the reconcile due in the same
+pass rather than waiting for the cadence. The <code>nodes</code>-table filter is
+not restated, because <code>Nodes([], prefilter='active')</code> already drops
+anything it cannot hydrate from that table; mirroring only three of
+the four is deliberate, not an oversight — a check asking a <em>broader</em>
+question than the reconciler can answer would find a permanently
+qualifying phantom (a <code>node_metrics</code> row that outlived its node) and
+force the five-minute job every maintenance pass forever. The
+maintenance loop runs at most once every 60s, so this closes the
+warm-up window to roughly a minute after a hypervisor's metrics
+become visible, not immediately — the larger remaining term is the
+resources daemon's own publication cadence for those metrics, which
+this does not shorten (phase 3 of
+<a href="../../plans/PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals</a>).
+The check also forces at most once per distinct unguarded set: a node
+that qualifies here but which the reconciler declines to size anyway
+costs one forced pass, not a permanent every-minute one, and
+<code>scheduler_capacity_reconcile_forced_total</code> (<code>SCHEDULER_CAPACITY_FORCED</code>
+in <code>shakenfist/daemons/cluster/scheduled_tasks.py</code>) counts forced
+passes so that a disagreement is visible without grepping logs — a
+count that keeps climbing in an otherwise steady cluster means this
+check and the reconciler disagree about which nodes should have rows,
+which is worth reporting rather than tuning around.</p>
+<p>The SQL itself is covered by
 <code>shakenfist/tests/test_mariadb_capacity_reconcile_live.py</code>, which runs
 against a real MariaDB in the "Schema ENUM widening" CI job (whose
 script runs every <code>test_mariadb_*_live</code> module behind one MariaDB
@@ -14034,9 +14066,11 @@ bargain the branch probe strikes.</p>
 <ul>
 <li><strong>A missing <code>cluster_capacity</code> singleton refuses</strong>, where placement
   fails open. Admitting an instance unguarded records where a machine
-  already is and the reconciler agrees within a pass; creating a claim
-  unguarded writes a promise against totals nothing has computed, which
-  the next pass folds into <code>claimed_*</code> whether it fits or not.</li>
+  already is and the reconciler agrees within about a minute of that
+  hypervisor's metrics existing (see above), rather than waiting out
+  its ordinary cadence; creating a claim unguarded writes a promise
+  against totals nothing has computed, which the next pass folds into
+  <code>claimed_*</code> whether it fits or not.</li>
 <li><strong>Claim ceilings are advisory</strong> for one release.
   <code>_direct_admit_instance_placement()</code> splits phase 3's single
   <code>guarded = enforce and node_present</code> into <code>node_guarded</code>,

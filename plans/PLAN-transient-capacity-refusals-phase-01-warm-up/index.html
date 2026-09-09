@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-transient-capacity-refusals/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-transient-capacity-refusals-phase-01-warm-up/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>A capacity refusal is transient - Shaken Fist</title>
+        <title>Phase 1: close the warm-up window - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#a-capacity-refusal-is-transient" class="md-skip">
+        <a href="#phase-1-close-the-warm-up-window" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              A capacity refusal is transient
+              Phase 1: close the warm-up window
             
           </span>
         </div>
@@ -13670,10 +13670,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Context
       
     </span>
   </a>
@@ -13681,22 +13681,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Scope
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Situation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the survey found
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decisions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#the-cost" class="md-nav__link">
+  <a href="#d1-the-check-runs-inside-the-60-s-maintenance-gate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The cost
+        D1 -- The check runs inside the 60 s maintenance gate
       
     </span>
   </a>
@@ -13704,10 +13726,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-the-refusal-actually-is" class="md-nav__link">
+  <a href="#d2-the-check-mirrors-the-reconcilers-predicate-including-the-active-node-intersection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the refusal actually is
+        D2 -- The check mirrors the reconciler's predicate, including the active-node intersection
       
     </span>
   </a>
@@ -13715,10 +13737,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#three-real-mechanisms-that-are-not-the-driver" class="md-nav__link">
+  <a href="#d3-do-not-force-twice-for-the-same-unguarded-set" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Three real mechanisms that are not the driver
+        D3 -- Do not force twice for the same unguarded set
       
     </span>
   </a>
@@ -13726,10 +13748,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-has-been-tried" class="md-nav__link">
+  <a href="#d4-delete-the-election-time-call-site" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What has been tried
+        D4 -- Delete the election-time call site
       
     </span>
   </a>
@@ -13737,10 +13759,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-this-is-not" class="md-nav__link">
+  <a href="#d5-one-warning-per-distinct-unguarded-set-plus-a-counter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What this is not
+        D5 -- One warning per distinct unguarded set, plus a counter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d6-the-functional-assertion-replaces-the-skip-and-the-report-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D6 -- The functional assertion replaces the skip, and the report measures
       
     </span>
   </a>
@@ -13753,10 +13786,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
+  <a href="#step-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission and problem statement
+        Step plan
       
     </span>
   </a>
@@ -13764,52 +13797,24 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
+  <a href="#risks-and-mitigations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Open questions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Open questions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-where-does-the-retry-live" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Where does the retry live?
+        Risks and mitigations
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#2-does-a-retry-hide-the-problem" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Does a retry hide the problem?
+        Definition of done
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Why is allocation less reliable in the first minutes, and can the window be shortened?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -13834,850 +13839,284 @@
   
 
 
-<h1 id="a-capacity-refusal-is-transient">A capacity refusal is transient<a class="headerlink" href="#a-capacity-refusal-is-transient" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-relevant source files, understand existing patterns (object
-lifecycle, state machines, MariaDB storage via the three-layer
-direct/gRPC/public pattern, Pydantic schemas, daemon
-architecture, operation queue system, event logging), and
-ground your answers in what the code actually does today. Do
-not speculate about the codebase when you could read it
-instead. Where a question touches on external concepts
-(KVM/libvirt, VXLAN networking, MariaDB/Galera, gRPC/protobuf),
-research as needed to give a confident answer. Flag any
-uncertainty explicitly rather than guessing.</p>
-<p>This plan spans three repositories: this one (the scheduler, the
-cluster and resources daemons, and the <code>shakenfist_ci</code> functional
-suite), <code>client-python</code> (<code>shakenfist_client.apiclient</code>, which is
-what the suite and every operator script calls), and, for one
-step only, <code>shakenfist/actions</code> (where the reusable
-<code>smoke-cluster</code> workflow collects the per-run summary this plan
-adds). It is a sibling of
-<a href="../PLAN-ci-cloud-sizing/">Right-size the CI test clouds</a> and
-<a href="../PLAN-scheduler-reservations/">Atomic scheduling via reservations</a>,
-and deliberately does not own anything either of those already
-owns: topology shape belongs to the first, the admission ledger
-and claims to the second. What is left, and what this plan is, is
-the piece both of them explicitly deferred -- that nothing in the
-system treats "no capacity right now" as the transient condition
-it is.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the system architecture
-overview, object types, and daemon structure. Consult
-<code>CLAUDE.md</code> for build commands, project conventions, and
-database access patterns. Consult <code>GOALS.md</code> for current
-development priorities. Key references inside the repo
-include <code>shakenfist/scheduler.py</code> (<code>_has_sufficient_cpu</code>, the
-pre-filter that raises the refusal this plan is about),
-<code>shakenfist/external_api/instance.py</code> (the two <code>507</code> branches of
-<code>POST /instances</code>), <code>shakenfist/daemons/cluster/main.py</code>
-(<code>_force_capacity_reconcile_if_unguarded</code> and the anchored
-reconcile), <code>shakenfist/daemons/resources/main.py</code> (the 60 s
-metrics cadence that <code>measured_cpus</code> comes from),
-<code>shakenfist/deploy/shakenfist_ci/base.py</code> and <code>retries.py</code> (the
-suite's await and retry helpers), and
-<code>shakenfist/deploy/shakenfist_ci/load_budget.py</code>
-(<code>HARNESS_DRIVEN_PAIRS</code>, which any new suite-side polling must be
-declared in).</p>
-<!-- shared-block: plan-file-conventions v1 -->
-<p>Plan file conventions (shared block; do not edit -- the canonical
-copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-file-conventions.md</code>):</p>
+<h1 id="phase-1-close-the-warm-up-window">Phase 1: close the warm-up window<a class="headerlink" href="#phase-1-close-the-warm-up-window" title="Permanent link">&para;</a></h1>
+<p>Parent plan:
+<a href="../PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals.md</a>.</p>
+<p><strong>Planning effort:</strong> high, as the master plan specifies. The change
+itself is a dozen lines in one file. What keeps it above mechanical
+is that the check has to agree with a predicate that lives in
+another process's SQL, and a check which disagrees with it does not
+fail loudly -- it silently demands a reconcile pass forever, turning
+a five-minute job into a one-minute one for the life of the cluster.</p>
+<p>This phase opens the plan's decision sequence at <strong>D1</strong>. There is one
+namespace across the whole plan, because later phases cite these by
+number.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The master plan's Situation section establishes that the warm-up
+window is <em>not</em> what fails CI runs -- every post-#4106
+<code>sufficient_idle_cpu</code> refusal read from journals was a
+<code>force_placement</code> create onto a node genuinely at its ledger limit.
+The window is real, it accounts for the whole of the sub-three-minute
+exposure, and it produces the <code>0 / 6 / 3</code> and <code>6 / 0 / 3</code> residue
+rows in that section's table, but fixing it will not by itself make
+a red run green.</p>
+<p>It is first anyway, for three reasons. It is the smallest server-side
+change in the plan. It is the one that finishes #4087, which is still
+open. And phases 2 and 5 measure how long the suite waits for
+capacity: if ten to seventeen placements per run are still being
+admitted against nothing at all while that measurement is taken, the
+numbers phase 5 reads are polluted by a known defect.</p>
+<p>Concretely: <code>scheduler_node_capacity</code> has no rows until the
+reconciler's first pass. A node with no row is admitted against
+nothing (P7), so every early placement fails open, and the first real
+pass then writes accumulated ground truth onto a row whose limit it
+already exceeds. PR #4106 anchored the reconcile to election and
+added a one-shot <code>_force_capacity_reconcile_if_unguarded()</code>
+(<code>shakenfist/daemons/cluster/main.py:741</code>, called at <code>:879</code>). In all
+six post-#4106 runs the one-shot fired 130-150 s <em>before</em> the test
+step and the pass it forced logged <code>nodes=0 nodes_added=0</code>: no
+hypervisor had published metrics yet. The table then stayed empty
+until the five-minute cadence created rows at +155..+181 s.</p>
+<p>The one-shot is not wrong. It is a property of <em>election</em>, and the
+condition it tests is a property of <em>time</em>.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p><strong>In scope:</strong></p>
 <ul>
-<li>All planning documents live in <code>docs/plans/</code>.</li>
-<li>Detailed planning gets one plan file per phase. Phase files are
-  named for their master plan, sit in the same directory as it,
-  and append <code>-phase-NN-descriptive</code> before the <code>.md</code> extension.</li>
-<li>The master plan tracks its phases in a table under its Execution
-  section:</li>
+<li>Making the unguarded-table check something the elected loop repeats
+  rather than something election does once.</li>
+<li>Making that check agree with the predicate the reconciler actually
+  applies, so it cannot demand a pass which will never satisfy it.</li>
+<li>Unit tests extending the existing <code>ForcedCapacityReconcileTestCase</code>.</li>
+<li>One functional assertion in the CI suite, replacing a <code>skipTest</code>
+  which this change makes unreachable.</li>
+<li>A non-gating time-to-first-capacity-row figure in the headroom
+  report, so the improvement is visible in every run's log.</li>
+<li>Commenting on #4087 with the finding, and closing it.</li>
+<li>Documentation: <code>docs/operator_guide/scheduler.md</code> and
+  <code>docs/developer_guide/subsystem_internals.md</code> both describe the
+  unguarded state and must describe how long it now lasts.</li>
 </ul>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. Schema migration</td>
-<td>PLAN-thing-phase-01-schema.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>2. Public API</td>
-<td>PLAN-thing-phase-02-api.md</td>
-<td>Not started</td>
-</tr>
-</tbody>
-</table>
+<p><strong>Out of scope:</strong></p>
 <ul>
-<li>One commit per logical change, and at minimum one commit per
-  phase. Unrelated changes are not batched into a single commit.
-  Each commit is self-contained: it builds, passes tests, and has
-  a message explaining what changed and why.</li>
+<li>Anything that changes admission itself. The pre-filters, the demand
+  guard, <code>max(measured, committed)</code> and the guarded UPDATE all belong
+  to scheduler-reservations (its D11, phase 5). This phase changes
+  <em>when a capacity row exists</em>, never what admission does with one.</li>
+<li>The 60 s metrics publication lag. That is phase 3, and it is the
+  dominant term in the remaining window -- see D1.</li>
+<li>Any client or suite retry behaviour. Phases 2 and 4.</li>
+<li>Reshaping the CI topologies. <code>PLAN-ci-cloud-sizing.md</code> phase 4.</li>
+<li>Making the refusal itself more informative. Phase 4.</li>
 </ul>
-<!-- shared-block-end -->
-
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<h3 id="the-cost">The cost<a class="headerlink" href="#the-cost" title="Permanent link">&para;</a></h3>
-<p>Issue #3772 is the signature in essentially every failing merge
-group. Over the sixteen days to 2026-09-08 the <code>Functional tests</code>
-workflow's <code>merge_group</code> runs split <strong>108 failures, 45 successes,
-14 cancelled</strong>. Of the thirty most recent failing runs, twenty-four
-failed the <code>Debian 12 tier</code> job (the <code>slim-tier</code> topology). Of
-eighteen of those runs whose failed-job logs were read, <strong>all
-eighteen contain</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>shakenfist_client.apiclient.InsufficientResourcesException: ('API request failed', 'POST',
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>'http://localhost:13000/instances', 507,
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>'{"error": "No nodes remaining at scheduling stage sufficient_idle_cpu", "status": 507}')
-</code></pre></div>
-<p>and in fourteen a known victim of that refusal is the test that
-failed: <code>test_network_plumbing_lifecycle</code> (8),
-<code>test_disappearing_source_instance</code> (3),
-<code>test_stray_torn_down_while_a_hosted_network_survives</code> (3), then
-<code>test_artifact_show</code>, <code>test_lifecycle_power_cycle</code> and the
-affinity tests. The next-largest cause, the database load-budget
-check, appeared in seven of the eighteen -- and in six of those a
-507 was in the same run, so fixing the budget family alone would
-not have turned one of them green.</p>
-<h3 id="what-the-refusal-actually-is">What the refusal actually is<a class="headerlink" href="#what-the-refusal-actually-is" title="Permanent link">&para;</a></h3>
-<p>The evidence below comes from the full CI bundles -- the 15 s
-headroom series, the Loki refusal census and every node's
-<code>journalctl -u 'sf-*'</code> export -- of six failing merge runs after
-PR #4106 landed (34163288637, 34171977552, 34178278720,
-34119030297, 34125365386 on <code>slim-tier</code>; 34168326220 on
-<code>slim-primary</code>), two before it (33991296717, 33948911843), and the
-50 usable <code>slim-tier</code> records of the sizing plan's baseline
-dataset. The reproduction recipe and the analysis script are under
-<a href="../data/transient-capacity-refusals/"><code>docs/plans/data/transient-capacity-refusals/</code></a>.
-<code>+Ns</code> is seconds after the <code>Run functional tests</code> step started.</p>
-<p><strong>Every <code>sufficient_idle_cpu</code> abort in the six post-#4106 runs was
-a <code>force_placement</code> single-candidate create onto a node whose
-capacity ledger was genuinely at its limit, while the cluster as a
-whole held 3-9 of its 12 vCPU.</strong> The ledger reconstructed from the
-<code>instance placed</code> and <code>instance placement released</code> events in
-every node's journal matched the pre-filter's <code>committed_cpus</code>
-exactly in all ten cases. It is not over-counting, not a race, and
-not the warm-up window.</p>
-<table>
-<thead>
-<tr>
-<th>run</th>
-<th>topology</th>
-<th>first capacity row</th>
-<th>cpu abort(s)</th>
-<th>after first row</th>
-<th>forced onto</th>
-<th>measured / committed / limit</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>34163288637</td>
-<td>tier</td>
-<td>+181s</td>
-<td>+309s</td>
-<td>+128s</td>
-<td>sf1</td>
-<td>2 / 3 / 3</td>
-</tr>
-<tr>
-<td>34171977552</td>
-<td>tier</td>
-<td>+166s</td>
-<td>+512s</td>
-<td>+346s</td>
-<td>primary</td>
-<td>3 / 3 / 3</td>
-</tr>
-<tr>
-<td>34178278720</td>
-<td>tier</td>
-<td>+181s</td>
-<td>+200, +201, +202, +314s</td>
-<td>+20..+133s</td>
-<td>sf1, sf1, sf2, sf1</td>
-<td>0/3/3, 0/3/3, 1/6/6, 3/3/3</td>
-</tr>
-<tr>
-<td>34119030297</td>
-<td>tier</td>
-<td>+165s</td>
-<td>+481s</td>
-<td>+316s</td>
-<td>sf1</td>
-<td><strong>6 / 0 / 3</strong></td>
-</tr>
-<tr>
-<td>34125365386</td>
-<td>tier</td>
-<td>+166s</td>
-<td>+696s</td>
-<td>+530s</td>
-<td>sf2</td>
-<td>3 / 6 / 6</td>
-</tr>
-<tr>
-<td>34168326220</td>
-<td>primary</td>
-<td>+166s</td>
-<td>+824s</td>
-<td>+658s</td>
-<td>sf1</td>
-<td>3 / 3 / 3</td>
-</tr>
-<tr>
-<td>33991296717 (pre)</td>
-<td>tier</td>
-<td>+166s</td>
-<td>+519, +542, +565, +725s</td>
-<td>+354..+559s</td>
-<td><em>none: all three nodes</em></td>
-<td>sf2 6/6, sf1 3/3, primary 3/3</td>
-</tr>
-<tr>
-<td>33948911843 (pre)</td>
-<td>tier</td>
-<td>+181s</td>
-<td>+176, +177, +523s</td>
-<td>-5s, -4s, +342s</td>
-<td>primary, primary, primary</td>
-<td><strong>0 / 6 / 3</strong>, 0/6/3, 3/3/3</td>
-</tr>
-</tbody>
-</table>
-<p>(The +200 s trio and the +176 s pair are
-<code>test_duplicate_network_work_is_coalesced</code>, which pins a burst of
-six across the hypervisors and tolerates its own create errors; the
-test that failed each run was a later one.)</p>
-<p>Three things follow from the table.</p>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>Seven findings. Four contradict claims this phase inherited. Finding
+2 was corrected in the master plan before it merged (commit
+<code>7d4cfbda0</code>); findings 1 and 6 are corrected at source in this
+planning commit. Re-check all three rather than redoing them.
+Findings 3, 4, 5 and 7 are new information rather than corrections,
+and live here.</p>
 <ol>
-<li><strong>The binding constraint is the 3 vCPU ledger on the two
-   infra hypervisors.</strong> <code>primary</code> (hypervisor, network node and
-   database node) and <code>sf1</code> (hypervisor and database node) are
-   4-thread VMs carrying the deploy-time reservation of 4 threads
-   (<code>examples/_shared/site.yml</code>, <code>(1 + infra_role) * 2</code>), so
-   <code>cpu_schedulable = max(1, 4 - 4) = 1</code>
-   (<code>shakenfist/daemons/resources/main.py:126</code>) and
-   <code>limit_cpus = floor(1 x 3.0) = 3</code> (<code>shakenfist/mariadb.py</code>,
-   <code>_derive_cpu_memory_limits</code>). <code>sf2</code> gets 6. Cluster 12,
-   confirmed at exactly 12.0 in all 50 baseline records.</li>
-<li><strong>The victim tests pick those nodes deterministically.</strong>
-   <code>test_network_plumbing_lifecycle</code> takes the first two
-   non-network hypervisors (<code>sf1</code>, <code>sf2</code>);
-   <code>test_disappearing_source_instance</code> the first hypervisor;
-   <code>test_stray_torn_down_while_a_hosted_network_survives</code> the first
-   non-network hypervisor (<code>sf1</code>); <code>test_artifact_show</code> its first
-   instance's node. Five stestr workers queue their pinned creates
-   on a node three 1-vCPU instances fill, and the instances that
-   fill it are still fetching images (measured 0, committed 3) when
-   the next one is refused.</li>
-<li><strong>The refusals are not concentrated in the warm-up.</strong> They land
-   between +176 s and +824 s, through the first fourteen minutes
-   of a 25-35 minute step, after the ledger rows exist. In the
-   baseline, the ledger-3 nodes sat at 100% of ledger at p90 in
-   <strong>65%</strong> of node-records (peak at or above 1.0 in 96%); 33 of the
-   37 <code>slim-tier</code> failures had at least one abort; <code>slim-tier</code>
-   passed 13 of 50.</li>
+<li>
+<p><strong>The elected loop's maintenance body runs every 60 s, not every
+   iteration.</strong> The loop polls every <code>ELECTED_LOOP_POLL_SECONDS = 5</code>
+   (<code>shakenfist/daemons/cluster/main.py:63</code>) but the maintenance
+   block sits behind <code>if now - last_loop_run &gt;= 60</code> (<code>:913</code>) and
+   <code>_run_due_scheduled_jobs()</code> is inside it (<code>:918</code>). Marking the
+   capacity reconcile due does not run it before the next 60 s tick.
+   The master plan cites this as <code>:912</code>, off by one; corrected here.
+   This is the finding D1 turns on.</p>
+</li>
+<li>
+<p><strong><code>cluster_stable()</code> reads no metric freshness.</strong> It compares
+   object versions across nodes (<code>shakenfist/daemons/daemon.py:377</code>)
+   and catches a just-restarted cluster only incidentally, because
+   no node has recorded a version yet and <code>minimum</code> is <code>inf</code>. The
+   master plan's phase 1 section said the gate protects against "a
+   pass with no fresh metrics"; that was corrected before merge.</p>
+</li>
+<li>
+<p><strong>The unit tests already exist.</strong> The master plan reads as though
+   this phase writes the first one. <code>ForcedCapacityReconcileTestCase</code>
+   (<code>shakenfist/tests/test_daemon_cluster_schedule_anchoring.py:244</code>)
+   already pins five cases: an empty table forces the pass due, a
+   populated table leaves the cadence alone, a degraded read is not
+   an empty table, a failed read does not escape the election, and no
+   registered job reads nothing. Extend that class; do not create a
+   new file, and do not weaken any of the five.</p>
+</li>
+<li>
+<p><strong>No new RPC is needed.</strong> <code>mariadb.get_all_node_metrics()</code>
+   (<code>shakenfist/mariadb.py:21075</code>) already exists and is already
+   gRPC-backed, returning one dict per node. So this stays a
+   one-file-plus-tests change and needs no proto regeneration. Note
+   the shape: each dict is <code>{node_uuid, fqdn, timestamp, metrics}</code>,
+   and <code>is_hypervisor</code> is <em>inside</em> the <code>metrics</code> JSON, not a
+   top-level key -- the typed column exists in the table but
+   <code>_direct_get_all_node_metrics()</code> (<code>:20909</code>) does not project it
+   into the reply.</p>
+</li>
+<li>
+<p><strong>The reconciler's predicate is richer than "hypervisor with
+   fresh metrics", and this is the phase's main hazard.</strong>
+   <code>_direct_reconcile_scheduler_capacity()</code> (<code>:25022</code>) gives a node a
+   capacity row only if it is <code>is_hypervisor IS TRUE</code>, has
+   <code>timestamp &gt; now - RECONCILE_METRICS_MAX_AGE_SECONDS</code>, is in
+   <code>active_nodes</code> (an <code>object_states</code> row in <code>NODE_ACTIVE_STATES</code>)
+   <em>and</em> is in <code>known_nodes</code> (a row in the <code>nodes</code> table). The code
+   documents why the last one exists: a <code>node_metrics</code> row that
+   outlived its node "reads as a fresh hypervisor" and would
+   otherwise become a permanent phantom. A check testing only the
+   first two conditions would see that phantom as an unguarded
+   hypervisor on every pass, forever, and force the five-minute
+   reconcile to run every 60 s for the life of the cluster. D2 and D3
+   exist for this.</p>
+</li>
+<li>
+<p><strong>#4087 is open, not closed.</strong> It carries <code>bug</code> and
+   <code>automated-fix-attempted</code>. The master plan said "(closed by
+   #4106, incompletely) ... Phase 1 reopens or comments"; there is
+   nothing to reopen. Corrected at source in this planning commit, in
+   both the phase 1 section and the bugs list. This phase comments
+   and closes.</p>
+</li>
+<li>
+<p><strong>The freshness window is 900 s, not 60 s.</strong>
+   <code>RECONCILE_METRICS_MAX_AGE_SECONDS = 900</code> (<code>:636</code>). "Has published
+   metrics" in this check must mean the reconciler's 900 s window,
+   not the resources daemon's 60 s publication cadence. A tighter
+   window in the check would make it and the pass disagree in the
+   direction that matters least (missing a node), but a looser one
+   would make them disagree in the direction that thrashes.</p>
+</li>
 </ol>
-<p>Per-node saturation across the six post-#4106 runs
-(<code>max(measured, committed) &gt;= limit</code>):</p>
-<table>
-<thead>
-<tr>
-<th>node (ledger)</th>
-<th>share of the run at ledger</th>
-<th>longest stretch</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>sf1 (3)</td>
-<td>7-23%</td>
-<td>90-330 s</td>
-</tr>
-<tr>
-<td>primary (3)</td>
-<td>1-12%</td>
-<td>15-255 s</td>
-</tr>
-<tr>
-<td>sf2 (6)</td>
-<td>0-15%</td>
-<td>0-240 s</td>
-</tr>
-</tbody>
-</table>
-<h3 id="three-real-mechanisms-that-are-not-the-driver">Three real mechanisms that are not the driver<a class="headerlink" href="#three-real-mechanisms-that-are-not-the-driver" title="Permanent link">&para;</a></h3>
-<p><strong>The warm-up window is still open.</strong> Issue #4087 found that
-<code>scheduler_node_capacity</code> has no rows until the reconciler's first
-pass, so every early placement takes P7's fail-open branch and the
-first pass then writes the accumulated ground truth onto a row
-whose limit it exceeds. PR #4106 anchored the reconcile to
-election and added a one-shot
-<code>_force_capacity_reconcile_if_unguarded()</code>
-(<code>shakenfist/daemons/cluster/main.py:741-778</code>, called at <code>:879</code>).
-In all six post-#4106 runs that one-shot fired 130-150 s <em>before</em>
-the test step, and the pass it forced logged <code>nodes=0
-nodes_added=0</code>: no hypervisor had published metrics yet. The table
-then stayed empty until the five-minute cadence created rows at
-+155..+181 s, exactly the 135-210 s the baseline measured before
-the fix. Ten to seventeen placements per run were admitted
-<code>node_not_sized</code>, and the first real pass recorded <code>drift_cpus</code> of
-2-8 (34178278720: sf1 +6 on a limit of 3). The bold rows above are
-this residue. It is real, it is the whole of the sub-three-minute
-exposure, and it is not what fails the runs.</p>
-<p><strong>Measurement lags a delete burst by a metrics period.</strong> The
-34119030297 refusal was <code>measured 6 / committed 0 / limit 3</code>: six
-warm-up instances had been deleted and released 32 s earlier and
-the ledger was correctly zero, but <code>cpu_total_instance_vcpus</code> is
-republished every 60 s (<code>resources/main.py:645, 704</code>) and still
-counted six running domains. The next sample read zero. Because
-<code>_has_sufficient_cpu()</code> charges <code>max(measured, committed)</code>, a node
-refuses forced creates for up to a minute after a teardown even
-though it is empty. The same rule is why "release the ledger
-earlier in <code>Instance.delete()</code>" -- a proposal the research
-considered -- would not help: the measured side keeps charging the
-node until the domain is actually gone, and the journals show no
-deleted instance holding ledger at any refusal.</p>
-<p><strong>The demand guard is pure overhead on this topology.</strong> 114-140
-<code>schedule candidate refused by capacity guard</code> events per run,
-<strong>100% demand-only</strong>: the D13 bound is <code>0.75 x cpu_schedulable</code>,
-which is 0.75 on a 1-thread node against a <code>cpu_load_1</code> near 3.
-Every one was waived on the second walk, so roughly 40% of creates
-pay two guarded transactions at the moment the cluster is busiest.
-It never produced a 507 in these runs. It is owned by the
-scheduler-reservations plan and recorded there.</p>
-<h3 id="what-has-been-tried">What has been tried<a class="headerlink" href="#what-has-been-tried" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>#3724</strong> added the committed-vCPU ledger so placed-but-unbooted
-  instances are charged immediately. Admission became more
-  accurate; an accurate "no" is still a failed test. Three
-  recurrences followed and the six per-test issues were absorbed
-  into #3772.</li>
-<li><strong>#3722</strong> reordered the load-shedding filters below affinity.
-  Cannot help: the node is removed at admission before ranking.</li>
-<li><strong>#4106</strong> closed #4087 in principle and, as above, not in CI.</li>
-<li><strong>#3813</strong> made the demand guard satisfiable; the waiver rate fell
-  from 62% to 4%. Not a 507 cause.</li>
-<li><strong>#3907</strong> and <strong>#3565</strong> were closed test-side, by tolerating the
-  transient refusal and by skipping when the candidate set had
-  collapsed. Both are precedents for the shape of this plan and
-  neither generalised.</li>
-</ul>
-<h3 id="what-this-is-not">What this is not<a class="headerlink" href="#what-this-is-not" title="Permanent link">&para;</a></h3>
-<p>Claims are not the answer to a forced placement. A namespace claim
-is cluster-wide and carries no node affinity (scheduler-reservations
-D14), <code>shakenfist/scheduler.py</code> never reads <code>namespace_claims</code>, and
-the stage that refuses is per-node. Per-test namespaces holding
-claims would starve one another's unclaimed pool, and phase 5's
-hard ceiling caps the holder rather than helping it. The one
-legitimate claim in CI is the conductor holding one per run against
-<em>other</em> merge groups on the under-cloud, which is
-scheduler-reservations phase 4c. Node-scoped claims are considered
-under open question 5 below and declined for now.</p>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Make a capacity refusal something a caller can wait out rather
-than a failure it has to report, without hiding the refusal from
-the people who need to see it. Concretely:</p>
-<ul>
-<li>A cluster's first guarded placement should happen within seconds
-  of its hypervisors publishing metrics, not five minutes after its
-  cluster daemon started.</li>
-<li>A node should stop charging for instances that no longer exist
-  within seconds of their deletion, not within a metrics period.</li>
-<li>The functional suite should treat a 507 at <code>create_instance</code> as
-  "not yet" -- waiting, informed by the cluster's own published
-  headroom, for the node it needs -- and should say, per test and
-  per run, how long it waited, so that a topology that makes the
-  suite wait is visible rather than merely slower.</li>
-<li>The API should tell a client that a refusal is transient and
-  when to try again, and the Python client should be able to act
-  on that when asked to.</li>
-<li>Whether the server itself should queue a create until it fits is
-  decided from measurement, not argued from first principles, and
-  the decision is written down either way.</li>
-</ul>
-<p>The merge-queue outcome this is measured by is the <code>Debian 12
-tier</code> job's pass rate, which is 24% in the baseline and should be
-comparable to the other cluster jobs (78-96%) once this plan and
-the sizing plan's phase 4 have both landed.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>These were settled at planning time from the research recorded in
-the Situation section; the reasoning is kept so that a later
-reader can disagree with it on the evidence rather than
-re-deriving it.</p>
-<h3 id="1-where-does-the-retry-live">1. Where does the retry live?<a class="headerlink" href="#1-where-does-the-retry-live" title="Permanent link">&para;</a></h3>
-<p><strong>In the suite first, in the client second, in the server only
-if the data says so.</strong> The scheduler-reservations plan left this
-undecided ("the client SDK, the CI base class, or server-side
-admission queueing") and deliberately held it until #3772 had soak
-data from a <code>develop</code> carrying atomic admission. That soak data
-now exists -- the phase 2 baseline and the journals above -- and
-it says the refusals are correct against the ledger. A suite-side
-wait is the smallest change that stops the bleeding, it is where
-<code>retry_while_transient</code> already lives, and it is the only place a
-wait can be <em>informed</em>: <code>GET /admin/resources</code> publishes per node
-<code>cpu_available = cpu_hard_max - max(measured, committed)</code>, which is
-the pre-filter's own arithmetic, so a pinned test can wait for the
-node it needs rather than for the cluster. The client change is
-next because it is what makes the behaviour available to operators
-and to the downstream repositories' suites. A server-side queue
-reverses scheduler-reservations D8 and is phase 5's decision.</p>
-<h3 id="2-does-a-retry-hide-the-problem">2. Does a retry hide the problem?<a class="headerlink" href="#2-does-a-retry-hide-the-problem" title="Permanent link">&para;</a></h3>
-<p><strong>Only if it is silent, so it will not be.</strong> Both sibling plans
-say a retry would mask whether a bigger cloud or atomic admission
-actually changed the failure rate. The wrapper in phase 2 therefore
-records every wait as a test detail (how long, on which node, what
-the headroom looked like) and the run publishes a summary -- total
-seconds waited, waits per test, longest wait -- through the same
-bundle the headroom probe uses, so the sizing plan's phase 5
-guardrails can warn on it. A cloud that makes the suite wait
-becomes a number in every run instead of a flake in some. The
-sizing plan's phase 3 saturation tests, which assert what a full
-cluster does <em>today</em>, call the raw client and are exempt from the
-wrapper by an explicit marker.</p>
-<h3 id="3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened">3. Why is allocation less reliable in the first minutes, and can the window be shortened?<a class="headerlink" href="#3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened" title="Permanent link">&para;</a></h3>
-<p><strong>Because the one-shot fires before there is anything to
-reconcile; yes, from 135-210 s to roughly a
-minute.</strong> <code>_force_capacity_reconcile_if_unguarded()</code>
-runs once, on the election path, and tests <code>if rows:</code>. On a fresh
-cluster the cluster daemon wins its election within 2.5-7.5 s of
-starting, before <code>sf-resources</code> on any hypervisor has published --
-the pass finds nothing, and nothing re-checks. Phase 1 makes the
-check a property of the elected loop rather than of election:
-compare the set of active hypervisors that have published metrics
-against the set with a capacity row, and make the reconcile due
-when they differ. That also closes the narrower hole</p>
-<h1 id="4106-left-a-node-that-publishes-late-or-whose-row-the">4106 left -- a node that publishes late, or whose row the<a class="headerlink" href="#4106-left-a-node-that-publishes-late-or-whose-row-the" title="Permanent link">&para;</a></h1>
-<p>reconciler removed on stale metrics, admits unguarded for up to
-five minutes today.</p>
-<p>Note what bounds the improvement, because an earlier draft of this
-section claimed seconds. The elected loop polls every
-<code>ELECTED_LOOP_POLL_SECONDS = 5</code>
-(<code>shakenfist/daemons/cluster/main.py:63</code>) but its maintenance body
-sits behind <code>if now - last_loop_run &gt;= 60</code> (<code>:913</code>), and
-<code>_run_due_scheduled_jobs()</code> is inside that gate (<code>:918</code>). Marking
-the job due does not run it any sooner than the next 60 s tick, so
-a check placed inside the gate closes the window to about a
-minute. Closing it faster means running the comparison outside the
-gate on the 5 s poll, which is a fixed-rate database read and is
-not free. Phase 1 decides between those two; see its plan.</p>
-<h3 id="4-why-does-a-node-refuse-for-a-minute-after-its-instances-are-deleted">4. Why does a node refuse for a minute after its instances are deleted?<a class="headerlink" href="#4-why-does-a-node-refuse-for-a-minute-after-its-instances-are-deleted" title="Permanent link">&para;</a></h3>
-<p><strong>Because measurement is a 60 s poll of libvirt and the pre-filter
-charges the larger of measurement and ledger.</strong> The rule is right:
-it is what makes the ledger safe against instances the reconciler
-has not yet counted. What is wrong is the cadence. Phase 3 has
-<code>sf-resources</code> notice a change in the running-domain set cheaply
-(a <code>listAllDomains</code> every few seconds costs nothing and touches no
-database) and publish immediately when it changes, keeping the
-full 60 s publish for everything else. That is activity-coupled
-rather than fixed-rate, so it does not move the database load
-budget's idle figure, and it is declared in
-<code>database_load_budget.yaml</code> as such.</p>
-<h3 id="5-should-there-be-node-scoped-claims">5. Should there be node-scoped claims?<a class="headerlink" href="#5-should-there-be-node-scoped-claims" title="Permanent link">&para;</a></h3>
-<p><strong>Not now, and not for this problem.</strong> The question was raised at
-planning time because a claim "on hypervisor X for N vCPU" is the
-shape a pinned test would want: hold the reservation, then create
-against it, with no window between "the node has room" and "my
-create landed" for another worker to take it. Against that:</p>
-<ul>
-<li>For CI it buys one thing over an informed wait -- closing that
-  window -- and the window is small at concurrency 5. Every other
-  property (waiting for the right node, bounded by a deadline,
-  visible in the run) the phase 2 wrapper has already.</li>
-<li>It is a second ledger dimension on every <code>scheduler_node_capacity</code>
-  row (<code>claimed_cpus</code> beside <code>used_cpus</code>, with the unclaimed
-  admission guarded against <code>limit - claimed</code>), which the guarded
-  UPDATE, the reconciler, the cluster singleton's migration on
-  claim create and delete, and the pre-filter all have to learn.
-  That is scheduler-reservations phases 3 and 4 again, one level
-  down, while phase 5 has not decided what enforcement of the
-  existing claims even means.</li>
-<li>The pre-filter is claim-blind today; a node claim only works if
-  <code>_has_sufficient_cpu()</code> consults it, which makes the pre-filter a
-  ledger reader in a way D1 chose not to.</li>
-</ul>
-<p>Where it <em>would</em> earn its place is an operator need, not a test
-need: evacuating or draining a node (#1364) has to know there is
-room on the destinations before it starts moving instances, and a
-live migration wants the same guarantee. When that lifecycle is
-built, a per-node reservation is the primitive it needs, and it
-should be designed then, against the claim machinery as it stands
-after phase 5. Recorded under Future work in the
-scheduler-reservations plan so it is not lost.</p>
-<h3 id="6-should-the-demand-guard-be-changed-here">6. Should the demand guard be changed here?<a class="headerlink" href="#6-should-the-demand-guard-be-changed-here" title="Permanent link">&para;</a></h3>
-<p><strong>No; it is scheduler-reservations' and is recorded there.</strong> The
-bound of <code>0.75 x cpu_schedulable</code> cannot be met on a 1- or 2-thread
-node under any real load, so on the CI topologies the first walk
-never admits and the waiver walk always does. Rescaling or waiving
-it below some <code>cpu_schedulable</code> is a one-line change to the demand
-clause, but it is phase 4a's clause and the load it saves is the
-scheduler-reservations plan's to measure. This plan cites the
-evidence and moves on.</p>
-<h3 id="7-should-the-topology-change-here">7. Should the topology change here?<a class="headerlink" href="#7-should-the-topology-change-here" title="Permanent link">&para;</a></h3>
-<p><strong>No; it is the sizing plan's phase 4, and the evidence here
-sharpens what that phase must choose.</strong> Any shape that leaves an
-infra hypervisor at <code>limit_cpus</code> 3 leaves this failure in place,
-because the pinned tests select those nodes. The sizing plan's
-candidate "tier as 3 x 6 vCPU" gives <code>primary</code> and <code>sf1</code> a ledger
-of 6 each and <code>sf2</code> 12, which is the smallest shape in its table
-that changes the number that binds. The sizing plan is updated to
-say so.</p>
-<h3 id="8-should-the-server-queue-a-create-that-does-not-fit">8. Should the server queue a create that does not fit?<a class="headerlink" href="#8-should-the-server-queue-a-create-that-does-not-fit" title="Permanent link">&para;</a></h3>
-<p><strong>Decide in phase 5, from phase 2's wait data.</strong> The machinery
-exists -- <code>BaseClusterOperation.defer_with_backoff()</code> already
-re-enqueues with a delay for artifact fetches and network
-operations -- and a <code>202</code> with the instance held in <code>initial</code> (or a
-new <code>scheduling</code> state) until placement succeeds or a deadline
-passes is a contained change. Against it: it is exactly the
-"hold-until-fittable" that scheduler-reservations D8 rejected as
-queue-state surface the project does not want; it has no fairness
-model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
-ones, and a pinned create starves worst); waiting instances hold
-IPAM allocations, so a CPU shortage can become an address shortage;
-and the client's <code>_await_instance_create</code> has a 900 s ceiling that
-bounds any useful deadline. If phase 2 shows the suite waits are
-short and few once the topology is right, the answer is no and the
-phase closes as Abandoned with the numbers. If they are long or
-many, the phase designs the queue -- FIFO by request time, pinned
-placements admitted against their node only -- and reverses D8 in
-writing.</p>
-<h3 id="9-what-should-the-api-say">9. What should the API say?<a class="headerlink" href="#9-what-should-the-api-say" title="Permanent link">&para;</a></h3>
-<p><strong>That it is transient, and when to try again.</strong> Both <code>507</code>
-bodies from <code>POST /instances</code> (<code>external_api/instance.py:906</code> for
-the pre-filter, <code>:976-981</code> for the guard) are bare strings. Phase 4
-adds a <code>Retry-After</code> header and a machine-readable <code>stage</code> and
-<code>transient: true</code> to the error body, so a client does not have to
-parse prose to know which refusal it got. The honest hint is a
-fixed conservative constant (15 s, matching <code>defer()</code>'s default)
-rather than a computed one: the server has no pending-release
-horizon and a number that implies knowledge it lacks is worse than
-one that does not. The client's opt-in retry reuses the shape of
-its existing 406 loop and is bounded by the same deadline. The
-affinity <code>409</code> is deliberately ordered first in the handler and
-must never be retried.</p>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<!-- shared-block: plan-status-vocabulary v1 -->
-<p>Plan status vocabulary (shared block; do not edit -- the canonical
-copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-status-vocabulary.md</code>):</p>
-<p>A status cell -- in the master plan's own Execution phase table, and
-in the row <code>docs/plans/index.md</code> carries for the plan -- holds
-exactly one of these terms and nothing else:</p>
-<ul>
-<li><code>Proposed</code> -- written down as a concept, not yet scheduled.</li>
-<li><code>Not started</code> -- scheduled, but no work has begun.</li>
-<li><code>In progress</code> -- work has begun and has not finished.</li>
-<li><code>Blocked</code> -- cannot proceed until something outside the plan
-  changes. Say what, in the plan.</li>
-<li><code>Complete</code> -- the work is done.</li>
-<li><code>Abandoned</code> -- deliberately dropped without being done.</li>
-<li><code>Superseded</code> -- replaced by another plan, which the plan names.</li>
-</ul>
-<p>The term is the whole cell. No dates, no phase arithmetic, no
-parenthetical qualifiers, no summary of what happened: a status is
-read to decide whether a plan still wants attention, and prose in
-that column has repeatedly grown until it could no longer be read
-either by a person scanning the table or by tooling. Detail belongs
-in the plan file, and a one-line summary belongs in the index's own
-Intent column.</p>
-<p>Matching is case-insensitive, so <code>In Progress</code> is accepted, but the
-spelling above is the one to write.</p>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>The same term is written twice: once in the phase table
-below, and once in the row this plan carries in
-<code>docs/plans/index.md</code>. Keep them in step -- the index row is
-the whole-plan status, so it only reaches <code>Complete</code> once
-every phase has been completed, abandoned or superseded.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row</td>
-<td><a href="../PLAN-transient-capacity-refusals-phase-01-warm-up/">PLAN-transient-capacity-refusals-phase-01-warm-up.md</a></td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>2. The suite waits, and says so: an informed <code>create_instance</code> wrapper and a per-run wait summary</td>
-<td>PLAN-transient-capacity-refusals-phase-02-suite-wait.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>3. Publish metrics when the running-domain set changes</td>
-<td>PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>4. <code>Retry-After</code> and a machine-readable transient refusal, with an opt-in client retry</td>
-<td>PLAN-transient-capacity-refusals-phase-04-retry-after.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>5. Decide on server-side queued placement from the phase 2 data</td>
-<td>PLAN-transient-capacity-refusals-phase-05-queue-decision.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>6. Documentation and close-out</td>
-<td>PLAN-transient-capacity-refusals-phase-06-docs.md</td>
-<td>Not started</td>
-</tr>
-</tbody>
-</table>
-<p>Phases 1, 2 and 3 are independent of one another and can run in
-parallel. Phase 4 follows 2, because the client retry should match
-the semantics the suite has already proven. Phase 5 needs phase 2
-to have reported over a window of merge runs <em>after</em> the sizing
-plan's phase 4 has reshaped <code>slim-tier</code>; until then its data would
-be measuring the wrong cloud. Phase 6 is last.</p>
-<p>The ordering against the sibling plans: the sizing plan's phase 3
-(saturation coverage) does not gate any phase here, because none
-of them changes what a full cluster does -- but its phase 4
-(reshape) should land before phase 5 here reads its numbers.
-Nothing here touches the demand guard, the pre-filters, claim
-enforcement or the guarded UPDATE, all of which are
-scheduler-reservations' (D11, phase 5).</p>
-<h3 id="phase-1-close-the-warm-up-window">Phase 1 -- Close the warm-up window<a class="headerlink" href="#phase-1-close-the-warm-up-window" title="Permanent link">&para;</a></h3>
-<p>Make <code>_force_capacity_reconcile_if_unguarded()</code> a check the
-elected loop repeats rather than a one-shot at election
-(<code>shakenfist/daemons/cluster/main.py:741</code>, called once at <code>:879</code>).
-The check itself is the same comparison either way: if any active
-hypervisor has published metrics and has no capacity row, make the
-reconcile due now. Keep the
-distinction between a degraded read and an empty result that the
-existing code is careful about (<code>rows</code> is empty for both; only
-<code>degraded</code> says which).</p>
-<p><strong>The decision this phase owns is where the check runs</strong>, and the
-master plan does not pre-empt it. Inside the elected loop's 60 s
-maintenance gate (<code>:913</code>) the check costs nothing new -- it rides
-a pass that already reads the database -- and closes the warm-up
-window to about a minute. Outside the gate, on the
-<code>ELECTED_LOOP_POLL_SECONDS = 5</code> poll, it closes the window to
-seconds but adds a fixed-rate ~0.2/s read that needs a
-<code>cluster_base_qps</code> entry in
-<code>shakenfist/data/database_load_budget.yaml</code>, or
-<code>test_no_unbudgeted_fixed_rate_database_polling</code> fails. The phase
-plan picks one and says why; both are defensible and the 60 s
-version is the smaller change.</p>
-<p>Be accurate about the stability gate rather than repeating the
-elected loop's shorthand comment. <code>cluster_stable()</code>
-(<code>shakenfist/daemons/daemon.py:377</code>) compares object versions
-across nodes and reads no metric freshness at all; it catches a
-just-restarted cluster only incidentally, because no node has
-recorded a version yet and <code>minimum</code> is <code>inf</code>. The pass still
-belongs behind it -- issue #4087's second correction explains why
-a pass with no fresh metrics deletes rows -- but the protection is
-a side effect of the version check, not a freshness check, and the
-phase plan should not assume otherwise.</p>
-<p>Prove it two ways. A unit test in <code>shakenfist/tests/</code> drives the
-elected loop with a fake capacity table and a fake node roster and
-asserts the reconcile becomes due on the iteration a hypervisor
-first appears without a row, and not on later iterations where
-every hypervisor has one. A functional assertion in the CI
-harness reads the headroom probe's own series and requires that
-<code>cpu_committed_row_present</code> is true for every hypervisor before
-the first <code>instance placed</code> event of the run -- the field already
-exists end to end (published at <code>shakenfist/scheduler.py:1073</code>,
-harvested by <code>tools/ci_headroom_harvest.py</code>, reported by
-<code>tools/ci_headroom_report.py:319</code>) and the baseline dataset
-already carries it, so the assertion's premise can be checked
-against it before it is written. That assertion also retires a
-<code>skipTest</code>: <code>cluster_ci_tests/test_nodes.py:136</code> currently skips
-when a node has no capacity row, which is exactly the condition
-this phase makes impossible after start-up. Remove the skip in the
-same change rather than leaving unreachable code behind it. Phase
-1 also comments on #4087 with the finding and closes it. The issue
-is still open -- #4106 never closed it -- so there is nothing to
-reopen.</p>
-<p>Small, server-side, one file plus tests. Plan at high effort: the
-placement decision above, the interaction with the stability gate
-and the degraded-read distinction are the kind of thing a light
-brief gets wrong.</p>
-<h3 id="phase-2-the-suite-waits-and-says-so">Phase 2 -- The suite waits, and says so<a class="headerlink" href="#phase-2-the-suite-waits-and-says-so" title="Permanent link">&para;</a></h3>
-<p>Add <code>BaseTestCase.create_instance()</code> to
-<code>shakenfist/deploy/shakenfist_ci/base.py</code>, route every raw
-<code>test_client.create_instance(...)</code> call site in <code>cluster_ci_tests/</code>
-and <code>guest_ci_tests/</code> through it (there are 115 call sites across
-39 files; a list is a mechanical <code>grep</code>), and add a unit test in
-<code>shakenfist/tests/</code> that walks the suite's source with <code>ast</code> and
-fails on any raw call outside an explicit allowlist marker, the way
-<code>test_ci_claims_headroom.py</code> already asserts call sites by name.</p>
-<p>The wrapper: on <code>InsufficientResourcesException</code>, if the deadline
-(420 s, the claims suite's <code>CLUSTER_HEADROOM_WAIT</code>) has not passed,
-emit a tracing event, then wait <em>informed</em>: poll
-<code>system_client.get_cluster_resources()</code> at 10 s and proceed when
-<code>per_node[target]['cpu_available'] &gt;= cpus</code> for a <code>force_placement</code>
-create, or <code>total['cpu_available'] &gt;= cpus</code> otherwise, falling back
-to a blind sleep when <code>total['capacity_degraded']</code> is set. Re-create
-with a fresh uniquified name, because the refused instance is
-<code>enqueue_delete_due_error</code>'d and its name is not reusable
-synchronously. Reuse <code>retries.retry_while_transient</code> by converting
-the exception to a <code>(status, body)</code> pair so the loop stays
-unit-testable against a fake clock. Every wait is attached to the
-test as a detail: seconds waited, the node waited for, and the
-<code>per_node</code> headroom at the first refusal and at admission.</p>
-<p>The run summary: total seconds waited, number of waits, longest
-wait and its test, written to the bundle beside the headroom
-probe's output and printed in the job log. The collection step is
-in <code>shakenfist/actions</code> (the reusable <code>smoke-cluster</code> workflow),
-so this phase carries the same operator-push obligation the
-sizing plan's phase 1 did, and the summary is designed so that the
-sizing plan's phase 5 guardrail can read it.</p>
-<p>Budget the poll. <code>GET /admin/resources</code> reads <code>GetNodeMetrics</code> from
-the <code>api</code> caller, which is already in <code>HARNESS_DRIVEN_PAIRS</code>
-(<code>load_budget.py:309-323</code>) -- but that exemption's prose names the
-headroom probe as the producer and
-<code>test_the_suite_still_probes_cluster_headroom</code> holds it up. Extend
-the comment to name the wrapper as a second, activity-coupled
-producer (it polls only while a create is being retried), or the
-load-budget test's premise rots silently.</p>
-<p>Two test-side changes ride along because they are cheap and reduce
-the number of pinned creates: <code>test_commandline_artifacts.py</code>'s
-second instance and <code>test_imagefetch.py</code>'s first are pinned for
-convenience rather than for the assertion, and can target
-<code>inst1['node']</code> only where co-location is actually load-bearing.
-And <code>test_system_namespace.py</code> subclasses <code>BaseTestCase</code> rather than
-the namespaced base, so a failure between its inline create and
-delete strands a charged instance in the system namespace for the
-rest of the run; give it an <code>addCleanup</code>.</p>
-<p>The sizing plan's phase 3 saturation tests must call the raw client
-and assert the refusal; the allowlist marker exists for them.</p>
-<p>Plan at high effort. The wrapper is straightforward; the AST guard,
-the load-budget declaration and the bundle plumbing across two
-repositories are where a light brief goes wrong.</p>
-<h3 id="phase-3-publish-metrics-when-the-running-domain-set-changes">Phase 3 -- Publish metrics when the running-domain set changes<a class="headerlink" href="#phase-3-publish-metrics-when-the-running-domain-set-changes" title="Permanent link">&para;</a></h3>
-<p>In <code>shakenfist/daemons/resources/main.py</code>, beside the 60 s publish,
-poll libvirt's domain list every few seconds (no database access)
-and, when the set of running domains or their vCPU total differs
-from what was last published, publish immediately. Keep the 60 s
-full publish unchanged. Declare the new publish rate in
-<code>shakenfist/data/database_load_budget.yaml</code> as <code>activity_coupled</code>
-so the load-budget check models it correctly, and add a unit test
-that a domain disappearing between polls produces a publish before
-the 60 s tick.</p>
-<p>This is what makes "the node is empty" true within seconds of a
-teardown rather than within a minute, and it is the only change in
-this plan that touches a daemon other than the cluster daemon.
-Plan at medium effort; the pattern is the existing loop.</p>
-<h3 id="phase-4-retry-after-and-a-machine-readable-transient-refusal">Phase 4 -- <code>Retry-After</code> and a machine-readable transient refusal<a class="headerlink" href="#phase-4-retry-after-and-a-machine-readable-transient-refusal" title="Permanent link">&para;</a></h3>
-<p>Server: on both <code>507</code> branches of <code>POST /instances</code>
-(<code>external_api/instance.py:906</code>, <code>:976-981</code>), set <code>Retry-After: 15</code>
-and extend the error body with <code>stage</code> (<code>sufficient_idle_cpu</code>, or
-<code>capacity_guard</code>) and <code>transient: true</code>. <code>sf_api.error()</code> returns
-a bare <code>flask.Response</code>, so the header is set on the returned
-object. The <code>409</code> affinity branch is untouched. Update the OpenAPI
-declaration and the API-validation plan's error contract if it
-describes the body shape.</p>
-<p>Client (<code>client-python</code>): carry response headers on
-<code>APIException</code>, and add an opt-in retry policy for <code>507</code> bodies
-carrying <code>transient: true</code>, bounded by the existing async-strategy
-deadline and reusing the shape of the 406 loop in <code>_request_url</code>.
-Off by default; the suite turns it on, and its phase 2 wrapper then
-becomes the <em>informed</em> layer over the client's blind one.</p>
-<p>Plan at medium effort; each half is small, and the coordination is
-a version pin between the two repositories.</p>
-<h3 id="phase-5-decide-on-server-side-queued-placement">Phase 5 -- Decide on server-side queued placement<a class="headerlink" href="#phase-5-decide-on-server-side-queued-placement" title="Permanent link">&para;</a></h3>
-<p>A decision phase, not a build phase. Read the phase 2 wait
-summaries over at least twenty merge runs after the sizing plan's
-phase 4 has landed. If total wait per run is small and no test
-waits near its deadline, close this phase as Abandoned with the
-numbers and the reasoning in the phase file. Otherwise, design the
-queue against open question 8's constraints -- FIFO by request
-time, pinned creates admitted against their node only, IPAM
-allocated at placement rather than at request, a deadline the
-client's 900 s create ceiling can contain -- and record the
-reversal of scheduler-reservations D8 in that plan's decisions
-file before any code is written.</p>
-<p>Plan at high effort if it goes ahead; the state-machine and
-fairness questions are the expensive kind.</p>
-<h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
-<p>Document the transient-refusal contract in
-<code>docs/operator_guide/scheduler.md</code> and the API reference, the suite
-wrapper and its allowlist marker in <code>docs/developer_guide/ci.md</code>,
-and the wait summary beside the headroom probe's documentation.
-Update <code>docs/plans/index.md</code> and the sibling plans' cross-references
-to their final state. Comment on #3772 with the before-and-after
-pass rate and close it only if the <code>Debian 12 tier</code> job's failures
-are no longer <code>sufficient_idle_cpu</code>; otherwise leave it open with
-the numbers.</p>
-<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
-<!-- shared-block: subagent-execution-model v1 -->
-<p>Sub-agent execution model (shared block; do not edit -- the
-canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/subagent-execution-model.md</code>):</p>
-<p>All implementation work is done by sub-agents, never in the
-management session. The management session is reserved for
-planning, review, and decision-making. This keeps the management
-context lean and avoids drowning it in implementation diffs.</p>
-<p>The workflow is:</p>
-<ol>
-<li><strong>Plan</strong> at high effort in the management session.</li>
-<li><strong>Spawn a sub-agent</strong> for each implementation step with the
-   brief from the plan, at the recommended effort level and model.</li>
-<li><strong>Review</strong> the sub-agent's output in the management session.
-   Check the actual files -- the sub-agent's summary describes
-   what it intended, not necessarily what it did.</li>
-<li><strong>Fix or retry</strong> if the output is wrong. Diagnose whether the
-   brief was insufficient (improve it) or the model was too light
-   (upgrade it), then re-run.</li>
-<li><strong>Commit</strong> once the management session is satisfied.</li>
-</ol>
-<p>This applies to all steps, including high-effort ones. If a
-sub-agent cannot succeed even with a detailed brief and the right
-model, that is a signal the brief needs improving, not that the
-management session should do the implementation itself.</p>
-<p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
-risky or experimental; the worktree is discarded if the output is
-unsatisfactory. For safe, well-understood changes, sub-agents can
-work directly in the main tree.</p>
-<!-- shared-block-end -->
-
-<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
-<!-- shared-block: plan-planning-effort v1 -->
-<p>Planning effort (shared block; do not edit -- the canonical copy
-lives in shakenfist/development at
-<code>templates/shared-blocks/plan-planning-effort.md</code>):</p>
-<p>The master plan itself is always created at <strong>high effort</strong> -- it
-requires broad codebase understanding, cross-referencing several
-source files, and judgment calls about scope and sequencing.</p>
-<p>Each phase plan states the recommended effort level for planning
-that phase. Phases that turn on design decisions, cross-component
-coordination, protocol changes, or subtle correctness questions
-should be planned at high effort. Phases that are mechanical, or
-that follow a pattern already established elsewhere in the
-codebase, can be planned at medium effort.</p>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>Phases 1, 2 and 5 are planned at high effort: the first for
-its interaction with the stability gate and the degraded-read
-distinction, the second for its two-repository plumbing and
-the load-budget declaration, the fifth because it may be a
-state-machine design. Phases 3, 4 and 6 follow patterns that
-already exist and are planned at medium effort.</p>
-</div>
-<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
-<!-- shared-block: subagent-step-guidance v1 -->
-<p>Sub-agent step guidance (shared block; do not edit -- the
-canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/subagent-step-guidance.md</code>):</p>
-<p>Each phase plan includes a table like this:</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<h3 id="d1-the-check-runs-inside-the-60-s-maintenance-gate">D1 -- The check runs inside the 60 s maintenance gate<a class="headerlink" href="#d1-the-check-runs-inside-the-60-s-maintenance-gate" title="Permanent link">&para;</a></h3>
+<p>Not on the 5 s poll. The window closes to about a minute rather than
+to seconds.</p>
+<p>This is the decision a reviewer is most likely to argue with, so the
+reasoning is set out in full. Three things push this way.</p>
+<p>The check cadence is not the dominant term. The measured window is
+135-210 s, and almost all of it is the wait for a hypervisor to
+publish metrics at all -- the forced pass at election found
+<code>nodes=0</code> because there was nothing to size, 130-150 s before the
+test step. Once metrics exist, a 60 s worst case adds 60 s to a term
+that was already 135-210 s. Going from 60 s to 5 s buys at most 55 s
+on top of an improvement of roughly 100-150 s, and phase 3 attacks
+the dominant term directly.</p>
+<p>The 5 s option is not free. The check costs two reads
+(<code>get_scheduler_node_capacity()</code> and <code>get_all_node_metrics()</code>). Inside
+the 60 s gate that is 0.033/s, riding a maintenance pass that already
+reads far more. On the 5 s poll it is 0.4/s of fixed-rate polling,
+which needs a <code>cluster_base_qps</code> entry in
+<code>shakenfist/data/database_load_budget.yaml</code> or
+<code>test_no_unbudgeted_fixed_rate_database_polling</code> fails -- and it
+would be <em>fixed-rate</em>, so it raises the idle-cluster floor the
+database-load-reduction plan is trying to lower, permanently, to buy
+55 s once per cluster lifetime.</p>
+<p>Marking the job due from inside the gate runs it in the same pass.
+<code>_run_due_scheduled_jobs()</code> is called at <code>:918</code>, immediately after
+where the check goes, so setting <code>next_run</code> and then calling
+<code>schedule.run_pending()</code> executes the reconcile without waiting for
+another tick.</p>
+<p>If a later phase shows the residual minute matters, the check is one
+call and can move. Recorded as future work in the master plan rather
+than pre-empted here.</p>
+<h3 id="d2-the-check-mirrors-the-reconcilers-predicate-including-the-active-node-intersection">D2 -- The check mirrors the reconciler's predicate, including the active-node intersection<a class="headerlink" href="#d2-the-check-mirrors-the-reconcilers-predicate-including-the-active-node-intersection" title="Permanent link">&para;</a></h3>
+<p>A node counts as an unguarded hypervisor only if it has metrics with
+<code>is_hypervisor</code> true, a <code>timestamp</code> inside
+<code>RECONCILE_METRICS_MAX_AGE_SECONDS</code>, is in the active node set, and
+has no <code>scheduler_node_capacity</code> row. Import the constant from
+<code>mariadb</code> rather than restating 900; a check with its own copy of
+that number will drift from the pass it is trying to trigger.</p>
+<p>The active-node intersection is the one that cannot be skipped
+(finding 5). Use <code>Nodes([], prefilter='active')</code>, which is what both
+the scheduler and the reconciler's <code>active_nodes</code> set resolve to, so
+the check and the pass agree by construction rather than by
+coincidence.</p>
+<p>The <code>known_nodes</code> half of the reconciler's predicate is not mirrored:
+a node with an <code>object_states</code> row in an active state but no row in
+the <code>nodes</code> table is a stateless zombie, and the active-node
+prefilter already excludes anything without a resolvable object. If
+the implementer finds that assumption does not hold, treat it as a
+finding and stop -- do not add a second-guess intersection without
+saying why in the commit message.</p>
+<h3 id="d3-do-not-force-twice-for-the-same-unguarded-set">D3 -- Do not force twice for the same unguarded set<a class="headerlink" href="#d3-do-not-force-twice-for-the-same-unguarded-set" title="Permanent link">&para;</a></h3>
+<p>Remember the set of node uuids the last forced pass was issued for.
+Force only when the current unguarded set is non-empty and differs
+from that remembered set; clear the memory when the set becomes
+empty.</p>
+<p>This bounds the failure mode D2 is guarding against rather than
+merely making it unlikely. If some node genuinely qualifies under
+this check but the reconciler declines to size it anyway -- a P7
+decline this phase has not anticipated -- the pass is forced once,
+observed not to have helped, and then left alone until the set
+changes. The ordinary five-minute cadence still runs, so nothing is
+lost; the cluster just does not spend the rest of its life
+reconciling every minute.</p>
+<p>The remembered set is process-local state on the monitor object,
+reset on election like the rest of the elected loop's state. It is
+not persisted: a daemon restart re-forcing once is correct, not a
+bug.</p>
+<h3 id="d4-delete-the-election-time-call-site">D4 -- Delete the election-time call site<a class="headerlink" href="#d4-delete-the-election-time-call-site" title="Permanent link">&para;</a></h3>
+<p>Generalise the existing helper and call it from the maintenance pass;
+remove the call at <code>:879</code>.</p>
+<p>Keeping both would leave two paths that can drift. Nothing is lost by
+removing the election-time call: <code>last_loop_run</code> is initialised to 0
+(<code>:813</code>) outside the outer election loop, so the first maintenance
+pass after any election finds <code>now - last_loop_run &gt;= 60</code> true and
+runs immediately. The election-time call is also <em>upstream</em> of the
+<code>cluster_stable()</code> gate, so on an unstable cluster it can force a job
+due that will not run -- which is harmless but is exactly the kind of
+"why is this due?" confusion the check is meant to remove.</p>
+<p>The five existing unit tests call the helper directly and keep
+working unchanged. That is deliberate: they pin the degraded-read and
+empty-table semantics, which this phase must not alter.</p>
+<h3 id="d5-one-warning-per-distinct-unguarded-set-plus-a-counter">D5 -- One warning per distinct unguarded set, plus a counter<a class="headerlink" href="#d5-one-warning-per-distinct-unguarded-set-plus-a-counter" title="Permanent link">&para;</a></h3>
+<p>The existing helper logs <code>No scheduler capacity rows exist, so every
+placement is being admitted unguarded</code> at warning. Keep that
+wording for the all-empty case, and add a second warning naming the
+node uuids for the partial case, emitted under the same
+once-per-distinct-set rule as D3 so a stuck condition does not
+produce a line a minute forever.</p>
+<p>Export a counter for forced passes alongside the existing
+<code>SCHEDULER_CAPACITY_*</code> metrics in
+<code>shakenfist/daemons/cluster/scheduled_tasks.py</code>. Without it,
+"how often is this firing in production?" is answerable only by
+grepping logs, and a thrash introduced by a later change would be
+invisible until someone looked.</p>
+<h3 id="d6-the-functional-assertion-replaces-the-skip-and-the-report-measures">D6 -- The functional assertion replaces the skip, and the report measures<a class="headerlink" href="#d6-the-functional-assertion-replaces-the-skip-and-the-report-measures" title="Permanent link">&para;</a></h3>
+<p><code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_nodes.py:136</code>
+currently skips when the node under test has no capacity row. After
+this change that condition is the bug, so a skip would hide exactly
+the regression this phase exists to prevent. Convert it to an
+assertion.</p>
+<p>It must not race the cluster coming up. The suite already has
+<code>tools/ci_wait_schedulable.py</code> gating the test step, so by the time
+any functional test runs, a hypervisor exists and has been schedulable
+-- but the implementer must confirm that gate runs before this test
+in the workflow rather than assuming it, and if it does not, the
+assertion waits with the suite's existing retry helper rather than
+failing on first read.</p>
+<p><strong>Amended after review: the gate does not cover the condition, so the
+second branch applies.</strong> <code>ci_wait_schedulable.py</code> waits for a node to
+appear in <code>/admin/resources</code> <code>per_node</code>, which means active and
+publishing fresh metrics. It says nothing about a
+<code>scheduler_node_capacity</code> row, and by D1 that row arrives up to a
+minute later -- so clearing the gate and having the row are different
+facts, and asserting on the first read races the very window this
+phase measures. The assertion therefore waits. It does so with a
+bounded poll of <code>/admin/resources</code> rather than with
+<code>retries.retry_while_transient()</code>: that helper takes a <code>(status, body)</code>
+pair and retries on transient HTTP statuses, which is the wrong shape
+for polling a boolean field out of a successful response. The wait is
+120 s, comfortably longer than the warm-up window, so a row which
+never arrives still fails the test.</p>
+<p>Separately, <code>tools/ci_headroom_report.py</code> gains a time-to-first-
+capacity-row figure computed from the series it already parses
+(<code>cpu_committed_row_present</code> is in every sample). That is the
+measurement of this phase's effect across the whole fleet, and per
+ci-cloud-sizing D15 it is printed, never gating.</p>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -14691,255 +14130,173 @@ canonical copy lives in shakenfist/development at
 <tbody>
 <tr>
 <td>1a</td>
-<td>medium</td>
-<td>sonnet</td>
+<td>high</td>
+<td>opus</td>
 <td>none</td>
-<td>One-sentence summary of what to do and which files to touch</td>
+<td>Generalise <code>_force_capacity_reconcile_if_unguarded()</code> in <code>shakenfist/daemons/cluster/main.py:741</code> so it forces the capacity reconcile when <em>any</em> active hypervisor with fresh metrics has no <code>scheduler_node_capacity</code> row, not only when the table is entirely empty, and call it from the elected loop's maintenance pass instead of from election. Read the whole docstring first: the degraded-versus-empty distinction it describes is load-bearing and must survive unchanged (<code>get_scheduler_node_capacity()</code> returns <code>(rows, degraded)</code>; <code>rows</code> is empty for both an empty table and an unreadable one, and only <code>degraded</code> says which -- see <code>shakenfist/mariadb.py:27215</code>). The unguarded set is: nodes with a <code>get_all_node_metrics()</code> entry whose <code>metrics['is_hypervisor']</code> is true -- note <code>is_hypervisor</code> is inside the <code>metrics</code> dict, not a top-level key of the returned record (<code>mariadb.py:20909</code>) -- whose <code>timestamp</code> is greater than <code>now - mariadb.RECONCILE_METRICS_MAX_AGE_SECONDS</code> (import the constant, do not restate 900), which appear in <code>Nodes([], prefilter='active')</code>, and which have no row in <code>rows</code>. Mirroring the reconciler's predicate is the whole point: <code>_direct_reconcile_scheduler_capacity()</code> (<code>mariadb.py:25022</code>, the refresh block from <code>:25115</code>) applies exactly these plus a <code>nodes</code>-table membership test, and a check that omits the active-node intersection will treat a <code>node_metrics</code> row that outlived its node as a permanently unguarded hypervisor and force the five-minute job every 60 s forever -- the code comment at <code>:25201</code> describes that phantom. Implement D3: keep the set of uuids the last force was issued for on the monitor, force only when the current set is non-empty and differs from it, clear it when the set empties. Implement D5: keep the existing all-empty warning text, add a second warning naming the uuids for the partial case under the same once-per-set rule, and add a forced-pass counter beside the <code>SCHEDULER_CAPACITY_*</code> metrics in <code>shakenfist/daemons/cluster/scheduled_tasks.py</code>. Per D4, call it from inside the <code>else:</code> branch at <code>main.py:911</code> before <code>_run_due_scheduled_jobs()</code> at <code>:918</code> so the forced job runs in the same pass, and delete the call at <code>:879</code>. Extend <code>ForcedCapacityReconcileTestCase</code> (<code>shakenfist/tests/test_daemon_cluster_schedule_anchoring.py:244</code>) rather than writing a new file, and do not weaken its five existing tests. Add: a hypervisor with fresh metrics and no row forces the pass; the same set on the next call does not force again; a changed set does force again; a stale-metrics hypervisor does not force; a non-hypervisor with no row does not force; a hypervisor with fresh metrics that is not in the active set does not force (this is the phantom -- assert it explicitly, and confirm that deleting the active-node intersection makes this one test fail); a degraded read still forces nothing. Single quotes, 120 columns, no trailing whitespace.</td>
 </tr>
 <tr>
 <td>1b</td>
-<td>high</td>
-<td>opus</td>
-<td>worktree</td>
-<td>Why this needs high effort: requires understanding X to do Y</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>The CI-visible half. In <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_nodes.py</code>, convert the <code>skipTest</code> at <code>:136</code> into an assertion, per D6: after this phase a hypervisor without a capacity row is the defect, and skipping hides it. First confirm from <code>.github/workflows/</code> that <code>tools/ci_wait_schedulable.py</code> gates the functional-test step, so the assertion cannot race cluster start-up; if it does not, use the suite's existing retry helper (<code>shakenfist/deploy/shakenfist_ci/retries.py</code>) rather than asserting on the first read, and say which you found in the commit message. Leave the three assertions below it unchanged. Then add a time-to-first-capacity-row figure to <code>tools/ci_headroom_report.py</code>: the series already carries <code>cpu_committed_row_present</code> per node per sample, so report the offset from the first sample to the first sample in which every hypervisor in the roster has a row, and report it as absent rather than zero when it never happens. Print it; never gate on it (ci-cloud-sizing D15). Extend the tool's unit tests (<code>shakenfist/tests/test_ci_headroom_report.py</code>) with a series where the row never appears and one where it appears immediately.</td>
+</tr>
+<tr>
+<td>1c</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Documentation. <code>docs/operator_guide/scheduler.md</code> describes the unguarded state at <code>:305</code> and <code>:768</code>, and <code>docs/developer_guide/subsystem_internals.md</code> at <code>:248</code>; all three now need to say how long a cluster spends in it and what ends it. State the bound honestly: about a minute after a hypervisor's metrics become visible to the elected node, not "immediately", and note that the wait for those metrics is the larger term and is phase 3's. Mention the forced-pass counter from 1a where the other <code>SCHEDULER_CAPACITY_*</code> metrics are documented. Do not touch <code>AGENTS.md</code> or <code>ARCHITECTURE.md</code>: no convention and no component boundary changes here.</td>
+</tr>
+<tr>
+<td>1d</td>
+<td>low</td>
+<td>haiku</td>
+<td>none</td>
+<td>Comment on #4087 and close it. The comment states what #4106 did fix (the missing-stamp case, and the MariaDB-outlived-its-nodes case), what it did not (the one-shot fires on the election path, before any hypervisor has published metrics, so on a fresh cluster it finds nothing and nothing re-checks -- observed in all six post-#4106 CI runs as a forced pass logging <code>nodes=0 nodes_added=0</code> 130-150 s before the test step), and what this phase changed. Do not reopen anything -- the issue is already open. Link the merged pull request. Wait for the operator's confirmation that 1a-1c have merged before commenting.</td>
+</tr>
+<tr>
+<td>1e</td>
+<td>low</td>
+<td>haiku</td>
+<td>none</td>
+<td>Set the phase 1 row to <code>Complete</code> in the master plan's Execution table and in <code>docs/plans/index.md</code>, update the index arithmetic to <code>1 of 6</code>, then run <code>python3 tools/check-plan-status.py</code>. Only after 1a-1d are reviewed and the operator has confirmed a real CI run shows the time-to-first-capacity-row figure from 1b.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Effort levels</strong>, from cheapest to most thorough:</p>
+<p>The survey corrections that would otherwise have been a step here
+were made in the planning commit, per the note under <em>What the survey
+found</em>.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>low</strong> -- Purely mechanical changes: rename, reformat, add a
-  log line, regenerate generated code. The brief is a complete
-  instruction.</li>
-<li><strong>medium</strong> -- The plan provides enough context to follow a clear
-  brief. The sub-agent may read a few files, but the approach is
-  already decided.</li>
-<li><strong>high</strong> -- Requires reading several files, making judgment
-  calls, or understanding non-obvious invariants. The sub-agent
-  needs to think about edge cases.</li>
-<li><strong>xhigh</strong> -- The setting for hard coding and agentic steps:
-  long-horizon changes, or steps where the sub-agent must both
-  research and implement.</li>
-<li><strong>max</strong> -- Correctness matters more than cost. Expect
-  diminishing returns and occasional overthinking; reserve it for
-  steps where a wrong answer would be expensive to detect.</li>
+<li><strong>The check disagrees with the reconciler and thrashes.</strong> The
+  headline risk, and the reason this phase is planned at high effort.
+  A node that satisfies the check but which the reconciler declines
+  to size makes the five-minute job run every 60 s for the life of
+  the cluster, which is a permanent load regression that no test
+  would catch. <em>Mitigation:</em> D2 mirrors the predicate and imports the
+  reconciler's own freshness constant; D3 bounds the blast radius to
+  one forced pass per distinct set even if the mirror is imperfect;
+  1a's test list includes the phantom case explicitly and requires
+  that removing the intersection makes it fail; D5's counter makes
+  the condition visible in production. The management session checks
+  the counter against a real run before 1e closes the phase.</li>
+<li><strong>Deleting the election-time call loses a case nobody enumerated.</strong>
+  D4's reasoning depends on <code>last_loop_run</code> being initialised outside
+  the election loop, which is true today (<code>:813</code>) but is not
+  obviously load-bearing to a future reader. <em>Mitigation:</em> 1a is
+  briefed to leave a comment at the initialisation saying the
+  capacity check depends on it. A reviewer who disagrees can keep
+  both call sites at the cost of one extra read per election; say so
+  in review rather than after merge.</li>
+<li><strong>The converted assertion makes CI flakier, not less flaky.</strong> This
+  plan exists because CI is unreliable; adding a hard assertion to a
+  suite that already fails on capacity is a real way to make things
+  worse. <em>Mitigation:</em> D6 requires the implementer to confirm the
+  readiness gate runs first rather than assume it, with a retry
+  fallback if it does not. If the assertion fires on a green run
+  during review, revert it to a skip and treat that as a finding
+  about this phase's fix, not about the test.</li>
+<li><strong>A minute is still too long and nobody notices.</strong> <em>Mitigation:</em>
+  1b's report figure is the measurement, printed on every run, so the
+  question is answerable from any bundle rather than needing another
+  journal dig like the one that produced this plan.</li>
+<li><strong>The phase is mistaken for a fix for #3772.</strong> It is not, and the
+  master plan says so. <em>Mitigation:</em> 1d's comment closes #4087 only;
+  the commit messages say "Related to #3772", never "Fixes".</li>
 </ul>
-<p><strong>Brief for sub-agent:</strong> this is the key field. Write it as if
-briefing a colleague who has never seen the codebase. Include what
-to change, which files to touch, what patterns to follow, and any
-non-obvious constraints.</p>
-<p>A good brief front-loads the research the planner already did, so
-the implementing agent does not repeat it. Instead of "add storage
-functions for the new object", name the functions to add, the file
-they belong in, the existing equivalent to mirror (with line
-numbers), and any registration the change also needs.</p>
-<p>The better the brief, the lower the effort level needed and the
-lighter the model that can succeed.</p>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>The invariants a brief in this plan must carry, because none
-of them is inferable from the code being edited:</p>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Falsifiable, in order:</p>
+<ol>
+<li><code>_force_capacity_reconcile_if_unguarded()</code> forces the reconcile
+   when an active hypervisor with fresh metrics has no capacity row,
+   not only when the table is empty, and is called from the elected
+   loop's maintenance pass rather than from election. The call at
+   <code>main.py:879</code> is gone.</li>
+<li>All five pre-existing tests in <code>ForcedCapacityReconcileTestCase</code>
+   still pass. <em>Two were modified, and this item is not met as
+   written.</em> Both previously reached the real
+   <code>mariadb.get_all_node_metrics()</code>, whose behaviour in a unit test
+   depends on the host: where nothing is configured it raises at once
+   and the check returns on its unknown-answer branch, so
+   <code>test_a_populated_table_leaves_the_cadence_alone</code> was passing
+   without ever reaching the question it names, and
+   <code>test_an_empty_table_forces_the_pass_due</code> was reaching the
+   empty-table branch only by way of that same accident. Both now mock
+   the three reads the check makes. The behaviour they assert is
+   unchanged; what changed is that they now assert it deterministically
+   and offline.</li>
+<li>A test asserts that a hypervisor with fresh metrics which is <em>not</em>
+   in the active node set does not force a pass, and deleting the
+   active-node intersection from the implementation makes that test
+   fail. The second half is the check: run it and confirm, do not
+   assert it from reading.</li>
+<li>A test asserts that the same unguarded set on two consecutive
+   calls forces exactly one pass, and that a changed set forces
+   another.</li>
+<li>No literal <code>900</code> appears in the new code; the freshness bound is
+   <code>mariadb.RECONCILE_METRICS_MAX_AGE_SECONDS</code>.</li>
+<li><code>test_nodes.py</code> contains no <code>skipTest</code> for a missing capacity row,
+   and the assertion that replaced it is either gated by
+   <code>ci_wait_schedulable</code> running earlier in the workflow or wrapped
+   in the suite's retry helper -- the commit message says which.
+   <em>Met by the second branch: the gate does not cover the condition,
+   so the assertion waits. See the amendment under D6.</em></li>
+<li><code>_unguarded_hypervisors()</code> returns <code>None</code> rather than the empty set
+   for a metrics read which returned nothing, and a test fails if it
+   does not. Both transports swallow a failed read into <code>[]</code>, so the
+   empty list is an unknown answer and treating it as an authoritative
+   one would defeat D3.</li>
+<li><code>tools/ci_headroom_report.py</code> prints a time-to-first-capacity-row
+   figure, reports it as absent rather than zero when no sample has
+   every hypervisor covered, distinguishes a bundle which never
+   carried <code>cpu_committed_row_present</code> from one which carried it false,
+   and has unit tests for all three.</li>
+<li>A real CI run on <code>slim-tier</code> shows that figure under 60 s. The
+   operator confirms this from a bundle; it cannot be checked from a
+   worktree.</li>
+<li>No statement in <code>docs/operator_guide/scheduler.md</code> or
+    <code>docs/developer_guide/subsystem_internals.md</code> still implies the
+    unguarded window lasts until the five-minute cadence, and neither
+    claims it is closed immediately.</li>
+<li>
+<h1 id="4087-is-closed-with-a-comment-recording-what-4106-fixed-and">4087 is closed with a comment recording what #4106 fixed and<a class="headerlink" href="#4087-is-closed-with-a-comment-recording-what-4106-fixed-and" title="Permanent link">&para;</a></h1>
+<p>what it did not.</p>
+</li>
+<li><code>python3 tools/check-plan-status.py</code> passes and
+    <code>pre-commit run --all-files</code> passes.</li>
+</ol>
+<h2 id="what-later-phases-inherit">What later phases inherit<a class="headerlink" href="#what-later-phases-inherit" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Placement transactions open with a guarded <code>UPDATE</code>, never a
-  <code>SELECT</code> (the snapshot-isolation invariant, <code>AGENTS.md</code>).
-  No phase here touches one, and a brief should say so
-  explicitly so a sub-agent does not "improve" one in passing.</li>
-<li>Attribute writes carry a field mask (<code>CLAUDE.md</code>, common
-  pitfall 3).</li>
-<li>Any new suite-side or daemon-side polling is declared in
-  <code>shakenfist/data/database_load_budget.yaml</code> or
-  <code>HARNESS_DRIVEN_PAIRS</code>, with prose naming the producer, or
-  <code>test_no_unbudgeted_fixed_rate_database_polling</code> will fail
-  the next merge group (#3975, #4028).</li>
-<li>The reconcile pass stays behind <code>cluster_stable()</code>.</li>
-<li>The <code>409</code> affinity refusal is never retried.</li>
+<li>A cluster whose capacity rows exist within about a minute of a
+  hypervisor publishing metrics, so phase 5's measurement of how long
+  the suite waits is not polluted by unguarded admissions.</li>
+<li>A printed per-run figure for how long the window actually was, so
+  phase 3's effect on the dominant term is measurable against a
+  before-and-after rather than argued.</li>
+<li>A forced-pass counter, which phase 3 should watch: publishing
+  metrics on domain-set change will make hypervisors appear to the
+  reconciler sooner, and this counter is where that shows up.</li>
+<li>The knowledge that the reconciler's qualifying predicate has four
+  clauses and that mirroring three of them is a permanent load
+  regression, recorded here so the next person to write a
+  capacity-adjacent check does not rediscover it.</li>
 </ul>
-</div>
-<h3 id="model-choice">Model choice<a class="headerlink" href="#model-choice" title="Permanent link">&para;</a></h3>
-<!-- shared-block: subagent-model-roster v1 -->
-<p>Sub-agent model roster (shared block; do not edit -- the canonical
-copy lives in shakenfist/development at
-<code>templates/shared-blocks/subagent-model-roster.md</code>):</p>
-<p>The planner recommends which model is best suited to each step.
-This is a judgment call, not a rigid rule -- the right model
-depends on what the step requires, not on whether it is "planning"
-or "implementation". The models available to sub-agents are:</p>
-<ul>
-<li><strong>fable</strong> -- The most capable model available, for the hardest
-  reasoning and the longest-horizon work: multi-step changes a
-  single sub-agent must carry end to end, or steps whose
-  correctness depends on holding a whole subsystem in mind at
-  once. It costs materially more than opus, so reserve it for
-  steps that have already defeated opus or are expected to.</li>
-<li><strong>opus</strong> -- The default for steps needing deep reasoning,
-  architectural understanding, subtle correctness judgment
-  (locking, state machines, migrations), or intricate
-  implementation that would be costly to debug if it were wrong.</li>
-<li><strong>sonnet</strong> -- A good default for well-briefed implementation
-  work. Faster and cheaper than opus, and effective when the plan
-  front-loads the research and the brief leaves no broad judgment
-  calls to make.</li>
-<li><strong>haiku</strong> -- Suitable for purely mechanical tasks:
-  search-and-replace, regenerating generated code, adding log
-  lines, running commands. The brief must be a near-complete
-  instruction.</li>
-</ul>
-<p>Model choice interacts with effort level and brief quality. A
-detailed brief compensates for a lighter model -- sonnet at medium
-effort with a thorough brief often matches opus at medium effort
-with a vague brief. The planner's job is to write briefs good
-enough that the recommended model can succeed.</p>
-<p>The model also determines the context window: fable, opus and
-sonnet have 1M tokens, haiku has 200K. A step that must hold many
-files in context at once may need one of the larger-context models
-for that reason alone, even when the reasoning itself is
-straightforward.</p>
-<p><strong>When in doubt, skew to the more capable model.</strong> Saving money
-only matters if the outcome is still acceptable. A failed or
-low-quality implementation wastes more time -- and therefore more
-money -- than the heavier model would have cost. Recommend a
-lighter model only when you are confident the brief is detailed
-enough for it to succeed.</p>
-<!-- shared-block-end -->
-
-<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<!-- shared-block: plan-review-checklist v1 -->
-<p>Management session review checklist (shared block; do not edit --
-the canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-review-checklist.md</code>):</p>
-<p>After a sub-agent completes, the management session verifies:</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The files that were supposed to change actually changed --
-      read them, do not trust the summary.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No unrelated files were modified.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The changes match the intent of the brief: not merely
-      syntactically correct, but semantically right.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The project's own pre-merge checks pass, including any
-      generated code that has to be regenerated and committed
-      (see the project-specific checks below).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The commit message follows project conventions, including
-      the <code>Co-Authored-By</code> line recording model, context window,
-      and effort level.</li>
-</ul>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>The project-specific checks referred to above are:</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The code passes <code>pre-commit run --all-files</code> (flake8,
-      stestr unit tests, mypy).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>python3 tools/check-plan-status.py</code> passes after any
-      edit to a plan or to <code>docs/plans/index.md</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A change that adds polling has its budget entry, and
-      <code>test_no_unbudgeted_fixed_rate_database_polling</code> has
-      been reasoned about, not merely run.</li>
-</ul>
-</div>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
-<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
-<p>We will know when this plan has been successfully implemented
-because the following statements will be true:</p>
-<ul>
-<li>In every merge-run bundle, every hypervisor has a capacity row
-  before the run's first <code>instance placed</code> event, and no first
-  reconcile pass records a <code>drift_cpus</code> above zero.</li>
-<li>A node's published <code>cpu_total_instance_vcpus</code> falls within ten
-  seconds of its last instance being undefined.</li>
-<li>No functional test fails with <code>507 sufficient_idle_cpu</code> at
-  <code>create_instance</code>; a test that waits for capacity records how
-  long, and the run's summary reports it.</li>
-<li><code>POST /instances</code> refusals for capacity carry <code>Retry-After</code>,
-  <code>stage</code> and <code>transient: true</code>, and <code>shakenfist_client</code> can be
-  told to honour them.</li>
-<li>The decision on server-side queued placement is written down in
-  the phase 5 file with the data it was made from, whichever way
-  it went.</li>
-<li>The <code>Debian 12 tier</code> job's pass rate is comparable to the other
-  cluster jobs, and its remaining failures are not
-  <code>sufficient_idle_cpu</code>.</li>
-<li>The code passes <code>pre-commit run --all-files</code> (flake8, stestr
-  unit tests, and mypy type checking).</li>
-<li>Lines are wrapped at 120 characters, single quotes for strings,
-  double quotes for docstrings.</li>
-<li>Documentation in <code>docs/</code> has been updated. <code>ARCHITECTURE.md</code>
-  and <code>AGENTS.md</code> are updated only if a convention or the shape
-  of the system changed; a transient-refusal contract is an
-  operator-guide and API-reference matter.</li>
-</ul>
-<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
-<p>This plan is registered in <code>docs/plans/index.md</code> (one row, in the
-<em>Master plans</em> table) and in <code>docs/plans/order.yml</code>. Phase files
-are linked from the Execution table above and appear in neither,
-which is what <code>tools/check-plan-status.py</code> enforces.</p>
-<!-- shared-block: plan-closeout-sections v1 -->
-<p>Plan close-out sections (shared block; do not edit -- the
-canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-closeout-sections.md</code>):</p>
-<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<p>We should list obvious extensions, known issues, unrelated bugs we
-encountered, and anything else we should one day do but have
-chosen to defer to here, so that we do not forget them.</p>
-<ul>
-<li><strong>Stop re-scheduling an already-charged placement.</strong>
-  <code>NodeInstNetdescOp._instance_preflight()</code>
-  (<code>shakenfist/operations/node_inst_netdesc_op.py:156-162</code>)
-  constructs a fresh <code>Scheduler</code> -- a full <code>refresh_metrics()</code>,
-  one <code>get_node_metrics</code> RPC per node -- and re-runs
-  <code>find_candidates(inst, candidates=[config.NODE_UUID])</code> for an
-  instance the API already admitted on this node. The ledger term
-  cannot refuse it (the self-charge is subtracted), but the
-  60-second-old <code>measured_cpus</code> can, and when it does the op
-  redirects to another node and re-enqueues the artifact fetches.
-  Replacing that with "is my placement still recorded here and is
-  the node healthy" removes a distinct CI failure family (<code>Too
-  many start attempts</code>) and halves per-create scheduler load. Not
-  a 507 cause, so not in this plan.</li>
-<li><strong>Suite concurrency denominated in ledger.</strong> The sizing plan's
-  Future work already records this; phase 2's wait summary is the
-  measurement that would justify it.</li>
-<li><strong>The queue-depth stage.</strong> <code>_has_reasonable_queue_state</code>
-  refuses any node with more than twenty waiting jobs. Under
-  suite concurrency queue depth is exactly what spikes; it did not
-  fire in the runs read here but it is untracked and worth a
-  census line.</li>
-<li><strong>Every refused create is a full create-and-delete.</strong>
-  <code>enqueue_delete_due_error</code> at the 507 site means each refusal
-  costs an object, IPAM allocations, an event trail and a delete
-  op, at the moment the cluster is busiest. Phase 5's queue, if it
-  is built, removes this; if it is not, the cost stands and should
-  be measured.</li>
-</ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>This section should list any bugs we encounter during development
-that we fixed. You should also scan the project's issue tracker,
-where one exists, for directly related issues that we should
-either resolve as part of this master plan or at least be aware of
-while planning it.</p>
-<ul>
-<li><strong>#3772</strong> (open, umbrella) -- the refusal this plan is about.
-  Stays open until phase 6 has the before-and-after numbers.</li>
-<li><strong>#4087</strong> (open; #4106 attempted it and did not close it) -- the
-  warm-up window. Phase 1 fixes it, comments with what #4106 did and
-  did not cover, and closes it.</li>
-<li><strong>#3498, #3602, #3670, #3728, #3749, #3767</strong> (closed into #3772)
-  -- the per-test victims. Do not file another; the umbrella exists
-  because per-test tracking stopped paying for itself.</li>
-<li><strong>#3907, #3565</strong> (closed test-side) -- precedents for tolerating
-  a transient refusal in the suite; phase 2 generalises what they
-  did once.</li>
-<li><strong>#3975, #4028</strong> (closed) -- the headroom probe failing the
-  load-budget check. The obligation they left is why phase 2 and
-  phase 3 each carry a budget declaration.</li>
-<li><strong>#1364</strong> (open) -- lame-duck and evacuate. Where node-scoped
-  reservations would earn their place; see open question 5.</li>
-</ul>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
-<p>Before executing any step of this plan, please back brief the
-operator as to your understanding of the plan and how the work you
-intend to do aligns with that plan.</p>
-<!-- shared-block-end -->
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step of this plan, back brief the operator on
+your understanding of it: what you are about to change, which
+decision you think is weakest, and what you expect to be true when
+you are done. Do not begin until that is acknowledged.</p>
+<p>There is one gate inside the phase. Step 1a's treatment of D2 and D3
+is cheap to propose and expensive to redo, because getting the
+predicate wrong is invisible until it is running in production.
+Before writing the tests, state the exact predicate you intend to
+implement -- clause by clause, against
+<code>_direct_reconcile_scheduler_capacity()</code> -- and have it agreed. If
+your reading of the reconciler differs from finding 5 in any
+respect, stop and say so: the finding is what the rest of this plan
+is built on.</p>
 
 
 
@@ -14960,7 +14317,7 @@ intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-transient-capacity-refusals.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-transient-capacity-refusals.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-transient-capacity-refusals/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-transient-capacity-refusals-phase-01-warm-up.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-transient-capacity-refusals-phase-01-warm-up.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-transient-capacity-refusals-phase-01-warm-up/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

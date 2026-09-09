@@ -15975,7 +15975,9 @@ for why a <code>SELECT</code> ahead of the <code>UPDATE</code> reintroduces ER_C
 <p>Operator-facing observability is the <code>scheduler_capacity_*</code> family of
 prometheus metrics (per-node limit/used/expected-demand gauges, cluster-row
 gauges, and reconcile pass/failure counters, last-success timestamp and
-duration) exported from the cluster daemon's metrics port
+duration, plus <code>scheduler_capacity_reconcile_forced_total</code> counting
+passes the elected node forced because a hypervisor had no capacity
+row) exported from the cluster daemon's metrics port
 (<code>CLUSTER_METRICS_PORT</code>, default <code>13007</code>), plus one structured log line
 per reconcile pass.</p>
 <p>Disk capacity is claimed at virtual size, which the phase 0 step 3

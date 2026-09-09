@@ -14467,12 +14467,18 @@ it is already placed on, and a node with no capacity row -- one
 mid-upgrade, or one the reconciler declined to size -- is charged
 nothing, because admission will let it through unguarded too. That
 is also true of a cluster whose reconciler has not completed a pass
-yet, where <em>no</em> node has a row; the reconcile is scheduled so that
-window is a cluster's first moments rather than its first five
-minutes (see <a href="../../developer_guide/database_internals/">the database internals
-guide</a>), and an admission
-made inside it says so on the instance's <code>instance placed without
-capacity guard</code> event with a <code>reason</code> of <code>never_reconciled</code>.</p>
+yet, where <em>no</em> node has a row: the elected cluster node's
+maintenance pass forces a reconcile as soon as it sees an active
+hypervisor with fresh metrics and no capacity row, so that window
+closes roughly a minute after the hypervisor's metrics become visible
+rather than waiting out the reconciler's five-minute cadence (see
+<a href="../../developer_guide/database_internals/">the database internals
+guide</a>). That minute is not
+the dominant term -- most of the wait is for the resources daemon to
+publish metrics at all, on its own roughly 60-second cadence, which
+this does not shorten -- and an admission made inside either window
+says so on the instance's <code>instance placed without capacity guard</code>
+event with a <code>reason</code> of <code>never_reconciled</code>.</p>
 <p>See <a href="#admission-is-a-guarded-capacity-claim">Admission is a guarded capacity
 claim</a> for the check that
 actually admits or refuses a placement, and closes the burst window
@@ -14926,10 +14932,14 @@ tells the whole story:</p>
   MariaDB, which the reply reports back on its <code>degraded</code> field. It is
   <em>not</em> emitted for an empty table: a cluster the reconciler has not
   reached yet has no rows at all, which is normal and admits
-  unguarded. Admission is unchanged either way, so this marks a
-  decision made with less information rather than a decision made
-  differently. Seeing it repeatedly points at the database tier rather
-  than at the scheduler.</li>
+  unguarded -- and self-limiting, since the elected node forces a
+  reconcile within about a minute of an active hypervisor's metrics
+  becoming visible (see <a href="#admission-is-a-guarded-capacity-claim">Admission is a guarded capacity
+  claim</a> above). Admission is
+  unchanged either way, so this marks a decision made with less
+  information rather than a decision made differently. Seeing it
+  repeatedly points at the database tier rather than at the
+  scheduler.</li>
 <li><code>schedule at stage affinity_constraints</code> is the hard constraint
   filter, with a <code>dropped</code> map naming which of <code>require_with_tag</code> or
   <code>require_without_tag</code> ejected each node. It is absent when no hard
