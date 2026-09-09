@@ -14174,7 +14174,7 @@ checker's blind spot, and the only numbers here it cannot recompute.</p>
 <tr>
 <td>2026-08-27</td>
 <td><a href="PLAN-ci-cloud-sizing/">Right-size the CI test clouds</a></td>
-<td>Measured sizing for the nested CI clouds, with headroom instrumentation and explicit saturation coverage before any cloud grows. The instrument now runs in every cluster job, and its first readings show the cluster-wide utilisation figure the plan was written against can be half the per-node figure the scheduler actually admits against</td>
+<td>Measured sizing for the nested CI clouds, with headroom instrumentation and explicit saturation coverage before any cloud grows. The instrument now runs in every cluster job, and its first readings show the cluster-wide utilisation figure the plan was written against can be half the per-node figure the scheduler actually admits against. Phase 3 turns that reading into a design constraint: its survey found the suite has no serialisation seam, so the saturation test the plan asked for fills one hypervisor rather than the cluster, and proves the refusal contract with a request no cluster could satisfy</td>
 <td>In progress</td>
 <td>3 of 7</td>
 </tr>

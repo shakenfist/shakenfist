@@ -15325,8 +15325,8 @@ superseded.</p>
 </tr>
 <tr>
 <td>3. Explicit saturation coverage, so that growing a cloud cannot silence a defect</td>
-<td>PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-ci-cloud-sizing-phase-03-saturation-coverage/">PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md</a></td>
+<td>In progress</td>
 </tr>
 <tr>
 <td>4. Re-shape the topologies against the phase 2 data</td>
@@ -15414,14 +15414,32 @@ Its headline findings, including the ones that corrected this
 plan's expectations, are recorded in the phase 2 plan.</p>
 <h3 id="phase-3-explicit-saturation-coverage">Phase 3 -- Explicit saturation coverage<a class="headerlink" href="#phase-3-explicit-saturation-coverage" title="Permanent link">&para;</a></h3>
 <p><strong>Gate on this phase before phase 4.</strong> Convert the scarcity
-coverage we get by accident into coverage we get on purpose: a
-functional test that deliberately fills a cluster to its ledger
-and asserts the documented behaviour at the boundary, and issues
-filed for every signature phase 0 classified as a defect. Where
-the documented behaviour is itself wrong -- #3772 argues a bare
-507 is the wrong answer to a transient condition -- the test
-asserts what the system does today and the issue records what it
-should do, so growing the clouds cannot quietly close it.</p>
+coverage we get by accident into coverage we get on purpose:
+tests that reach each capacity refusal stage deliberately and
+assert the behaviour at the boundary, and issues filed for every
+signature phase 0 classified as a defect. Growing the clouds must
+not be able to close a defect quietly.</p>
+<p>Phase 3's planning survey changed two things this section said in
+August, and both are recorded in
+<a href="../PLAN-ci-cloud-sizing-phase-03-saturation-coverage/">its plan</a>:</p>
+<ul>
+<li>This section said the test would <em>fill a cluster to its ledger</em>.
+  It fills <strong>one hypervisor</strong> instead (D23), and proves the
+  refusal contract with a request no cluster could satisfy (D24).
+  The suite runs five stestr workers against one cluster with no
+  serialisation seam, so a test which fills the cluster starves
+  the other four and manufactures the exact <code>507</code> signature this
+  plan exists to make deliberate -- and on <code>slim-tier</code>, which
+  phase 2 measured at or above a node's ledger ceiling in 100% of
+  job-runs, "the cluster's remaining ledger" is not a quantity a
+  test can name.</li>
+<li>This section said the <em>issue</em> records what the behaviour should
+  be, naming #3772. That issue closed on 2026-09-09, and the
+  record now lives in
+  <a href="../PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals.md</a>
+  -- a sibling plan which owns making a capacity refusal
+  transient, and which this plan deliberately does not touch.</li>
+</ul>
 <h3 id="phase-4-re-shape-the-topologies">Phase 4 -- Re-shape the topologies<a class="headerlink" href="#phase-4-re-shape-the-topologies" title="Permanent link">&para;</a></h3>
 <p>Apply the phase 2 decision to <code>ci-topology-slim-primary.yml</code> and
 <code>ci-topology-slim-tier.yml</code> (and the <code>-released</code> variants), keeping
@@ -15773,9 +15791,8 @@ which is what <code>tools/check-plan-status.py</code> enforces.</p>
   <code>shakenfist/actions</code>, and the second is the event that actually
   says "the cluster refused this create at the guard". Deliberately
   not done in phase 2, which had already re-measured once and must
-  not become a rolling measurement window; phase 3 wants it, because
-  a saturation test asserting guard behaviour needs to observe the
-  outcome and not only the denial.</li>
+  not become a rolling measurement window. <strong>Phase 3 owns it, as its
+  D29.</strong></li>
 <li><strong>Instrument the two cluster jobs the probe cannot see.</strong> Phase
   2's D17 found that only four of the six clouds a merge run builds
   carry the phase 1 probe, for two different reasons. <code>Ansible
