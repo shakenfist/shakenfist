@@ -185,7 +185,7 @@ already defaulted to `develop`.
 | 2. Reconcile the scope lists | Complete | 8b77b32 |
 | 3. Lift the scope parsing into `audit/scope.py` | Complete | 8b77b32 |
 | 4. Add the `scope-coverage` check | Complete | 8b77b32 |
-| 5. Push audit | In progress | |
+| 5. Push audit | Complete | c24636a, 0759e46 |
 
 Phases 2 to 4 shipped as a single pull request, so the `Merged`
 record is the same merge commit for all three: `8b77b32`, the merge
@@ -194,6 +194,18 @@ parent is the whole of this plan's work. That record was
 reconstructed in phase 5 rather than written as the phases landed;
 it comes from `gh pr view 93`, not from a path-filtered `git log`,
 which cannot say which commits arrived under a merge.
+
+Phase 5 landed across two pull requests, and the `Merged` cell
+records both because a later audit of this plan needs both ranges.
+`c24636a` is the merge of pull request 106 on 2026-09-08, carrying
+the four fixes the audit found; `0759e46` is the merge of pull
+request 107 the same day, carrying the plan record and 5a's
+correction to `PUSH-AUDIT.md`. The split is the shared block's rule
+that findings land as their own pull request against `main` rather
+than on the audit branch. Setting the two status cells could not
+ride in either merge, since both merges are what those cells
+attest to, so the closeout is a third pull request that changes
+nothing else.
 
 ### 1. `develop` branches for the onboarding repositories
 
