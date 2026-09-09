@@ -346,22 +346,48 @@ capacity counters, namespace claims, and a reconciler
 instead, and the batch-create phase is deferred out of the
 table entirely (decision D8).
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 00a. Load-aware ordering and system reservations (static quick wins) | [PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md) | Complete |
-| 0. Research and decisions document | [PLAN-scheduler-reservations-phase-00-decisions.md](PLAN-scheduler-reservations-phase-00-decisions.md) | Complete |
-| 1. Promote node capacity fields to typed columns | [PLAN-scheduler-reservations-phase-01-node-metrics-columns.md](PLAN-scheduler-reservations-phase-01-node-metrics-columns.md) | Complete |
-| 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete |
-| 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete |
-| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete |
-| 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete |
-| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete |
-| 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete |
-| 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started |
-| 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete |
-| 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete |
-| 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started |
-| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 00a. Load-aware ordering and system reservations (static quick wins) | [PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md](PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md) | Complete | `113e4efb5` (#3436), `c27ad9bf2` (#3930), `2fcfe8afc` (#3956) |
+| 0. Research and decisions document | [PLAN-scheduler-reservations-phase-00-decisions.md](PLAN-scheduler-reservations-phase-00-decisions.md) | Complete | `87a58a81e` (#3566), `a16d32aec` (#3731), `b93539322` (#3783) |
+| 1. Promote node capacity fields to typed columns | [PLAN-scheduler-reservations-phase-01-node-metrics-columns.md](PLAN-scheduler-reservations-phase-01-node-metrics-columns.md) | Complete | `80bffad56` (#3578) |
+| 2. Capacity tables, reconciler and migration | [PLAN-scheduler-reservations-phase-02-capacity-tables.md](PLAN-scheduler-reservations-phase-02-capacity-tables.md) | Complete | `d3a91cdef` (#3614) |
+| 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete | `0144e36ed` (#3754), `921573c47` (#3888) |
+| 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete | `7bd7bbd03` (#3790), `921573c47` (#3888) |
+| 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete | `b02ec6e5e` (#3843), `921573c47` (#3888) |
+| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
+| 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
+| 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started | — |
+| 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
+| 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
+| 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
+| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`.
+These entries were reconstructed after the fact, because the
+plan did not record them as its phases landed; they come from
+the repository's merged pull request list cross-checked against
+the first-parent history, and not from a path-filtered
+`git log`, which cannot say which commits arrived inside a
+pull request. Every SHA is the merge commit of the pull request named
+beside it, so `<sha>^1..<sha>` is the whole of what that pull
+request put on `develop`. A phase which has not landed reads
+`—`.
+
+Several phases took more than one pull request, because the
+plan's habit is to land the work and then close the phase out in
+a later documentation change; #3888 closed out phases 3, 4 and
+4a together, so it appears in three rows, and phase 4c took four
+between its first landing and the measurement window closing in
+#4154.
+
+Three defect fixes on this plan's code landed outside its phase
+branches and belong to no phase row: `49e98a67c` (#3722, ranking
+affinity above transient load shedding, issue #3565),
+`45332ff81` (#3918, the claims tests' unreserved-headroom
+assumption, issue #3907) and `a5c621633` (#3937, RAM-aware
+ranking and gating, issue #3636). Phase 9's audit reads them
+alongside the phase merges.
 
 ### Phase status notes
 
