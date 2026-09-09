@@ -959,7 +959,7 @@ those are corrected here as well.
 | 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete |
 | 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete |
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete |
-| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md | Not started |
+| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | In progress |
 | 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started |
 | 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started |
@@ -1048,14 +1048,32 @@ plan's expectations, are recorded in the phase 2 plan.
 ### Phase 3 -- Explicit saturation coverage
 
 **Gate on this phase before phase 4.** Convert the scarcity
-coverage we get by accident into coverage we get on purpose: a
-functional test that deliberately fills a cluster to its ledger
-and asserts the documented behaviour at the boundary, and issues
-filed for every signature phase 0 classified as a defect. Where
-the documented behaviour is itself wrong -- #3772 argues a bare
-507 is the wrong answer to a transient condition -- the test
-asserts what the system does today and the issue records what it
-should do, so growing the clouds cannot quietly close it.
+coverage we get by accident into coverage we get on purpose:
+tests that reach each capacity refusal stage deliberately and
+assert the behaviour at the boundary, and issues filed for every
+signature phase 0 classified as a defect. Growing the clouds must
+not be able to close a defect quietly.
+
+Phase 3's planning survey changed two things this section said in
+August, and both are recorded in
+[its plan](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md):
+
+* This section said the test would *fill a cluster to its ledger*.
+  It fills **one hypervisor** instead (D23), and proves the
+  refusal contract with a request no cluster could satisfy (D24).
+  The suite runs five stestr workers against one cluster with no
+  serialisation seam, so a test which fills the cluster starves
+  the other four and manufactures the exact `507` signature this
+  plan exists to make deliberate -- and on `slim-tier`, which
+  phase 2 measured at or above a node's ledger ceiling in 100% of
+  job-runs, "the cluster's remaining ledger" is not a quantity a
+  test can name.
+* This section said the *issue* records what the behaviour should
+  be, naming #3772. That issue closed on 2026-09-09, and the
+  record now lives in
+  [PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md)
+  -- a sibling plan which owns making a capacity refusal
+  transient, and which this plan deliberately does not touch.
 
 ### Phase 4 -- Re-shape the topologies
 
@@ -1414,9 +1432,8 @@ which is what `tools/check-plan-status.py` enforces.
   `shakenfist/actions`, and the second is the event that actually
   says "the cluster refused this create at the guard". Deliberately
   not done in phase 2, which had already re-measured once and must
-  not become a rolling measurement window; phase 3 wants it, because
-  a saturation test asserting guard behaviour needs to observe the
-  outcome and not only the denial.
+  not become a rolling measurement window. **Phase 3 owns it, as its
+  D29.**
 - **Instrument the two cluster jobs the probe cannot see.** Phase
   2's D17 found that only four of the six clouds a merge run builds
   carry the phase 1 probe, for two different reasons. `Ansible
