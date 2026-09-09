@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-08T10:52:37.746658+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-09T10:59:00.589409+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -658,7 +658,7 @@ Details for non-compliant projects:
 - **divergulent** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md
 - **instar** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)
 - **occystrap** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-quay-label-search.md (no push audit phase; phase 5 is "5. Filter by tag age (since parameter)"); 1 plan(s) with no phases this check can read, not judged: PLAN-info-check.md
-- **shakenfist** (Status): 2 of 17 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-kerbside-vdi-tokens.md (push audit phase is not last, so phase 11 ("11. Close out the post-completion defects (#4003, #4009)") is unaudited; move the audit phase after it); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
+- **shakenfist** (Status): 2 of 17 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-transient-capacity-refusals.md (no push audit phase; phase 6 is "6. Documentation and close-out"); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
 ## plan-index
@@ -1058,7 +1058,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#103 |
+| development | compliant | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
@@ -1075,8 +1075,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 63 of 98 in-scope files reviewed at HEAD; 35 need review (threshold 5)
-- **development** (Status): 161 of 179 in-scope files reviewed at HEAD; 18 need review (threshold 5)
+- **actions** (Status): 71 of 98 in-scope files reviewed at HEAD; 27 need review (threshold 5)
 - **kerbside** (Status): 117 of 229 in-scope files reviewed at HEAD; 112 need review (threshold 5)
 - **ryll** (Status): 83 of 195 in-scope files reviewed at HEAD; 112 need review (threshold 5)
 
@@ -1371,7 +1370,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 
 | Project | flake8wrap | Runners | Static tags | VM size | Permissions | Linting | devpi fallback | devpi IP | Review marks | Issue |
 |---------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
-| actions | N/A | non-compliant | compliant | compliant | compliant | compliant | N/A | compliant | compliant | shakenfist/actions#57 |
+| actions | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | compliant | - |
 | agent-python | non-compliant | non-compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/agent-python#105, shakenfist/agent-python#130, shakenfist/agent-python#82 |
 | client-python | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/client-python#378 |
 | client-python-k3s | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
@@ -1394,7 +1393,6 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 
 Details for non-compliant projects:
 
-- **actions** (Runners): 1 unmarked GitHub-hosted runner reference(s): issue-link-check.yml:36 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **agent-python** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **agent-python** (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **agent-python** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:25 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
