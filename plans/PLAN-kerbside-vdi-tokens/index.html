@@ -14455,6 +14455,18 @@ and is the authoritative list of what this plan actually merged:</p>
 <td><code>f2df423d8</code></td>
 </tr>
 <tr>
+<td>shakenfist</td>
+<td>10 (audit, its three medium fixes, the <code>.vv</code> functional test)</td>
+<td>#4099</td>
+<td><code>2d585cd1a</code></td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>10 closeout (docs)</td>
+<td>#4137</td>
+<td><code>ccc1b5ff2</code></td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>4</td>
 <td>#350</td>
@@ -14479,13 +14491,46 @@ and is the authoritative list of what this plan actually merged:</p>
 <td><code>7803368</code></td>
 </tr>
 <tr>
+<td>kerbside</td>
+<td>10 (F-B1 part 1: a key fetch no longer errors the source)</td>
+<td>#412</td>
+<td><code>e2a493ea6</code></td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>10 (F-B1 part 2: cleanup narrowed to enumerated sources)</td>
+<td>#413</td>
+<td><code>29323fb85</code></td>
+</tr>
+<tr>
 <td>ryll</td>
 <td>3</td>
 <td>#190</td>
 <td><code>fa7ee21</code></td>
 </tr>
+<tr>
+<td>ryll</td>
+<td>10 (F8: SPICE TLS trust anchors)</td>
+<td>#358</td>
+<td><code>aac25cf3c</code></td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>10 follow-up (redundant <code>app.js</code> test assertion removed)</td>
+<td>#366</td>
+<td><code>0113f0ff7</code></td>
+</tr>
 </tbody>
 </table>
+<p>Rows are grouped by repository and ordered by merge within each, which
+is why phase 10 trails phase 11 in the Shaken Fist block: the
+post-completion defects were fixed before the audit ran. Phase 10
+appears six times because the audit did not merge as one change. Its
+findings were fixed in whichever repository owned them, and the
+blocking one took two attempts. The fourteen advisory findings are
+deliberately <em>not</em> rows here -- they were filed as issues in their own
+repositories and land on their own schedule, so a list would go stale.
+Follow those from the disposition table in phase 10's plan.</p>
 <h3 id="phase-0-decisions-and-token-format">Phase 0: Decisions and token format<a class="headerlink" href="#phase-0-decisions-and-token-format" title="Permanent link">&para;</a></h3>
 <p>Settle the Open questions above and write the token format
 down as a short normative spec (claims, algorithm, key
