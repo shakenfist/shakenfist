@@ -184,12 +184,18 @@ report per-operation outcomes from the chain on failure.
 
 ## Phases (to be re-cut by phase 0)
 
-| Phase | Content |
-|-------|---------|
-| 0 | Resolve open questions; record decisions; re-cut this table |
-| 1 | Schema and object: dependency fields on `AgentOperation`, `AGENTOPERATION` admitted to the dependency model, API parameters |
-| 2 | Dispatch evaluation: same-instance edges, cascade, settle attribute |
-| 3 | Cross-instance edges and namespace enforcement |
-| 4 | client-python: chain submission helpers, await-the-chain UX, failure reporting |
-| 5 | Documentation: developer-guide agent operation model, worked examples; `client-python-k3s` adopts dependencies (rolling update via one submitted chain) as the first example application |
-| 6 | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
+| Phase | Content | Merged |
+|-------|---------|--------|
+| 0 | Resolve open questions; record decisions; re-cut this table | — |
+| 1 | Schema and object: dependency fields on `AgentOperation`, `AGENTOPERATION` admitted to the dependency model, API parameters | — |
+| 2 | Dispatch evaluation: same-instance edges, cascade, settle attribute | — |
+| 3 | Cross-instance edges and namespace enforcement | — |
+| 4 | client-python: chain submission helpers, await-the-chain UX, failure reporting | — |
+| 5 | Documentation: developer-guide agent operation model, worked examples; `client-python-k3s` adopts dependencies (rolling update via one submitted chain) as the first example application | — |
+| 6 | Push audit: runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. Nothing in
+this plan has landed, so every cell reads `—`; phase 0 re-cuts
+this table and the column comes with it.

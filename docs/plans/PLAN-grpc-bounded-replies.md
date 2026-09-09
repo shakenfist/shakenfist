@@ -230,15 +230,20 @@ trustworthy first.
 
 ## Execution
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Decisions: mechanism per RPC class, caller taxonomy, bound policy | PLAN-grpc-bounded-replies-phase-00-decisions.md | Not started |
-| 1. Audit and measure: classify every `repeated` reply field and every caller; add a server-side reply-size histogram | PLAN-grpc-bounded-replies-phase-01-audit.md | Not started |
-| 2. Bounded by construction: convert sweep-style callers to explicit "next N, oldest first" queries with an explicit more-available signal | PLAN-grpc-bounded-replies-phase-02-sweeps.md | Not started |
-| 3. The general mechanism for genuinely unbounded reads (`GetObjectEvents`, `GetObjectsByState`, the `Get*Uuids` family) | PLAN-grpc-bounded-replies-phase-03-mechanism.md | Not started |
-| 4. Enforcement: CI fails when a new unbounded `repeated` reply field appears unregistered | PLAN-grpc-bounded-replies-phase-04-enforcement.md | Not started |
-| 5. Lower the client cap, retire the stopgaps, document the contract | PLAN-grpc-bounded-replies-phase-05-closeout.md | Not started |
-| 6. Push audit | PLAN-grpc-bounded-replies-phase-06-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Decisions: mechanism per RPC class, caller taxonomy, bound policy | PLAN-grpc-bounded-replies-phase-00-decisions.md | Not started | — |
+| 1. Audit and measure: classify every `repeated` reply field and every caller; add a server-side reply-size histogram | PLAN-grpc-bounded-replies-phase-01-audit.md | Not started | — |
+| 2. Bounded by construction: convert sweep-style callers to explicit "next N, oldest first" queries with an explicit more-available signal | PLAN-grpc-bounded-replies-phase-02-sweeps.md | Not started | — |
+| 3. The general mechanism for genuinely unbounded reads (`GetObjectEvents`, `GetObjectsByState`, the `Get*Uuids` family) | PLAN-grpc-bounded-replies-phase-03-mechanism.md | Not started | — |
+| 4. Enforcement: CI fails when a new unbounded `repeated` reply field appears unregistered | PLAN-grpc-bounded-replies-phase-04-enforcement.md | Not started | — |
+| 5. Lower the client cap, retire the stopgaps, document the contract | PLAN-grpc-bounded-replies-phase-05-closeout.md | Not started | — |
+| 6. Push audit | PLAN-grpc-bounded-replies-phase-06-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`: the merge
+commit of its pull request, or an explicit `first..last` range where the
+phase landed directly. It is filled in as each phase lands, so `—` means
+the phase has not landed yet.
 
 Named for phase 1's audit scope, so they are not rediscovered one
 review round at a time: `_direct_get_expired_blob_uuids()` and

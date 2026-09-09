@@ -396,16 +396,22 @@ rules. Phase 0 picks between the two nftables options.
 
 Provisional. Phase 0 may re-cut the phase table.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Research and decisions document | PLAN-replace-exec-with-netlink-phase-00-decisions.md | Not started |
-| 1. Introduce `pyroute2` dependency; port `ip link / addr / route / neigh` operations | PLAN-replace-exec-with-netlink-phase-01-rtnetlink.md | Not started |
-| 2. Port bridge management off `brctl` via `IFLA_BR_*` | PLAN-replace-exec-with-netlink-phase-02-bridges.md | Not started |
-| 3. Port iptables rules to nftables via netlink, table by table | PLAN-replace-exec-with-netlink-phase-03-nftables.md | Not started |
-| 4. Stand up `sf-net-privexec` with a typed network API; net-worker becomes its only client | PLAN-replace-exec-with-netlink-phase-04-net-privexec.md | Not started |
-| 5. Drop `CAP_NET_ADMIN` from `sf-privexec`; remove the network RPCs from its surface | PLAN-replace-exec-with-netlink-phase-05-privexec-shrink.md | Not started |
-| 6. Close out the `sf-net` direct-exec sites and the remaining narrow corners (sysctl, arping) | PLAN-replace-exec-with-netlink-phase-06-cleanup.md | Not started |
-| 7. Push audit | PLAN-replace-exec-with-netlink-phase-07-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Research and decisions document | PLAN-replace-exec-with-netlink-phase-00-decisions.md | Not started | — |
+| 1. Introduce `pyroute2` dependency; port `ip link / addr / route / neigh` operations | PLAN-replace-exec-with-netlink-phase-01-rtnetlink.md | Not started | — |
+| 2. Port bridge management off `brctl` via `IFLA_BR_*` | PLAN-replace-exec-with-netlink-phase-02-bridges.md | Not started | — |
+| 3. Port iptables rules to nftables via netlink, table by table | PLAN-replace-exec-with-netlink-phase-03-nftables.md | Not started | — |
+| 4. Stand up `sf-net-privexec` with a typed network API; net-worker becomes its only client | PLAN-replace-exec-with-netlink-phase-04-net-privexec.md | Not started | — |
+| 5. Drop `CAP_NET_ADMIN` from `sf-privexec`; remove the network RPCs from its surface | PLAN-replace-exec-with-netlink-phase-05-privexec-shrink.md | Not started | — |
+| 6. Close out the `sf-net` direct-exec sites and the remaining narrow corners (sysctl, arping) | PLAN-replace-exec-with-netlink-phase-06-cleanup.md | Not started | — |
+| 7. Push audit | PLAN-replace-exec-with-netlink-phase-07-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 Notes on sequencing:
 

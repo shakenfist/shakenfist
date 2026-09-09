@@ -247,10 +247,15 @@ before any implementation phase is cut:
 > 7. Listing/events reliability cleanup (#1974, #1283).
 > 8. Docs, CI (incl. `sf-client`-driven tests, #540), and client-python sync.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Decisions pass | _to be created_ | Not started |
-| (later phases) | _to be created_ | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Decisions pass | _to be created_ | Not started | — |
+| (later phases) | _to be created_ | Not started | — |
+
+The `Merged` column records what put each phase on `develop`: the merge commit
+of its pull request, or an explicit `first..last` range where the phase landed
+directly. It is filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 ### Push audit
 
