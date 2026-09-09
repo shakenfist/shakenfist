@@ -287,16 +287,28 @@ so the phase plans do not reopen them:
 
 ## Execution
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. Stop the idle-loop polls | [PLAN-database-load-reduction-phase-01-idle-loop.md](PLAN-database-load-reduction-phase-01-idle-loop.md) | Complete |
-| 2. Static object value caching | [PLAN-database-load-reduction-phase-02-static-cache.md](PLAN-database-load-reduction-phase-02-static-cache.md) | Complete |
-| 3. Consolidate the gRPC client stacks | [PLAN-database-load-reduction-phase-03-client-consolidation.md](PLAN-database-load-reduction-phase-03-client-consolidation.md) | Complete |
-| 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete |
-| 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete |
-| 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Complete |
-| 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Complete |
-| 8. Push audit | [PLAN-database-load-reduction-phase-08-push-audit.md](PLAN-database-load-reduction-phase-08-push-audit.md) | Complete |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Stop the idle-loop polls | [PLAN-database-load-reduction-phase-01-idle-loop.md](PLAN-database-load-reduction-phase-01-idle-loop.md) | Complete | `dcd3b32b1` (#3466) |
+| 2. Static object value caching | [PLAN-database-load-reduction-phase-02-static-cache.md](PLAN-database-load-reduction-phase-02-static-cache.md) | Complete | `926060406` (#3473) |
+| 3. Consolidate the gRPC client stacks | [PLAN-database-load-reduction-phase-03-client-consolidation.md](PLAN-database-load-reduction-phase-03-client-consolidation.md) | Complete | `dcd3b32b1` (#3466) |
+| 4. Caller attribution on counters | [PLAN-database-load-reduction-phase-04-attribution.md](PLAN-database-load-reduction-phase-04-attribution.md) | Complete | `926060406` (#3473) |
+| 5. Next-tier reductions | [PLAN-database-load-reduction-phase-05-next-tier.md](PLAN-database-load-reduction-phase-05-next-tier.md) | Complete | `706f8db81` (#3504), `ff259930d` (#3506), `c64ef3afe` (#3508), `6e2948ee9` (#3509) |
+| 6. Residual load and the regression | [PLAN-database-load-reduction-phase-06-residual-load.md](PLAN-database-load-reduction-phase-06-residual-load.md) | Complete | `89d4ec294` (#3818), `19f6783d4` (#3825), `accea7f20` (#3877) |
+| 7. Deployer-visible regression detection | [PLAN-database-load-reduction-phase-07-regression-detection.md](PLAN-database-load-reduction-phase-07-regression-detection.md) | Complete | `5af155827` (#3893) |
+| 8. Push audit | [PLAN-database-load-reduction-phase-08-push-audit.md](PLAN-database-load-reduction-phase-08-push-audit.md) | Complete | `c45f14c2f` (#3950), `d76ac9b77` (#3969) |
+
+The `Merged` column records what put each phase on `develop`.
+These entries were reconstructed after the fact, because the
+plan did not record them as its phases landed. The merges come
+from phase 8's own decision 1 table, which the audit built
+from the merged pull request list and the first-parent history
+rather than from a path-filtered `git log`; phase 7's and
+phase 8's own merges are added here and were recovered the
+same way. Every SHA is the merge commit of the pull request
+named beside it, so `<sha>^1..<sha>` is the whole of what that
+pull request put on `develop`. Phases 1 and 3 shared a pull
+request, as did phases 2 and 4.
 
 Phase summaries:
 

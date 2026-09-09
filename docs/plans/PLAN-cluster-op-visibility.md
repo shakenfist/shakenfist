@@ -254,15 +254,30 @@ every consumer, so that:
 
 ## Execution
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. CI await helper deflake | [PLAN-cluster-op-visibility-phase-01-ci-deflake.md](PLAN-cluster-op-visibility-phase-01-ci-deflake.md) | Complete |
-| 1b. Atomic target writes + by-target JOIN fix | (folded into phase 1 PR; see below) | Complete |
-| 2. Observational flag: schema and query layer | PLAN-cluster-op-visibility-phase-02-observational-schema.md | Not started |
-| 3. Classify and mark observational enqueue sites | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started |
-| 4. API surface: has_pending_operations and truthful outstanding ops | PLAN-cluster-op-visibility-phase-04-api-surface.md | Not started |
-| 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started |
-| 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. CI await helper deflake | [PLAN-cluster-op-visibility-phase-01-ci-deflake.md](PLAN-cluster-op-visibility-phase-01-ci-deflake.md) | Complete | `bc7c119bf` (#3465) |
+| 1b. Atomic target writes + by-target JOIN fix | (folded into phase 1 PR; see below) | Complete | `bc7c119bf` (#3465) |
+| 2. Observational flag: schema and query layer | PLAN-cluster-op-visibility-phase-02-observational-schema.md | Not started | — |
+| 3. Classify and mark observational enqueue sites | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started | — |
+| 4. API surface: has_pending_operations and truthful outstanding ops | PLAN-cluster-op-visibility-phase-04-api-surface.md | Not started | — |
+| 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started | — |
+| 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`.
+These entries were reconstructed after the fact, because the
+plan did not record them as its phases landed; they come from
+the repository's merged pull request list cross-checked against
+the first-parent history, and not from a path-filtered
+`git log`, which cannot say which commits arrived inside a
+pull request. Every SHA is the merge commit of the pull request named
+beside it, so `<sha>^1..<sha>` is the whole of what that pull
+request put on `develop`. A phase which has not landed reads
+`—`.
+
+Phase 1b was folded into phase 1's pull request rather than
+landing separately, so both rows name the same merge and the
+audit reads that one range for both.
 
 ### Phase 1b: Atomic cluster_operation_targets writes (done, in the phase 1 PR)
 
