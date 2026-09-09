@@ -1,3 +1,4 @@
+import ipaddress
 import json
 import os
 import random
@@ -227,6 +228,16 @@ def get_interface_mtu(interface: str, netns: str | None = None) -> int | None:
     return None
 
 
+# What ``ip netns exec`` exits with when the namespace it was asked for
+# does not exist ("Cannot open network namespace ...: No such file or
+# directory"). It is distinct from the exit codes ip itself uses for the
+# command it was asked to run -- 2 for "no such route", for example --
+# so a caller which wants to tolerate a vanished namespace can tell that
+# apart from the command having failed inside a namespace which is
+# there. Verified against iproute2 rather than assumed.
+NETNS_MISSING_EXIT_CODE = 255
+
+
 def get_default_routes(netns: str | None) -> list[str]:
     stdout, _ = concurrency.execute(
         'ip route list default', netns=netns)
@@ -240,6 +251,68 @@ def get_default_routes(netns: str | None) -> list[str]:
         if len(elems) > 3 and elems[2] not in routes:
             routes.append(elems[2])
     return routes
+
+
+def get_host_routes(netns: str | None, device: str) -> set[str]:
+    """Return the host route destinations pointing at a device.
+
+    Host routes list without a prefix length ("192.168.15.29 dev ..."),
+    while a connected network route lists with one, so the presence of a
+    "/" is what separates the routes somebody added from the ones the
+    kernel derived from an address. Used to tell whether a routed
+    address's route is actually installed inside a network namespace.
+    """
+    stdout, _ = concurrency.execute(
+        f'ip route list dev {device}', netns=netns)
+
+    destinations = set()
+    for line in stdout.split('\n'):
+        candidate = line.split(' ')[0]
+        if '/' in candidate:
+            # A connected route the kernel derived from an address on
+            # the device, not one somebody added.
+            continue
+        try:
+            ipaddress.ip_address(candidate)
+        except ValueError:
+            # A blank line, "default", or a route type keyword such as
+            # "unreachable" or "blackhole". None of them is a host
+            # route destination, and the caller asked for destinations.
+            continue
+        destinations.add(candidate)
+    return destinations
+
+
+def check_for_iptables_rule(netns: str | None, table: str,
+                            rule: list[str]) -> bool:
+    """Is an iptables rule present, optionally inside a namespace?
+
+    ``rule`` is the chain name followed by the match and target
+    arguments, as ``shakenfist.util.iptables`` builds them.
+
+    This asks iptables with ``-C`` rather than parsing ``-S`` output,
+    because iptables normalises what it prints: a rule written with a
+    dotted quad netmask -- which is how the network object holds one --
+    lists back as a prefix length, so a textual comparison would report
+    a rule which is right there as missing. Anything which stops the
+    check running at all, a namespace which is not there included,
+    counts as absent: the repair for both is the same rebuild.
+
+    The elements of ``rule`` are joined with spaces and interpolated
+    into a command string which sf-privexec runs as root through a
+    shell, so they must never carry user supplied data. Today's callers
+    build rules from ``shakenfist.util.iptables``, whose only inputs are
+    an IPAM derived address and netmask and a hex formatted vxid; a
+    caller which wants to check something a user chose needs to quote it
+    first.
+    """
+    try:
+        concurrency.execute(
+            'iptables -w 10 -t {} -C {}'.format(table, ' '.join(rule)),
+            netns=netns)
+        return True
+    except ProcessExecutionError:
+        return False
 
 
 def add_default_route(netns: str, router: str) -> None:

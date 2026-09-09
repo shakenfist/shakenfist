@@ -52,6 +52,13 @@ Each machine in the cluster should match this description:
   standard MTU of 1,500 bytes would result in fragmentation. I generally
   select 9,000 bytes.
 * Has at least 1 gigabit connectivity on the "mesh interface".
+* Has the iptables connection tracking match (`xt_conntrack`, what
+  `iptables -m conntrack` loads) available if it will be a network node. It
+  is present in any stock Ubuntu or Debian kernel, so this only bites a
+  custom or heavily stripped kernel. A network node without it cannot bring
+  up a NAT providing virtual network at all, rather than degrading -- see
+  the floating IP discussion in [the networking overview](networking/overview.md)
+  for why the rule needs it.
 
 Your ansible control node needs `ansible-core >= 2.15`.
 

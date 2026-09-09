@@ -166,6 +166,7 @@ target     prot opt source               destination
 Chain POSTROUTING (policy ACCEPT)
 target     prot opt source               destination
 MASQUERADE  all  --  172.16.0.0/24        anywhere
+MASQUERADE  all  --  172.16.0.0/24        anywhere             ctstate DNAT
 ```
 
 So, the default route is via the egress veth at `egr-e2300f-i` (inside the
@@ -177,9 +178,11 @@ which is wired to the linux kernel VXLAN interface at `vxlan-e2300f`. Finally,
 traffic to other floating IPs on `192.168.15.0/24` is routed to the egress
 bridge as well.
 
-The iptables `MASQUERADE` entry is there to convert internal addresses to the
-external `192.168.15.194` "floating gateway" address so instances can talk outside
-their virtual network.
+The first iptables `MASQUERADE` entry is there to convert internal addresses to
+the external `192.168.15.194` "floating gateway" address so instances can talk
+outside their virtual network. The second one, which only matches connections
+whose destination has been rewritten, is for floating IP traffic which turns
+around here instead of leaving -- see the floating IP section below.
 
 Perhaps a diagram would help!
 
@@ -311,11 +314,53 @@ target     prot opt source               destination
 Chain POSTROUTING (policy ACCEPT)
 target     prot opt source               destination
 MASQUERADE  all  --  172.16.0.0/24        anywhere
+MASQUERADE  all  --  172.16.0.0/24        anywhere             ctstate DNAT
 ```
 
 So our floating IP of `192.168.15.29` is DNAT'ed to the instance's IP of
 `172.16.0.37`. This means floating IP traffic "bounces" off the network namespace.
-To make that work, the inside of the veth is configured with the floating IP:
+
+The second `MASQUERADE` rule above handles the case where the client is
+itself an instance on the same virtual network. That traffic is DNAT'ed by
+the same rule and then sent straight back out the veth it arrived on, so the
+reply would travel directly over the virtual network's own layer 2 and never
+return through the namespace -- which means it would never have its source
+rewritten back to the floating address, and the client would discard it.
+Masquerading those u-turned connections to the network's gateway address puts
+the namespace back on the return path, where conntrack can undo the
+destination rewrite.
+
+The two matches on that rule each exclude something different, and both are
+needed. The `-s` match confines the rule to connections which started inside
+the virtual network, which is what preserves the real source address for
+clients outside the cluster -- their traffic is DNAT'ed here too, so without
+`-s` it would be masqueraded as well. The `--ctstate DNAT` match confines the
+rule to connections whose destination was rewritten, which is what excludes a
+routed IP turning around in the same namespace, since a routed IP is never
+DNAT'ed and its whole point is that it arrives unrewritten.
+
+The cost is that the instance holding the floating IP sees such a connection
+as coming from the network's gateway rather than from the calling instance;
+if the destination needs to know who is calling, use a routed IP, which is
+not rewritten at all.
+
+The network daemon's maintenance pass checks each cycle that this rule is
+present in the namespace, and rebuilds the network on the network node if it
+is not. That check is how a cluster which was upgraded while all of its
+networks were healthy acquires the rule at all -- nothing else re-runs the
+namespace's iptables setup for a network which is otherwise working.
+
+`--ctstate DNAT` means a network node now needs the iptables conntrack match
+(`xt_conntrack`, which is present in any stock Ubuntu or Debian kernel and is
+what `iptables -m conntrack` loads). This is a hard requirement rather than a
+degradation: a node which cannot install the rule fails the whole
+`enable_nat` step, so a NAT-providing network will not come up there at all
+rather than coming up without in-network floating IPs. The error reported
+against the failed operation carries iptables' own complaint about the rule
+it refused.
+
+To make the DNAT bounce work, the inside of the veth is configured with
+the floating IP:
 
 ```bash
 debian@test:~$ sudo ip netns exec 17be6538-8f96-4ccb-b71e-a7e3022fead3 ip a
@@ -372,13 +417,56 @@ work equally well for other traffic.
     intended for a specific floating IP, but in return must have been configured
     to use that floating IP.
 
-The implementation of routed IPs is relatively trivial. For each routed IP, a
-route on the network node into the relevant virtual network bridge is created.
-Such a route might look like this:
+The implementation of routed IPs is relatively trivial. For each routed IP,
+two routes are created on the network node, one in each of the two routing
+tables which decide where the address's traffic goes.
+
+The first is in the network node's own routing table, and is how traffic
+from outside the cluster arrives. It puts the address onto the virtual
+network's bridge, where whichever interface was configured to answer ARP for
+it picks it up:
 
 ```
-ip route add 192.168.15.29/32 dev br-vxlan-e2300f
+ip route replace 192.168.15.29/32 dev br-vxlan-e2300f
 ```
+
+The second is inside the virtual network's own network namespace, and is how
+an instance *on* that network reaches the address:
+
+```
+ip netns exec 17be6538-8f96-4ccb-b71e-a7e3022fead3 \
+    ip route replace 192.168.15.29/32 dev veth-e2300f-i
+```
+
+That second route is needed because a routed IP comes from the floating pool,
+and as the routing table above shows, the namespace has the whole floating
+block on link on its egress veth. Without a more specific route an instance's
+packet reaches its default gateway and the namespace then ARPs for the address
+out on the egress bridge, where nothing answers -- unlike a floating IP, a
+routed IP is not configured on an interface anywhere on the network node, it
+exists only as a route. The `/32` turns that into a u-turn back into the
+network, which is the same delivery the network node performs for everybody
+else, and it means a routed address behaves identically whether the client is
+on the virtual network the address is routed to, or outside the cluster
+entirely (github issue #3662).
+
+A client on a *different* Shaken Fist virtual network is not covered by
+either route, and remains unsupported. That namespace also has the whole
+floating block on link on its egress veth, so it ARPs for the routed address
+on the egress bridge -- and unlike a floating IP, which the namespace owning
+it answers for from its egress veth, a routed IP is configured on no
+interface there and nothing replies. Reach a routed address from another
+virtual network the same way anything outside the cluster does, by way of the
+network node.
+
+Both routes use `ip route replace` rather than `ip route add` because they are
+re-applied: the network daemon's maintenance pass restores a network's routed
+addresses whenever it rebuilds the network on the network node, and also
+checks each maintenance pass that both routes are still there -- the one in
+the root namespace and the one inside the network's namespace. An address
+missing either is re-routed, which installs both, so a network which is
+otherwise healthy is not dragged through a rebuild to recover one route.
+Removing a routed IP deletes both routes, and tolerates either being absent.
 
 ## Interface naming conventions
 

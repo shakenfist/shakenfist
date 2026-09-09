@@ -43,6 +43,7 @@ from shakenfist.node import Node
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.util import general as util_general
+from shakenfist.util import iptables as util_iptables
 from shakenfist.util import network as util_network
 
 
@@ -559,7 +560,54 @@ class Network(dbowo):
                     EVENT_TYPE_STATUS, 'network not ok, dnsmasq not running')
                 return False
 
+        if self.provide_nat and not self.is_nat_okay():
+            return False
+
         return True
+
+    def is_nat_okay(self):
+        """Audit the namespace NAT rules for this network.
+
+        Only the hairpin masquerade is checked, and only because
+        checking is what gets it onto a cluster which already has this
+        network. Nothing re-installs these rules while a network is
+        otherwise healthy -- ``is_created`` looks at the bridge and the
+        dnsmasq check looks at dnsmasq, and neither has ever looked at
+        iptables -- so a cluster which upgraded while all of its
+        networks were well would never acquire a rule added by the
+        upgrade, and floating address u-turns would go on hanging
+        exactly as they did before (issue 3662).
+
+        The hairpin rule stands in for the other three because all four
+        are installed by the same privexec call, so a namespace either
+        went through it or did not. Checking one rule keeps this to a
+        single exec per NAT providing network per maintain pass.
+        """
+        # The floating network has no namespace of its own, and no NAT
+        # rules to audit.
+        if self.uuid == FLOATING_NETWORK_UUID:
+            return True
+
+        # A network's namespace only exists on the network node, so
+        # anywhere else the honest answer is "nothing here to audit"
+        # rather than "drifted". is_okay() gates on the node role before
+        # it gets here, but this is a public method and the next caller
+        # -- a debugging path, sf-ctl -- will not necessarily do that,
+        # and reporting drift from a hypervisor would emit a status
+        # event which is simply false.
+        if not config.NODE_IS_NETWORK_NODE:
+            return True
+
+        rule = util_iptables.hairpin_masquerade_rule(
+            self.network_address, self.netmask, self.vxid)
+        if util_network.check_for_iptables_rule(
+                str(self.uuid), util_iptables.HAIRPIN_TABLE, rule):
+            return True
+
+        self.add_event(
+            EVENT_TYPE_STATUS,
+            'network not ok, namespace nat rules have drifted')
+        return False
 
     def is_created(self):
         """Attempt to ensure network has been created successfully."""

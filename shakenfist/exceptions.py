@@ -527,7 +527,23 @@ class UnknownPrivExecReplyException(Exception):
 
 
 class EnableNATFailed(Exception):
-    ...
+    """A network's namespace NAT rules could not be installed.
+
+    Carries the EnableNATReply error details, which name the rule
+    iptables refused and repeat its own complaint about it. Without
+    them the ErrorReport an operator eventually reads records
+    ``network.nat.enable_failed`` and nothing else, which does not
+    distinguish a missing conntrack match from a namespace which has
+    gone away (issue 3662).
+    """
+
+    def __init__(self, error: str, error_text: str,
+                 network_uuid: str) -> None:
+        super().__init__(
+            f'{error}: {error_text} (network={network_uuid})')
+        self.error = error
+        self.error_text = error_text
+        self.network_uuid = network_uuid
 
 
 class EnsureMeshFailed(Exception):

@@ -13,6 +13,7 @@ from shakenfist.operations.net_op import NetOp
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+from shakenfist.util import iptables as util_iptables
 
 
 class NetworkTestCase(base.ShakenFistTestCase):
@@ -64,6 +65,29 @@ class NetworkNormalNodeTestCase(NetworkTestCase):
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
 
+    @mock.patch('shakenfist.util.network.check_for_iptables_rule',
+                return_value=False)
+    def test_is_nat_okay_off_the_network_node(self, mock_check):
+        """A hypervisor has no namespace to audit, and must not claim drift.
+
+        is_okay() gates on the node role before it reaches here, but
+        is_nat_okay() is public and the next caller -- sf-ctl, a
+        debugging path -- will not necessarily do the same. Without its
+        own guard it would exec into a namespace which does not exist,
+        get nothing, and emit a status event saying the network's NAT
+        rules have drifted, which is simply false.
+        """
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
+        n = network.Network.from_db(network_uuid)
+
+        self.assertTrue(n.is_nat_okay())
+        mock_check.assert_not_called()
+
     @mock.patch('shakenfist.network.network.Network.has_pending_cluster_operation',
                 return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=False)
@@ -113,7 +137,9 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                 return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
-    def test_is_okay_yes(self, mock_is_dnsmasq, mock_is_created, mock_pending):
+    @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=True)
+    def test_is_okay_yes(self, mock_is_nat_okay, mock_is_dnsmasq, mock_is_created,
+                         mock_pending):
         self.mock_mariadb = MockMariaDB(self, node_count=4)
         self.mock_mariadb.setup()
 
@@ -122,6 +148,105 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                                          provide_nat=True)
         n = network.Network.from_db(network_uuid)
         self.assertTrue(n.is_okay())
+
+    @mock.patch('shakenfist.network.network.Network.has_pending_cluster_operation',
+                return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=False)
+    def test_is_okay_no_nat_rules(self, mock_is_nat_okay, mock_is_dnsmasq,
+                                  mock_is_created, mock_pending):
+        """A network node network with drifted namespace NAT rules is not okay.
+
+        Nothing else re-runs the namespace's iptables setup for a network
+        which is otherwise healthy, so a cluster upgraded into a new rule
+        while all of its networks were well would never acquire it. The
+        maintain pass only ever asks is_okay() (issue 3662).
+        """
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
+        n = network.Network.from_db(network_uuid)
+        self.assertFalse(n.is_okay())
+
+    @mock.patch('shakenfist.network.network.Network.has_pending_cluster_operation',
+                return_value=False)
+    @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=False)
+    def test_is_okay_ignores_nat_rules_without_nat(
+            self, mock_is_nat_okay, mock_is_dnsmasq, mock_is_created, mock_pending):
+        """A network which does not provide NAT has no NAT rules to audit."""
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=False)
+        n = network.Network.from_db(network_uuid)
+        self.assertTrue(n.is_okay())
+        mock_is_nat_okay.assert_not_called()
+
+    #
+    #  is_nat_okay()
+    #
+    @mock.patch('shakenfist.util.network.check_for_iptables_rule',
+                return_value=True)
+    def test_is_nat_okay_present(self, mock_check):
+        """The rule asked for is the hairpin rule, in the network's namespace.
+
+        The rule text comes from shakenfist.util.iptables, which is also
+        where sf-privexec gets it, so the audit cannot ask for a rule the
+        install never wrote.
+        """
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
+        n = network.Network.from_db(network_uuid)
+        self.assertTrue(n.is_nat_okay())
+
+        mock_check.assert_called_once_with(
+            network_uuid, 'nat',
+            util_iptables.hairpin_masquerade_rule(
+                n.network_address, n.netmask, n.vxid))
+
+    @mock.patch('shakenfist.util.network.check_for_iptables_rule',
+                return_value=False)
+    def test_is_nat_okay_absent(self, mock_check):
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        network_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_network('bobnet', network_uuid, provide_dhcp=True,
+                                         provide_nat=True)
+        n = network.Network.from_db(network_uuid)
+        self.assertFalse(n.is_nat_okay())
+
+    @mock.patch('shakenfist.util.network.check_for_iptables_rule',
+                return_value=False)
+    def test_is_nat_okay_skips_the_floating_network(self, mock_check):
+        """The floating network has no namespace, and so no rules to audit.
+
+        It is not a bridged VXLAN network -- there is no namespace named
+        for its uuid to exec into -- so probing it would fail on every
+        pass and report drift which nothing could ever repair.
+        """
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.mock_mariadb.create_network(
+            'floatnet', str(FLOATING_NETWORK_UUID),
+            provide_dhcp=False, provide_nat=True)
+        n = network.Network.from_db(str(FLOATING_NETWORK_UUID))
+
+        self.assertTrue(n.is_nat_okay())
+        mock_check.assert_not_called()
 
     @mock.patch('shakenfist.network.network.Network.has_pending_cluster_operation',
                 return_value=False)
@@ -188,8 +313,9 @@ class NetworkNetNodeTestCase(NetworkTestCase):
                 return_value=False)
     @mock.patch('shakenfist.network.network.Network.is_created', return_value=True)
     @mock.patch('shakenfist.network.network.Network.is_dnsmasq_running', return_value=True)
+    @mock.patch('shakenfist.network.network.Network.is_nat_okay', return_value=True)
     def test_is_okay_falls_through_when_no_pending_operation(
-            self, mock_is_dnsmasq, mock_is_created, mock_pending):
+            self, mock_is_nat_okay, mock_is_dnsmasq, mock_is_created, mock_pending):
         """is_okay() falls through to bridge/dnsmasq checks when no op is in flight."""
         self.mock_mariadb = MockMariaDB(self, node_count=4)
         self.mock_mariadb.setup()

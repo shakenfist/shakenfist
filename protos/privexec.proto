@@ -44,6 +44,15 @@ message EnableNATReply {
     enum Errors {
         OK = 0;
         IPTABLES_FAILED = 1;
+
+        // Retired, and a trap: do not return this. The client
+        // (util.concurrency.enable_nat) raises EnableNATFailed for any
+        // reply which is not OK, so "the rules were already there" --
+        // the normal outcome every time the maintain loop recreates a
+        // healthy network -- became a hard failure and the network
+        // never came up (issue 3662). Each rule now carries its own
+        // iptables -C instead, and success is success either way. The
+        // number stays claimed so no later member reuses it.
         RULES_ALREADY_PRESENT = 2;
     }
 

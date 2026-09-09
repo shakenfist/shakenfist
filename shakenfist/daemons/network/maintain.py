@@ -8,6 +8,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
+from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist.network import network
@@ -68,6 +69,61 @@ _TERMINAL_OP_STATES = {
     dbo.STATE_DELETED,
     dbo.STATE_ERROR,
 }
+
+
+def missing_routed_address_routes(n, addresses):
+    """Which of a network's routed addresses are missing either route.
+
+    A routed address is two routes, not one: the network node's root
+    namespace routes it onto the network's bridge so the world can reach
+    it, and the network's own namespace routes it back out the veth so
+    the network's instances can (issue 3662). Only the first of those
+    existed until recently, and nothing re-applies either route while the
+    network is otherwise healthy -- the reconciliation below fires only
+    for a network which has drifted far enough to need rebuilding. A
+    cluster which upgraded while all its networks were well would
+    therefore never acquire the second route for the addresses it already
+    had.
+
+    Both tables are read, and an address missing from either is
+    reported: re-routing installs both and is idempotent, so the repair
+    does not care which one drifted. The root namespace route is the
+    less likely of the two to go missing -- losing the bridge takes it
+    with it, and that takes ``is_created()`` false and drives a full
+    recreate -- but it can be lost while the bridge survives, and in
+    that state the address is unreachable from outside the cluster with
+    nothing looking for it. That is the same silent drift this reads
+    the namespace for, in the other direction.
+
+    This costs two execs per pass for each network which has routed
+    addresses at all, which is a small number of networks even on a
+    large cluster.
+    """
+    subst = n.subst_dict()
+    try:
+        present = util_network.get_host_routes(
+            str(n.uuid), subst['vx_veth_inner'])
+        present &= util_network.get_host_routes(None, subst['vx_bridge'])
+    except ProcessExecutionError as e:
+        # No namespace, no veth inside it, or no bridge. Each is a
+        # larger drift than a missing route, and rebuilding the network
+        # is what fixes it -- which re-applies these routes on the way
+        # past.
+        #
+        # A transient privexec failure or a timed out exec lands here
+        # too, and is indistinguishable from real drift: both say
+        # "nothing missing" and this pass emits nothing. That
+        # self-corrects on the next pass, but a persistent exec layer
+        # fault would go on looking exactly like a healthy network, so
+        # say so in the journal.
+        LOG.with_fields({
+            'network': n,
+            'exit_code': e.exit_code,
+            'stderr': e.stderr
+        }).info('Could not read routing tables for routed address audit')
+        return []
+
+    return [address for address in addresses if address not in present]
 
 
 class Job(util_concurrency.Job):
@@ -498,6 +554,66 @@ class Job(util_concurrency.Job):
         for vxid, reason in reapable:
             self._reap_stray_vxlan(vxid, reason, this_node)
 
+    def _reconciliation_guard_fired(self, n, op_type):
+        """Should this pass leave a drifted network alone?
+
+        Two guards, both reading the network's own recent terminal
+        operation history for one operation type. The type matters: a
+        repair enqueued as a NetIPOp which can never succeed -- a
+        permanently absent veth, a namespace in a state nothing here can
+        fix -- would otherwise be re-enqueued on every pass forever,
+        because a NetOp history knows nothing about it.
+
+        The cooldown lets a single recent failure breathe before the
+        same repair is tried again. The circuit breaker quiesces a
+        network whose last K repairs all errored, until an operator (or
+        a later successful reconciliation) clears it.
+
+        The two histories clear differently, and the ``net_ip_op`` one
+        is worth knowing about. It covers both halves of the routed
+        address lifecycle, so a user's errored *unroute* counts against
+        the automatic *route* repair; and because these repairs are the
+        only thing which enqueues a NetIPOp for an otherwise-healthy
+        network, K errored ops of either kind quiesce the repair with no
+        self-clearing path. An operator clears it by routing or
+        unrouting an address on the network by hand, which is the
+        operator attention the circuit breaker is asking for anyway.
+
+        Returns True if the caller should skip this network.
+        """
+        recent = mariadb.get_recent_terminal_op_states_for_target(
+            target_object_type=ObjectType.NETWORK,
+            target_uuid=str(n.uuid),
+            limit=1,
+            op_type=op_type)
+        if recent:
+            _, state_value, update_time = recent[0]
+            if (state_value == dbo.STATE_ERROR
+                    and update_time > time.time()
+                    - config.MAINTAIN_RECONCILE_COOLDOWN_SECONDS):
+                n.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'maintain pass skipped for network: recent '
+                    'reconciliation error within cooldown window')
+                return True
+
+        circuit_k = config.MAINTAIN_RECONCILE_CIRCUIT_K
+        history = mariadb.get_recent_terminal_op_states_for_target(
+            target_object_type=ObjectType.NETWORK,
+            target_uuid=str(n.uuid),
+            limit=circuit_k,
+            op_type=op_type)
+        if (len(history) == circuit_k
+                and all(h[1] == dbo.STATE_ERROR for h in history)):
+            n.add_event(
+                EVENT_TYPE_AUDIT,
+                'network has failed reconciliation %d times in a '
+                'row; quiesced pending operator attention' % (
+                    circuit_k))
+            return True
+
+        return False
+
     def execute(self):
         LOG.info('Starting network maintenance')
         last_loop = 0
@@ -614,62 +730,84 @@ class Job(util_concurrency.Job):
 
                 network_okay = n.is_okay()
                 mesh_okay = n.is_mesh_okay() if network_okay else False
-                if network_okay and mesh_okay:
+
+                # Routed addresses are the third thing which can drift:
+                # either of the two routes for one can be missing on a
+                # network which is otherwise perfectly healthy (issue
+                # 3662). Reading the routing tables costs execs, so only
+                # networks which have routed addresses at all are
+                # candidates, and only on the node whose namespaces they
+                # are.
+                #
+                # ``mesh_okay`` is part of this for the same reason the
+                # pending-operation gate sits above the probe below: a
+                # network whose mesh has drifted takes the mesh repair
+                # branch and discards whatever the probe would have
+                # said, so paying for the execs is pure waste.
+                routed_here = (config.NODE_IS_NETWORK_NODE and network_okay
+                               and mesh_okay
+                               and n.uuid in routed_by_network)
+
+                if network_okay and mesh_okay and not routed_here:
                     # No drift detected for this network on this pass.
                     continue
 
                 # Per-network gating. If a cluster operation targeting
                 # this network is already in flight, skip this pass --
-                # the in-flight op will fix the drift when it runs.
+                # the in-flight op will fix the drift when it runs. This
+                # sits above the namespace route read so a network which
+                # is already being reconciled does not pay for a probe
+                # whose answer is discarded here anyway.
                 if mariadb.has_pending_cluster_operation_target(
                         target_object_type=ObjectType.NETWORK,
                         target_uuid=str(n.uuid)):
                     continue
 
-                # Cooldown. If the most recent terminal reconciliation
-                # for this network ended in ERROR within the cooldown
-                # window, let the previous failure breathe before
-                # retrying.
-                recent = mariadb.get_recent_terminal_op_states_for_target(
-                    target_object_type=ObjectType.NETWORK,
-                    target_uuid=str(n.uuid),
-                    limit=1,
-                    op_type='net_op')
-                if recent:
-                    _, state_value, update_time = recent[0]
-                    if (state_value == dbo.STATE_ERROR
-                            and update_time > time.time()
-                            - config.MAINTAIN_RECONCILE_COOLDOWN_SECONDS):
-                        n.add_event(
-                            EVENT_TYPE_AUDIT,
-                            'maintain pass skipped for network: recent '
-                            'reconciliation error within cooldown window')
-                        continue
+                missing_routes = []
+                if routed_here:
+                    missing_routes = missing_routed_address_routes(
+                        n, routed_by_network[n.uuid])
 
-                # Circuit breaker. If the last K terminal reconciliations
-                # all ended in ERROR, quiesce this network until a fresh
-                # reconciliation succeeds (operator intervention).
-                circuit_k = config.MAINTAIN_RECONCILE_CIRCUIT_K
-                history = mariadb.get_recent_terminal_op_states_for_target(
-                    target_object_type=ObjectType.NETWORK,
-                    target_uuid=str(n.uuid),
-                    limit=circuit_k,
-                    op_type='net_op')
-                if (len(history) == circuit_k
-                        and all(h[1] == dbo.STATE_ERROR for h in history)):
-                    n.add_event(
-                        EVENT_TYPE_AUDIT,
-                        'network has failed reconciliation %d times in a '
-                        'row; quiesced pending operator attention' % (
-                            circuit_k))
+                if network_okay and mesh_okay and not missing_routes:
+                    # The only thing which might have drifted had not.
+                    continue
+
+                # Which repair this pass is heading for decides which
+                # operation history the guards below should read. A
+                # network whose only problem is a missing route is
+                # repaired with a NetIPOp, and a NetOp history says
+                # nothing about whether that has been failing.
+                route_repair_only = network_okay and mesh_okay
+                guard_op_type = 'net_ip_op' if route_repair_only else 'net_op'
+
+                if self._reconciliation_guard_fired(n, guard_op_type):
                     continue
 
                 # Drift remains and no guard fired.
+                if route_repair_only:
+                    # The network and its mesh are both fine; all that is
+                    # missing is the in-namespace route for one or more
+                    # routed addresses. Re-routing the address installs
+                    # both of its routes and is idempotent, so this needs
+                    # nothing rebuilt.
+                    n.add_event(
+                        EVENT_TYPE_STATUS,
+                        'restoring in-namespace routes for routed addresses',
+                        extra={'floating': missing_routes})
+                    for address in missing_routes:
+                        net_ip_create_and_enqueue(
+                            network_uuid=str(n.uuid),
+                            ip=address,
+                            tasks=[net_ip_tasks.route_address],
+                            priority=PRIORITY.background)
+                    continue
+
                 if network_okay:
                     # The network itself is fine; only the vxlan mesh
                     # has drifted. A full recreate is not needed --
                     # enqueue the targeted repair on this node's queue
-                    # and move on.
+                    # and move on. Any missing routed address route waits
+                    # for the pass after the mesh comes back.
                     n.add_event(
                         EVENT_TYPE_STATUS,
                         'Repairing drifted vxlan mesh on this node')

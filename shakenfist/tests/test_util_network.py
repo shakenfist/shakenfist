@@ -213,6 +213,57 @@ class UtilTestCase(base.ShakenFistTestCase):
         mock_execute.assert_called_with(
             'ip route list default', netns='mynamespace')
 
+    @mock.patch(
+        'shakenfist.util.concurrency.execute',
+        return_value=('192.168.15.29 scope link\n'
+                      '192.168.15.30 scope link\n'
+                      '172.16.0.0/24 proto kernel scope link src 172.16.0.1\n'
+                      'default via 192.168.15.1\n'
+                      'unreachable 10.0.0.0/8\n'
+                      '\n',
+                      ''))
+    def test_get_host_routes(self, mock_execute):
+        """Only routes somebody added, and only ones which are addresses.
+
+        The kernel derives the connected 172.16.0.0/24 route from the
+        address on the device, and the presence of a prefix length is
+        what separates it from a host route. The other two lines are
+        neither: "default" and a route type keyword are not
+        destinations, and returning them would make the function a trap
+        for a caller which does something with the values rather than
+        just testing membership.
+        """
+        found = util_network.get_host_routes('mynamespace', 'veth-e2300f-i')
+        self.assertEqual({'192.168.15.29', '192.168.15.30'}, found)
+        mock_execute.assert_called_with(
+            'ip route list dev veth-e2300f-i', netns='mynamespace')
+
+    @mock.patch('shakenfist.util.concurrency.execute', return_value=('', ''))
+    def test_check_for_iptables_rule_present(self, mock_execute):
+        found = util_network.check_for_iptables_rule(
+            'mynamespace', 'nat',
+            ['POSTROUTING', '-s', '172.16.0.0/255.255.255.0', '-j',
+             'MASQUERADE'])
+        self.assertEqual(True, found)
+        mock_execute.assert_called_with(
+            'iptables -w 10 -t nat -C POSTROUTING -s 172.16.0.0/255.255.255.0 '
+            '-j MASQUERADE',
+            netns='mynamespace')
+
+    @mock.patch('shakenfist.util.concurrency.execute',
+                side_effect=ProcessExecutionError('Bad rule'))
+    def test_check_for_iptables_rule_absent(self, mock_execute):
+        """A rule iptables cannot find, or cannot look for, is absent.
+
+        iptables exits non-zero for a rule which is not there, and ip
+        netns exec exits non-zero for a namespace which is not there.
+        Both mean the same repair, so both answer False rather than
+        raising into the maintain pass.
+        """
+        found = util_network.check_for_iptables_rule(
+            'mynamespace', 'nat', ['POSTROUTING', '-j', 'MASQUERADE'])
+        self.assertEqual(False, found)
+
     @mock.patch('shakenfist.util.concurrency.execute')
     def test_create_interface_bridge(self, mock_execute):
         util_network.create_interface('eth0', 'bridge', '')
