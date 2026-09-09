@@ -25605,6 +25605,26 @@ class CapacityDimensionDetailDict(TypedDict):
     expected_demand: NotRequired[float]
 
 
+class CapacityClampDetailDict(TypedDict):
+    """One counter a floored decrement clamped at zero, and by how much.
+
+    ``counter`` is ``namespace_claim``, ``cluster_unclaimed``, or the
+    dashed uuid of the scheduler_node_capacity row. The shortfalls are
+    the observed drift per dimension -- ``max(0, released -
+    pre_clamp_used)``, read inside the transaction before the clamp
+    erased it -- not the release's allocation. A record exists only for
+    a counter which actually clamped, so a result carrying
+    ``clamped=True`` with an empty ``clamps`` list came from an
+    sf-database predating the wire field and means "detail not
+    reported", never "nothing drifted" (issue 4050).
+    """
+
+    counter: str
+    shortfall_cpus: int
+    shortfall_memory_mb: int
+    shortfall_disk_gb: int
+
+
 class AdmitPlacementResult(TypedDict):
     """The reply _direct_admit_instance_placement builds."""
 
@@ -25613,6 +25633,10 @@ class AdmitPlacementResult(TypedDict):
     admitted: bool
     unguarded: bool
     clamped: bool
+    # Which counter(s) are behind a True clamped, and the observed drift
+    # -- empty when nothing clamped, or when the reply came from an
+    # sf-database predating the field (issue 4050).
+    clamps: list[CapacityClampDetailDict]
     failing_stage: str
     dimensions: list[CapacityDimensionDetailDict]
     node_used_cpus: int
@@ -25645,6 +25669,12 @@ class ReleasePlacementResult(TypedDict):
     error: str
     released: bool
     clamped: bool
+    # Which counter(s) are behind a True clamped -- the namespace claim,
+    # the cluster unclaimed sums, or any of the nodes this release
+    # touched -- and the observed per-dimension drift. Empty when
+    # nothing clamped, or when the reply came from an sf-database
+    # predating the field (issue 4050).
+    clamps: list[CapacityClampDetailDict]
     # The released node's counters after the decrement, in the same
     # vocabulary AdmitPlacementResult reports its post-drawdown ones, so
     # both halves of the placement ledger read the same way. They
@@ -25855,6 +25885,40 @@ def _dimension_from_proto(d: Any) -> CapacityDimensionDetailDict:
     return detail
 
 
+def _clamp_from_proto(c: Any) -> CapacityClampDetailDict:
+    """One CapacityClampDetail proto message back into dict form."""
+    return {
+        'counter': c.counter,
+        'shortfall_cpus': int(c.shortfall_cpus),
+        'shortfall_memory_mb': int(c.shortfall_memory_mb),
+        'shortfall_disk_gb': int(c.shortfall_disk_gb),
+    }
+
+
+def _capacity_clamp_detail(
+        counter: str, row: Any, columns: tuple[str, str, str],
+        amounts: tuple[int, int, int]) -> CapacityClampDetailDict:
+    """The observed drift a floored decrement is about to clamp away.
+
+    ``row`` is the counter row as it stood before the clamp, so each
+    shortfall is ``max(0, released - pre_clamp_used)`` -- the amount the
+    ledger was short of the allocation being returned, which is the
+    number the reconciler's correction will be, not the release's own
+    allocation. ``row`` can only be None under a mocked connection (a
+    real clamp UPDATE cannot match a row the preceding SELECT could not
+    see); shortfalls of zero are the honest reading there too.
+    """
+    shortfalls = [
+        max(0, amount - int(getattr(row, column))) if row is not None else 0
+        for column, amount in zip(columns, amounts)]
+    return {
+        'counter': counter,
+        'shortfall_cpus': shortfalls[0],
+        'shortfall_memory_mb': shortfalls[1],
+        'shortfall_disk_gb': shortfalls[2],
+    }
+
+
 def _empty_admit_result() -> AdmitPlacementResult:
     """A successful, not-yet-decided admission reply."""
     return {
@@ -25863,6 +25927,7 @@ def _empty_admit_result() -> AdmitPlacementResult:
         'admitted': False,
         'unguarded': False,
         'clamped': False,
+        'clamps': [],
         'failing_stage': '',
         'dimensions': [],
         'node_used_cpus': 0,
@@ -25883,6 +25948,7 @@ def _empty_release_result() -> ReleasePlacementResult:
         'error': '',
         'released': False,
         'clamped': False,
+        'clamps': [],
         'counters_node_uuid': '',
         'node_used_cpus': 0,
         'node_used_memory_mb': 0,
@@ -25951,7 +26017,7 @@ def _demand_guard_clause(
 
 def _floored_node_decrement(
         conn: sa.Connection, node_key: UUID, cpus: int, memory_mb: int,
-        disk_gb: int) -> tuple[bool, bool]:
+        disk_gb: int) -> tuple[bool, Optional[CapacityClampDetailDict]]:
     """Decrement a node's used_* counters, floored at zero (P6).
 
     First the guarded form (``used >= x`` per dimension), which is the
@@ -25966,9 +26032,12 @@ def _floored_node_decrement(
     pass, so subtracting a placement's original contribution here would
     over-credit a node whose contribution had already decayed.
 
-    Returns ``(touched, clamped)``. ``touched`` is False when there is no
-    capacity row for the node at all, which is P7's fail-open case
-    rather than a clamp.
+    Returns ``(touched, clamp_detail)``. ``touched`` is False when there
+    is no capacity row for the node at all, which is P7's fail-open case
+    rather than a clamp. ``clamp_detail`` names this node and carries
+    the per-dimension drift when the clamp form had to run, and is None
+    on a clean decrement -- so the caller can report *which* counter
+    drifted and by how much rather than a bare boolean (issue 4050).
     """
     capacity = _get_scheduler_node_capacity_table()
 
@@ -25983,7 +26052,15 @@ def _floored_node_decrement(
         used_disk_gb=capacity.c.used_disk_gb - disk_gb,
         updated_at=sa.func.now())
     if conn.execute(guarded).rowcount > 0:
-        return True, False
+        return True, None
+
+    # The pre-clamp counters, read to report the drift the clamp below
+    # is about to erase. Legal under the ER_CHECKREAD invariant for the
+    # same reason as the post-release counter read: it comes after this
+    # transaction's writes, and the guarded UPDATE above already scanned
+    # and locked this row on its way to matching nothing.
+    row = conn.execute(sa.select(capacity).where(
+        capacity.c.node_uuid == node_key)).first()
 
     clamp = sa.update(capacity).where(
         capacity.c.node_uuid == node_key
@@ -25994,29 +26071,39 @@ def _floored_node_decrement(
         used_disk_gb=sa.func.greatest(0, capacity.c.used_disk_gb - disk_gb),
         updated_at=sa.func.now())
     if conn.execute(clamp).rowcount > 0:
+        detail = _capacity_clamp_detail(
+            str(node_key), row,
+            ('used_cpus', 'used_memory_mb', 'used_disk_gb'),
+            (cpus, memory_mb, disk_gb))
         LOG.warning(
             f'Clamped capacity decrement on node {node_key}: counters were '
             f'below the released allocation ({cpus} cpus, {memory_mb} MB, '
-            f'{disk_gb} GB)')
-        return True, True
-    return False, False
+            f'{disk_gb} GB) by ({detail["shortfall_cpus"]} cpus, '
+            f'{detail["shortfall_memory_mb"]} MB, '
+            f'{detail["shortfall_disk_gb"]} GB)')
+        return True, detail
+    return False, None
 
 
 def _floored_namespace_decrement(
         conn: sa.Connection, claim_uuid: Optional[UUID], cpus: int,
-        memory_mb: int, disk_gb: int) -> bool:
+        memory_mb: int, disk_gb: int) -> Optional[CapacityClampDetailDict]:
     """Floored decrement of the claim row, or the cluster unclaimed sums.
 
     The namespace-side mirror of _floored_node_decrement: guarded first,
-    ``GREATEST(0, ...)`` on a miss. Returns True if it had to clamp.
+    ``GREATEST(0, ...)`` on a miss. Returns the clamp detail -- which of
+    the two counters this was, and the per-dimension drift -- when it
+    had to clamp, or None on a clean decrement (issue 4050).
     """
     if claim_uuid is not None:
         table: sa.Table = _get_namespace_claims_table()
         key = table.c.uuid == claim_uuid
+        counter = 'namespace_claim'
         columns = ('used_cpus', 'used_memory_mb', 'used_disk_gb')
     else:
         table = _get_cluster_capacity_table()
         key = table.c.id == 1
+        counter = 'cluster_unclaimed'
         columns = ('unclaimed_used_cpus', 'unclaimed_used_memory_mb',
                    'unclaimed_used_disk_gb')
 
@@ -26029,7 +26116,11 @@ def _floored_namespace_decrement(
         for column, amount in zip(columns, amounts)
     })
     if conn.execute(guarded).rowcount > 0:
-        return False
+        return None
+
+    # The pre-clamp counters, for the same reason and under the same
+    # invariant reasoning as _floored_node_decrement()'s read.
+    row = conn.execute(sa.select(table).where(key)).first()
 
     clamp = sa.update(table).where(key).values(
         updated_at=sa.func.now(), **{
@@ -26037,13 +26128,16 @@ def _floored_namespace_decrement(
             for column, amount in zip(columns, amounts)
         })
     if conn.execute(clamp).rowcount > 0:
+        detail = _capacity_clamp_detail(counter, row, columns, amounts)
         LOG.warning(
             f'Clamped capacity decrement on {table.name}: counters were '
             f'below the released allocation ({cpus} cpus, {memory_mb} MB, '
-            f'{disk_gb} GB)')
-        return True
+            f'{disk_gb} GB) by ({detail["shortfall_cpus"]} cpus, '
+            f'{detail["shortfall_memory_mb"]} MB, '
+            f'{detail["shortfall_disk_gb"]} GB)')
+        return detail
     # No row at all: nothing was ever charged here, so nothing to clamp.
-    return False
+    return None
 
 
 def _active_claim_for_namespace(
@@ -26641,9 +26735,11 @@ def _direct_admit_instance_placement(
             def _release_old_node() -> None:
                 if old_node_key is None:
                     return
-                _, clamped = _floored_node_decrement(
+                _, clamp_detail = _floored_node_decrement(
                     conn, old_node_key, cpus, memory_mb, disk_gb)
-                outcome['clamped'] = outcome['clamped'] or clamped
+                if clamp_detail is not None:
+                    outcome['clamped'] = True
+                    outcome['clamps'].append(clamp_detail)
 
             if old_node_key is not None and old_node_key.int < node_key.int:
                 _release_old_node()
@@ -26864,15 +26960,19 @@ def _direct_release_instance_placement(
             # producing, and the reconciler recomputes both sides from
             # ground truth every pass, so a residual discrepancy from a
             # historical duplicate corrects itself within one period.
-            if _floored_namespace_decrement(
-                    conn, probe.claim_uuid, cpus, memory_mb, disk_gb):
+            clamp_detail = _floored_namespace_decrement(
+                conn, probe.claim_uuid, cpus, memory_mb, disk_gb)
+            if clamp_detail is not None:
                 outcome['clamped'] = True
+                outcome['clamps'].append(clamp_detail)
 
             decremented: list[UUID] = []
             for node_key in sorted(set(probe.nodes), key=lambda u: u.int):
-                touched, clamped = _floored_node_decrement(
+                touched, clamp_detail = _floored_node_decrement(
                     conn, node_key, cpus, memory_mb, disk_gb)
-                outcome['clamped'] = outcome['clamped'] or clamped
+                if clamp_detail is not None:
+                    outcome['clamped'] = True
+                    outcome['clamps'].append(clamp_detail)
                 if touched:
                     decremented.append(node_key)
 
@@ -26997,6 +27097,10 @@ def _grpc_admit_instance_placement(
         result['unguarded'] = bool(reply.unguarded)
         result['unguarded_reason'] = reply.unguarded_reason
         result['clamped'] = bool(reply.clamped)
+        # Additive reply field: a reply from an sf-database predating it
+        # unpacks as an empty list under clamped=True, which the caller
+        # reads as "detail not reported" (issue 4050).
+        result['clamps'] = [_clamp_from_proto(c) for c in reply.clamps]
         result['failing_stage'] = reply.failing_stage
         result['dimensions'] = [
             _dimension_from_proto(d) for d in reply.dimensions]
@@ -27051,9 +27155,11 @@ def _grpc_release_instance_placement(
         result['error'] = reply.error
         result['released'] = bool(reply.released)
         result['clamped'] = bool(reply.clamped)
+        result['clamps'] = [_clamp_from_proto(c) for c in reply.clamps]
         # Additive reply fields, so an sf-database predating them reads
-        # as proto3 defaults: an empty counters_node_uuid, which is
-        # exactly the "not reported" the caller already has to handle.
+        # as proto3 defaults: an empty counters_node_uuid (and an empty
+        # clamps list), which is exactly the "not reported" the caller
+        # already has to handle.
         result['counters_node_uuid'] = reply.counters_node_uuid
         result['node_used_cpus'] = int(reply.node_used_cpus)
         result['node_used_memory_mb'] = int(reply.node_used_memory_mb)
@@ -27136,6 +27242,9 @@ def admit_instance_placement(
 
         {'success': bool, 'error': str,
          'admitted': bool, 'unguarded': bool, 'clamped': bool,
+         'clamps': [{'counter': str, 'shortfall_cpus': int,
+                     'shortfall_memory_mb': int,
+                     'shortfall_disk_gb': int}, ...],
          'failing_stage': '' | 'cluster' | 'claim' | 'node',
          'dimensions': [{'dimension': str, 'limit': float, 'used': float,
                          'requested': float, 'exceeded': bool,
@@ -27188,9 +27297,20 @@ def release_instance_placement(
     Returns:
 
         {'success': bool, 'error': str, 'released': bool,
-         'clamped': bool, 'counters_node_uuid': str,
+         'clamped': bool,
+         'clamps': [{'counter': str, 'shortfall_cpus': int,
+                     'shortfall_memory_mb': int,
+                     'shortfall_disk_gb': int}, ...],
+         'counters_node_uuid': str,
          'node_used_cpus': int, 'node_used_memory_mb': int,
          'node_used_disk_gb': int, 'node_expected_demand': float}
+
+    ``clamps`` says which counter(s) a True ``clamped`` is about --
+    ``namespace_claim``, ``cluster_unclaimed``, or a node's dashed uuid
+    -- and the observed per-dimension drift, so the caller's audit event
+    can name what actually drifted (issue 4050). Empty under
+    ``clamped=True`` means the reply came from an sf-database predating
+    the field: detail not reported, never "nothing drifted".
 
     ``released`` is False when there was nothing to release, which is
     how a repeat call (``hard_delete()`` behind ``_delete_globally()``,
