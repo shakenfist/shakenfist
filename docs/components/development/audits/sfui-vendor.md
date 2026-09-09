@@ -26,8 +26,9 @@ Repositories with no `.sfui-commit` are not applicable.
 private-ci, the first sfui consumer, is internal tooling excluded from
 the conventions audits, but this check runs against it anyway. It is in
 the workflow matrix scoped by `only_checks` in `REPO_OVERRIDES` to this
-check alone, so it collects no issues about packaging, release
-workflows or branch naming. The reason for the exception is that
+check and the four plan criteria, so it collects no issues about
+packaging, release workflows or branch naming. `docs/audits/README.md`
+holds the current list. The reason for the exception is that
 vendored drift produces no symptom: private-ci kept working perfectly
 for five days with a copy two canonical merges behind, and only a
 hand-run of `tools/vendor.sh --check` -- which nobody is scheduled to

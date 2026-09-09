@@ -231,15 +231,19 @@ this repository's convention.
 
 | Phase | Status | Merged |
 |-------|--------|--------|
-| 1. Split the generated output out | Complete | |
-| 2. Bring the specifications into review scope | Complete | |
-| 3. Documentation and runbooks | Complete | |
-| 4. Push audit | Complete | |
+| 1. Split the generated output out | Complete | 7843932 |
+| 2. Bring the specifications into review scope | Complete | 7843932 |
+| 3. Documentation and runbooks | Complete | 7843932 |
+| 4. Push audit | Complete | 7843932 |
 
-The `Merged` column stays empty until the branch lands; all four
-phases ship as one pull request rather than one each, because phase 2
-cannot be reviewed without phase 1 in the tree and phase 3 corrects
-prose that phase 1 makes wrong.
+All four phases shipped as one pull request rather than one each,
+because phase 2 cannot be reviewed without phase 1 in the tree and
+phase 3 corrects prose that phase 1 makes wrong: `7843932` is the
+merge commit of pull request 57, whose diff against its first
+parent is the whole of this plan's work. The `Merged` cells were
+filled by backfill, in step 4b of
+`docs/plans/PLAN-push-audit-phase.md`, rather than as the phases
+landed.
 
 Phases 1 and 2 have a hard ordering dependency:
 `test_review_tracking.py` asserts that every pattern in

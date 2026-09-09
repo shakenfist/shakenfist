@@ -9,9 +9,9 @@ holds it in place: the phase reached the fleet's plans as a hand-driven
 sweep, and until this check existed nothing stopped the next plan from
 omitting it.
 
-For every master plan `docs/plans/index.md` links whose status is not
-terminal -- that is, anything other than `Complete`, `Abandoned` or
-`Superseded`:
+For every master plan `docs/plans/index.md` links whose entry records a
+status, and whose status is not terminal -- that is, anything other
+than `Complete`, `Abandoned` or `Superseded`:
 
 * the plan **names `PUSH-AUDIT.md`**, and
 * the **last** of its phases is the push audit phase.
@@ -111,6 +111,11 @@ rather than this one's. A plan the check could not find is *named* in
 the result either way, because a plan silently walked past looks
 exactly like a plan that passed.
 
+A repository whose linked plans are all *statusless* is not N/A,
+though. It links plans, and every one of them is named in the result;
+reporting it as N/A would say the index links none, which is the
+opposite of what a reader has to be told.
+
 ## What this deliberately does not cover
 
 * **Whether the audit was run.** A plan can carry the phase, never run
@@ -125,13 +130,11 @@ exactly like a plan that passed.
   the handful of plans still able to act on a finding and one that
   files an issue against every plan the fleet has ever closed.
 
-  The block words the carve-out as `Complete` alone. The check applies
-  it to all three terminal terms of the status vocabulary, because
-  `Abandoned` and `Superseded` are terminal for the same reason and
-  the block's silence about them is a gap rather than a decision.
-  Rewording the block bumps its version and stales every embedded copy
-  across the fleet, which is a sweep; it is scheduled as one, in
-  `docs/plans/PLAN-push-audit-phase.md`.
+  The block names all three terminal terms of the status vocabulary
+  from v3 onwards. The check applied to all three before the block
+  caught up, because `Abandoned` and `Superseded` are terminal for
+  the same reason and the block's earlier silence about them was a
+  gap rather than a decision.
 * **Plans with a terminal status that do carry the phase.** Not
   inspected either. Whether the audit ran is a judgement about the
   plan's own record, and the presence of a heading cannot settle it.
@@ -156,6 +159,42 @@ exactly like a plan that passed.
   them is how the next `PLAN-release-1.0.md` stays hidden. The names
   are there so a person can read the handful by hand.
 * **Repositories with no plan practice.** No index, no finding.
+* **Plans the index links without recording a status.** They are not
+  judged, and they are named. The carve-out above turns on the status,
+  so a plan the index never placed on either side of it cannot be put
+  there by this check: judging it would demand a push audit phase for a
+  plan nobody has said is still open, and if that plan is finished the
+  shared block's carve-out says explicitly not to reopen it. The check
+  cannot tell which, so it declines rather than guessing, and the
+  decision is recorded as decision 2 of
+  `docs/plans/PLAN-push-audit-phase.md`.
+
+  This covers more than an empty cell in a status table. A plan linked
+  from prose, or from a bullet list in an index that is not a table
+  yet, records no status either, and the verdict says so in those terms
+  -- "N plan(s) the index links without recording a status" -- rather
+  than naming a row that may not exist.
+
+  The criterion that speaks to the index's shape is `plan-index`, and
+  it requires a *table*, not a status column:
+  [`plan-index.md`](/components/development/audits/plan-index/) says a `Status` column is optional,
+  because a standalone plan listing that tracks no status is
+  registered, just not tracked. So a repository can satisfy
+  `plan-index` with a `Date | Plan | Intent` table and never enter
+  this criterion's scope, and a row of a table that *does* carry the
+  column can stop before reaching it -- `| 2026-01-01 |
+  [One](/components/development/audits/PLAN-one/) | Do one |` under a four-column header -- which
+  drops that one plan from judgement while every other row keeps
+  working. Those two shapes are an opt-out that nothing detects.
+
+  A cell that is present but empty is not one of them. `plan-index`
+  reads it, and the empty string is not in the shared vocabulary, so
+  `| 2026-01-01 | [One](/components/development/audits/PLAN-one/) | Do one | |` fails there as a
+  status cell outside the vocabulary even while this criterion
+  declines to judge the plan. Only the omitted cell and the absent
+  column escape. Naming every statusless plan in the verdict is the
+  whole of the mitigation for those two: a repository opting out says
+  so on the compliance page every morning rather than quietly passing.
 
 ## Template
 
