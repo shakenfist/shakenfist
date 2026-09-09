@@ -1098,6 +1098,17 @@ def capacity_coverage_record(series):
     have ``seconds`` None, and printing a zero for either would read as
     "the window was instant", which is exactly backwards -- the trap this
     figure exists to avoid.
+
+    ``flag_present`` separates the two ways this can fail to be achieved.
+    A bundle from a cluster whose /admin/resources predates
+    cpu_committed_row_present carries the key nowhere, so every sample
+    reads as not covered and the series would otherwise report as a
+    permanent regression rather than as a payload this tool cannot
+    measure. Note that the functional assertion in test_nodes.py takes
+    the opposite default for a missing key and passes: it runs against a
+    live cluster which always publishes the flag, so absence there means
+    a payload change worth not failing on, while absence here means an
+    old bundle worth not scoring.
     """
     stamped = sorted(
         (s for s in series.samples if s.sampled_at is not None),
@@ -1105,6 +1116,9 @@ def capacity_coverage_record(series):
 
     record = collections.OrderedDict([
         ('achieved', False),
+        ('flag_present', any(
+            n.row_present is not None
+            for sample in stamped for n in sample.nodes.values())),
         ('window_start', stamped[0].sampled_at if stamped else None),
         ('covered_at', None),
         ('seconds', None),
@@ -1653,6 +1667,12 @@ def print_capacity_coverage(record):
         print('  No usable samples, so there is nothing to measure.')
         return
     if not coverage['achieved']:
+        if not coverage['flag_present']:
+            print('  NOT MEASURABLE: no sample in this series carried')
+            print('  cpu_committed_row_present at all, so this bundle')
+            print('  predates the flag. Coverage here is unknown, not never')
+            print('  achieved -- do not read it as a regression.')
+            return
         print('  NEVER OBSERVED: no sample in this series had every')
         print('  hypervisor in its roster carrying a scheduler_node_capacity')
         print('  row. Reported as absent rather than as zero -- a zero here')

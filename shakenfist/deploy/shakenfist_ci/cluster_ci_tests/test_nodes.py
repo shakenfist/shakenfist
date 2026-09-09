@@ -1,4 +1,5 @@
 import json
+import time
 
 from testtools import content
 
@@ -124,32 +125,51 @@ class TestNodes(base.BaseNamespacedTestCase):
         self.assertEqual(node['uuid'], inst['node'])
 
         try:
-            resources = self.system_client.get_cluster_resources()
-            self.addDetail('resources after', content.text_content(json.dumps(
-                resources, indent=4, sort_keys=True)))
-            per_node = resources['per_node'][node['uuid']]
-
             # A node the capacity reconciler has not written a row for is
             # admitted unguarded (P7): every placement onto it fails open
             # and the node's ledger cannot be trusted. Since
             # PLAN-transient-capacity-refusals phase 1, the elected loop's
             # maintenance pass forces a reconcile within about a minute of
             # any hypervisor's metrics becoming fresh
-            # (`_force_capacity_reconcile_if_unguarded()`), and this test
-            # only runs once `tools/ci_wait_schedulable.py` has gated the
-            # functional test step -- see
-            # `shakenfist/actions/build-smoke-cluster/action.yml`'s "Wait
-            # for the cluster to become schedulable" step, which runs
-            # before "Run functional tests" in
-            # `shakenfist/actions/.github/workflows/smoke-cluster.yml`.
-            # So a missing row here is the regression this phase exists to
-            # prevent, not a normal start-up state, and must fail rather
-            # than hide behind a skip.
+            # (`_force_capacity_reconcile_if_unguarded()`).
+            #
+            # That minute is why this waits rather than asserting on the
+            # first read. The readiness gate which runs before the
+            # functional suite (`tools/ci_wait_schedulable.py`) waits for
+            # a node to appear in per_node, which means active and
+            # publishing fresh metrics -- it says nothing about a
+            # scheduler_node_capacity row, so clearing that gate does not
+            # mean the row exists yet. Waiting out a window longer than
+            # the warm-up one still catches the regression this phase
+            # exists to prevent (a row which never arrives at all) while
+            # not failing on the warm-up itself.
+            deadline = time.time() + 120
+            while True:
+                resources = self.system_client.get_cluster_resources()
+                per_node = resources['per_node'].get(node['uuid'])
+                if per_node is not None and per_node.get(
+                        'cpu_committed_row_present', True):
+                    break
+                if time.time() > deadline:
+                    break
+                time.sleep(5)
+
+            self.addDetail('resources after', content.text_content(json.dumps(
+                resources, indent=4, sort_keys=True)))
+
+            # A hypervisor which drops out of per_node entirely has stale
+            # metrics or an overlong queue, which is a different failure
+            # from an unguarded one and deserves to say so.
+            self.assertIsNotNone(
+                per_node,
+                'Node %s vanished from /admin/resources per_node while an '
+                'instance was placed on it' % node['uuid'])
             self.assertTrue(
                 per_node.get('cpu_committed_row_present', True),
-                'Node %s is admitting placements unguarded: it has no '
-                'scheduler_node_capacity row, so the capacity reconciler '
-                'has not sized it yet' % node['uuid'])
+                'Node %s is still admitting placements unguarded two '
+                'minutes after placement: it has no scheduler_node_capacity '
+                'row, so the capacity reconciler has not sized it yet'
+                % node['uuid'])
 
             # Our instance is placed here and not deleted, so the node's
             # committed total must account for at least its one vCPU

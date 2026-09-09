@@ -602,6 +602,50 @@ class CapacityCoverageTestCase(HeadroomReportTestCase):
         self.assertEqual(0, code)
         self.assertIn('NEVER OBSERVED', output)
 
+    def test_a_bundle_predating_the_flag_is_unknown_not_never(self):
+        """An old bundle must not read as a permanent regression.
+
+        A cluster whose /admin/resources predates
+        cpu_committed_row_present publishes the key nowhere, so every
+        sample parses as not covered. Scoring that as NEVER OBSERVED
+        would report the warm-up window as never having closed, when the
+        truth is that this bundle cannot answer the question at all.
+        """
+        roster = [roster_entry(NODE_ONE, 'sf1')]
+        payload = node_payload()
+        del payload['cpu_committed_row_present']
+        path = self._series([
+            sample({NODE_ONE: payload}, nodes=roster,
+                   sampled_at=1756000000.0 + 15 * i)
+            for i in range(3)
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'NOT MEASURABLE', output,
+            'A bundle which never carried cpu_committed_row_present was '
+            'scored as if the row never appeared, which reads as a '
+            'regression rather than as an unmeasurable payload.')
+        self.assertNotIn('NEVER OBSERVED', output)
+
+    def test_a_flag_present_and_false_is_still_never_observed(self):
+        """The other side of the distinction above.
+
+        A payload which carries the flag and says false is a real
+        measurement of a real unguarded node, and must keep reading as
+        NEVER OBSERVED rather than being softened into "unmeasurable".
+        """
+        roster = [roster_entry(NODE_ONE, 'sf1')]
+        path = self._series([
+            sample({NODE_ONE: node_payload(row_present=False)}, nodes=roster,
+                   sampled_at=1756000000.0 + 15 * i)
+            for i in range(3)
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn('NEVER OBSERVED', output)
+        self.assertNotIn('NOT MEASURABLE', output)
+
 
 class CensusTestCase(HeadroomReportTestCase):
     def test_an_unknown_stage_string_is_tallied_and_printed(self):

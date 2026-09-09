@@ -285,6 +285,21 @@ in the workflow rather than assuming it, and if it does not, the
 assertion waits with the suite's existing retry helper rather than
 failing on first read.
 
+**Amended after review: the gate does not cover the condition, so the
+second branch applies.** `ci_wait_schedulable.py` waits for a node to
+appear in `/admin/resources` `per_node`, which means active and
+publishing fresh metrics. It says nothing about a
+`scheduler_node_capacity` row, and by D1 that row arrives up to a
+minute later -- so clearing the gate and having the row are different
+facts, and asserting on the first read races the very window this
+phase measures. The assertion therefore waits. It does so with a
+bounded poll of `/admin/resources` rather than with
+`retries.retry_while_transient()`: that helper takes a `(status, body)`
+pair and retries on transient HTTP statuses, which is the wrong shape
+for polling a boolean field out of a successful response. The wait is
+120 s, comfortably longer than the warm-up window, so a row which
+never arrives still fails the test.
+
 Separately, `tools/ci_headroom_report.py` gains a time-to-first-
 capacity-row figure computed from the series it already parses
 (`cpu_committed_row_present` is in every sample). That is the
@@ -353,7 +368,18 @@ Falsifiable, in order:
    loop's maintenance pass rather than from election. The call at
    `main.py:879` is gone.
 2. All five pre-existing tests in `ForcedCapacityReconcileTestCase`
-   still pass unmodified.
+   still pass. *Two were modified, and this item is not met as
+   written.* Both previously reached the real
+   `mariadb.get_all_node_metrics()`, whose behaviour in a unit test
+   depends on the host: where nothing is configured it raises at once
+   and the check returns on its unknown-answer branch, so
+   `test_a_populated_table_leaves_the_cadence_alone` was passing
+   without ever reaching the question it names, and
+   `test_an_empty_table_forces_the_pass_due` was reaching the
+   empty-table branch only by way of that same accident. Both now mock
+   the three reads the check makes. The behaviour they assert is
+   unchanged; what changed is that they now assert it deterministically
+   and offline.
 3. A test asserts that a hypervisor with fresh metrics which is *not*
    in the active node set does not force a pass, and deleting the
    active-node intersection from the implementation makes that test
@@ -368,19 +394,28 @@ Falsifiable, in order:
    and the assertion that replaced it is either gated by
    `ci_wait_schedulable` running earlier in the workflow or wrapped
    in the suite's retry helper -- the commit message says which.
-7. `tools/ci_headroom_report.py` prints a time-to-first-capacity-row
+   *Met by the second branch: the gate does not cover the condition,
+   so the assertion waits. See the amendment under D6.*
+7. `_unguarded_hypervisors()` returns `None` rather than the empty set
+   for a metrics read which returned nothing, and a test fails if it
+   does not. Both transports swallow a failed read into `[]`, so the
+   empty list is an unknown answer and treating it as an authoritative
+   one would defeat D3.
+8. `tools/ci_headroom_report.py` prints a time-to-first-capacity-row
    figure, reports it as absent rather than zero when no sample has
-   every hypervisor covered, and has unit tests for both.
-8. A real CI run on `slim-tier` shows that figure under 60 s. The
+   every hypervisor covered, distinguishes a bundle which never
+   carried `cpu_committed_row_present` from one which carried it false,
+   and has unit tests for all three.
+9. A real CI run on `slim-tier` shows that figure under 60 s. The
    operator confirms this from a bundle; it cannot be checked from a
    worktree.
-9. No statement in `docs/operator_guide/scheduler.md` or
-   `docs/developer_guide/subsystem_internals.md` still implies the
-   unguarded window lasts until the five-minute cadence, and neither
-   claims it is closed immediately.
-10. #4087 is closed with a comment recording what #4106 fixed and
+10. No statement in `docs/operator_guide/scheduler.md` or
+    `docs/developer_guide/subsystem_internals.md` still implies the
+    unguarded window lasts until the five-minute cadence, and neither
+    claims it is closed immediately.
+11. #4087 is closed with a comment recording what #4106 fixed and
     what it did not.
-11. `python3 tools/check-plan-status.py` passes and
+12. `python3 tools/check-plan-status.py` passes and
     `pre-commit run --all-files` passes.
 
 ## What later phases inherit

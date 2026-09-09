@@ -852,9 +852,10 @@ class Monitor(daemon.Daemon):
     def _unguarded_hypervisors(self, rows):
         """Active hypervisors with fresh metrics and no capacity row.
 
-        Returns None if a read failed, which is a different answer from
-        the empty set for the same reason ``degraded`` is different from
-        an empty table: it means this process does not know.
+        Returns None if a read failed or could not be trusted, which is a
+        different answer from the empty set for the same reason
+        ``degraded`` is different from an empty table: it means this
+        process does not know.
         """
         try:
             metrics = mariadb.get_all_node_metrics()  # nopushdown: every node wanted
@@ -864,12 +865,46 @@ class Monitor(daemon.Daemon):
                 'reconcile on its anchored cadence')
             return None
 
+        if not metrics:
+            # An empty list is not an authoritative "this cluster has no
+            # nodes". Neither transport raises on a failed read: both
+            # _grpc_get_all_node_metrics() (on RpcError) and
+            # _direct_get_all_node_metrics() (on OperationalError) log
+            # and return []. And sf-resources publishes from every node
+            # whatever its roles, so a running cluster with no
+            # node_metrics rows at all is a cluster whose metrics could
+            # not be read rather than one with nothing to report.
+            #
+            # Reading that as the empty set would clear the
+            # once-per-condition memory below, so a cluster with a
+            # genuine unguarded hypervisor and an intermittently failing
+            # metrics read would forget what it had forced and re-force
+            # the five minute pass every time the read flapped -- the
+            # load regression the memory exists to bound.
+            LOG.warning(
+                'Read no node metrics at all, which a running cluster '
+                'does not produce; treating it as an unknown answer and '
+                'leaving the capacity reconcile on its anchored cadence')
+            return None
+
         # is_hypervisor lives inside the metrics blob rather than being a
         # top level field of the record, and is compared against True
         # rather than tested for truth: the reconciler leaves a node
         # whose value is missing or NULL (mid-upgrade, before the
         # resources daemon repopulates the column) out of both its
         # hypervisor set and its non-hypervisor set, and so do we.
+        #
+        # The two do read the fact from different storage. The
+        # reconciler filters on the typed is_hypervisor column projected
+        # at upsert time by NODE_METRICS_EXTRACTION_SPEC; this reads the
+        # JSON blob that column is derived from. They agree because
+        # sf-resources re-derives the column from this same JSON on every
+        # publication cycle, so a row whose column is still NULL from
+        # before the projection existed disagrees for at most one cycle.
+        # In that window this can qualify a node the reconciler will not
+        # size, which the once-per-condition memory bounds to a single
+        # forced pass.
+        #
         # RECONCILE_METRICS_MAX_AGE_SECONDS is imported rather than
         # restated because a check carrying its own copy of that number
         # would drift from the pass it is trying to trigger.
@@ -889,6 +924,15 @@ class Monitor(daemon.Daemon):
         # Only now is the active node set worth reading. In the steady
         # state every fresh hypervisor already has a row, so this costs
         # nothing on the overwhelming majority of maintenance passes.
+        #
+        # Note what the once-per-condition memory does and does not
+        # bound. It suppresses the forced pass and its warning, not this
+        # read: while a disagreement persists (a phantom row, a node the
+        # reconciler declines to size) this hydration runs on every
+        # maintenance pass for the life of the condition. At one read a
+        # minute that sits well under the unbudgeted ceiling
+        # test_no_unbudgeted_fixed_rate_database_polling enforces, but do
+        # not read the memory as making the whole check go quiet.
         try:
             active = {str(n.uuid) for n in Nodes([], prefilter='active')}
         except Exception as e:
