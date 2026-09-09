@@ -978,6 +978,18 @@ def claim_event(namespace='ci-namespace', claim_dimensions=None):
     return ['1756000000000000000', json.dumps(record)]
 
 
+def forced_write_event(failing_stage='node', dimensions=None):
+    record = {
+        'message': 'placement recorded despite exceeding capacity guard',
+        'extra': {
+            'node': NODE_ONE,
+            'failing_stage': failing_stage,
+            'dimensions': dimensions if dimensions is not None else [],
+        },
+    }
+    return ['1756000000000000000', json.dumps(record)]
+
+
 class GuardCensusTestCase(HeadroomReportTestCase):
     """The capacity guard's own refusals, below the stage layer.
 
@@ -1036,6 +1048,68 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             'Guard refusals: YES', output,
             'A claim exceedance was reported as a refusal. It is an ADMITTED '
             'placement; advisory mode did what the operator asked.')
+
+    def test_a_forced_write_is_counted_apart_from_refusals(self):
+        """The P5 forced ground-truth write is a recorded placement.
+
+        The collector ships it -- issue 4087's rule-out of the P5
+        mechanism needed exactly this event -- so a report which dropped
+        it would leave the durable record unable to tell a forced write
+        from the never-reconciled window once the bundles expire.
+        """
+        census = self._census([
+            denial_event(dimensions=[
+                dimension('cpus', 3.0, 3.0, 1.0, True, shortfall=1.0)]),
+            forced_write_event(dimensions=[
+                dimension('cpus', 3.0, 3.0, 1.0, True, shortfall=1.0)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        target = os.path.join(self.tempdir, 'summary.json')
+        code, output = self._run('--series', path, '--census', census,
+                                 '--json', target)
+        self.assertEqual(0, code)
+        self.assertIn('Placements refused by the guard: 1', output)
+        self.assertIn('Forced ground-truth writes past the guard (P5): 1',
+                      output)
+        with open(target) as f:
+            record = json.load(f)
+        guard = record['guard']
+        self.assertEqual(1, guard['denials'])
+        self.assertEqual(
+            1, guard['forced_writes'],
+            'The forced write was folded into another count or dropped. '
+            'It is neither a refusal nor a claim exceedance.')
+        self.assertEqual({'node': 1}, guard['forced_write_stages'])
+        self.assertEqual({'cpus': 1}, guard['forced_write_exceeded'])
+        self.assertEqual(
+            2, record['census']['guard_events'],
+            'The forced write did not count as a guard event, so it reads '
+            'as an unmatched log line rather than a guard fact.')
+
+    def test_a_forced_write_alone_is_a_collected_census(self):
+        """One forced write with no refusals must not read as not_collected.
+
+        'No guard events' is a statement about the collector's filter,
+        and a census carrying only forced writes was collected by a
+        filter which matches all three guard messages.
+        """
+        census = self._census([
+            forced_write_event(dimensions=[
+                dimension('quantum_flux', 1.0, 9.0, 1.0, True)]),
+        ])
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertNotIn('NO CAPACITY GUARD EVENTS IN THIS CENSUS.', output)
+        self.assertIn('Forced ground-truth writes past the guard (P5): 1',
+                      output)
+        self.assertIn('Placements refused by the guard: 0', output)
+        self.assertIn(
+            'quantum_flux', output,
+            'A dimension this tool has not been told about was dropped '
+            'from a forced write; the no-hardcoded-list rule (D10) applies '
+            'to every guard message equally.')
+        self.assertIn('Counted but unrecognised', output)
 
     def test_an_unknown_stage_and_dimension_are_tallied_not_dropped(self):
         """The same no-hardcoded-list rule the stage census follows (D10)."""
@@ -1477,6 +1551,7 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
             'any conclusion at all about refusals.')
         self.assertIsNone(record['guard']['denials'])
         self.assertIsNone(record['guard']['claims'])
+        self.assertIsNone(record['guard']['forced_writes'])
         self.assertIsNone(
             record['verdict']['refusal_warning'],
             'The refusal half of the band verdict must be unknown rather '

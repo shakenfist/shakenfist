@@ -209,18 +209,25 @@ MISSING_DATA_REASON = 'no memory_max in node metrics'
 
 NO_REASON = '(no reason recorded)'
 
-# The capacity guard's own two audit messages, below the stage layer the
+# The capacity guard's own three audit messages, below the stage layer the
 # constants above match. Matched on the message for the same reason the
 # stage events are: the shipped JSON's 'message' is the event's message,
 # because pylogrus merges the caller's fields over the record last.
 #
-# The two are read in one pass over the census file and tallied in two
+# The three are read in one pass over the census file and tallied in three
 # separate places, which is the whole point: 'instance placement denied' is
-# the ledger refusing a write, and 'placement admitted over namespace
-# capacity claim' is a placement which was ADMITTED, over an advisory claim
-# the operator set. The second is never added to the first.
+# the ledger refusing a write, 'placement admitted over namespace capacity
+# claim' is a placement which was ADMITTED, over an advisory claim the
+# operator set, and 'placement recorded despite exceeding capacity guard' is
+# the P5 forced ground-truth write -- a placement recorded even though the
+# guard refused it. None of the three is ever added to another. The forced
+# write is the one event which tells the P5 mechanism apart from the
+# never-reconciled window (issue 4087), and the bundles it could be read
+# from raw expire, so dropping it here would leave the durable record
+# unable to make that distinction.
 GUARD_DENIED_MESSAGE = 'instance placement denied'
 CLAIM_OVER_LIMIT_MESSAGE = 'placement admitted over namespace capacity claim'
+FORCED_WRITE_MESSAGE = 'placement recorded despite exceeding capacity guard'
 
 # The stages _direct_admit_instance_placement() can fail at, used only to
 # annotate rows -- never to filter what is tallied. An unrecognised stage
@@ -571,6 +578,13 @@ class GuardCensus:
     misread: a claim exceedance is an ADMITTED placement. Advisory mode
     exists so exceedances are observed before they are refused, so it is
     never a refusal and never enters ``denials``.
+
+    The forced-write tally is a fourth: a ground-truth writer (the
+    cleaner, or startup reconciliation) recording where a libvirt domain
+    already is, after the guard refused the write. It is the only path
+    which can push a node past its own ledger outside the
+    never-reconciled window (issue 4087), so it is counted apart from
+    everything above rather than read as either a refusal or a claim.
     """
 
     def __init__(self):
@@ -615,6 +629,11 @@ class GuardCensus:
         self.claim_namespaces = collections.Counter()
         self.claim_exceeded = collections.Counter()
 
+        self.forced_writes = 0
+        self.forced_write_malformed = 0
+        self.forced_write_stages = collections.Counter()
+        self.forced_write_exceeded = collections.Counter()
+
     @property
     def observed(self):
         """Whether this census carried any guard event at all.
@@ -624,20 +643,21 @@ class GuardCensus:
         LogQL filter selects the stage messages only. The report says so
         rather than printing a zero which reads as "nothing was refused".
         """
-        return bool(self.denials or self.claims or self.malformed
-                    or self.claim_malformed)
+        return bool(self.denials or self.claims or self.forced_writes
+                    or self.malformed or self.claim_malformed)
 
     @property
     def unrecognised_stages(self):
         # The placeholders this file writes for a missing value are not
         # unrecognised stages: they are this tool saying the event did not
         # carry one, and they are already flagged in the table.
-        return sorted(s for s in self.stages
+        return sorted(s for s in set(self.stages) | set(self.forced_write_stages)
                       if s not in GUARD_STAGE_NOTES and s != UNKNOWN_STAGE)
 
     @property
     def unrecognised_dimensions(self):
-        names = set(self.exceeded) | set(self.claim_exceeded)
+        names = (set(self.exceeded) | set(self.claim_exceeded)
+                 | set(self.forced_write_exceeded))
         return sorted(n for n in names
                       if n not in GUARD_DIMENSION_NOTES and n != UNKNOWN_DIMENSION)
 
@@ -775,6 +795,25 @@ class GuardCensus:
         for name in set(names):
             self.claim_exceeded[name] += 1
 
+    def observe_forced_write(self, extra):
+        """A ground-truth write recorded past the guard (P5).
+
+        Never added to ``denials``: the write succeeded, recording where
+        a libvirt domain already is. Tallied by the stage and dimensions
+        of the refusal it overrode, so the durable record says what was
+        exceeded without a trip back to journals which expire.
+        """
+        self.forced_writes += 1
+        stage = extra.get('failing_stage') if isinstance(extra, dict) else None
+        self.forced_write_stages[
+            stage if isinstance(stage, str) and stage else UNKNOWN_STAGE] += 1
+        names, _, well_formed = self._dimensions_of(extra, 'dimensions')
+        if not well_formed:
+            self.forced_write_malformed += 1
+            return
+        for name in set(names):
+            self.forced_write_exceeded[name] += 1
+
     def observe(self, message, extra):
         """Tally one record if it is a guard event. Returns whether it was."""
         if message == GUARD_DENIED_MESSAGE:
@@ -782,6 +821,9 @@ class GuardCensus:
             return True
         if message == CLAIM_OVER_LIMIT_MESSAGE:
             self.observe_claim(extra)
+            return True
+        if message == FORCED_WRITE_MESSAGE:
+            self.observe_forced_write(extra)
             return True
         return False
 
@@ -1314,6 +1356,7 @@ def guard_record(census):
     if state != 'collected':
         record['denials'] = None
         record['claims'] = None
+        record['forced_writes'] = None
         return record
 
     record['denials'] = guard.denials
@@ -1349,6 +1392,16 @@ def guard_record(census):
         sorted(guard.claim_exceeded.items()))
     record['claim_shortfalls'] = collections.OrderedDict(
         sorted(guard.claim_shortfalls.items()))
+
+    # A recorded write, never a refusal: the P5 ground-truth writers
+    # force a denied placement through because a guard cannot refuse
+    # where a domain already is.
+    record['forced_writes'] = guard.forced_writes
+    record['forced_write_malformed'] = guard.forced_write_malformed
+    record['forced_write_stages'] = collections.OrderedDict(
+        sorted(guard.forced_write_stages.items()))
+    record['forced_write_exceeded'] = collections.OrderedDict(
+        sorted(guard.forced_write_exceeded.items()))
     return record
 
 
@@ -1823,8 +1876,9 @@ def print_guard_census(record):
         print('  filter, and if that filter selects only the scheduler stage')
         print('  messages then a guard which refused every candidate leaves')
         print('  nothing here to count. The filter must also match')
-        print('  %r' % GUARD_DENIED_MESSAGE)
-        print('  and %r' % CLAIM_OVER_LIMIT_MESSAGE)
+        print('  %r,' % GUARD_DENIED_MESSAGE)
+        print('  %r' % CLAIM_OVER_LIMIT_MESSAGE)
+        print('  and %r' % FORCED_WRITE_MESSAGE)
         print('  for this section to mean anything at all.')
         if census['stage_events']:
             print('  This census DID carry %d schedule stage %s, so the log'
@@ -1939,6 +1993,32 @@ def print_guard_census(record):
             print('  Counted but unrecognised %s: %s'
                   % (plural(len(unrecognised), what),
                      ', '.join(unrecognised)))
+
+    print()
+    print('  Forced ground-truth writes past the guard (P5): %d'
+          % guard['forced_writes'])
+    if guard['forced_writes']:
+        print('    These placements were RECORDED after the guard refused')
+        print('    them: a cleaner or startup-reconciliation write saying')
+        print('    where a libvirt domain already is, which a guard cannot')
+        print('    refuse. This is the one event which tells the P5 forced')
+        print('    write apart from the never-reconciled window (issue 4087),')
+        print('    and it can push a node past its own ledger.')
+        if guard['forced_write_stages']:
+            print('    Overridden stages: %s' % ', '.join(
+                '%s x%d' % (stage, count)
+                for stage, count in sorted(
+                    guard['forced_write_stages'].items(),
+                    key=lambda kv: (-kv[1], kv[0]))))
+        if guard['forced_write_exceeded']:
+            print('    Exceeded dimensions: %s' % ', '.join(
+                '%s x%d' % (name, count)
+                for name, count in sorted(
+                    guard['forced_write_exceeded'].items(),
+                    key=lambda kv: (-kv[1], kv[0]))))
+        if guard['forced_write_malformed']:
+            print('    %d carried no usable dimensions list.'
+                  % guard['forced_write_malformed'])
 
     print()
     print('  Claim exceedances (ADMITTED, never refused): %d' % guard['claims'])
