@@ -111,9 +111,11 @@ def generate_keypair() -> dict[str, Any]:
 def get_signing_material() -> Optional[dict[str, Any]]:
     """Return the stored signing material, or None if the row is absent.
 
-    Reads the ``KERBSIDE_JWT_SIGNING_KEY`` row via
-    ``mariadb.get_cluster_config()``. Both the direct and gRPC read
-    paths JSON-decode the value before returning it, so in normal
+    Reads only the ``KERBSIDE_JWT_SIGNING_KEY`` row via
+    ``mariadb.get_cluster_config_value()`` -- a full-table read here
+    would materialise every cluster secret per call to a
+    namespace-readable endpoint (issue 4096). Both the direct and gRPC
+    read paths JSON-decode the value before returning it, so in normal
     operation we receive an already-parsed dict. We stay defensive
     against a raw JSON string arriving (for example if the value is
     ever surveyed through a path that does not decode) and parse it.
@@ -123,7 +125,7 @@ def get_signing_material() -> Optional[dict[str, Any]]:
     # module risks a circular import (see config.load_cluster_config).
     from shakenfist import mariadb
 
-    value = mariadb.get_cluster_config().get(SIGNING_KEY_CONFIG_NAME)
+    value = mariadb.get_cluster_config_value(SIGNING_KEY_CONFIG_NAME)
     if value is None:
         return None
     if isinstance(value, str):

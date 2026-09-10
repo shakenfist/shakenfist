@@ -556,8 +556,26 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.ClusterConfigRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.ClusterConfigReply:
-        """Get all cluster config entries."""
+        """Get cluster config entries.
+
+        A request naming a key_name returns zero or one entries via an
+        indexed single-row read; an empty key_name returns every row.
+        Single-key callers must name their key so the full table -- which
+        includes cluster secrets -- stays out of the reply (issue 4096).
+        """
         try:
+            if request.key_name:
+                self.monitor.counters['get_cluster_config_value'].inc()
+                value = mariadb._direct_get_cluster_config_value(
+                    request.key_name)
+                if value is None:
+                    return database_pb2.ClusterConfigReply(entries=[])
+                return database_pb2.ClusterConfigReply(entries=[
+                    database_pb2.ClusterConfigEntry(
+                        key_name=request.key_name,
+                        value_json=json.dumps(value),
+                    )])
+
             self.monitor.counters['get_cluster_config'].inc()
             config_data = mariadb._direct_get_all_cluster_config()
             entries = []
@@ -6373,8 +6391,8 @@ class Monitor(daemon.WorkerPoolDaemon):
             'find_existing_coalescible_op_v2',
             'acquire_lock', 'release_lock', 'refresh_lock', 'get_lock_holder',
             'clear_stale_locks', 'get_existing_locks',
-            'get_cluster_config', 'set_cluster_config',
-            'delete_cluster_config',
+            'get_cluster_config', 'get_cluster_config_value',
+            'set_cluster_config', 'delete_cluster_config',
             'record_event_batch', 'prune_events',
             'get_object_events', 'delete_object_events',
             # MariaDB state operations

@@ -832,12 +832,21 @@ class ClusterConfigRequest(_message.Message):
 
     DESCRIPTOR: _descriptor.Descriptor
 
+    KEY_NAME_FIELD_NUMBER: _builtins.int
+    key_name: _builtins.str
+    """When set, return only this key (zero or one entries). An empty
+    key_name returns every row, which materialises cluster secrets in
+    the reply; single-key callers must set this so secrets they have
+    no business reading stay off the wire.
+    """
     def __init__(
         self,
+        *,
+        key_name: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["key_name", b"key_name"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

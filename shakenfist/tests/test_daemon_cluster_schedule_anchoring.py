@@ -99,12 +99,12 @@ class AnchorScheduledJobsTestCase(base.ShakenFistTestCase):
         return m, job
 
     @mock.patch(
-        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config')
+        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config_value')
     def test_an_overdue_stamp_makes_the_job_due_now(self, mock_get):
         # The heart of issue 3869: at registration the daily job is a
         # day away, so a process which never lives a day never prunes.
         # A stamp 40 days old must pull the job due immediately.
-        mock_get.return_value = {PRUNE_KEY: time.time() - (40 * 86400)}
+        mock_get.side_effect = {PRUNE_KEY: time.time() - (40 * 86400)}.get
         m, job = self._monitor_with_daily_prune()
         self.assertFalse(job.should_run)
 
@@ -113,13 +113,13 @@ class AnchorScheduledJobsTestCase(base.ShakenFistTestCase):
         self.assertTrue(job.should_run)
 
     @mock.patch(
-        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config')
+        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config_value')
     def test_a_recent_stamp_defers_the_job(self, mock_get):
         # A lock handover must not re-fire a task another node ran an
         # hour ago: the next run is one period after that run, not one
         # period after this node's registration.
         stamp = time.time() - 3600
-        mock_get.return_value = {PRUNE_KEY: stamp}
+        mock_get.side_effect = {PRUNE_KEY: stamp}.get
         m, job = self._monitor_with_daily_prune()
 
         m._anchor_scheduled_jobs()
@@ -131,8 +131,8 @@ class AnchorScheduledJobsTestCase(base.ShakenFistTestCase):
             job.next_run)
 
     @mock.patch(
-        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config',
-        return_value={})
+        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config_value',
+        return_value=None)
     def test_a_missing_stamp_makes_the_job_due_now(self, mock_get):
         # No stamp means the task has never verifiably run (the first
         # election after this code lands): run it on the first pass.
@@ -141,9 +141,12 @@ class AnchorScheduledJobsTestCase(base.ShakenFistTestCase):
         m._anchor_scheduled_jobs()
 
         self.assertTrue(job.should_run)
+        # Issue 4096: each stamp is fetched by key, not by pulling the
+        # whole cluster_config table (which holds cluster secrets).
+        mock_get.assert_called_once_with(PRUNE_KEY)
 
     @mock.patch(
-        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config',
+        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config_value',
         side_effect=DatabaseUnavailable('tier is down'))
     def test_an_unreadable_database_keeps_process_local_timers(
             self, mock_get):
@@ -158,9 +161,9 @@ class AnchorScheduledJobsTestCase(base.ShakenFistTestCase):
         self.assertEqual(before, job.next_run)
 
     @mock.patch(
-        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config')
+        'shakenfist.daemons.cluster.main.mariadb.get_cluster_config_value')
     def test_a_corrupt_stamp_is_ignored(self, mock_get):
-        mock_get.return_value = {PRUNE_KEY: 'not a timestamp'}
+        mock_get.side_effect = {PRUNE_KEY: 'not a timestamp'}.get
         m, job = self._monitor_with_daily_prune()
         before = job.next_run
 

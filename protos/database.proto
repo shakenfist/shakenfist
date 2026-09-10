@@ -658,7 +658,13 @@ message ClusterGetExistingLocksReply {
 
 // Cluster Config
 
-message ClusterConfigRequest {}
+message ClusterConfigRequest {
+  // When set, return only this key (zero or one entries). An empty
+  // key_name returns every row, which materialises cluster secrets in
+  // the reply; single-key callers must set this so secrets they have
+  // no business reading stay off the wire.
+  string key_name = 1;
+}
 
 message ClusterConfigEntry {
   string key_name = 1;
