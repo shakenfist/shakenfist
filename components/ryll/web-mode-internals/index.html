@@ -10815,6 +10815,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#choosing-a-wake-primitive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a wake primitive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#server-side-reaper-ryllsrcweblifecyclers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14469,6 +14480,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#choosing-a-wake-primitive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a wake primitive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#server-side-reaper-ryllsrcweblifecyclers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14939,17 +14961,28 @@ WebRTC bring-up explicitly allowed stubbing this, and it is
 carried as future work in
 <a href="/components/ryll/plans/PLAN-web-frontend/"><code>PLAN-web-frontend.md</code></a>.</p>
 <h3 id="webrtc-rs-convention-handler-methods-must-never-block">webrtc-rs convention: handler methods must never block<a class="headerlink" href="#webrtc-rs-convention-handler-methods-must-never-block" title="Permanent link">&para;</a></h3>
-<p>See the "WebRTC conventions" section in <a href="https://github.com/shakenfist/ryll/blob/develop/AGENTS.md"><code>AGENTS.md</code></a> for the
-normative rule. In short: webrtc-rs 0.20 awaits every
-<code>PeerConnectionEventHandler</code> method inline in the peer
-connection's driver event loop, so a handler method that loops
-(like a datachannel or track read loop) or blocks on a slow
-consumer stalls the whole connection. <code>bridge.rs</code> has no
-<code>on_track</code> implementation — the bridge only sends media, it does
-not receive any — but the same rule is why <code>on_data_channel</code>
-spawns a pump task instead of polling inline, and why
-<code>BridgeEvents::on_state_change</code> uses <code>try_send</code> rather than
-<code>send().await</code>.</p>
+<p>This is the normative statement of the rule; <code>AGENTS.md</code>
+carries a summary of it.</p>
+<p>webrtc-rs 0.20 replaced the per-object callback registrations
+(<code>on_peer_connection_state_change</code>, <code>on_track</code>,
+<code>on_data_channel</code>, <code>on_message</code>, ...) with one
+<code>PeerConnectionEventHandler</code> supplied to the builder before the
+peer connection exists, and the driver event loop awaits every
+method on it inline. A handler method that loops (like a
+datachannel or track read loop) or blocks on a slow consumer
+therefore stalls the whole connection, not just the event it is
+handling. That is stricter than pre-0.20, where only <code>on_track</code>
+firings were serialised on each other.</p>
+<p>So anything that needs to <em>loop</em> must <code>tokio::spawn</code> and return
+immediately, and anything that needs to hand off from inside a
+handler method must use <code>try_send</code>, never <code>send().await</code>, so
+that a full channel degrades to a dropped message rather than
+stalling the driver.</p>
+<p><code>bridge.rs</code> has no <code>on_track</code> implementation — the bridge only
+sends media, it does not receive any — but the same rule is why
+<code>on_data_channel</code> spawns a pump task instead of polling inline,
+and why <code>BridgeEvents::on_state_change</code> uses <code>try_send</code> rather
+than <code>send().await</code>.</p>
 <p>The rule follows the dispatch path, not the type. Only the
 methods reached from <code>BridgeHandler</code> run inline.
 <code>on_control_message</code> lives on the same struct but is called from
@@ -14958,7 +14991,10 @@ datachannel's poll loop and nothing else — which is why it
 awaits. That is the right trade for an ordered, reliable channel
 carrying input: back-pressure onto SCTP costs latency, whereas a
 dropped key-up leaves a modifier stuck down in the guest and
-never gets redelivered.</p>
+never gets redelivered. Applying "never block" to
+<code>on_control_message</code> cost real input events before it was
+caught, so check where a function is actually <em>called from</em>
+before applying the rule to it.</p>
 <h2 id="spice-wire-up">SPICE wire-up<a class="headerlink" href="#spice-wire-up" title="Permanent link">&para;</a></h2>
 <p>Four connections carry real data between the SPICE session and the
 bridge: display frames, audio, keyboard/mouse input, and cursor overlay.</p>
@@ -15148,6 +15184,32 @@ consumer this matters to.</p>
   keeping a reference to the bridge; <code>handle.wait().await</code>
   is equivalent to <code>wait_for_dead()</code>.</li>
 </ul>
+<h3 id="choosing-a-wake-primitive">Choosing a wake primitive<a class="headerlink" href="#choosing-a-wake-primitive" title="Permanent link">&para;</a></h3>
+<p>A one-shot lifecycle fact uses <code>StickySignal</code>. A recurring nudge
+uses a bare <code>Notify</code> plus an explicit re-check of the condition
+that matters. Both halves of that rule are load-bearing, and
+both were bugs before they were rules.</p>
+<p><code>Notify::notify_waiters()</code> wakes only the waiters registered at
+that instant, so a waiter that subscribes afterwards blocks
+forever — and <code>Notified</code> does not register interest until it is
+first polled, which leaves the naive "check a flag, then await"
+ordering with a lost-wakeup window. That was a real production
+bug in the bridge reaper. <code>StickySignal</code> (<code>sticky.rs</code>) packages
+the correct pattern — <code>Notified::enable()</code> before the flag check
+on the wait side, <code>notify_waiters()</code> on the raise side, never
+<code>notify_one()</code>, which would leak a permit — and is unit-tested
+against the lost-wakeup schedule. Do not hand-roll another copy;
+that is how the original bug got in.</p>
+<p><code>WebState::bridge_replaced</code> is the other case, and the rules
+invert. It is a bare <code>Notify</code> using <code>notify_one()</code> on purpose:
+the stored permit is the feature, because it survives the
+reaper's 500 ms no-bridge sleep and is still there when the loop
+next parks. The cost is that such a wake carries no information.
+Any loop that gains a second wake source must re-check the
+condition it actually cares about rather than treating the wake
+as proof — the reaper waking and concluding "my bridge died" is
+a bug that shipped, and the fix was to gate the reap on
+<code>StickySignal::is_raised</code>, which is step 4 of the loop below.</p>
 <h3 id="server-side-reaper-ryllsrcweblifecyclers">Server-side reaper (<code>ryll/src/web/lifecycle.rs</code>)<a class="headerlink" href="#server-side-reaper-ryllsrcweblifecyclers" title="Permanent link">&para;</a></h3>
 <p><code>run_bridge_reaper(state: Arc&lt;WebState&gt;)</code> is a long-lived
 task spawned from <code>run_web</code>. Its loop:</p>

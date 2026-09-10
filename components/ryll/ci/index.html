@@ -10100,6 +10100,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-mermaid-lint-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The mermaid lint lane
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The mermaid lint lane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#it-is-deliberately-not-a-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        It is deliberately not a gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-three-gates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14013,6 +14041,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-mermaid-lint-lane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The mermaid lint lane
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The mermaid lint lane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#it-is-deliberately-not-a-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        It is deliberately not a gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-three-gates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14612,6 +14668,55 @@ reporter without waiting for a real failure to do it.</p>
 <code>coverage-fuzz.yml</code>; the criterion is
 <a href="https://github.com/shakenfist/development/blob/main/docs/audits/fuzz-nightly-reporting.md">fuzz-nightly-reporting</a>
 in shakenfist/development.</p>
+<h2 id="the-mermaid-lint-lane">The mermaid lint lane<a class="headerlink" href="#the-mermaid-lint-lane" title="Permanent link">&para;</a></h2>
+<p><code>mermaid-lint.yml</code> renders every tracked markdown file that
+contains a mermaid diagram and fails on any that does not parse.
+It is a copy of <code>templates/mermaid-lint/</code> from
+<code>shakenfist/development</code> — both the workflow and
+<code>tools/mermaid-lint.sh</code> are byte-identical to the template, so
+drift shows up as a diff rather than as a surprise. Sync from
+there rather than editing either file here.</p>
+<p>A mermaid syntax error is invisible to everything else in CI. It
+commits cleanly, passes rustfmt, clippy, shellcheck and
+skillsaw, and then shows an error box on GitHub and nothing at
+all on the mkdocs site. Nothing else reads a diagram, which is
+the gap this lane closes.</p>
+<p>It runs on <code>pull_request</code> and on pushes to <code>develop</code>, filtered
+to markdown plus the two files that make up the lane itself, so
+a change to the checker that touches no markdown still runs it.
+<code>REVIEWS.md</code> is excluded on both sides — the workflow's filter
+and the script's own candidate set — because a review session
+rewrites it without changing a diagram, and the two exclusions
+have to move together.</p>
+<p>The job needs a docker daemon, because <code>mmdc</code> renders through a
+headless browser and the fleet keeps chromium off the runners.
+That is why it asks for <code>debian-12-docker</code> rather than a static
+runner. The container runs with <code>--network none</code>: rendering is a
+local operation, and this is third-party code driving a browser
+over repository content.</p>
+<p>To run it locally, which the pre-push audit's documentation
+review should:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>tools/mermaid-lint.sh<span class="w">            </span><span class="c1"># every tracked markdown file</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tools/mermaid-lint.sh<span class="w"> </span>docs/x.md<span class="w">  </span><span class="c1"># just this one</span>
+</code></pre></div>
+<p>Check the exit status directly rather than piping the script
+into <code>tail</code> or <code>grep</code>, which reports the filter's status and
+turns every failure green.</p>
+<h3 id="it-is-deliberately-not-a-gate">It is deliberately not a gate<a class="headerlink" href="#it-is-deliberately-not-a-gate" title="Permanent link">&para;</a></h3>
+<p>This lane is the one job that can fail a pull request without a
+gate depending on it, and that is on purpose rather than an
+oversight of the rule in <a href="#the-three-gates">the three gates</a>.</p>
+<p>It is path-filtered, so it does not run at all on a pull request
+that touches no markdown. A required status check that never
+reports blocks the pull request forever, so making this one
+required would mean every Rust-only change waiting on a check
+that will never arrive. Adding <code>merge_group</code> instead does not
+help either: <code>paths</code> is not supported on that event, so every
+merge would spin a virtual machine to lint diagrams the pull
+request already linted.</p>
+<p>So it is advisory. A red <strong>Mermaid lint</strong> on a pull request is
+visible and is expected to be fixed, but nothing enforces that
+automatically.</p>
 <h2 id="the-three-gates">The three gates<a class="headerlink" href="#the-three-gates" title="Permanent link">&para;</a></h2>
 <p>The <code>develop</code> ruleset requires exactly three status checks, and
 none of them builds anything — they are aggregators over the
@@ -14629,10 +14734,10 @@ jobs that do:</p>
 failed or was skipped, and then evaluates a jq expression over
 the <code>needs</code> context that maps each dependency to "success or
 skipped" and requires all of them:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>jq<span class="w"> </span><span class="s1">'. | to_entries</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="s1">      | map([.value.result == "success",</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="s1">             .value.result == "skipped"] | any)</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="s1">      | all'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>jq<span class="w"> </span><span class="s1">'. | to_entries</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="s1">      | map([.value.result == "success",</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="s1">             .value.result == "skipped"] | any)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="s1">      | all'</span>
 </code></pre></div>
 <p>Treating a skipped dependency as success is what makes the
 review-only fast path work — see below. A failed or cancelled
@@ -14649,6 +14754,9 @@ the automated reviewer should wait for them, to
 <code>automated_reviewer</code>); add merge-tier jobs to <code>can_merge</code>. A
 job that no gate depends on can fail without blocking
 anything.</p>
+<p>There is one deliberate exception: the mermaid lint lane,
+which is path-filtered and so cannot be required. See <a href="#the-mermaid-lint-lane">the
+mermaid lint lane</a>.</p>
 </div>
 <h2 id="the-life-of-a-pull-request">The life of a pull request<a class="headerlink" href="#the-life-of-a-pull-request" title="Permanent link">&para;</a></h2>
 <ol>
@@ -14775,11 +14883,11 @@ by <code>export-repo-config.yml</code>, which runs daily and on demand.</p>
 <h2 id="reproducing-ci-locally">Reproducing CI locally<a class="headerlink" href="#reproducing-ci-locally" title="Permanent link">&para;</a></h2>
 <p>Every Linux x86_64 job runs inside the devcontainer via the
 Makefile, so the local commands are the ones CI runs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span>lint<span class="w">            </span><span class="c1"># rustfmt + clippy, as the Lint job</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>make<span class="w"> </span>check-windows<span class="w">   </span><span class="c1"># the Windows cross-check</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">            </span><span class="c1"># the unit test suite</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>make<span class="w"> </span>web-smoke<span class="w">       </span><span class="c1"># --web startup and shutdown</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>make<span class="w"> </span>web-smoke-tls<span class="w">   </span><span class="c1"># the same, with TLS</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>make<span class="w"> </span>lint<span class="w">            </span><span class="c1"># rustfmt + clippy, as the Lint job</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>make<span class="w"> </span>check-windows<span class="w">   </span><span class="c1"># the Windows cross-check</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">            </span><span class="c1"># the unit test suite</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>make<span class="w"> </span>web-smoke<span class="w">       </span><span class="c1"># --web startup and shutdown</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>make<span class="w"> </span>web-smoke-tls<span class="w">   </span><span class="c1"># the same, with TLS</span>
 </code></pre></div>
 <p>The merge tier cannot be reproduced locally — we own no macOS,
 Windows, or aarch64 Linux hardware, which is also why those jobs
@@ -14820,6 +14928,10 @@ consistency audit.</p>
 <td>Nightly <code>cargo-fuzz</code> build and smoke run against develop; failures filed as issues</td>
 </tr>
 <tr>
+<td><code>mermaid-lint.yml</code></td>
+<td>Renders every mermaid diagram in the repository's markdown; advisory, not a gate</td>
+</tr>
+<tr>
 <td><code>renovate.yml</code></td>
 <td>Automated dependency updates (hourly)</td>
 </tr>
@@ -14852,16 +14964,16 @@ queues behind it.</p>
 <p>Use the job-level form rather than the workflow-level one, so
 that unrelated jobs in the same workflow do not cancel each
 other:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">jobs</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">my-job</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">vm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-12</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">s</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">concurrency</span><span class="p">:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.workflow }}-${{ github.ref }}-my-job</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">jobs</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">my-job</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">vm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-12</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">s</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">concurrency</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.workflow }}-${{ github.ref }}-my-job</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>Comment-triggered workflows (<code>pr-retest</code>, <code>pr-re-review</code>) need a
 different group key:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pr-retest-${{ github.event.issue.number }}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pr-retest-${{ github.event.issue.number }}</span>
 </code></pre></div>
 <p><code>github.ref</code> points at the default branch for <code>issue_comment</code>
 events, so it does not distinguish one pull request from
@@ -14874,11 +14986,11 @@ every push to <code>develop</code>. A group keyed on it is therefore unique
 per rebuild, <code>cancel-in-progress</code> never matches, and superseded
 merge groups run to completion holding runners the whole fleet
 shares. Branch the key on the event:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">        </span><span class="no">${{ github.workflow }}-my-job-${{</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">        </span><span class="no">github.event_name == 'merge_group'</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">        </span><span class="no">&amp;&amp; format('merge_group-{0}', github.event.merge_group.base_ref)</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="no">|| github.ref }}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">        </span><span class="no">${{ github.workflow }}-my-job-${{</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="no">github.event_name == 'merge_group'</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">        </span><span class="no">&amp;&amp; format('merge_group-{0}', github.event.merge_group.base_ref)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">        </span><span class="no">|| github.ref }}</span>
 </code></pre></div>
 <p>The <code>merge_group-</code> prefix keeps a queue run from sharing a group
 with a <code>workflow_dispatch</code> run on <code>develop</code>, whose <code>github.ref</code>
@@ -14900,7 +15012,7 @@ takes a <code>workflow_dispatch</code>, and a manual run <em>should</em> superse
 an in-flight nightly rather than queue behind it. It resolves
 that by making the flag an expression rather than choosing one
 answer for both events:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'workflow_dispatch' }}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event_name == 'workflow_dispatch' }}</span>
 </code></pre></div>
 <p>A flat <code>true</code> there is the general rule's case exactly. The job
 waits on the same starved <code>l</code> pool the lane exists to get out of
