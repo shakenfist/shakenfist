@@ -136,3 +136,11 @@ diff of every phase in the plan against `develop`, not the last phase's diff
 alone. Findings land as their own pull request, and the plan is not complete
 until each is resolved or declined in writing here. If the audit finds
 nothing, that is recorded in one sentence.
+
+There are no phases yet, so there is nothing to record a `Merged` entry
+against. When they are cut, each phase records what put it on `develop`
+-- the merge commit of its pull request, so that `<sha>^1..<sha>` is the
+whole of what that phase landed -- as a `Merged` column in the Execution
+table, or as a `Merged:` line in the phase's own section if the phases
+are written as prose. That record is what this audit reads, because by
+the time it runs a diff against `develop` will be empty.
