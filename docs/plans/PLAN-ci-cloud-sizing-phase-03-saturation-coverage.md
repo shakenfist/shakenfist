@@ -140,11 +140,13 @@ in the planning commit -- do not redo them.
 including the umbrella the phase is framed around.** #3772 closed
 **2026-09-09T13:09:41Z** as `COMPLETED`, #3496 on 2026-08-29,
 #3696 on 2026-09-05; #3813, #3565 and #3907 were already closed
-when phase 0 wrote the table. Only #3718 (the second shape of the
-runner-communication family, out of scope per D8) is still open.
-The master plan's phase 3 section says "the issue records what it
-should do, so growing the clouds cannot quietly close it" -- there
-is no longer an open issue holding that record.
+when phase 0 wrote the table. Of the six, only #3718 (the second
+shape of the runner-communication family, out of scope per D8) was
+still open when this plan was written. The master plan's phase 3
+section says "the issue records what it should do, so growing the
+clouds cannot quietly close it" -- and at that point no open issue
+held that record. **#3772 has since been reopened; see the
+resolution below.**
 
 Two further facts about #3772's closure, because they change what
 this phase can assume:
@@ -161,16 +163,50 @@ this phase can assume:
   node's committed vCPU at peak fraction 1.000. So the signature was
   still occurring hours before the issue was closed.
 
-The reading this phase adopts is that the record moved rather than
-the problem, and that the durable statement of what a capacity
-refusal *should* do is now
-[PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md)
-rather than an issue. That plan still describes #3772 as open (at
-its *Related issues* section); correcting it belongs to that plan's
-own next phase and is reported rather than done here. **This is the
-finding the back brief asks the operator to confirm**, because if
-#3772 was instead closed as *fixed*, phase 3's tests are asserting
-behaviour someone believes has changed.
+**Resolved 2026-09-10: the closure was an error, and #3772 is
+reopened.** The back brief asked the operator which reading was
+intended, because if #3772 had been closed as *fixed* then this
+phase's tests would be asserting a contract someone expects to
+change. It was not. Three recurrences postdate the closure --
+[34398770295](https://github.com/shakenfist/shakenfist/actions/runs/34398770295)
+on `fd617fe72`,
+[34426395717](https://github.com/shakenfist/shakenfist/actions/runs/34426395717)
+and
+[34433668437](https://github.com/shakenfist/shakenfist/actions/runs/34433668437)
+on `cd379c627` -- all three in merge groups for changes that cannot
+reach admission (a keyed `cluster_config` read, and two Renovate
+type-stub bumps). The second is decisive, because its census
+separates the two candidate causes: capacity-row coverage was
+complete **0 seconds** after the first sample, so #4087's warm-up
+fix was live, and yet two of the three hypervisors sat at
+committed-vCPU peak *and* p90 fraction 1.000 for the whole
+1665-second window. That is genuine exhaustion of the admission
+ledger, not a node recorded above its limit during an unguarded
+window. The issue was reopened carrying that evidence, and the
+`automated-fix-attempted` label was left in place so the issue-fix
+workflow does not race this phase.
+
+So the record is held by the issue *and* by
+[PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md),
+which owns making a refusal transient and which this plan does not
+touch; that plan's *Related issues* section describing #3772 as
+open is correct again, and needs no edit. **This phase's tests
+assert today's behaviour unchanged, and 3a's helper docstring is
+right about what will change it.**
+
+One thing in the evidence did move, and it weakens an assumption
+made elsewhere in this plan. The 2026-09-08 research into #3772
+found that every post-#4106 507 was a `force_placement`
+single-candidate create onto one of the 3-vCPU infra nodes
+(`NODE_CPU_RESERVATION_THREADS=4` on a 4-thread node yields
+`cpu_schedulable=1`, hence limit 3) *while the cluster still held
+3-9 of its 12 vCPU*. The runs above have far less slack than that:
+two nodes pinned for a whole window. D23 sizes its fill from the
+node's own `cpu_limit - cpu_committed` and so still works, but the
+risks table's reading -- that one node can be filled without
+disturbing the other four workers -- is less safe than when it was
+written, and D26's skip is doing more of the work than the table
+credits it with.
 
 **F2 -- A stale line reference.** Phase 0's inventory cites
 `_has_idle_disk_bandwidth()` at `shakenfist/scheduler.py:329`; it is
@@ -454,11 +490,11 @@ have used them. 3g is last.
 
 | Risk | Mitigation | Who checks |
 |------|-----------|------------|
-| The fill in 3c starves the other four stestr workers and manufactures the very 507s this plan exists to remove. | D23 bounds the fill to a single hypervisor, and D26 skips when that node is not comfortably free. On `slim-tier` (three nodes, 12 vCPU) filling one 6 vCPU node is half the cluster, which is the worst case; if the merge-run evidence after 3c shows a rise in other tests' 507s, the test is restricted to `slim-primary` by a topology skip rather than kept and tuned. | The operator, over the merge runs following 3c, against the phase 1 census. |
+| The fill in 3c starves the other four stestr workers and manufactures the very 507s this plan exists to remove. | D23 bounds the fill to a single hypervisor, and D26 skips when that node is not comfortably free. On `slim-tier` (three nodes, 12 vCPU) filling one 6 vCPU node is half the cluster, which is the worst case; if the merge-run evidence after 3c shows a rise in other tests' 507s, the test is restricted to `slim-primary` by a topology skip rather than kept and tuned. **Amended 2026-09-10:** F1's newest runs show two of three `slim-tier` hypervisors pinned at their ceiling for a whole run, so the headroom this row assumed is not reliably there and D26's skip, not the single-node bound, is the load-bearing mitigation. Expect 3c to skip often on `slim-tier`; a 3c that never skips there is evidence the skip predicate is wrong, not that the cluster is roomy. | The operator, over the merge runs following 3c, against the phase 1 census. |
 | The new tests become the flake source. | Every test skips on ambient shortage (D26), and the Definition of done requires clean merge runs after landing, not just a green branch. | 3g, and the operator. |
 | A test asserts a refusal produced by an unreadable capacity table rather than by a full one, and passes for the wrong reason. | D26 skips on `capacity_degraded` and on a missing capacity row -- the exact distinction phase 2's D19 added the flag to make answerable. | 3b and 3c briefs; mutation testing in 3c. |
 | The refusal contract changes under us when the sibling plan's phase 4 lands, and eight tests need editing. | D27's single helper, and its docstring naming the plan that will change it. | 3a. |
-| #3772 was closed as *fixed* rather than *superseded*, so this phase asserts behaviour someone believes has changed. | The back brief asks the operator directly before any step runs. F1 records both readings and the evidence for each. | The operator, before 3a. |
+| ~~#3772 was closed as *fixed* rather than *superseded*, so this phase asserts behaviour someone believes has changed.~~ **Retired 2026-09-10:** the closure was an error and the issue is reopened, so the contract this phase asserts is not expected to change. See F1. | n/a. | Resolved before 3a. |
 | 3e cannot be verified before it merges, the same seam that made phase 2's 2e awkward. | Sequenced early, reviewed as a diff, and confirmed from a real merge run's census section before 3f reads the census. | The operator. |
 
 ## Definition of done
@@ -502,8 +538,10 @@ Falsifiable, in order:
     worker's load: for each, the failure modes are enumerated in
     its docstring and each is either asserted or skipped.
 11. The master plan's phase 3 section describes what this phase did
-    rather than what it was expected to do in August, and the
-    `#3772 is open` framing is gone from it.
+    rather than what it was expected to do in August, and every
+    statement it makes about #3772's state matches
+    `gh issue view 3772 --json state,stateReason` on the day the
+    phase closes out.
 12. `python3 tools/check-plan-status.py` passes, and `pre-commit
     run --all-files` passes in the main repository.
 
@@ -532,15 +570,16 @@ Falsifiable, in order:
 Before executing any step, back brief the operator on the
 understanding of this plan, and in particular on:
 
-* **F1 -- why #3772 was closed.** It closed by hand on 2026-09-09
-  with no comment, hours after two fresh recurrences and six hours
-  after the #4087 warm-up fix, and no commit claims it. This phase
-  assumes the record moved to
-  `PLAN-transient-capacity-refusals.md` and the tests should assert
-  today's behaviour unchanged. If the intent was instead that the
-  warm-up fix *fixed* it, some of these tests are asserting a
-  contract that is expected to change, and 3a's helper docstring is
-  wrong about what changes it. This should be settled before 3a.
+* **F1 -- why #3772 was closed. Settled 2026-09-10, before 3a: the
+  closure was an error and the issue is reopened.** The question was
+  whether the #4087 warm-up fix was thought to have *fixed* it, in
+  which case some of these tests would assert a contract expected to
+  change and 3a's helper docstring would be wrong about what changes
+  it. Three recurrences postdating the closure answer it -- one with
+  the warm-up fix demonstrably live and two hypervisors at their
+  ledger ceiling for the whole run. The tests assert today's
+  behaviour unchanged, as planned. No gate remains here; F1 carries
+  the evidence and the one assumption it weakened.
 * **D23 and D24 together**, which replace the master plan's "fill a
   cluster to its ledger" with "fill one node, and prove the
   contract with a request no cluster could satisfy". This is the

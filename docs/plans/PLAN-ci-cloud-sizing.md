@@ -1069,8 +1069,12 @@ August, and both are recorded in
   job-runs, "the cluster's remaining ledger" is not a quantity a
   test can name.
 * This section said the *issue* records what the behaviour should
-  be, naming #3772. That issue closed on 2026-09-09, and the
-  record now lives in
+  be, naming #3772. That issue was closed on 2026-09-09 and
+  **reopened on 2026-09-10**, the closure having been made in
+  error -- three recurrences postdate it, one with the #4087
+  warm-up fix demonstrably in effect and two of three hypervisors
+  pinned at their ledger ceiling for a whole run. So the issue does
+  hold the record again, and it is held jointly with
   [PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md)
   -- a sibling plan which owns making a capacity refusal
   transient, and which this plan deliberately does not touch.
