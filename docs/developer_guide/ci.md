@@ -128,6 +128,56 @@ that connects and then stops responding; without this the job would stall
 until the CI runner's own timeout killed it, with no indication of which test
 was to blame.
 
+## Creating instances in the functional suite
+
+Every functional test creates instances through `self.create_instance()` on
+`BaseTestCase` (`shakenfist/deploy/shakenfist_ci/base.py`), never through a
+client's `create_instance()` directly. The wrapper forwards its arguments
+unchanged and waits out a transient `InsufficientResourcesException` (a 507)
+rather than failing the test on it.
+
+The reason is that a 507 on a shared CI cluster is usually a statement about
+a moment, not about the cluster: the capacity the refusing node is holding is
+very often already being returned by a sibling test that is mid-delete.
+Failing the test on that makes a run's pass/fail a coin flip on sibling
+timing. The wrapper polls `/admin/resources` for room for up to
+`CLUSTER_HEADROOM_WAIT` -- 420 seconds, the same deadline
+`cluster_ci_tests/test_namespace_claims.py` already used for the same
+reason -- and only for a plain 507: an `AffinityConstraintUnsatisfiable` 409
+is never caught, because that refusal does not become satisfiable by
+waiting.
+
+If the deadline passes, which is what it means for a test that is genuinely
+asking for more than the cloud has, the test fails with the last refusal's
+body, the node the wrapper waited for (or "unpinned" if the create had no
+placement), and the `per_node` capacity roster from the last successful
+poll -- so the failure carries the diagnosis a reader needs rather than a
+bare 507.
+
+A raw call -- `self.test_client.create_instance(...)`, a local client,
+another test's client, anything that does not go through
+`self.create_instance()` -- skips the wait silently, and needs a
+`# raw-create: <reason>` comment immediately above it, with a non-empty
+reason. A unit test in `shakenfist/tests/` (`test_ci_raw_creates.py`) walks
+the suite's source with `ast` looking for exactly this, rather than
+importing the suite, which depends on `shakenfist_client` -- not a test
+dependency of this repository. An empty reason fails the same as no marker
+at all, so the allowlist cannot grow by copy-pasting an existing line.
+
+The marker exists for a caller that must see the 507 rather than have it
+waited out. `cluster_ci_tests/test_coalescing.py`'s mesh burst is the
+current example: it pins instances round robin across the hypervisors
+inside a `try` that tolerates and records a capacity refusal as a normal
+outcome on a shared cluster, and carries on -- wrapping that create would
+break it twice, since the wrapper's own deadline failure is a test failure
+rather than an `APIException` the `except` clause could catch, and waiting
+up to seven minutes per refusal would serialise a burst whose simultaneity
+is the thing under test. The other reserved use is the wrapper's own call
+inside `base.py`, which has to reach the client somehow. The CI cloud
+sizing plan's phase 3 saturation tests are expected to need the marker
+too, to assert that a genuinely full cluster refuses rather than have the
+refusal waited away.
+
 ## CI headroom instrumentation
 
 Phase 1 of `docs/plans/PLAN-ci-cloud-sizing.md` (see
@@ -229,6 +279,37 @@ wrong cannot be the thing that empties the last good dataset; and any
 harvest whose output is going to be committed names both ends of its
 window, because `--since` alone grows with every merge and `--limit`
 moves with the day it is run on.
+
+### A third file: the capacity-wait trace (`--waits`)
+
+A third file lands beside the other two, written by a different
+mechanism. `PLAN-transient-capacity-refusals` phase 2's
+`self.create_instance()` wrapper (see "Creating instances in the
+functional suite" above) appends one JSON line to
+`/srv/ci/traces/instance-waits.jsonl` every time a create waits out a
+transient 507. It reaches the bundle through the same "Gather logs"
+scp as `headroom.jsonl` and `headroom-census.json`, with no separate
+plumbing needed to get it there.
+
+`tools/ci_headroom_report.py --waits <file>` summarises it: total
+seconds waited, the number of waits, the longest wait and the test it
+came from, and the split between waits that were informed by a
+capacity read and waits that had to sleep blind because
+`/admin/resources` itself could not be read (`mode: degraded`).
+Because the report already runs over a downloaded bundle rather than
+only inside a live job, this summary is available from the moment the
+phase that writes the trace merges -- the evidence does not wait for
+`ci_headroom_collect.sh` to grow its own `--waits` plumbing and print
+it into the job log, which is a separate, later change.
+
+An absent or empty file reports as unknown, never as zero waits, for
+the same reason an absent or empty census reports as unknown rather
+than as zero refusals (see "Nothing here is a quality gate" below): "no
+one collected this" and "the wrapper never had to wait" are different
+findings, and the reading that looks reassuring -- zero -- is exactly
+the wrong one to print when the file was never written or never read.
+A file that was read but whose every line was malformed is reported
+the same way, for the same reason.
 
 ### The series record format
 

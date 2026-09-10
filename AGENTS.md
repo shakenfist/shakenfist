@@ -133,6 +133,12 @@ metrics. The headlines:
   the operator recovery path; see
   [docs/operator_guide/node_health.md](docs/operator_guide/node_health.md).
 
+- **A raw `create_instance()` call in the CI suite needs a `# raw-create:
+  <reason>` comment**, or an `ast`-based unit test fails the build; use
+  `self.create_instance()` instead unless the test must see a 507
+  directly. See
+  [docs/developer_guide/ci.md](docs/developer_guide/ci.md#creating-instances-in-the-functional-suite).
+
 - **An unlanded plan may already own the code you are changing.** A fix
   landed across a partially implemented plan has to be unpicked later,
   which is why the automated fixer reads `docs/plans/` before writing
