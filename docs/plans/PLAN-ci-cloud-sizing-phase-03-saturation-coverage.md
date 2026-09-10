@@ -336,11 +336,38 @@ This gives deterministic coverage of three stages:
 | Stage | Impossible request | Sized from |
 |-------|--------------------|------------|
 | `sufficient_idle_cpu` | vCPUs greater than `max(cpu_limit)` over all nodes | `/admin/resources` |
-| `sufficient_idle_memory` | memory greater than `max(ram_available)` | `/admin/resources` |
-| `sufficient_free_disk` | a disk larger than `max(disk_available)` | `/admin/resources` |
+| `sufficient_idle_memory` | memory greater than `max(ram_max)` | `/admin/resources` |
+| `sufficient_free_disk` | a disk larger than `max(disk_available) + sum(disk_available)` | `/admin/resources` |
 
 The sizes are read from the API rather than hardcoded, because a
 hardcoded "impossible" number is a number phase 4 can make possible.
+
+*Correction (2026-09-10, found implementing 3b):* the memory and
+disk rows of that table originally named `max(ram_available)` and
+`max(disk_available)`. Those are **headroom** figures, and headroom
+moves *upward* whenever a sibling stestr worker deletes an instance
+or a blob. A request sized one unit beyond the largest headroom at
+read time therefore becomes satisfiable the moment any worker frees
+more than one unit on that node -- the create is admitted, no
+exception is raised, and the test fails. That is the "the new tests
+become the flake source" risk in the table below, introduced by this
+decision's own sizing rule. The CPU row was already correct because
+`cpu_limit` is a **ceiling**: it is what the node is guarded to,
+whether it is idle or full.
+
+The rows above are the corrected sizings. Memory has a published
+ceiling, `ram_max` (`scheduler.py:1109-1111`,
+`memory_max * RAM_OVERCOMMIT_RATIO`), and a guarded node can be
+bounded below it by its row's `limit_memory_mb`, recoverable as
+`ram_available + ram_committed`; the test takes the larger of the
+two so the request exceeds whichever ceiling binds. Disk has **no
+published ceiling at all** -- nothing in `summarize_resources()`
+publishes a node's total disk -- so the disk test cannot be made
+load-proof the way the other two are. It uses the cluster's whole
+free-disk total as a margin, which exceeds what the largest node
+could reach even if every other node's free space were released onto
+it, and its docstring says plainly that this is a generous margin
+rather than a proof of impossibility.
 
 D23 and D24 are complementary and both are needed: D24 proves the
 refusal *contract* (which status, which stage name, which event),
