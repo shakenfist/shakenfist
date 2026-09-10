@@ -46,7 +46,7 @@ class TestInNetworkReachability(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def _create_instance(self, name):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             name, 1, 1024,
             [
                 {

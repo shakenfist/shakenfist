@@ -119,7 +119,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
         url = 'http://10.0.0.10/debian-12-disappearing-instance'
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'inst1', 1, 1024, None,
             [
                 {
@@ -141,7 +141,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
         # Ensure we can still start an instance
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'inst2', 1, 1024, None,
             [
                 {
@@ -211,7 +211,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
         url = ('http://10.0.0.10:%d/debian-12-vanished-server'
                % self.VANISHED_SERVER_PORT)
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'inst1', 1, 1024, None,
             [
                 {
@@ -236,7 +236,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
         # Ensure we can still start an instance, on a node which has not
         # seen this image before if the cluster has one.
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'inst2', 1, 1024, None,
             [
                 {

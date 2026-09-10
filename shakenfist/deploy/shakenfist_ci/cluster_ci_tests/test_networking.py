@@ -58,7 +58,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.test_client.delete_network(n['uuid'])
 
     def test_virtual_networks_are_separate(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-networks-separate-1', 1, 1024,
             [
                 {
@@ -76,7 +76,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             'inst1',
             content.text_content(json.dumps(inst1, indent=4, sort_keys=True)))
 
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'test-networks-separate-1', 1, 1024,
             [
                 {
@@ -127,7 +127,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         inst1_address = '192.168.242.10'
         inst2_address = '192.168.242.20'
 
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-overlap-cidr-1', 1, 1024,
             [
                 {
@@ -151,7 +151,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         }
         )
 
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'test-overlap-cidr-2', 1, 1024,
             [
                 {
@@ -212,7 +212,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertTrue(' 100% packet' in results['stdout'])
 
     def test_single_virtual_networks_work(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-networks-1', 1, 1024,
             [
                 {
@@ -230,7 +230,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             'inst1',
             content.text_content(json.dumps(inst1, indent=4, sort_keys=True)))
 
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'test-networks-2', 1, 1024,
             [
                 {

@@ -33,7 +33,7 @@ class TestCloudInit(base.BaseNamespacedTestCase):
         ud = """#!/bin/sh
 sudo echo 'banana' >  /tmp/output"""
 
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-instance', 1, 1024,
             [
                 {
@@ -74,7 +74,7 @@ sudo echo 'banana' >  /tmp/output"""
         self.assertTrue('elLwq/bpzBWsg0JjjGvtuuKMM' in out)
 
     def test_cloudinit_no_tracebacks(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'notracebacks', 2, 2048,
             [
                 {

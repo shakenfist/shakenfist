@@ -23,7 +23,7 @@ class TestDisks(base.BaseNamespacedTestCase):
 
     def test_boot_nvme(self):
         self.skipTest('This test is flakey in CI for reasons I do not understand.')
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-cirros-boot-nvme', 1, 1024,
             [
                 {

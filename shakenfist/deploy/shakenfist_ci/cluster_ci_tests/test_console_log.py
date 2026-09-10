@@ -23,7 +23,7 @@ class TestConsoleLog(base.BaseNamespacedTestCase):
 
     def test_console_log(self):
         # Start our test instance
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-console', 1, 1024,
             [
                 {

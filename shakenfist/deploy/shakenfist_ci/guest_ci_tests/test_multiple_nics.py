@@ -39,7 +39,7 @@ sudo echo 'auto eth1'             >> /etc/network/interfaces
 sudo echo 'iface eth1 inet dhcp'  >> /etc/network/interfaces
 sudo /etc/init.d/S40network restart"""
 
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-multiple-nics', 1, 1024,
             [
                 {

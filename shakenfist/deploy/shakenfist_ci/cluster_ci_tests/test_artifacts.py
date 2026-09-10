@@ -69,7 +69,7 @@ class TestImages(base.BaseNamespacedTestCase):
 
     def test_instance_invalid_image(self):
         # Start our test instance
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'nosuch', 1, 1024,
             [
                 {
@@ -94,7 +94,7 @@ class TestImages(base.BaseNamespacedTestCase):
         self.assertEqual('error', i['state'])
 
     def test_resize_image_too_small(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'resizetoosmall', 2, 2048,
             [],
             [

@@ -129,7 +129,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
             self.skipTest('Insufficient nodes for test')
 
         # Create an instance with a tag
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'inst1', 1, 1024,
             [
                 {
@@ -149,7 +149,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
         self._await_instance_create(inst1['uuid'])
 
         # Now create two more instances, one with affinity one without
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'inst2', 1, 1024,
             [
                 {
@@ -168,7 +168,7 @@ class TestAffinity(base.BaseNamespacedTestCase):
                     }
                 }
             )
-        inst3 = self.test_client.create_instance(
+        inst3 = self.create_instance(
             'inst3', 1, 1024,
             [
                 {
@@ -291,12 +291,12 @@ class TestAffinity(base.BaseNamespacedTestCase):
         if len(nodes) < 3:
             self.skipTest('Insufficient nodes for test')
 
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'binst1', 1, 1024, self._networks(), self._disks(), None, None,
             metadata={'tags': ['binary-tag']})
         self._await_instance_create(inst1['uuid'])
 
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'binst2', 1, 1024, self._networks(), self._disks(), None, None,
             metadata={'affinity': {'prefer_with_tag': ['binary-tag']}})
         self._await_instance_create(inst2['uuid'])

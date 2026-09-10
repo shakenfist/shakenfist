@@ -67,7 +67,7 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def test_simple(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-simple-metadata', 1, 1024,
             [
                 {
@@ -94,7 +94,7 @@ class TestInstanceMetadata(base.BaseNamespacedTestCase):
         self.assertEqual({}, self.test_client.get_instance_metadata(inst['uuid']))
 
     def test_set_during_create(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-set-during-create', 1, 1024,
             [
                 {
@@ -147,7 +147,7 @@ class TestInterfaceMetadata(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def test_simple(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-simple-metadata', 1, 1024,
             [
                 {

@@ -85,7 +85,7 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
                node['name']))
 
     def _create_instance_on(self, node):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'netlifecycle', 1, 1024,
             [
                 {

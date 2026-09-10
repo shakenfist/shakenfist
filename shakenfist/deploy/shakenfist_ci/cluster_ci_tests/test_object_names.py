@@ -40,7 +40,7 @@ class TestObjectNames(base.BaseNamespacedTestCase):
 
         inst_uuids = {}
         for name in ['barry', 'dave', 'trouble-writing-tests']:
-            new_inst = self.test_client.create_instance(
+            new_inst = self.create_instance(
                 name, 1, 1024,
                 [
                     {
@@ -110,7 +110,7 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
 
         try:
             # Namespace A instance (self.namespace / self.test_client)
-            inst_a = self.test_client.create_instance(
+            inst_a = self.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=self.namespace)
             self.addDetail(
@@ -118,9 +118,9 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                 content.text_content(json.dumps(inst_a, indent=4, sort_keys=True)))
 
             # Namespace B instance
-            inst_b = client_b.create_instance(
+            inst_b = self.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
-                namespace=ns_b_name)
+                client=client_b, namespace=ns_b_name)
             self.addDetail(
                 'inst_b',
                 content.text_content(json.dumps(inst_b, indent=4, sort_keys=True)))
@@ -194,12 +194,12 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
         inst_a = None
         inst_b = None
         try:
-            inst_a = self.test_client.create_instance(
+            inst_a = self.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=self.namespace)
-            inst_b = client_b.create_instance(
+            inst_b = self.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
-                namespace=ns_b_name)
+                client=client_b, namespace=ns_b_name)
             self.assertNotEqual(inst_a['uuid'], inst_b['uuid'])
 
             # System creds, explicit namespace=A → must be A's UUID.

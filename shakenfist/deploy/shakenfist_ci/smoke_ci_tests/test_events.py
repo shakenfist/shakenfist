@@ -32,7 +32,7 @@ class TestEvents(base.BaseNamespacedTestCase):
             0, len(self.test_client.get_network_events(self.net_one['uuid'])))
 
     def test_instance_events(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-instance-events', 1, 1024,
             [
                 {

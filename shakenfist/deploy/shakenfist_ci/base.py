@@ -1372,7 +1372,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def _test_distro_boot(self, base_image):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             base_image.replace(':', '-').replace('.', ''), 1, 1024,
             [
                 {

@@ -117,7 +117,7 @@ class TestNodes(base.BaseNamespacedTestCase):
         # is downloaded, so this costs the cluster almost nothing, and we
         # deliberately do not wait for it -- the whole point is to read the
         # cluster's view of the node before any domain exists.
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'unbooted', 1, 128, None, [{'size': 1, 'type': 'disk'}],
             None, None, force_placement=node['name'])
         self.addDetail('instance', content.text_content(json.dumps(

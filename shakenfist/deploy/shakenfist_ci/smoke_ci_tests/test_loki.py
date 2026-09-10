@@ -233,7 +233,7 @@ class TestLoki(base.BaseNamespacedTestCase):
             content.text_content(json.dumps(net, indent=4, sort_keys=True)))
         self._await_networks_ready([net['uuid']])
 
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-event-extra-uuid', 1, 1024,
             [
                 {

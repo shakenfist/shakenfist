@@ -55,7 +55,7 @@ class TestNamespace(base.BaseNamespacedTestCase):
 
         inst_uuids = set()
         for i in range(NUM_INSTANCES):
-            new_inst = self.test_client.create_instance(
+            new_inst = self.create_instance(
                 'test-%s' % i, 1, 1024,
                 [
                     {

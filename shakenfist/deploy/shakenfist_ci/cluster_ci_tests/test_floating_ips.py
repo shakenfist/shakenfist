@@ -34,7 +34,7 @@ sudo chmod ugo+rw /var/www/html/index.html
 echo 'Floating IPs work!' > /var/www/html/index.html
 """
 
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'floating', 1, 1024,
             [
                 {
@@ -233,7 +233,7 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
         # guest -- the reachability ping. Floating and its host-side plumbing
         # live entirely on the network node, so callers that only assert
         # plumbing can wait for the cheaper 'created' state instead.
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'floatlifecycle', 1, 1024,
             [
                 {

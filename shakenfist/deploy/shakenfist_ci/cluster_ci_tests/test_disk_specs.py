@@ -12,7 +12,7 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
         super().__init__(*args, **kwargs)
 
     def test_default(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-default-disk', 1, 1024, None,
             [
                 {

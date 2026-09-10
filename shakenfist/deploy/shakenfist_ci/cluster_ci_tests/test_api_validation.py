@@ -107,7 +107,7 @@ class TestNamespaceBodyParameterStillWorks(base.BaseNamespacedTestCase):
 
     def test_get_instance_with_namespace_body_parameter(self):
         minimal_disk = [{'size': 1, 'type': 'disk'}]
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'namespace-body-param', 1, 128, None, minimal_disk, None, None,
             namespace=self.namespace)
         self.addDetail(

@@ -18,7 +18,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def test_single_disk_snapshots(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-snapshots', 1, 1024,
             [
                 {
@@ -148,7 +148,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         })
 
         # Now attempt to boot the snapshot via blob uuid
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'cirros-from-blob', 1, 1024,
             [
                 {
@@ -174,7 +174,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self._await_instance_ready(inst2['uuid'])
 
         # Now attempt to boot the snapshot via snapshot uuid
-        inst3 = self.test_client.create_instance(
+        inst3 = self.create_instance(
             'cirros-from-snapshot', 1, 1024,
             [
                 {
@@ -260,7 +260,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.test_client.delete_instance(inst3['uuid'])
 
     def test_multiple_disk_snapshots(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-multi-snapshots', 1, 1024,
             [
                 {
@@ -350,7 +350,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.test_client.delete_instance(inst['uuid'])
 
     def test_labels(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-labels', 1, 1024,
             [
                 {
@@ -380,7 +380,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertIsNotNone(snap)
 
         # Now attempt to boot the snapshot via snapshot uuid
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'cirros-from-snapshot', 1, 1024,
             [
                 {
@@ -405,7 +405,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.test_client.delete_instance(inst2['uuid'])
 
     def test_labels_with_deleted_snapshot(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-deleted-snapshot', 1, 1024,
             [
                 {
@@ -457,7 +457,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
                 self.fail('Snapshot remains')
 
     def test_specific_device_snapshots(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-device-snapshots', 1, 1024,
             [
                 {
@@ -542,7 +542,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.test_client.delete_instance(inst['uuid'])
 
     def test_thin_snapshots(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'thin-original', 1, 1024,
             [
                 {
@@ -617,7 +617,7 @@ class TestSnapshots(base.BaseNamespacedTestCase):
         self.assertLess(snap1_info['blobs'][1]['size'], b['size'])
 
         # Try booting an instance with the thin snapshot
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'thin-snapshot', 1, 1024,
             [
                 {

@@ -133,7 +133,7 @@ class TestCoalescing(base.BaseNamespacedTestCase):
     def test_duplicate_network_work_is_coalesced(self):
         instances = []
         for i in range(BURST):
-            instances.append(self.burst_client.create_instance(
+            instances.append(self.create_instance(
                 'coalesce-%d' % i, 1, 1024,
                 [
                     {
@@ -146,7 +146,7 @@ class TestCoalescing(base.BaseNamespacedTestCase):
                         'base': base.CLUSTER_CI_IMAGE,
                         'type': 'disk'
                     }
-                ], None, None))
+                ], None, None, client=self.burst_client))
 
         self.addDetail('instances', content.text_content(json.dumps(
             [i['uuid'] for i in instances], indent=4, sort_keys=True)))
@@ -474,6 +474,13 @@ class TestCoalescing(base.BaseNamespacedTestCase):
         for i in range(BURST):
             target = hypervisors[i % len(hypervisors)]
             try:
+                # raw-create: this burst deliberately tolerates a
+                # capacity refusal and records it, as the except clause
+                # below says, so it must see the 507 rather than have it
+                # waited out. Waiting would also serialise a burst whose
+                # simultaneity is the thing under test, and the wrapper's
+                # deadline failure is not an APIException, so it would
+                # not reach that clause at all.
                 instances.append(self.burst_client.create_instance(
                     'mesh-coalesce-%d' % i, 1, 1024,
                     [
