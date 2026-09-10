@@ -48,8 +48,9 @@ for the measurement that closed it, and
 for the reading that unlocked the flip and what the flip changed for
 callers, and
 [`PLAN-api-input-validation-phase-05-narrow.md`](PLAN-api-input-validation-phase-05-narrow.md)
-for the phase now ready to start. Phases 6 and 7 are not yet cut into
-per-phase files.
+for the narrowing and the two leaks it closed. Phase 6 is the next
+phase to start, and neither it nor phase 7 is yet cut into a per-phase
+file.
 
 ## Situation
 

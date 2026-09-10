@@ -329,6 +329,17 @@ answer for the ones that were not; see the [v0.7 to v0.8 release
 notes](../release_notes/v07-v08.md) for the caller-visible shape of
 it.
 
+Budget for the operator-visible shape too. A refusal under `enforce`
+is an audit event; a `TypeError` under `warn` or `off` is a server
+fault, so it writes an exception record under
+`/srv/shakenfist/exceptions/` and logs at ERROR. `record_exception`
+keys those records by a hash of the traceback and the `TypeError`
+message embeds the caller's own key name, so a client sending varying
+undeclared keys writes one record per distinct key and one ERROR line
+per request — which is client input driving disk usage and quite
+possibly alerting. It is a reason to treat the rollback as temporary
+rather than a resting state.
+
 Because a refusal is answered from outside every per-method decorator,
 `log_token_use` never runs for one. The refusal writes its own
 `request refused by input validation` audit event against the caller's

@@ -182,7 +182,11 @@ for path, tree, cls, fn in d.handlers():
     ...
 ```
 
-The count is **zero**. Recorded with a caution: the first cut of that
+The count is **zero** — and it answers a narrower question than the
+one that mattered, which the review of #4162 later caught. Read the
+correction at the end of this finding before relying on it.
+
+Recorded with a caution: the first cut of that
 script sliced the defaults against a list it had already filtered
 `self` and the `*_from_db` injected parameters out of, and reported
 **22** handlers. The number was wrong in the direction that would have
@@ -192,6 +196,50 @@ answers `missing namespace in request` from the handler's own guard,
 not a `TypeError` — which is the check that should have been run
 first. A derived number that nobody drove through the stack is exactly
 the sort of assertion this plan's own review rounds keep catching.
+
+**The corrected number was still answering the wrong question.** The
+review of [#4162](https://github.com/shakenfist/shakenfist/pull/4162)
+found that the hazard is not a parameter *without* a default. It is a
+parameter *with* a `None` default which a handler then dereferences
+without a type guard. Every declared parameter compiles to a field
+with `allow_none=True`, and D17 leaves `required` unenforced, so
+`None` reaches handlers routinely on the **default** `enforce` path —
+which an AST check for missing defaults cannot see at all.
+
+`InstancesEndpoint.post` is the proven instance. It defaults
+`name=None`; `validators.hostname(None, ...)` returns a falsy
+`ValidationError` rather than raising, so execution reaches
+`contains_domain = '.' in name`, which raises `TypeError: argument of
+type 'NoneType' is not iterable`. Before this phase that answered 400
+with interpreter text. After step 2 it answers a recorded 500, on the
+default path, for `POST /instances {}`. Fixed here, with tests.
+
+So F5's zero covers non-defaulted parameters only, and D25's
+blast-radius argument covers undeclared body keys under `warn`/`off`
+only. Neither covered a plain caller mistake against a declared but
+nullable parameter. `POST /networks` next door escapes only by
+accident, because `ipaddress.ip_network(None)` raises `ValueError`
+rather than `TypeError`.
+
+The class as a whole is unswept, and sweeping it belongs to phase 6,
+which already owns `required` and semantic validation. Filed as
+[#4167](https://github.com/shakenfist/shakenfist/issues/4167), which
+also carries three further latent 500s the fix's author found in the
+same handler while probing its other fifteen parameters — `cpus` and
+`memory` as null, `disk[].base` as a non-string, and
+`network[].network_uuid` as a non-string. **None of the three is a
+regression from this phase**: they raise pydantic `ValidationError` or
+`AttributeError`, which the deleted arm never caught, so they answered
+a 500 before it too. The last two share a structural cause worth phase
+6's attention on its own — an `arrayofdict` compiles to
+`fields.List(fields.Dict())` with no value schema, so every nested key
+in `disk` and `network` is unvalidated by construction, in every
+mode. The lesson
+worth carrying is not that the script had a bug — it is that the
+script was mechanically correct on the second attempt and still aimed
+at the wrong property. This phase's own risk register named "a
+TypeError source the survey missed becomes a 500" and the survey
+still missed one.
 
 ### F6. #3523's raising frame, found
 
