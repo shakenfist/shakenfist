@@ -963,6 +963,7 @@ those are corrected here as well.
 | 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started |
 | 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started |
+| 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started |
 
 ### Phase 0 -- Decisions and scarcity inventory
 
@@ -1118,6 +1119,14 @@ the ledger arithmetic, the band, and how to re-measure -- and
 propagate the reshaped topologies to the downstream repositories
 that consume the reusable workflow, per the copy-paste-drift
 finding in `project-sf-ecosystem-ci`.
+
+### Phase 7 -- Push audit
+
+Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in
+this plan against `develop`, not the last phase's diff alone.
+Findings land as their own pull request, and the plan is not
+complete until each is resolved or declined in writing here. If
+the audit finds nothing, that is recorded in one sentence.
 
 ## Agent guidance
 
