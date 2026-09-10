@@ -422,6 +422,68 @@ This shape is the fleet-wide standard, generalized from instar's
 [fuzz-nightly-reporting](https://github.com/shakenfist/development/blob/main/docs/audits/fuzz-nightly-reporting.md)
 in shakenfist/development.
 
+## The mermaid lint lane
+
+`mermaid-lint.yml` renders every tracked markdown file that
+contains a mermaid diagram and fails on any that does not parse.
+It is a copy of `templates/mermaid-lint/` from
+`shakenfist/development` — both the workflow and
+`tools/mermaid-lint.sh` are byte-identical to the template, so
+drift shows up as a diff rather than as a surprise. Sync from
+there rather than editing either file here.
+
+A mermaid syntax error is invisible to everything else in CI. It
+commits cleanly, passes rustfmt, clippy, shellcheck and
+skillsaw, and then shows an error box on GitHub and nothing at
+all on the mkdocs site. Nothing else reads a diagram, which is
+the gap this lane closes.
+
+It runs on `pull_request` and on pushes to `develop`, filtered
+to markdown plus the two files that make up the lane itself, so
+a change to the checker that touches no markdown still runs it.
+`REVIEWS.md` is excluded on both sides — the workflow's filter
+and the script's own candidate set — because a review session
+rewrites it without changing a diagram, and the two exclusions
+have to move together.
+
+The job needs a docker daemon, because `mmdc` renders through a
+headless browser and the fleet keeps chromium off the runners.
+That is why it asks for `debian-12-docker` rather than a static
+runner. The container runs with `--network none`: rendering is a
+local operation, and this is third-party code driving a browser
+over repository content.
+
+To run it locally, which the pre-push audit's documentation
+review should:
+
+```bash
+tools/mermaid-lint.sh            # every tracked markdown file
+tools/mermaid-lint.sh docs/x.md  # just this one
+```
+
+Check the exit status directly rather than piping the script
+into `tail` or `grep`, which reports the filter's status and
+turns every failure green.
+
+### It is deliberately not a gate
+
+This lane is the one job that can fail a pull request without a
+gate depending on it, and that is on purpose rather than an
+oversight of the rule in [the three gates](#the-three-gates).
+
+It is path-filtered, so it does not run at all on a pull request
+that touches no markdown. A required status check that never
+reports blocks the pull request forever, so making this one
+required would mean every Rust-only change waiting on a check
+that will never arrive. Adding `merge_group` instead does not
+help either: `paths` is not supported on that event, so every
+merge would spin a virtual machine to lint diagrams the pull
+request already linted.
+
+So it is advisory. A red **Mermaid lint** on a pull request is
+visible and is expected to be fixed, but nothing enforces that
+automatically.
+
 ## The three gates
 
 The `develop` ruleset requires exactly three status checks, and
@@ -465,6 +527,10 @@ why `Can merge` being skipped does not block a pull request, and
     `automated_reviewer`); add merge-tier jobs to `can_merge`. A
     job that no gate depends on can fail without blocking
     anything.
+
+    There is one deliberate exception: the mermaid lint lane,
+    which is path-filtered and so cannot be required. See [the
+    mermaid lint lane](#the-mermaid-lint-lane).
 
 ## The life of a pull request
 
@@ -618,6 +684,7 @@ consistency audit.
 | `codeql-analysis.yml` | CodeQL security scanning |
 | `supply-chain.yml` | Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in `ci.yml` |
 | `fuzz.yml` | Nightly `cargo-fuzz` build and smoke run against develop; failures filed as issues |
+| `mermaid-lint.yml` | Renders every mermaid diagram in the repository's markdown; advisory, not a gate |
 | `renovate.yml` | Automated dependency updates (hourly) |
 | `export-repo-config.yml` | Daily repository configuration export |
 | `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
