@@ -947,6 +947,80 @@ class Census:
                    for t in self.stages.values())
 
 
+class Waits:
+    """The capacity-wait trace PLAN-transient-capacity-refusals phase 2 writes.
+
+    ``create_instance()`` on ``BaseTestCase`` (shakenfist_ci/base.py) appends
+    one JSON object per waited-out 507 to /srv/ci/traces/instance-waits.jsonl,
+    and this is that file read back. Absent and empty are kept apart from a
+    file which was read and simply holds no records, for the same reason a
+    census which was never collected is kept apart from one which found
+    nothing (D14): a wrapper which never ran here and a wrapper which ran and
+    never waited are different findings, and only the second is genuinely
+    zero.
+    """
+
+    def __init__(self):
+        self.path = None
+        self.status = 'not requested'
+        self.detail = None
+        self.records = []
+        self.total_lines = 0
+        self.malformed_lines = 0
+
+    @property
+    def available(self):
+        return self.status == 'read'
+
+
+def read_waits(path):
+    """Read the capacity-wait JSONL trace, tolerating a killed writer.
+
+    Mirrors read_census()'s honesty about absence: ``path`` of None (--waits
+    not given) is 'not requested', a file which does not exist is
+    'unreadable', and a file which exists but is empty is 'empty'. Only a
+    file which was actually opened and read is 'read', and even then a
+    malformed line -- one worker's write clipped by a crash, per D14 -- is
+    skipped and counted rather than treated as fatal, exactly as
+    read_series() treats a truncated final line.
+    """
+    waits = Waits()
+    if path is None:
+        return waits
+    waits.path = path
+
+    try:
+        with open(path) as f:
+            lines = f.readlines()
+    except OSError as e:
+        waits.status = 'unreadable'
+        waits.detail = str(e)
+        return waits
+
+    if not any(line.strip() for line in lines):
+        waits.status = 'empty'
+        waits.detail = 'the file exists but is empty'
+        return waits
+
+    waits.status = 'read'
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        waits.total_lines += 1
+        try:
+            record = json.loads(line)
+        except ValueError:
+            waits.malformed_lines += 1
+            continue
+        if not isinstance(record, dict):
+            waits.malformed_lines += 1
+            continue
+        waits.records.append(record)
+
+    return waits
+
+
 def stage_of(message):
     """The stage a schedule audit message names, or None if it names none.
 
@@ -1535,6 +1609,67 @@ def guard_record(census):
         sorted(guard.forced_write_stages.items()))
     record['forced_write_exceeded'] = collections.OrderedDict(
         sorted(guard.forced_write_exceeded.items()))
+    return record
+
+
+def waits_record(waits):
+    """What the capacity-wait trace says, or an honest account of why not.
+
+    Every count is null unless the trace was actually read (D14), for the
+    same reason census_record() nulls everything for a census which was
+    never collected: --waits not given, and a --waits file which is absent
+    or empty, must never print as "0 seconds waited". That reading would
+    say the wrapper found nothing to wait out, when in fact nothing was
+    looked at.
+
+    A file which *was* read and holds no records at all -- 0 good lines,
+    whether because the run genuinely never waited or because every line in
+    it was malformed -- is a real zero, and is reported as one, with the
+    malformed count alongside it so the two readings are not confused.
+    """
+    record = collections.OrderedDict()
+    record['state'] = waits.status
+    record['available'] = waits.available
+    record['detail'] = waits.detail
+    record['path'] = waits.path
+    if not waits.available:
+        for key in ('count', 'malformed_lines', 'seconds_waited_total',
+                    'informed_waits', 'degraded_waits', 'other_mode_waits',
+                    'longest_wait_seconds', 'longest_wait_test'):
+            record[key] = None
+        return record
+
+    record['malformed_lines'] = waits.malformed_lines
+    record['count'] = len(waits.records)
+
+    total_seconds = 0.0
+    informed = 0
+    degraded = 0
+    other_mode = 0
+    longest_seconds = None
+    longest_test = None
+    for wait in waits.records:
+        seconds = numeric(wait.get('seconds_waited')) or 0.0
+        total_seconds += seconds
+
+        mode = wait.get('mode')
+        if mode == 'informed':
+            informed += 1
+        elif mode == 'degraded':
+            degraded += 1
+        else:
+            other_mode += 1
+
+        if longest_seconds is None or seconds > longest_seconds:
+            longest_seconds = seconds
+            longest_test = wait.get('test_id')
+
+    record['seconds_waited_total'] = total_seconds if waits.records else None
+    record['informed_waits'] = informed
+    record['degraded_waits'] = degraded
+    record['other_mode_waits'] = other_mode
+    record['longest_wait_seconds'] = longest_seconds
+    record['longest_wait_test'] = longest_test
     return record
 
 
@@ -2250,6 +2385,64 @@ def print_guard_census(record):
                   % (dimension, fmt(guard['claim_shortfalls'][dimension], 3)))
 
 
+def print_waits(waits):
+    """The capacity-wait trace, under its own heading.
+
+    PLAN-transient-capacity-refusals phase 2's create_instance() wrapper
+    waits out a transient 507 rather than failing the test on it, and
+    records each wait to /srv/ci/traces/instance-waits.jsonl. This is a
+    summary of that file (``waits_record()``'s output), read the same way
+    the series and census are: an absent or empty file says so and prints
+    no figures, never a zero, because "the wrapper never ran here" and
+    "the wrapper ran and never had to wait" are different findings.
+
+    Deliberately not folded into the main summary record (D18's dict): the
+    two files are unrelated inputs on unrelated schedules -- the series and
+    census cover one job's headroom, the waits file accumulates across
+    every stestr worker of the same job -- and this section is optional in
+    a way the rest of the report is not.
+    """
+    print_heading('Capacity waits')
+    if waits['state'] == 'not requested':
+        print('  NO WAITS FILE WAS SUPPLIED (--waits was not given).')
+        print('  This is not "no waits": nothing was looked at. A run whose')
+        print('  capacity waits were never collected and a run which never')
+        print('  waited are different findings, and this is the first.')
+        return
+    if not waits['available']:
+        print('  NO CAPACITY WAIT DATA IS AVAILABLE: %s (%s)'
+              % (waits['state'], waits['detail']))
+        print('  File: %s' % waits['path'])
+        print('  Read this as "unknown", never as zero waits. An unwritten')
+        print('  or empty file looks exactly like a run with perfect')
+        print('  headroom unless the difference is said out loud.')
+        return
+
+    print('  File:              %s' % waits['path'])
+    if waits['count'] == 0:
+        print('  0 well-formed wait records, %d malformed %s'
+              % (waits['malformed_lines'], plural(waits['malformed_lines'], 'line')))
+        print('  Every line in the file was malformed, so whether the suite')
+        print('  ever actually waited on capacity cannot be said from this')
+        print('  file. Read this as unknown, not as zero seconds waited.')
+        return
+
+    print('  Waits:             %d (%d malformed %s skipped)'
+          % (waits['count'], waits['malformed_lines'],
+             plural(waits['malformed_lines'], 'line')))
+    print('  Total time waited: %.1fs' % waits['seconds_waited_total'])
+    print('  Longest wait:      %.1fs (%s)'
+          % (waits['longest_wait_seconds'], waits['longest_wait_test'] or
+             '(no test id recorded)'))
+    print('  Mode split:        %d informed, %d degraded'
+          % (waits['informed_waits'], waits['degraded_waits']))
+    if waits['other_mode_waits']:
+        print('  %d %s carried a mode this report does not recognise, and '
+              'are counted in neither split above.'
+              % (waits['other_mode_waits'],
+                 plural(waits['other_mode_waits'], 'wait')))
+
+
 def print_verdict(record):
     census = record['census']
     guard = record['guard']
@@ -2344,13 +2537,18 @@ def print_verdict(record):
         print('  lower bound. Absence of a warning is not evidence of absence.')
 
 
-def print_report(record):
+def print_report(record, waits=None):
     """Render the whole report from the record, and nothing but the record.
 
     Every figure printed here is read out of the dict rather than computed,
     so the job log and the --json file cannot disagree (D18). The sections
     which are not printed for an empty series are skipped on the record's
     own sample count for the same reason.
+
+    ``waits``, if given, is a waits_record() dict and is printed in its own
+    section (D14). It is a separate argument rather than a key folded into
+    ``record`` because it is not part of the versioned summary record --
+    see write_record() and the note on RECORD_VERSION.
     """
     title = 'Shaken Fist CI headroom report'
     print(title)
@@ -2372,6 +2570,8 @@ def print_report(record):
 
     print_census(record)
     print_guard_census(record)
+    if waits is not None:
+        print_waits(waits)
     print_verdict(record)
     print()
 
@@ -2379,12 +2579,15 @@ def print_report(record):
 def report(args):
     record = summary_record(args.series, census=args.census, label=args.label,
                             census_limit=args.census_limit)
-    print_report(record)
+    waits = waits_record(read_waits(args.waits))
+    print_report(record, waits=waits)
     if args.json:
         # Deliberately silent on success. The printed report must read
         # identically whether or not a summary record was also written, so
         # that a reader comparing a job log from before --json was wired up
-        # against one from after sees no difference at all.
+        # against one from after sees no difference at all. The waits
+        # summary is not written here (see print_report()'s docstring): it
+        # is not part of the versioned record.
         write_record(record, args.json)
 
 
@@ -2423,6 +2626,15 @@ def main(argv=None):
               'short. Defaults to 5000, which is both Loki\'s default '
               'max_entries_limit_per_query and the value used by '
               'tools/ci_headroom_collect.sh in shakenfist/actions.'))
+    parser.add_argument(
+        '--waits', default=None,
+        help=('Path to the capacity-wait JSONL trace written by '
+              'create_instance() on BaseTestCase '
+              '(/srv/ci/traces/instance-waits.jsonl in the bundle) -- one '
+              'line per transient 507 the suite waited out '
+              '(PLAN-transient-capacity-refusals phase 2, D14). Optional: '
+              'the report says so explicitly when it is absent or empty, '
+              'rather than printing zero seconds waited.'))
 
     try:
         args = parser.parse_args(argv)

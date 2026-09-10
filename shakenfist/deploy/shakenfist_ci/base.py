@@ -24,6 +24,15 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 LOG = logging.getLogger()
 TRACE_PATH = '/srv/ci/traces'
 
+# One JSON object per capacity wait, appended as a line by
+# _append_capacity_wait_trace() below (D14). smoke-cluster.yml:212 in
+# shakenfist/actions creates TRACE_PATH on the primary and chowns it to the
+# base image user before the suite runs, and :550 scp's the whole directory
+# into the artifact bundle, so this file reaches the bundle with no change
+# needed there. A module-level constant so the path is greppable and
+# overridable (a test points it at a tempdir rather than the real path).
+CAPACITY_WAIT_TRACE_FILE = os.path.join(TRACE_PATH, 'instance-waits.jsonl')
+
 
 CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 
@@ -299,8 +308,12 @@ class BaseTestCase(testtools.TestCase):
         """Say that a create waited, and for how long.
 
         An instrument may never fail the thing it measures, so nothing
-        here is allowed to raise into the test.
+        here is allowed to raise into the test. This is also the seam
+        step 2c hooks the CI bundle's JSONL record into -- see
+        _append_capacity_wait_trace() below.
         """
+        self._append_capacity_wait_trace(wait)
+
         try:
             self._capacity_waits = getattr(self, '_capacity_waits', 0) + 1
             self.addDetail(
@@ -315,6 +328,45 @@ class BaseTestCase(testtools.TestCase):
                    wait.get('headroom_at_start'), wait.get('headroom_at_end')))
         except Exception as e:
             LOG.info('Failed to record a capacity wait: %s' % e)
+
+    def _append_capacity_wait_trace(self, wait):
+        """Append one line describing this wait to CAPACITY_WAIT_TRACE_FILE.
+
+        One line per wait, not per run (D14): concurrent stestr workers
+        never have to agree on anything, because the file is opened 'a' and
+        each write is one line, and a worker which crashes mid-wait loses
+        at most its own in-flight line.
+
+        Most of the record is read straight off ``wait``, the dict
+        wait_for_capacity() returns -- 'node', 'cpus', 'mode',
+        'seconds_waited', 'headroom_at_start' and 'headroom_at_end', plus
+        'instance_name' and 'attempt' which create_instance() adds before
+        calling here. The one field with no source in that dict is the test
+        id, which only BaseTestCase knows, via self.id().
+
+        Every failure here is swallowed. An instrument may never fail the
+        thing it measures, for the same reason ci_headroom_collect.sh's
+        header gives for never failing a job, and step 2a already
+        established this property for the caller above -- this must not
+        weaken it.
+        """
+        try:
+            record = {
+                'test_id': self.id(),
+                'instance_name': wait.get('instance_name'),
+                'node': wait.get('node'),
+                'cpus': wait.get('cpus'),
+                'seconds_waited': wait.get('seconds_waited'),
+                'mode': wait.get('mode'),
+                'attempts': wait.get('attempt'),
+                'headroom_at_first_refusal': wait.get('headroom_at_start'),
+                'headroom_at_admission': wait.get('headroom_at_end'),
+            }
+            with open(CAPACITY_WAIT_TRACE_FILE, 'a') as f:
+                f.write(json.dumps(record, sort_keys=True, default=str))
+                f.write('\n')
+        except Exception as e:
+            LOG.info('Failed to append a capacity wait trace: %s' % e)
 
     def _fail_capacity_wait(self, name, cpus, node, refusal, waits, attempts):
         roster = None
