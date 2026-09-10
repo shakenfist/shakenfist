@@ -29,6 +29,20 @@ _INTERPRETER_TEXT_MARKERS = (
 )
 
 
+# This suite intentionally pins only the enforced 400 shape above, not the
+# opaque {"error": "server error", "status": 500} shape decision D31
+# settled on for a genuine handler-internal fault. The 400 is reachable on
+# purpose -- an ordinary caller sends an undeclared parameter every day --
+# but there is no known way to drive a real endpoint into an internal
+# TypeError from this namespaced CI client without either white-box
+# mocking (unavailable against a remote cluster, which is the whole point
+# of this suite) or actually exploiting a live bug, and deliberately
+# breaking a running cluster to exercise a failure path is out of bounds
+# for this suite. The 500 shape is pinned instead in the unit suite --
+# test_a_handler_internal_type_error_is_a_recorded_500 and the
+# warn/off-mode tests in shakenfist/tests/external_api/
+# test_request_validation.py -- where a handler can be safely mocked into
+# raising. This absence is a decision, not an oversight.
 class TestUndeclaredParameterRefused(base.BaseNamespacedTestCase):
     """PLAN-api-input-validation-phase-04-enforce.md step 6, test 1.
 

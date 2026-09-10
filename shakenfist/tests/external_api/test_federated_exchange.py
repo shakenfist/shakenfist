@@ -373,7 +373,7 @@ class ExchangeAuditTestCase(FederatedExchangeTestCase):
         # the audit trail along with the credential.
         self.assertIn('/auth/federated', logged)
 
-    def test_a_damaged_rule_does_not_leak_its_uuid(self):
+    def test_a_damaged_rule_is_refused_rather_than_erroring(self):
         # CorruptMappingRule names the rule, and decision D31 stopped
         # putting repr(e) in the generic 500 body but did not remove
         # the dedicated guard around this read -- that guard is what
@@ -381,6 +381,15 @@ class ExchangeAuditTestCase(FederatedExchangeTestCase):
         # anybody may call, would still answer a bare 500 rather than a
         # categorised 401, and the fault would go unevented against the
         # rule's owner.
+        #
+        # The uuid-leak assertion below is no longer load-bearing on
+        # its own: decision D31 made every 500 body the same opaque
+        # 'server error' string, so the uuid would be absent from the
+        # response whether or not this guard exists. The status code
+        # is what actually distinguishes them -- without the guard this
+        # becomes an uncategorised 500 rather than a 401 -- which is
+        # why the test still fails if the guard is removed, and why it
+        # is named for that property rather than the uuid.
         #
         # The exception is raised where the policy is decoded, not
         # where the rule is looked up: from_db_by_name reads the static
