@@ -124,6 +124,22 @@ whether the suite got quieter because the system got better.
 * Chasing #3565's scheduler question. It closed as a test bug on a
   test change (scheduler-reservations phase 6), and phase 0's row
   was corrected to say so on 2026-09-01.
+* **The deterministic affinity reproduction phase 0's #3565 row
+  still asks phase 3 for**, and this exclusion was missing until
+  step 3f found it. The bullet above excludes *chasing the scheduler
+  question*, which is not the same thing: phase 0's row, even after
+  its 2026-09-01 correction, says "the deterministic reproduction
+  phase 3 owes it is still worth having -- it is now coverage of a
+  documented guarantee rather than a hunt for a bug". This phase
+  does not write it, and the reason is D23. A reproduction of the
+  kind phase 0 describes -- fill the affinity target, then place --
+  has to fill a *named* node chosen by the affinity test rather than
+  the roomiest one, so it cannot use D26's "skip unless this node is
+  comfortably free" escape: if the target is busy the test has
+  nothing to do but wait or fail. That is a different risk profile
+  from 3c, and pricing it needs the merge-run evidence 3c is about
+  to produce about how often a single-node fill skips. **Phase 4
+  inherits it as an explicit debt, not as an oversight.**
 * The master plan's other *Future work* entries -- the under-cloud
   probe, per-suite concurrency, `test_coalescing`'s burst, the two
   uninstrumented cluster jobs.
@@ -619,6 +635,19 @@ Falsifiable, in order:
 * A written answer on `sufficient_idle_disk`: it is the stage
   sizing cannot fix *and* the stage no functional test can force,
   so if it recurs after phase 4 the evidence will be census data.
+* **One debt, named rather than dropped:** the deterministic
+  affinity reproduction phase 0's #3565 row asks for, which this
+  phase declines in its Scope section with the reasoning. It is the
+  only inventory row that names a test phase 3 owes and still has
+  none; everything else in the table is discharged by a test that
+  now exists, or explicitly cannot be.
+* **Two questions only a merge run answers**, both recorded at their
+  rows by 3f: which of the three refusal paths a real full node
+  gives 3c (the #3496 row), and how often the demand guard's waive
+  fails to save a create, which needs a run carrying 3e's widened
+  census filter (the #3813 row). 3f assessed dispositions against
+  measured frequencies, but no test this phase wrote has ever
+  executed, and nothing in the inventory claims otherwise.
 
 ## Back brief
 
