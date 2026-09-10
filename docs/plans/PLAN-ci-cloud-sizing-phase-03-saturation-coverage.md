@@ -426,6 +426,18 @@ Today's contract, from `scheduler.py:540` and the create path:
 * HTTP **507**, from `external_api/instance.py:901-906`, raised
   as `exceptions.LowResourceException`.
 * Message `No nodes remaining at scheduling stage <stage>`.
+
+*Correction (2026-09-10, found implementing 3c):* there is a
+**second** 507 with a different message. When a stage pre-filter
+prunes every candidate the message above is raised; when the
+pre-filter passes a candidate and the atomic capacity guard inside
+`Instance.place_instance()` then refuses it, the create path returns
+507 carrying `no node had capacity for this instance, N candidates
+refused it` (`external_api/instance.py:975-982`). The helper matches
+only the first, deliberately -- the two mean different things, and
+conflating them would let a guard refusal satisfy an assertion about
+a stage refusal. See D28 for what a test does when it meets the
+second.
 * An audit event `schedule has no candidates at stage <stage>,
   aborting`, carrying `candidates` and `dropped` in its extra.
 
@@ -452,6 +464,22 @@ node produces:
   `Requested node lacks resources`
   (`operations/node_inst_netdesc_op.py:207`), which surfaces as an
   errored instance rather than as an HTTP status.
+
+*Correction (2026-09-10, found implementing 3c):* there are
+**three** paths, not two. The first bullet above is really two, per
+D27's correction: the stage pre-filter's 507 and the capacity
+guard's 507 carry different messages. The distinction is not
+cosmetic. `_has_sufficient_cpu()`'s docstring
+(`scheduler.py:321-350`) says it is "a cheap CPU pre-filter (P2) ...
+not the admission decision", and that it reads the capacity row's
+`limit_cpus` and charges `max(measured_cpus, committed_cpus)`
+precisely so it sees what the guard sees. A node deliberately filled
+to its `cpu_limit` therefore fails the pre-filter, and the **stage**
+message is the expected answer. Reaching the guard instead means the
+pre-filter believed there was room -- that the ledger the test sized
+itself from was already stale. That is not a refusal to assert and
+not a failure: it is an invalid premise, and 3c skips on it, saying
+so. The third path stays as this decision describes it.
 
 The implementing step observes which occurs, asserts that, and
 writes a sentence in the test explaining which path produced it. If
