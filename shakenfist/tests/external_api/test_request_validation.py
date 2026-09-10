@@ -120,6 +120,18 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         # observed and stood aside" from "warn rejected" -- which a
         # status code on its own cannot say.
         self.assertNotIn('not declared by this endpoint', body['error'])
+        # The body is the opaque one every 500 carries (decision D31),
+        # not merely "not the 400 that used to be here". Warn is
+        # precisely the mode where a handler-raised TypeError still
+        # happens, so it is where a regression in
+        # suppress_exceptions_to_client leaking interpreter text back
+        # into the response would first show up.
+        self.assertEqual('server error', body['error'])
+        raw = response.get_data(as_text=True)
+        for fragment in INTERPRETER_TEXT:
+            self.assertNotIn(
+                fragment, raw,
+                'the server error leaked interpreter text: %s' % raw)
 
     def test_a_clean_request_produces_no_findings(self):
         """Otherwise every request is a finding and the log says nothing."""
@@ -231,6 +243,16 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual(500, body['status'])
         # Nothing from the layer reached the caller, in either mode.
         self.assertNotIn('not declared by this endpoint', body['error'])
+        # Off means check() never runs at all, so this is the mode
+        # least likely to be caught by the EnforcedValidationTestCase
+        # sweep if suppress_exceptions_to_client ever regressed back to
+        # leaking repr(e). Assert the same opaque shape as warn's.
+        self.assertEqual('server error', body['error'])
+        raw = response.get_data(as_text=True)
+        for fragment in INTERPRETER_TEXT:
+            self.assertNotIn(
+                fragment, raw,
+                'the server error leaked interpreter text: %s' % raw)
 
     def test_the_validator_does_not_refetch_the_body(self):
         """The validator reads the body log_request stashed, so it
@@ -487,6 +509,46 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
                 self.assertEqual(
                     'the request body must be a JSON object',
                     response.get_json()['error'])
+
+    def test_a_non_object_body_400_is_attributed(self):
+        """Item 3 of the phase 5 review: the 400 above must still carry
+        the attribution issue 4069 added.
+
+        Before phase 5, this path raised TypeError and
+        handle_authorization_exceptions caught it, logging
+        _authorization_failure_log(e).info('API request rejected as
+        malformed') -- a line carrying request-id, method, path and
+        remote-address so the rejection can be joined to the 'API
+        request parsed' and audit records. Answering directly (decision
+        D23) dropped that logging unless log_request emits it itself,
+        which is what this pins.
+        """
+        # The RequestID middleware sets FLASK_REQUEST_ID from an
+        # incoming X-Request-ID header (or generates one if absent), so
+        # the header rather than environ_base is what actually pins the
+        # value this test checks for -- environ_base is overwritten by
+        # the middleware before the request reaches log_request.
+        with mock.patch.object(api_base, 'LOG') as log:
+            response = self.client.post(
+                '/auth', data=json.dumps(['a', 'b']),
+                content_type='application/json',
+                headers={'X-Request-ID': 'req-non-object-400'},
+                environ_base={'REMOTE_ADDR': '192.168.9.9'})
+
+        self.assertEqual(400, response.status_code)
+
+        # Exactly one attributed line, and nothing else: the request
+        # is refused before log_request's own 'API request parsed'
+        # line, and before any decorator further out gets a chance to
+        # log anything of its own.
+        self.assertEqual(1, log.with_fields.call_count)
+        fields = log.with_fields.call_args[0][0]
+        self.assertEqual('req-non-object-400', fields['request-id'])
+        self.assertEqual('POST', fields['method'])
+        self.assertEqual('/auth', fields['path'])
+        self.assertEqual('192.168.9.9', fields['remote-address'])
+        log.with_fields.return_value.info.assert_called_once_with(
+            'API request rejected as malformed')
 
     def test_findings_are_emitted_with_the_response_status(self):
         """The after_request hook is the deliverable: a finding line

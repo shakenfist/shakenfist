@@ -1391,7 +1391,19 @@ def log_request(func):
             # decorator chain catches, and would silently merge a list
             # of two-character strings as key value pairs.
             if not isinstance(j, dict):
-                return sf_api.error(400, 'the request body must be a JSON object')
+                # This used to be a raised TypeError, caught by
+                # handle_authorization_exceptions and logged through
+                # _authorization_failure_log(e) -- the attributed line
+                # issue 4069 added so a rejection can be joined to the
+                # 'API request parsed' and audit records by request-id.
+                # Answering directly (decision D23) dropped that unless
+                # it is emitted here instead; suppress_traceback=True
+                # because there is no exception in flight to log a
+                # traceback for.
+                _request_rejection_log().info('API request rejected as malformed')
+                return sf_api.error(
+                    400, 'the request body must be a JSON object',
+                    suppress_traceback=True)
 
             # A body key with the same name as a URL path parameter
             # overwrites it. Recorded here rather than in the validator
@@ -1493,24 +1505,37 @@ def redirect_to_root_clearing_jwt() -> flask.Response:
     return resp
 
 
-def _authorization_failure_log(e: Exception):
+def _request_rejection_log(fields=None):
     """A logger carrying the attribution a rejected request needs.
 
     The record emitted here is the only one saying *why* a request was
     rejected, and without the request-id it cannot be joined to the
     'API request parsed' and audit records which say *which* request it
-    was (issue 4069). The exception class travels as its own field so
-    an expired token, an unparseable one and a revoked one are
-    distinguishable in a query rather than only by message text.
+    was (issue 4069). This is the common attribution every rejection
+    site needs; _authorization_failure_log below layers an exception's
+    class and message on top of it, and a site with no exception in
+    flight -- log_request's non-object-body 400 -- calls this directly.
     """
-    return LOG.with_fields({
+    base_fields = {
         'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
         'method': flask.request.method,
         'path': flask.request.path,
         'remote-address': flask.request.remote_addr,
-        'error-class': type(e).__name__,
-        'error': str(e)
-    })
+    }
+    if fields:
+        base_fields.update(fields)
+    return LOG.with_fields(base_fields)
+
+
+def _authorization_failure_log(e: Exception):
+    """A logger carrying the attribution a rejected request needs.
+
+    The exception class travels as its own field so an expired token,
+    an unparseable one and a revoked one are distinguishable in a query
+    rather than only by message text.
+    """
+    return _request_rejection_log(
+        {'error-class': type(e).__name__, 'error': str(e)})
 
 
 def handle_authorization_exceptions(func):
