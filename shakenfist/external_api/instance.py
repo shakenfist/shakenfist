@@ -265,7 +265,6 @@ class InstanceEndpoint(api_base.Resource):
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, instance_ref=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted

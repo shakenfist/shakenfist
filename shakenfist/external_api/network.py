@@ -162,7 +162,6 @@ class NetworkEndpoint(api_base.Resource):
          (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, network_ref=None, network_from_db=None, namespace=None):
         if network_ref == str(FLOATING_NETWORK_UUID):

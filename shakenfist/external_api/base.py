@@ -1295,6 +1295,20 @@ def requires_network_active(func):
 
 
 def requires_namespace_exist_if_specified(func):
+    # Apply this above any ref-resolving decorator (`arg_is_instance_ref`,
+    # `arg_is_network_ref`, and friends), never below one. Those decorators
+    # each open with `kwargs.pop('namespace', None)` so they can resolve and
+    # authorise the namespace themselves before calling inward; applied below
+    # one, this decorator's `kwargs.get('namespace')` always sees `None` and
+    # the check is silently dead code. That happened: phase 4 of
+    # PLAN-api-input-validation found it on `InstanceEndpoint.delete` and
+    # `NetworkEndpoint.delete` and recorded it without filing an issue (F8 of
+    # PLAN-api-input-validation-phase-05-narrow), and phase 5 removed both
+    # uses rather than reordering them, because the ref decorator already
+    # resolves the namespace and answers its own 404 -- reordering instead
+    # would have changed those routes' 404 message text for no benefit (D29
+    # of the same plan). If you are adding a new use of this decorator next
+    # to a ref decorator, put it above.
     def wrapper(*args, **kwargs):
         if kwargs.get('namespace'):
             if not Namespace.from_db(kwargs['namespace']):
