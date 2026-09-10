@@ -616,6 +616,60 @@ Falsifiable, in order:
 12. `python3 tools/check-plan-status.py` passes, and `pre-commit
     run --all-files` passes in the main repository.
 
+## Outcome
+
+Every step has landed except the parts which by the plan's own
+ordering cannot: 3a, 3b, 3c, 3d and the reachable half of 3f are
+committed; 3e is written but sits uncommitted in the
+`shakenfist/actions` repository, because only the operator pushes
+there.
+
+**The phase is not Complete, and its status rows still say
+`In progress` deliberately.** Two Definition of done items cannot be
+satisfied before this branch merges and CI runs it, and marking the
+phase done on a green branch would be exactly the "a status column is
+a claim, not evidence" failure that the phase-completion check exists
+to catch. What remains is named below, not implied.
+
+Each Definition of done item was run rather than read:
+
+| # | Result | How it was checked |
+|---|--------|--------------------|
+| 1 | **pass** | `grep -rc` over `shakenfist_ci/` returns the stage string once, in `base.py` alone |
+| 2 | **partial** | The file exists with four tests covering all three of D24's stages. That they pass *on a cluster with no free capacity* is the half no worktree can check |
+| 3 | **pass** | Read from the diff: 19 `skipTest()` paths, 8 `capacity_degraded` references |
+| 4 | **pass** | Mutation tested: with the in-body release deleted, the ledger assertion fails rather than the test passing |
+| 5 | **pass** | 3c reported 33 mutations across both CI topologies and a fractional-limit one, with no unexpected outcome |
+| 6 | **pass** | All four predicates are named by unit tests; three of the four were zero before |
+| 7 | **pending the operator** | Needs a merge run carrying 3e, which is unmerged. Unchanged from what the item already said |
+| 8 | **pass** | Every `file:line` citation in the inventory re-resolved, and every issue state refreshed against `gh` |
+| 9 | **pass** | 3f links a discharging test per row, or states why none exists |
+| 10 | **pass** | Read from the diff: each test's docstring enumerates its failure modes, each marked asserted or skipped |
+| 11 | **pass** | `gh issue view 3772` reports `OPEN`/`REOPENED`, which is what the master plan's phase 3 section now says |
+| 12 | **pass** | `check-plan-status.py` agrees; `pre-commit run --all-files` passes all ten hooks |
+
+What close-out still owes, once this merges and a merge run uses it:
+
+* **Item 7**, the census section reporting a count rather than a
+  "not collected" notice, which needs 3e pushed first.
+* **Item 2's other half**, and with it the question 3c was written to
+  answer and could not: which of the three refusal paths a real full
+  node actually gives. 3c records it with `addDetail`, so the first
+  merge run answers it -- read that detail rather than the reasoning
+  in 3c's docstring, which is argument, not observation.
+* **The skip rate on `slim-tier`.** The plan predicts 3c skips often
+  there and says a 3c which never skips is evidence the predicate is
+  wrong. Nobody can know yet.
+* **Whether the fill disturbs the other four stestr workers**, which
+  is D23's whole premise and which F1's amendment already weakened.
+* **The cost of 3c's ownership listing** against
+  `load_budget.py`'s database-load budget. It lists every instance in
+  the cluster, once on the happy path and once per release poll, and
+  was not measured.
+
+Only after those are answered should the Execution table and
+`docs/plans/index.md` move to `Complete` and `4 of 7`.
+
 ## What phase 4 inherits
 
 * Deterministic assertions at three of the four capacity stages
