@@ -14297,6 +14297,77 @@ implement -- clause by clause, against
 your reading of the reconciler differs from finding 5 in any
 respect, stop and say so: the finding is what the rest of this plan
 is built on.</p>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Complete. Steps 1a-1c merged as
+<a href="https://github.com/shakenfist/shakenfist/pull/4147">#4147</a>; steps 1d
+and 1e are recorded here.</p>
+<h3 id="the-measurement-definition-of-done-item-9">The measurement (definition of done item 9)<a class="headerlink" href="#the-measurement-definition-of-done-item-9" title="Permanent link">&para;</a></h3>
+<p>Two <code>slim-tier</code> bundles from 2026-09-09, same tier and same probe,
+read with the time-to-first-capacity-row figure step 1b added to
+<code>tools/ci_headroom_report.py</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Commit</th>
+<th>Phase 1 present</th>
+<th>Time to full capacity-row coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/34338417787">34338417787</a></td>
+<td><code>459e22835</code></td>
+<td>no</td>
+<td>165 s</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/34345875271">34345875271</a></td>
+<td><code>7cc93750d</code></td>
+<td>yes</td>
+<td>0 s</td>
+</tr>
+</tbody>
+</table>
+<p>The item asked for under 60 s and got 0 s, but read the zero
+carefully: it means the window had already closed before the probe's
+first sample, so it bounds the window rather than measuring it. The
+probe starts after the readiness gate, not at cluster start, and
+cannot see anything earlier. The 165 s baseline is the more
+informative number -- it lands inside the 135-210 s band the master
+plan predicted from journal readings, which is the survey's
+characterisation of the defect confirmed against a real run rather
+than against logs.</p>
+<h3 id="4087-definition-of-done-item-11">#4087 (definition of done item 11)<a class="headerlink" href="#4087-definition-of-done-item-11" title="Permanent link">&para;</a></h3>
+<p>Closed, but not by this phase, and not for the right reason. The
+autofixer opened <a href="https://github.com/shakenfist/shakenfist/pull/4144">#4144</a>
+against the issue on 2026-09-08 and it merged on 2026-09-09 carrying
+<code>Fixes #4087</code>, which auto-closed it. #4144 is a sound change --
+it tallies the forced-write guard event in the headroom census -- but
+it touches only <code>tools/ci_headroom_report.py</code> and its tests, and its
+description asserts that #4106 had already fixed the core of the
+issue. Finding 6 of the survey above is that #4106 did not: its
+one-shot ran at election, before any hypervisor had published
+metrics, and its predicate only asked whether the capacity table was
+entirely empty.</p>
+<p>The issue is therefore in the right state for the wrong reason. Step
+1d posted the comment it owed --
+<a href="https://github.com/shakenfist/shakenfist/issues/4087#issuecomment-5607329096">issuecomment-5607329096</a>
+-- recording what #4106 covered, what it did not, what actually
+closed the window, and the two measurements above. The issue was left
+closed rather than reopened and re-closed, since the end state is
+correct and the churn would buy nothing.</p>
+<p>This is the second time the issue-fix workflow has raced a planned
+phase to the same issue. Nothing in this phase's scope addresses
+that; it is noted here because the next phase to file or claim an
+issue should expect it.</p>
+<h3 id="deviations-from-this-plan">Deviations from this plan<a class="headerlink" href="#deviations-from-this-plan" title="Permanent link">&para;</a></h3>
+<p>Two, both recorded above at their source rather than only here:
+definition of done item 2 (two pre-existing tests were modified, for
+the reasons under that item) and D6 (the readiness gate does not
+cover the condition the assertion makes, so the assertion waits --
+see the amendment under D6). Both were found in review of #4147, not
+during implementation.</p>
 
 
 
