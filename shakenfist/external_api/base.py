@@ -1695,8 +1695,18 @@ def suppress_exceptions_to_client(func):
             fields.update(getattr(flask.g, _RECORDED_EXCEPTION_FIELDS, {}))
 
             LOG.with_fields(fields).exception('Server error')
-            return sf_api.error(500, 'server error: %s' % repr(e),
-                                suppress_traceback=True)
+
+            # The body is deliberately opaque. A repr(e) here -- exception
+            # class, message, both -- is the same defect as the interpreter
+            # text this phase deleted from handle_authorization_exceptions
+            # (issue 3612, decision D31): it answers a caller in the
+            # implementation's words instead of the API's. The caller is
+            # not who the detail is for, and loses nothing that mattered --
+            # the log line above and the on-disk record under
+            # /srv/shakenfist/exceptions/ both already carry exception_class,
+            # the full traceback and the correlation fields, which is more
+            # than repr(e) ever put in the response.
+            return sf_api.error(500, 'server error', suppress_traceback=True)
 
     return wrapper
 

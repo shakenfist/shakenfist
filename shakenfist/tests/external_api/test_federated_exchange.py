@@ -374,10 +374,13 @@ class ExchangeAuditTestCase(FederatedExchangeTestCase):
         self.assertIn('/auth/federated', logged)
 
     def test_a_damaged_rule_does_not_leak_its_uuid(self):
-        # The generic 500 handler answers with repr(e), and
-        # CorruptMappingRule names the rule. /auth/federated is the one
-        # endpoint anybody may call, so that repr would hand a stranger
-        # an identifier they have no business holding.
+        # CorruptMappingRule names the rule, and decision D31 stopped
+        # putting repr(e) in the generic 500 body but did not remove
+        # the dedicated guard around this read -- that guard is what
+        # this test pins. Without it, /auth/federated, the one endpoint
+        # anybody may call, would still answer a bare 500 rather than a
+        # categorised 401, and the fault would go unevented against the
+        # rule's owner.
         #
         # The exception is raised where the policy is decoded, not
         # where the rule is looked up: from_db_by_name reads the static

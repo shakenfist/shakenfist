@@ -68,7 +68,11 @@ class ServerErrorLoggingTestCase(base.ShakenFistTestCase):
         resp = self.client.get('/boom')
 
         self.assertEqual(500, resp.status_code)
-        self.assertIn('ValueError', resp.get_data(as_text=True))
+
+        # Decision D31: the response body is deliberately opaque. The
+        # attribution this test is about lives on the log record
+        # asserted below, not in anything the caller can read.
+        self.assertNotIn('ValueError', resp.get_data(as_text=True))
 
         records = self._server_error_records()
         self.assertEqual(1, len(records))
@@ -144,8 +148,10 @@ class ServerErrorLoggingTestCase(base.ShakenFistTestCase):
     def test_recorder_failure_does_not_misattribute(self):
         # If the on-disk exception recorder itself fails (for example
         # /srv/shakenfist/exceptions is unwritable), the 'Server error'
-        # record and the client response must still attribute the original
-        # exception, not the recorder's failure.
+        # record must still attribute the original exception, not the
+        # recorder's failure. The client response carries neither name
+        # (decision D31): it stays the same bare 'server error' whether
+        # or not the recorder worked, which is what is checked below.
         self.mock_record_exception_patcher.stop()
         try:
             with mock.patch(
@@ -157,7 +163,7 @@ class ServerErrorLoggingTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(500, resp.status_code)
         body = resp.get_data(as_text=True)
-        self.assertIn('ValueError', body)
+        self.assertNotIn('ValueError', body)
         self.assertNotIn('PermissionError', body)
 
         records = self._server_error_records()

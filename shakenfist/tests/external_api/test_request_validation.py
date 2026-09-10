@@ -832,14 +832,13 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
         actually produces.
 
         On what the body carries. Every INTERPRETER_TEXT marker is
-        asserted absent except the exception class name, which
-        suppress_exceptions_to_client still puts in the body itself via
-        `repr(e)` in its `server error: %s` message -- a separate leak
-        on the generic 500 path, common to every exception class and
-        not something the deleted arm was responsible for. What matters
-        for D23 is asserted in full: the caller learns no endpoint
-        class, no method name, no traceback and no source path, and is
-        told this was a server error rather than their bad request.
+        asserted absent, with no exemption: decision D31 stopped
+        suppress_exceptions_to_client putting `repr(e)` in the body,
+        so the generic 500 path no longer leaks the exception class
+        name either. The caller learns no endpoint class, no method
+        name, no traceback, no source path and no exception class, and
+        is told only that this was a server error rather than their
+        bad request.
         """
         findings, patcher = self._spy_on_check()
 
@@ -862,8 +861,7 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
         self.assertEqual(500, response.status_code, response.get_json())
         body = response.get_json()
         self.assertEqual(500, body['status'])
-        self.assertTrue(
-            body['error'].startswith('server error: '), body['error'])
+        self.assertEqual('server error', body['error'])
 
         # Recorded rather than swallowed: the operator gets a file
         # under /srv/shakenfist/exceptions/ for a fault the caller is
@@ -873,8 +871,6 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
 
         raw = response.get_data(as_text=True)
         for fragment in INTERPRETER_TEXT:
-            if fragment == 'TypeError':
-                continue
             self.assertNotIn(
                 fragment, raw,
                 'the server error leaked interpreter text: %s' % raw)
