@@ -109,14 +109,6 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
         self.assertEqual('created', img['state'])
 
     def test_disappearing_source_instance(self):
-        nodes = self.system_client.get_nodes()
-        self.addDetail('nodes', content.text_content(json.dumps(
-            nodes, indent=4, sort_keys=True)))
-        for n in nodes:
-            if n['is_hypervisor']:
-                break
-        n = n['name']
-
         p = subprocess.run(
             ['sudo /srv/shakenfist/venv/bin/sf-client '
              'artifact download debian-12 '
@@ -127,7 +119,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
             f'Command failed:\n\tstdout = {p.stdout}\n\tstderr = {p.stderr}\n')
 
         url = 'http://10.0.0.10/debian-12-disappearing-instance'
-        inst = self.test_client.create_instance(
+        inst1 = self.test_client.create_instance(
             'inst1', 1, 1024, None,
             [
                 {
@@ -135,10 +127,10 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
                     'base': url,
                     'type': 'disk'
                 }
-            ], None, None, force_placement=n)
+            ], None, None)
         self.addDetail('inst1', content.text_content(json.dumps(
-            inst, indent=4, sort_keys=True)))
-        self._await_instance_ready(inst['uuid'])
+            inst1, indent=4, sort_keys=True)))
+        self._await_instance_ready(inst1['uuid'])
 
         # Remove the source image
         p = subprocess.run(
@@ -157,7 +149,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
                     'base': url,
                     'type': 'disk'
                 }
-            ], None, None, force_placement=n)
+            ], None, None, force_placement=inst1['node'])
         self.addDetail('inst2', content.text_content(json.dumps(
             inst, indent=4, sort_keys=True)))
         self._await_instance_ready(inst['uuid'])

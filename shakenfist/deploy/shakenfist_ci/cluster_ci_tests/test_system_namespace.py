@@ -7,6 +7,13 @@ from shakenfist_client import apiclient
 
 
 class TestSystemNamespace(base.BaseTestCase):
+    def _safe_delete_instance(self, instance_uuid):
+        """Delete an instance, tolerating if it's already gone."""
+        try:
+            self.system_client.delete_instance(instance_uuid)
+        except apiclient.ResourceNotFoundException:
+            pass
+
     def test_system_namespace(self):
         self.assertEqual('system', self.system_client.namespace)
 
@@ -38,6 +45,7 @@ class TestSystemNamespace(base.BaseTestCase):
                     'type': 'disk'
                 }
             ], None, None)
+        self.addCleanup(self._safe_delete_instance, inst['uuid'])
         self.addDetail(
             'inst',
             content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
