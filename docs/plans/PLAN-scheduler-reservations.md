@@ -376,10 +376,12 @@ request put on `develop`. A phase which has not landed reads
 
 Several phases took more than one pull request, because the
 plan's habit is to land the work and then close the phase out in
-a later documentation change; #3888 closed out phases 3, 4 and
-4a together, so it appears in three rows, and phase 4c took four
-between its first landing and the measurement window closing in
-#4154.
+a later documentation change. Two pull requests therefore appear
+in more than one row: #3888 closed out phases 3, 4 and 4a
+together, so it appears in three, and #3930 closed out 00a while
+landing 4b's server half, so it appears in two. Phase 4c took
+four between its first landing and the measurement window
+closing in #4154.
 
 Three defect fixes on this plan's code landed outside its phase
 branches and belong to no phase row: `49e98a67c` (#3722, ranking

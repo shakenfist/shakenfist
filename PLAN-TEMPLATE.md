@@ -178,6 +178,15 @@ copy lives in shakenfist/development at
     name rather than by position, so a `Merged` column added
     after it does not disturb the index arithmetic.
 
+    A few of this repository's older roadmaps write their
+    phases as prose sections rather than as a table --
+    `blob-storage-roadmap.md` and
+    `api-query-batching-roadmap.md`. Those carry a `**Merged**:`
+    line in each phase's own section instead, directly under
+    the phase heading, and `—` until the phase lands. Nothing
+    checks either form, so a wrong SHA is caught only in
+    review.
+
 ## Agent guidance
 
 ### Execution model

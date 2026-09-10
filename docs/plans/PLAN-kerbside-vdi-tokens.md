@@ -374,14 +374,14 @@ Recommendations are recorded inline.
 | 0. Decisions and token format | shakenfist | Folded into this document (no separate plan file) | Complete | shakenfist `9d41a1716` (#3491) |
 | 1. Cluster signing key + pubkey publication | shakenfist | [PLAN-kerbside-vdi-tokens-phase-01-signing-key.md](PLAN-kerbside-vdi-tokens-phase-01-signing-key.md) | Complete | shakenfist `9d41a1716` (#3491) |
 | 2. vdiconsoleproxy endpoint | shakenfist | [PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md](PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md) | Complete | shakenfist `9d41a1716` (#3491) |
-| 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Complete | ryll `fa7ee21` (#190) |
-| 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Complete | client-python `b426e1f` (#350) |
-| 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Complete | kerbside `f50ea59` (#167) |
-| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59` (#167) |
-| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59` (#167) |
-| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59` (#167) |
-| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete | kerbside `115416c` (#194), `7803368` (#201); shakenfist `07d7081b7` (#3580) |
-| 11. Close out the post-completion defects (#4003, #4009) | shakenfist | See *Post-completion defects* below | Complete | shakenfist `5ef83c065` (#4016), `913411586` (#4018), `f2df423d8` (#4024) |
+| 3. Pip-installable ryll | ryll | PLAN-pip-distribution.md (in ryll's docs/plans/) | Complete | ryll `fa7ee21d8` (#190) |
+| 4. Client, CLI, and viewer launch | client-python | PLAN-vdi-console-tokens.md (in that repo, branch `vdi-console-tokens-client`) | Complete | client-python `b426e1f86` (#350) |
+| 5. Kerbside exchange endpoint | kerbside | PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch `sf-vdi-tokens`) | Complete | kerbside `f50ea59c2` (#167) |
+| 6. Cluster-wide scrape and host_subject | kerbside + shakenfist | PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
+| 7. Functional test: SF mint path | shakenfist | PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside) | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
+| 8. Documentation | all | PLAN-kerbside-vdi-tokens-phase-08-docs.md | Complete | shakenfist `9d41a1716` (#3491); kerbside `f50ea59c2` (#167) |
+| 9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF) | all | PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside) | Complete | kerbside `115416ccc` (#194), `78033687d` (#201); shakenfist `07d7081b7` (#3580) |
+| 11. Close out the post-completion defects (#4003, #4004, #4009) | shakenfist | See *Post-completion defects* below | Complete | shakenfist `5ef83c065` (#4016), `913411586` (#4018), `f2df423d8` (#4024) |
 | 10. Push audit | all | [PLAN-kerbside-vdi-tokens-phase-10-push-audit.md](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md) | Complete | shakenfist `2d585cd1a` (#4099), `ccc1b5ff2` (#4137); kerbside `e2a493ea6` (#412), `29323fb85` (#413); ryll `aac25cf3c` (#358), `0113f0ff7` (#366) |
 
 The push audit is the last row of the table, and phase 11 sits above
@@ -396,8 +396,7 @@ default branch. A phase that landed elsewhere names the repository, as
 the shared block asks. The column was reconstructed after the fact --
 the table originally named plan files rather than pull requests, which
 meant phase 10 had to rebuild the merge history in four working copies
-before it could audit anything. That reconstruction is recorded once,
-in
+before it could audit anything. That reconstruction is recorded once, in
 [phase 10's decision 1](PLAN-kerbside-vdi-tokens-phase-10-push-audit.md),
 and the table below is it: the same merges as the column, grouped by
 pull request rather than by phase, which is the only way to show the
@@ -414,13 +413,13 @@ at all.
 | shakenfist | 11 (#4004) | #4024 | `f2df423d8` |
 | shakenfist | 10 (audit, its three medium fixes, the `.vv` functional test) | #4099 | `2d585cd1a` |
 | shakenfist | 10 closeout (docs) | #4137 | `ccc1b5ff2` |
-| client-python | 4 | #350 | `b426e1f` |
-| kerbside | 5, 6, 7, 8 (kerbside half) | #167 | `f50ea59` |
-| kerbside | 9 (SF end-to-end lane) | #194 | `115416c` |
-| kerbside | post-phase-9 scrape fix | #201 | `7803368` |
+| client-python | 4 | #350 | `b426e1f86` |
+| kerbside | 5, 6, 7, 8 (kerbside half) | #167 | `f50ea59c2` |
+| kerbside | 9 (SF end-to-end lane) | #194 | `115416ccc` |
+| kerbside | post-phase-9 scrape fix | #201 | `78033687d` |
 | kerbside | 10 (F-B1 part 1: a key fetch no longer errors the source) | #412 | `e2a493ea6` |
 | kerbside | 10 (F-B1 part 2: cleanup narrowed to enumerated sources) | #413 | `29323fb85` |
-| ryll | 3 | #190 | `fa7ee21` |
+| ryll | 3 | #190 | `fa7ee21d8` |
 | ryll | 10 (F8: SPICE TLS trust anchors) | #358 | `aac25cf3c` |
 | ryll | 10 follow-up (redundant `app.js` test assertion removed) | #366 | `0113f0ff7` |
 

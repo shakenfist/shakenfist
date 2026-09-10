@@ -1012,8 +1012,8 @@ not land anywhere else.
 | Phase | Repo | Plan | Status | Merged |
 |-------|------|------|--------|--------|
 | 0. Research and decisions | shakenfist | TBD | Not started | — |
-| 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- the work landed under `PLAN-auth-federation.md` phase 3 |
-| 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- the work landed under `PLAN-auth-federation.md` phase 3 |
+| 1. JWT validation refactor (split issuance from validation; introduce per-issuer validators) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 steps 3a-3c and 3f: `72187d2ff` (#3556), `c64269e63` (#3625) |
+| 2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification) | shakenfist | [PLAN-auth-federation-phase-03-exchange.md](PLAN-auth-federation-phase-03-exchange.md) | Superseded | Superseded -- landed as `PLAN-auth-federation.md` phase 3 step 3f: `c64269e63` (#3625), `1e7a167ea` (#3641) |
 | 3. OIDC discovery | shakenfist | TBD | Not started | — |
 | 4. Claim-driven namespace authorisation, including multi-namespace | shakenfist | TBD | Not started | — |
 | 5. Admin as a claim | shakenfist | TBD | Not started | — |
@@ -1028,9 +1028,18 @@ the merge commit of its pull request, or an explicit
 `first..last` range where the phase landed directly. It is
 filled in as each phase lands, so `—` means the phase has not
 landed yet. Phases 1 and 2 are the exception: they were
-superseded rather than abandoned, so the cell names the plan
-whose phases did the work and whose merges an audit of that
-code should read.
+superseded rather than abandoned, so their cells name the
+merges that landed the work under another plan, and phase
+10's audit reads those ranges directly rather than following
+a pointer. `PLAN-auth-federation.md` is `Complete` and so
+carries no `Merged` column of its own -- a Complete plan is
+not reopened to acquire one -- which is why the merges are
+written out here. They were reconstructed from that plan's
+phase 3 step table, whose per-step commit subjects were
+matched against the first-parent history rather than a
+path-filtered `git log`: #3556 landed steps 3a-3d, #3625
+landed 3e-3i, and #3641 added trust anchors for a private
+JWKS endpoint.
 
 **Phase 0 — research and decisions.** Settles open question
 13, direct-bearer versus exchange-based human sessions, and

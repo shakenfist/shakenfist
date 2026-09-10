@@ -348,9 +348,9 @@ question is whether the enqueue-time check, the `queue_is_cluster_wide`
 skip and `COALESCIBLE_TASKS` are now three expressions of one rule or
 three copies that can drift apart. And phases 9 and 10 added
 measurement tooling and event fields whose consumers --
-`tools/queue-wait-report.py` among them -- are the kind of code
-that
-gets no test coverage and no documentation unless an audit asks.
+`tools/queue-wait-report.py` among them -- are the kind of
+code that gets no test coverage and no documentation unless
+an audit asks.
 
 Findings land as their own pull request, and the plan is not complete
 until each is resolved or declined in writing here. If the audit
