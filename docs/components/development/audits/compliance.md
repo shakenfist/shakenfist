@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-09T10:59:00.589409+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-10T10:54:47.683936+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -471,7 +471,7 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#356 |
+| ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
@@ -479,7 +479,6 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 
 Details for non-compliant projects:
 
-- **ryll** (Status): AGENTS.md is 307 lines / 2118 words (limits: 300 lines, 2500 words); move detail into docs/ and leave a summary and a link
 - **visual-digest-rust** (Status): AGENTS.md and ARCHITECTURE.md share the headings "feature flag matrix"; give each fact one home and link to it from the other file
 
 ## llm-tooling
@@ -588,7 +587,7 @@ Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#337 |
+| ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#3979 |
 | uncalibrated-sextant | N/A | - |
@@ -596,7 +595,6 @@ Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
 
 Details for non-compliant projects:
 
-- **ryll** (Status): mermaid diagrams are not linted: missing tools/mermaid-lint.sh and a CI workflow that runs it (copy templates/mermaid-lint/ from the development repository)
 - **shakenfist** (Status): mermaid diagrams are not linted: missing tools/mermaid-lint.sh and a CI workflow that runs it (copy templates/mermaid-lint/ from the development repository)
 
 ## pin-indirect-dependencies
@@ -645,7 +643,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#129 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | N/A | - |
@@ -657,7 +655,6 @@ Details for non-compliant projects:
 
 - **divergulent** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md
 - **instar** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)
-- **occystrap** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-quay-label-search.md (no push audit phase; phase 5 is "5. Filter by tag age (since parameter)"); 1 plan(s) with no phases this check can read, not judged: PLAN-info-check.md
 - **shakenfist** (Status): 2 of 17 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-transient-capacity-refusals.md (no push audit phase; phase 6 is "6. Documentation and close-out"); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
@@ -681,7 +678,7 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 | kerbside-patches | N/A | - |
 | library-utilities | compliant | - |
 | occystrap | non-compliant | shakenfist/occystrap#116 |
-| private-ci | N/A | - |
+| private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#24 |
 | shakenfist | compliant | - |
@@ -703,7 +700,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | actions | compliant | - |
 | agent-python | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#382 |
-| client-python-k3s | compliant | - |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#58 |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
@@ -714,7 +711,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
-| private-ci | N/A | - |
+| private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#3732 |
@@ -724,8 +721,9 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
+- **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:54, docs/library-api.md:65, docs/library-api.md:180, docs/library-api.md:182
 - **instar** (Status): 6 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/quirks.md:4199, docs/quirks.md:4205, docs/quirks.md:4206, docs/quirks.md:4407, docs/quirks.md:4463, docs/quirks.md:4464
-- **shakenfist** (Status): 24 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:71, docs/developer_guide/ci.md:133, docs/developer_guide/ci.md:216, docs/developer_guide/ci.md:267, docs/developer_guide/ci.md:268, docs/developer_guide/database_internals.md:351, docs/developer_guide/database_internals.md:355, docs/developer_guide/subsystem_internals.md:51, docs/developer_guide/subsystem_internals.md:110 (+14 more)
+- **shakenfist** (Status): 26 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:71, docs/developer_guide/ci.md:133, docs/developer_guide/ci.md:235, docs/developer_guide/ci.md:286, docs/developer_guide/ci.md:287, docs/developer_guide/database_internals.md:346, docs/developer_guide/database_internals.md:360, docs/developer_guide/database_internals.md:364, docs/developer_guide/subsystem_internals.md:51 (+16 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
 
@@ -749,7 +747,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | N/A | - |
+| private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | compliant | - |
@@ -770,18 +768,18 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | compliant | - |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#59 |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#110 |
+| instar | non-compliant | shakenfist/instar#561 |
+| kerbside | non-compliant | shakenfist/kerbside#421 |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | non-compliant | shakenfist/occystrap#117 |
-| private-ci | N/A | - |
+| private-ci | non-compliant | shakenfist/private-ci#33 |
 | ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#3892 |
@@ -790,7 +788,12 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 
 Details for non-compliant projects:
 
+- **client-python-k3s** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
+- **divergulent** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
+- **instar** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
+- **kerbside** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
 - **occystrap** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
+- **private-ci** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
 - **shakenfist** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **uncalibrated-sextant** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 
@@ -815,7 +818,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | library-utilities | N/A | - |
 | occystrap | non-compliant | shakenfist/occystrap#110 |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#323 |
+| ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#15 |
 | shakenfist | non-compliant | shakenfist/shakenfist#3911 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#11 |
@@ -825,7 +828,6 @@ Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
 - **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
-- **ryll** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 - **shakenfist** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **uncalibrated-sextant** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block comment-proportion (copy it verbatim from templates/shared-blocks/comment-proportion.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
@@ -1052,13 +1054,13 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#29 |
+| actions | compliant | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | compliant | - |
+| development | non-compliant | shakenfist/development#116 |
 | divergulent | N/A | - |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
@@ -1075,9 +1077,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 71 of 98 in-scope files reviewed at HEAD; 27 need review (threshold 5)
+- **development** (Status): 173 of 179 in-scope files reviewed at HEAD; 6 need review (threshold 5)
 - **kerbside** (Status): 117 of 229 in-scope files reviewed at HEAD; 112 need review (threshold 5)
-- **ryll** (Status): 83 of 195 in-scope files reviewed at HEAD; 112 need review (threshold 5)
+- **ryll** (Status): 90 of 200 in-scope files reviewed at HEAD; 110 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1108,7 +1110,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 
 Details for non-compliant projects:
 
-- **ryll** (Status): 36 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
+- **ryll** (Status): 33 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
 
 ## rust-unwrap-lint
 
@@ -1225,15 +1227,11 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 | library-utilities | N/A | - |
 | occystrap | compliant | - |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#322 |
+| ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **ryll** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tools/browser-offer-probe.py:68 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
 
 ## sfui-vendor
 
@@ -1256,7 +1254,7 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | compliant | - |
-| ryll | non-compliant | shakenfist/ryll#349 |
+| ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1265,7 +1263,6 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 Details for non-compliant projects:
 
 - **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **ryll** (Status): ryll/src/web/assets/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 
