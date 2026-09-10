@@ -5,6 +5,15 @@ from shakenfist.util import general as util_general
 
 
 class UtilUserAgent(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        # get_user_agent() caches the cpuinfo probe in a module-level global so it is
+        # only paid for once per process. Reset it before and after every test so tests
+        # don't leak a cached value into each other via assertions against different
+        # cpuinfo.get_cpu_info mocks.
+        util_general.CPUINFO_CACHE = None
+        self.addCleanup(setattr, util_general, 'CPUINFO_CACHE', None)
+
     @mock.patch('cpuinfo.get_cpu_info', return_value={
         'arch_string_raw': 'x86_64',
         'vendor_id_raw': 'GenuineIntel'
@@ -38,3 +47,17 @@ class UtilUserAgent(base.ShakenFistTestCase):
         self.assertEqual('Mozilla/5.0 (Debian GNU/Linux 10 (buster); '
                          'unknown x86_64) Shaken Fist/1.2.3',
                          ua)
+
+    @mock.patch('cpuinfo.get_cpu_info', return_value={
+        'arch_string_raw': 'x86_64',
+        'vendor_id_raw': 'GenuineIntel'
+    })
+    @mock.patch('distro.name', return_value='Debian GNU/Linux 10 (buster)')
+    @mock.patch('shakenfist.util.general.get_version', return_value='1.2.3')
+    def test_user_agent_caches_cpu_probe(self, mock_version, mock_distro, mock_cpuinfo):
+        # cpuinfo.get_cpu_info() can shell out to external tools on some platforms, and
+        # get_user_agent() is called on every proxied API request and image fetch, so
+        # the probe must only run once per process.
+        util_general.get_user_agent()
+        util_general.get_user_agent()
+        self.assertEqual(1, mock_cpuinfo.call_count)

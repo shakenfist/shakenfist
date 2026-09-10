@@ -84,8 +84,26 @@ def get_version() -> str:
     return sf_version
 
 
+CPUINFO_CACHE: dict[str, Any] | None = None
+
+
+def _get_cpu_info() -> dict[str, Any]:
+    global CPUINFO_CACHE
+
+    # py-cpuinfo probes through several mechanisms, including subprocess invocations on
+    # some platforms, and get_user_agent() is called on every proxied API request and
+    # image fetch. The result cannot change for the lifetime of the process, so probe
+    # once and cache it -- a partial result is fine to cache now that the caller
+    # tolerates one. Compare against None rather than falsiness: an empty dict is a
+    # valid (if partial) cached probe result, not "not yet probed".
+    if CPUINFO_CACHE is None:
+        CPUINFO_CACHE = cpuinfo.get_cpu_info()
+
+    return CPUINFO_CACHE
+
+
 def get_user_agent() -> str:
-    architecture = cpuinfo.get_cpu_info()
+    architecture = _get_cpu_info()
     # py-cpuinfo probes through several mechanisms and returns whatever it managed to
     # collect, so neither key below is guaranteed to be present. A partial probe used to
     # raise a KeyError here, which propagated out of a request handler as an opaque 500
