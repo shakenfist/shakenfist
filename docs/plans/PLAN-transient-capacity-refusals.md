@@ -497,7 +497,7 @@ spelling above is the one to write.
 
 | Phase | Plan | Status |
 |-------|------|--------|
-| 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Not started |
+| 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete |
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | PLAN-transient-capacity-refusals-phase-02-suite-wait.md | Not started |
 | 3. Publish metrics when the running-domain set changes | PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md | Not started |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started |
