@@ -1096,6 +1096,77 @@ class BaseTestCase(testtools.TestCase):
                     % (instance_uuid, contains, console))
             time.sleep(30)
 
+    def assertRefusedAtStage(self, response, stage):
+        """Assert a create was refused at a scheduler stage, per D27.
+
+        The contract asserted here, as of 2026-09 (``scheduler.py:540``
+        and the create path's ``except exceptions.LowResourceException``
+        clause, ``external_api/instance.py:901-906``):
+
+        * HTTP status 507.
+        * A body whose ``error`` field is ``No nodes remaining at
+          scheduling stage <stage>``, optionally followed by
+          ``: <detail>`` -- the stage can append a detail, and the bare
+          message is just as valid without one.
+
+        ``response`` is either the ``shakenfist_client.apiclient.APIException``
+        (in practice almost always its ``InsufficientResourcesException``
+        subclass, since that is the 507 case) the client raised, or an
+        explicit ``(status, body)`` pair -- the shape
+        ``test_namespace_claims.py``'s ``_claim_api()`` already returns,
+        where ``body`` is the decoded JSON error body or the raw response
+        text.
+
+        Returns the ``<detail>`` suffix when the message carried one, else
+        None, so a caller that wants to assert on it does not have to
+        re-parse the message itself.
+
+        ``PLAN-transient-capacity-refusals.md``'s phase 4 adds a
+        ``Retry-After`` header and a machine-readable body to this
+        contract. When it does, this is the single helper to change --
+        not every test that calls it.
+
+        Do not route the request behind this assertion through
+        ``shakenfist_ci.retries``. A refusal assertion must never retry:
+        doing so risks retrying the very refusal under test away if the
+        cluster frees up between attempts, which is exactly backwards from
+        what a saturation test is trying to prove. See the "Why success
+        assertions retry 507" section of ``test_namespace_claims.py``'s
+        module docstring (lines 35-52) for the full reasoning -- that file
+        draws the same line between requests whose success is asserted
+        (retried) and requests whose refusal is asserted (not retried).
+        """
+        if isinstance(response, apiclient.APIException):
+            status, body = response.status_code, response.text
+        else:
+            status, body = response
+
+        # body arrives decoded (a dict, from a caller following the
+        # test_namespace_claims.py::_claim_api() convention), or as raw
+        # text (an exception's .text, or a body that was not JSON) -- try
+        # the decode once here rather than making every caller do it.
+        if isinstance(body, str):
+            try:
+                body = json.loads(body)
+            except (TypeError, ValueError):
+                pass
+
+        self.assertEqual(
+            507, status,
+            f'Expected a 507 refusal at scheduling stage {stage}, got HTTP '
+            f'{status} with body {body}')
+
+        message = body.get('error', '') if isinstance(body, dict) else (body or '')
+
+        expected = f'No nodes remaining at scheduling stage {stage}'
+        match = re.fullmatch(f'{re.escape(expected)}(?:: (?P<detail>.*))?', message, re.DOTALL)
+        self.assertIsNotNone(
+            match,
+            f'Expected refusal message {expected!r} (optionally with a '
+            f'": <detail>" suffix) at scheduling stage {stage}, got {message!r}')
+
+        return match.group('detail')
+
 
 class BaseNamespacedTestCase(BaseTestCase):
     def __init__(self, *args, **kwargs):
