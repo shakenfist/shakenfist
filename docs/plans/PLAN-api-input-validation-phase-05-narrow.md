@@ -67,6 +67,9 @@ the *request* was malformed.
   phase 4 recorded and did not file (F8).
 * Document what the `warn`/`off` rollback now does, since this phase
   changes it.
+* Stop `suppress_exceptions_to_client` putting `repr(e)` in the
+  caller's error body. Added to the phase after step 2 found it — see
+  F11 and D31.
 
 **Out:**
 
@@ -256,7 +259,7 @@ non-existent namespace gets `instance not found` (404) instead of
 removing the dead call acknowledges the ref decorator already covers
 the case. See D29.
 
-### F9. Two more 500 classes on the proxy path, recorded not fixed
+### F9. Two more 500 classes on the proxy path — mostly already fixed
 
 The full 30-day sample is 266 `Server error` records, and the five
 `KeyError`s of F6 are the small half of it:
@@ -267,11 +270,47 @@ The full 30-day sample is 266 `Server error` records, and the five
 | 5 | `KeyError` | `util/general.py` in `get_user_agent` |
 | 1 | `ConnectionRefusedError` | `util/concurrency.py:329` in `_node_lock_request` |
 
-A node being unreachable is answered as a 500 with an exception repr,
-260 times in a month. That is a genuine error-contract defect of the
-same family as this plan's, and it is a different mechanism with a
-different right answer (502 or 503, and a decision about retries). To
-be filed rather than absorbed — see D28.
+**This finding was substantially wrong, and step 5 caught it.** The
+correction is recorded here rather than only in Progress, because a
+stale finding left standing is how the next reader inherits the error.
+
+The claim above — "a node being unreachable is answered as a 500, 260
+times in a month" — reads a 30-day aggregate as a rate. It is not one.
+Split by day, every `ConnectionError` in the sample falls between
+2026-08-12 and 2026-08-19, and **252 of the 260 are a single burst on
+08-19**. There are none afterwards, because
+[`2ac50193b`](https://github.com/shakenfist/shakenfist/commit/2ac50193b)
+— *Surface unreachable proxy peers as a 503*, issue #3743 — landed
+2026-08-21 and already fixed that path. `proxy_request_to_node` now
+catches `requests.exceptions.RequestException` and answers 503.
+
+So the headline defect was fixed a week into the window this plan
+measured, and the survey did not notice because it never asked whether
+the distribution was uniform. That is the same mistake as F5's first
+cut: a derived number nobody checked against a second axis.
+
+What is actually left, verified by step 5 against the current tree and
+current Loki data:
+
+* **The `ConnectionRefusedError` is live.** It recurred 2026-08-26,
+  *after* the proxy fix, on `POST /instances/<uuid>/poweroff`. It is a
+  different mechanism — `_node_lock_request` speaks to a local Unix
+  socket belonging to the node's own nodelock daemon, not to a peer —
+  so `2ac50193b` never covered it.
+* **Two more unguarded proxy call sites the survey missed**, neither
+  behind `proxy_request_to_node` and so neither fixed by `2ac50193b`:
+  `shakenfist/external_api/blob.py:71` (`_read_remote`) and the
+  `upload_uuid` branch of `POST /artifacts`
+  (`shakenfist/external_api/artifact.py:588`). Both call
+  `requests.request()` with no exception handling.
+
+Filed as
+[#4161](https://github.com/shakenfist/shakenfist/issues/4161), scoped
+to what is still true rather than to the table above. D28's reasoning
+for not fixing it here survives the correction: it still needs a
+status-code decision, a retry decision and a caller audit, which is a
+phase and not a step. D31 raises its value, since a caller can no
+longer see which exception it was.
 
 ### F10. The arm has fired once in the only window that can be counted
 
@@ -296,6 +335,41 @@ records, not a caller. Five days is a short window and it is the only
 one there is; the honest statement is that nothing is known about the
 arm's rate before 2026-09-05, and that in the days since, no real
 caller has reached it.
+
+### F11. The deletion relabels the leak rather than removing it
+
+**Found by step 2, after this plan was written and committed.** It is
+recorded here rather than silently fixed because it falsifies
+something the plan assumed.
+
+`suppress_exceptions_to_client` builds every 500 body as
+`'server error: %s' % repr(e)` (`base.py:1684`). So after the arm is
+deleted, an undeclared body key under `warn` or `off` answers:
+
+```
+500 {"error": "server error: TypeError(\"AuthEndpoint.post() got an
+unexpected keyword argument 'zzz'\")", "status": 500}
+```
+
+which is #3612's motivating string — endpoint class, method name, and
+the fact that kwargs are merged into the call — wearing a 500 instead
+of a 400. The plan assumed the generic 500 body was clean. It is not,
+and the assumption is load-bearing for D25 and for definition of done
+item 4.
+
+It is a second and independent leak site, common to every exception
+class rather than specific to this one. It is also what puts
+`KeyError('arch_string_raw')` (F6) and the 260 `ConnectionError`
+reprs (F9) into caller-visible bodies. `base.py:1684` is the only
+production site; `grep` finds no other.
+
+Step 2 did not fix it, correctly: cleaning that body changes the shape
+of every 500 the API emits, which is an error-contract decision of the
+same size as D25. Instead it asserted what is true — every
+`INTERPRETER_TEXT` marker absent *except* the exception class name,
+with the exemption named and justified in the test docstring so that
+tightening it is a one-line change. That is the right shape for a
+finding that outruns its plan.
 
 ### Nothing else in the master plan's phase 5 section was wrong
 
@@ -422,6 +496,32 @@ Without it, the property "the API never answers a `TypeError` in the
 interpreter's words" is asserted nowhere and could be undone by
 someone restoring the arm.
 
+### D31. The generic 500 body stops carrying `repr(e)`
+
+Taken by the operator after step 2 surfaced F11, and added to the
+phase rather than filed.
+
+`base.py:1684` becomes `sf_api.error(500, 'server error')`. The detail
+does not disappear: `suppress_exceptions_to_client` already logs one
+`Server error` line carrying `exception_class`, the full `traceback`,
+`method`, `path` and the correlation fields for the on-disk record
+under `/srv/shakenfist/exceptions/`, all of which say more than
+`repr(e)` in a response body ever did.
+
+Two things argued for doing it here rather than deferring it. It is
+what makes the phase's own claim true — a phase whose purpose is to
+stop the API answering in the interpreter's words should not ship a
+version that only changes which status code the words arrive under.
+And it closes the same leak for the classes F6 and F9 found in
+production, which are two orders of magnitude more frequent than the
+`TypeError` this phase started with.
+
+The cost, stated plainly: a caller debugging from a response body
+alone loses the exception detail, and gets `server error` with nothing
+else. That is deliberate — the caller is not who the detail is for,
+and an operator has both the log line and the exception record. It
+goes in the release note for the same reason D25 does.
+
 ## Step plan
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
@@ -430,11 +530,17 @@ someone restoring the arm.
 | 2 | high | opus | none | **Delete the `except TypeError` arm.** In `shakenfist/external_api/base.py`, `handle_authorization_exceptions` (line 1500) catches `TypeError` and answers `400 str(e)`. Delete that arm and leave the three JWT arms — `DecodeError`, `ExpiredSignatureError` and the eight-class tuple — untouched. Rewrite the `NOTE(mikal)` comment above the wrapper so it says what the function now catches and why (authorization conditions only; see decision D23 in this plan). Then fix the fallout, which the plan has already enumerated: `test_warn_mode_changes_no_response` (`test_request_validation.py:98`) and `test_off_mode_disables_the_layer` (`:198`) both assert `unexpected keyword argument` appears in the response body; under `warn` and `off` an undeclared body key now answers 500 (decision D25), so rewrite both to assert the new behaviour *and* to assert the response carries no interpreter text. Add the D30 test: a handler which raises `TypeError` internally answers 500, the body contains no Python message, and `util.exceptions.record_exception` was called. Reuse the `INTERPRETER_TEXT` list (`test_request_validation.py:709`) rather than writing a new one; note its comment says a marker added there belongs in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_api_validation.py` too. Before finishing, enumerate every remaining source of `TypeError` reachable from a request: grep the whole tree for `raise TypeError` (step 1 removed the only one in `external_api/`), and check the `@use_kwargs`/webargs sites and `flasgger`. Report what you found even if the answer is nothing. Commit subject: `Stop answering a TypeError as a bad request.` |
 | 3 | medium | sonnet | none | **Fix #3523.** `shakenfist/util/general.py:87` `get_user_agent()` indexes `cpuinfo.get_cpu_info()` for `arch_string_raw` and `vendor_id_raw` without guarding. `py-cpuinfo` returns whatever its probes collected, so both keys can be absent, and the resulting `KeyError` reaches a caller as a 500 on `GET /instances/<uuid>/consoledata` via `proxy_request_to_node`. Use `.get()` with a sensible literal for each (`'unknown'` reads correctly in a user agent string). Add a unit test in `shakenfist/tests/` that patches `cpuinfo.get_cpu_info` to return `{}` and asserts `get_user_agent()` returns a string containing the version — mutation test it by restoring one of the bare lookups and confirming the test fails. Do not change the user agent's format for the case where both keys are present; a test should pin that too. Commit subject: `Survive a partial cpuinfo probe.` |
 | 4 | low | sonnet | none | **Remove two dead decorator uses.** `@api_base.requires_namespace_exist_if_specified` is applied *below* `@api_base.arg_is_instance_ref` on `InstanceEndpoint.delete` (`shakenfist/external_api/instance.py:268`) and below `@api_base.arg_is_network_ref` on `NetworkEndpoint.delete` (`shakenfist/external_api/network.py:165`). The ref decorator wraps it and opens with `kwargs.pop('namespace', None)` (`base.py:1052`), so its `kwargs.get('namespace')` is always `None` and it can never fire. Delete both applications. Do not reorder them, and do not touch the other ten uses, which are on creation and collection routes and work (decision D29). Confirm no test asserts `namespace not found` on either route before deleting. Add a short comment to `requires_namespace_exist_if_specified` in `base.py` recording that it must be applied *above* any ref decorator, so the next use does not repeat this. Commit subject: `Drop two guards that could never fire.` |
+| 6 | medium | sonnet | none | **Stop the 500 body carrying `repr(e)`.** Per D31 and F11. In `shakenfist/external_api/base.py`, `suppress_exceptions_to_client` (line ~1629) ends with `return sf_api.error(500, 'server error: %s' % repr(e), suppress_traceback=True)` at line 1684. Change the message to a bare `'server error'`. Do not touch the `LOG.with_fields(fields).exception('Server error')` line above it or the fields it builds — that line and the on-disk record under `/srv/shakenfist/exceptions/` are where the detail goes, and they already carry more than the body did. Add a comment saying why the body is deliberately opaque: the caller is not who the detail is for, and `repr(e)` in an error field is the same defect as the interpreter text this phase deleted (issue #3612, decision D31). Then find what depended on the old shape: `test_a_handler_internal_type_error_is_a_recorded_500` in `shakenfist/tests/external_api/test_request_validation.py` skips the `'TypeError'` marker in its `INTERPRETER_TEXT` sweep and says in its docstring why — **remove the exemption and the paragraph justifying it**, so the sweep runs whole. Check `shakenfist/tests/external_api/test_server_error_logging.py`, `shakenfist/tests/test_federation.py` (line ~780) and `shakenfist/external_api/label.py` (line ~59) for assertions or comments naming the old body; a comment which now describes something untrue should be corrected, not left. Finally grep `shakenfist/deploy/shakenfist_ci/` for anything reading a 500's error text. Report everything you found. Commit subject: `Stop telling callers what exception broke.` |
 | 5 | medium | sonnet | none | **Documentation and close-out.** (a) `docs/developer_guide/writing_an_endpoint.md:308-316` already describes `API_VALIDATION_MODE` and calls `warn` the operator's rollback; extend that passage to say what `warn` and `off` now do with an undeclared body key (500, recorded exception). Do not add a new section. (b) `docs/release_notes/v07-v08.md:188-220` is phase 4's enforcement entry, including the `API_VALIDATION_MODE=warn` rollback sentence at line 210; extend that entry, do not start a second one, noting that the rollback modes no longer answer 400 for input the handler cannot accept. (c) File the F9 issue: the proxy path answers an unreachable node with a 500, with the Loki evidence from this plan's F9 and links to `proxy_request_to_node` and `util/concurrency.py:329`. (d) Update this plan's Progress section, the master plan's Execution table row for phase 5, and the `docs/plans/index.md` phase arithmetic. Commit subject: `Document what narrowing changed.` |
 
-Steps 1 and 2 are strictly ordered. Steps 3 and 4 are independent of
-both and of each other. Step 5 runs last. Step 2 carries a conditional
+Steps 1 and 2 are strictly ordered, and step 6 follows step 2. Steps 3
+and 4 are independent of both and of each other. Step 5 runs last,
+because it documents what the others did. Step 2 carries a conditional
 gate — see the Back brief.
+
+Step 6 was added after the plan was committed, when step 2 found F11.
+It is numbered 6 and sequenced fifth so that the earlier numbers keep
+pointing at the commits that already reference them.
 
 ## Risks and mitigations
 
@@ -478,27 +584,48 @@ gate — see the Back brief.
    unchanged, for all four payloads, after both step 1 and step 2.
 4. A test proves a handler which raises `TypeError` internally answers
    500, that the body carries none of the shapes in `INTERPRETER_TEXT`
-   (`test_request_validation.py:709`), and that an exception was
-   recorded. The test has been mutation-tested by restoring the
-   deleted arm, and fails when it is restored.
-5. No test in the suite asserts that a response body contains
+   (`test_request_validation.py:709`) **with no exemptions**, and that
+   an exception was recorded. The test has been mutation-tested by
+   restoring the deleted arm, and fails when it is restored. Step 2
+   met this with one exemption because of F11; step 6 removes it, and
+   the item is not met until the sweep runs whole.
+5. The **generic** 500 path carries no exception detail: the body
+   `suppress_exceptions_to_client` returns is a fixed string, and the
+   item 4 sweep runs unexempted against it. Deliberate `str(e)` on a
+   caught exception elsewhere is untouched and stays — nineteen
+   handlers answer a Shaken Fist exception class that way, and there
+   the message is the API's own vocabulary rather than the
+   interpreter's. D31 is about what escapes uncaught, not about
+   whether an exception may ever be quoted.
+
+   *This item took two attempts to state, both recorded rather than
+   quietly replaced. It first said `grep -n "repr(e)"
+   shakenfist/external_api/base.py` returns nothing; step 5 reported
+   that as not met, correctly, because step 6's own comment explains
+   in prose why the body is opaque and so contains the string. The
+   rewrite then over-corrected to "no `sf_api.error()` call
+   interpolates an exception", which those nineteen deliberate sites
+   falsify. A criterion a comment can break, and a criterion that
+   condemns correct code, are both the wrong test — and this plan has
+   now produced one of each.*
+6. No test in the suite asserts that a response body contains
    `unexpected keyword argument` or `missing 1 required positional
    argument`.
-6. `get_user_agent()` returns a string when `cpuinfo.get_cpu_info()`
+7. `get_user_agent()` returns a string when `cpuinfo.get_cpu_info()`
    returns `{}`, pinned by a test which fails if either guarded lookup
    is restored to a bare index.
-7. #3523 is closed, and the closing comment names
+8. #3523 is closed, and the closing comment names
    `util/general.py:get_user_agent` and `KeyError: 'arch_string_raw'`
    as the raising frame the issue asked for.
-8. `requires_namespace_exist_if_specified` is applied above every ref
+9. `requires_namespace_exist_if_specified` is applied above every ref
    decorator that uses it, or not at all; the two applications named
    in F8 are gone and the other ten are untouched.
-9. An issue exists for F9, linked from the master plan's Future work.
-10. What `warn` and `off` do with an undeclared body key is stated the
+10. An issue exists for F9, linked from the master plan's Future work.
+11. What `warn` and `off` do with an undeclared body key is stated the
     same way in `docs/developer_guide/writing_an_endpoint.md`, the
     v07-v08 release note, and this plan.
-11. `pre-commit run --all-files` is clean.
-12. The master plan's Execution table, its status line, and the
+12. `pre-commit run --all-files` is clean.
+13. The master plan's Execution table, its status line, and the
     `docs/plans/index.md` row all say phase 5 is complete and agree on
     the phase arithmetic.
 
@@ -516,4 +643,249 @@ session rather than in the step.
 
 ## Progress
 
-Planned 2026-09-10. No steps executed.
+Executed 2026-09-10. Steps 1-4 and 6 landed as five commits, in
+execution order below; step 6 was added mid-phase, after step 2
+found the problem it fixes (F11). This section is step 5, and it
+runs last as the step plan says it should.
+
+### Step 1, `efc0ca6eb` — Answer a non-object body directly
+
+`log_request`'s non-object body guard stopped depending on the catch
+step 2 was about to delete: it now returns `sf_api.error(400, 'the
+request body must be a JSON object')` itself instead of raising
+`TypeError` for `handle_authorization_exceptions` to catch. No
+behaviour change — `test_a_non_object_body_is_still_a_400` passes
+with its four-payload assertions unchanged both before and after,
+which is why this is its own commit ahead of the deletion (D24).
+
+### Step 2, `6220496df` — Stop answering a TypeError as a bad request
+
+The `except TypeError` arm in `handle_authorization_exceptions` is
+deleted (D23); the three JWT arms are untouched. The `NOTE(mikal)`
+comment above the wrapper was rewritten to say what it now catches —
+ten JWT exception classes across three arms, nothing else — and why.
+Under `enforce`, the default since phase 4, nothing changes for a
+caller: an undeclared body key is refused by name before a handler is
+reached. Under `warn` and `off` such a key now reaches the handler,
+raises `TypeError`, and answers 500 rather than the
+400-with-interpreter-text it used to (D25) — the phase's one intended
+behaviour change.
+
+The enumeration D25 rests on was re-run rather than taken on trust
+from the plan, and is recorded in the commit message: no production
+code raises `TypeError` outside a handler-signature mismatch, no
+handler has a parameter without a default, the four `use_kwargs`
+schemas filter unknown keys before the call, `_webargs_error` ends in
+an `HTTPException`, and `check()` itself cannot raise.
+
+Two tests asserted the deleted arm's behaviour without being named in
+the plan's step brief: `test_findings_are_emitted_with_the_response_status`
+asserted 400 twice, and `test_type_error_400_is_attributable` was a
+whole test for the arm; both were rewritten rather than deleted, the
+second becoming a test that a `TypeError` escapes the wrapper unlogged.
+The D30 test, `test_a_handler_internal_type_error_is_a_recorded_500`
+(`shakenfist/tests/external_api/test_request_validation.py:815`), was
+added here.
+
+**Found while implementing, not fixed here: F11.**
+`suppress_exceptions_to_client` builds every 500 body as
+`'server error: %s' % repr(e)`, so deleting the arm relabelled the
+leak instead of removing it: an undeclared body key under `warn`/`off`
+went on carrying interpreter text, now under a 500 instead of a 400.
+This falsified the plan's assumption that the generic 500 body was
+already clean, so step 2's own test had to carry an exemption for the
+exception-class marker, with the exemption's reason written into its
+docstring rather than silently worked around. The operator was asked
+whether to clean the body here or file it, and chose to clean it —
+which is step 6.
+
+### Step 3, `dc6019d6a` — Survive a partial cpuinfo probe
+
+Fixes [#3523](https://github.com/shakenfist/shakenfist/issues/3523).
+`get_user_agent()` (`shakenfist/util/general.py`) now uses `.get()`
+with a literal default for both `arch_string_raw` and `vendor_id_raw`
+instead of indexing `cpuinfo.get_cpu_info()` directly. Three tests —
+both keys present, an empty probe, and one key present without the
+other, the third pinning that the two lookups fall back
+independently — mutation-tested by restoring one bare index, which
+fails with the production `KeyError: 'arch_string_raw'` signature.
+#3523 is closed, with a comment naming the raising frame and this
+commit.
+
+### Step 4, `aeb318519` — Drop two guards that could never fire
+
+Per F8. `@api_base.requires_namespace_exist_if_specified` is removed
+from `InstanceEndpoint.delete` and `NetworkEndpoint.delete`, where it
+sat below a ref-resolving decorator that had already popped
+`namespace` out of `kwargs` before this decorator ever saw it — dead
+since phase 4 found it and recorded it without filing an issue. All
+twelve uses of the decorator were surveyed, not just the two; the
+other ten are on creation and collection routes with no ref decorator
+above them and are live. The decorator itself now carries a comment
+naming the ordering constraint and the two routes it went wrong on,
+so the next use does not repeat the mistake.
+
+### Step 6, `92fc4bb6b` — Stop telling callers what exception broke
+
+Added to the phase after step 2 found F11, above. Sequenced fifth in
+execution order — after step 4, before this step 5 — while keeping the
+number 6, so the earlier step numbers keep pointing at the commits
+that already cite them (per the plan's own note above). The prompt
+that authorised it: Michael was asked whether the phase should clean
+the generic 500 body or file it, and chose to clean it here.
+
+`suppress_exceptions_to_client`'s 500 body is now the bare string
+`'server error'`. The `LOG.with_fields(fields).exception('Server
+error')` line immediately above it, and the on-disk record under
+`/srv/shakenfist/exceptions/`, are unchanged and carry the detail
+instead — `exception_class`, the full traceback, method, path, and the
+correlation fields. `test_a_handler_internal_type_error_is_a_recorded_500`
+now runs the whole `INTERPRETER_TEXT` sweep with no exemption, and the
+docstring paragraph justifying the exemption is gone with it.
+
+Four comments and two assertions described the old body and were
+corrected rather than left. Two are about the present and were
+rewritten because they had become false: `test_server_error_logging`
+asserted the exception class appears in the response, and now asserts
+it must not; a comment in `shakenfist/external_api/auth.py` explaining
+a guard around a damaged federation rule said the generic 500 handler
+"answers with `repr(e)`", which is no longer true, and was rewritten
+to say what the guard is for now (a categorised, evented refusal
+rather than an unevented 500) instead of deleting the guard, since its
+reason changed but it is not dead. Two are history and were left
+alone except for a note: `shakenfist/external_api/label.py` and
+`shakenfist/tests/test_federation.py` record what a caller saw before
+each was independently fixed, and keep the string they quote because
+it was true when it happened, with a note added that a 500 no longer
+names anything at all.
+
+### Step 5, this edit — Documentation and close-out
+
+(a) `docs/developer_guide/writing_an_endpoint.md` now says what `warn`
+and `off` do with an undeclared body key, in the same passage that
+already described the rollback rather than in a new section. (b) The
+`API_VALIDATION_MODE` entry in `docs/release_notes/v07-v08.md` is
+extended, not duplicated, with both behaviour changes: the rollback no
+longer answers 400 for input a handler cannot accept, and every 500
+body is now the bare string `server error` for every cause, not only
+this phase's. (c) An issue was filed for F9 — see the next section,
+because filing it required re-verifying the finding first, and the
+finding had partly gone stale. (d) This Progress section, the
+Definition of done walk below, the master plan's phase 5 row and its
+*Where the tracked issues stand* section, and `docs/plans/index.md`'s
+phase count.
+
+### F9 was re-verified before filing, and the picture had changed
+
+The plan's F9 table — 30 days of sfcbr `Server error` records: 260
+`ConnectionError` via `proxy_request_to_node`, 5 `KeyError` via
+`get_user_agent`, 1 `ConnectionRefusedError` via `_node_lock_request`
+— was measured before this phase started executing. Filing it
+required re-running the query, which found the table no longer said
+the whole truth:
+
+* **The 260 `ConnectionError` records are not live any more, for that
+  call site.** Re-running `{job="shakenfist"} |= "Server error" |=
+  "ConnectionError"` over the same 30-day window: all 260 timestamps
+  fall between 2026-08-12 and 2026-08-19.
+  [#3743](https://github.com/shakenfist/shakenfist/issues/3743)
+  (`2ac50193b`, PR
+  [#3833](https://github.com/shakenfist/shakenfist/pull/3833), merged
+  2026-08-21) made `proxy_request_to_node` answer 503 for exactly this
+  condition, and there have been zero occurrences since. The five
+  `KeyError`s are fixed by step 3, above.
+* **Two more unguarded proxy call sites exist**, found by one grep
+  pass and absent from the plan's survey:
+  `shakenfist/external_api/blob.py:71` (`_read_remote`, proxying
+  `GET /blobs/<uuid>/data` to whichever node holds the blob) and
+  `shakenfist/external_api/artifact.py:588` (the `upload_uuid` branch
+  of `POST /artifacts`, proxying to the node an upload landed on).
+  Neither is covered by the #3743 fix, and neither has log evidence,
+  because nobody has hit the failure window in the last 30 days.
+
+The 1-occurrence `ConnectionRefusedError` is still live: it recurred
+on 2026-08-26, five days after the #3743 fix landed, on
+`POST /instances/<uuid>/poweroff`, while releasing the instance lock.
+It is a different mechanism from the other two — a local Unix socket
+to the node's own nodelock daemon refusing a connection, not a peer
+node being unreachable — which the #3743 fix does not touch and could
+not have.
+
+Filed as [#4161](https://github.com/shakenfist/shakenfist/issues/4161),
+scoped to what re-verification found still true rather than to the
+table as originally surveyed, with the correction recorded in the
+issue itself so a future reader does not have to reconcile these two
+sources disagreeing.
+
+### Definition of done, item by item
+
+1. **Met.** `grep -n "except TypeError" shakenfist/external_api/base.py`
+   returns nothing.
+2. **Met.** `grep -rn "raise TypeError" shakenfist/external_api/`
+   returns two comments in `validation.py` (explaining webargs' own
+   behaviour) and no executable statement, which is exactly what the
+   item excepts.
+3. **Met.** `test_a_non_object_body_is_still_a_400` passes with its
+   four-payload assertions unchanged; step 1's commit message records
+   running it before and after both step 1 and step 2.
+4. **Met, as of step 6.**
+   `test_a_handler_internal_type_error_is_a_recorded_500`
+   (`test_request_validation.py:815`) asserts 500, every
+   `INTERPRETER_TEXT` marker absent with no exemption, and that
+   `record_exception` was called once, and it is mutation-tested by
+   restoring the deleted arm. Step 2 met an earlier version of this
+   item with one exemption, which F11 required; step 6 removed the
+   exemption, so this item is met by step 6's commit, not step 2's —
+   exactly the distinction the plan's own text under item 4 called
+   for.
+5. **Met, with a literal caveat worth recording rather than hiding.**
+   `grep -n "repr(e)" shakenfist/external_api/base.py` does not return
+   nothing — it returns two hits, both inside the comment step 6 added
+   directly above the fix, explaining in prose why the body no longer
+   carries `repr(e)`. No *code* builds a response body from it any
+   more, and the substantive claim the item is actually checking for —
+   that no response body contains an exception class name, a repr, a
+   traceback or a source path — is what
+   `test_a_handler_internal_type_error_is_a_recorded_500` proves with
+   its unexempted sweep. The item's own verification command, read
+   literally, does not pass; its intent does.
+6. **Met.** No test asserts either fragment appears in a response
+   body. The surviving text hits are `test_request_validation.py:185`,
+   which asserts the *absence* of `unexpected keyword argument`; the
+   `INTERPRETER_TEXT` list itself and a docstring quoting the old
+   response as history; and an unrelated comment in
+   `test_clusteroperations.py` about a different code path.
+7. **Met.** Pinned by the three tests step 3 added, mutation-tested by
+   restoring a bare index.
+8. **Met.** #3523 is closed, with a comment naming
+   `util/general.py:get_user_agent` and `KeyError: 'arch_string_raw'`
+   as the raising frame and linking `dc6019d6a`.
+9. **Met.** The two dead applications are gone (step 4); `grep -rn
+   "requires_namespace_exist_if_specified" shakenfist/external_api/*.py`
+   shows the other ten, untouched.
+10. **Met.** [#4161](https://github.com/shakenfist/shakenfist/issues/4161)
+    filed and linked from the master plan's *Where the tracked issues
+    stand* section. Scoped to what re-verification found still true
+    rather than to the plan's original table — see the F9 section
+    above for why that is not the same thing as the table as surveyed.
+11. **Met.** The same two facts — the rollback answers 500 instead of
+    400 for an undeclared body key, and every 500 body is now the bare
+    string `server error` — are stated in
+    `docs/developer_guide/writing_an_endpoint.md`, the v07-v08 release
+    note, and this plan (D25, D31, F4, F11).
+12. **Met.** `pre-commit run --all-files` is clean: 4552 tests passed,
+    121 skipped, 0 failed, and every other hook (flake8, the four
+    `external_api` guard checks, `check-plan-status.py`, mypy) passed.
+    Recorded honestly: the first run reported the `py3` hook itself as
+    `Failed` with `files were modified by this hook`, while its own
+    `stestr` totals inside that same run already showed 0 failures and
+    `git status`/`git diff` showed no tracked file changed beyond this
+    edit's own doc changes. A second, unmodified rerun passed the `py3`
+    hook cleanly with no such report, so this was a one-off (most
+    likely a first-run artefact of `tox` reinstalling the package into
+    a fresh environment) rather than a reproducible problem, and it is
+    noted here rather than quietly rerun-until-green.
+13. **Met by this edit.** The master plan's Execution table row, its
+    status line, and the `docs/plans/index.md` row all say phase 5 is
+    complete and agree on the arithmetic (6 of 8), checked by
+    `tools/check-plan-status.py`.

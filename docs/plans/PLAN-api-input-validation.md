@@ -32,7 +32,7 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: phases 0 to 5 planned; 0, 1, 2, 3 and 4 complete.**
+**Status: phases 0 to 5 planned; 0, 1, 2, 3, 4 and 5 complete.**
 The open questions at the bottom are answered in the Decisions
 section; see
 [`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
@@ -301,7 +301,7 @@ declarations are good enough to compile.
 | 2: Type vocabulary | Complete | The specification-validation test (#3626) plus `schemes`/`securityDefinitions` template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; `unsignedinteger`/`macaddr`/`base64`/`netblock` tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events `limit` cap are visible to callers. See [phase 2](PLAN-api-input-validation-phase-02-type-vocabulary.md) |
 | 3: Compile and warn | Complete | Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is *already* a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared `namespace` of #3739 and fourteen metadata `value` declarations narrower than their handlers — which phase 4 fixes before it enforces. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) |
 | 4: Enforce | Complete | Landed 2026-09-09 via [#4141](https://github.com/shakenfist/shakenfist/pull/4141). Fixed the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moved to Future work as [#4098](https://github.com/shakenfist/shakenfist/issues/4098): read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) |
-| 5: Narrow the handlers | In progress | Delete the `except TypeError` arm from `handle_authorization_exceptions`, which is the second half of the #3612 mechanism and could not be removed until phase 4 was refusing the input it absorbed. Three of the four attribution issues closed independently while phases 3 and 4 ran (#3615, #3606 via PR #3714, #3371), so the phase is the narrowing plus #3523 — whose raising frame the phase 5 survey identified as an unguarded `cpuinfo` lookup in `util/general.py`. See [phase 5](PLAN-api-input-validation-phase-05-narrow.md) |
+| 5: Narrow the handlers | Complete | Deleted the `except TypeError` arm from `handle_authorization_exceptions` (D23): a handler-internal `TypeError` is now a recorded 500 like any other server fault, and under the `warn`/`off` rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed [#3523](https://github.com/shakenfist/shakenfist/issues/3523) (a partial `cpuinfo` probe raising `KeyError` in `get_user_agent`) and removed two `requires_namespace_exist_if_specified` applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried `repr(e)` (F11): every 500 response now answers a bare `server error` with no exception detail at all, for any cause (D31). Filed [#4161](https://github.com/shakenfist/shakenfist/issues/4161) for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix ([#3743](https://github.com/shakenfist/shakenfist/issues/3743)) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See [phase 5](PLAN-api-input-validation-phase-05-narrow.md) |
 | 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
 | 7: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
@@ -317,8 +317,10 @@ the plan was scoped against.
 #3629 (body-supplied `all`, see D6 below), #3615 (`log_request`
 discarding headers), #3739 (the ref decorators' undeclared
 `namespace`, closed when phase 4 merged 2026-09-09), #3606 (JWT
-rejection attribution, PR #3714, merged 2026-08-12) and #3371
-(`record_exception` tracebacks only at DEBUG).
+rejection attribution, PR #3714, merged 2026-08-12), #3371
+(`record_exception` tracebacks only at DEBUG) and #3523 (a
+partial `cpuinfo` probe raising `KeyError` in `get_user_agent`,
+closed when phase 5 landed `dc6019d6a`).
 
 **Filed by phase 4, and deliberately not fixed by it:** #4098 (the
 `get_args` fold, see the carried section below) and #4100 (an
@@ -327,8 +329,18 @@ in the tree wrongly blamed on this plan — the compiled path never
 injects, so no phase of this plan unblocks it; it needs a client
 release which omits the key).
 
+**Filed by phase 5, and deliberately not fixed by it:** #4161 (the
+proxy path answering an unreachable node — or the local nodelock
+socket refusing a connection — with an unqualified 500, see F9 in
+[phase 5](PLAN-api-input-validation-phase-05-narrow.md)). Filing
+it required re-verifying the finding first: an unrelated fix
+(#3743, merged 2026-08-21) had already closed the largest of the
+three classes the phase 5 survey recorded, so the issue is scoped
+to the two proxy call sites and the local-socket case that fix
+does not cover, not to the survey's original table.
+
 **Still open and still owned by this plan:** #528 (parent), #3612
-(the mechanism), #936, #534, #3269, #323, #3523, #2094.
+(the mechanism), #936, #534, #3269, #323, #2094.
 
 **Phase 5 was overtaken from outside, as predicted.** Three of
 its four attribution issues were picked up by the automated issue
