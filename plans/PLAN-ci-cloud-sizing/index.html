@@ -13990,6 +13990,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#phase-7-push-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 7 -- Push audit
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15343,6 +15354,11 @@ superseded.</p>
 <td>PLAN-ci-cloud-sizing-phase-06-docs.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>7. Push audit</td>
+<td>PLAN-ci-cloud-sizing-phase-07-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <h3 id="phase-0-decisions-and-scarcity-inventory">Phase 0 -- Decisions and scarcity inventory<a class="headerlink" href="#phase-0-decisions-and-scarcity-inventory" title="Permanent link">&para;</a></h3>
@@ -15477,6 +15493,12 @@ the ledger arithmetic, the band, and how to re-measure -- and
 propagate the reshaped topologies to the downstream repositories
 that consume the reusable workflow, per the copy-paste-drift
 finding in <code>project-sf-ecosystem-ci</code>.</p>
+<h3 id="phase-7-push-audit">Phase 7 -- Push audit<a class="headerlink" href="#phase-7-push-audit" title="Permanent link">&para;</a></h3>
+<p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
+this plan against <code>develop</code>, not the last phase's diff alone.
+Findings land as their own pull request, and the plan is not
+complete until each is resolved or declined in writing here. If
+the audit finds nothing, that is recorded in one sentence.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-execution-model v1 -->

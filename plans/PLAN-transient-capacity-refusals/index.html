@@ -14436,6 +14436,11 @@ every phase has been completed, abandoned or superseded.</p>
 <td>PLAN-transient-capacity-refusals-phase-06-docs.md</td>
 <td>Not started</td>
 </tr>
+<tr>
+<td>7. Push audit</td>
+<td>PLAN-transient-capacity-refusals-phase-07-push-audit.md</td>
+<td>Not started</td>
+</tr>
 </tbody>
 </table>
 <p>Phases 1, 2 and 3 are independent of one another and can run in
@@ -14443,7 +14448,8 @@ parallel. Phase 4 follows 2, because the client retry should match
 the semantics the suite has already proven. Phase 5 needs phase 2
 to have reported over a window of merge runs <em>after</em> the sizing
 plan's phase 4 has reshaped <code>slim-tier</code>; until then its data would
-be measuring the wrong cloud. Phase 6 is last.</p>
+be measuring the wrong cloud. Phase 6 follows everything else, and
+the phase 7 push audit is last.</p>
 <p>The ordering against the sibling plans: the sizing plan's phase 3
 (saturation coverage) does not gate any phase here, because none
 of them changes what a full cluster does -- but its phase 4
@@ -14614,6 +14620,12 @@ to their final state. Comment on #3772 with the before-and-after
 pass rate and close it only if the <code>Debian 12 tier</code> job's failures
 are no longer <code>sufficient_idle_cpu</code>; otherwise leave it open with
 the numbers.</p>
+<h3 id="phase-7-push-audit">Phase 7 -- Push audit<a class="headerlink" href="#phase-7-push-audit" title="Permanent link">&para;</a></h3>
+<p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
+this plan against <code>develop</code>, not the last phase's diff alone.
+Findings land as their own pull request, and the plan is not
+complete until each is resolved or declined in writing here. If
+the audit finds nothing, that is recorded in one sentence.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-execution-model v1 -->
