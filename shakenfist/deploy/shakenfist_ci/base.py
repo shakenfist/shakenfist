@@ -222,6 +222,24 @@ class BaseTestCase(testtools.TestCase):
     def _uniquifier(self):
         return ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
+    def _now(self):
+        """The wall clock, as a seam a unit test can script.
+
+        create_instance()'s deadline arithmetic reads this rather than
+        calling time.time() directly, so a test can move the clock past
+        the deadline without patching the process-wide one. Patching it
+        is not an option here, and the reason is worth writing down
+        because it cost a red CI run: this method logs between two of
+        its own clock reads, and on Python 3.11 logging.LogRecord reads
+        time.time() once per record, so a scripted sequence sized for
+        the reads below is silently consumed by that log line and the
+        next read raises StopIteration. Python 3.13 reads time.time_ns()
+        instead and does not consume it, so the same test passes on a
+        3.13 workstation and fails on CI's 3.11 -- which looks like
+        flakiness and reads like a bug in this method.
+        """
+        return time.time()
+
     def create_instance(self, name, cpus, memory, network, disk, sshkey,
                         userdata, *, client=None, force_placement=None,
                         **kwargs):
@@ -260,7 +278,7 @@ class BaseTestCase(testtools.TestCase):
         # on a class without one has to say which client it means, and
         # the AttributeError says so.
         client = client or self.test_client
-        deadline = time.time() + CLUSTER_HEADROOM_WAIT
+        deadline = self._now() + CLUSTER_HEADROOM_WAIT
 
         attempts = 0
         waits = []
@@ -287,7 +305,7 @@ class BaseTestCase(testtools.TestCase):
             except apiclient.InsufficientResourcesException as e:
                 refusal = e
 
-            if time.time() > deadline:
+            if self._now() > deadline:
                 self._fail_capacity_wait(
                     name, cpus, force_placement, refusal, waits, attempts)
 
@@ -300,7 +318,7 @@ class BaseTestCase(testtools.TestCase):
             waits.append(wait)
             self._record_capacity_wait(wait)
 
-            if not wait['satisfied'] and time.time() > deadline:
+            if not wait['satisfied'] and self._now() > deadline:
                 self._fail_capacity_wait(
                     name, cpus, force_placement, refusal, waits, attempts)
 

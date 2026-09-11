@@ -32,9 +32,12 @@ repository.
 """
 
 import importlib.util
+import json
 import logging
 import os
+import shutil
 import sys
+import tempfile
 import types
 
 from unittest import mock
@@ -419,7 +422,7 @@ class _WrapperHarness(ci_base.BaseTestCase):
     harness supplies the four things the wrapper touches instead.
     """
 
-    def __init__(self, client):
+    def __init__(self, client, clock=None):
         # Deliberately not calling TestCase.__init__: this is not being
         # run as a test, only used as a bound self for the wrapper.
         self.test_client = client
@@ -427,10 +430,33 @@ class _WrapperHarness(ci_base.BaseTestCase):
         self.details = {}
         self.failure = None
         self.uniquifiers = 0
+        self.clock = list(clock or [0.0])
 
     def _uniquifier(self):
         self.uniquifiers += 1
         return 'uniq%04d' % self.uniquifiers
+
+    def id(self):
+        # _append_capacity_wait_trace() reads this for the trace record's
+        # test_id, and it is the only field with no source in the wait
+        # dict. A harness without it makes every write raise into the
+        # swallowing except clause, so the trace path looks exercised and
+        # is not.
+        return 'shakenfist_ci.tests.test_harness.FakeTest.test_create'
+
+    def _now(self):
+        """The scripted clock create_instance() reads its deadline from.
+
+        The last value sticks rather than the script running out. A test
+        here is saying "and then the deadline had passed", which stays
+        true however many times the wrapper asks, so an extra read is
+        not an error worth raising on. Scripting this rather than
+        patching time.time() is what keeps the module's log lines out of
+        the clock -- see BaseTestCase._now() for what that cost once.
+        """
+        if len(self.clock) > 1:
+            return self.clock.pop(0)
+        return self.clock[0]
 
     def addDetail(self, name, detail):
         self.details[name] = detail
@@ -462,6 +488,16 @@ class FakeInstanceClient:
 
 
 class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir, True)
+        self.trace = os.path.join(self.tempdir, 'instance-waits.jsonl')
+        patcher = mock.patch.object(
+            ci_base, 'CAPACITY_WAIT_TRACE_FILE', self.trace)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_a_create_which_is_not_refused_is_not_wrapped_at_all(self):
         client = FakeInstanceClient([{'uuid': 'inst-1'}])
         harness = _WrapperHarness(client)
@@ -549,7 +585,9 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
             'no node has 4 cpus', status_code=507,
             text='instance could not be placed')
         client = FakeInstanceClient([refusal])
-        harness = _WrapperHarness(client)
+        # Inside the deadline for the first check, past it for the second,
+        # which is what makes the wrapper give up rather than loop.
+        harness = _WrapperHarness(client, clock=[0.0, 0.0, 10000.0])
 
         exhausted = {'satisfied': False, 'mode': 'informed',
                      'seconds_waited': 420.0, 'node': 'n1',
@@ -559,12 +597,10 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
                      'polls': 43, 'poll_errors': ['ValueError: reset']}
         with mock.patch.object(ci_base.retries, 'wait_for_capacity',
                                return_value=dict(exhausted)):
-            with mock.patch.object(ci_base.time, 'time',
-                                   side_effect=[0.0, 0.0, 10000.0]):
-                self.assertRaises(
-                    AssertionError, harness.create_instance,
-                    'toobig', 4, 1024, None, [], None, None,
-                    force_placement='n1')
+            self.assertRaises(
+                AssertionError, harness.create_instance,
+                'toobig', 4, 1024, None, [], None, None,
+                force_placement='n1')
 
         self.assertIn('instance could not be placed', harness.failure)
         self.assertIn('n1', harness.failure)
@@ -607,3 +643,76 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
 
         harness.addDetail = explode
         harness._record_capacity_wait({'instance_name': 'x', 'mode': 'informed'})
+
+    def test_a_wait_appends_one_well_formed_line_to_the_trace(self):
+        """The trace is this phase's only output, so its shape is asserted.
+
+        D14 makes the JSONL file the evidence a later phase reads the
+        baseline from, and tools/ci_headroom_report.py --waits parses it
+        one line at a time. A record missing a field the report names
+        does not fail anything at write time; it shows up as a malformed
+        line in a bundle weeks later, which is the wrong place to find
+        out.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='full')
+        client = FakeInstanceClient([refusal, {'uuid': 'inst-4'}])
+        harness = _WrapperHarness(client)
+
+        satisfied = {'satisfied': True, 'mode': 'informed',
+                     'seconds_waited': 30.0, 'node': 'n1', 'cpus': 2,
+                     'headroom_at_start': 0, 'headroom_at_end': 4,
+                     'per_node': {}, 'polls': 4, 'poll_errors': []}
+        with mock.patch.object(ci_base.retries, 'wait_for_capacity',
+                               return_value=dict(satisfied)):
+            harness.create_instance('traced', 2, 1024, None, [], None, None,
+                                    force_placement='n1')
+
+        with open(self.trace) as f:
+            lines = f.read().splitlines()
+
+        self.assertEqual(
+            1, len(lines),
+            'One line per wait, not per run (D14): a worker which crashes '
+            'mid-wait must lose at most its own in-flight line.')
+        record = json.loads(lines[0])
+        self.assertEqual('traced', record['instance_name'])
+        self.assertEqual('n1', record['node'])
+        self.assertEqual(2, record['cpus'])
+        self.assertEqual(30.0, record['seconds_waited'])
+        self.assertEqual('informed', record['mode'])
+        self.assertEqual(1, record['attempts'])
+        self.assertEqual(0, record['headroom_at_first_refusal'])
+        self.assertEqual(4, record['headroom_at_admission'])
+        self.assertIn('test_create', record['test_id'])
+
+    def test_an_unwritable_trace_never_fails_the_create(self):
+        """The trace is an instrument, and shares their one absolute rule.
+
+        ci_headroom_collect.sh gives the reasoning for a job; it holds
+        the same way for a test. /srv/ci/traces does not exist on a
+        workstation, so this is the ordinary case when the suite is run
+        outside CI rather than an exotic one.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='full')
+        client = FakeInstanceClient([refusal, {'uuid': 'inst-5'}])
+        harness = _WrapperHarness(client)
+
+        satisfied = {'satisfied': True, 'mode': 'informed',
+                     'seconds_waited': 10.0, 'node': None, 'cpus': 1,
+                     'headroom_at_start': 0, 'headroom_at_end': 2,
+                     'per_node': {}, 'polls': 2, 'poll_errors': []}
+        with mock.patch.object(
+                ci_base, 'CAPACITY_WAIT_TRACE_FILE',
+                os.path.join(self.tempdir, 'no', 'such', 'waits.jsonl')):
+            with mock.patch.object(ci_base.retries, 'wait_for_capacity',
+                                   return_value=dict(satisfied)):
+                inst = harness.create_instance(
+                    'untraced', 1, 1024, None, [], None, None)
+
+        self.assertEqual({'uuid': 'inst-5'}, inst)
+        self.assertEqual(
+            ['capacity-wait-1'], list(harness.details),
+            'The wait was still attached to the test, so a missing trace '
+            'file costs the bundle record and nothing else.')
