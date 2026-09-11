@@ -13889,7 +13889,7 @@ file per detailed phase, named with <code>-phase-NN-descriptive</code>
 appended.</p>
 <p>I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.</p>
-<p><strong>Status: phases 0 to 4 planned; 0, 1, 2 and 3 complete.</strong>
+<p><strong>Status: phases 0 to 5 planned; 0, 1, 2, 3, 4 and 5 complete.</strong>
 The open questions at the bottom are answered in the Decisions
 section; see
 <a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>
@@ -13902,8 +13902,12 @@ recorded, and
 <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/"><code>PLAN-api-input-validation-phase-03-compile-and-warn.md</code></a>
 for the measurement that closed it, and
 <a href="../PLAN-api-input-validation-phase-04-enforce/"><code>PLAN-api-input-validation-phase-04-enforce.md</code></a>
-for the phase now ready to start. Phases 5 onward are not yet cut
-into per-phase files.</p>
+for the reading that unlocked the flip and what the flip changed for
+callers, and
+<a href="../PLAN-api-input-validation-phase-05-narrow/"><code>PLAN-api-input-validation-phase-05-narrow.md</code></a>
+for the narrowing and the two leaks it closed. Phase 6 is the next
+phase to start, and neither it nor phase 7 is yet cut into a per-phase
+file.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
 <p>The REST API does not validate its inputs. A request body value
 of any JSON type reaches the handler that reads it, and what
@@ -14226,13 +14230,13 @@ declarations are good enough to compile.</p>
 </tr>
 <tr>
 <td>4: Enforce</td>
-<td>In progress</td>
-<td>Fix the two declaration bugs the warn window found (#3739's undeclared <code>namespace</code> on 55 handlers, and fourteen metadata <code>value</code> declarations), teach the derivation to see decorator-consumed kwargs so that class cannot recur, then turn on rejection with one malformed-input response shape that never contains interpreter text. The <code>get_args</code> fold moves to Future work: read as "delete the four <code>@use_kwargs</code> decorators" it is a bug, because the compiled path is check-only and <code>@use_kwargs</code> is the only thing that gets a query parameter to a handler. See <a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a></td>
+<td>Complete</td>
+<td>Landed 2026-09-09 via <a href="https://github.com/shakenfist/shakenfist/pull/4141">#4141</a>. Fixed the two declaration bugs the warn window found (#3739's undeclared <code>namespace</code> on 55 handlers, and fourteen metadata <code>value</code> declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The <code>get_args</code> fold moved to Future work as <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>: read as "delete the four <code>@use_kwargs</code> decorators" it is a bug, because the compiled path is check-only and <code>@use_kwargs</code> is the only thing that gets a query parameter to a handler. See <a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a></td>
 </tr>
 <tr>
 <td>5: Narrow the handlers</td>
-<td>Not started</td>
-<td>Narrow <code>except TypeError</code> to JWT errors — still owned by this plan, and still gated on phase 4. The attribution issues are being closed independently: #3615 landed 2026-08-10, #3606 is in flight as PR #3714, leaving #3523 and #3371. See the note below</td>
+<td>Complete</td>
+<td>Deleted the <code>except TypeError</code> arm from <code>handle_authorization_exceptions</code> (D23): a handler-internal <code>TypeError</code> is now a recorded 500 like any other server fault, and under the <code>warn</code>/<code>off</code> rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed <a href="https://github.com/shakenfist/shakenfist/issues/3523">#3523</a> (a partial <code>cpuinfo</code> probe raising <code>KeyError</code> in <code>get_user_agent</code>) and removed two <code>requires_namespace_exist_if_specified</code> applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried <code>repr(e)</code> (F11): every 500 response now answers a bare <code>server error</code> with no exception detail at all, for any cause (D31). Filed <a href="https://github.com/shakenfist/shakenfist/issues/4161">#4161</a> for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix (<a href="https://github.com/shakenfist/shakenfist/issues/3743">#3743</a>) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See <a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a></td>
 </tr>
 <tr>
 <td>6: Required and semantics</td>
@@ -14254,30 +14258,42 @@ the plan was scoped against.</p>
 2026-08-07), #3626 (specification validation in CI), #3616
 (<code>base.py</code> under mypy), #3642 (variadic handlers in the audit),</p>
 <h1 id="3629-body-supplied-all-see-d6-below-3615-log_request">3629 (body-supplied <code>all</code>, see D6 below), #3615 (<code>log_request</code><a class="headerlink" href="#3629-body-supplied-all-see-d6-below-3615-log_request" title="Permanent link">&para;</a></h1>
-<p>discarding headers). #3739 (the ref decorators' undeclared
-<code>namespace</code>) is fixed by phase 4 and closes when that branch
-merges.</p>
+<p>discarding headers), #3739 (the ref decorators' undeclared
+<code>namespace</code>, closed when phase 4 merged 2026-09-09), #3606 (JWT
+rejection attribution, PR #3714, merged 2026-08-12), #3371
+(<code>record_exception</code> tracebacks only at DEBUG) and #3523 (a
+partial <code>cpuinfo</code> probe raising <code>KeyError</code> in <code>get_user_agent</code>,
+closed when phase 5 landed <code>dc6019d6a</code>).</p>
 <p><strong>Filed by phase 4, and deliberately not fixed by it:</strong> #4098 (the
 <code>get_args</code> fold, see the carried section below) and #4100 (an
 explicit <code>thin: false</code> on a snapshot request, which two comments
 in the tree wrongly blamed on this plan — the compiled path never
 injects, so no phase of this plan unblocks it; it needs a client
 release which omits the key).</p>
+<p><strong>Filed by phase 5, and deliberately not fixed by it:</strong> #4161 (the
+proxy path answering an unreachable node — or the local nodelock
+socket refusing a connection — with an unqualified 500, see F9 in
+<a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a>). Filing
+it required re-verifying the finding first: an unrelated fix
+(#3743, merged 2026-08-21) had already closed the largest of the
+three classes the phase 5 survey recorded, so the issue is scoped
+to the two proxy call sites and the local-socket case that fix
+does not cover, not to the survey's original table.</p>
 <p><strong>Still open and still owned by this plan:</strong> #528 (parent), #3612
-(the mechanism), #936, #534, #3269, #323, #3523, #3371, #2094;</p>
-<h1 id="3606-is-in-flight-as-pr-3714">3606 is in flight as PR #3714.<a class="headerlink" href="#3606-is-in-flight-as-pr-3714" title="Permanent link">&para;</a></h1>
-<p><strong>Phase 5 is being overtaken from outside.</strong> Two of its four
-attribution issues have been picked up by the automated issue
-fixer rather than by this plan. That is fine — they are genuinely
-independent of phases 3 and 4, which is why they were grouped
-rather than sequenced. It is recorded because it changes what
-phase 5 <em>is</em>: by the time phases 3 and 4 land, phase 5 is likely
-to be the single item that actually depends on them — narrowing
+(the mechanism), #936, #534, #3269, #323, #2094.</p>
+<p><strong>Phase 5 was overtaken from outside, as predicted.</strong> Three of
+its four attribution issues were picked up by the automated issue
+fixer rather than by this plan — #3615, #3606 and #3371, leaving
+only #3523. That is fine: they were genuinely independent of
+phases 3 and 4, which is why they were grouped rather than
+sequenced. It is recorded because it changed what phase 5 <em>is</em>.
+The forecast written here was that phase 5 would reduce to the
+single item which actually depends on phases 3 and 4 — narrowing
 <code>except TypeError</code> to JWT errors, which cannot happen until a
 validation layer is rejecting the malformed input that broad
-catch currently absorbs. Nobody picks that up incidentally,
-because on its own it looks like a regression risk with no
-visible benefit.</p>
+catch absorbs. That is now the fact rather than the forecast.
+Nobody picks that item up incidentally, because on its own it
+looks like a regression risk with no visible benefit.</p>
 <h3 id="carried-into-phase-2-from-phase-1">Carried into phase 2 from phase 1<a class="headerlink" href="#carried-into-phase-2-from-phase-1" title="Permanent link">&para;</a></h3>
 <p>Phase 1 corrected which location each parameter declares. It did
 not change how <code>swagger_helper()</code> renders them, which leaves two
