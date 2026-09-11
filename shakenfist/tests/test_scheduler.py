@@ -1989,6 +1989,56 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
             'cpu_schedulable_from_fallback': False,
         }, reason)
 
+    def test_a_node_with_no_capacity_row_is_bounded_by_its_live_hard_max(self):
+        """An unguarded node (P7) is limited, just not by a ledger.
+
+        ``find_candidates()`` level coverage that such a node stays a
+        candidate already exists (``test_prefilter_keeps_a_node_with_no_
+        capacity_row``). What is pinned here is the arithmetic it keeps
+        the node on: ``limit_cpus`` falls back to the node's own live
+        ``hard_max_cpus``, ``committed_cpus`` is zero because there is no
+        row to read one from, and the boundary is still the strict one.
+        This is the branch ``shakenfist_ci/sizing.py``'s
+        ``effective_cpu_ceiling()`` mirrors when it reads a null
+        ``cpu_limit`` as the node's ``cpu_hard_max``, so the two must
+        agree about what bounds an unguarded node.
+        """
+        node = self._node_uuid('node2')
+        hard_max = 4 * fake_config.CPU_OVERCOMMIT_RATIO
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', cpus=int(hard_max))
+
+        ok, reason = self._call(fake_inst, node, {})
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_refusal_on_the_hard_max_says_there_was_no_capacity_row(self):
+        # The reason dict is what the sufficient_idle_cpu audit event
+        # publishes, and capacity_row_present is the field an operator
+        # reads to tell "this node is full" from "this node was never
+        # sized". Nothing asserted its False case before.
+        node = self._node_uuid('node2')
+        hard_max = 4 * fake_config.CPU_OVERCOMMIT_RATIO
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', cpus=int(hard_max) + 1)
+
+        ok, reason = self._call(fake_inst, node, {})
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'would exceed hard max CPUs',
+            'current_cpus': 0,
+            'measured_cpus': 0,
+            'committed_cpus': 0,
+            'capacity_row_present': False,
+            'requested_cpus': int(hard_max) + 1,
+            'limit_cpus': hard_max,
+            'hard_max_cpus': hard_max,
+            'cpu_schedulable': 4,
+            'cpu_schedulable_from_fallback': False,
+        }, reason)
+
 
 class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
     """Unit coverage of _has_sufficient_ram(), the sufficient_idle_memory
@@ -2106,6 +2156,30 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
             'requested_memory_mb': 100,
             'limit_memory_mb': 1000,
         }, reason)
+
+    def test_a_node_with_no_capacity_row_is_not_refused_on_a_missing_ledger(
+            self):
+        """P7, for memory. The CPU predicate has this covered; RAM did not.
+
+        Same figures as the refusal above -- a 100 MB request where a row
+        recording 901 of 1000 MB committed would refuse -- but with no row
+        at all. A node the reconciler has not sized is guarded by nothing
+        and admission will let it through unguarded, so refusing it here
+        would prune a candidate the cluster is willing to place on, for a
+        ledger which does not exist. Only the measured checks above apply
+        there, and the baseline satisfies them.
+
+        This is the state both halves of phase 3's functional coverage
+        deliberately skip on (``cpu_committed_row_present`` false), so
+        without this case nothing in the phase covers it at any level.
+        """
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
+
+        ok, reason = self._call(fake_inst, node, {})
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
 
 
 class HasSufficientDiskPredicateTestCase(SchedulerTestCase):

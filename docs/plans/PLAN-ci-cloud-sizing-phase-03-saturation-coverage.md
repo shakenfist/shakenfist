@@ -636,7 +636,7 @@ Each Definition of done item was run rather than read:
 | # | Result | How it was checked |
 |---|--------|--------------------|
 | 1 | **pass** | `grep -rc` over `shakenfist_ci/` returns the stage string once, in `base.py` alone |
-| 2 | **partial** | The file exists with four tests covering all three of D24's stages. That they pass *on a cluster with no free capacity* is the half no worktree can check |
+| 2 | **partial** | The file exists with four tests covering all three of D24's stages, and since the #4170 review its sizing arithmetic is unit tested here (`test_ci_saturation.py`, 17 tests, mutation tested). That the tests pass *on a cluster with no free capacity* is the half no worktree can check |
 | 3 | **pass** | Read from the diff: 19 `skipTest()` paths, 8 `capacity_degraded` references |
 | 4 | **pass** | Mutation tested: with the in-body release deleted, the ledger assertion fails rather than the test passing |
 | 5 | **pass** | 3c reported 33 mutations across both CI topologies and a fractional-limit one, with no unexpected outcome |
@@ -664,11 +664,93 @@ What close-out still owes, once this merges and a merge run uses it:
   is D23's whole premise and which F1's amendment already weakened.
 * **The cost of 3c's ownership listing** against
   `load_budget.py`'s database-load budget. It lists every instance in
-  the cluster, once on the happy path and once per release poll, and
-  was not measured.
+  the cluster, and still needs measuring. The #4170 review reduced the
+  worst case from one listing per 5 s poll to one per 30 s plus one at
+  each deadline -- roughly 36 listings down to 7 on a run that waits
+  the full ledger-return deadline -- but a smaller unmeasured cost is
+  still unmeasured.
 
 Only after those are answered should the Execution table and
 `docs/plans/index.md` move to `Complete` and `4 of 7`.
+
+### Code review, 2026-09-11 (PR #4170)
+
+CLAUDE.md asks for a code review at the end of a plan. The automated
+reviewer raised one `[FIX]` and eight `[CONSIDER]` items on #4170;
+eight were taken and one was declined. What changed, because three of
+these moved a decision rather than just the code:
+
+* **A forced fill create is now asserted to have landed on the node it
+  named** (`_create_fill_instance()`). This was the `[FIX]`, and it is
+  the most serious thing the review found: a wrong-node placement is
+  issue #3496, and without the assertion it degraded to a *skip* --
+  the ours/foreign split would count zero vCPUs of this test's own on
+  the target node and read the shortfall as ambient load, reporting
+  nothing about the one defect the test sits closest to, while leaving
+  a create budget of stray instances on the siblings D23 exists to
+  protect.
+* **D23's ledger-return assertion now skips on a delete backlog.** It
+  fails only once the cluster has finished deleting what the test
+  released, asked of the instance listing rather than assumed. The
+  assertion's text claims a ledger regression, and a queue backlog on
+  the shared cluster produces the identical shape -- so as written it
+  was the file's most likely flake, making a claim the evidence did not
+  support. A ledger still charging an instance the cluster has not
+  finished deleting is correct; one charging an instance that is gone
+  is the regression, and that is now what fails.
+* **D24's sizing arithmetic moved to `shakenfist_ci/sizing.py`** and is
+  unit tested by `shakenfist/tests/test_ci_saturation.py`, which loads
+  it by path -- the arrangement `retries.py` and
+  `test_ci_claims_headroom.py` already use. This is the one part of the
+  phase whose correctness never needed a cluster, and it was the part
+  with no test at any level. 17 unit tests now cover it, each mutation
+  tested: dropping the increment, dropping the minimum clamp, reading a
+  null `cpu_limit` as zero and sizing memory from headroom are all
+  caught. The same file carries the AST guard the repository already
+  applies to the claims suite, pinning the `apiclient` names and the
+  `async_request` keyword the saturation suite depends on and nothing
+  here can import.
+
+The five smaller items: the CPU test now **skips** when any node's
+published `cpu_max_per_instance` is below the computed request, rather
+than letting an earlier stage's refusal surface as a stage-name
+mismatch; the whole-cluster instance listing is rate limited to once
+per 30 s plus one read at each deadline, rather than once per 5 s poll,
+which was the unmeasured database-load cost the Outcome section above
+already conceded; polled `/admin/resources` readings are attached with
+`addDetailUniqueName()` so a failed run keeps the ledger's whole
+trajectory instead of only its last read; a tautological `assertIn()`
+inside the branch whose condition it restated is gone, with the
+evidence left to the `addDetail()` above it; and
+`_resolve_unexpected_admission()`'s docstring no longer claims it never
+returns normally, which was false for exactly the path D28 asked it to
+record.
+
+**Declined, with reasoning:** the review asked for unit coverage of the
+`placement_filter()` re-place discount in both ledger predicates. That
+branch is already covered, at the `find_candidates()` level rather than
+the predicate level, by `test_scheduler.py`'s
+`test_prefilter_does_not_charge_an_instance_for_itself` (CPU) and
+`test_ram_prefilter_does_not_charge_an_instance_for_itself` (RAM), both
+of which sit exactly on the boundary the discount moves. Duplicating
+them at the predicate level would add no failure the existing pair does
+not already catch. The *other* half of that item was a real gap and was
+taken: nothing asserted the no-capacity-row refusal's reason dict
+(`capacity_row_present: False`, `limit_cpus` falling back to the live
+hard maximum), and the memory predicate had no P7 coverage at any level
+-- three tests were added for those, taking the file to 108.
+
+**One defect the review did not find, fixed here:** `one_unit_beyond()`
+justified its `math.floor` by claiming a truncating `int()` cast could
+round a negative reading back into servable range. It cannot --
+truncation rounds a negative value *towards* zero, so it returns a
+figure which still strictly exceeds the reading, and with the minimum
+clamped at 1 the two are indistinguishable for every input. The code
+was right and its stated reason was wrong, which is worse than a
+comment being absent. The docstring now says what is actually true, and
+the unit tests assert the two properties a caller depends on -- the
+result strictly exceeds the reading, and stays a size a create could
+ask for -- rather than enshrining particular return values.
 
 ## What phase 4 inherits
 

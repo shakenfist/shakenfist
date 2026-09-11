@@ -43,6 +43,13 @@ cluster happens to be, so these tests:
   resizing phase could make possible, and would then leave this file
   quietly testing nothing.
 
+The arithmetic which turns a ``/admin/resources`` reading into an
+impossible size lives in ``shakenfist_ci/sizing.py`` rather than here, so
+that ``shakenfist/tests/test_ci_saturation.py`` can load it by path and
+pin its boundaries without a cluster -- the same reason ``retries.py``
+keeps itself free of suite imports. Everything below is the part which
+genuinely needs a deployed cluster to exercise.
+
 Every refusal is asserted through ``BaseTestCase.assertRefusedAtStage()``
 (D27), and none of these requests goes anywhere near
 ``shakenfist_ci.retries``: a refusal under test must never be retried away,
@@ -51,12 +58,12 @@ its own refusal assertions.
 """
 
 import json
-import math
 import time
 
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import sizing
 from shakenfist_client import apiclient
 
 
@@ -86,96 +93,6 @@ CAPACITY_GUARD_REFUSAL = 'no node had capacity for this instance'
 REPLACE_ABORT_REFUSAL = 'Requested node lacks resources'
 
 
-def _one_unit_beyond(value, minimum=1):
-    """The smallest int that is both >= ``minimum`` and > ``value``.
-
-    ``value`` is a published headroom or ceiling figure, which can be
-    negative -- a node already over its own ledger (for example after a
-    capacity row's limit was lowered) reports negative ``cpu_available``,
-    ``ram_available`` or ``disk_available``. ``math.floor`` is used rather
-    than a truncating ``int()`` cast because truncation rounds a negative
-    value *up* towards zero, which could land the result back inside what
-    the node can actually serve; flooring keeps it strictly beyond ``value``
-    in every case. ``minimum`` then keeps the result a sane positive
-    request (a 1 vCPU, 1 MB or 1 GB ask, at the smallest) when every node
-    is already saturated on the dimension being sized.
-    """
-    return max(minimum, int(math.floor(value)) + 1)
-
-
-def _effective_cpu_ceiling(per_node_entry):
-    """The real per-node vCPU ceiling ``_has_sufficient_cpu()`` enforces.
-
-    ``summarize_resources()`` (``shakenfist/scheduler.py``) publishes
-    ``cpu_limit`` as ``None`` for a node the capacity reconciler has not
-    written a ``scheduler_node_capacity`` row for yet, or ever (P7, an
-    "unguarded" node). The scheduler does not then treat that node as
-    limitless: ``_has_sufficient_cpu()`` falls back to the node's own
-    live ``cpu_hard_max`` (``limit_cpus = row['limit_cpus'] if row else
-    hard_max_cpus``), and ``cpu_hard_max`` is computed and published for
-    every hypervisor unconditionally, independent of whether it has a
-    capacity row. Treating a ``None`` ``cpu_limit`` as zero, or excluding
-    the node from the ``max()`` entirely, would understate an unguarded
-    node's real ceiling: if that node's live ``cpu_hard_max`` happens to
-    be the largest ceiling in the cluster, a request sized only from the
-    guarded nodes' ``cpu_limit`` values would still be admitted there,
-    and this test would wrongly assert a 507 that never arrives.
-    """
-    cpu_limit = per_node_entry.get('cpu_limit')
-    if cpu_limit is not None:
-        return cpu_limit
-    return per_node_entry.get('cpu_hard_max', 0)
-
-
-def _effective_ram_ceiling(per_node_entry):
-    """The real per-node memory ceiling, immune to ambient headroom moving.
-
-    Unlike ``cpu_available`` or ``disk_available``, ``ram_max``
-    (``scheduler.py:1109-1111``, ``memory_max * config.RAM_OVERCOMMIT_RATIO``)
-    is a published *ceiling*: it is derived from the node's physical memory
-    and the overcommit ratio, published unconditionally for every
-    hypervisor, and does not move when a sibling stestr worker frees RAM by
-    deleting an instance. Sizing this test from ``ram_available`` instead
-    would be sizing from headroom, which another worker can *increase* at
-    any moment -- if a sibling frees more than one unit on the node that
-    held the maximum at read time, an "impossible" request sized from
-    headroom becomes possible between the read and the create, and the
-    test flakes exactly the way the phase plan's risk table warns against.
-    (Recorded as a D24 survey finding: D24's memory and disk rows
-    originally named headroom fields, not ceilings; the CPU row was
-    already right.)
-
-    A guarded node's real ceiling can additionally be bounded *below*
-    ``ram_max`` by its capacity row's own ``limit_memory_mb`` -- not
-    published directly, but recoverable as ``ram_available +
-    ram_committed`` for exactly the node where that ledger bound is the
-    one binding ``ram_available`` (``scheduler.py:1114-1120``: when the
-    ledger bound wins the ``min()``, ``ram_available == limit_memory_mb -
-    ram_committed``, so adding ``ram_committed`` back recovers
-    ``limit_memory_mb`` exactly; when the measurement bound wins instead,
-    or the node is unguarded and ``ram_committed`` is 0, the
-    reconstruction falls at or below ``ram_max`` and contributes nothing
-    to the ``max()``). Taking ``max(ram_max, ram_available +
-    ram_committed)`` per node is therefore defensive rather than a
-    normal-case correction: it costs nothing when the two agree, and it
-    stops a node whose ledger limit has drifted above its measured
-    ``ram_max`` (a reconcile overdue, or a manually raised claim) from
-    silently capping what this test believes the cluster's true ceiling
-    is.
-
-    A missing or zero ``ram_max`` -- like a ``None`` ``cpu_limit`` -- must
-    not drop the node out of the surrounding ``max()`` or read as a zero
-    ceiling: ``.get('ram_max') or 0`` only supplies the identity element
-    for the ``max()`` against the reconstructed ledger figure below, it
-    never substitutes for a missing ceiling the way a bare, uncompared
-    ``0`` would.
-    """
-    ram_max = per_node_entry.get('ram_max') or 0
-    ram_available = per_node_entry.get('ram_available', 0)
-    ram_committed = per_node_entry.get('ram_committed', 0)
-    return max(ram_max, ram_available + ram_committed)
-
-
 class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
     """The ``/admin/resources`` read both halves of this file start from.
 
@@ -187,7 +104,7 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
     so never instantiates it.
     """
 
-    def _cluster_resources_or_skip(self):
+    def _cluster_resources_or_skip(self, polled=False):
         """Read ``/admin/resources``, applying D26's two skip rules.
 
         Skips (rather than fails) when the response cannot support an
@@ -204,10 +121,24 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
         Both conditions are logged with the figure the test wanted,
         following the ``test_nodes.py:111`` skip idiom, so a skipped run
         says why rather than just not running.
+
+        ``polled`` says this is one reading in a sequence rather than the
+        single reading a test starts from. testtools' ``addDetail()``
+        overwrites by name, so the fill loop and the ledger-return loop
+        would otherwise leave a failed run holding only their last read --
+        losing the trajectory of how the ledger moved, which is precisely
+        what the phase plan says the first merge run has to record to
+        settle its two open questions. Polled reads are therefore attached
+        under unique names, and the plain ``resources`` name is left to the
+        one read a test takes before it touches anything.
         """
         resources = self.system_client.get_cluster_resources()
-        self.addDetail('resources', content.text_content(json.dumps(
-            resources, indent=4, sort_keys=True)))
+        detail = content.text_content(json.dumps(
+            resources, indent=4, sort_keys=True))
+        if polled:
+            self.addDetailUniqueName('resources', detail)
+        else:
+            self.addDetail('resources', detail)
 
         if resources['total'].get('capacity_degraded'):
             self.skipTest(
@@ -238,20 +169,29 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
         Sized from ``max(cpu_limit)`` over every node in ``per_node``,
         falling back to a node's own ``cpu_hard_max`` where ``cpu_limit``
-        is ``None`` (see ``_effective_cpu_ceiling()``).
+        is ``None`` (see ``sizing.effective_cpu_ceiling()``).
 
         Failure modes, and whether each is asserted or skipped:
 
         * ``total.capacity_degraded`` is true: **skipped** (D26).
         * ``per_node`` is empty: **skipped** (D26).
         * Every node's ``cpu_max_per_instance`` (the libvirt per-domain
-          vCPU cap, an earlier scheduler stage than ``sufficient_idle_cpu``)
-          happens to be smaller than the computed request: **asserted**,
-          not skipped -- ``assertRefusedAtStage()`` would report a stage
-          mismatch rather than a silent pass, and this has not been
-          observed on either CI topology, since that cap is sized from
-          libvirt's own host limit rather than from the scheduler's
-          cluster-sizing ledger.
+          vCPU cap) is smaller than the computed request: **skipped**,
+          naming both figures. That cap is an *earlier* scheduler stage
+          than ``sufficient_idle_cpu`` (``scheduler.py:643-655``, which
+          drops any candidate where ``inst.cpus > cpu_max_per_instance``),
+          so the refusal would be real but would arrive from the wrong
+          stage -- an unanswerable premise rather than a wrong answer, and
+          D26 says those skip. ``/admin/resources`` publishes the figure
+          per node (``scheduler.py:1058``), so this is observable before
+          the request is made rather than something to be inferred from a
+          stage-mismatch failure. It has not been seen on either CI
+          topology, where the cap comes from libvirt's own host limit and
+          is far above any ledger ceiling; it becomes reachable on a node
+          whose ``cpu_schedulable * CPU_OVERCOMMIT_RATIO`` grows past that
+          limit. A published zero is treated the same way, because the
+          scheduler does too -- a node whose metric is missing reads as 0
+          there and is dropped at that same stage for any request at all.
         * Every node is already fully committed on vCPUs by the rest of
           the suite at read time: changes nothing here, because the
           request exceeds every node's *ceiling* (the most vCPUs a node
@@ -267,11 +207,26 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
         resources, per_node = self._cluster_resources_or_skip()
 
         max_ceiling = max(
-            _effective_cpu_ceiling(entry) for entry in per_node.values())
-        requested_cpus = _one_unit_beyond(max_ceiling)
+            sizing.effective_cpu_ceiling(entry)
+            for entry in per_node.values())
+        requested_cpus = sizing.one_unit_beyond(max_ceiling)
+        max_per_instance = min(
+            entry.get('cpu_max_per_instance', 0)
+            for entry in per_node.values())
         self.addDetail('sizing', content.text_content(
-            'max_ceiling=%r requested_cpus=%r'
-            % (max_ceiling, requested_cpus)))
+            'max_ceiling=%r requested_cpus=%r '
+            'min_cpu_max_per_instance=%r'
+            % (max_ceiling, requested_cpus, max_per_instance)))
+
+        if max_per_instance < requested_cpus:
+            self.skipTest(
+                'A request of %r vCPUs is needed to exceed every node\'s '
+                'ledger ceiling (the largest is %r), but the smallest '
+                'cpu_max_per_instance published by any node is %r -- so the '
+                'create would be refused at the earlier cpu_max_per_instance '
+                'stage rather than at sufficient_idle_cpu, and this test '
+                'cannot prove the stage it is about (D26)'
+                % (requested_cpus, max_ceiling, max_per_instance))
 
         exc = self.assertRaises(
             apiclient.InsufficientResourcesException,
@@ -285,8 +240,9 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
         """A memory request beyond every node's real ceiling is refused.
 
         Sized from ``max(ram_max, ram_available + ram_committed)`` over
-        every node in ``per_node`` -- see ``_effective_ram_ceiling()`` for
-        why this is a ceiling and not headroom. The vCPU and disk asks are
+        every node in ``per_node`` -- see
+        ``sizing.effective_ram_ceiling()`` for why this is a ceiling and
+        not headroom. The vCPU and disk asks are
         the smallest the suite ever asks for (1 vCPU, a single 1 GB empty
         disk -- the shape ``test_nodes.py:116-122`` already uses for a
         zero-cost create), so this test's only impossible dimension is
@@ -324,8 +280,9 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
         resources, per_node = self._cluster_resources_or_skip()
 
         max_ram_ceiling = max(
-            _effective_ram_ceiling(entry) for entry in per_node.values())
-        requested_memory_mb = _one_unit_beyond(max_ram_ceiling)
+            sizing.effective_ram_ceiling(entry)
+            for entry in per_node.values())
+        requested_memory_mb = sizing.one_unit_beyond(max_ram_ceiling)
         self.addDetail('sizing', content.text_content(
             'max_ram_ceiling=%r requested_memory_mb=%r'
             % (max_ram_ceiling, requested_memory_mb)))
@@ -390,7 +347,7 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
         max_disk_available = max(disk_available_values)
         total_disk_available = sum(disk_available_values)
         disk_margin = max_disk_available + total_disk_available
-        requested_disk_gb = _one_unit_beyond(disk_margin)
+        requested_disk_gb = sizing.one_unit_beyond(disk_margin)
         self.addDetail('sizing', content.text_content(
             'max_disk_available=%r total_disk_available=%r '
             'requested_disk_gb=%r'
@@ -445,6 +402,13 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
     ADMISSION_OUTCOME_DEADLINE_SECONDS = 300
     POLL_SECONDS = 5
 
+    # How often the whole-cluster instance listing may be read while a loop
+    # polls. The cheap /admin/resources read runs every POLL_SECONDS; the
+    # listing costs an external_view() per active instance in the cluster
+    # and is only needed to explain a residue, not to detect one, so it is
+    # rate limited to this and to one unconditional read at a deadline.
+    OWNERSHIP_SPLIT_INTERVAL_SECONDS = 30
+
     def _node_entry_or_skip(self, node_uuid, when):
         """The target node's ``per_node`` entry from a fresh read, or skip.
 
@@ -454,7 +418,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         capacity row, cannot answer the question this test is asking, and
         neither is this test's doing -- so both skip rather than fail.
         """
-        _, per_node = self._cluster_resources_or_skip()
+        _, per_node = self._cluster_resources_or_skip(polled=True)
 
         entry = per_node.get(node_uuid)
         if entry is None:
@@ -480,7 +444,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         return entry
 
     def _cpus_on_node_by_ownership(self, node_uuid):
-        """(ours, foreign) vCPU totals of active instances placed on a node.
+        """(ours, foreign, still_listed) for active instances on a node.
 
         Read through the admin client, which sees every namespace
         (``baseobject.namespace_filter()`` returns True unconditionally for
@@ -491,20 +455,38 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         worker's load and skips. Without the split, the two are the same
         number and the test would have to guess -- which, per D26, is what
         it must not do.
+
+        ``ours`` and ``foreign`` are vCPU totals. ``still_listed`` is the
+        ``(uuid, state)`` of each of this namespace's own instances the
+        listing still returns for the node, which is the third question a
+        residue raises and the one ``_assert_ledger_returns()`` turns on:
+        the listing's default prefilter is ``active``
+        (``external_api/instance.py:485``, ``Instance.ACTIVE_STATES``), so
+        an instance which appears here at all has not reached ``deleted``
+        yet. A ledger still charging an instance the cluster has not
+        finished deleting is correct; a ledger charging one which is gone
+        is the regression.
+
+        This is the most expensive read in the file -- ``external_view()``
+        per active instance across the whole cluster -- so it is called
+        only where the split is needed to explain something, never on every
+        poll of a loop.
         """
         ours = 0
         foreign = 0
+        still_listed = []
         for inst in self.system_client.get_instances():
             if inst.get('node') != node_uuid:
                 continue
             cpus = inst.get('cpus') or 0
             if inst.get('namespace') == self.namespace:
                 ours += cpus
+                still_listed.append((inst.get('uuid'), inst.get('state')))
             else:
                 foreign += cpus
-        return ours, foreign
+        return ours, foreign, still_listed
 
-    def _create_fill_instance(self, node_name, index):
+    def _create_fill_instance(self, node_uuid, node_name, index):
         """One unit of fill: the zero-cost create shape from test_nodes.py.
 
         1 vCPU, 128 MB, no base image and a single empty 1 GB disk, forced
@@ -512,10 +494,31 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         each unit costs a database write and a vCPU of ledger and nothing
         else -- which is what makes filling a node cheap enough to do in a
         suite that shares the cluster.
+
+        The placement is asserted immediately, the way
+        ``test_nodes.py:125`` asserts its own forced create, and it is an
+        assertion rather than a skip: a create which names a node and lands
+        on another one is issue 3496, a defect in the very accounting D23
+        is about. Without this check such a placement would charge a
+        different node's ledger, so the fill loop would burn its create
+        budget without moving the target node's ``cpu_committed``, and the
+        ours/foreign split would then count zero vCPUs of "ours" on the
+        target and *skip* -- reporting ambient load on the one failure this
+        test is best placed to catch, while leaving up to a whole create
+        budget of stray instances on the siblings D23 exists to protect.
         """
-        return self.test_client.create_instance(
+        inst = self.test_client.create_instance(
             'nodefill-%d' % index, 1, 128, None, [{'size': 1, 'type': 'disk'}],
             None, None, force_placement=node_name)
+        self.addDetailUniqueName('fill instance', content.text_content(
+            json.dumps(inst, indent=4, sort_keys=True)))
+        self.assertEqual(
+            node_uuid, inst['node'],
+            'A create forced onto node %s (%s) was placed on %r instead. '
+            'force_placement is not being honoured (issue 3496), so this '
+            'fill is charging another node\'s ledger.'
+            % (node_name, node_uuid, inst['node']))
+        return inst
 
     def _release_fill(self, fill):
         """Delete every fill instance, without waiting for any of them.
@@ -546,7 +549,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
           releasing capacity on this node as fast as this test claims it.
           That is ambient load, and per D26 it **skips**.
         """
-        ours, foreign = self._cpus_on_node_by_ownership(node_uuid)
+        ours, foreign, _ = self._cpus_on_node_by_ownership(node_uuid)
         self.addDetail('incomplete fill', content.text_content(
             'reason=%s node=%s cpu_committed=%r cpu_limit=%r creates=%d '
             'ours_vcpus=%r foreign_vcpus=%r'
@@ -626,7 +629,8 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     'deadline of %ds exhausted' % self.FILL_DEADLINE_SECONDS)
 
             try:
-                fill.append(self._create_fill_instance(node_name, len(fill)))
+                fill.append(self._create_fill_instance(
+                    node_uuid, node_name, len(fill)))
 
             except apiclient.InsufficientResourcesException as e:
                 # A unit of fill was refused before the node reached its
@@ -671,7 +675,10 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     'fill cannot be completed: %s (D26)' % (node_name, e))
 
     def _resolve_unexpected_admission(self, inst, node_uuid, node_name):
-        """Never returns normally: the create at the full node was admitted.
+        """Resolve a create the full node admitted, which D28 did not expect.
+
+        Returns only when D28's third path is observed and recorded; every
+        other outcome fails or skips.
 
         This is D28's third path, and the branch which decides whether an
         admission at a node the ledger said was full is a defect or a race.
@@ -717,11 +724,14 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                 message = i.get('error_message') or ''
 
                 if REPLACE_ABORT_REFUSAL in message:
+                    # Recorded rather than re-asserted: an assertion here
+                    # would restate the condition of the branch it is
+                    # inside, so it could never fail while reading as a
+                    # check. The detail is the evidence D28 asked for.
                     self.addDetail(
                         'asynchronous re-place abort',
                         content.text_content(json.dumps(
                             i, indent=4, sort_keys=True)))
-                    self.assertIn(REPLACE_ABORT_REFUSAL, message)
                     return
 
                 if message:
@@ -785,8 +795,36 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         still charged belongs to somebody else -- which is the same
         ours/foreign split ``_fail_or_skip_incomplete_fill()`` uses, for
         the same reason.
+
+        Two things are deliberate about how the residue is judged.
+
+        First, a residue is only a *failure* once the cluster has finished
+        deleting what this test released. ``_release_fill()`` deletes
+        asynchronously, and on the shared cluster this suite runs on a
+        queue backlog can leave those instances sitting in ``delete-wait``
+        for longer than the deadline here. A ledger which still charges an
+        instance the cluster has not finished deleting is behaving
+        correctly, and the failure message below -- which asserts a ledger
+        regression -- would be making a claim the evidence does not
+        support. So the instances are asked: while any of this test's own
+        remain in the listing for this node, this **skips** and names them,
+        the way every other ambient-load branch in this file does. The
+        regression the failure does describe is a ledger which charges
+        placements that no longer exist at all, and that is exactly the
+        state left when the listing shows none of ours and the committed
+        figure is still above both the baseline and what others hold.
+
+        Second, that listing is the whole-cluster instance read, so it is
+        not made on every poll. The cheap ``/admin/resources`` read detects
+        a residue; the expensive listing is only needed to *explain* one,
+        which it does at most once every
+        ``OWNERSHIP_SPLIT_INTERVAL_SECONDS`` and always once at the
+        deadline, before anything is concluded. A run which waits the full
+        deadline therefore makes a handful of listings rather than one per
+        poll -- the consumer ``database_load_budget.yaml`` exists to catch.
         """
         deadline = time.time() + self.LEDGER_RETURN_DEADLINE_SECONDS
+        next_split = 0.0
         while True:
             entry = self._node_entry_or_skip(
                 node_uuid, 'after releasing the fill')
@@ -798,27 +836,58 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     % (node_name, committed, baseline_committed)))
                 return
 
-            ours, foreign = self._cpus_on_node_by_ownership(node_uuid)
-            if committed <= foreign:
-                self.addDetail('ledger returned', content.text_content(
-                    'node=%s cpu_committed=%r baseline=%r foreign=%r: the '
-                    'ledger released everything this test placed, and what '
-                    'remains charged belongs to another namespace which grew '
-                    'during the test'
-                    % (node_name, committed, baseline_committed, foreign)))
-                return
+            now = time.time()
+            expired = now > deadline
+            if expired or now >= next_split:
+                next_split = now + self.OWNERSHIP_SPLIT_INTERVAL_SECONDS
+                ours, foreign, still_listed = (
+                    self._cpus_on_node_by_ownership(node_uuid))
+                self.addDetailUniqueName(
+                    'ledger residue', content.text_content(
+                        'node=%s cpu_committed=%r baseline=%r ours=%r '
+                        'foreign=%r still_listed=%r'
+                        % (node_name, committed, baseline_committed, ours,
+                           foreign, still_listed)))
 
-            if time.time() > deadline:
-                self.fail(
-                    'Node %s still publishes cpu_committed %r %ds after this '
-                    'test deleted its fill. It started at %r, and %r vCPU of '
-                    'what is charged now belongs to this test\'s own '
-                    'namespace while %r belongs to others -- so the excess '
-                    'is not another worker\'s and the placements this test '
-                    'released have not come back off the ledger.'
-                    % (node_name, committed,
-                       self.LEDGER_RETURN_DEADLINE_SECONDS,
-                       baseline_committed, ours, foreign))
+                if committed <= foreign:
+                    self.addDetail('ledger returned', content.text_content(
+                        'node=%s cpu_committed=%r baseline=%r foreign=%r: '
+                        'the ledger released everything this test placed, '
+                        'and what remains charged belongs to another '
+                        'namespace which grew during the test'
+                        % (node_name, committed, baseline_committed,
+                           foreign)))
+                    return
+
+                if expired and still_listed:
+                    self.skipTest(
+                        'Node %s still publishes cpu_committed %r %ds after '
+                        'this test deleted its fill (it started at %r), but '
+                        'the cluster has not finished deleting what was '
+                        'released: %r of this test\'s own instances are '
+                        'still listed on the node as %r. A ledger charging '
+                        'an instance which is not yet deleted is correct, so '
+                        'there is no ledger regression to report here -- the '
+                        'delete queue is simply slower than this test\'s '
+                        'deadline (D26)'
+                        % (node_name, committed,
+                           self.LEDGER_RETURN_DEADLINE_SECONDS,
+                           baseline_committed, len(still_listed),
+                           still_listed))
+
+                if expired:
+                    self.fail(
+                        'Node %s still publishes cpu_committed %r %ds after '
+                        'this test deleted its fill. It started at %r, every '
+                        'instance this test placed on it is gone from the '
+                        'instance listing, and only %r vCPU of what is '
+                        'charged belongs to another namespace -- so the '
+                        'excess is not another worker\'s and the placements '
+                        'this test released have not come back off the '
+                        'ledger.'
+                        % (node_name, committed,
+                           self.LEDGER_RETURN_DEADLINE_SECONDS,
+                           baseline_committed, foreign))
 
             time.sleep(self.POLL_SECONDS)
 
@@ -912,9 +981,16 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
           ``cpu_limit``, which would be a defect rather than load.
         * The create at the full node is admitted and errors for a reason
           which is neither known refusal: **fails**, with the message.
+        * A fill create forced onto the target node is placed somewhere
+          else: **fails** (issue 3496). This is the one wrong-node
+          outcome which is a defect rather than load, and it is asserted
+          at the create rather than inferred from the ledger later.
         * The released fill does not come back off ``cpu_committed``:
-          **fails**, but only when the residue is not explained by
-          instances another namespace owns.
+          **fails**, but only when the residue is explained neither by
+          instances another namespace owns nor by this test's own
+          instances which the cluster has not finished deleting -- a
+          delete-queue backlog **skips**, naming the instances and their
+          states.
         * ``cpu_measured`` lagging the release by up to a minute: not
           asserted on at all, deliberately -- see
           ``_assert_ledger_returns()``.
@@ -998,7 +1074,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
             # committed ledger accounts for at least the instances this test
             # has placed on this node. cpu_measured cannot supply this --
             # nothing here has booted.
-            ours, foreign = self._cpus_on_node_by_ownership(node_uuid)
+            ours, foreign, _ = self._cpus_on_node_by_ownership(node_uuid)
             self.addDetail('ownership at limit', content.text_content(
                 'node=%s ours_vcpus=%r foreign_vcpus=%r cpu_committed=%r'
                 % (node_name, ours, foreign, after['cpu_committed'])))
@@ -1061,7 +1137,8 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
             # not wrapped in retries.retry_while_transient(): a refusal
             # under assertion must never be retried away.
             try:
-                admitted = self._create_fill_instance(node_name, len(fill))
+                admitted = self._create_fill_instance(
+                    node_uuid, node_name, len(fill))
 
             except apiclient.InsufficientResourcesException as e:
                 body = str(e.text)
