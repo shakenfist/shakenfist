@@ -236,30 +236,51 @@ class NodeInstOp(BaseClusterOperation):
 
             inst.delete()
 
-            # Check each network used by the deleted instance
+            # Check each network used by the deleted instance. A failure
+            # cleaning up one network must not abandon cleanup of the
+            # others -- for a multi-homed instance that would leave the
+            # remaining networks' bridge and vxlan devices behind as
+            # strays (issue 4165). Record the first failure and re-raise
+            # it once every network has been processed, so the operation
+            # still lands in the error state.
+            first_failure: Exception | None = None
             for network_uuid in instance_networks:
-                n = Network.from_db(network_uuid)
-                if not n:
-                    continue
+                try:
+                    n = Network.from_db(network_uuid)
+                    if not n:
+                        continue
 
-                if n.state.value == Network.STATE_DELETE_WAIT:
-                    continue
+                    if n.state.value == Network.STATE_DELETE_WAIT:
+                        continue
 
-                # dnsmasq config files live on the network node only,
-                # so invoking the worker's ``_apply_update_dnsmasq``
-                # method directly from this hypervisor mutates nothing
-                # useful. Enqueue a net_op instead so the network
-                # node's dispatcher picks up the stale lease prune
-                # after the instance is gone.
-                n.update_dnsmasq()
+                    # dnsmasq config files live on the network node only,
+                    # so invoking the worker's ``_apply_update_dnsmasq``
+                    # method directly from this hypervisor mutates nothing
+                    # useful. Enqueue a net_op instead so the network
+                    # node's dispatcher picks up the stale lease prune
+                    # after the instance is gone.
+                    n.update_dnsmasq()
 
-                if (not config.NODE_IS_NETWORK_NODE and
-                        network_uuid not in host_networks):
-                    # We are not the network node and the network not used by any
-                    # other instance on this hypervisor, therefore clean it up
+                    if (not config.NODE_IS_NETWORK_NODE and
+                            network_uuid not in host_networks):
+                        # We are not the network node and the network not
+                        # used by any other instance on this hypervisor,
+                        # therefore clean it up
+                        self.log.with_fields({
+                            'network': network_uuid,
+                            'host_networks': host_networks,
+                        }).debug('Last instance on host using this network, '
+                                 'deleting on hypervisor')
+                        BridgedVXLanNetwork(n)._apply_delete_on_hypervisor()
+
+                except Exception as e:
+                    util_exceptions.ignore_exception('node_inst_op', e)
                     self.log.with_fields({
                         'network': network_uuid,
-                        'host_networks': host_networks,
-                    }).debug('Last instance on host using this network, '
-                             'deleting on hypervisor')
-                    BridgedVXLanNetwork(n)._apply_delete_on_hypervisor()
+                    }).error('Network cleanup failed during instance delete, '
+                             'continuing with remaining networks')
+                    if first_failure is None:
+                        first_failure = e
+
+            if first_failure is not None:
+                raise first_failure

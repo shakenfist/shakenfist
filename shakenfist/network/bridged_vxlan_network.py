@@ -604,9 +604,17 @@ class BridgedVXLanNetwork:
         """Tear down the local VXLAN interfaces for the wrapped network.
 
         Lifted verbatim from ``Network.delete_on_hypervisor``
-        (network.py:721-745). The single-threaded net-worker dispatcher
-        is the only caller of this method and provides natural
-        serialisation; no explicit lock is required.
+        (network.py:721-745). Unlike most ``_apply_*`` methods, this one
+        is not serialised by the single-threaded net-worker dispatcher:
+        both of its callers (``node_net_op._network_destroy`` and
+        ``node_inst_op._instance_delete``) run on sf-queues' concurrent
+        worker pool, so several instance deletes on one hypervisor can
+        reach it at once for the same network. The existence checks and
+        the ``ip link delete`` calls are therefore guarded by a
+        node-local lock on the network: the loser of a race observes
+        the device already gone and no-ops, instead of raising
+        ProcessExecutionError from the check-then-delete TOCTOU window
+        (issue 4165).
         """
         subst = self.network.subst_dict()
         self.network.add_event(
@@ -614,17 +622,19 @@ class BridgedVXLanNetwork:
             extra={'vx_bridge': subst['vx_bridge'],
                    'vx_interface': subst['vx_interface']})
 
-        bridge_present = util_network.check_for_interface(
-            subst['vx_bridge'])
-        if bridge_present:
-            util_concurrency.execute(
-                'ip link delete %(vx_bridge)s' % subst)
+        with self.network.get_lock(
+                op='Network delete on hypervisor', global_scope=False):
+            bridge_present = util_network.check_for_interface(
+                subst['vx_bridge'])
+            if bridge_present:
+                util_concurrency.execute(
+                    'ip link delete %(vx_bridge)s' % subst)
 
-        interface_present = util_network.check_for_interface(
-            subst['vx_interface'])
-        if interface_present:
-            util_concurrency.execute(
-                'ip link delete %(vx_interface)s' % subst)
+            interface_present = util_network.check_for_interface(
+                subst['vx_interface'])
+            if interface_present:
+                util_concurrency.execute(
+                    'ip link delete %(vx_interface)s' % subst)
 
         self.network.add_event(
             EVENT_TYPE_AUDIT, 'deleted network on hypervisor',
