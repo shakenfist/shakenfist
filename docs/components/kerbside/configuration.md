@@ -115,8 +115,7 @@ Values tracked include:
 
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
-| LOG_OUTPUT_PATH | String (default empty) | Where to write logs to. If "stdout", then stdout is used. If blank, syslog is used. |
-| LOG_OUTPUT_JSON | Boolean (default False) | If true, log entries are in JSON format. |
+| LOG_OUTPUT_PATH | String (default empty) | Where to write logs to. If "stdout", then stdout is used. If blank, syslog is used. Daemon logs are always structured JSON, one object per line. |
 | LOG_VERBOSE | Boolean (default False) | Whether to log verbose debugging information. |
 | PROMETHEUS_METRICS_PORT | Integer (default 13003) | The TCP port that the prometheus metrics HTTP server will listen on. |
 | PROMETHEUS_METRICS_ADDRESS | String (default 127.0.0.1) | The address the Rust proxy binds its `/metrics` server to. Defaults to loopback because the endpoint is unauthenticated and must not be exposed on the public VDI interface; set a management address (or 0.0.0.0 behind a firewall) to scrape it from another host. |
