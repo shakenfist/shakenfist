@@ -345,7 +345,7 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Semantics pin, oracle selection, and the doc correction | [PLAN-differencing-phase-01-pin.md](/components/instar/plans/PLAN-differencing-phase-01-pin/) | Complete | `8b81a0f` (#549) |
-| 2. Real differencing fixtures, happy-path and adversarial (instar + instar-testdata) | [PLAN-differencing-phase-02-fixtures.md](/components/instar/plans/PLAN-differencing-phase-02-fixtures/) | Complete | instar-testdata `77f5f589f0` + `623a30866f` (direct to `main`); instar: pending |
+| 2. Real differencing fixtures, happy-path and adversarial (instar + instar-testdata) | [PLAN-differencing-phase-02-fixtures.md](/components/instar/plans/PLAN-differencing-phase-02-fixtures/) | Complete | instar-testdata `77f5f589f0` + `623a30866f` (direct to `main`); instar `1a677c7` (#552) |
 | 3. Parent-locator parsing in `crates/vhd` and `crates/vhdx` | PLAN-differencing-phase-03-parse.md | Not started | |
 | 4. Read-side policy: close the silent parent-ignoring read | PLAN-differencing-phase-04-read-policy.md | Not started | |
 | 5. `plan_vhd` differencing emitter | PLAN-differencing-phase-05-vhd-emitter.md | Not started | |
