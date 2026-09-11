@@ -24,6 +24,11 @@ These things are checked:
   `order.yml`, and neither names a plan that is not there, nor names one
   twice -- a second index row for a plan is never read, so it is free to
   say anything at all;
+* every master plan whose index status is not terminal (`Complete`,
+  `Abandoned` or `Superseded`) names `PUSH-AUDIT.md`, because the
+  `plan-push-audit-phase` shared block requires every open plan to end with
+  a phase that runs it, and the consistency audit that enforces the block
+  fleet-wide only reports the drift the morning after it lands;
 * every markdown link between plans resolves to a file that exists; and
 * every phase plan is linked from somewhere in `docs/plans/`.
 
@@ -374,6 +379,23 @@ def problems():
         if status.lower() not in known:
             found.append('%s:%d: index status %r is not one of %s'
                          % (index, lineno, status, listed))
+
+        # The push audit phase is required of every plan that is still
+        # open, whatever shape its phases take, so this is a naming check
+        # rather than a table check: a plan cannot carry the phase without
+        # saying what the phase runs. Terminal plans are the shared
+        # block's own carve-out -- a closed plan is not reopened to
+        # acquire a phase auditing a diff nobody is going to write.
+        if status.lower() in UNFINISHED:
+            with open(path, encoding='utf-8') as f:
+                body = f.read()
+            if 'PUSH-AUDIT.md' not in body:
+                found.append(
+                    '%s: open master plan (%s in the index) never names '
+                    'PUSH-AUDIT.md. The plan-push-audit-phase shared block '
+                    'requires every plan that is not Complete, Abandoned '
+                    'or Superseded to end with a push audit phase.'
+                    % (path, status))
 
         if name in HAND_COUNTED:
             continue

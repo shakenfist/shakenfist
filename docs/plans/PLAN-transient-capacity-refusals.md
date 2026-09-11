@@ -503,13 +503,15 @@ spelling above is the one to write.
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started |
 | 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started |
+| 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started |
 
 Phases 1, 2 and 3 are independent of one another and can run in
 parallel. Phase 4 follows 2, because the client retry should match
 the semantics the suite has already proven. Phase 5 needs phase 2
 to have reported over a window of merge runs *after* the sizing
 plan's phase 4 has reshaped `slim-tier`; until then its data would
-be measuring the wrong cloud. Phase 6 is last.
+be measuring the wrong cloud. Phase 6 follows everything else, and
+the phase 7 push audit is last.
 
 The ordering against the sibling plans: the sizing plan's phase 3
 (saturation coverage) does not gate any phase here, because none
@@ -707,6 +709,14 @@ to their final state. Comment on #3772 with the before-and-after
 pass rate and close it only if the `Debian 12 tier` job's failures
 are no longer `sufficient_idle_cpu`; otherwise leave it open with
 the numbers.
+
+### Phase 7 -- Push audit
+
+Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in
+this plan against `develop`, not the last phase's diff alone.
+Findings land as their own pull request, and the plan is not
+complete until each is resolved or declined in writing here. If
+the audit finds nothing, that is recorded in one sentence.
 
 ## Agent guidance
 

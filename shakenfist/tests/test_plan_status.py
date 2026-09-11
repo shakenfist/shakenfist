@@ -66,6 +66,8 @@ VOCABULARY_BLOCK = """<!-- shared-block: plan-status-vocabulary v1 -->
 
 MASTER = """# A plan
 
+The last phase runs `PUSH-AUDIT.md` over the accumulated diff.
+
 ## Execution
 
 | Phase | Plan | Status |
@@ -255,6 +257,26 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         self._write('index.md', INDEX.replace('| In progress | 1 of 2 |',
                                               '| Not started | 2 of 2 |'))
         self.assertProblem('every phase in')
+
+    def test_an_open_plan_never_naming_push_audit_fails(self):
+        # The plan-push-audit-phase shared block requires every open plan
+        # to end with a push audit phase. Two plans have now been written
+        # without one -- the drift the fleet-wide consistency audit only
+        # reports the morning after it lands, and this catches at commit.
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            'The last phase runs `PUSH-AUDIT.md` over the accumulated '
+            'diff.\n\n', ''))
+        self.assertProblem('never names PUSH-AUDIT.md')
+
+    def test_a_terminal_plan_without_a_push_audit_passes(self):
+        # The shared block's carve-out: a closed plan is not reopened to
+        # acquire a phase auditing a diff nobody is going to write.
+        self._write('FIXTURE-plan.md', MASTER.replace(
+            'The last phase runs `PUSH-AUDIT.md` over the accumulated '
+            'diff.\n\n', '').replace('| Not started |', '| Complete |'))
+        self._write('index.md', INDEX.replace('| In progress | 1 of 2 |',
+                                              '| Complete | 2 of 2 |'))
+        self.assertEqual([], checker.problems())
 
     def test_an_unregistered_master_plan_fails(self):
         # A plan missing from the index is normally missing from order.yml
