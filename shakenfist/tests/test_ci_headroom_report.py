@@ -144,6 +144,39 @@ def census_payload(events):
     }
 
 
+def wait_event(test_id='pkg.mod.TestCase.test_something', instance_name='i1',
+               node='n1', roster_key='n1', cpus=2, memory_mb=1024, disk_gb=8,
+               binding_dimension=None, seconds_waited=12.5, mode='informed',
+               attempt_number=1, headroom_at_first_refusal=0,
+               headroom_at_admission=2):
+    """One line of the capacity-wait trace create_instance() writes (D14).
+
+    These keys must stay identical to the record
+    BaseTestCase._append_capacity_wait_trace() builds in
+    shakenfist/deploy/shakenfist_ci/base.py. A fixture which drifts from
+    the writer tests the parser against a line shape nothing emits,
+    which is the one failure this report is supposed to survive and the
+    one its tests would then not notice. The drift is not hypothetical:
+    this fixture said 'attempts' while the writer said 'attempt_number',
+    and omitted three fields the writer has always written.
+    """
+    return {
+        'test_id': test_id,
+        'instance_name': instance_name,
+        'node': node,
+        'roster_key': roster_key,
+        'cpus': cpus,
+        'memory_mb': memory_mb,
+        'disk_gb': disk_gb,
+        'binding_dimension': binding_dimension,
+        'seconds_waited': seconds_waited,
+        'mode': mode,
+        'attempt_number': attempt_number,
+        'headroom_at_first_refusal': headroom_at_first_refusal,
+        'headroom_at_admission': headroom_at_admission,
+    }
+
+
 class HeadroomReportTestCase(base.ShakenFistTestCase):
     """Every test drives main() and reads the printed report."""
 
@@ -169,6 +202,12 @@ class HeadroomReportTestCase(base.ShakenFistTestCase):
 
     def _census(self, events):
         return self._write('census.json', json.dumps(census_payload(events)))
+
+    def _waits(self, records, trailing=None):
+        body = ''.join(json.dumps(r) + '\n' for r in records)
+        if trailing is not None:
+            body += trailing
+        return self._write('instance-waits.jsonl', body)
 
     def _run(self, *argv):
         """Run the tool, returning (exit code, stdout)."""
@@ -2002,3 +2041,174 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
             'A run with no samples must have no band verdict rather than a '
             'verdict computed from nothing.')
         self.assertIsNone(record['cluster']['committed_cpu']['p90'])
+
+
+class CapacityWaitsTestCase(HeadroomReportTestCase):
+    """--waits summarises the JSONL trace create_instance() writes (D14).
+
+    An absent or empty file must read as "unknown", never as "0 seconds
+    waited" -- printing a zero there is precisely the misreading a broken
+    instrument would produce, which is why census_record() and now
+    waits_record() both refuse to say it. A malformed line among good ones
+    is skipped and counted, not fatal, because a crashed stestr worker
+    leaves one on every run that hits it.
+    """
+
+    def test_a_populated_file_reports_the_five_figures(self):
+        path = self._waits([
+            wait_event(test_id='t.test_a', seconds_waited=10.0,
+                       mode='informed'),
+            wait_event(test_id='t.test_b', seconds_waited=90.0,
+                       mode='degraded'),
+            wait_event(test_id='t.test_c', seconds_waited=5.0,
+                       mode='informed'),
+        ])
+        series = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', series, '--waits', path)
+        self.assertEqual(0, code)
+
+        self.assertIn('Waits:             3', output)
+        self.assertIn('Total time waited: 105.0s', output)
+        self.assertIn('Longest wait:      90.0s (t.test_b)', output,
+                      'The longest wait and the test it belongs to were not '
+                      'both printed.')
+        self.assertIn('Mode split:        2 informed, 1 degraded', output)
+
+    def test_an_absent_waits_file_is_never_zero_seconds(self):
+        series = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run(
+            '--series', series,
+            '--waits', os.path.join(self.tempdir, 'does-not-exist.jsonl'))
+        self.assertEqual(0, code)
+        self.assertIn('NO CAPACITY WAIT DATA IS AVAILABLE', output)
+        self.assertIn('never as zero waits', output)
+        self.assertNotIn('0 seconds waited', output)
+        self.assertNotIn('Total time waited', output)
+
+    def test_an_empty_waits_file_is_never_zero_seconds(self):
+        path = self._write('instance-waits.jsonl', '')
+        series = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', series, '--waits', path)
+        self.assertEqual(0, code)
+        self.assertIn('NO CAPACITY WAIT DATA IS AVAILABLE', output)
+        self.assertIn('empty', output)
+        self.assertIn('never as zero waits', output)
+        self.assertNotIn('Total time waited', output)
+
+    def test_no_waits_argument_says_nothing_was_looked_at(self):
+        series = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', series)
+        self.assertEqual(0, code)
+        self.assertIn('NO WAITS FILE WAS SUPPLIED', output)
+        self.assertIn('nothing was looked at', output)
+
+    def test_a_malformed_line_among_good_ones_is_skipped_and_counted(self):
+        path = self._waits(
+            [wait_event(test_id='t.test_a', seconds_waited=20.0)],
+            trailing='not json at all\n')
+        series = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', series, '--waits', path)
+        self.assertEqual(0, code)
+        self.assertIn('Waits:             1 (1 malformed line skipped)', output)
+        self.assertIn('Total time waited: 20.0s', output)
+
+    def test_a_file_of_only_malformed_lines_is_unknown_not_zero(self):
+        """Every line malformed is a broken writer, not a quiet run.
+
+        A JSONL file with content, none of which parsed, must not print
+        '0 seconds waited' either: that reading is indistinguishable from a
+        run which genuinely never waited, and the two are different facts.
+        """
+        path = self._write('instance-waits.jsonl', 'garbage\nmore garbage\n')
+        series = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', series, '--waits', path)
+        self.assertEqual(0, code)
+        self.assertIn('NO CAPACITY WAIT DATA IS AVAILABLE: unparseable', output)
+        self.assertIn('every one of the 2 lines in the file was malformed',
+                      output)
+        self.assertIn('never as zero waits', output)
+        self.assertNotIn('Total time waited', output)
+
+    def test_an_all_malformed_file_reads_as_unknown_to_a_machine_too(self):
+        """The prose said unknown; the record said 'available, zero waits'.
+
+        waits_record() is what phase 5 and the sizing plan's guardrail
+        read, and a consumer which cannot read prose saw 'available: true,
+        count: 0' -- indistinguishable from a run which genuinely never
+        waited, which is the exact confusion the printed text spends three
+        paragraphs guarding against.
+        """
+        path = self._write('instance-waits.jsonl', 'garbage\nmore garbage\n')
+        record = report.waits_record(report.read_waits(path))
+
+        self.assertEqual('unparseable', record['state'])
+        self.assertFalse(
+            record['available'],
+            'A file nothing could be parsed out of carries no data, so it '
+            'must not be marked available.')
+        self.assertIsNone(
+            record['count'],
+            'A count of 0 here is a lie: the run may have waited for '
+            'hours and lost every line to a broken writer.')
+        self.assertIsNone(record['seconds_waited_total'])
+        self.assertEqual(
+            2, record['malformed_lines'],
+            'How much was lost is the one thing which can be said, so it '
+            'is still said.')
+
+    def test_a_file_of_good_lines_is_a_real_zero_when_it_is_empty_of_waits(self):
+        """The positive control for the state above.
+
+        Malformed lines among good ones are skipped and counted, and the
+        file is still read: the unparseable state must not swallow a run
+        which produced usable data.
+        """
+        path = self._waits(
+            [wait_event(test_id='t.test_a', seconds_waited=4.0)],
+            trailing='{"partial": ')
+        record = report.waits_record(report.read_waits(path))
+
+        self.assertEqual('read', record['state'])
+        self.assertTrue(record['available'])
+        self.assertEqual(1, record['count'])
+        self.assertEqual(1, record['malformed_lines'])
+        self.assertEqual(4.0, record['seconds_waited_total'])
+
+    def test_an_unrecognised_mode_is_counted_apart_from_the_split(self):
+        path = self._waits([
+            wait_event(test_id='t.test_a', mode='informed'),
+            wait_event(test_id='t.test_b', mode='sideways'),
+        ])
+        series = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', series, '--waits', path)
+        self.assertEqual(0, code)
+        self.assertIn('Mode split:        1 informed, 0 degraded', output)
+        self.assertIn('1 wait carried a mode this report does not '
+                      'recognise', output)
+
+    def test_read_waits_and_waits_record_agree_with_the_printed_report(self):
+        """The functions the report is built from, exercised directly.
+
+        Phase 2's harvest is expected to call these the way phase 1's does
+        summary_record() -- straight over a downloaded bundle -- so they
+        need to work without going through main().
+        """
+        path = self._waits([
+            wait_event(test_id='t.test_a', seconds_waited=1.0, mode='informed'),
+            wait_event(test_id='t.test_b', seconds_waited=2.0, mode='degraded'),
+        ])
+        record = report.waits_record(report.read_waits(path))
+        self.assertEqual('read', record['state'])
+        self.assertTrue(record['available'])
+        self.assertEqual(2, record['count'])
+        self.assertEqual(0, record['malformed_lines'])
+        self.assertEqual(3.0, record['seconds_waited_total'])
+        self.assertEqual(1, record['informed_waits'])
+        self.assertEqual(1, record['degraded_waits'])
+        self.assertEqual(2.0, record['longest_wait_seconds'])
+        self.assertEqual('t.test_b', record['longest_wait_test'])
+
+        not_requested = report.waits_record(report.read_waits(None))
+        self.assertEqual('not requested', not_requested['state'])
+        self.assertFalse(not_requested['available'])
+        self.assertIsNone(not_requested['count'])

@@ -25,7 +25,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net_one['uuid']])
 
     def test_instance_execute_small(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-instance-execute-small', 1, 1024,
             [
                 {
@@ -59,7 +59,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             f'"root\\n": {aop}')
 
     def test_instance_execute_large(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-instance-execute-large', 1, 1024,
             [
                 {
@@ -101,7 +101,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
     def test_put_and_exec_large_stdout(self):
         # Create an instance to run our script on
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-put-and-get-file', 1, 1024, None,
             [
                 {
@@ -136,7 +136,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             '[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987'))
 
     def test_instance_put_and_get_blob(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-instance-put-blob', 1, 1024,
             [
                 {
@@ -238,7 +238,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
     def test_get(self):
         # Create an instance to fetch files from
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-put-and-get-file', 1, 1024, None,
             [
                 {
@@ -258,7 +258,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
     def test_get_missing_file(self):
         # Create an instance to fetch files from
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-put-and-get-file-missing', 1, 1024, None,
             [
                 {
@@ -282,7 +282,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             '10.0.0.0/24', True, True, '%s-hotplug' % self.namespace)
 
         # Create an instance to run our command on
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-hotplug', 1, 1024, None,
             [
                 {
@@ -346,7 +346,7 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
             '10.0.0.0/24', True, True, '%s-hotplug' % self.namespace)
 
         # Create an instance to run our command on
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-hotplug', 1, 1024, None,
             [
                 {

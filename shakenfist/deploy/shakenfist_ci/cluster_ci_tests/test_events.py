@@ -44,7 +44,7 @@ class TestEvents(base.BaseNamespacedTestCase):
         self.assertNotEqual(0, len(events))
 
     def test_instance_events(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-instance-events', 1, 1024,
             [
                 {
@@ -105,7 +105,7 @@ class TestEvents(base.BaseNamespacedTestCase):
         generated as a mutate event, which is the only view of that from
         outside the hypervisor.
         """
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-instance-domain-xml', 1, 1024,
             [
                 {

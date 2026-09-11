@@ -136,7 +136,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         # output from the command line client is JSON not a python dict.
 
         # Create an instance
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-artifact-show', 1, 1024, None,
             [
                 {
@@ -179,7 +179,7 @@ class TestArtifactCommandLine(base.BaseNamespacedTestCase):
         self.assertEqual(0, len(show_info['blobs']['1']['instances']))
 
         # Start an instance on the snapshot
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'test-cirros-boot-no-network', 1, 1024, None,
             [
                 {

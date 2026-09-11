@@ -28,7 +28,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # We need to start a spare instance on the same node / network so that
         # the network doesn't get torn down during any of the tests.
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'keepalive-statechanges', 1, 1024,
             [
                 {
@@ -54,7 +54,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self._emit_tracing_event({
             'msg': 'Starting target instance'
         })
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-statechanges-%s' % suffix, 1, 1024,
             [
                 {
@@ -217,7 +217,7 @@ class TestDetectReboot(base.BaseNamespacedTestCase):
 
     def test_agent_detects_reboot(self):
         # Start our test instance
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-rebootdetect', 1, 1024,
             [
                 {

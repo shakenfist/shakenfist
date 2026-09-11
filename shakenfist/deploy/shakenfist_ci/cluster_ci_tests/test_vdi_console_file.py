@@ -34,7 +34,7 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         which is all the .vv generator reads.
         """
         minimal_disk = [{'size': 1, 'type': 'disk'}]
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'vvfile-%s' % self._uniquifier(), 1, 128, None, minimal_disk,
             None, None, namespace=self.namespace, video=video)
         self._await_instance_create(inst['uuid'])

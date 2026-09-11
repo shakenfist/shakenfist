@@ -313,7 +313,7 @@ class TestStrayVxlanInstanceProtection(StrayVxlanHostMixin,
             json.dumps(hosted_net, indent=4, sort_keys=True)))
         self._await_networks_ready([hosted_net['uuid']])
 
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'strayvxlanprot', 1, 1024,
             [{'network_uuid': hosted_net['uuid']}],
             [{'size': 8, 'base': base.CLUSTER_CI_IMAGE, 'type': 'disk'}],

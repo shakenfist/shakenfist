@@ -272,7 +272,7 @@ class DatabaseTierTestsMixin:
         # wrapped in the ResourceNotFoundException guard -- which is
         # exactly how this test failed every merge group from the day it
         # landed.
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'dbtier-attributes', 1, 1024, None,
             [
                 {

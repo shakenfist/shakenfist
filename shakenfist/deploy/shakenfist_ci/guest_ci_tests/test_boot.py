@@ -44,7 +44,7 @@ class TestBoot(testscenarios.WithScenarios, base.BaseNamespacedTestCase):
         Once we had a bug that only stopped instance creation when no network
         was specified.
         """
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             f'test-boot-no-network-{self.base}', 1, 1024, None,
             [
                 {
@@ -57,7 +57,7 @@ class TestBoot(testscenarios.WithScenarios, base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
     def _boot_network(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             f'test-boot-network-{self.base}', 1, 1024,
             [
                 {
@@ -75,7 +75,7 @@ class TestBoot(testscenarios.WithScenarios, base.BaseNamespacedTestCase):
         self._await_instance_ready(inst['uuid'])
 
     def _boot_large_disk(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             f'test-boot-large-disk-{self.base}', 1, 1024, None,
             [
                 {

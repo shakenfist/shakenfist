@@ -260,6 +260,37 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # in ci_headroom_probe.py's own docstring, in the CI headroom section of
 # docs/developer_guide/ci.md, and against #3975 in PLAN-ci-cloud-sizing.md.
 #
+# GetNodeMetrics/api gained a second producer with
+# PLAN-transient-capacity-refusals phase 2: create_instance() on
+# BaseTestCase (shakenfist_ci/base.py) calls wait_for_capacity(), which
+# polls the same GET /admin/resources endpoint the probe above samples,
+# via self.system_client.get_cluster_resources(). It is not the same
+# shape of poll, though, and is named here rather than folded into the
+# probe's paragraph for that reason: the probe reads on a fixed --interval
+# timer for the whole test step regardless of what the suite is doing,
+# which is the independent_of_activity() signature the check is built to
+# catch, while the wrapper polls only while a create is being retried
+# after a 507 -- it adds nothing to an idle cluster and adds load in
+# proportion to how full the cluster already is, which tracks activity
+# rather than ignoring it. This does not widen the trim obligation above:
+# GetAllNodeDaemonStates/api, GetNode/api and GetNodeAttributes/api still
+# have only the probe behind them, and dropping the probe still means
+# dropping those three: GetNodeMetrics/api is the one pair of the four
+# that outlives the probe's retirement, because the wrapper keeps calling
+# GET /admin/resources on its own.
+#
+# Sizing note for whoever reads this while working out why a full cluster
+# is busy: one poll is not one read. GET /admin/resources constructs a
+# Scheduler, which refreshes through get_active_node_metrics() -- an
+# iteration over active nodes plus one GetNodeMetrics per node -- so a
+# cluster of N nodes costs N node-metric reads per poll, every
+# CAPACITY_POLL_INTERVAL seconds, per stestr worker currently blocked on
+# a refusal. That arrives precisely when the cluster is fullest, which is
+# the same moment the workers are most likely to be waiting together. It
+# is bounded by CLUSTER_HEADROOM_WAIT and by how many workers can be
+# blocked at once, and GetNodeMetrics/api is exempt above, so this is
+# recorded as a thing to know rather than as a budget entry.
+#
 # The agent operation await helper is the same shape a third time, and it
 # brings the cluster's side of the conversation in with it. _await_command()
 # in shakenfist_ci/base.py submits an agent operation and then reads it back

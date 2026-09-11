@@ -25,6 +25,8 @@ class TestPlacement(base.BaseNamespacedTestCase):
         # Make sure we get an except for a missing node
         self.assertRaises(
             apiclient.ResourceNotFoundException,
+            # raw-create: asserts the 404 a force_placement onto a node which
+            # does not exist gets. That node never acquires capacity.
             self.test_client.create_instance,
             'ubuntu-2004', 1, 1024,
             [
@@ -43,7 +45,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
     def test_local_placement_works(self):
         # Create an instance, force it to be on the name node as us.
         try:
-            inst = self.test_client.create_instance(
+            inst = self.create_instance(
                 'ubuntu-2004', 1, 1024,
                 [
                     {
@@ -79,7 +81,7 @@ class TestPlacement(base.BaseNamespacedTestCase):
     def test_remote_placement_works(self):
         # Create another instance, force it to be on a remote node.
         try:
-            inst = self.test_client.create_instance(
+            inst = self.create_instance(
                 'remotelyplaced', 1, 1024,
                 [
                     {

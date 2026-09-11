@@ -44,7 +44,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                                     self.net_four['uuid']])
 
     def test_specific_ip_request(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-specific-ip', 1, 1024,
             [
                 {
@@ -101,7 +101,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             }
         ]
 
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-specific-ip-reuse', 1, 1024, netdesc, diskdesc, None, None)
         self.addDetail(
             'inst',
@@ -111,7 +111,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.test_client.delete_instance(inst['uuid'])
         self._await_instance_deleted(inst['uuid'])
 
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-specific-ip-reuse', 1, 1024, netdesc, diskdesc, None, None)
         self.addDetail(
             'inst_recreated',
@@ -127,6 +127,8 @@ class TestNetworking(base.BaseNamespacedTestCase):
     def test_specific_ip_request_invalid(self):
         self.assertRaises(
             apiclient.RequestMalformedException,
+            # raw-create: asserts the 400 an address outside the network gets,
+            # which is raised validating the request, not scheduling it.
             self.test_client.create_instance,
             'test-invalid-ip', 1, 1024,
             [
@@ -144,7 +146,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
             ], None, None)
 
     def test_specific_macaddress_request(self):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             'test-macaddress', 1, 1024,
             [
                 {
@@ -168,7 +170,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertTrue('04:ed:33:c0:2e:6c' in results['stdout'])
 
     def test_interface_delete(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-iface-delete', 1, 1024,
             [
                 {
@@ -212,7 +214,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self._await_networks_ready([dupnet['uuid']])
 
         try:
-            inst_hyp1_vm1 = self.test_client.create_instance(
+            inst_hyp1_vm1 = self.create_instance(
                 'dup1', 1, 1024,
                 [
                     {
@@ -227,7 +229,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     }
                 ], None, None, force_placement='sf-2')
 
-            inst_hyp1_vm2 = self.test_client.create_instance(
+            inst_hyp1_vm2 = self.create_instance(
                 'dup2', 1, 1024,
                 [
                     {
@@ -242,7 +244,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     }
                 ], None, None, force_placement='sf-2')
 
-            inst_hyp2_vm1 = self.test_client.create_instance(
+            inst_hyp2_vm1 = self.create_instance(
                 'dup3', 1, 1024,
                 [
                     {
@@ -276,7 +278,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertFalse('DUP' in results['stdout'])
 
     def test_provided_dns(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-provided-dns', 1, 1024,
             [
                 {
@@ -290,7 +292,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                     'type': 'disk'
                 }
             ], None, None)
-        inst2 = self.test_client.create_instance(
+        inst2 = self.create_instance(
             'test-provided-dns-2', 1, 1024,
             [
                 {
@@ -402,7 +404,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
                 f'output:\n\n{data}')
 
     def test_no_provided_dns(self):
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-no-provided-dns', 1, 1024,
             [
                 {
@@ -461,7 +463,7 @@ class TestNetworking(base.BaseNamespacedTestCase):
         extra_dns_net = self.test_client.allocate_network(
             '192.168.242.0/24', True, True, '%s-extra-dns' % self.namespace,
             provide_dns=True)
-        inst1 = self.test_client.create_instance(
+        inst1 = self.create_instance(
             'test-provided-dns', 1, 1024,
             [
                 {

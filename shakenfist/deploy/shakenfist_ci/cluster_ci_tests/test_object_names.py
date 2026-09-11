@@ -40,7 +40,7 @@ class TestObjectNames(base.BaseNamespacedTestCase):
 
         inst_uuids = {}
         for name in ['barry', 'dave', 'trouble-writing-tests']:
-            new_inst = self.test_client.create_instance(
+            new_inst = self.create_instance(
                 name, 1, 1024,
                 [
                     {
@@ -58,7 +58,14 @@ class TestObjectNames(base.BaseNamespacedTestCase):
                 'new_inst_%s' % name,
                 content.text_content(json.dumps(new_inst, indent=4,
                                                 sort_keys=True)))
-            inst_uuids[name] = new_inst['uuid']
+            # Keyed by the name the instance actually got, not by the
+            # one requested. create_instance() retries a capacity refusal
+            # under a fresh name (see the wrapper in base.py), and this
+            # loop's assertion -- that an instance resolves by its own
+            # name -- is true either way. Keyed by the literal it would
+            # instead 404 after a wait, and report it as a name
+            # resolution bug.
+            inst_uuids[new_inst['name']] = new_inst['uuid']
         self.addDetail(
             'inst_uuids',
             content.text_content(json.dumps(inst_uuids, indent=4,
@@ -110,6 +117,15 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
 
         try:
             # Namespace A instance (self.namespace / self.test_client)
+            # raw-create: this test's subject is the name itself --
+            # two instances sharing one name across namespaces -- so
+            # it cannot use the wrapper, whose capacity retry issues
+            # a fresh uniquified name. A renamed retry here would
+            # leave the two instances with different names and the
+            # assertions below would pass while testing nothing. The
+            # create is tiny (1 cpu, 128MB, no base image) so a
+            # capacity refusal is unlikely, and an honest failure is
+            # the right outcome if one happens.
             inst_a = self.test_client.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=self.namespace)
@@ -118,6 +134,15 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                 content.text_content(json.dumps(inst_a, indent=4, sort_keys=True)))
 
             # Namespace B instance
+            # raw-create: this test's subject is the name itself --
+            # two instances sharing one name across namespaces -- so
+            # it cannot use the wrapper, whose capacity retry issues
+            # a fresh uniquified name. A renamed retry here would
+            # leave the two instances with different names and the
+            # assertions below would pass while testing nothing. The
+            # create is tiny (1 cpu, 128MB, no base image) so a
+            # capacity refusal is unlikely, and an honest failure is
+            # the right outcome if one happens.
             inst_b = client_b.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=ns_b_name)
@@ -194,9 +219,27 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
         inst_a = None
         inst_b = None
         try:
+            # raw-create: this test's subject is the name itself --
+            # two instances sharing one name across namespaces -- so
+            # it cannot use the wrapper, whose capacity retry issues
+            # a fresh uniquified name. A renamed retry here would
+            # leave the two instances with different names and the
+            # assertions below would pass while testing nothing. The
+            # create is tiny (1 cpu, 128MB, no base image) so a
+            # capacity refusal is unlikely, and an honest failure is
+            # the right outcome if one happens.
             inst_a = self.test_client.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=self.namespace)
+            # raw-create: this test's subject is the name itself --
+            # two instances sharing one name across namespaces -- so
+            # it cannot use the wrapper, whose capacity retry issues
+            # a fresh uniquified name. A renamed retry here would
+            # leave the two instances with different names and the
+            # assertions below would pass while testing nothing. The
+            # create is tiny (1 cpu, 128MB, no base image) so a
+            # capacity refusal is unlikely, and an honest failure is
+            # the right outcome if one happens.
             inst_b = client_b.create_instance(
                 inst_name, 1, 128, None, minimal_disk, None, None,
                 namespace=ns_b_name)

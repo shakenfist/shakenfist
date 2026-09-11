@@ -17,14 +17,66 @@ from prettytable import PrettyTable
 from shakenfist_client import apiclient
 
 from shakenfist_ci import process
+from shakenfist_ci import retries
 
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 LOG = logging.getLogger()
 TRACE_PATH = '/srv/ci/traces'
 
+# One JSON object per capacity wait, appended as a line by
+# _append_capacity_wait_trace() below (D14). smoke-cluster.yml:212 in
+# shakenfist/actions creates TRACE_PATH on the primary and chowns it to the
+# base image user before the suite runs, and :550 scp's the whole directory
+# into the artifact bundle, so this file reaches the bundle with no change
+# needed there. A module-level constant so the path is greppable and
+# overridable (a test points it at a tempdir rather than the real path).
+CAPACITY_WAIT_TRACE_FILE = os.path.join(TRACE_PATH, 'instance-waits.jsonl')
+
 
 CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
+
+
+# How long create_instance() waits out a capacity refusal before failing
+# the test with it: the capacity a create needs is usually being held by
+# a sibling test which is already deleting it, and deletion returns
+# capacity asynchronously. This is the single definition --
+# cluster_ci_tests/test_namespace_claims.py retries a refused claim
+# request for the same span and for the same reason, and imports it from
+# here rather than keeping a second copy of the number.
+# Comfortably longer than any sibling test holds its instances, far
+# shorter than the job timeout.
+#
+# This does not make refusals rarer. It makes them survivable, and each
+# wait is recorded so that a run which spent its time waiting says so.
+CLUSTER_HEADROOM_WAIT = 420
+
+# How often to re-read /admin/resources while waiting. The poll is
+# activity-coupled: it runs only while a create is being retried, so it
+# adds nothing to an idle cluster and adds load in proportion to how
+# full the cluster already is.
+CAPACITY_POLL_INTERVAL = 10
+
+# A ceiling on how many creates one wrapped call may issue. The pacing
+# floor create_instance() passes to wait_for_capacity() already bounds
+# the loop at about one attempt per poll interval, so this should never
+# be what stops it -- but the bound is derived from two other constants
+# and a predicate's behaviour, and a create which is refused for a
+# reason the predicate cannot see is exactly the case where derived
+# reasoning is least trustworthy. Each attempt leaves an error-deleted
+# instance behind, so the failure mode this closes is expensive.
+MAX_CREATE_ATTEMPTS = CLUSTER_HEADROOM_WAIT // CAPACITY_POLL_INTERVAL + 2
+
+# external_api/instance.py rejects an instance name longer than 63
+# characters, or one which is not a valid hostname, with a 400. A retry
+# appends '-' and an 8 character uniquifier, so a base name is trimmed
+# to leave room for that: otherwise a caller near the limit sees its
+# capacity retry come back as a RequestMalformedException which escapes
+# this wrapper and reads as an unrelated failure. No current caller is
+# close, but TestDistroBoots builds its name from a base image name, so
+# the length is not entirely under the suite's control.
+MAX_INSTANCE_NAME_LENGTH = 63
+RETRY_SUFFIX_LENGTH = 9
 
 
 # await_agent_command() and await_agent_fetch() can raise three unrelated
@@ -193,6 +245,274 @@ class BaseTestCase(testtools.TestCase):
     def _uniquifier(self):
         return ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
+    def _now(self):
+        """The wall clock, as a seam a unit test can script.
+
+        create_instance()'s deadline arithmetic reads this rather than
+        calling time.time() directly, so a test can move the clock past
+        the deadline without patching the process-wide one. Patching it
+        is not an option here, and the reason is worth writing down
+        because it cost a red CI run: this method logs between two of
+        its own clock reads, and on Python 3.11 logging.LogRecord reads
+        time.time() once per record, so a scripted sequence sized for
+        the reads below is silently consumed by that log line and the
+        next read raises StopIteration. Python 3.13 reads time.time_ns()
+        instead and does not consume it, so the same test passes on a
+        3.13 workstation and fails on CI's 3.11 -- which looks like
+        flakiness and reads like a bug in this method.
+        """
+        return time.time()
+
+    def _sleep(self, seconds):
+        """The sleep create_instance()'s wait uses, as a seam.
+
+        Beside _now(), and there for the same reason: a unit test which
+        drives the whole wrapper loop against the real
+        retries.wait_for_capacity() -- rather than against a canned wait
+        record -- would otherwise take the deadline in wall clock time to
+        assert anything at all.
+        """
+        time.sleep(seconds)
+
+    def create_instance(self, name, cpus, memory, network, disk, sshkey,
+                        userdata, *, client=None, force_placement=None,
+                        **kwargs):
+        """Create an instance, waiting out a transient capacity refusal.
+
+        Every create in this suite goes through here. A 507 in CI is
+        usually a statement about a moment rather than about the
+        cluster: the instance the refusing node is holding is very
+        often already being deleted by a sibling test, and deletion
+        returns its capacity asynchronously. Failing the test on that
+        makes a run's pass/fail a coin flip on sibling timing.
+
+        So a 507 is waited out for up to CLUSTER_HEADROOM_WAIT, and
+        only a 507 -- see retries.wait_for_capacity() for what "there
+        is room now" is read against. In particular the 409 from an
+        unsatisfiable affinity constraint is not caught here. Server
+        side that refusal is raised by a *subclass* of the low resource
+        exception and is kept distinct only by the ordering of two
+        except clauses (external_api/instance.py); an affinity
+        constraint does not become satisfiable by waiting, and
+        catching the family rather than the exact capacity exception
+        would turn a clear failure into a seven minute one.
+
+        Arguments are the client's, plus two:
+
+        * client -- which client to create as. Defaults to
+          self.test_client, which is what almost every caller wants; a
+          test creating in another namespace passes its own.
+        * force_placement is named explicitly rather than left in
+          kwargs because it is also the node the wait watches.
+
+        Everything else is forwarded to the client untouched, so this
+        wrapper does not have to track the client's defaults.
+        """
+        # self.test_client is set up by BaseNamespacedTestCase. A caller
+        # on a class without one has to say which client it means, and
+        # the AttributeError says so.
+        client = client or self.test_client
+        deadline = self._now() + CLUSTER_HEADROOM_WAIT
+        disk_gb = retries.requested_disk_gb(disk)
+        # Resolved lazily and then remembered: once per create that is
+        # actually refused, never for one that is not. Almost every
+        # create in a run succeeds first time, and making each of them
+        # pay a GET /nodes to answer a question no one asked would put
+        # a node listing behind every instance the suite builds. The
+        # mapping cannot change usefully within one create, so once is
+        # also enough for a create which is refused repeatedly.
+        roster_key = None
+        roster_key_resolved = None
+
+        attempts = 0
+        waits = []
+        while True:
+            attempts += 1
+            if attempts == 1:
+                attempt_name = name
+            else:
+                # The refused instance was created and then
+                # enqueue_delete_due_error'd, so the name the caller
+                # chose stays in use until that delete completes. Retry
+                # under a fresh one; the caller only ever learns of it
+                # from a failure message or a wait record, both of
+                # which state it.
+                attempt_name = '%s-%s' % (
+                    name[:MAX_INSTANCE_NAME_LENGTH - RETRY_SUFFIX_LENGTH],
+                    self._uniquifier())
+
+            try:
+                # raw-create: this is the wrapper itself, and is the one
+                # place in the suite which has to issue the create.
+                return client.create_instance(
+                    attempt_name, cpus, memory, network, disk, sshkey,
+                    userdata, force_placement=force_placement, **kwargs)
+
+            except apiclient.InsufficientResourcesException as e:
+                refusal = e
+
+            if self._now() > deadline:
+                self._fail_capacity_wait(
+                    name, cpus, force_placement, refusal, waits, attempts)
+
+            if attempts >= MAX_CREATE_ATTEMPTS:
+                self._fail_capacity_wait(
+                    name, cpus, force_placement, refusal, waits, attempts,
+                    reason='The attempt ceiling (%d) was reached before the '
+                           'deadline was, which means the wait kept reporting '
+                           'capacity the create was then refused for anyway. '
+                           'The refusal is for something the predicate cannot '
+                           'see -- see retries.wait_for_capacity().'
+                           % MAX_CREATE_ATTEMPTS)
+
+            # The first wait may hand control straight back: capacity
+            # returned between the refusal and the poll is the common
+            # case, and sleeping on it would add an interval to every
+            # refusal in the run. Every wait after that is paced, because
+            # a second refusal after a satisfied wait means the predicate
+            # cannot see what is being refused, and an unpaced loop there
+            # spins until the deadline leaving an error-deleted instance
+            # behind on every turn.
+            if roster_key_resolved is None:
+                roster_key, roster_key_resolved = self._placement_roster_key(
+                    force_placement)
+
+            wait = retries.wait_for_capacity(
+                self.system_client.get_cluster_resources, cpus, memory,
+                disk_gb, roster_key, deadline,
+                clock=self._now, sleep=self._sleep,
+                interval=CAPACITY_POLL_INTERVAL,
+                minimum_sleep=0 if attempts == 1 else CAPACITY_POLL_INTERVAL,
+                blind=not roster_key_resolved)
+            wait['instance_name'] = name
+            wait['attempt'] = attempts
+            # Both, because they are different facts and a reader of the
+            # trace needs each: what the test asked for, and which roster
+            # entry the wait actually watched.
+            wait['pinned_to'] = force_placement
+            wait['roster_key'] = roster_key
+            waits.append(wait)
+            self._record_capacity_wait(wait)
+
+            if not wait['satisfied'] and self._now() > deadline:
+                self._fail_capacity_wait(
+                    name, cpus, force_placement, refusal, waits, attempts)
+
+    def _record_capacity_wait(self, wait):
+        """Say that a create waited, and for how long.
+
+        An instrument may never fail the thing it measures, so nothing
+        here is allowed to raise into the test. This is also the seam
+        step 2c hooks the CI bundle's JSONL record into -- see
+        _append_capacity_wait_trace() below.
+        """
+        self._append_capacity_wait_trace(wait)
+
+        try:
+            self._capacity_waits = getattr(self, '_capacity_waits', 0) + 1
+            self.addDetail(
+                'capacity-wait-%d' % self._capacity_waits,
+                content.text_content(
+                    json.dumps(wait, indent=4, sort_keys=True, default=str)))
+            LOG.info(
+                'Creating %s waited %.1fs for %s capacity on %s (%s, '
+                'headroom %s -> %s)'
+                % (wait.get('instance_name'), wait.get('seconds_waited', 0),
+                   wait.get('binding_dimension') or 'no dimension of',
+                   wait.get('node') or 'any node', wait.get('mode'),
+                   wait.get('headroom_at_start'), wait.get('headroom_at_end')))
+        except Exception as e:
+            LOG.info('Failed to record a capacity wait: %s' % e)
+
+    def _append_capacity_wait_trace(self, wait):
+        """Append one line describing this wait to CAPACITY_WAIT_TRACE_FILE.
+
+        One line per wait, not per run (D14): concurrent stestr workers
+        never have to agree on anything, because the file is opened 'a' and
+        each write is one line, and a worker which crashes mid-wait loses
+        at most its own in-flight line.
+
+        Most of the record is read straight off ``wait``, the dict
+        wait_for_capacity() returns -- 'node', the three request
+        dimensions, 'binding_dimension', 'mode', 'seconds_waited',
+        'headroom_at_start' and 'headroom_at_end' -- plus 'instance_name'
+        and 'attempt' which create_instance() adds before calling here.
+        The one field with no source in that dict is the test id, which
+        only BaseTestCase knows, via self.id().
+
+        'attempt' is written out as 'attempt_number' rather than
+        'attempts', because it is a 1-indexed position and not a count: a
+        create refused three times writes three lines carrying 1, 2 and 3,
+        and a reader who summed a field called 'attempts' would get six.
+        The headroom fields are dicts keyed by dimension, for the same
+        reason wait_for_capacity() models three of them.
+
+        Every failure here is swallowed. An instrument may never fail the
+        thing it measures, for the same reason ci_headroom_collect.sh's
+        header gives for never failing a job, and step 2a already
+        established this property for the caller above -- this must not
+        weaken it.
+        """
+        try:
+            record = {
+                'test_id': self.id(),
+                'instance_name': wait.get('instance_name'),
+                # What the test asked for, which is what a person reading
+                # the bundle recognises. The roster is keyed by uuid, so
+                # the entry actually watched is recorded beside it rather
+                # than in place of it -- see _placement_roster_key().
+                'node': wait.get('pinned_to'),
+                'roster_key': wait.get('roster_key'),
+                'cpus': wait.get('cpus'),
+                'memory_mb': wait.get('memory_mb'),
+                'disk_gb': wait.get('disk_gb'),
+                'binding_dimension': wait.get('binding_dimension'),
+                'seconds_waited': wait.get('seconds_waited'),
+                'mode': wait.get('mode'),
+                'attempt_number': wait.get('attempt'),
+                'headroom_at_first_refusal': wait.get('headroom_at_start'),
+                'headroom_at_admission': wait.get('headroom_at_end'),
+            }
+            with open(CAPACITY_WAIT_TRACE_FILE, 'a') as f:
+                f.write(json.dumps(record, sort_keys=True, default=str))
+                f.write('\n')
+        except Exception as e:
+            LOG.info('Failed to append a capacity wait trace: %s' % e)
+
+    def _fail_capacity_wait(self, name, cpus, node, refusal, waits, attempts,
+                            reason=None):
+        roster = None
+        errors = []
+        bindings = []
+        for wait in waits:
+            if wait.get('per_node') is not None:
+                roster = wait['per_node']
+            errors.extend(wait.get('poll_errors', []))
+            if wait.get('binding_dimension'):
+                bindings.append(wait['binding_dimension'])
+
+        waited = sum(wait.get('seconds_waited', 0) for wait in waits)
+        self.fail(
+            'Creating instance %s (%d cpus, %s) was refused for insufficient '
+            'resources and the cluster did not free enough before its '
+            '%ds deadline. %d attempts, %.1fs waited.\n\n'
+            '%s'
+            'The last refusal was:\n%s\n\n'
+            'The node waited for was: %s\n\n'
+            'What the waits were short of: %s\n\n'
+            'The resource roster at the last successful poll was:\n%s\n\n'
+            'Polls which failed:\n%s'
+            % (name, cpus,
+               'pinned to %s' % node if node else 'unpinned',
+               CLUSTER_HEADROOM_WAIT, attempts, waited,
+               '%s\n\n' % reason if reason else '',
+               getattr(refusal, 'text', None) or str(refusal),
+               node or '(unpinned, any node would have done)',
+               ', '.join(sorted(set(bindings))) or
+               '(nothing -- every wait said there was room)',
+               json.dumps(roster, indent=4, sort_keys=True, default=str),
+               '\n'.join(errors) or '(none)'))
+
     def _emit_tracing_event(self, event):
         # This method implements a simple tracing scheme to help work out what
         # the slow bits of a unit test are. This isn't really a complete thing,
@@ -274,6 +594,51 @@ class BaseTestCase(testtools.TestCase):
     def _get_cluster_nodes(self):
         """Return the cluster's nodes as reported by the API."""
         return self.system_client.get_nodes()
+
+    def _placement_roster_key(self, force_placement):
+        """Which /admin/resources per_node key this pin refers to.
+
+        Returns a (key, resolved) pair. per_node is keyed by node UUID --
+        summarize_resources() builds it from the metrics dict, which
+        get_active_node_metrics() keys by str(n.uuid) and says so in a
+        comment (scheduler.py) -- while force_placement is almost always
+        a node *name*: 'sf-2' in test_networking.py, node['name'] in
+        test_nodes.py and test_placement.py, socket.getfqdn() in
+        test_instance_placement.py.
+
+        Handing the name straight to the wait made per_node.get(target)
+        miss on every poll, so the target read as zero headroom in every
+        dimension and no dimension was ever recorded as binding. The wait
+        could then never be satisfied however empty the cluster was: one
+        transient 507 on a name-pinned create became a guaranteed
+        CLUSTER_HEADROOM_WAIT failure, whose message said there was room
+        everywhere and so pointed at the predicate rather than at the pin.
+
+        A pin which is already a UUID is passed through. An unresolvable
+        pin returns (None, False), which the caller waits blind on rather
+        than reading as a node with no room -- not knowing which entry to
+        read is not evidence that the entry is empty.
+        """
+        if not force_placement:
+            return None, True
+
+        try:
+            nodes = self._get_cluster_nodes()
+        except Exception as e:
+            # Listing nodes is not this method's job to insist on. A
+            # failure here is the same kind of ignorance as a name which
+            # does not resolve, and is reported the same way.
+            LOG.info('Could not list nodes to resolve the pin %s: %s'
+                     % (force_placement, e))
+            return None, False
+
+        for n in nodes:
+            if force_placement in (n.get('uuid'), n.get('name')):
+                return n.get('uuid'), True
+
+        LOG.info('The pin %s matched no node, so its wait is blind'
+                 % force_placement)
+        return None, False
 
     def _network_node(self):
         """Return the node dict for the cluster's network node, or None."""
@@ -1224,7 +1589,7 @@ class TestDistroBoots(BaseNamespacedTestCase):
         self._await_networks_ready([self.net['uuid']])
 
     def _test_distro_boot(self, base_image):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             base_image.replace(':', '-').replace('.', ''), 1, 1024,
             [
                 {

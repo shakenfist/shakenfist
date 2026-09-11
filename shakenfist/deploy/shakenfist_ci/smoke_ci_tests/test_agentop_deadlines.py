@@ -162,7 +162,7 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
         self._await_networks_ready([self.net_one['uuid']])
 
     def _create_ready_instance(self, name):
-        inst = self.test_client.create_instance(
+        inst = self.create_instance(
             name, 1, 1024,
             [
                 {

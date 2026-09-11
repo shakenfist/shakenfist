@@ -498,7 +498,7 @@ spelling above is the one to write.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete |
-| 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | PLAN-transient-capacity-refusals-phase-02-suite-wait.md | Not started |
+| 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Not started |
 | 3. Publish metrics when the running-domain set changes | PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md | Not started |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started |
 | 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started |
@@ -587,12 +587,22 @@ brief gets wrong.
 
 Add `BaseTestCase.create_instance()` to
 `shakenfist/deploy/shakenfist_ci/base.py`, route every raw
-`test_client.create_instance(...)` call site in `cluster_ci_tests/`
-and `guest_ci_tests/` through it (there are 115 call sites across
-39 files; a list is a mechanical `grep`), and add a unit test in
+`test_client.create_instance(...)` call site in
+`shakenfist/deploy/shakenfist_ci/` through it (there are 117 call
+sites across 41 files; a list is a mechanical `grep`), and add a
+unit test in
 `shakenfist/tests/` that walks the suite's source with `ast` and
 fails on any raw call outside an explicit allowlist marker, the way
 `test_ci_claims_headroom.py` already asserts call sites by name.
+
+*Amended by the phase 2 survey: this section originally named only
+`cluster_ci_tests/` and `guest_ci_tests/`, which hold 88 of the
+calls. The 115 it quoted was a count over the whole of
+`shakenfist/deploy/shakenfist_ci/`, which today is 117 across 41
+files. The difference is `smoke_ci_tests/` (27 calls in 7 files),
+`base.py:1227` and `database_tier.py:275`. The smoke tier belongs in
+scope: it runs on the smallest cloud, where one sibling instance is
+the largest fraction of the cluster.*
 
 The wrapper: on `InsufficientResourcesException`, if the deadline
 (420 s, the claims suite's `CLUSTER_HEADROOM_WAIT`) has not passed,
@@ -609,6 +619,21 @@ unit-testable against a fake clock. Every wait is attached to the
 test as a detail: seconds waited, the node waited for, and the
 `per_node` headroom at the first refusal and at admission.
 
+*Amended by the phase 2 survey: both halves of the predicate above
+are wrong, and phase 2's D8 replaces them.
+`per_node[n]['cpu_available']` is derived from the live overcommit
+arithmetic (`scheduler.py:1086-1088`), not from the capacity row's
+`limit_cpus` that admission actually refuses against -- the endpoint
+publishes both precisely so a reader can see them disagree. And
+`total['cpu_available']` is a sum across nodes (`:1091-1093`) while
+an instance must fit on one, so it is satisfied by a cluster with a
+spare thread on each of ten nodes. `retry_while_transient` is also
+not reusable as written: it re-issues the request every 10 s, which
+here means a fresh refused create -- and each refused create builds
+an instance and error-deletes it -- and its module deliberately
+imports nothing from the suite so the unit tests can load it by
+path.*
+
 The run summary: total seconds waited, number of waits, longest
 wait and its test, written to the bundle beside the headroom
 probe's output and printed in the job log. The collection step is
@@ -616,6 +641,17 @@ in `shakenfist/actions` (the reusable `smoke-cluster` workflow),
 so this phase carries the same operator-push obligation the
 sizing plan's phase 1 did, and the summary is designed so that the
 sizing plan's phase 5 guardrail can read it.
+
+*Amended by the phase 2 survey: only the job-log print carries that
+obligation. `smoke-cluster.yml:212` creates `/srv/ci/traces` on the
+primary and chowns it to the base-image user, and the "Gather logs"
+step at `:550` scp's the whole directory into the artifact bundle;
+the suite runs on the primary as that user. So a file the suite
+writes there reaches the bundle with no change in
+`shakenfist/actions` at all, and the report can be run over a
+downloaded bundle -- which is how phase 1 ultimately verified its
+own definition-of-done item 9. Phase 2's D14 puts the cross-repo
+change last and lets nothing depend on it.*
 
 Budget the poll. `GET /admin/resources` reads `GetNodeMetrics` from
 the `api` caller, which is already in `HARNESS_DRIVEN_PAIRS`
@@ -635,6 +671,19 @@ And `test_system_namespace.py` subclasses `BaseTestCase` rather than
 the namespaced base, so a failure between its inline create and
 delete strands a charged instance in the system namespace for the
 rest of the run; give it an `addCleanup`.
+
+*Amended by the phase 2 survey: `test_commandline_artifacts.py`
+already has the shape asked for -- `:182-190` pins the second
+instance to `inst1['node']` and the first is not pinned at all --
+so there is nothing to change there. `test_imagefetch.py` has four
+pinned creates, not one. In its first test both (`:130`, `:152`)
+target an arbitrary first hypervisor, and since the source URL is
+deleted between them the second one's co-location is load-bearing:
+the first's pin comes out, the second's becomes `inst1['node']`. Its
+second test pins `first` and `second` deliberately, to place the
+second instance on a node which has not seen the image, and must be
+left alone. The `test_system_namespace.py` observation is correct as
+written.*
 
 The sizing plan's phase 3 saturation tests must call the raw client
 and assert the refusal; the allowlist marker exists for them.

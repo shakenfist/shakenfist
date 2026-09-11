@@ -40,9 +40,9 @@ class TestVDIConsoleTokens(base.BaseNamespacedTestCase):
         # all the mint endpoint requires. video is left unset so the server
         # applies its default SPICE console.
         minimal_disk = [{'size': 1, 'type': 'disk'}]
-        inst = client.create_instance(
+        inst = self.create_instance(
             'vditoken-%s' % self._uniquifier(), 1, 128, None, minimal_disk,
-            None, None, namespace=namespace)
+            None, None, client=client, namespace=namespace)
         self.addDetail(
             'instance',
             content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
