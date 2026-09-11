@@ -14224,12 +14224,7 @@ planned extension of the delivered policy.</p>
 <tr>
 <td>LOG_OUTPUT_PATH</td>
 <td>String (default empty)</td>
-<td>Where to write logs to. If "stdout", then stdout is used. If blank, syslog is used.</td>
-</tr>
-<tr>
-<td>LOG_OUTPUT_JSON</td>
-<td>Boolean (default False)</td>
-<td>If true, log entries are in JSON format.</td>
+<td>Where to write logs to. If "stdout", then stdout is used. If blank, syslog is used. Daemon logs are always structured JSON, one object per line.</td>
 </tr>
 <tr>
 <td>LOG_VERBOSE</td>
