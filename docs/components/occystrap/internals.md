@@ -27,25 +27,19 @@ The `quay://` scheme is not implemented as an `ImageInput` subclass.
 Instead, it is a **resolver** that expands a single URI into a list of
 standard `(registry, image, tag)` tuples:
 
-```
-quay://kolla/*:latest
-    │
-    ▼
-resolve_quay_uri('kolla', '*', 'latest')
-    │
-    ├── QuayClient.list_repositories('kolla')     ← quay.io API v1
-    ├── fnmatch filter by glob pattern
-    ├── QuayClient.has_tag('kolla', repo, 'latest') for each match (parallel)
-    │
-    ▼
-[('quay.io', 'kolla/nova-api', 'latest'),
- ('quay.io', 'kolla/keystone', 'latest'),
- ...]
-    │
-    ▼
-For each tuple (concurrently, up to -J workers):
-build a standard registry.Image input and run
-through the existing pipeline
+```mermaid
+flowchart TD
+    uri["quay://kolla/*:latest"]
+    resolve["resolve_quay_uri('kolla', '*', 'latest')"]
+    list["QuayClient.list_repositories('kolla')<br/>quay.io API v1, paginated"]
+    glob["fnmatch filter by glob pattern"]
+    hastag["QuayClient.has_tag(...) for each match<br/>in parallel, -j workers"]
+    tuples["[('quay.io', 'kolla/nova-api', 'latest'),<br/>('quay.io', 'kolla/keystone', 'latest'), ...]"]
+    pipeline["For each tuple, concurrently up to -J workers:<br/>build a registry.Image input and run it<br/>through the existing pipeline"]
+
+    uri --> resolve
+    resolve --> list --> glob --> hastag --> tuples
+    tuples --> pipeline
 ```
 
 ### Module: `occystrap/quay.py`
