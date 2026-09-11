@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-10T10:54:47.683936+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-11T10:51:15.615232+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -647,7 +647,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4063 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#10 |
 | visual-digest-rust | N/A | - |
 
@@ -655,7 +655,6 @@ Details for non-compliant projects:
 
 - **divergulent** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md
 - **instar** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)
-- **shakenfist** (Status): 2 of 17 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-ci-cloud-sizing.md (no push audit phase; phase 6 is "6. Documentation and downstream propagation"), PLAN-transient-capacity-refusals.md (no push audit phase; phase 6 is "6. Documentation and close-out"); 1 plan(s) with no phases this check can read, not judged: PLAN-netserv.md
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
 ## plan-index
@@ -768,13 +767,13 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#59 |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#110 |
-| instar | non-compliant | shakenfist/instar#561 |
-| kerbside | non-compliant | shakenfist/kerbside#421 |
+| instar | compliant | - |
+| kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
@@ -788,10 +787,7 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
 - **divergulent** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
-- **instar** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
-- **kerbside** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
 - **occystrap** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **private-ci** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
 - **shakenfist** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
@@ -995,7 +991,7 @@ Criterion: [renovate-lockstep-groups.md](/components/development/audits/renovate
 | development | N/A | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#401 |
+| kerbside | N/A | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
@@ -1006,10 +1002,6 @@ Criterion: [renovate-lockstep-groups.md](/components/development/audits/renovate
 | shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **kerbside** (Status): Not grouped for Renovate: oslo (oslo.concurrency, oslo.config, oslo.i18n, oslo.utils) -- the OpenStack oslo libraries. Add a packageRules entry with a groupName covering every member, unrestricted by matchUpdateTypes
 
 ## renovate
 
@@ -1077,9 +1069,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **development** (Status): 173 of 179 in-scope files reviewed at HEAD; 6 need review (threshold 5)
-- **kerbside** (Status): 117 of 229 in-scope files reviewed at HEAD; 112 need review (threshold 5)
-- **ryll** (Status): 90 of 200 in-scope files reviewed at HEAD; 110 need review (threshold 5)
+- **development** (Status): 171 of 179 in-scope files reviewed at HEAD; 8 need review (threshold 5)
+- **kerbside** (Status): 114 of 229 in-scope files reviewed at HEAD; 115 need review (threshold 5)
+- **ryll** (Status): 89 of 200 in-scope files reviewed at HEAD; 111 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1156,7 +1148,7 @@ Criterion: [scope-coverage.md](/components/development/audits/scope-coverage/)
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | compliant | - |
+| development | non-compliant | shakenfist/development#120 |
 | divergulent | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
@@ -1170,6 +1162,10 @@ Criterion: [scope-coverage.md](/components/development/audits/scope-coverage/)
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
+
+Details for non-compliant projects:
+
+- **development** (Status): 1 repository(s) in the organisation are in neither the audit matrix nor the excluded list
 
 ## secret-handling
 
@@ -1253,8 +1249,8 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | compliant | - |
-| ryll | compliant | - |
+| private-ci | non-compliant | shakenfist/private-ci#36 |
+| ryll | non-compliant | shakenfist/ryll#374 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1262,7 +1258,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 
@@ -1279,7 +1277,7 @@ Criterion: [undeclared-direct-dependency.md](/components/development/audits/unde
 | development | N/A | - |
 | divergulent | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#400 |
+| kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
@@ -1290,10 +1288,6 @@ Criterion: [undeclared-direct-dependency.md](/components/development/audits/unde
 | shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **kerbside** (Status): Imported but declared only as a transitive pin: packaging (pyproject.toml:110), PyJWT (pyproject.toml:113), requests (pyproject.toml:118), urllib3 (pyproject.toml:125). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run
 
 ## unused-declared-dependency
 
@@ -1327,7 +1321,7 @@ Details for non-compliant projects:
 - **agent-python** (Status): Declared but never imported: grpcio-status (pyproject.toml:29), grpcio-tools (pyproject.toml:30). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **client-python** (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
-- **kerbside** (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:66), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:61). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **kerbside** (Status): Declared but never imported: bcrypt (pyproject.toml:45), flasgger (pyproject.toml:43), gunicorn (pyproject.toml:46), kerbside-proxy (pyproject.toml:34), mysqlclient (pyproject.toml:89), prometheus-client (pyproject.toml:40), psutil (pyproject.toml:49), pylogrus (pyproject.toml:39), PyMySQL (pyproject.toml:50), typing-extensions (pyproject.toml:84). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 
 ## version-file-gitignore
 
