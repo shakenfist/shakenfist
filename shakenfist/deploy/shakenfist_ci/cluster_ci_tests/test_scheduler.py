@@ -324,6 +324,9 @@ class TestAffinity(base.BaseNamespacedTestCase):
         """
         self.assertRaises(
             apiclient.ResourceStateConflictException,
+            # raw-create: asserts the 409 an unsatisfiable affinity constraint
+            # gets, and a 507 instead is the failure this test exists to catch.
+            # Waiting one out would hide it behind a seven minute timeout.
             self.test_client.create_instance,
             'binst-refused', 1, 1024, self._networks(), self._disks(),
             None, None,

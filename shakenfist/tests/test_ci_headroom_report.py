@@ -2108,9 +2108,56 @@ class CapacityWaitsTestCase(HeadroomReportTestCase):
         series = self._series([sample({NODE_ONE: node_payload()})])
         code, output = self._run('--series', series, '--waits', path)
         self.assertEqual(0, code)
-        self.assertIn('0 well-formed wait records, 2 malformed lines', output)
-        self.assertIn('cannot be said from this', output)
+        self.assertIn('NO CAPACITY WAIT DATA IS AVAILABLE: unparseable', output)
+        self.assertIn('every one of the 2 lines in the file was malformed',
+                      output)
+        self.assertIn('never as zero waits', output)
         self.assertNotIn('Total time waited', output)
+
+    def test_an_all_malformed_file_reads_as_unknown_to_a_machine_too(self):
+        """The prose said unknown; the record said 'available, zero waits'.
+
+        waits_record() is what phase 5 and the sizing plan's guardrail
+        read, and a consumer which cannot read prose saw 'available: true,
+        count: 0' -- indistinguishable from a run which genuinely never
+        waited, which is the exact confusion the printed text spends three
+        paragraphs guarding against.
+        """
+        path = self._write('instance-waits.jsonl', 'garbage\nmore garbage\n')
+        record = report.waits_record(report.read_waits(path))
+
+        self.assertEqual('unparseable', record['state'])
+        self.assertFalse(
+            record['available'],
+            'A file nothing could be parsed out of carries no data, so it '
+            'must not be marked available.')
+        self.assertIsNone(
+            record['count'],
+            'A count of 0 here is a lie: the run may have waited for '
+            'hours and lost every line to a broken writer.')
+        self.assertIsNone(record['seconds_waited_total'])
+        self.assertEqual(
+            2, record['malformed_lines'],
+            'How much was lost is the one thing which can be said, so it '
+            'is still said.')
+
+    def test_a_file_of_good_lines_is_a_real_zero_when_it_is_empty_of_waits(self):
+        """The positive control for the state above.
+
+        Malformed lines among good ones are skipped and counted, and the
+        file is still read: the unparseable state must not swallow a run
+        which produced usable data.
+        """
+        path = self._waits(
+            [wait_event(test_id='t.test_a', seconds_waited=4.0)],
+            trailing='{"partial": ')
+        record = report.waits_record(report.read_waits(path))
+
+        self.assertEqual('read', record['state'])
+        self.assertTrue(record['available'])
+        self.assertEqual(1, record['count'])
+        self.assertEqual(1, record['malformed_lines'])
+        self.assertEqual(4.0, record['seconds_waited_total'])
 
     def test_an_unrecognised_mode_is_counted_apart_from_the_split(self):
         path = self._waits([

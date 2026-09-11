@@ -225,6 +225,56 @@ being wrong in this direction is bounded by the 420 s deadline; the
 cost of being wrong in the other direction is the measurement phase 5
 reads.
 
+**Corrected in review (2026-09-11).** D8 as written models one
+dimension, and the automated reviewer was right that it is the wrong
+one to model alone. The scheduler pre-filters a candidate on three --
+`_has_sufficient_cpu()`, `_has_sufficient_ram()` and
+`_has_sufficient_disk()` -- and turns any of their
+`LowResourceException`s into the same 507. CI instances are 1 vCPU but
+1-2 GB with 8 GB disks, so memory and disk bind far more often than
+cpus do. A one-dimension predicate is therefore not a rougher version
+of the right answer; it is permanently satisfied while the server is
+permanently refusing, which is a different failure with a different
+shape. The predicate now requires every dimension the create asks for
+to fit **on one node** (`retries.coverage_of()`), which is the same
+error as `total['cpu_available']` one level down: an instance is placed
+on one node and needs all three of its dimensions there.
+
+Two per-instance ceilings join the ledgers above, for the same reason:
+`cpu_max_per_instance` and `ram_max_per_instance` bound the largest
+single instance a node will take whatever its aggregate headroom, so a
+create larger than one of them is refused permanently. They differ in
+how a zero reads -- a missing `cpu_max_per_instance` metric publishes
+as 0, where `ram_max_per_instance` is legitimately 0 on a full node --
+so the cpu one is read only when non-zero and the memory one whenever
+present.
+
+The wait record now names the `binding_dimension` it was short of at
+the first poll, which is the question phase 5 actually asks of this
+data: a duration with no cause attached to it cannot be acted on.
+
+**Also corrected in review: the predicate is not the only thing that
+has to be right.** A satisfied wait hands control straight back to a
+caller which has just been refused, and `wait_for_capacity()` returns
+after one poll and zero sleeps when the predicate is already met. If
+the refusal is for anything the predicate cannot see -- a pre-filter it
+does not model, the admission guard losing a race it cannot observe --
+then satisfied is the *permanent* answer, and the wrapper re-issues as
+fast as two HTTP round trips allow for the whole 420 s, leaving an
+error-deleted instance, a trace line and an `addDetail` entry behind on
+every turn. That is the risk section's "turns one 507 into six" with
+three more orders of magnitude on it.
+
+Widening the predicate shrinks that window but cannot close it, because
+the whole point is that some refusals are invisible from
+`/admin/resources`. So the loop is paced as well: the first wait after
+a refusal may return immediately, because capacity returning between
+the refusal and the poll is the common case and the reason this phase
+exists, and every wait after that sleeps at least one poll interval
+(`minimum_sleep`). `MAX_CREATE_ATTEMPTS` is a hard ceiling under the
+derived bound, and the failure it raises says the refusal is for
+something the predicate cannot see rather than blaming the cluster.
+
 ### D9 -- A node missing from `per_node` is "not yet", not "never"
 
 The wait loop treats an absent `per_node[target]` as zero available

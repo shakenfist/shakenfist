@@ -39,6 +39,8 @@ class TestDiskSpecifications(base.BaseNamespacedTestCase):
     def test_bad_bus(self):
         self.assertRaises(
             apiclient.RequestMalformedException,
+            # raw-create: asserts the 400 a malformed disk bus gets, which is
+            # raised validating the request long before the scheduler runs.
             self.test_client.create_instance,
             'test-bad-bus-disk', 1, 1024, None,
             [

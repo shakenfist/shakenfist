@@ -38,10 +38,12 @@ CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 
 
 # How long create_instance() waits out a capacity refusal before failing
-# the test with it. The same number, for the same reason, as
-# cluster_ci_tests/test_namespace_claims.py's CLUSTER_HEADROOM_WAIT: the
-# capacity a create needs is usually being held by a sibling test which
-# is already deleting it, and deletion returns capacity asynchronously.
+# the test with it: the capacity a create needs is usually being held by
+# a sibling test which is already deleting it, and deletion returns
+# capacity asynchronously. This is the single definition --
+# cluster_ci_tests/test_namespace_claims.py retries a refused claim
+# request for the same span and for the same reason, and imports it from
+# here rather than keeping a second copy of the number.
 # Comfortably longer than any sibling test holds its instances, far
 # shorter than the job timeout.
 #
@@ -54,6 +56,27 @@ CLUSTER_HEADROOM_WAIT = 420
 # adds nothing to an idle cluster and adds load in proportion to how
 # full the cluster already is.
 CAPACITY_POLL_INTERVAL = 10
+
+# A ceiling on how many creates one wrapped call may issue. The pacing
+# floor create_instance() passes to wait_for_capacity() already bounds
+# the loop at about one attempt per poll interval, so this should never
+# be what stops it -- but the bound is derived from two other constants
+# and a predicate's behaviour, and a create which is refused for a
+# reason the predicate cannot see is exactly the case where derived
+# reasoning is least trustworthy. Each attempt leaves an error-deleted
+# instance behind, so the failure mode this closes is expensive.
+MAX_CREATE_ATTEMPTS = CLUSTER_HEADROOM_WAIT // CAPACITY_POLL_INTERVAL + 2
+
+# external_api/instance.py rejects an instance name longer than 63
+# characters, or one which is not a valid hostname, with a 400. A retry
+# appends '-' and an 8 character uniquifier, so a base name is trimmed
+# to leave room for that: otherwise a caller near the limit sees its
+# capacity retry come back as a RequestMalformedException which escapes
+# this wrapper and reads as an unrelated failure. No current caller is
+# close, but TestDistroBoots builds its name from a base image name, so
+# the length is not entirely under the suite's control.
+MAX_INSTANCE_NAME_LENGTH = 63
+RETRY_SUFFIX_LENGTH = 9
 
 
 # await_agent_command() and await_agent_fetch() can raise three unrelated
@@ -240,6 +263,17 @@ class BaseTestCase(testtools.TestCase):
         """
         return time.time()
 
+    def _sleep(self, seconds):
+        """The sleep create_instance()'s wait uses, as a seam.
+
+        Beside _now(), and there for the same reason: a unit test which
+        drives the whole wrapper loop against the real
+        retries.wait_for_capacity() -- rather than against a canned wait
+        record -- would otherwise take the deadline in wall clock time to
+        assert anything at all.
+        """
+        time.sleep(seconds)
+
     def create_instance(self, name, cpus, memory, network, disk, sshkey,
                         userdata, *, client=None, force_placement=None,
                         **kwargs):
@@ -279,6 +313,7 @@ class BaseTestCase(testtools.TestCase):
         # the AttributeError says so.
         client = client or self.test_client
         deadline = self._now() + CLUSTER_HEADROOM_WAIT
+        disk_gb = retries.requested_disk_gb(disk)
 
         attempts = 0
         waits = []
@@ -293,7 +328,9 @@ class BaseTestCase(testtools.TestCase):
                 # under a fresh one; the caller only ever learns of it
                 # from a failure message or a wait record, both of
                 # which state it.
-                attempt_name = '%s-%s' % (name, self._uniquifier())
+                attempt_name = '%s-%s' % (
+                    name[:MAX_INSTANCE_NAME_LENGTH - RETRY_SUFFIX_LENGTH],
+                    self._uniquifier())
 
             try:
                 # raw-create: this is the wrapper itself, and is the one
@@ -309,10 +346,30 @@ class BaseTestCase(testtools.TestCase):
                 self._fail_capacity_wait(
                     name, cpus, force_placement, refusal, waits, attempts)
 
+            if attempts >= MAX_CREATE_ATTEMPTS:
+                self._fail_capacity_wait(
+                    name, cpus, force_placement, refusal, waits, attempts,
+                    reason='The attempt ceiling (%d) was reached before the '
+                           'deadline was, which means the wait kept reporting '
+                           'capacity the create was then refused for anyway. '
+                           'The refusal is for something the predicate cannot '
+                           'see -- see retries.wait_for_capacity().'
+                           % MAX_CREATE_ATTEMPTS)
+
+            # The first wait may hand control straight back: capacity
+            # returned between the refusal and the poll is the common
+            # case, and sleeping on it would add an interval to every
+            # refusal in the run. Every wait after that is paced, because
+            # a second refusal after a satisfied wait means the predicate
+            # cannot see what is being refused, and an unpaced loop there
+            # spins until the deadline leaving an error-deleted instance
+            # behind on every turn.
             wait = retries.wait_for_capacity(
-                self.system_client.get_cluster_resources, cpus,
-                force_placement, deadline,
-                interval=CAPACITY_POLL_INTERVAL)
+                self.system_client.get_cluster_resources, cpus, memory,
+                disk_gb, force_placement, deadline,
+                clock=self._now, sleep=self._sleep,
+                interval=CAPACITY_POLL_INTERVAL,
+                minimum_sleep=0 if attempts == 1 else CAPACITY_POLL_INTERVAL)
             wait['instance_name'] = name
             wait['attempt'] = attempts
             waits.append(wait)
@@ -339,9 +396,10 @@ class BaseTestCase(testtools.TestCase):
                 content.text_content(
                     json.dumps(wait, indent=4, sort_keys=True, default=str)))
             LOG.info(
-                'Creating %s waited %.1fs for capacity on %s (%s, headroom '
-                '%s -> %s)'
+                'Creating %s waited %.1fs for %s capacity on %s (%s, '
+                'headroom %s -> %s)'
                 % (wait.get('instance_name'), wait.get('seconds_waited', 0),
+                   wait.get('binding_dimension') or 'no dimension of',
                    wait.get('node') or 'any node', wait.get('mode'),
                    wait.get('headroom_at_start'), wait.get('headroom_at_end')))
         except Exception as e:
@@ -356,11 +414,19 @@ class BaseTestCase(testtools.TestCase):
         at most its own in-flight line.
 
         Most of the record is read straight off ``wait``, the dict
-        wait_for_capacity() returns -- 'node', 'cpus', 'mode',
-        'seconds_waited', 'headroom_at_start' and 'headroom_at_end', plus
-        'instance_name' and 'attempt' which create_instance() adds before
-        calling here. The one field with no source in that dict is the test
-        id, which only BaseTestCase knows, via self.id().
+        wait_for_capacity() returns -- 'node', the three request
+        dimensions, 'binding_dimension', 'mode', 'seconds_waited',
+        'headroom_at_start' and 'headroom_at_end' -- plus 'instance_name'
+        and 'attempt' which create_instance() adds before calling here.
+        The one field with no source in that dict is the test id, which
+        only BaseTestCase knows, via self.id().
+
+        'attempt' is written out as 'attempt_number' rather than
+        'attempts', because it is a 1-indexed position and not a count: a
+        create refused three times writes three lines carrying 1, 2 and 3,
+        and a reader who summed a field called 'attempts' would get six.
+        The headroom fields are dicts keyed by dimension, for the same
+        reason wait_for_capacity() models three of them.
 
         Every failure here is swallowed. An instrument may never fail the
         thing it measures, for the same reason ci_headroom_collect.sh's
@@ -374,9 +440,12 @@ class BaseTestCase(testtools.TestCase):
                 'instance_name': wait.get('instance_name'),
                 'node': wait.get('node'),
                 'cpus': wait.get('cpus'),
+                'memory_mb': wait.get('memory_mb'),
+                'disk_gb': wait.get('disk_gb'),
+                'binding_dimension': wait.get('binding_dimension'),
                 'seconds_waited': wait.get('seconds_waited'),
                 'mode': wait.get('mode'),
-                'attempts': wait.get('attempt'),
+                'attempt_number': wait.get('attempt'),
                 'headroom_at_first_refusal': wait.get('headroom_at_start'),
                 'headroom_at_admission': wait.get('headroom_at_end'),
             }
@@ -386,28 +455,37 @@ class BaseTestCase(testtools.TestCase):
         except Exception as e:
             LOG.info('Failed to append a capacity wait trace: %s' % e)
 
-    def _fail_capacity_wait(self, name, cpus, node, refusal, waits, attempts):
+    def _fail_capacity_wait(self, name, cpus, node, refusal, waits, attempts,
+                            reason=None):
         roster = None
         errors = []
+        bindings = []
         for wait in waits:
             if wait.get('per_node') is not None:
                 roster = wait['per_node']
             errors.extend(wait.get('poll_errors', []))
+            if wait.get('binding_dimension'):
+                bindings.append(wait['binding_dimension'])
 
         waited = sum(wait.get('seconds_waited', 0) for wait in waits)
         self.fail(
             'Creating instance %s (%d cpus, %s) was refused for insufficient '
             'resources and the cluster did not free enough within %ds. '
             '%d attempts, %.1fs waited.\n\n'
+            '%s'
             'The last refusal was:\n%s\n\n'
             'The node waited for was: %s\n\n'
+            'What the waits were short of: %s\n\n'
             'The resource roster at the last successful poll was:\n%s\n\n'
             'Polls which failed:\n%s'
             % (name, cpus,
                'pinned to %s' % node if node else 'unpinned',
                CLUSTER_HEADROOM_WAIT, attempts, waited,
+               '%s\n\n' % reason if reason else '',
                getattr(refusal, 'text', None) or str(refusal),
                node or '(unpinned, any node would have done)',
+               ', '.join(sorted(set(bindings))) or
+               '(nothing -- every wait said there was room)',
                json.dumps(roster, indent=4, sort_keys=True, default=str),
                '\n'.join(errors) or '(none)'))
 

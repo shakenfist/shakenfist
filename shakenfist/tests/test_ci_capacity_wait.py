@@ -153,14 +153,29 @@ def _load_ci_base():
 ci_base, ci_apiclient = _load_ci_base()
 
 
-def node(cpu_available, cpu_limit=None, cpu_committed=0):
-    """One entry as summarize_resources() publishes it, trimmed."""
-    return {
+def node(cpu_available, cpu_limit=None, cpu_committed=0,
+         ram_available=64 * 1024, disk_available=1024,
+         cpu_max_per_instance=None, ram_max_per_instance=None):
+    """One entry as summarize_resources() publishes it, trimmed.
+
+    Memory and disk default to far more than any test here asks for, so
+    a test about cpus is about cpus. The two per-instance ceilings are
+    omitted unless a test asks for them, because a node which has
+    published no metrics for them omits them too.
+    """
+    entry = {
         'cpu_available': cpu_available,
         'cpu_limit': cpu_limit,
         'cpu_committed': cpu_committed,
         'cpu_committed_row_present': cpu_limit is not None,
+        'ram_available': ram_available,
+        'disk_available': disk_available,
     }
+    if cpu_max_per_instance is not None:
+        entry['cpu_max_per_instance'] = cpu_max_per_instance
+    if ram_max_per_instance is not None:
+        entry['ram_max_per_instance'] = ram_max_per_instance
+    return entry
 
 
 def roster(per_node, degraded=False, total_cpu_available=None):
@@ -209,11 +224,45 @@ class FakeCluster:
         self.now += seconds
 
 
+class RequestedDiskTestCase(test_base.ShakenFistTestCase):
+    """The disk a create asks for, counted as the scheduler counts it."""
+
+    def test_the_sizes_are_summed(self):
+        self.assertEqual(28, retries.requested_disk_gb(
+            [{'size': 20, 'type': 'disk'}, {'size': 8, 'type': 'disk'}]))
+
+    def test_a_sizeless_disk_asks_for_nothing(self):
+        """_has_sufficient_disk() ignores them, so this must too.
+
+        A cdrom is exactly the size of its base image and carries no
+        size, and charging it as zero is what the server does.
+        """
+        self.assertEqual(8, retries.requested_disk_gb(
+            [{'size': 8, 'type': 'disk'},
+             {'type': 'cdrom', 'base': 'sf://upload/system/debian-12'},
+             {'size': None, 'type': 'disk'}]))
+
+    def test_no_disk_spec_at_all_asks_for_nothing(self):
+        self.assertEqual(0, retries.requested_disk_gb(None))
+        self.assertEqual(0, retries.requested_disk_gb([]))
+
+    def test_a_size_which_is_not_a_number_is_skipped_rather_than_fatal(self):
+        """The wrapper must not raise on a spec the server would reject.
+
+        A malformed disk spec is the server's 400 to give, and it gives a
+        far better message than a TypeError from inside a wait predicate.
+        """
+        self.assertEqual(8, retries.requested_disk_gb(
+            [{'size': 8}, {'size': 'banana'}, 'not-a-dict']))
+
+
 class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
-    def _wait(self, cluster, cpus=2, target=None, deadline=420):
+    def _wait(self, cluster, cpus=2, memory_mb=1024, disk_gb=8, target=None,
+              deadline=420, minimum_sleep=0):
         return retries.wait_for_capacity(
-            cluster.poll, cpus, target, cluster.now + deadline,
-            clock=cluster.clock, sleep=cluster.sleep)
+            cluster.poll, cpus, memory_mb, disk_gb, target,
+            cluster.now + deadline, clock=cluster.clock, sleep=cluster.sleep,
+            minimum_sleep=minimum_sleep)
 
     def test_room_already_means_no_wait_at_all(self):
         """The common case must cost one poll and no sleep.
@@ -231,8 +280,11 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(1, record['polls'])
         self.assertEqual(0.0, record['seconds_waited'])
         self.assertEqual('informed', record['mode'])
-        self.assertEqual(8, record['headroom_at_start'])
-        self.assertEqual(8, record['headroom_at_end'])
+        self.assertEqual(8, record['headroom_at_start']['cpus'])
+        self.assertEqual(8, record['headroom_at_end']['cpus'])
+        self.assertIsNone(
+            record['binding_dimension'],
+            'Nothing was short, so nothing was waited on.')
 
     def test_a_wait_ends_when_a_sibling_gives_its_capacity_back(self):
         """The whole point: full now is not full soon.
@@ -252,8 +304,9 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(3, record['polls'])
         self.assertEqual(2, cluster.sleeps)
         self.assertEqual(20.0, record['seconds_waited'])
-        self.assertEqual(0, record['headroom_at_start'])
-        self.assertEqual(4, record['headroom_at_end'])
+        self.assertEqual(0, record['headroom_at_start']['cpus'])
+        self.assertEqual(4, record['headroom_at_end']['cpus'])
+        self.assertEqual('cpus', record['binding_dimension'])
 
     def test_a_cluster_which_stays_full_gives_up_at_the_deadline(self):
         """Waiting is bounded, and the roster comes back with the answer.
@@ -319,10 +372,10 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         self.assertTrue(record['satisfied'])
         self.assertEqual(2, record['polls'])
         self.assertEqual(
-            0, record['headroom_at_start'],
+            0, record['headroom_at_start']['cpus'],
             'An absent node must read as no headroom, not as the '
             'headroom of whichever node happened to be listed.')
-        self.assertEqual(8, record['headroom_at_end'])
+        self.assertEqual(8, record['headroom_at_end']['cpus'])
 
     def test_a_binding_limit_beats_generous_published_headroom(self):
         """The decision this whole phase rests on.
@@ -348,7 +401,7 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
             'admission is measured against, so it would stop waiting '
             'during exactly the window the two disagree.')
         self.assertEqual(
-            1, record['headroom_at_start'],
+            1, record['headroom_at_start']['cpus'],
             'The headroom recorded must be the binding one (limit 16 '
             'less 15 committed), not the published 64.')
 
@@ -370,7 +423,7 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
             record['satisfied'],
             'The wait was satisfied by capacity spread across ten '
             'nodes, which no single instance can be placed into.')
-        self.assertEqual(1, record['headroom_at_start'])
+        self.assertEqual(1, record['headroom_at_start']['cpus'])
 
     def test_an_unpinned_create_takes_the_best_single_node(self):
         cluster = FakeCluster([roster({
@@ -379,7 +432,7 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         record = self._wait(cluster, cpus=4)
 
         self.assertTrue(record['satisfied'])
-        self.assertEqual(6, record['headroom_at_end'])
+        self.assertEqual(6, record['headroom_at_end']['cpus'])
 
     def test_a_poll_which_raises_is_not_evidence_about_capacity(self):
         """An unreachable endpoint says nothing, so the wait continues.
@@ -400,6 +453,152 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(['ValueError: connection reset'],
                          record['poll_errors'])
 
+    def test_a_create_waits_on_memory_the_same_way_it_waits_on_cpus(self):
+        """The dimension most likely to bind in CI, and the one D8 missed.
+
+        CI instances are 1 vCPU and 1-2 GB, so a node runs out of memory
+        long before it runs out of threads. A predicate which read only
+        cpus would report "there is room now" for the whole deadline
+        while the server went on refusing, and the caller would re-issue
+        as fast as two HTTP round trips allow -- leaving an
+        error-deleted instance behind every time.
+        """
+        cluster = FakeCluster([
+            roster({'n1': node(64, cpu_limit=64, ram_available=512)}),
+            roster({'n1': node(64, cpu_limit=64, ram_available=4096)}),
+        ])
+        record = self._wait(cluster, cpus=1, memory_mb=2048, target='n1')
+
+        self.assertTrue(record['satisfied'])
+        self.assertEqual(2, record['polls'])
+        self.assertEqual(
+            'memory_mb', record['binding_dimension'],
+            'The wait must say what it waited on, or phase 5 reads a '
+            'duration with no cause attached to it.')
+        self.assertEqual(512, record['headroom_at_start']['memory_mb'])
+        self.assertEqual(4096, record['headroom_at_end']['memory_mb'])
+
+    def test_a_create_waits_on_disk_the_same_way(self):
+        cluster = FakeCluster([
+            roster({'n1': node(64, cpu_limit=64, disk_available=4)})])
+        record = self._wait(cluster, cpus=1, disk_gb=20, target='n1',
+                            deadline=5)
+
+        self.assertFalse(record['satisfied'])
+        self.assertEqual('disk_gb', record['binding_dimension'])
+
+    def test_a_node_must_cover_every_dimension_at_once(self):
+        """Two nodes which each cover half the request cover none of it.
+
+        The same error as reading total['cpu_available'], one level down:
+        an instance is placed on one node and needs all three of its
+        dimensions there.
+        """
+        cluster = FakeCluster([roster({
+            'plenty-of-cpu': node(64, cpu_limit=64, ram_available=512),
+            'plenty-of-ram': node(1, cpu_limit=16, cpu_committed=15,
+                                  ram_available=64 * 1024)})])
+        record = self._wait(cluster, cpus=4, memory_mb=2048, deadline=5)
+
+        self.assertFalse(
+            record['satisfied'],
+            'The wait was satisfied by cpus on one node and memory on '
+            'another, which no single instance can be placed into.')
+
+    def test_a_per_instance_ceiling_is_not_aggregate_headroom(self):
+        """cpu_max_per_instance bounds one instance, not the node.
+
+        A node can publish ample aggregate headroom and still refuse a
+        create larger than the biggest single instance it will take, and
+        that refusal is permanent rather than transient -- so a predicate
+        which ignored the ceiling is satisfied forever while the server
+        refuses forever.
+        """
+        cluster = FakeCluster([roster({
+            'n1': node(64, cpu_limit=64, cpu_max_per_instance=2)})])
+        record = self._wait(cluster, cpus=4, target='n1', deadline=5)
+
+        self.assertFalse(record['satisfied'])
+        self.assertEqual(2, record['headroom_at_start']['cpus'])
+        self.assertEqual('cpus', record['binding_dimension'])
+
+    def test_a_missing_per_instance_ceiling_does_not_read_as_zero(self):
+        """A node publishing no cpu_max_per_instance metric publishes a 0.
+
+        Reading that as "this node will take no instances" would make
+        every wait against a node mid-upgrade run to its deadline.
+        """
+        entry = node(8, cpu_limit=16, cpu_committed=8,
+                     cpu_max_per_instance=0)
+        cluster = FakeCluster([roster({'n1': entry})])
+        record = self._wait(cluster, cpus=4, target='n1', deadline=5)
+
+        self.assertTrue(record['satisfied'])
+        self.assertEqual(8, record['headroom_at_start']['cpus'])
+
+    def test_a_memory_ceiling_of_zero_is_a_real_full_node(self):
+        """ram_max_per_instance differs from the cpu one, deliberately.
+
+        It is memory_available less the node's reservation, which is
+        legitimately zero or negative on a genuinely full node rather
+        than a sign of a missing metric, so it is read whenever present.
+        """
+        cluster = FakeCluster([roster({
+            'n1': node(64, cpu_limit=64, ram_available=64 * 1024,
+                       ram_max_per_instance=0)})])
+        record = self._wait(cluster, cpus=1, memory_mb=1024, target='n1',
+                            deadline=5)
+
+        self.assertFalse(record['satisfied'])
+        self.assertEqual('memory_mb', record['binding_dimension'])
+
+    def test_a_dimension_the_create_asks_nothing_of_cannot_bind(self):
+        """A sizeless disk spec asks for no disk.
+
+        A node with no disk left would otherwise never satisfy a create
+        which wants none of it, and the wait would run to its deadline
+        over a dimension nobody asked about.
+        """
+        cluster = FakeCluster([roster({
+            'n1': node(8, cpu_limit=16, cpu_committed=8, disk_available=0)})])
+        record = self._wait(cluster, cpus=1, disk_gb=0, target='n1',
+                            deadline=5)
+
+        self.assertTrue(record['satisfied'])
+
+    def test_a_satisfied_wait_can_be_paced_by_its_caller(self):
+        """The floor which stops a caller busy-looping on a blind refusal.
+
+        A satisfied wait hands control straight back to a caller which
+        has just been refused. If the refusal is for something this
+        predicate cannot see, satisfied is the permanent answer, and an
+        unpaced caller re-issues as fast as two HTTP round trips allow
+        until its deadline.
+        """
+        cluster = FakeCluster([
+            roster({'n1': node(64, cpu_limit=64)})])
+        record = self._wait(cluster, cpus=1, target='n1', minimum_sleep=10)
+
+        self.assertTrue(record['satisfied'])
+        self.assertEqual(1, record['polls'])
+        self.assertEqual(1, cluster.sleeps)
+        self.assertEqual(
+            10.0, record['seconds_waited'],
+            'A paced wait must report the time it actually spent, or the '
+            'trace under-reports what the run cost.')
+
+    def test_pacing_never_adds_to_a_wait_which_already_waited(self):
+        """The floor is a minimum, not a tax on every wait."""
+        cluster = FakeCluster([
+            roster({'n1': node(0, cpu_limit=16, cpu_committed=16)}),
+            roster({'n1': node(8, cpu_limit=16, cpu_committed=8)}),
+        ])
+        record = self._wait(cluster, cpus=1, target='n1', minimum_sleep=10)
+
+        self.assertTrue(record['satisfied'])
+        self.assertEqual(1, cluster.sleeps)
+        self.assertEqual(10.0, record['seconds_waited'])
+
     def test_a_node_with_no_capacity_row_is_read_as_published(self):
         """cpu_limit None means admission is guarded by nothing.
 
@@ -411,7 +610,7 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         record = self._wait(cluster, cpus=4, target='n1')
 
         self.assertTrue(record['satisfied'])
-        self.assertEqual(8, record['headroom_at_end'])
+        self.assertEqual(8, record['headroom_at_end']['cpus'])
 
 
 class _WrapperHarness(ci_base.BaseTestCase):
@@ -422,7 +621,7 @@ class _WrapperHarness(ci_base.BaseTestCase):
     harness supplies the four things the wrapper touches instead.
     """
 
-    def __init__(self, client, clock=None):
+    def __init__(self, client, clock=None, advancing=False):
         # Deliberately not calling TestCase.__init__: this is not being
         # run as a test, only used as a bound self for the wrapper.
         self.test_client = client
@@ -431,6 +630,8 @@ class _WrapperHarness(ci_base.BaseTestCase):
         self.failure = None
         self.uniquifiers = 0
         self.clock = list(clock or [0.0])
+        self.advancing = advancing
+        self.slept = []
 
     def _uniquifier(self):
         self.uniquifiers += 1
@@ -453,10 +654,23 @@ class _WrapperHarness(ci_base.BaseTestCase):
         not an error worth raising on. Scripting this rather than
         patching time.time() is what keeps the module's log lines out of
         the clock -- see BaseTestCase._now() for what that cost once.
+
+        An 'advancing' harness is the other mode: one clock which moves
+        only when something sleeps, for a test which drives the real
+        wait_for_capacity() through the wrapper and needs the two to
+        agree about what time it is.
         """
+        if self.advancing:
+            return self.clock[0]
         if len(self.clock) > 1:
             return self.clock.pop(0)
         return self.clock[0]
+
+    def _sleep(self, seconds):
+        """The seam which keeps a real wait out of real wall clock time."""
+        self.slept.append(seconds)
+        if self.advancing:
+            self.clock[0] += seconds
 
     def addDetail(self, name, detail):
         self.details[name] = detail
@@ -467,10 +681,16 @@ class _WrapperHarness(ci_base.BaseTestCase):
 
 
 class FakeInstanceClient:
-    """Answers create_instance() from a script, and records what it saw."""
+    """Answers create_instance() from a script, and records what it saw.
 
-    def __init__(self, answers, resources=None):
+    A script of one entry repeats that entry forever, which is how "the
+    server refuses this create for a reason the roster does not show"
+    is written down.
+    """
+
+    def __init__(self, answers, resources=None, repeat_last=False):
         self.answers = list(answers)
+        self.repeat_last = repeat_last
         self.calls = []
         self.resources = resources or roster(
             {'n1': node(64, cpu_limit=64)})
@@ -478,7 +698,10 @@ class FakeInstanceClient:
     def create_instance(self, name, cpus, memory, network, disk, sshkey,
                         userdata, **kwargs):
         self.calls.append((name, cpus, kwargs))
-        answer = self.answers.pop(0)
+        if self.repeat_last and len(self.answers) == 1:
+            answer = self.answers[0]
+        else:
+            answer = self.answers.pop(0)
         if isinstance(answer, Exception):
             raise answer
         return answer
@@ -554,13 +777,16 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
 
         satisfied = {'satisfied': True, 'mode': 'informed',
                      'seconds_waited': 12.5, 'node': 'n1',
-                     'headroom_at_start': 0, 'headroom_at_end': 4,
+                     'headroom_at_start': {'cpus': 0}, 'headroom_at_end': {'cpus': 4},
                      'per_node': {}, 'polls': 2, 'poll_errors': []}
         with mock.patch.object(ci_base.retries, 'wait_for_capacity',
                                return_value=dict(satisfied)) as waiter:
             inst = harness.create_instance(
-                'retried', 4, 1024, None, [], None, None,
-                force_placement='n1')
+                'retried', 4, 1024, None,
+                [{'size': 12, 'type': 'disk'},
+                 {'size': 8, 'type': 'disk'},
+                 {'type': 'cdrom'}],
+                None, None, force_placement='n1')
 
         self.assertEqual({'uuid': 'inst-2'}, inst)
         self.assertEqual('retried', client.calls[0][0])
@@ -570,14 +796,55 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
             'still in use until its error delete completes.')
 
         # The wait watches the node the create was pinned to, and asks
-        # for the cpus the create asked for.
+        # for the whole size the create asked for -- all three dimensions
+        # the scheduler pre-filters on, not just the cpus.
         self.assertEqual(4, waiter.call_args[0][1])
-        self.assertEqual('n1', waiter.call_args[0][2])
+        self.assertEqual(1024, waiter.call_args[0][2])
+        self.assertEqual(20, waiter.call_args[0][3])
+        self.assertEqual('n1', waiter.call_args[0][4])
 
         self.assertEqual(
             ['capacity-wait-1'], list(harness.details),
             'A wait which is not attached to the test is a wait the '
             'run cannot be asked about afterwards.')
+
+    def test_a_retry_cannot_build_a_name_the_server_will_reject(self):
+        """63 characters, or a 400 which reads as an unrelated failure.
+
+        external_api/instance.py rejects a name over 63 characters, and a
+        retry appends a hyphen and eight characters. A caller near the
+        limit would see its capacity retry come back as a
+        RequestMalformedException, which is not caught here and so escapes
+        the wrapper -- reported as a malformed request rather than as the
+        capacity problem it actually is. TestDistroBoots builds its name
+        from a base image name, so the length is not entirely under the
+        suite's control.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='full')
+        client = FakeInstanceClient([refusal, {'uuid': 'inst-7'}])
+        harness = _WrapperHarness(client)
+
+        long_name = 'x' * 63
+        satisfied = {'satisfied': True, 'mode': 'informed',
+                     'seconds_waited': 10.0, 'node': None, 'cpus': 1,
+                     'headroom_at_start': {'cpus': 0},
+                     'headroom_at_end': {'cpus': 2},
+                     'per_node': {}, 'polls': 2, 'poll_errors': []}
+        with mock.patch.object(ci_base.retries, 'wait_for_capacity',
+                               return_value=dict(satisfied)):
+            harness.create_instance(long_name, 1, 1024, None, [], None, None)
+
+        retried = client.calls[1][0]
+        self.assertLessEqual(
+            len(retried), 63,
+            'The retry built a %d character name, which the server '
+            'rejects with a 400 the wrapper does not catch.' % len(retried))
+        self.assertTrue(retried.startswith('x' * 54))
+        self.assertEqual(
+            'x' * 63, client.calls[0][0],
+            'Only a retry is trimmed. The first attempt must use the '
+            'name the caller asked for.')
 
     def test_the_deadline_fails_with_the_refusal_and_the_roster(self):
         """A genuinely too-small cloud must still fail, and say what was full."""
@@ -591,7 +858,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
 
         exhausted = {'satisfied': False, 'mode': 'informed',
                      'seconds_waited': 420.0, 'node': 'n1',
-                     'headroom_at_start': 0, 'headroom_at_end': 0,
+                     'headroom_at_start': {'cpus': 0}, 'headroom_at_end': {'cpus': 0},
                      'per_node': {'n1': node(0, cpu_limit=16,
                                              cpu_committed=16)},
                      'polls': 43, 'poll_errors': ['ValueError: reset']}
@@ -634,6 +901,103 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(2, len(client.calls))
         self.assertEqual(['capacity-wait-1'], list(harness.details))
 
+    def test_a_refusal_the_predicate_cannot_see_does_not_busy_loop(self):
+        """The seam between the wrapper and the real wait, unpatched.
+
+        Every other test here hands the wrapper a canned wait record, so
+        none of them can see what happens when the two disagree -- and
+        that disagreement is the whole failure mode. The server refuses
+        every create while the roster reports ample room in all three
+        dimensions, which is what a refusal for something the predicate
+        does not model looks like: an admission guard losing a race, a
+        pre-filter this does not read, a 507 from a path the roster says
+        nothing about.
+
+        With no floor under the loop the wrapper re-issues as fast as two
+        HTTP round trips allow for the whole seven minutes, leaving an
+        error-deleted instance and a trace line behind on every turn --
+        thousands of each from one refusal. With the floor the loop runs
+        at the poll interval, so the attempts are bounded by the deadline
+        and the clock really moves between them.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='no node would take it')
+        client = FakeInstanceClient([refusal], repeat_last=True)
+        harness = _WrapperHarness(client, clock=[0.0], advancing=True)
+
+        self.assertRaises(
+            AssertionError, harness.create_instance,
+            'blind', 1, 1024, None, [{'size': 8, 'type': 'disk'}], None, None)
+
+        ceiling = (ci_base.CLUSTER_HEADROOM_WAIT //
+                   ci_base.CAPACITY_POLL_INTERVAL) + 2
+        self.assertLessEqual(
+            len(client.calls), ceiling,
+            'The wrapper issued %d creates inside one deadline. Each one '
+            'leaves an error-deleted instance behind, so an unpaced loop '
+            'turns a single transient refusal into an outage.'
+            % len(client.calls))
+        self.assertGreater(
+            len(client.calls), 1,
+            'The create was not retried at all, so this proves nothing '
+            'about pacing.')
+        self.assertEqual(
+            len(client.calls) - 2, len(harness.slept),
+            'The first retry is free -- capacity returning between the '
+            'refusal and the poll is the common case -- and every retry '
+            'after that must be preceded by a sleep.')
+        self.assertGreater(
+            harness.clock[0], ci_base.CLUSTER_HEADROOM_WAIT / 2,
+            'The clock barely moved, so the loop was spinning rather '
+            'than waiting.')
+
+    def test_the_attempt_ceiling_says_what_it_means(self):
+        """The failure a blind refusal produces must name its own cause.
+
+        "The cluster did not free enough" is the wrong diagnosis when
+        every poll said there was room. The message has to send the
+        reader at the predicate instead.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='no node would take it')
+        client = FakeInstanceClient([refusal], repeat_last=True)
+        harness = _WrapperHarness(client, clock=[0.0], advancing=True)
+
+        self.assertRaises(
+            AssertionError, harness.create_instance,
+            'blind', 1, 1024, None, [{'size': 8, 'type': 'disk'}], None, None)
+
+        self.assertIn('no node would take it', harness.failure)
+        self.assertIn(
+            'every wait said there was room', harness.failure,
+            'The failure must say that nothing bound, which is the whole '
+            'diagnosis: the refusal is for something the wait cannot see.')
+
+    def test_a_wait_which_really_ends_lets_the_create_through(self):
+        """The positive control for the test above.
+
+        Without it, a wrapper which had simply stopped retrying would
+        pass every assertion in test_a_refusal_the_predicate_cannot_see
+        _does_not_busy_loop.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='full')
+        client = FakeInstanceClient(
+            [refusal, refusal, {'uuid': 'inst-6'}],
+            resources=roster({'n1': node(64, cpu_limit=64)}))
+        harness = _WrapperHarness(client, clock=[0.0], advancing=True)
+
+        inst = harness.create_instance(
+            'eventually', 1, 1024, None, [{'size': 8, 'type': 'disk'}],
+            None, None)
+
+        self.assertEqual({'uuid': 'inst-6'}, inst)
+        self.assertEqual(3, len(client.calls))
+        self.assertEqual(
+            [ci_base.CAPACITY_POLL_INTERVAL], harness.slept,
+            'The first wait is free and every later one is paced, so two '
+            'retries cost exactly one interval.')
+
     def test_recording_a_wait_may_never_fail_the_test_it_measures(self):
         """An instrument which breaks the run is worse than no instrument."""
         harness = _WrapperHarness(FakeInstanceClient([]))
@@ -661,12 +1025,16 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
 
         satisfied = {'satisfied': True, 'mode': 'informed',
                      'seconds_waited': 30.0, 'node': 'n1', 'cpus': 2,
-                     'headroom_at_start': 0, 'headroom_at_end': 4,
+                     'memory_mb': 1024, 'disk_gb': 8,
+                     'binding_dimension': 'memory_mb',
+                     'headroom_at_start': {'cpus': 0},
+                     'headroom_at_end': {'cpus': 4},
                      'per_node': {}, 'polls': 4, 'poll_errors': []}
         with mock.patch.object(ci_base.retries, 'wait_for_capacity',
                                return_value=dict(satisfied)):
-            harness.create_instance('traced', 2, 1024, None, [], None, None,
-                                    force_placement='n1')
+            harness.create_instance(
+                'traced', 2, 1024, None, [{'size': 8, 'type': 'disk'}], None,
+                None, force_placement='n1')
 
         with open(self.trace) as f:
             lines = f.read().splitlines()
@@ -681,9 +1049,17 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(2, record['cpus'])
         self.assertEqual(30.0, record['seconds_waited'])
         self.assertEqual('informed', record['mode'])
-        self.assertEqual(1, record['attempts'])
-        self.assertEqual(0, record['headroom_at_first_refusal'])
-        self.assertEqual(4, record['headroom_at_admission'])
+        self.assertEqual(
+            1, record['attempt_number'],
+            'The field is a 1-indexed position, not a count: a create '
+            'refused three times writes three lines carrying 1, 2 and 3, '
+            'and a reader who summed a field called "attempts" would get '
+            'six.')
+        self.assertEqual(1024, record['memory_mb'])
+        self.assertEqual(8, record['disk_gb'])
+        self.assertEqual('memory_mb', record['binding_dimension'])
+        self.assertEqual({'cpus': 0}, record['headroom_at_first_refusal'])
+        self.assertEqual({'cpus': 4}, record['headroom_at_admission'])
         self.assertIn('test_create', record['test_id'])
 
     def test_an_unwritable_trace_never_fails_the_create(self):
@@ -701,7 +1077,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
 
         satisfied = {'satisfied': True, 'mode': 'informed',
                      'seconds_waited': 10.0, 'node': None, 'cpus': 1,
-                     'headroom_at_start': 0, 'headroom_at_end': 2,
+                     'headroom_at_start': {'cpus': 0}, 'headroom_at_end': {'cpus': 2},
                      'per_node': {}, 'polls': 2, 'poll_errors': []}
         with mock.patch.object(
                 ci_base, 'CAPACITY_WAIT_TRACE_FILE',

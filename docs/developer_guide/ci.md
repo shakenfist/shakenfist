@@ -141,28 +141,62 @@ a moment, not about the cluster: the capacity the refusing node is holding is
 very often already being returned by a sibling test that is mid-delete.
 Failing the test on that makes a run's pass/fail a coin flip on sibling
 timing. The wrapper polls `/admin/resources` for room for up to
-`CLUSTER_HEADROOM_WAIT` -- 420 seconds, the same deadline
-`cluster_ci_tests/test_namespace_claims.py` already used for the same
-reason -- and only for a plain 507: an `AffinityConstraintUnsatisfiable` 409
-is never caught, because that refusal does not become satisfiable by
-waiting.
+`CLUSTER_HEADROOM_WAIT` -- 420 seconds, which
+`cluster_ci_tests/test_namespace_claims.py` imports from `base.py` rather
+than keeping its own copy of -- and only for a plain 507: an
+`AffinityConstraintUnsatisfiable` 409 is never caught, because that refusal
+does not become satisfiable by waiting.
+
+"Room" means room for the whole create, on one node. The scheduler
+pre-filters a candidate on cpus, memory and disk, and refuses for whichever
+of the three binds, so the wait models all three
+(`retries.wait_for_capacity()`): a node satisfies the wait only when every
+dimension the create asks for fits on that node, and the wait record names
+the dimension it was short of. Reading just one dimension is not a smaller
+version of the same thing but a different failure -- a predicate that is
+permanently satisfied while the server is permanently refusing, which turns
+one 507 into a retry loop rather than a wait.
+
+For the same reason the loop is paced. The first wait after a refusal may
+hand control straight back, because capacity returning between the refusal
+and the poll is both common and the case the whole mechanism exists for.
+Every wait after that sleeps at least one poll interval, because a second
+refusal following a satisfied wait means the create is being refused for
+something the predicate cannot see, and an unpaced loop there re-issues as
+fast as two HTTP round trips allow until the deadline -- leaving an
+error-deleted instance behind on every turn. `MAX_CREATE_ATTEMPTS` is a
+ceiling under that, and a failure that cites it says so rather than
+blaming the cluster's capacity.
+
+A retry uses a fresh name, because the refused instance holds the caller's
+name until its error delete completes. The base name is trimmed so that the
+name plus the retry suffix stays inside the server's 63 character limit.
 
 If the deadline passes, which is what it means for a test that is genuinely
 asking for more than the cloud has, the test fails with the last refusal's
 body, the node the wrapper waited for (or "unpinned" if the create had no
 placement), and the `per_node` capacity roster from the last successful
-poll -- so the failure carries the diagnosis a reader needs rather than a
-bare 507.
+poll, plus the dimensions the waits were short of -- so the failure carries
+the diagnosis a reader needs rather than a bare 507.
 
 A raw call -- `self.test_client.create_instance(...)`, a local client,
 another test's client, anything that does not go through
 `self.create_instance()` -- skips the wait silently, and needs a
-`# raw-create: <reason>` comment immediately above it, with a non-empty
-reason. A unit test in `shakenfist/tests/` (`test_ci_raw_creates.py`) walks
-the suite's source with `ast` looking for exactly this, rather than
-importing the suite, which depends on `shakenfist_client` -- not a test
-dependency of this repository. An empty reason fails the same as no marker
-at all, so the allowlist cannot grow by copy-pasting an existing line.
+`# raw-create: <reason>` comment in the block of comment lines immediately
+above it, with a non-empty reason. A unit test in `shakenfist/tests/`
+(`test_ci_raw_creates.py`) walks the suite's source with `ast` looking for
+exactly this, rather than importing the suite, which depends on
+`shakenfist_client` -- not a test dependency of this repository. An empty
+reason fails the same as no marker at all, so the allowlist cannot grow by
+copy-pasting an existing line.
+
+A call is not the only way to reach a client's `create_instance()`.
+`assertRaises(Exc, self.test_client.create_instance, ...)` hands the bound
+method over as a reference and lets `assertRaises` do the calling, and the
+guard checks those too -- the marker goes on the line above the reference,
+inside the `assertRaises` call. Six sites in the suite use that shape, each
+asserting a 400, 404 or 409 that must not be waited out, and each carries a
+marker saying which.
 
 The marker exists for a caller that must see the 507 rather than have it
 waited out. `cluster_ci_tests/test_coalescing.py`'s mesh burst is the
@@ -295,7 +329,11 @@ plumbing needed to get it there.
 seconds waited, the number of waits, the longest wait and the test it
 came from, and the split between waits that were informed by a
 capacity read and waits that had to sleep blind because
-`/admin/resources` itself could not be read (`mode: degraded`).
+`/admin/resources` itself could not be read (`mode: degraded`). Each
+line also carries the create's three request dimensions, the
+`binding_dimension` it was short of, and `attempt_number` -- a
+1-indexed position, not a count, so a create refused three times
+writes three lines carrying 1, 2 and 3.
 Because the report already runs over a downloaded bundle rather than
 only inside a live job, this summary is available from the moment the
 phase that writes the trace merges -- the evidence does not wait for
@@ -309,7 +347,11 @@ one collected this" and "the wrapper never had to wait" are different
 findings, and the reading that looks reassuring -- zero -- is exactly
 the wrong one to print when the file was never written or never read.
 A file that was read but whose every line was malformed is reported
-the same way, for the same reason.
+the same way, for the same reason, and carries its own `state` of
+`unparseable` in the machine-readable record rather than an
+`available` file with a count of zero -- the prose and the record have
+to say the same thing, because the later phases that read this are
+consumers of the record.
 
 ### The series record format
 

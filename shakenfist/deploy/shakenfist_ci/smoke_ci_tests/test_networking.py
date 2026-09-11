@@ -127,6 +127,8 @@ class TestNetworking(base.BaseNamespacedTestCase):
     def test_specific_ip_request_invalid(self):
         self.assertRaises(
             apiclient.RequestMalformedException,
+            # raw-create: asserts the 400 an address outside the network gets,
+            # which is raised validating the request, not scheduling it.
             self.test_client.create_instance,
             'test-invalid-ip', 1, 1024,
             [

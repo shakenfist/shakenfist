@@ -12,9 +12,17 @@ does so silently: nothing about a raw call looks different from a
 wrapped one in a test run, right up until a sibling test's capacity
 turns it into a flake.
 
+A call is not the only way to reach one. ``assertRaises(Exc,
+self.test_client.create_instance, ...)`` hands the bound method over as a
+*reference* and lets assertRaises do the calling, which is how six sites
+in this suite reach the raw client. A guard which matched only
+``ast.Call`` saw none of them while claiming to cover everything, so
+references are checked too and carry the same marker.
+
 So a raw call is not banned, it is priced. It needs a
-``# raw-create: <reason>`` comment immediately above it, with a
-non-empty reason, or this guard fails the build. Two kinds of caller pay
+``# raw-create: <reason>`` comment in the block of comment lines
+immediately above it, with a non-empty reason, or this guard fails the
+build. Two kinds of caller pay
 that price on purpose: the wrapper's own single internal call in
 ``base.py`` (it has to reach the client somehow), and a caller which
 must see the refusal rather than have it waited out -- the CI cloud
@@ -62,16 +70,36 @@ RAW_CREATE_RE = re.compile(r'^\s*#\s*raw-create:\s*(.*)$')
 COMMENT_RE = re.compile(r'^\s*#')
 
 
-def _is_create_instance_call(node):
-    return (isinstance(node, ast.Call) and
-            isinstance(node.func, ast.Attribute) and
-            node.func.attr == 'create_instance')
+def _is_wrapped_receiver(attribute):
+    """True for self.create_instance, which needs no marker.
+
+    The receiver has to be the bare name ``self``, not merely start with
+    it: ``self.test_client.create_instance`` reaches the client directly
+    and is exactly what this guard is for.
+    """
+    return (isinstance(attribute.value, ast.Name) and
+            attribute.value.id == WRAPPED_RECEIVER)
 
 
-def _is_wrapped_call(node):
-    """True for self.create_instance(...), which needs no marker."""
-    return (isinstance(node.func.value, ast.Name) and
-            node.func.value.id == WRAPPED_RECEIVER)
+def _create_instance_sites(tree):
+    """Every place this source names a client's create_instance.
+
+    A call is not the only way to reach one. ``assertRaises(Exc,
+    self.test_client.create_instance, ...)`` passes the bound method as a
+    *reference* and lets assertRaises do the calling, so a guard which
+    only matched ast.Call saw none of those -- six of them, at the time
+    this was written, every one a raw create which the marker rule
+    claimed to cover and did not.
+
+    Walking attribute nodes rather than call nodes finds both shapes, and
+    finds each exactly once. An ast.Call's ``func`` *is* the attribute
+    node, and CPython gives a call and its func the same lineno, so
+    walking calls as well would report every call twice and tell us
+    nothing the attribute had not already said.
+    """
+    return [node for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute)
+            and node.attr == 'create_instance']
 
 
 def _preceding_comment_block(lines, lineno):
@@ -91,29 +119,32 @@ def _preceding_comment_block(lines, lineno):
 
 
 def _raw_create_reason(lines, lineno):
-    """The marker's reason text for a call at 1-indexed `lineno`, or None."""
-    block = _preceding_comment_block(lines, lineno)
-    if not block:
-        return None
-    m = RAW_CREATE_RE.match(block[0])
-    if not m:
-        return None
-    return m.group(1).strip()
+    """The marker's reason text for a call at 1-indexed `lineno`, or None.
+
+    Any line of the comment block carries the marker, not only its first.
+    Requiring the first meant that an ordinary comment above a marker --
+    ``# Start our test instance`` on the line above ``# raw-create: ...``
+    -- silently disabled it, which fails safe but is a baffling thing to
+    debug when adding one.
+    """
+    for line in _preceding_comment_block(lines, lineno):
+        m = RAW_CREATE_RE.match(line)
+        if m:
+            return m.group(1).strip()
+    return None
 
 
 def find_unmarked_raw_creates(source):
-    """Line numbers of raw create_instance() calls with no non-empty marker."""
+    """Line numbers of raw create_instance uses with no non-empty marker."""
     tree = ast.parse(source)
     lines = source.splitlines()
     offences = []
-    for node in ast.walk(tree):
-        if not _is_create_instance_call(node):
+    for attribute in _create_instance_sites(tree):
+        if _is_wrapped_receiver(attribute):
             continue
-        if _is_wrapped_call(node):
-            continue
-        if not _raw_create_reason(lines, node.lineno):
-            offences.append(node.lineno)
-    return offences
+        if not _raw_create_reason(lines, attribute.lineno):
+            offences.append(attribute.lineno)
+    return sorted(offences)
 
 
 class RawCreateInstanceMarkerTestCase(base.ShakenFistTestCase):
@@ -154,6 +185,72 @@ class RawCreateInstanceMarkerTestCase(base.ShakenFistTestCase):
         """self.create_instance(...) is the wrapper: this is the safe path."""
         offences = find_unmarked_raw_creates(
             "self.create_instance('a', 1, 1024, None, None, None, None)\n")
+        self.assertEqual([], offences)
+
+    def test_a_marker_may_sit_under_an_ordinary_comment(self):
+        """The marker is looked for anywhere in the block, not only first.
+
+        Requiring the first line meant an ordinary comment above a marker
+        silently disabled it, and the call was then reported as unmarked
+        with no hint as to why -- which is a baffling thing to debug at
+        exactly the moment someone is adding their first marker.
+        """
+        offences = find_unmarked_raw_creates(
+            "# Start our test instance\n"
+            "# raw-create: must see the raw refusal, not a waited-out one\n"
+            "client.create_instance('a', 1, 1024, None, None, None, None)\n")
+        self.assertEqual([], offences)
+
+    def test_a_reference_passed_to_assert_raises_is_not_exempt(self):
+        """The shape six sites in this suite use, which ast.Call misses.
+
+        assertRaises() is handed the bound method and does the calling
+        itself, so there is no ast.Call naming create_instance anywhere in
+        the source. Without this the guard reported a clean scan while six
+        raw creates went unmarked, and the next one added would have been
+        exempt for free.
+        """
+        offences = find_unmarked_raw_creates(
+            "self.assertRaises(\n"
+            "    Exception,\n"
+            "    self.test_client.create_instance,\n"
+            "    'a', 1, 1024, None, None, None, None)\n")
+        self.assertEqual([3], offences)
+
+    def test_a_marked_reference_is_accepted(self):
+        offences = find_unmarked_raw_creates(
+            "self.assertRaises(\n"
+            "    Exception,\n"
+            "    # raw-create: asserts a 404, which waiting cannot fix\n"
+            "    self.test_client.create_instance,\n"
+            "    'a', 1, 1024, None, None, None, None)\n")
+        self.assertEqual([], offences)
+
+    def test_a_call_is_reported_once(self):
+        """A call is an attribute node too, so it can be found twice.
+
+        ast.walk() visits a call's own func attribute as well as the call
+        itself, and the two share a lineno, so a guard which walked both
+        kinds would report every unmarked call twice -- and every
+        offence list, and the failure message built from it, would be
+        double length for no reason.
+        """
+        offences = find_unmarked_raw_creates(
+            "return client.create_instance(\n"
+            "    'a', 1, 1024, None, None, None, None)\n")
+        self.assertEqual([1], offences)
+
+    def test_a_marker_above_a_wrapped_call_line_is_found(self):
+        """The marker sits above the call, which is where the receiver is."""
+        offences = find_unmarked_raw_creates(
+            "# raw-create: this is the wrapper itself\n"
+            "return client.create_instance(\n"
+            "    'a', 1, 1024, None, None, None, None)\n")
+        self.assertEqual([], offences)
+
+    def test_a_reference_through_self_needs_no_marker(self):
+        offences = find_unmarked_raw_creates(
+            "self.assertRaises(Exception, self.create_instance, 'a')\n")
         self.assertEqual([], offences)
 
     def test_a_call_through_a_self_attribute_is_not_exempt(self):

@@ -129,9 +129,13 @@ CAPACITY_ACCOUNTING_WAIT = 420
 # where the caller is about to assert success. The capacity the request
 # needs is usually held by the rest of the suite, and instance deletion
 # returns it asynchronously -- full-now is not full-soon (issue 3907).
-# Comfortably longer than any sibling test holds its instances, far
-# shorter than the job timeout.
-CLUSTER_HEADROOM_WAIT = 420
+#
+# This is the same wait, for the same reason, that base.create_instance()
+# gives a refused instance create, so it is that constant rather than a
+# second copy of the number: two independent 420s which the plan requires
+# to stay equal are coupled by nothing but a comment, and a comment does
+# not fail when one of them moves.
+CLUSTER_HEADROOM_WAIT = base.CLUSTER_HEADROOM_WAIT
 
 
 class _ClaimTarget:

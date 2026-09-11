@@ -25,6 +25,8 @@ class TestPlacement(base.BaseNamespacedTestCase):
         # Make sure we get an except for a missing node
         self.assertRaises(
             apiclient.ResourceNotFoundException,
+            # raw-create: asserts the 404 a force_placement onto a node which
+            # does not exist gets. That node never acquires capacity.
             self.test_client.create_instance,
             'ubuntu-2004', 1, 1024,
             [

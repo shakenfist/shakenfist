@@ -521,6 +521,8 @@ class TestTypoedLabel(base.BaseNamespacedTestCase):
 
     def test_typo_is_error(self):
         self.assertRaises(apiclient.ResourceNotFoundException,
+                          # raw-create: asserts the 404 a label which does not exist gets,
+                          # which no amount of waiting for capacity turns into a success.
                           self.test_client.create_instance,
                           'typoedlabel', 1, 1024, None,
                           [

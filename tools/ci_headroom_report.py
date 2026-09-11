@@ -1622,13 +1622,31 @@ def waits_record(waits):
     say the wrapper found nothing to wait out, when in fact nothing was
     looked at.
 
-    A file which *was* read and holds no records at all -- 0 good lines,
-    whether because the run genuinely never waited or because every line in
-    it was malformed -- is a real zero, and is reported as one, with the
-    malformed count alongside it so the two readings are not confused.
+    A file which was read and holds no records because the run genuinely
+    never waited is a real zero and is reported as one. A file whose every
+    line was malformed is not: nothing can be said about whether the suite
+    waited. print_waits() has always said so in prose, but the record is
+    what phase 5 and the sizing plan's guardrail read, and 'available:
+    true, count: 0' is indistinguishable from a clean run to a reader which
+    cannot read prose. So that case gets its own state, and its counts are
+    nulled exactly as an unread file's are.
     """
     record = collections.OrderedDict()
     record['state'] = waits.status
+    if waits.available and waits.malformed_lines and not waits.records:
+        record['state'] = 'unparseable'
+        record['available'] = False
+        record['detail'] = (
+            'every one of the %d %s in the file was malformed'
+            % (waits.malformed_lines,
+               plural(waits.malformed_lines, 'line')))
+        record['path'] = waits.path
+        record['malformed_lines'] = waits.malformed_lines
+        for key in ('count', 'seconds_waited_total', 'informed_waits',
+                    'degraded_waits', 'other_mode_waits',
+                    'longest_wait_seconds', 'longest_wait_test'):
+            record[key] = None
+        return record
     record['available'] = waits.available
     record['detail'] = waits.detail
     record['path'] = waits.path
@@ -2414,19 +2432,12 @@ def print_waits(waits):
               % (waits['state'], waits['detail']))
         print('  File: %s' % waits['path'])
         print('  Read this as "unknown", never as zero waits. An unwritten')
-        print('  or empty file looks exactly like a run with perfect')
-        print('  headroom unless the difference is said out loud.')
+        print('  or empty file -- or one nothing could be parsed out of --')
+        print('  looks exactly like a run with perfect headroom unless the')
+        print('  difference is said out loud.')
         return
 
     print('  File:              %s' % waits['path'])
-    if waits['count'] == 0:
-        print('  0 well-formed wait records, %d malformed %s'
-              % (waits['malformed_lines'], plural(waits['malformed_lines'], 'line')))
-        print('  Every line in the file was malformed, so whether the suite')
-        print('  ever actually waited on capacity cannot be said from this')
-        print('  file. Read this as unknown, not as zero seconds waited.')
-        return
-
     print('  Waits:             %d (%d malformed %s skipped)'
           % (waits['count'], waits['malformed_lines'],
              plural(waits['malformed_lines'], 'line')))
