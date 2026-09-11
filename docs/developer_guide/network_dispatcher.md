@@ -799,6 +799,17 @@ executes network work, so concurrent host-mutating calls from other daemons
 (`sf-queues`, `sf-api`, `instance.py`) cannot bypass the dispatcher by
 construction.
 
+One of those locks has since returned. The dispatcher-only premise never
+held for `_apply_delete_on_hypervisor`: it is called from
+`node_inst_op._instance_delete` and `node_net_op._network_destroy`, both of
+which run on sf-queues' concurrent worker pool, so several instance deletes
+on one hypervisor raced its check-then-delete of the vxlan devices and the
+loser raised `ProcessExecutionError` (issue 4165). It therefore holds a
+per-node `NodeLock` on the network again. `_apply_create_on_hypervisor`
+shares the same out-of-dispatcher callers and remains lock-free; its
+check-then-create has the mirror-image window, but no failure of that shape
+has been observed.
+
 An important scope note: all 13 removed locks used `global_scope=False`, making
 them per-node `NodeLock`s, not `ClusterLock`s. The single-threaded-dispatcher
 argument covers per-node serialisation only. `ClusterLock`s serialise across the
@@ -833,10 +844,12 @@ methods on it. The single-worker-per-queue invariant (see the comment
 block at `self._defer_delays` in workitem.py) is a load-bearing property:
 it is why the dispatcher's in-memory exponential back-off map is correct,
 and why cross-daemon serialisation can be queue-based rather than
-lock-based. All `NodeLock(global_scope=False)` wrappers that formerly
-existed inside `_apply_*` methods have been removed — only `sf-net`
-dequeues and executes network work, so concurrent invocation across
-daemons cannot happen by construction. The cancellation check on dequeue
+lock-based. All but one of the `NodeLock(global_scope=False)` wrappers
+that formerly existed inside `_apply_*` methods have been removed — only
+`sf-net` dequeues and executes network work, so concurrent invocation
+across daemons cannot happen by construction. The exception is
+`_apply_delete_on_hypervisor`, whose callers are sf-queues dispatchers
+rather than the net-worker; see "NodeLock removal" above. The cancellation check on dequeue
 runs before the `_apply_*` call; if the op is already cancelled, the
 worker skips execution and transitions the op to `STATE_ABORT`.
 

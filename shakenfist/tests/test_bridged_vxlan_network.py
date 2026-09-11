@@ -867,7 +867,11 @@ class BridgedVXLanNetworkApplyDeleteOnHypervisorTestCase(
 
         bvn._apply_delete_on_hypervisor()
 
-        network.get_lock.assert_not_called()
+        # The teardown is guarded by a node-local lock on the network:
+        # its callers run on sf-queues' concurrent worker pool, not the
+        # single-threaded net-worker dispatcher (issue 4165).
+        network.get_lock.assert_called_once_with(
+            op='Network delete on hypervisor', global_scope=False)
         self.assertEqual(2, self.mock_execute.call_count)
         self.mock_execute.assert_any_call('ip link delete br-vxlan-000123')
         self.mock_execute.assert_any_call('ip link delete vxlan-000123')
@@ -880,6 +884,28 @@ class BridgedVXLanNetworkApplyDeleteOnHypervisorTestCase(
         bvn._apply_delete_on_hypervisor()
 
         # No `ip link delete` invocations.
+        self.mock_execute.assert_not_called()
+
+    def test_race_loser_noops_after_winner_deletes(self):
+        # Two concurrent instance deletes race to tear down the same
+        # network (issue 4165). The winner deletes the devices while the
+        # loser waits on the lock; once the loser acquires it, the
+        # existence checks must see the devices gone and skip the
+        # `ip link delete` calls rather than raising
+        # ProcessExecutionError. Model the winner by flipping
+        # check_for_interface to False as the lock is acquired.
+        self.mock_check_for_interface.return_value = True
+        network = self._make_network(vxid=0x123)
+
+        def winner_deletes_devices():
+            self.mock_check_for_interface.return_value = False
+
+        network.get_lock.return_value.__enter__ = mock.Mock(
+            side_effect=lambda *args: winner_deletes_devices())
+
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        bvn._apply_delete_on_hypervisor()
+
         self.mock_execute.assert_not_called()
 
 
