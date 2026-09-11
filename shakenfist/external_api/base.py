@@ -1295,6 +1295,20 @@ def requires_network_active(func):
 
 
 def requires_namespace_exist_if_specified(func):
+    # Apply this above any ref-resolving decorator (`arg_is_instance_ref`,
+    # `arg_is_network_ref`, and friends), never below one. Those decorators
+    # each open with `kwargs.pop('namespace', None)` so they can resolve and
+    # authorise the namespace themselves before calling inward; applied below
+    # one, this decorator's `kwargs.get('namespace')` always sees `None` and
+    # the check is silently dead code. That happened: phase 4 of
+    # PLAN-api-input-validation found it on `InstanceEndpoint.delete` and
+    # `NetworkEndpoint.delete` and recorded it without filing an issue (F8 of
+    # PLAN-api-input-validation-phase-05-narrow), and phase 5 removed both
+    # uses rather than reordering them, because the ref decorator already
+    # resolves the namespace and answers its own 404 -- reordering instead
+    # would have changed those routes' 404 message text for no benefit (D29
+    # of the same plan). If you are adding a new use of this decorator next
+    # to a ref decorator, put it above.
     def wrapper(*args, **kwargs):
         if kwargs.get('namespace'):
             if not Namespace.from_db(kwargs['namespace']):
@@ -1368,14 +1382,28 @@ def log_request(func):
         if j:
             # Only a JSON object can merge into kwargs. Any other JSON
             # document -- a list, a string, a number -- has always been
-            # refused as a 400 (previously by the per-key merge raising
-            # TypeError on the lookup), and this guard keeps it that
-            # way: dict.update would raise ValueError for most of them,
-            # which nothing in the decorator chain catches, and would
-            # silently merge a list of two-character strings as key
-            # value pairs.
+            # refused as a 400 and still is, but it is refused here
+            # directly rather than by raising a TypeError and depending
+            # on a catch two decorators further out. That catch is gone
+            # as of phase 5 of PLAN-api-input-validation, and this guard
+            # had to stop leaning on it first: dict.update would
+            # raise ValueError for most of them, which nothing in the
+            # decorator chain catches, and would silently merge a list
+            # of two-character strings as key value pairs.
             if not isinstance(j, dict):
-                raise TypeError('the request body must be a JSON object')
+                # This used to be a raised TypeError, caught by
+                # handle_authorization_exceptions and logged through
+                # _authorization_failure_log(e) -- the attributed line
+                # issue 4069 added so a rejection can be joined to the
+                # 'API request parsed' and audit records by request-id.
+                # Answering directly (decision D23) dropped that unless
+                # it is emitted here instead; suppress_traceback=True
+                # because there is no exception in flight to log a
+                # traceback for.
+                _request_rejection_log().info('API request rejected as malformed')
+                return sf_api.error(
+                    400, 'the request body must be a JSON object',
+                    suppress_traceback=True)
 
             # A body key with the same name as a URL path parameter
             # overwrites it. Recorded here rather than in the validator
@@ -1477,38 +1505,64 @@ def redirect_to_root_clearing_jwt() -> flask.Response:
     return resp
 
 
-def _authorization_failure_log(e: Exception):
+def _request_rejection_log(fields=None):
     """A logger carrying the attribution a rejected request needs.
 
     The record emitted here is the only one saying *why* a request was
     rejected, and without the request-id it cannot be joined to the
     'API request parsed' and audit records which say *which* request it
-    was (issue 4069). The exception class travels as its own field so
-    an expired token, an unparseable one and a revoked one are
-    distinguishable in a query rather than only by message text.
+    was (issue 4069). This is the common attribution every rejection
+    site needs; _authorization_failure_log below layers an exception's
+    class and message on top of it, and a site with no exception in
+    flight -- log_request's non-object-body 400 -- calls this directly.
     """
-    return LOG.with_fields({
+    base_fields = {
         'request-id': flask.request.environ.get('FLASK_REQUEST_ID', 'none'),
         'method': flask.request.method,
         'path': flask.request.path,
         'remote-address': flask.request.remote_addr,
-        'error-class': type(e).__name__,
-        'error': str(e)
-    })
+    }
+    if fields:
+        base_fields.update(fields)
+    return LOG.with_fields(base_fields)
+
+
+def _authorization_failure_log(e: Exception):
+    """A logger carrying the attribution a rejected request needs.
+
+    The exception class travels as its own field so an expired token,
+    an unparseable one and a revoked one are distinguishable in a query
+    rather than only by message text.
+    """
+    return _request_rejection_log(
+        {'error-class': type(e).__name__, 'error': str(e)})
 
 
 def handle_authorization_exceptions(func):
-    # NOTE(mikal): like _reject_token, these are logged at INFO. Every
-    # rejection here is caused by the credential the client presented,
-    # which is an expected client condition and not a cluster fault, so
-    # none of them should be paging anyone (issue 3606).
+    # NOTE(mikal): this wrapper catches authorization conditions and
+    # nothing else -- the ten JWT exception classes below, covering a
+    # token which cannot be decoded, one which has expired, and the
+    # assorted ways flask_jwt_extended reports a token which is
+    # structurally fine but not acceptable. Like _reject_token, they
+    # are all logged at INFO: every rejection here is caused by the
+    # credential the client presented, which is an expected client
+    # condition and not a cluster fault, so none of them should be
+    # paging anyone (issue 3606).
+    #
+    # TypeError used to be caught here too, and answered as a 400
+    # carrying str(e). It is not an authorization condition, and
+    # nothing in flask_jwt_extended or PyJWT signals one with it: the
+    # arm existed because a handler called with a body key it does not
+    # accept raises TypeError, and a 400 was a better answer than a
+    # 500 in the absence of a validation layer. Phases 1 to 4 of
+    # PLAN-api-input-validation built that layer, so an undeclared body
+    # key is now refused by name before the handler is reached, and the
+    # workaround has been deleted (decision D23). What is left behind
+    # it is a genuine handler-internal TypeError, which is a server
+    # fault and is now recorded and answered as one.
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-
-        except TypeError as e:
-            _authorization_failure_log(e).info('API request rejected as malformed')
-            return sf_api.error(400, str(e), suppress_traceback=False)
 
         except DecodeError as e:
             # Send a more informative message than 'Not enough segments'. If this
@@ -1666,8 +1720,18 @@ def suppress_exceptions_to_client(func):
             fields.update(getattr(flask.g, _RECORDED_EXCEPTION_FIELDS, {}))
 
             LOG.with_fields(fields).exception('Server error')
-            return sf_api.error(500, 'server error: %s' % repr(e),
-                                suppress_traceback=True)
+
+            # The body is deliberately opaque. A repr(e) here -- exception
+            # class, message, both -- is the same defect as the interpreter
+            # text this phase deleted from handle_authorization_exceptions
+            # (issue 3612, decision D31): it answers a caller in the
+            # implementation's words instead of the API's. The caller is
+            # not who the detail is for, and loses nothing that mattered --
+            # the log line above and the on-disk record under
+            # /srv/shakenfist/exceptions/ both already carry exception_class,
+            # the full traceback and the correlation fields, which is more
+            # than repr(e) ever put in the response.
+            return sf_api.error(500, 'server error', suppress_traceback=True)
 
     return wrapper
 

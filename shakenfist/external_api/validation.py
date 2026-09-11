@@ -534,10 +534,13 @@ def check(compiled: CompiledEndpoint, body: Any,
 
     # An undeclared body key is already fatal when the request reaches
     # its handler -- log_request merges every key into kwargs and no
-    # handler is variadic, so Python raises TypeError and the broad
-    # except in handle_authorization_exceptions returns it as a 400
-    # carrying interpreter text. Counting these is how phase 4 chooses
-    # between webargs' EXCLUDE and RAISE (decision D10).
+    # handler is variadic, so Python raises TypeError. Counting these
+    # is how phase 4 chose between webargs' EXCLUDE and RAISE
+    # (decision D10). Until phase 5 that TypeError was caught by a
+    # broad except in handle_authorization_exceptions and returned as
+    # a 400 carrying interpreter text; that arm is gone (decision
+    # D23), so in 'warn' and 'off' -- the only modes where such a key
+    # still reaches a handler -- it is now a recorded 500 (D25).
     if not compiled.raw_body:
         unknown = [name for name in body if name not in compiled.names]
         for name in unknown[:MAX_UNKNOWN_PARAMETER_FINDINGS]:

@@ -1897,11 +1897,13 @@ class AuthFederatedEndpoint(api_base.Resource):
                 namespace=namespace)
 
         #    Read the whole policy in one go, and refuse a damaged row
-        #    rather than let it escape as an exception. The generic 500
-        #    handler answers with repr(e), and CorruptMappingRule names
-        #    the rule's UUID -- which on the one endpoint anybody may
-        #    call would hand a stranger an identifier they should not
-        #    have.
+        #    rather than let it escape as an exception. Decision D31
+        #    stopped the generic 500 handler putting repr(e) in the
+        #    body, so CorruptMappingRule's rule UUID no longer reaches
+        #    a caller that way either -- but going through this guard
+        #    still turns an internal fault into a categorised refusal
+        #    evented against the rule's owner via _federated_refusal,
+        #    rather than an unevented 500 nobody but the log sees.
         #
         #    The guard belongs here and not around the lookup above.
         #    from_db_by_name reads the static row and the object state,

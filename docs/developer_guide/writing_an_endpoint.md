@@ -317,6 +317,29 @@ have been refused and changes no response — and `off` disables the
 layer entirely, as a further safety valve against unexpected log
 volume.
 
+Neither rollback restores the handler-facing behaviour from before
+enforcement existed, and an undeclared body key is where that shows.
+Under `warn` or `off` the key still reaches the handler, which raises
+`TypeError` on the unexpected keyword argument, and that now answers
+`500` — recorded like any other server exception, with nothing about
+it in the response body — rather than the `400` carrying the
+interpreter's own message it used to answer. An operator choosing the
+rollback gets requests that were working kept working, not a tidier
+answer for the ones that were not; see the [v0.7 to v0.8 release
+notes](../release_notes/v07-v08.md) for the caller-visible shape of
+it.
+
+Budget for the operator-visible shape too. A refusal under `enforce`
+is an audit event; a `TypeError` under `warn` or `off` is a server
+fault, so it writes an exception record under
+`/srv/shakenfist/exceptions/` and logs at ERROR. `record_exception`
+keys those records by a hash of the traceback and the `TypeError`
+message embeds the caller's own key name, so a client sending varying
+undeclared keys writes one record per distinct key and one ERROR line
+per request — which is client input driving disk usage and quite
+possibly alerting. It is a reason to treat the rollback as temporary
+rather than a resting state.
+
 Because a refusal is answered from outside every per-method decorator,
 `log_token_use` never runs for one. The refusal writes its own
 `request refused by input validation` audit event against the caller's

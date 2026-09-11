@@ -1,5 +1,4 @@
 # Copyright 2019 Michael Still and contributors
-import json
 import logging
 
 import flask
@@ -142,17 +141,37 @@ class AuthorizationFailureLoggingTestCase(base.ShakenFistTestCase):
             'API request rejected, JWT authorization failed')
         self._assert_attribution(record, 'NoAuthorizationError')
 
-    def test_type_error_400_is_attributable(self):
-        resp = self._raise_through_handler(
-            TypeError("'<=' not supported between instances of "
-                      "'str' and 'int'"),
-            'application/json')
-        self.assertEqual(400, resp.status_code)
-        body = json.loads(resp.get_data(as_text=True))
-        self.assertIn('not supported', body['error'])
+    def test_a_type_error_is_not_an_authorization_failure(self):
+        """Phase 5 of PLAN-api-input-validation, decision D23.
 
-        record = self._sole_record('API request rejected as malformed')
-        self._assert_attribution(record, 'TypeError')
+        A TypeError used to be caught here and answered as a 400
+        carrying str(e) -- the second half of the mechanism issue 3612
+        describes, and a workaround for the absence of the validation
+        layer phases 1 to 4 built. It is not an authorization
+        condition: nothing in flask_jwt_extended or PyJWT signals one
+        with it, and there is no attribute on a TypeError that would
+        let this wrapper tell where it came from. So it must now travel
+        straight through, to be recorded and answered as the server
+        fault it is by the decorators outside this one.
+
+        Asserted in this frame as well as at request level (see
+        test_request_validation's
+        test_a_handler_internal_type_error_is_a_recorded_500), because
+        this is the frame the arm lived in: restoring it fails this
+        test on the exception which no longer escapes, however the
+        response is shaped further out.
+        """
+        with self.assertRaises(TypeError):
+            self._raise_through_handler(
+                TypeError("'<=' not supported between instances of "
+                          "'str' and 'int'"),
+                'application/json')
+
+        # And this wrapper said nothing about it. An INFO line here
+        # claiming the *request* was malformed would be a second and
+        # wrong attribution of a server side fault, on top of the one
+        # suppress_exceptions_to_client correctly emits.
+        self.assertEqual([], self.capture.records)
 
     def test_success_path_logs_nothing(self):
         @api_base.handle_authorization_exceptions

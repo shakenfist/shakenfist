@@ -779,7 +779,10 @@ class JWKSTrustAnchorTestCase(base.ShakenFistTestCase):
         # unauthenticated endpoint. Neither TokenValidationFailed nor
         # anything else auth.py catches, so it escaped as `server error:
         # FileNotFoundError(2, 'No such file or directory')` on every
-        # exchange from then on, naming no setting.
+        # exchange from then on, naming no setting. A 500 no longer
+        # names the exception either (decision D31), which makes the
+        # unhandled version of this strictly less diagnosable and this
+        # test more load bearing than when it was written.
         with mock.patch.object(federation.config,
                                'FEDERATION_JWKS_CA_BUNDLE',
                                '/no/such/jwks-ca.pem'):

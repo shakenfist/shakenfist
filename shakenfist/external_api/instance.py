@@ -265,7 +265,6 @@ class InstanceEndpoint(api_base.Resource):
          (404, 'Instance not found.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
-    @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
     def delete(self, instance_ref=None, instance_from_db=None, namespace=None):
         # Check if instance has already been deleted
@@ -588,6 +587,31 @@ class InstancesEndpoint(api_base.Resource):
         # If accessing a foreign namespace, we need to be an admin
         if not namespace_is_trusted(namespace, request_namespace()):
             return sf_api.error(404, 'namespace not found')
+
+        # A name has to be a string before anything can ask whether it is a
+        # good one. `name` is declared required, but required-ness is
+        # deliberately not enforced (decision D17 of
+        # PLAN-api-input-validation), and the compiled field is nullable, so
+        # an omitted name and an explicit JSON null both arrive here as None.
+        # validators.hostname() *returns* a falsy ValidationError for None
+        # rather than raising, so without this guard execution reaches
+        # `'.' in name` and the interpreter raises TypeError -- which until
+        # this phase was answered as a 400 by the arm
+        # handle_authorization_exceptions no longer carries, and is otherwise
+        # a recorded 500 for a plain caller mistake.
+        #
+        # Two messages rather than one, because these are two different
+        # mistakes. The refusal below explains the permitted character set,
+        # which is the right answer for a name that is a string and a bad
+        # one, and says nothing a caller who sent no name at all can act on.
+        # The isinstance arm is unreachable while API_VALIDATION_MODE is
+        # 'enforce' -- a non-string name is refused as a type mismatch before
+        # the handler is entered -- but 'warn' and 'off' are the operator's
+        # rollback and hand the handler whatever the caller sent.
+        if name is None:
+            return sf_api.error(400, 'instance name must be specified')
+        if not isinstance(name, str):
+            return sf_api.error(400, 'instance name must be a string')
 
         # Check that the instance name is safe for use as a DNS host name
         valid_hostname = validators.hostname(

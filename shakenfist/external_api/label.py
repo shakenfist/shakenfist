@@ -59,7 +59,11 @@ def _label_url_or_error(label_name):
     that answered ``server error: LabelHierarchyTooDeep()`` -- the
     third way this endpoint had of returning 500, alongside the two
     fixed in get() and delete(). It is the caller's mistake rather than
-    ours, so it is a 400, and it says which mistake.
+    ours, so it is a 400, and it says which mistake. (A 500 no longer
+    names the exception at all: decision D31 of
+    PLAN-api-input-validation-phase-05-narrow made that body opaque.
+    The reason this is a 400 is unchanged -- an opaque 500 is still the
+    wrong answer to a caller's own mistake.)
     """
     try:
         namespace, label_url = _label_url(label_name)
