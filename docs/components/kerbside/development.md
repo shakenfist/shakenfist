@@ -499,6 +499,20 @@ hand-edit between the markers** — the next run deletes whatever it
 finds there. New *direct* dependencies go above the start marker,
 preferring an exact version.
 
+Anything the repository *imports* belongs above the start marker too,
+even when the generated block already carries a pin for it. A pin in
+that block exists only for as long as something else happens to
+require the package, so an import resting on one is a breakage with
+somebody else's release date on it. That is not hypothetical:
+`requests` was reached only through the oslo stack that
+`shakenfist-utilities` required, and when 0.8.8 stopped requiring it
+the next reconcile reaped the pin and every lane that starts the
+daemon failed at `import requests` (issue #400). The
+`undeclared-direct-dependency` consistency audit checks for exactly
+this, and it reads `[project] dependencies` only — declaring the
+package in the `test` extra does suppress the generated pin, but does
+not satisfy the audit.
+
 Four things about the script are not obvious from the block it
 produces:
 
