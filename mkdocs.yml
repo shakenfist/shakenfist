@@ -383,6 +383,7 @@ nav:
                 - "Phase 4: Parallel and async output I/O": components/occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io.md
                 - "Phase 5: Benchmarking and tuning": components/occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking.md
                 - "Phase 5: Filter by tag age (`since` parameter)": components/occystrap/plans/PLAN-quay-label-search-phase-05-since-filter.md
+                - "Plan: Refactor Developer Automation Workflows to Shared Actions": components/occystrap/plans/PLAN-workflow-refactor.md
                 - "Post-write verification for output integrity": components/occystrap/plans/PLAN-post-write-verification.md
                 - "Quay.io tag-based bulk image discovery and download": components/occystrap/plans/PLAN-quay-label-search.md
                 - "Registry Proxy Mode (dockerpush as persistent registry)": components/occystrap/plans/PLAN-registry-proxy.md

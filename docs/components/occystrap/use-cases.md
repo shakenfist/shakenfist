@@ -455,6 +455,18 @@ occystrap --debug process registry://docker.io/library/busybox:latest \
     tar://busybox.tar
 ```
 
+`--debug` is what surfaces a dependency's informational records, and
+there are a lot of them: httpx logs a line per HTTP request, so a
+multi-layer image narrates every manifest, token and blob fetch.
+Neither flag is needed to see a dependency's warnings and errors, which
+always print.
+
+Library records are named by the logger which emitted them --
+`httpx` or `urllib3.connectionpool`, for instance -- because a record
+from a dependency is only useful once you know which dependency
+produced it, and they go to stderr so that they cannot corrupt the
+output of a command asked for JSON.
+
 When running in a terminal, registry downloads and uploads display
 interactive progress bars. In non-TTY environments (CI, pipes),
 periodic log messages are emitted instead.

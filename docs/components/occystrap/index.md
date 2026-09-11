@@ -60,7 +60,8 @@ occystrap process registry://docker.io/library/python:3.11 tar://python.tar \
   bot commands
 
 Design and phase plans, current and historical, live in
-[plans/](plans/).
+[plans/](plans/), and every one of them is registered in
+[plans/index.md](/components/occystrap/plans/index/).
 
 ## Key Concepts
 
