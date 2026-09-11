@@ -215,6 +215,22 @@ cluster start and never recur; treating it as "the published headroom
 is all we know" is the right reading, and it is what the fallback to
 `cpu_available` alone does.
 
+*Amended by the automated review of PR #4166: the predicate was right
+about which ledger to read and wrong about how to find the row. The
+`per_node` mapping is keyed by node UUID -- `summarize_resources()`
+builds it from the metrics dict, which `get_active_node_metrics()` keys
+by `str(n.uuid)` -- while the suite pins by node name almost everywhere
+(`'sf-2'`, `node['name']`, `socket.getfqdn()`). The target was therefore
+absent from the roster on every poll for a name-pinned create, which
+`best_node()` reads as zero headroom in every dimension rather than as
+"no entry", so the wait could never be satisfied however empty the
+cluster was. One transient 507 on a name-pinned create became a
+guaranteed 420 s failure whose message said there was room everywhere.
+`BaseTestCase._placement_roster_key()` now resolves the pin to the
+roster's key space before waiting; a pin that resolves to nothing waits
+blind (`mode: degraded`) rather than reading an absent key as an empty
+node.*
+
 This is the decision a reviewer is most likely to argue with, because
 it makes the wrapper wait *longer* than the master plan's predicate
 would in exactly the case where the two ledgers disagree. That is the
@@ -340,6 +356,23 @@ delete completes asynchronously. Every retry appends
 returns the instance it finally created, so the caller never sees the
 name it did not choose except in the failure message and the wait
 record, both of which state it.
+
+*Amended by the automated review of PR #4166: D13 holds, but its stated
+mechanism was incomplete and the consequence was not carried through to
+the callers. Nothing refuses a duplicate instance name on create -- the
+only name validation is the DNS hostname check at
+`external_api/instance.py:592-600`. What actually keeps the name in use
+is resolution: `Instance.ACTIVE_STATES` (`instance.py:239-244`) includes
+the error states, so the refused instance still answers a name lookup
+until its delete finishes, and reusing the name would make that lookup
+ambiguous rather than refused. The consequence is that a retried create
+does not carry the caller's name, which breaks any test that resolves an
+instance by the literal it passed. `test_object_names.py` did, in two
+different ways, and both are fixed: the first keys on the name the
+instance actually got, and the two duplicate-name tests -- whose subject
+is the name itself, and which would have asserted nothing against a
+renamed instance -- take `# raw-create:` markers. The rename is now
+stated in `ci.md` rather than only in the wrapper's docstring.*
 
 ### D14 -- The wait record lands in the bundle without a cross-repo push
 

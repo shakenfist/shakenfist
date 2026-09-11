@@ -688,12 +688,24 @@ class FakeInstanceClient:
     is written down.
     """
 
-    def __init__(self, answers, resources=None, repeat_last=False):
+    def __init__(self, answers, resources=None, repeat_last=False,
+                 nodes=None):
         self.answers = list(answers)
         self.repeat_last = repeat_last
         self.calls = []
         self.resources = resources or roster(
             {'n1': node(64, cpu_limit=64)})
+        # Shaped as get_nodes() really answers: a uuid and a name per
+        # node, which is the whole point of the pin resolution these
+        # fixtures exercise. Defaulted so that the rosters keyed by 'n1'
+        # elsewhere in this file keep resolving 'n1' to themselves.
+        self.nodes = nodes if nodes is not None else [
+            {'uuid': 'n1', 'name': 'n1', 'is_hypervisor': True}]
+        self.node_listings = 0
+
+    def get_nodes(self):
+        self.node_listings += 1
+        return self.nodes
 
     def create_instance(self, name, cpus, memory, network, disk, sshkey,
                         userdata, **kwargs):
@@ -1092,3 +1104,121 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
             ['capacity-wait-1'], list(harness.details),
             'The wait was still attached to the test, so a missing trace '
             'file costs the bundle record and nothing else.')
+
+    def test_a_name_pinned_wait_reads_the_uuid_keyed_roster_entry(self):
+        """The roster is keyed by uuid; almost every pin in the suite is a name.
+
+        summarize_resources() builds per_node from the metrics dict,
+        which get_active_node_metrics() keys by str(n.uuid). The suite
+        pins by name -- 'sf-2', node['name'], socket.getfqdn(). Handing
+        the name to the wait made the target absent from per_node on
+        every poll, which reads as zero headroom in every dimension
+        rather than as "no entry", so a name-pinned create could never be
+        satisfied however empty the cluster was.
+
+        This is written through the real wait_for_capacity() on an
+        advancing clock rather than a canned record, because a mocked
+        wait cannot show a lookup missing.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='no room on sf-2')
+        uuid = '7f1c9e26-5a0e-4b76-9a7f-2d4f0a1b3c5d'
+        client = FakeInstanceClient(
+            [refusal, {'uuid': 'inst-9'}],
+            resources=roster({uuid: node(64, cpu_limit=64)}),
+            nodes=[{'uuid': uuid, 'name': 'sf-2', 'is_hypervisor': True}])
+        harness = _WrapperHarness(client, clock=[0.0], advancing=True)
+
+        inst = harness.create_instance(
+            'pinned', 2, 1024, None, [{'size': 8, 'type': 'disk'}], None, None,
+            force_placement='sf-2')
+
+        self.assertEqual({'uuid': 'inst-9'}, inst)
+        record = json.loads(harness.details['capacity-wait-1'].as_text())
+        self.assertTrue(
+            record['satisfied'],
+            'The wait could not find the node it was pinned to, so a '
+            'cluster with 64 spare cpus read as a full one.')
+        self.assertEqual('informed', record['mode'])
+        self.assertEqual(uuid, record['roster_key'])
+        self.assertEqual('sf-2', record['pinned_to'])
+        self.assertIsNone(
+            record['binding_dimension'],
+            'Nothing was short, so nothing should be recorded as binding. '
+            'A missing roster entry reports every dimension as zero, which '
+            'names a binding dimension that does not exist.')
+
+    def test_an_unresolvable_pin_waits_blind_rather_than_reading_zero(self):
+        """Not knowing which entry to read is not evidence the entry is empty.
+
+        A pin which matches no node leaves the wait with nothing to read
+        about its target. Reading the roster anyway would report zero
+        headroom in every dimension -- a confident answer built from an
+        absent key -- so the wait is blind instead, exactly as it is for
+        a cluster whose capacity mapping could not be read.
+        """
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='full')
+        uuid = '7f1c9e26-5a0e-4b76-9a7f-2d4f0a1b3c5d'
+        client = FakeInstanceClient(
+            [refusal, {'uuid': 'inst-10'}],
+            resources=roster({uuid: node(64, cpu_limit=64)}),
+            nodes=[{'uuid': uuid, 'name': 'sf-2', 'is_hypervisor': True}])
+        harness = _WrapperHarness(client, clock=[0.0], advancing=True)
+
+        inst = harness.create_instance(
+            'orphan', 2, 1024, None, [{'size': 8, 'type': 'disk'}], None, None,
+            force_placement='sf-nosuchnode')
+
+        self.assertEqual({'uuid': 'inst-10'}, inst)
+        record = json.loads(harness.details['capacity-wait-1'].as_text())
+        self.assertEqual('degraded', record['mode'])
+        self.assertIsNone(record['roster_key'])
+        self.assertEqual('sf-nosuchnode', record['pinned_to'])
+        self.assertIsNone(
+            record['headroom_at_start'],
+            'The roster was read for a target which is not in it, so the '
+            'wait recorded a headroom figure it had no basis for.')
+
+    def test_a_create_which_is_not_refused_lists_no_nodes(self):
+        """Resolving the pin is a cost only a refused create should pay.
+
+        Almost every create in a run is admitted first time. Resolving
+        force_placement eagerly would put a GET /nodes behind every
+        instance the suite builds, to answer a question that create
+        never asks -- and GET /nodes hydrates every node and renders an
+        external view for each, so it is not a cheap call to add to a
+        hot path. See load_budget.py.
+        """
+        client = FakeInstanceClient([{'uuid': 'inst-11'}])
+        harness = _WrapperHarness(client)
+
+        harness.create_instance('quick', 1, 1024, None, [], None, None,
+                                force_placement='n1')
+
+        self.assertEqual(
+            0, client.node_listings,
+            'The wrapper listed the clusternodes for a create which was '
+            'never refused, so every instance the suite builds now pays '
+            'for a lookup only a wait needs.')
+
+    def test_a_refused_create_resolves_its_pin_once(self):
+        """And only once, however many times it is refused."""
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'full', status_code=507, text='full')
+        uuid = '7f1c9e26-5a0e-4b76-9a7f-2d4f0a1b3c5d'
+        client = FakeInstanceClient(
+            [refusal, refusal, {'uuid': 'inst-12'}],
+            resources=roster({uuid: node(64, cpu_limit=64)}),
+            nodes=[{'uuid': uuid, 'name': 'sf-2', 'is_hypervisor': True}])
+        harness = _WrapperHarness(client, clock=[0.0], advancing=True)
+
+        harness.create_instance(
+            'twice', 2, 1024, None, [{'size': 8, 'type': 'disk'}], None, None,
+            force_placement='sf-2')
+
+        self.assertEqual(3, len(client.calls))
+        self.assertEqual(
+            1, client.node_listings,
+            'The pin was resolved once per wait rather than once per '
+            'create, which puts a node listing into the retry loop.')

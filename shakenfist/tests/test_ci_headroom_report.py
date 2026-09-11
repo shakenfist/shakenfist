@@ -145,18 +145,33 @@ def census_payload(events):
 
 
 def wait_event(test_id='pkg.mod.TestCase.test_something', instance_name='i1',
-               node='n1', cpus=2, seconds_waited=12.5, mode='informed',
-               attempts=1, headroom_at_first_refusal=0,
+               node='n1', roster_key='n1', cpus=2, memory_mb=1024, disk_gb=8,
+               binding_dimension=None, seconds_waited=12.5, mode='informed',
+               attempt_number=1, headroom_at_first_refusal=0,
                headroom_at_admission=2):
-    """One line of the capacity-wait trace create_instance() writes (D14)."""
+    """One line of the capacity-wait trace create_instance() writes (D14).
+
+    These keys must stay identical to the record
+    BaseTestCase._append_capacity_wait_trace() builds in
+    shakenfist/deploy/shakenfist_ci/base.py. A fixture which drifts from
+    the writer tests the parser against a line shape nothing emits,
+    which is the one failure this report is supposed to survive and the
+    one its tests would then not notice. The drift is not hypothetical:
+    this fixture said 'attempts' while the writer said 'attempt_number',
+    and omitted three fields the writer has always written.
+    """
     return {
         'test_id': test_id,
         'instance_name': instance_name,
         'node': node,
+        'roster_key': roster_key,
         'cpus': cpus,
+        'memory_mb': memory_mb,
+        'disk_gb': disk_gb,
+        'binding_dimension': binding_dimension,
         'seconds_waited': seconds_waited,
         'mode': mode,
-        'attempts': attempts,
+        'attempt_number': attempt_number,
         'headroom_at_first_refusal': headroom_at_first_refusal,
         'headroom_at_admission': headroom_at_admission,
     }

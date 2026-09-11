@@ -279,6 +279,18 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # that outlives the probe's retirement, because the wrapper keeps calling
 # GET /admin/resources on its own.
 #
+# Sizing note for whoever reads this while working out why a full cluster
+# is busy: one poll is not one read. GET /admin/resources constructs a
+# Scheduler, which refreshes through get_active_node_metrics() -- an
+# iteration over active nodes plus one GetNodeMetrics per node -- so a
+# cluster of N nodes costs N node-metric reads per poll, every
+# CAPACITY_POLL_INTERVAL seconds, per stestr worker currently blocked on
+# a refusal. That arrives precisely when the cluster is fullest, which is
+# the same moment the workers are most likely to be waiting together. It
+# is bounded by CLUSTER_HEADROOM_WAIT and by how many workers can be
+# blocked at once, and GetNodeMetrics/api is exempt above, so this is
+# recorded as a thing to know rather than as a budget entry.
+#
 # The agent operation await helper is the same shape a third time, and it
 # brings the cluster's side of the conversation in with it. _await_command()
 # in shakenfist_ci/base.py submits an agent operation and then reads it back

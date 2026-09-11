@@ -221,7 +221,7 @@ def best_node(per_node, request, node=None):
 
 def wait_for_capacity(poll, cpus, memory_mb, disk_gb, node, deadline,
                       clock=time.time, sleep=time.sleep, interval=10,
-                      minimum_sleep=0):
+                      minimum_sleep=0, blind=False):
     """Wait until the cluster could admit a create of this size.
 
     poll() returns the /admin/resources dict. It is injected rather
@@ -249,6 +249,13 @@ def wait_for_capacity(poll, cpus, memory_mb, disk_gb, node, deadline,
     A poll which raises is none of the three: the endpoint being
     briefly unreachable is not evidence about capacity, so it is
     recorded in 'poll_errors' and the wait continues.
+
+    blind says the caller could not work out which roster entry its
+    target is, so there is nothing here to read about it. That is not
+    the same as a target with no room, and must not be reported as one:
+    the roster is not consulted at all and the wait behaves as it does
+    for a degraded cluster, sleeping one interval and handing back
+    'mode': 'degraded'. See BaseTestCase._placement_roster_key().
 
     minimum_sleep is the floor under a satisfied wait, and exists
     because a satisfied wait hands control straight back to a caller
@@ -288,6 +295,12 @@ def wait_for_capacity(poll, cpus, memory_mb, disk_gb, node, deadline,
         slept = clock() - started
         if slept < minimum_sleep:
             sleep(minimum_sleep - slept)
+        return done()
+
+    if blind:
+        record['mode'] = 'degraded'
+        record['degraded_polls'] += 1
+        sleep(interval)
         return done()
 
     while True:

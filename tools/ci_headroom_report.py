@@ -2438,9 +2438,16 @@ def print_waits(waits):
         return
 
     print('  File:              %s' % waits['path'])
-    print('  Waits:             %d (%d malformed %s skipped)'
-          % (waits['count'], waits['malformed_lines'],
-             plural(waits['malformed_lines'], 'line')))
+    # Conditional, like the other_mode_waits note below: a healthy run
+    # printing "(0 malformed lines skipped)" invites the reader to wonder
+    # what went wrong, and every other caveat in this report appears only
+    # when it has something to say.
+    if waits['malformed_lines']:
+        print('  Waits:             %d (%d malformed %s skipped)'
+              % (waits['count'], waits['malformed_lines'],
+                 plural(waits['malformed_lines'], 'line')))
+    else:
+        print('  Waits:             %d' % waits['count'])
     print('  Total time waited: %.1fs' % waits['seconds_waited_total'])
     print('  Longest wait:      %.1fs (%s)'
           % (waits['longest_wait_seconds'], waits['longest_wait_test'] or

@@ -133,7 +133,16 @@ class TestCoalescing(base.BaseNamespacedTestCase):
     def test_duplicate_network_work_is_coalesced(self):
         instances = []
         for i in range(BURST):
-            instances.append(self.create_instance(
+            # raw-create: the same reasoning as the mesh burst below.
+            # setUp built burst_client precisely so this loop does not
+            # pause between creates -- its comment says a pausing client
+            # 'would serialise the burst below into six sequential
+            # instance creates and leave nothing to coalesce' -- and a
+            # waited-out refusal would inject up to CLUSTER_HEADROOM_WAIT
+            # between two creates of a burst whose simultaneity is the
+            # thing under test. Passing the non-pausing client to a
+            # wrapper which pauses would have taken the pause back.
+            instances.append(self.burst_client.create_instance(
                 'coalesce-%d' % i, 1, 1024,
                 [
                     {
@@ -146,7 +155,7 @@ class TestCoalescing(base.BaseNamespacedTestCase):
                         'base': base.CLUSTER_CI_IMAGE,
                         'type': 'disk'
                     }
-                ], None, None, client=self.burst_client))
+                ], None, None))
 
         self.addDetail('instances', content.text_content(json.dumps(
             [i['uuid'] for i in instances], indent=4, sort_keys=True)))

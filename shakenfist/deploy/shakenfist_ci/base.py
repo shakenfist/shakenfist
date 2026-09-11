@@ -314,6 +314,15 @@ class BaseTestCase(testtools.TestCase):
         client = client or self.test_client
         deadline = self._now() + CLUSTER_HEADROOM_WAIT
         disk_gb = retries.requested_disk_gb(disk)
+        # Resolved lazily and then remembered: once per create that is
+        # actually refused, never for one that is not. Almost every
+        # create in a run succeeds first time, and making each of them
+        # pay a GET /nodes to answer a question no one asked would put
+        # a node listing behind every instance the suite builds. The
+        # mapping cannot change usefully within one create, so once is
+        # also enough for a create which is refused repeatedly.
+        roster_key = None
+        roster_key_resolved = None
 
         attempts = 0
         waits = []
@@ -364,14 +373,24 @@ class BaseTestCase(testtools.TestCase):
             # cannot see what is being refused, and an unpaced loop there
             # spins until the deadline leaving an error-deleted instance
             # behind on every turn.
+            if roster_key_resolved is None:
+                roster_key, roster_key_resolved = self._placement_roster_key(
+                    force_placement)
+
             wait = retries.wait_for_capacity(
                 self.system_client.get_cluster_resources, cpus, memory,
-                disk_gb, force_placement, deadline,
+                disk_gb, roster_key, deadline,
                 clock=self._now, sleep=self._sleep,
                 interval=CAPACITY_POLL_INTERVAL,
-                minimum_sleep=0 if attempts == 1 else CAPACITY_POLL_INTERVAL)
+                minimum_sleep=0 if attempts == 1 else CAPACITY_POLL_INTERVAL,
+                blind=not roster_key_resolved)
             wait['instance_name'] = name
             wait['attempt'] = attempts
+            # Both, because they are different facts and a reader of the
+            # trace needs each: what the test asked for, and which roster
+            # entry the wait actually watched.
+            wait['pinned_to'] = force_placement
+            wait['roster_key'] = roster_key
             waits.append(wait)
             self._record_capacity_wait(wait)
 
@@ -438,7 +457,12 @@ class BaseTestCase(testtools.TestCase):
             record = {
                 'test_id': self.id(),
                 'instance_name': wait.get('instance_name'),
-                'node': wait.get('node'),
+                # What the test asked for, which is what a person reading
+                # the bundle recognises. The roster is keyed by uuid, so
+                # the entry actually watched is recorded beside it rather
+                # than in place of it -- see _placement_roster_key().
+                'node': wait.get('pinned_to'),
+                'roster_key': wait.get('roster_key'),
                 'cpus': wait.get('cpus'),
                 'memory_mb': wait.get('memory_mb'),
                 'disk_gb': wait.get('disk_gb'),
@@ -470,8 +494,8 @@ class BaseTestCase(testtools.TestCase):
         waited = sum(wait.get('seconds_waited', 0) for wait in waits)
         self.fail(
             'Creating instance %s (%d cpus, %s) was refused for insufficient '
-            'resources and the cluster did not free enough within %ds. '
-            '%d attempts, %.1fs waited.\n\n'
+            'resources and the cluster did not free enough before its '
+            '%ds deadline. %d attempts, %.1fs waited.\n\n'
             '%s'
             'The last refusal was:\n%s\n\n'
             'The node waited for was: %s\n\n'
@@ -570,6 +594,51 @@ class BaseTestCase(testtools.TestCase):
     def _get_cluster_nodes(self):
         """Return the cluster's nodes as reported by the API."""
         return self.system_client.get_nodes()
+
+    def _placement_roster_key(self, force_placement):
+        """Which /admin/resources per_node key this pin refers to.
+
+        Returns a (key, resolved) pair. per_node is keyed by node UUID --
+        summarize_resources() builds it from the metrics dict, which
+        get_active_node_metrics() keys by str(n.uuid) and says so in a
+        comment (scheduler.py) -- while force_placement is almost always
+        a node *name*: 'sf-2' in test_networking.py, node['name'] in
+        test_nodes.py and test_placement.py, socket.getfqdn() in
+        test_instance_placement.py.
+
+        Handing the name straight to the wait made per_node.get(target)
+        miss on every poll, so the target read as zero headroom in every
+        dimension and no dimension was ever recorded as binding. The wait
+        could then never be satisfied however empty the cluster was: one
+        transient 507 on a name-pinned create became a guaranteed
+        CLUSTER_HEADROOM_WAIT failure, whose message said there was room
+        everywhere and so pointed at the predicate rather than at the pin.
+
+        A pin which is already a UUID is passed through. An unresolvable
+        pin returns (None, False), which the caller waits blind on rather
+        than reading as a node with no room -- not knowing which entry to
+        read is not evidence that the entry is empty.
+        """
+        if not force_placement:
+            return None, True
+
+        try:
+            nodes = self._get_cluster_nodes()
+        except Exception as e:
+            # Listing nodes is not this method's job to insist on. A
+            # failure here is the same kind of ignorance as a name which
+            # does not resolve, and is reported the same way.
+            LOG.info('Could not list nodes to resolve the pin %s: %s'
+                     % (force_placement, e))
+            return None, False
+
+        for n in nodes:
+            if force_placement in (n.get('uuid'), n.get('name')):
+                return n.get('uuid'), True
+
+        LOG.info('The pin %s matched no node, so its wait is blind'
+                 % force_placement)
+        return None, False
 
     def _network_node(self):
         """Return the node dict for the cluster's network node, or None."""

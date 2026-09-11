@@ -169,8 +169,19 @@ ceiling under that, and a failure that cites it says so rather than
 blaming the cluster's capacity.
 
 A retry uses a fresh name, because the refused instance holds the caller's
-name until its error delete completes. The base name is trimmed so that the
-name plus the retry suffix stays inside the server's 63 character limit.
+name until its error delete completes: the instance object is created and
+then error-deleted, and `Instance.ACTIVE_STATES` includes the error states,
+so the name still resolves while that delete is in flight. The base name is
+trimmed so that the name plus the retry suffix stays inside the server's 63
+character limit.
+
+**This means the instance's name is not always the name you asked for.** A
+test that looks an instance up by the literal it passed in will 404 after a
+wait; read the name back from the returned dict (`inst['name']`) instead,
+which is what `test_object_names.py` does. A test whose subject *is* the
+name -- one asserting that two namespaces can hold the same name -- cannot
+be renamed at all without silently asserting nothing, and so uses a
+`# raw-create:` marker rather than the wrapper.
 
 If the deadline passes, which is what it means for a test that is genuinely
 asking for more than the cloud has, the test fails with the last refusal's
@@ -333,7 +344,11 @@ capacity read and waits that had to sleep blind because
 line also carries the create's three request dimensions, the
 `binding_dimension` it was short of, and `attempt_number` -- a
 1-indexed position, not a count, so a create refused three times
-writes three lines carrying 1, 2 and 3.
+writes three lines carrying 1, 2 and 3. `node` is the placement the
+test asked for, and `roster_key` is the `per_node` entry the wait
+actually watched: `/admin/resources` keys that mapping by node UUID
+while the suite pins by node name, so the two differ and the wait has
+to resolve one to the other before it can read anything.
 Because the report already runs over a downloaded bundle rather than
 only inside a live job, this summary is available from the moment the
 phase that writes the trace merges -- the evidence does not wait for
