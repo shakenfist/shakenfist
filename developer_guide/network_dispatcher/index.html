@@ -15656,6 +15656,16 @@ serialisation is now provided by the queue itself — only <code>sf-net</code> d
 executes network work, so concurrent host-mutating calls from other daemons
 (<code>sf-queues</code>, <code>sf-api</code>, <code>instance.py</code>) cannot bypass the dispatcher by
 construction.</p>
+<p>One of those locks has since returned. The dispatcher-only premise never
+held for <code>_apply_delete_on_hypervisor</code>: it is called from
+<code>node_inst_op._instance_delete</code> and <code>node_net_op._network_destroy</code>, both of
+which run on sf-queues' concurrent worker pool, so several instance deletes
+on one hypervisor raced its check-then-delete of the vxlan devices and the
+loser raised <code>ProcessExecutionError</code> (issue 4165). It therefore holds a
+per-node <code>NodeLock</code> on the network again. <code>_apply_create_on_hypervisor</code>
+shares the same out-of-dispatcher callers and remains lock-free; its
+check-then-create has the mirror-image window, but no failure of that shape
+has been observed.</p>
 <p>An important scope note: all 13 removed locks used <code>global_scope=False</code>, making
 them per-node <code>NodeLock</code>s, not <code>ClusterLock</code>s. The single-threaded-dispatcher
 argument covers per-node serialisation only. <code>ClusterLock</code>s serialise across the
@@ -15686,10 +15696,12 @@ methods on it. The single-worker-per-queue invariant (see the comment
 block at <code>self._defer_delays</code> in workitem.py) is a load-bearing property:
 it is why the dispatcher's in-memory exponential back-off map is correct,
 and why cross-daemon serialisation can be queue-based rather than
-lock-based. All <code>NodeLock(global_scope=False)</code> wrappers that formerly
-existed inside <code>_apply_*</code> methods have been removed — only <code>sf-net</code>
-dequeues and executes network work, so concurrent invocation across
-daemons cannot happen by construction. The cancellation check on dequeue
+lock-based. All but one of the <code>NodeLock(global_scope=False)</code> wrappers
+that formerly existed inside <code>_apply_*</code> methods have been removed — only
+<code>sf-net</code> dequeues and executes network work, so concurrent invocation
+across daemons cannot happen by construction. The exception is
+<code>_apply_delete_on_hypervisor</code>, whose callers are sf-queues dispatchers
+rather than the net-worker; see "NodeLock removal" above. The cancellation check on dequeue
 runs before the <code>_apply_*</code> call; if the op is already cancelled, the
 worker skips execution and transitions the op to <code>STATE_ABORT</code>.</p>
 <p><strong>Network methods enqueue; maintain is discovery-only.</strong> All 15
