@@ -810,9 +810,10 @@ row) exported from the cluster daemon's metrics port
 per reconcile pass.
 
 Disk capacity is claimed at virtual size, measured at 40-140x actual
-usage (median ~65x) for sparse qcow2 images, so a within-period burst
-of virtual claims would be rejected against last-observed actual free
-space.
+usage (median ~65x for sparse qcow2 images; see
+[PLAN-scheduler-reservations](../plans/PLAN-scheduler-reservations.md)),
+so a within-period burst of virtual claims would be rejected against
+last-observed actual free space.
 `SCHEDULER_DISK_OVERCOMMIT` (default 5.0) multiplies the free-space
 headroom term of each node's derived disk limit — `used + max(0,
 floor(free/GiB) - reservation) x SCHEDULER_DISK_OVERCOMMIT` — never
@@ -874,10 +875,10 @@ on all of them. Aggregating asks the question you actually want
 answered: has *anybody* reconciled recently.
 
 The `namespace_claims` table has writers other than the reconciler.
-Five `sf-database` RPCs —
-`CreateNamespaceClaim`, `GetNamespaceClaim`, `GetNamespaceClaims`,
-`UpdateNamespaceClaim` and `DeleteNamespaceClaim` — back the admin-only
-REST endpoints at `/auth/namespaces/<namespace>/claims`, and the
+Five `sf-database` RPCs — `CreateNamespaceClaim`, `GetNamespaceClaim`,
+`GetNamespaceClaims`, `UpdateNamespaceClaim` and `DeleteNamespaceClaim`
+— back the admin-only REST endpoints at
+`/auth/namespaces/<namespace>/claims`, and the
 `NamespaceClaim` object is persisted in this same table rather than a
 separate static-values one.
 

@@ -228,9 +228,9 @@ Operator-facing documentation is
 
 ### The claim admission transaction
 
-`namespace_claims` is writable. A claim is a namespace's
-promise of aggregate cluster capacity, so creating, growing or shrinking
-one is an admission decision in its own right — against the
+`namespace_claims` is writable. A claim is a namespace's promise of
+aggregate cluster capacity, so creating, growing or shrinking one is an
+admission decision in its own right — against the
 `cluster_capacity` singleton rather than against a node — and the five
 CRUD RPCs (`CreateNamespaceClaim`, `GetNamespaceClaim`,
 `GetNamespaceClaims`, `UpdateNamespaceClaim`, `DeleteNamespaceClaim`)
