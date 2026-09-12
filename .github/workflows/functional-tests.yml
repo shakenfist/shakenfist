@@ -718,7 +718,12 @@ jobs:
       (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
       && needs.check_paths.outputs.code_changed != 'false'
     needs: [check_paths]
-    runs-on: [self-hosted, vm, debian-12]
+    # Carries a size element because the conductor falls back to xs
+    # (1 vCPU / 2048 MB, no swap) when the labels name none. This job
+    # apt-installs a real MariaDB server and then runs the live test
+    # modules against it, which is the same shape that ran out of
+    # memory on xs in node_lifecycle_collection above.
+    runs-on: [self-hosted, vm, debian-12, s]
     timeout-minutes: 30
     concurrency:
       group: >-
