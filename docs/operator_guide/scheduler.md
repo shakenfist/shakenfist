@@ -641,7 +641,7 @@ decays linearly to zero over `SCHEDULER_DEMAND_DECAY_SECONDS` of
 instance age. The purpose is to stop a burst of placements all choosing
 the same node because none of them have started doing any work yet.
 
-Since scheduler-reservations phase 3 they do affect placement: each
+They do affect placement: each
 successful admission adds `vcpus × SCHEDULER_DEMAND_PER_VCPU` to the
 target node's `expected_demand` counter in the same transaction, and
 the admission guard refuses a node whose existing load is *already*

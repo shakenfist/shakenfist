@@ -730,10 +730,10 @@ table whose rows are ephemeral by design.
 The three capacity tables (`scheduler_node_capacity`, `namespace_claims` and
 `cluster_capacity`) are recomputed wholesale from ground truth by a
 reconciler that runs every five minutes on the elected cluster node, and —
-since phase 3, described below — are also drawn down and released
-incrementally by the placement admission and release RPCs between those
-passes. The reconciler is therefore the drift corrector rather than the
-only writer. Each pass is a single `ReconcileSchedulerCapacity`
+as described below — are also drawn down and released incrementally by
+the placement admission and release RPCs between those passes. The
+reconciler is therefore the drift corrector rather than the only
+writer. Each pass is a single `ReconcileSchedulerCapacity`
 RPC which expires stale claims, re-derives each hypervisor's limits from
 the typed `node_metrics` columns (deliberately mirroring the scheduler's
 admission arithmetic), recomputes usage counters from placed instances,
@@ -742,9 +742,8 @@ recomputes the decaying expected-demand signal, and rebuilds the
 ensure-mariadb-schema` (run it before rolling the daemons after an
 upgrade, as always).
 
-As of scheduler-reservations phase 3 the counters are consumed for
-admission, not just observed. Instance placement goes through two
-`sf-database` RPCs, `AdmitInstancePlacement` and
+The counters are consumed for admission, not just observed. Instance
+placement goes through two `sf-database` RPCs, `AdmitInstancePlacement` and
 `ReleaseInstancePlacement`, each performing its guarded counter update,
 the `placement` attribute write and the `instance_location` reference
 rewrite in a single transaction, so a placement can never be recorded
@@ -810,10 +809,10 @@ row) exported from the cluster daemon's metrics port
 (`CLUSTER_METRICS_PORT`, default `13007`), plus one structured log line
 per reconcile pass.
 
-Disk capacity is claimed at virtual size, which the phase 0 step 3
-addendum measured at 40-140x actual usage (median ~65x) for sparse
-qcow2 images, so a within-period burst of virtual claims would be
-rejected against last-observed actual free space.
+Disk capacity is claimed at virtual size, measured at 40-140x actual
+usage (median ~65x) for sparse qcow2 images, so a within-period burst
+of virtual claims would be rejected against last-observed actual free
+space.
 `SCHEDULER_DISK_OVERCOMMIT` (default 5.0) multiplies the free-space
 headroom term of each node's derived disk limit — `used + max(0,
 floor(free/GiB) - reservation) x SCHEDULER_DISK_OVERCOMMIT` — never
@@ -874,8 +873,8 @@ own frozen value. A per-instance staleness alert would fire permanently
 on all of them. Aggregating asks the question you actually want
 answered: has *anybody* reconciled recently.
 
-As of scheduler-reservations phase 4 the `namespace_claims` table has
-writers other than the reconciler. Five `sf-database` RPCs —
+The `namespace_claims` table has writers other than the reconciler.
+Five `sf-database` RPCs —
 `CreateNamespaceClaim`, `GetNamespaceClaim`, `GetNamespaceClaims`,
 `UpdateNamespaceClaim` and `DeleteNamespaceClaim` — back the admin-only
 REST endpoints at `/auth/namespaces/<namespace>/claims`, and the
@@ -927,7 +926,7 @@ Two behaviours differ deliberately from instance admission:
   the reply, which `Instance` turns into a `placement admitted over
   namespace capacity claim` audit event. See [the scheduler operator
   guide](scheduler.md#namespace-capacity-claims) for the operator view.
-  Phase 3's single fail-open flag was split into three for this: the node
+  What was a single fail-open flag is split into three for this: the node
   and cluster guards keep failing open on a node with no capacity row,
   because that reasoning is about *this node's* limits being absent from
   the totals, which says nothing about whether a namespace has exceeded
@@ -1112,7 +1111,7 @@ dedicated attribute tables:
 | Table | Object Type | Key Fields |
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
-| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; the dual-write and the union into reads were removed in scheduler-reservations phase 3; the legacy `instances` JSON column itself remains in place (nullable, unread) as a rollback fallback until a later release drops it |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; the dual-write and the union into reads have been removed; the legacy `instances` JSON column itself remains in place (nullable, unread) as a rollback fallback until a later release drops it |
 | `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column is left in place until a later schema bump drops it |
 | `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
 | `trusted_issuer_attributes` | TrustedIssuer | uuid, issuer_url, jwks_uri, audience |

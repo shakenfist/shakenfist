@@ -16,6 +16,19 @@ repos:
         name: Lint GitHub Actions workflows
         description: Static checker for GitHub Actions workflow files
 
+  # Lints the agent context -- AGENTS.md, CLAUDE.md and the skills
+  # under .claude/ -- for malformed frontmatter, smuggled instructions,
+  # embedded credentials and dangerous hook or settings configuration.
+  # The llm-context-lint-ci audit requires this here and in CI: the
+  # daily consistency audit is a backstop, so a secret pasted into
+  # CLAUDE.md should fail the commit that introduces it rather than a
+  # report up to a day later. Renovate's pre-commit manager keeps the
+  # rev current.
+  - repo: https://github.com/stbenjam/skillsaw
+    rev: v0.20.0
+    hooks:
+      - id: skillsaw
+
   # Ansible linter for the shakenfist.shakenfist deployer collection
   # Requires: pip install ansible-lint
   # Note: Uses 'local' repo because the upstream pre-commit hook has Python 3.13

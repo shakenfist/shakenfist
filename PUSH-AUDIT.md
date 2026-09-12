@@ -189,6 +189,29 @@ Add the judgment-level review on the diff
   blocking or advisory and why. Skip ones inside test
   modules unless they disable coverage on production code.
 
+<!-- shared-block: python-version-discipline v1 -->
+Python version and typing (shared block; do not edit -- the
+canonical copy lives in shakenfist/development at
+`templates/shared-blocks/python-version-discipline.md`):
+
+- No syntax or standard library API newer than the floor in
+  `requires-python`. Structural pattern matching, `X | Y` unions in
+  annotations evaluated at runtime, `tomllib`, and
+  `datetime.UTC` each raise on an interpreter the package still
+  claims to support, and none of them fail in CI when CI runs only
+  the newest version. This is the finding to look for first: it is
+  a real break on a real user's machine, not a style point.
+- New and modified code carries type hints, and mypy is expected to
+  be clean over it. A project part way through a staged rollout is
+  held to the new code, not to the whole tree.
+- Prefer the walrus operator and f-strings where they make the code
+  read better, subject to the floor above.
+- Raising the floor in `requires-python` is a supported-platforms
+  decision, not a convenience: it drops users. If it is genuinely
+  right, the platforms table, `requires-python` and
+  `constraints.python` in `renovate.json` all move together.
+<!-- shared-block-end -->
+
 <!-- shared-block: comment-proportion v1 -->
 Comment proportion (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
@@ -250,6 +273,32 @@ Also verify:
   the database daemon, note which `cluster_ci` tests in
   particular would exercise the new behaviour and whether
   they should be run before push.
+
+<!-- shared-block: functional-test-coverage v1 -->
+Functional test coverage (shared block; do not edit -- the
+canonical copy lives in shakenfist/development at
+`templates/shared-blocks/functional-test-coverage.md`):
+
+- The standard is "do we run the code to do the real thing, and
+  does it work as intended". Every subcommand exposed on the command
+  line, and every endpoint exposed by an API, should have a test
+  that exercises it for real rather than against a mock of itself.
+- For a change that adds or alters user-visible behaviour, the
+  question to answer is which functional test would have failed
+  before it and passes after. If there is none, that is the finding,
+  and it is a finding about this change rather than a note for
+  later.
+- Unit tests are held to no coverage percentage, but a branch that
+  is reachable from outside the process and has no test is worth
+  naming. Error paths and argument validation are where this bites:
+  they are the code most often written once and never run again.
+- Mocking the system under test proves nothing. Mock the boundary --
+  the network, the clock, the hypervisor -- and let the code being
+  tested actually run.
+- Where a gap is real but out of scope for the change in hand, say
+  so plainly and record it, rather than silently widening the
+  change or silently leaving it unsaid.
+<!-- shared-block-end -->
 
 Report findings as a bullet list grouped by file.
 
@@ -328,6 +377,36 @@ edit -- the canonical copy lives in shakenfist/development at
   worth a quick pass even when the diff does not touch
   `state_targets`, as the diagrams have drifted from the maps
   before.
+
+<!-- shared-block: diagram-discipline v1 -->
+Diagram discipline (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+`templates/shared-blocks/diagram-discipline.md`):
+
+- A diagram of *structure or flow* -- components and the arrows
+  between them, an ordered exchange of messages, a state machine
+  -- is written as a fenced `mermaid` block, not drawn in ASCII.
+  GitHub renders those natively and the mkdocs sites render them
+  through `pymdownx.superfences`, so the same source is a picture
+  in both places.
+- Not every box of characters is a diagram. These stay as plain
+  code fences, because mermaid cannot express them and would lose
+  what they show: directory and file trees; memory maps, address
+  space layouts and register or bit-field diagrams, where column
+  alignment carries the meaning; wire-format and on-disk byte
+  layouts; captured terminal output; and tables. The test is
+  whether the picture is nodes and edges. Something that is a
+  table with lines drawn on it is a table.
+- Pick the diagram type that matches the claim: `flowchart` for
+  components and data flow, `sequenceDiagram` for an ordered
+  exchange between parties, `stateDiagram-v2` for a state
+  machine, `erDiagram` for data relationships. A sequence drawn
+  as a flowchart has thrown away the ordering it existed to show.
+- A new ASCII box-and-arrow diagram in the diff is a finding.
+  Converting one the diff already touches is in scope; converting
+  every other diagram in the file is not, because a sweep is its
+  own change and its own review.
+<!-- shared-block-end -->
 
 <!-- shared-block: plan-phase-references v1 -->
 Plan phase references (shared block; do not edit -- the canonical
@@ -415,6 +494,33 @@ Check for:
 - **Concurrency:** Are there new shared-state patterns or
   lock acquisitions? Could they deadlock with existing
   locks? Is lock ordering documented or obvious?
+
+<!-- shared-block: path-traversal-review v1 -->
+Path construction from outside data (shared block; do not edit --
+the canonical copy lives in shakenfist/development at
+`templates/shared-blocks/path-traversal-review.md`):
+
+- Treat as a candidate any filesystem path built from a value the
+  process did not choose: a request parameter, an image name, tag or
+  digest, a layer path, an archive member name, a filename out of a
+  configuration file or a database row.
+- The question is not whether the value looks dangerous but whether
+  the resulting path is *proved* to stay inside its intended base
+  directory. Resolve the joined path with `os.path.realpath()` and
+  verify it still starts with the base; a check on the untrusted
+  component alone is defeated by symlinks and by encodings the
+  check did not anticipate.
+- Prefer a helper that cannot be forgotten at a call site --
+  `safe_path_join()` in occystrap, or the framework's own
+  (`send_from_directory` in Flask) -- over an inline guard repeated
+  at each join.
+- Archive extraction is the case most often missed: a member name
+  inside a tarball or zip is attacker-controlled in exactly the same
+  way as a request parameter.
+- Where a bare join is correct because every component is
+  process-chosen, say so in a comment rather than leaving the
+  reader to re-derive it.
+<!-- shared-block-end -->
 
 Report findings with severity (critical / high / medium /
 low / informational). For each finding, state the file,

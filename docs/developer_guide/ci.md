@@ -68,13 +68,13 @@ That leaves a released client mattering to exactly one audience -- operators
 -- which is worth knowing before treating a release as a prerequisite for
 anything internal.
 
-Phase 4 of `docs/plans/PLAN-scheduler-reservations.md` reasoned from the
+Work on `docs/plans/PLAN-scheduler-reservations.md` reasoned from the
 opposite belief and deliberately wrote its functional coverage against
 `apiclient.Client._request_url()` to work around a constraint which had
-already been gone for seven weeks. Its phase 4b then made the same mistake
-about the conductor, in the same document that corrected the first one --
-because it checked this repository's install path and took the conductor's
-from another plan. If you find yourself about to do something similar, check
+already been gone for seven weeks. It then made the same mistake about the
+conductor, in the same document that corrected the first one -- because it
+checked this repository's install path and took the conductor's from
+another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.
 
@@ -218,20 +218,21 @@ break it twice, since the wrapper's own deadline failure is a test failure
 rather than an `APIException` the `except` clause could catch, and waiting
 up to seven minutes per refusal would serialise a burst whose simultaneity
 is the thing under test. The other reserved use is the wrapper's own call
-inside `base.py`, which has to reach the client somehow. The CI cloud
-sizing plan's phase 3 saturation tests are expected to need the marker
-too, to assert that a genuinely full cluster refuses rather than have the
-refusal waited away.
+inside `base.py`, which has to reach the client somehow. The saturation
+tests planned in
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) are expected to
+need the marker too, to assert that a genuinely full cluster refuses
+rather than have the refusal waited away.
 
 ## CI headroom instrumentation
 
-Phase 1 of `docs/plans/PLAN-ci-cloud-sizing.md` (see
-`docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md` for the
-decisions behind it) added two data-gathering instruments to every
-functional cluster job, so that later phases can size CI's clouds from
-a distribution instead of the handful of hand-collected numbers the
-plan started from. Neither instrument gates anything itself -- see
-"Nothing here is a quality gate" below -- but the poller's own traffic
+Every functional cluster job carries two data-gathering instruments,
+so that CI's clouds can be sized from a distribution instead of the
+handful of hand-collected numbers
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) started from;
+`docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md` records
+the decisions behind them. Neither instrument gates anything itself
+-- see "Nothing here is a quality gate" below -- but the poller's own traffic
 does interact with a check that gates, which is the one reason a
 reader troubleshooting a CI failure might need this section; see "The
 probe's traffic is exempted from the idle-load check". Otherwise it
@@ -328,9 +329,8 @@ moves with the day it is run on.
 ### A third file: the capacity-wait trace (`--waits`)
 
 A third file lands beside the other two, written by a different
-mechanism. `PLAN-transient-capacity-refusals` phase 2's
-`self.create_instance()` wrapper (see "Creating instances in the
-functional suite" above) appends one JSON line to
+mechanism. The `self.create_instance()` wrapper (see "Creating
+instances in the functional suite" above) appends one JSON line to
 `/srv/ci/traces/instance-waits.jsonl` every time a create waits out a
 transient 507. It reaches the bundle through the same "Gather logs"
 scp as `headroom.jsonl` and `headroom-census.json`, with no separate
@@ -370,9 +370,9 @@ consumers of the record.
 
 ### The series record format
 
-Phase 2 parses `headroom.jsonl` as a contract, so treat the shape
-below as load-bearing rather than as prose to paraphrase; the tool's
-own docstring is the source of truth if the two ever disagree. Each
+`headroom.jsonl` is parsed as a contract, so treat the shape below as
+load-bearing rather than as prose to paraphrase; the tool's own
+docstring is the source of truth if the two ever disagree. Each
 line is one JSON object. A successful sample carries:
 
 * `sampled_at` -- float, unix epoch seconds, wall clock at sample
@@ -416,14 +416,16 @@ evidence the cloud needs more disk capacity.
 
 ### Nothing here is a quality gate
 
-Every workflow step this phase added is `continue-on-error`, and
-`ci_headroom_report.py` always exits 0 whatever it finds -- even an
-internal error in the report is printed, not raised. The band verdict
-it prints (committed vCPU as a fraction of the admission ledger,
-against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
-phase 0 set those bounds with no distribution to check them against,
-phase 2 replaces or defends them, and any enforcement is phase 5's to
-add. No verdict this instrumentation prints can fail a job.
+Every workflow step this instrumentation added is
+`continue-on-error`, and `ci_headroom_report.py` always exits 0
+whatever it finds -- even an internal error in the report is printed,
+not raised. The band verdict it prints (committed vCPU as a fraction
+of the admission ledger, against bounds of 0.35 and 0.70) is
+explicitly labelled PROVISIONAL: those bounds were set with no
+distribution to check them against, and replacing or defending them --
+and turning any of this into something that gates -- is work
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) still has
+ahead of it. No verdict this instrumentation prints can fail a job.
 
 That is not the same as the instrumentation being invisible to the
 checks that do gate, which is what this section used to say and what

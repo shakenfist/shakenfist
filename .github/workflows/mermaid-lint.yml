@@ -1,0 +1,91 @@
+# Render every mermaid diagram in the repository's markdown and fail on
+# any that does not parse.
+#
+# Copied from shakenfist/development at templates/mermaid-lint/. See
+# that directory's README.md before editing, and in particular before
+# making this a required status check -- a path-filtered workflow that
+# a merge queue requires never reports, and blocks the queue.
+#
+# The runner label is not a typo. This needs a docker daemon, and
+# static runners do not have one: `debian-12-docker` is the fleet's
+# docker-capable image. Add it to .github/actionlint.yaml's runner
+# labels or actionlint fails.
+#
+# Living in its own file has one consequence worth stating. This job
+# can fail a pull request, but a `needs:` list in another workflow
+# cannot reach it, and it is deliberately not a required check either
+# -- see "Required status checks" in the template README for why a
+# path-filtered required check is a trap. So a red Mermaid lint is
+# visible on the pull request and blocks nothing automatically. Where
+# a repository records which jobs gate a pull request, this one
+# belongs on the list of deliberate exceptions.
+name: Mermaid lint
+
+on:
+  # Also on push, because a commit that lands on the default branch
+  # without a pull request -- an admin push, a bot commit -- would
+  # otherwise never be linted here. It would be caught by whichever
+  # unrelated pull request next touches markdown, which is worse than
+  # not catching it: the whole tree is linted every run, so the failure
+  # lands on an author who did not write the diagram.
+  #
+  # Both branch names ship, because the fleet's default branch is
+  # `develop` in some repositories and `main` in others; the one a
+  # given repository does not have simply never matches. There is
+  # deliberately no merge_group trigger: this is not a required check,
+  # and a path-filtered workflow made required reports pending forever
+  # on the pull requests it filters out.
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - '**.md'
+      - '.github/workflows/mermaid-lint.yml'
+      - 'tools/mermaid-lint.sh'
+      - '!REVIEWS.md'
+  pull_request:
+    # Markdown can break a diagram, and so can the checker itself: a
+    # pull request that edits the script or this workflow and no
+    # markdown would otherwise ship a change to the lane that was never
+    # run.
+    #
+    # REVIEWS.md is excluded because a review session or a bot prune
+    # rewrites it and changes no diagram, while this lane costs a
+    # virtual machine. A repository that has no REVIEWS.md keeps the
+    # line anyway, so that the exclusion is in force from the first
+    # commit of one rather than from whenever somebody remembered it.
+    # The negation is last because a later pattern wins.
+    #
+    # mermaid-lint.sh drops the same file from its own candidate set,
+    # and the two must stay in step: the script lints the whole tree
+    # every run, so a file excluded here but linted there fails
+    # somebody else's pull request over a diagram they did not write.
+    paths:
+      - '**.md'
+      - '.github/workflows/mermaid-lint.yml'
+      - 'tools/mermaid-lint.sh'
+      - '!REVIEWS.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mermaid-lint:
+    name: Mermaid lint
+    runs-on: [self-hosted, vm, debian-12-docker, s]
+    timeout-minutes: 15
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      # The script does the work; see the CI script rule in AGENTS.md.
+      # It lints every tracked markdown file rather than only the
+      # changed ones: the whole run is a few seconds per file, and a
+      # diagram can also be broken by a mermaid upgrade that no diff
+      # touches.
+      - name: Lint mermaid diagrams
+        run: ./tools/mermaid-lint.sh
