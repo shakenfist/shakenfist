@@ -113,6 +113,7 @@ nav:
                 - "Audit: Dependencies declared but never imported": components/development/audits/unused-declared-dependency.md
                 - "Audit: Dependency name normalization": components/development/audits/dependency-name-normalization.md
                 - "Audit: diagram format": components/development/audits/diagram-format.md
+                - "Audit: End-of-life distributions": components/development/audits/eol-distro.md
                 - "Audit: Expensive lane path filtering": components/development/audits/expensive-lane-path-filter.md
                 - "Audit: Exporting repo configuration changes": components/development/audits/export-repo-config.md
                 - "Audit: Fuzz nightly reporting": components/development/audits/fuzz-nightly-reporting.md
@@ -160,6 +161,7 @@ nav:
                 - "Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster": components/development/plans/PLAN-plan-template-blocks.md
                 - "Plan: split the generated compliance tables out of the audit specifications": components/development/plans/PLAN-audit-compliance-split.md
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
+                - "Plan: the image supply chain, from end-of-life migration to production that reports its own failures": components/development/plans/PLAN-image-supply-chain.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
