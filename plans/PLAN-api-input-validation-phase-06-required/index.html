@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-api-input-validation/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-api-input-validation-phase-06-required/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Declarative validation and a consistent error contract for the REST API - Shaken Fist</title>
+        <title>Phase 6: Required and scalar semantics - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#declarative-validation-and-a-consistent-error-contract-for-the-rest-api" class="md-skip">
+        <a href="#phase-6-required-and-scalar-semantics" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Declarative validation and a consistent error contract for the REST API
+              Phase 6: Required and scalar semantics
             
           </span>
         </div>
@@ -13698,10 +13698,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Context
       
     </span>
   </a>
@@ -13709,83 +13709,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Scope
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Situation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-the-per-endpoint-fix-was-abandoned" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why the per-endpoint fix was abandoned
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-asset-nobody-is-using" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The asset nobody is using
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-catch-stated-up-front" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The catch, stated up front
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#type-vocabulary-gaps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Type vocabulary gaps
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#reported-issues-this-plan-addresses" class="md-nav__link">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reported issues this plan addresses
+        What the survey found
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Reported issues this plan addresses">
+    <nav class="md-nav" aria-label="What the survey found">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#core-declarative-validation" class="md-nav__link">
+  <a href="#f1-every-declared-required-body-parameter-is-optional-in-fact" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Core: declarative validation
+        F1. Every declared-required body parameter is optional in fact
       
     </span>
   </a>
@@ -13793,10 +13743,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#error-contract-and-attribution" class="md-nav__link">
+  <a href="#f2-the-production-numbers-exist-and-they-are-thin" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error contract and attribution
+        F2. The production numbers exist, and they are thin
       
     </span>
   </a>
@@ -13804,10 +13754,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#enabling" class="md-nav__link">
+  <a href="#f3-exactly-one-type-token-validates-anything" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Enabling
+        F3. Exactly one type token validates anything
       
     </span>
   </a>
@@ -13815,38 +13765,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#adjacent-related-deliberately-not-absorbed" class="md-nav__link">
+  <a href="#f4-3269-is-exactly-as-filed-four-years-on" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Adjacent — related, deliberately not absorbed
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#decisions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decisions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Decisions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#phases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Phases
+        F4. #3269 is exactly as filed, four years on
       
     </span>
   </a>
@@ -13854,10 +13776,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#where-the-tracked-issues-stand" class="md-nav__link">
+  <a href="#f5-323-is-not-a-format-problem-and-534-is-not-a-top-level-one" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where the tracked issues stand
+        F5. #323 is not a format problem, and #534 is not a top-level one
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f6-nested-structures-are-unvalidated-by-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F6. Nested structures are unvalidated by construction
       
     </span>
   </a>
@@ -13890,692 +13823,637 @@
   
 
 
-<h1 id="declarative-validation-and-a-consistent-error-contract-for-the-rest-api">Declarative validation and a consistent error contract for the REST API<a class="headerlink" href="#declarative-validation-and-a-consistent-error-contract-for-the-rest-api" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-relevant source files, understand existing patterns (the
-decorator chain in <code>shakenfist/external_api/base.py</code>, especially
-<code>Resource.method_decorators</code>, <code>log_request</code>,
-<code>handle_authorization_exceptions</code>, <code>record_exception</code> and
-<code>suppress_exceptions_to_client</code>; the <code>swagger_helper()</code>
-declarations on every endpoint; the four existing
-<code>use_kwargs</code> sites; <code>shakenfist/util/exceptions.py</code>). Ground
-your answers in what the code does today. Do not speculate when
-you could read it instead. Where a question touches on external
-concepts (webargs / marshmallow schema composition, Flask-RESTful
-dispatch, OpenAPI 2.0 parameter locations, HTTP status code
-semantics for malformed input), research as needed to give a
-confident answer. Flag any uncertainty explicitly rather than
-guessing.</p>
-<p>All planning documents should go into <code>docs/plans/</code>.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the component inventory and
-<code>CLAUDE.md</code> for build commands, project conventions, and the
-warning about decorator ordering in <code>external_api/app.py</code>.</p>
-<p>When we get to detailed planning, I prefer a separate plan
-file per detailed phase, named with <code>-phase-NN-descriptive</code>
-appended.</p>
-<p>I prefer one commit per logical change, and at minimum one
-commit per phase. Each commit should be self-contained.</p>
-<p><strong>Status: phases 0 to 5 planned; 0, 1, 2, 3, 4 and 5 complete.</strong>
-The open questions at the bottom are answered in the Decisions
-section; see
-<a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>
-for the measurements behind them,
-<a href="../PLAN-api-input-validation-phase-01-declaration-audit/"><code>PLAN-api-input-validation-phase-01-declaration-audit.md</code></a>
-for what the audit found,
-<a href="../PLAN-api-input-validation-phase-02-type-vocabulary/"><code>PLAN-api-input-validation-phase-02-type-vocabulary.md</code></a>
-for what the vocabulary work shipped and the four deviations it
-recorded, and
-<a href="../PLAN-api-input-validation-phase-03-compile-and-warn/"><code>PLAN-api-input-validation-phase-03-compile-and-warn.md</code></a>
-for the measurement that closed it, and
-<a href="../PLAN-api-input-validation-phase-04-enforce/"><code>PLAN-api-input-validation-phase-04-enforce.md</code></a>
-for the reading that unlocked the flip and what the flip changed for
-callers, and
-<a href="../PLAN-api-input-validation-phase-05-narrow/"><code>PLAN-api-input-validation-phase-05-narrow.md</code></a>
-for the narrowing and the two leaks it closed, and
-<a href="../PLAN-api-input-validation-phase-06-required/"><code>PLAN-api-input-validation-phase-06-required.md</code></a>
-for the required-ness decision and what the semantic type tokens turned
-out to be enforcing. Phase 6's survey split the phase it was planning:
-what was one row covering required-ness and four semantic issues is now
-phase 6 for the scalar half and phase 7 for element schemas on <code>dict</code>
-and <code>arrayofdict</code>, which #936 needs and which nothing in the vocabulary
-can express today. The push audit moves to phase 8. Neither phase 7 nor
-phase 8 is yet cut into a per-phase file.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>The REST API does not validate its inputs. A request body value
-of any JSON type reaches the handler that reads it, and what
-happens next depends entirely on whether that particular handler
-happened to guard the conversion.</p>
-<p>The mechanism is two decorators in
-<code>shakenfist/external_api/base.py</code>, both applied to every endpoint
-through <code>Resource.method_decorators</code>:</p>
-<ul>
-<li><code>log_request</code> merges <strong>every key of the JSON request body</strong>
-  into the handler's kwargs verbatim, with no type checking and
-  no schema (<code>base.py:588-598</code>). A body key also silently
-  overwrites a same-named URL path parameter.</li>
-<li><code>handle_authorization_exceptions</code> catches <strong>any</strong> <code>TypeError</code>
-  raised anywhere below it and returns
-  <code>400 &lt;str(exception)&gt;</code>. So a <code>TypeError</code> raised arbitrarily
-  deep in the stack is handed to the client as the interpreter's
-  own error text.</li>
-</ul>
-<p>Anything that escapes both — a <code>ValueError</code>, an <code>OverflowError</code>,
-an <code>OSError</code> — falls through to <code>suppress_exceptions_to_client</code>
-and becomes a 500 with an exception repr in the body and a
-recorded server exception on disk.</p>
-<p>Issue #3609 is one instance: <code>{"limit": "5"}</code> on the events
-endpoints produced
-<code>400 "'&lt;=' not supported between instances of 'str' and 'int'"</code>.</p>
-<h3 id="why-the-per-endpoint-fix-was-abandoned">Why the per-endpoint fix was abandoned<a class="headerlink" href="#why-the-per-endpoint-fix-was-abandoned" title="Permanent link">&para;</a></h3>
-<p>PR #3610 fixed #3609 by adding a shared <code>coerce_int()</code> helper and
-routing seven call sites through it. It was closed unmerged after
-six rounds of review. Two findings from that attempt matter here,
-because they are the argument for doing this declaratively:</p>
-<ol>
-<li><strong>Hand-rolled guards get written wrong.</strong> Of seven guards
-   written by hand, two were wrong on the first attempt: one
-   caught <code>(TypeError, ValueError)</code> and missed <code>OverflowError</code>
-   (reachable because Python's JSON parser accepts the
-   non-standard <code>Infinity</code> literal, and <code>int(float('inf'))</code>
-   raises <code>OverflowError</code>), and one type-checked
-   <code>max_versions</code> without range-checking it, leaving a
-   silently destructive negative value.</li>
-<li><strong>The class was still not covered when the PR was
-   abandoned.</strong> Of the 13 parameters this API <em>declares</em> as
-   <code>integer</code>, 6 were still read unconverted, including <code>cpus</code>
-   and <code>memory</code> on <code>POST /instances</code>, which are passed to
-   <code>Instance.new()</code> as received.</li>
-</ol>
-<p>Every endpoint added in future inherits the defect by default,
-because the default is no validation.</p>
-<h3 id="the-asset-nobody-is-using">The asset nobody is using<a class="headerlink" href="#the-asset-nobody-is-using" title="Permanent link">&para;</a></h3>
-<p><strong>124 of the 129 handler methods (96%) already declare their
-parameters.</strong> Every <code>swag_from(api_base.swagger_helper(...))</code>
-call passes a list of</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>(name, location, type, description, required)
+<h1 id="phase-6-required-and-scalar-semantics">Phase 6: Required and scalar semantics<a class="headerlink" href="#phase-6-required-and-scalar-semantics" title="Permanent link">&para;</a></h1>
+<p>Phase 6 of <a href="../PLAN-api-input-validation/"><code>PLAN-api-input-validation.md</code></a>,
+following <a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a>.</p>
+<p>Phase 4 turned rejection on for everything except required-ness. Phase 5
+deleted the broad <code>except TypeError</code> that had been absorbing the
+consequences. This phase answers the question phase 3 deferred as
+decision D17 and phase 4 left in place — whether a parameter declared
+<code>required</code> is actually required — and gives the semantic type tokens
+phase 2 added something to do beyond documenting themselves.</p>
+<p><strong>Planning effort:</strong> high. The code changes are small; deciding which
+of 75 declarations is telling the truth is not, and the previous phase
+demonstrated how to get a survey of exactly this shape wrong.</p>
+<p><strong>Review effort:</strong> high. A reviewer's job here is to find a parameter
+this phase marks required which some working client omits today.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p><code>CompiledEndpoint</code> records required-ness and never enforces it
+(<code>shakenfist/external_api/validation.py:82</code>), and <code>validate_request</code>
+filters it out of the enforceable set even on the default <code>enforce</code>
+path (<code>shakenfist/external_api/base.py:1906</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">enforceable</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">findings</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>               <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">reason</span> <span class="o">!=</span> <span class="n">validation</span><span class="o">.</span><span class="n">MISSING_REQUIRED</span><span class="p">]</span>
 </code></pre></div>
-<p>tuples — 254 parameters in total across 20 files, with 113
-declared <code>body</code> and 118 declared <code>query</code>. <code>swagger_helper()</code>
-already maps the type token through an <code>argtypes</code> table
-(<code>base.py:141-160</code>) covering <code>string</code>, <code>integer</code>, <code>number</code>,
-<code>boolean</code>, <code>uuid</code>, <code>uuidorname</code>, <code>namespace</code>, <code>node</code>, <code>url</code>,
-<code>ipv4</code>, <code>dict</code>, <code>arrayofdict</code>, <code>arrayofstring</code>, <code>binary</code>,
-<code>bearer</code>.</p>
-<p>That is a schema. It is read by nothing except the documentation
-generator.</p>
-<p>Making it load-bearing is the cheap path to closing #528: no new
-per-endpoint schemas need to be authored for the 96% that already
-declare, and webargs is already a dependency doing exactly this
-job at four sites (<code>blob.py</code>, <code>network.py</code>, <code>artifact.py</code>,
-<code>instance.py</code>) — none of them on request bodies. All four were
-<code>location='query'</code> when this was written; three are now
-<code>location='json_or_query'</code>, the custom loader #3629 introduced
-(see D6 below).</p>
-<h3 id="the-catch-stated-up-front">The catch, stated up front<a class="headerlink" href="#the-catch-stated-up-front" title="Permanent link">&para;</a></h3>
-<p>Because nothing has ever read these declarations, nothing has
-ever checked them. Phase 0 measured the damage: parameter
-<em>names</em> are 97% accurate, but parameter <em>locations</em> are not.</p>
-<p><strong>116 of the 119 parameters that appear in a URL path are
-declared as something other than <code>path</code></strong> — 104 as <code>query</code>, 11
-as <code>body</code>, and one as <code>'qeury'</code>, a typo. Only 3 are correct. A
-second declaration says <code>'post'</code>, which is not an OpenAPI
-location at all. Since location is exactly what a parser uses to
-decide <em>where to look for a value</em>, compiling these as written
-would look for <code>artifact_ref</code> in the query string of a request
-that carries it in the path.</p>
-<p>This is less alarming than it sounds, because the mounted routes
-in <code>app.py</code> are ground truth: which names are path parameters is
-derivable, not a matter of judgement, so the fix is mechanical
-rather than an audit. But it makes the declaration audit a
-<strong>precondition</strong> for compiling, not a tidy-up that can follow it.</p>
-<p><code>required</code> is a separate and probably worse problem: <code>mode</code> on
-<code>POST /instances/&lt;ref&gt;/agent/put</code> is declared required while
-omitting it has always been accepted, so enforcing required-ness
-naively would break working clients.</p>
-<p><strong>The plan must therefore treat "the declarations are accurate"
-as a hypothesis to be tested, not an assumption.</strong> The mechanism
-for testing it is a warn-only mode that validates, logs what it
-<em>would</em> have rejected, and changes nothing — deployed to sfcbr,
-which carries real traffic and ships logs to Loki.</p>
-<h3 id="type-vocabulary-gaps">Type vocabulary gaps<a class="headerlink" href="#type-vocabulary-gaps" title="Permanent link">&para;</a></h3>
-<p>The existing vocabulary is too coarse in at least these ways,
-each of which is a real defect in the issue list:</p>
+<p>The docstring on <code>CompiledEndpoint</code> explains why, and names the
+example: <code>mode</code> on the agent-put endpoint is declared required while
+omitting it has always been accepted. The finding is still generated
+and still logged, so the measurement apparatus has been running on the
+default path since phase 4 — it is telemetry for this phase's decision,
+which is what the comment says it is for.</p>
+<p>Meanwhile every compiled field is <code>allow_none=True</code>, so an omitted
+parameter and an explicit JSON <code>null</code> both reach the handler as <code>None</code>.
+<a href="https://github.com/shakenfist/shakenfist/issues/4167">#4167</a>, filed by
+phase 5, is the consequence: a handler that dereferences such a
+parameter without a type guard turns a caller's mistake into a recorded
+500. That issue says in its own words that it is phase 6's work, and
+this plan agrees — <strong>enforcing <code>required</code> is the systematic fix for the
+top-level half of #4167</strong>, and the two should not be solved twice.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p><strong>In:</strong></p>
 <ul>
-<li><strong>No unsigned integer.</strong> Artifact version indexes and
-  <code>max_versions</code> must not be negative. A negative <code>max_versions</code>
-  is silently destructive: <code>Artifact.delete_old_versions()</code>
-  computes <code>sorted(indexes)[:-max]</code>, so <code>-1</code> deletes the oldest
-  version on every index add.</li>
-<li><strong>No bounded integer.</strong> The events <code>limit</code> has a documented
-  default of 100 and a cap of 1000; <code>offset</code> on blob reads and
-  upload truncate must be non-negative and, for truncate, within
-  the object.</li>
-<li><strong>No format-constrained string.</strong> MAC addresses (#534),
-  base64-encoded user data (#3269), netblocks that must not
-  overlap reserved ranges (#323).</li>
-<li><strong>No structured value types.</strong> Disk, network and video specs
-  are validated imperatively today (#936).</li>
+<li>Decide, per declaration, whether <code>required=True</code> is true, and correct
+  the ones that are not.</li>
+<li>Enforce required-ness once the declarations are honest.</li>
+<li>Attach real validators to the semantic type tokens, so <code>base64</code>,
+  <code>netblock</code>, <code>ipv4</code>, <code>url</code> and <code>uuid</code> constrain what they claim to
+  (13 body/query declarations, enumerated below).</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/3269">#3269</a> — reject
+  non-base64 <code>user_data</code> at the API instead of on the hypervisor.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a> — reject a
+  network netblock which overlaps the floating network.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a> — validate
+  the caller-supplied MAC address format on interface create.</li>
 </ul>
-<h2 id="reported-issues-this-plan-addresses">Reported issues this plan addresses<a class="headerlink" href="#reported-issues-this-plan-addresses" title="Permanent link">&para;</a></h2>
-<p>Found by scanning all 83 open issues. The core group is the
-reason for the plan; the error-contract group is the other half
-of "what does a caller see when they get it wrong", and it shares
-the same decorator chain.</p>
-<h3 id="core-declarative-validation">Core: declarative validation<a class="headerlink" href="#core-declarative-validation" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a></td>
-<td>2020-11-11</td>
-<td><strong>Broaden declarative type/validity checking across all API endpoints.</strong> The parent issue; explicitly notes only ~4 endpoint files use <code>use_kwargs</code> today.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/936">#936</a></td>
-<td>2021-09-02</td>
-<td>Replace hand-rolled instance-create validation with a declarative schema. Video/disk/network specs are validated imperatively in <code>instance.py</code>.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3612">#3612</a></td>
-<td>2026-08-03</td>
-<td>Body parameters merged into handler kwargs untyped; broad <code>except TypeError</code> returns interpreter messages. The mechanism description above.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3609">#3609</a></td>
-<td>2026-08-02</td>
-<td><code>GET /nodes/&lt;node&gt;/events</code> with a string <code>limit</code> returns a 400 containing a Python type error. The trigger.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a></td>
-<td>2020-11-12</td>
-<td>Validate MAC address <em>format</em> on interface create (uniqueness is already enforced).</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3269">#3269</a></td>
-<td>2026-06-13</td>
-<td>Enforce base64-encoded user data at the API instead of failing later on the hypervisor with a traceback.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a></td>
-<td>2020-09-26</td>
-<td>Reject virtual networks that overlap reserved ranges (e.g. the floating network).</td>
-</tr>
-</tbody>
-</table>
-<h3 id="error-contract-and-attribution">Error contract and attribution<a class="headerlink" href="#error-contract-and-attribution" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3523">#3523</a></td>
-<td>2026-07-26</td>
-<td>A bare <code>KeyError</code> surfaces as a generic "Server error" whose traceback shows only wrapper frames, plus a content-free paired WARNING.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3371">#3371</a></td>
-<td>2026-07-11</td>
-<td><code>record_exception()</code> logs tracebacks only at DEBUG, so ~35k traceback lines/day never reach centralised logging.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3615">#3615</a></td>
-<td>2026-08-03</td>
-<td><code>log_request</code> assigns a string over the whole header dict when redacting Authorization, so every authenticated request logs no headers at all.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3606">#3606</a></td>
-<td>2026-08-02</td>
-<td><code>JWT token has incorrect nonce</code> logged at ERROR with no client, namespace or endpoint context (40 events/14d on sfcbr).</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/2094">#2094</a></td>
-<td>2023-11-23</td>
-<td><code>DELETE .../route/&lt;addr&gt;</code> returns a bare 403 when the address is already unrouted; make it idempotent or friendlier.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="enabling">Enabling<a class="headerlink" href="#enabling" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3616">#3616</a></td>
-<td>2026-08-03</td>
-<td>Add <code>external_api/base.py</code> to the mypy target list. The validation layer lands here; it should be type-checked.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="adjacent-related-deliberately-not-absorbed">Adjacent — related, deliberately not absorbed<a class="headerlink" href="#adjacent-related-deliberately-not-absorbed" title="Permanent link">&para;</a></h3>
+<p><strong>Out:</strong></p>
 <ul>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/1974">#1974</a> — pagination for listing endpoints. It needs exactly the bounded <code>limit</code>/<code>offset</code> parameter types this plan defines, and the events <code>limit</code> is a special case of it, but the query and response-shape work belongs to
-  <a href="../api-query-batching-roadmap/"><code>api-query-batching-roadmap.md</code></a>.
-  <strong>Coordinate on the parameter types; do not merge the plans.</strong></li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3271">#3271</a> — bare image shorthand silently shadows a local label. Input <em>interpretation</em> rather than input <em>validity</em>; the resolution-order fix is independent.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a> — the mariadb gRPC client conflates "unavailable" with "not found". Same family (the wrong thing is surfaced to the caller) but a different layer, and already scoped elsewhere.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3308">#3308</a> — the ansible collection's networkspec parser makes every non-empty value truthy. A <em>consumer</em> of this contract, and a good end-to-end test of it, but fixed in the collection.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/764">#764</a> and <a href="https://github.com/shakenfist/shakenfist/issues/121">#121</a> — validating fetched image content. Validation, but of downloaded bytes rather than API input. Out of scope.</li>
+<li><strong>Element schemas for <code>dict</code> and <code>arrayofdict</code>.</strong> This is the other
+  half of #4167 and the whole of
+  <a href="https://github.com/shakenfist/shakenfist/issues/936">#936</a>, and it is
+  a vocabulary change the size of phase 2. It gets its own phase — see
+  <em>A phase split</em> below.</li>
+<li>Response validation (decision D7, out of scope for the plan, not
+  deferred).</li>
+<li>The error shape, and in particular answering with more than one
+  finding at a time. <code>validate_request</code>'s docstring offers phase 6 that
+  argument "if callers ask for it". No caller has.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/2094">#2094</a> — the
+  already-unrouted <code>DELETE</code> returning 403. Phase 5 ruled it out of scope
+  as an idempotency question rather than a validation one, and nothing
+  here changes that.</li>
 </ul>
-<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
-<p>Resolved by phase 0. The measurements behind each are in
-<a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>.</p>
-<p><strong>The central hypothesis held.</strong> 229 of 236 declared parameter
-names (97%) match a kwarg their handler actually accepts, and no
-declared type contradicts its signature default. The
-declarations are good enough to compile.</p>
-<ol>
-<li><strong>Library — webargs + marshmallow.</strong> All three candidates
-   (webargs, marshmallow, pydantic) are already pinned direct
-   dependencies, so this is a fit decision, not a dependency
-   one. webargs exists to parse Flask request arguments, is
-   already used at four sites, and does per-location parsing.
-   Pydantic models persisted state here; keep that boundary.</li>
-<li><strong>Compile the existing declarations,</strong> with a per-endpoint
-   override for cases a declaration cannot express. Authoring
-   254 schemas to replace declarations that are already correct
-   is make-work, and the four endpoints that hand-author schemas
-   today are exactly the ones whose documentation has drifted.</li>
-<li><strong>Validation runs at index 0 of <code>method_decorators</code></strong> —
-   verified empirically as the innermost position, so after
-   authentication and before every per-method decorator. webargs'
-   default 422 handling must be replaced so failures come out
-   through <code>sf_api.error</code>.</li>
-<li><strong>The error shape does not change:</strong>
-   <code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": 400}</code>. The
-   official client never parses the message, and only 11 test
-   assertions touch error text.</li>
-<li><strong>Warn-only ends when every remaining rejection is
-   intended</strong> — not after a fixed duration. The window must
-   cover a full functional CI run plus seven days of sfcbr.
-   Warn records carry the offending value's <em>type</em>, never its
-   value.</li>
-<li><strong>Query strings become an accepted fallback</strong> for parameters
-   declared <code>query</code>, with the JSON body still authoritative.
-   Additive and unbreakable: the client sends everything in the
-   body regardless of method.</li>
-<li><strong>Response validation is out of scope,</strong> not deferred. It
-   breaks working clients when wrong, and no issue asks for it.</li>
-<li><strong>A body key colliding with a path parameter is rejected.</strong>
-   <code>log_request</code> already dodges one instance of this by mapping
-   body <code>uuid</code> to <code>passed_uuid</code>, which shows it is a known
-   hazard rather than a feature.
-   <em>Amended by phase 3:</em> the decision stands, the supporting
-   evidence does not. <code>passed_uuid</code> occurs once in the tree — the
-   assignment itself — so no handler accepts it and the remap
-   dodges nothing; it converts a body <code>uuid</code> into a guaranteed 400
-   on every endpoint. The check also cannot live where D3 puts the
-   validator, because <code>log_request</code> runs first and has already
-   merged the body. See D11 and D12 in
-   <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>.</li>
-<li><strong>The type vocabulary gains tokens and an optional
-   constraints element</strong> (<code>unsignedinteger</code>, <code>macaddr</code>,
-   <code>base64</code>, <code>netblock</code>; <code>minimum</code> / <code>maximum</code> / <code>pattern</code>).
-   These are valid Swagger 2.0 keywords, so constraints render
-   into the published OpenAPI instead of being invisible to
-   callers the way the events <code>limit</code> cap was.</li>
-</ol>
-<h3 id="phases">Phases<a class="headerlink" href="#phases" title="Permanent link">&para;</a></h3>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>The master plan's one-line description of this phase is accurate as far
+as it goes. Everything below is detail it could not have had, plus one
+claim that is now wrong.</p>
+<h3 id="f1-every-declared-required-body-parameter-is-optional-in-fact">F1. Every declared-required body parameter is optional in fact<a class="headerlink" href="#f1-every-declared-required-body-parameter-is-optional-in-fact" title="Permanent link">&para;</a></h3>
+<p>There are 349 parameter declarations. 147 are <code>path</code>, where required-ness
+is a tautology — the route does not match without the segment. Of the
+remaining 76 declared <code>required=True</code>, <strong>75 are body or query parameters
+whose handler gives them a default</strong>, and one (<code>namespace</code> on
+<code>AuthFederatedEndpoint.post</code>) is consumed by a decorator rather than
+named by the handler.</p>
+<p>Not one is structurally required. Python would not have raised for a
+single omission.</p>
+<p>The census is reproducible; the script is the appendix to this plan. Its
+shape matters as much as its answer: it asks whether the handler
+<em>accepts</em> an omission, which is the question that decides whether
+enforcement is a contract change. Finding F5 of phase 5 asked the
+adjacent question — whether any parameter <em>lacked</em> a default — got zero,
+and drew a conclusion the zero did not support. The two questions have
+the same code and opposite meanings.</p>
+<p>So "enforce required" is a contract change for 75 declarations, and the
+only way to know which of them is safe is to find out what each handler
+does with the omission. That is step 1, and it is the bulk of this
+phase.</p>
+<h3 id="f2-the-production-numbers-exist-and-they-are-thin">F2. The production numbers exist, and they are thin<a class="headerlink" href="#f2-the-production-numbers-exist-and-they-are-thin" title="Permanent link">&para;</a></h3>
+<p>26 days of sfcbr (<code>{job="shakenfist"}</code>, 2026-08-13 to 2026-09-08) carry
+358 validation findings:</p>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>Count</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type-mismatch</code></td>
+<td>336</td>
+<td>294 of them the metadata <code>value</code> class phase 4 fixed by widening fourteen declarations to <code>any</code>; 40 on <code>POST .../claims</code>; 2 on the events <code>limit</code></td>
+</tr>
+<tr>
+<td><code>missing-required</code></td>
+<td>20</td>
+<td><code>POST /auth</code> (12) and <code>POST .../claims</code> (8)</td>
+</tr>
+<tr>
+<td><code>unknown-parameter</code></td>
+<td>2</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Every one of the 20 <code>missing-required</code> findings was on a request that
+already answered 400.</strong> Enforcing required would not have changed a
+single observed outcome. Both routes are credential-handling, so
+<code>_handles_credentials()</code> redacted the parameter names — the reason code
+survives, the name does not.</p>
+<p>Two cautions on this table. Every record carries <code>validation-mode:
+warn</code>, and the newest is 2026-09-08, the day before phase 4 merged; no
+post-enforce record exists, and sf-api start-up lines are not shipped to
+this tenant, so the survey <strong>could not establish what mode sfcbr runs
+today</strong>. And sfcbr's traffic is overwhelmingly CI, which exercises a
+narrow slice of the API — 2 routes out of the 75 declarations at issue.</p>
+<p>That is why this phase does not open a warn window; see D35.</p>
+<h3 id="f3-exactly-one-type-token-validates-anything">F3. Exactly one type token validates anything<a class="headerlink" href="#f3-exactly-one-type-token-validates-anything" title="Permanent link">&para;</a></h3>
+<p>Phase 2 added <code>unsignedinteger</code>, <code>macaddr</code>, <code>base64</code> and <code>netblock</code> and
+an optional constraints element. <code>_field()</code>
+(<code>shakenfist/external_api/validation.py:112</code>) compiles <code>type</code>,
+<code>minimum</code>/<code>maximum</code>, <code>pattern</code> and <code>items</code>. <strong>It does not read <code>format</code>
+at all</strong>, except to recognise the <code>any</code> sentinel.</p>
+<p>Every semantic token therefore renders a <code>format</code> string into the
+published OpenAPI and compiles to a bare <code>fields.String</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Compiles to</th>
+<th>Validates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>macaddr</code></td>
+<td>String + pattern</td>
+<td>the format — the only one that does</td>
+</tr>
+<tr>
+<td><code>base64</code>, <code>netblock</code>, <code>ipv4</code>, <code>url</code>, <code>uuid</code>, <code>uuidorname</code>, <code>namespace</code>, <code>node</code></td>
+<td>String</td>
+<td>that it is a string</td>
+</tr>
+<tr>
+<td><code>unsignedinteger</code></td>
+<td>Integer + Range(min=0)</td>
+<td>the bound</td>
+</tr>
+</tbody>
+</table>
+<p>And <code>macaddr</code>, the one token that works, <strong>is declared nowhere</strong>. Its
+only occurrence outside <code>ARGTYPES</code> is a comment in <code>base.py:518</code> citing
+it as the example of an anchored pattern.</p>
+<p>The 13 body/query declarations using a semantic token, which are this
+phase's whole surface for D33:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Parameter</th>
+<th>Token</th>
+<th>Line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ArtifactsEndpoint</code></td>
+<td>post</td>
+<td><code>url</code></td>
+<td>url</td>
+<td><code>artifact.py:434</code></td>
+</tr>
+<tr>
+<td><code>ArtifactUploadEndpoint</code></td>
+<td>post</td>
+<td><code>upload_uuid</code></td>
+<td>uuid</td>
+<td><code>artifact.py:547</code></td>
+</tr>
+<tr>
+<td><code>ArtifactUploadEndpoint</code></td>
+<td>post</td>
+<td><code>blob_uuid</code></td>
+<td>uuid</td>
+<td><code>artifact.py:550</code></td>
+</tr>
+<tr>
+<td><code>ArtifactUploadEndpoint</code></td>
+<td>post</td>
+<td><code>source_url</code></td>
+<td>url</td>
+<td><code>artifact.py:555</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuersEndpoint</code></td>
+<td>post</td>
+<td><code>jwks_uri</code></td>
+<td>url</td>
+<td><code>auth.py:896</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuerEndpoint</code></td>
+<td>put</td>
+<td><code>jwks_uri</code></td>
+<td>url</td>
+<td><code>auth.py:954</code></td>
+</tr>
+<tr>
+<td><code>ClusterOperationsEndpoint</code></td>
+<td>get</td>
+<td><code>target_uuid</code></td>
+<td>uuid</td>
+<td><code>clusteroperation.py:305</code></td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint</code></td>
+<td>post</td>
+<td><code>user_data</code></td>
+<td>base64</td>
+<td><code>instance.py:512</code></td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint</code></td>
+<td>post</td>
+<td><code>nvram_template</code></td>
+<td>url</td>
+<td><code>instance.py:535</code></td>
+</tr>
+<tr>
+<td><code>InstanceAgentPutEndpoint</code></td>
+<td>post</td>
+<td><code>blob_uuid</code></td>
+<td>uuid</td>
+<td><code>instance.py:1895</code></td>
+</tr>
+<tr>
+<td><code>LabelEndpoint</code></td>
+<td>post</td>
+<td><code>blob_uuid</code></td>
+<td>uuid</td>
+<td><code>label.py:107</code></td>
+</tr>
+<tr>
+<td><code>NetworksEndpoint</code></td>
+<td>post</td>
+<td><code>netblock</code></td>
+<td>netblock</td>
+<td><code>network.py:229</code></td>
+</tr>
+<tr>
+<td><code>NetworkDNSAddressEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>ipv4</td>
+<td><code>network.py:743</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>namespace</code> (63 body uses) and <code>node</code> (3) are deliberately excluded: a
+ref decorator resolves them against the database and answers 404, which
+is a stronger check than a format one and already runs.</p>
+<h3 id="f4-3269-is-exactly-as-filed-four-years-on">F4. #3269 is exactly as filed, four years on<a class="headerlink" href="#f4-3269-is-exactly-as-filed-four-years-on" title="Permanent link">&para;</a></h3>
+<p><code>user_data</code> is declared <code>base64</code> at <code>instance.py:512</code>, which as F3
+establishes enforces nothing. The only <code>b64decode</code> of it is
+<code>shakenfist/instance.py:1930</code>, inside config-drive creation, unguarded:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_data</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">user_data</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_data</span><span class="p">)</span>
+</code></pre></div>
+<p>That runs on the hypervisor, after the API has answered 200 and the
+instance has been scheduled and placed. A <code>binascii.Error</code> there is the
+traceback the issue describes.</p>
+<h3 id="f5-323-is-not-a-format-problem-and-534-is-not-a-top-level-one">F5. #323 is not a format problem, and #534 is not a top-level one<a class="headerlink" href="#f5-323-is-not-a-format-problem-and-534-is-not-a-top-level-one" title="Permanent link">&para;</a></h3>
+<p>Both need saying, because "semantic validators for #534, #3269, #323"
+in the master plan reads as though all three are the same kind of work.
+They are not:</p>
+<ul>
+<li><strong>#323</strong> — <code>NetworksEndpoint.post</code> calls <code>ipaddress.ip_network()</code> and
+  refuses anything below /29 (<code>network.py:56</code>). There is no check
+  against the floating network. It cannot be a schema check: whether a
+  netblock overlaps depends on the deployed floating network, which is
+  cluster configuration the compiled schema has no access to. It is a
+  handler guard.</li>
+<li><strong>#534</strong> — the caller-supplied MAC arrives inside a <em>networkspec</em>, as
+  <code>netdesc['macaddress']</code>, and is consumed at
+  <code>shakenfist/network/interface.py:143</code>. <code>_netdesc_safety_checks</code>
+  (<code>instance.py:329</code>) validates <code>network_uuid</code> and the requested address
+  range and never looks at <code>macaddress</code>. Because networkspecs are
+  declared <code>dict</code>/<code>arrayofdict</code>, <strong>no schema can reach it</strong> — see F6. It
+  is a handler guard too, for now.</li>
+</ul>
+<h3 id="f6-nested-structures-are-unvalidated-by-construction">F6. Nested structures are unvalidated by construction<a class="headerlink" href="#f6-nested-structures-are-unvalidated-by-construction" title="Permanent link">&para;</a></h3>
+<p><code>dict</code> compiles to <code>fields.Dict()</code> and <code>arrayofdict</code> to
+<code>fields.List(fields.Dict())</code>, neither carrying a value schema. Every
+key inside a diskspec, networkspec or videospec is invisible to the
+validation layer in every mode. This is the structural cause behind</p>
+<h1 id="936-534-and-items-2-and-3-of-4167">936, #534, and items 2 and 3 of #4167.<a class="headerlink" href="#936-534-and-items-2-and-3-of-4167" title="Permanent link">&para;</a></h1>
+<p>It is real, it is worth fixing, and it is not this phase. See below.</p>
+<h3 id="f7-a-phase-split-and-a-correction-to-the-master-plan">F7. A phase split, and a correction to the master plan<a class="headerlink" href="#f7-a-phase-split-and-a-correction-to-the-master-plan" title="Permanent link">&para;</a></h3>
+<p>The master plan's phase 6 row bundles required-ness with "semantic
+validators for #534, #3269, #323, #936". The survey says #936 does not
+belong with the others: the first three are guards and scalar
+validators, and #936 is a vocabulary change — element schemas for
+<code>dict</code> and <code>arrayofdict</code>, plus a decision about how much of
+<code>InstancesEndpoint.post</code> can become declarative at all, given that
+roughly 130 of its lines interleave validation with blob, label and
+artifact <em>resolution</em> that no schema can express.</p>
+<p><strong>This plan therefore splits phase 6 and renumbers the push audit.</strong>
+The master plan's Execution table and the <code>docs/plans/index.md</code> row are
+corrected as part of the planning commit:</p>
 <table>
 <thead>
 <tr>
 <th>Phase</th>
-<th>Status</th>
-<th>Description</th>
+<th>Was</th>
+<th>Now</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>0: Research and decisions</td>
-<td>Complete</td>
-<td>Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See <a href="../PLAN-api-input-validation-phase-00-decisions/">phase 0</a></td>
+<td>6</td>
+<td>Required and semantics</td>
+<td>Required and scalar semantics (this plan)</td>
 </tr>
 <tr>
-<td>1: Declaration audit</td>
-<td>Complete</td>
-<td>Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. <code>sshkey</code>/<code>userdata</code> in the published OpenAPI) and 20 undeclared parameters; make <code>swagger_helper()</code> reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See <a href="../PLAN-api-input-validation-phase-01-declaration-audit/">phase 1</a></td>
+<td>7</td>
+<td>Push audit</td>
+<td><strong>Structured parameter schemas</strong> — #936, #534's declarative form, #4167 items 2 and 3</td>
 </tr>
 <tr>
-<td>2: Type vocabulary</td>
-<td>Complete</td>
-<td>The specification-validation test (#3626) plus <code>schemes</code>/<code>securityDefinitions</code> template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; <code>unsignedinteger</code>/<code>macaddr</code>/<code>base64</code>/<code>netblock</code> tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events <code>limit</code> cap are visible to callers. See <a href="../PLAN-api-input-validation-phase-02-type-vocabulary/">phase 2</a></td>
-</tr>
-<tr>
-<td>3: Compile and warn</td>
-<td>Complete</td>
-<td>Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared <code>namespace</code> of #3739 and fourteen metadata <code>value</code> declarations narrower than their handlers — which phase 4 fixes before it enforces. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
-</tr>
-<tr>
-<td>4: Enforce</td>
-<td>Complete</td>
-<td>Landed 2026-09-09 via <a href="https://github.com/shakenfist/shakenfist/pull/4141">#4141</a>. Fixed the two declaration bugs the warn window found (#3739's undeclared <code>namespace</code> on 55 handlers, and fourteen metadata <code>value</code> declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The <code>get_args</code> fold moved to Future work as <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>: read as "delete the four <code>@use_kwargs</code> decorators" it is a bug, because the compiled path is check-only and <code>@use_kwargs</code> is the only thing that gets a query parameter to a handler. See <a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a></td>
-</tr>
-<tr>
-<td>5: Narrow the handlers</td>
-<td>Complete</td>
-<td>Deleted the <code>except TypeError</code> arm from <code>handle_authorization_exceptions</code> (D23): a handler-internal <code>TypeError</code> is now a recorded 500 like any other server fault, and under the <code>warn</code>/<code>off</code> rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed <a href="https://github.com/shakenfist/shakenfist/issues/3523">#3523</a> (a partial <code>cpuinfo</code> probe raising <code>KeyError</code> in <code>get_user_agent</code>) and removed two <code>requires_namespace_exist_if_specified</code> applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried <code>repr(e)</code> (F11): every 500 response now answers a bare <code>server error</code> with no exception detail at all, for any cause (D31). Filed <a href="https://github.com/shakenfist/shakenfist/issues/4161">#4161</a> for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix (<a href="https://github.com/shakenfist/shakenfist/issues/3743">#3743</a>) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See <a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a></td>
-</tr>
-<tr>
-<td>6: Required and scalar semantics</td>
-<td>Not started</td>
-<td>Decide whether <code>required</code> is enforced, having found that all 75 body and query declarations carrying <code>required=True</code> are optional in fact — every one has a handler default, so nothing is structurally required and enforcement is a contract change for all of them. Also gives the semantic type tokens something to do: <code>macaddr</code> is the only one of them that validates anything today, and it is declared nowhere. Closes #3269 (base64 <code>user_data</code> failing on the hypervisor rather than at the API), #323 (a netblock overlapping the floating network) and #534 (an unvalidated caller-supplied MAC). See <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a></td>
-</tr>
-<tr>
-<td>7: Structured parameter schemas</td>
-<td>Not started</td>
-<td><code>dict</code> compiles to <code>fields.Dict()</code> and <code>arrayofdict</code> to <code>fields.List(fields.Dict())</code>, neither carrying a value schema, so every key inside a diskspec, networkspec or videospec is unvalidated in every mode. Teaching the vocabulary to carry an element schema is what #936 needs, and it is also items 2 and 3 of #4167. Split out of phase 6 by that phase's survey: the other four issues are guards and scalar validators, and this is a vocabulary change the size of phase 2</td>
-</tr>
-<tr>
-<td>8: Push audit</td>
-<td>Not started</td>
-<td>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
+<td>8</td>
+<td>—</td>
+<td>Push audit</td>
 </tr>
 </tbody>
 </table>
-<h3 id="where-the-tracked-issues-stand">Where the tracked issues stand<a class="headerlink" href="#where-the-tracked-issues-stand" title="Permanent link">&para;</a></h3>
-<p>Recorded here rather than by editing the tables above, so there
-is one place to maintain and the tables stay a record of what
-the plan was scoped against.</p>
-<p><strong>Closed since the plan was written:</strong> #3609 (the trigger,
-2026-08-07), #3626 (specification validation in CI), #3616
-(<code>base.py</code> under mypy), #3642 (variadic handlers in the audit),</p>
-<h1 id="3629-body-supplied-all-see-d6-below-3615-log_request">3629 (body-supplied <code>all</code>, see D6 below), #3615 (<code>log_request</code><a class="headerlink" href="#3629-body-supplied-all-see-d6-below-3615-log_request" title="Permanent link">&para;</a></h1>
-<p>discarding headers), #3739 (the ref decorators' undeclared
-<code>namespace</code>, closed when phase 4 merged 2026-09-09), #3606 (JWT
-rejection attribution, PR #3714, merged 2026-08-12), #3371
-(<code>record_exception</code> tracebacks only at DEBUG) and #3523 (a
-partial <code>cpuinfo</code> probe raising <code>KeyError</code> in <code>get_user_agent</code>,
-closed when phase 5 landed <code>dc6019d6a</code>).</p>
-<p><strong>Filed by phase 4, and deliberately not fixed by it:</strong> #4098 (the
-<code>get_args</code> fold, see the carried section below) and #4100 (an
-explicit <code>thin: false</code> on a snapshot request, which two comments
-in the tree wrongly blamed on this plan — the compiled path never
-injects, so no phase of this plan unblocks it; it needs a client
-release which omits the key).</p>
-<p><strong>Filed by phase 5, and deliberately not fixed by it:</strong> #4161 (the
-proxy path answering an unreachable node — or the local nodelock
-socket refusing a connection — with an unqualified 500, see F9 in
-<a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a>). Filing
-it required re-verifying the finding first: an unrelated fix
-(#3743, merged 2026-08-21) had already closed the largest of the
-three classes the phase 5 survey recorded, so the issue is scoped
-to the two proxy call sites and the local-socket case that fix
-does not cover, not to the survey's original table.</p>
-<p><strong>Still open and still owned by this plan:</strong> #528 (parent), #3612
-(the mechanism), #936, #534, #3269, #323, #2094.</p>
-<p><strong>Phase 5 was overtaken from outside, as predicted.</strong> Three of
-its four attribution issues were picked up by the automated issue
-fixer rather than by this plan — #3615, #3606 and #3371, leaving
-only #3523. That is fine: they were genuinely independent of
-phases 3 and 4, which is why they were grouped rather than
-sequenced. It is recorded because it changed what phase 5 <em>is</em>.
-The forecast written here was that phase 5 would reduce to the
-single item which actually depends on phases 3 and 4 — narrowing
-<code>except TypeError</code> to JWT errors, which cannot happen until a
-validation layer is rejecting the malformed input that broad
-catch absorbs. That is now the fact rather than the forecast.
-Nobody picks that item up incidentally, because on its own it
-looks like a regression risk with no visible benefit.</p>
-<h3 id="carried-into-phase-2-from-phase-1">Carried into phase 2 from phase 1<a class="headerlink" href="#carried-into-phase-2-from-phase-1" title="Permanent link">&para;</a></h3>
-<p>Phase 1 corrected which location each parameter declares. It did
-not change how <code>swagger_helper()</code> renders them, which leaves two
-specification-validity problems for phase 2 to pick up. Measured
-with <code>openapi_spec_validator</code> over the flasgger output (raised by
-the ninth review round and re-measured independently): develop
-produced 363 validation errors and this branch 241 at that
-measurement, with the entire "path template variable has no
-corresponding path parameter" class eliminated by the location
-audit. The <code>security</code> fix below then landed in phase 1 after all,
-and a rebase brought in the eleven federated-authentication
-handlers, so the branch now measures <strong>129</strong>: 128 from the body
-class, 1 from <code>schemes</code>.</p>
-<ul>
-<li><strong>Multiple body parameters per operation — fixed in phase 2.</strong>
-  Swagger 2.0 permits at most one <code>in: body</code> parameter, and it
-  must carry a <code>schema</code> rather than <code>type</code>/<code>format</code>;
-  <code>swagger_helper()</code> emitted <code>type</code>/<code>format</code> for everything, and
-  32 of 132 operations declared more than one body parameter (23
-  before phase 1 — correcting <code>key</code> from query to body on the
-  metadata endpoints added most of the rest, and the
-  federated-authentication endpoints arrived with several more).
-  Phase 2's second PR collapses an operation's body declarations
-  into a single generated <code>schema</code> at render time — declarations
-  keep their one-tuple-per-parameter shape, which is what the
-  audit reads and phase 3 compiles. The raw-body marker renders
-  as a binary schema, and declaring raw and named body parameters
-  together is rejected at import time. This took the validation
-  error count from 128 to zero, so the ratchet in
-  <code>test_openapi_spec.py</code> became a plain validity assertion.</li>
-<li><strong><code>schemes</code> renders as a string, not an array — fixed in
-  phase 2.</strong> <code>API_ADVERTISED_HTTP_SCHEMES</code> is typed <code>str</code> in
-  <code>config.py</code> while its own description calls it a "space
-  separated list", and <code>app.py</code> fed it straight into the
-  specification's top-level <code>schemes</code> key, which OpenAPI 2.0
-  requires to be an array of strings. A default deployment
-  therefore published <code>schemes: 'http'</code>. Pre-existing —
-  introduced in <code>01ef8a563</code>, not by this plan. Phase 2's first PR
-  splits the documented space-separated contract at the consumer
-  in <code>app.py</code>, and added the <code>securityDefinitions</code> entry the
-  <code>security</code> requirements referenced without defining.</li>
-<li><strong><code>security</code> renders as an object, not an array — fixed in
-  phase 1 after all.</strong> <code>swagger_helper()</code> emitted
-  <code>'security': {'bearerAuth': []}</code>, but OpenAPI 2.0 requires
-  <code>security</code> to be an <em>array</em> of requirement objects. This was
-  deferred here twice on scoping grounds, and the eleventh review
-  round questioned deferring a one-line change inside a function
-  the phase was already editing (the <code>format</code>/duplicated-key
-  fixes were the same class of renderer tweak). It shipped:
-  <code>'security': [{'bearerAuth': []}]</code> eliminated the entire
-  126-error class, the largest remaining. Kept in this list as a
-  record of the scoping call rather than as work to do.</li>
-<li><strong>Nothing validates the generated specification — fixed in
-  phase 2.</strong> Phase 1's path-implies-required rule exists to
-  satisfy linters and client generators, and was checked by hand.
-  Phase 2's first PR added
-  <code>shakenfist/tests/external_api/test_openapi_spec.py</code>, which
-  runs <code>openapi_spec_validator</code> over flasgger's output and holds
-  the remaining invalidity to an exact ratchet count (128, all in
-  the body-parameter class above), failing on any new error class
-  or any change in the count
-  (<a href="https://github.com/shakenfist/shakenfist/issues/3626">#3626</a>).
-  The test landed before the renderer fix on purpose: it turns
-  "invalid in N places" into a number that moves.</li>
-</ul>
-<h3 id="carried-into-phase-3-from-phase-1">Carried into phase 3 from phase 1<a class="headerlink" href="#carried-into-phase-3-from-phase-1" title="Permanent link">&para;</a></h3>
-<p><strong>Generate the derivation's input space rather than sampling it.</strong>
-A precondition for compiling, in the same way the audit itself
-was.</p>
-<p>Phase 1 took five review rounds, and four of them found a defect
-in the machinery added by the round before: the Werkzeug
-converter regex, the <code>flask.request.args</code> fallback, the webargs
-scope leak, and an emptied parameter list. Every one was
-<code>declarations.py</code> misreading source, and every one was a shape
-that did not occur anywhere in the tree — so no amount of testing
-against the tree could have found them, and neither could
-mutating it, which only permutes shapes already present.</p>
-<p>While the declarations are documentation, a misread costs a wrong
-line in the published API. Once phase 3 compiles them, the same
-misread rejects a valid request: a <code>path</code> parameter derived as
-<code>body</code> produces a schema hunting the JSON body for a URL segment,
-and decision D6's query-string fallback is granted only to
-parameters derived as <code>query</code>. The cost of the defect class rises
-sharply exactly here, which is why this belongs to phase 3 and
-not earlier.</p>
-<p>The shape to build is a <strong>combinatorial generator</strong>, not a
-fuzzer. Enumerate the axes and assert the derivation recovers
-what the source was constructed to mean:</p>
+<p>The index arithmetic moves from <code>6 of 8</code> to <code>6 of 9</code>. The push audit
+stays last by construction: it audits the accumulated diff of every
+phase.</p>
+<h3 id="nothing-else-in-the-phase-description-was-wrong">Nothing else in the phase description was wrong<a class="headerlink" href="#nothing-else-in-the-phase-description-was-wrong" title="Permanent link">&para;</a></h3>
+<p>The <code>except TypeError</code> narrowing the row once described belongs to
+phase 5 and is done. The three attribution issues it also listed are
+closed.</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<p><strong>D32. The declarations get corrected before required-ness is
+enforced, not after.</strong> F1 says all 75 are optional in fact, which means
+the declarations and the handlers disagree in every single case — so
+"enforce what is declared" would be enforcing something nobody has
+checked. Step 1 classifies each parameter by what the handler actually
+does with the omission, and step 2 rewrites the declarations to match.
+Only then does enforcement turn on. This is the same shape as phases
+3→4: fix the declarations the measurement found wrong, <em>then</em> reject.</p>
+<p><strong>D33. Semantic validators attach to the published <code>format</code> string,
+not to a parallel table.</strong> <code>_field()</code> grows a <code>_FORMATS</code> mapping keyed
+on the exact string <code>ARGTYPES</code> renders, so what the OpenAPI document
+promises and what the server enforces are the same string by
+construction. This is the argument <code>ANY_VALUE_FORMAT</code> already makes in
+its own comment, generalised. A validator rather than a pattern,
+because the netblock comment in <code>base.py:409</code> is right that a CIDR
+regex would describe the API as narrower than <code>ipaddress.ip_network()</code>
+makes it — a function can call <code>ip_network()</code> and be exactly as wide as
+the server.</p>
+<p><strong>D34. Handler guards stay, even where enforcement makes them
+unreachable.</strong> <code>warn</code> and <code>off</code> are the operator's rollback and hand
+the handler whatever the caller sent, so a guard deleted as "dead" is a
+500 waiting for the next rollback. Phase 5 established this precedent
+deliberately in <code>InstancesEndpoint.post</code>, where the <code>isinstance(name,
+str)</code> arm is documented as unreachable under <code>enforce</code> and kept anyway.
+New guards for #323 and #534 are written to the same standard.</p>
+<p><strong>D35. No warn window for required-ness.</strong> This is the departure from
+the phase 3→4 pattern and the decision most likely to be argued with.</p>
+<p>The case for a window: enforcing required is the change the master plan
+itself flags as most likely to break working clients, and every
+previous tightening in this plan was measured before it was turned on.</p>
+<p>The case against, which this plan takes: a warn window measures which
+omissions <em>happen</em>, and the question is which omissions the server
+<em>accepts</em>. F2 is the evidence — 26 days of production produced 20
+missing-required findings across 2 routes, every one on a request that
+already answered 400, leaving 73 of the 75 declarations untouched by
+any traffic at all. Step 1's sweep exercises all 75 deterministically
+and answers the question directly. Measurement by traffic is the weaker
+instrument here, and waiting for it would defer the phase by weeks to
+learn less.</p>
+<p>The residual risk is a caller that omits a parameter the sweep judges
+required. Step 1 resolves that class <em>toward</em> the caller: a parameter
+is only marked required if the handler refuses the request without it
+today. If the handler accepts the omission and does something sensible,
+the declaration is wrong and gets corrected to <code>required=False</code> —
+which also removes a false claim from the published OpenAPI.</p>
+<p><strong>D36. The sweep drives real requests, not the AST.</strong> #4167's closing
+note asks for this by name, and phase 5's F5 is why. The apparatus
+already exists: <code>AuthenticatedStackTestCase</code> in
+<code>test_request_validation.py</code> drives authenticated requests through the
+whole decorator stack, which is what caught the difference between a
+handler tested in isolation and the deployed behaviour in phase 3's
+review.</p>
+<p><strong>D37. <code>missing-required</code> keeps its own finding reason after
+enforcement.</strong> It would be tidier to fold it into the enforceable set
+and delete the filter, but the reason code is what makes the 20 events
+in F2 legible, and an operator rolling back to <code>warn</code> needs to see
+required failures distinguished from type failures. The filter goes;
+the reason code stays.</p>
+<p><strong>D38. #936 does not get a partial answer here.</strong> Declaring a
+diskspec's shape without also handling the resolution logic tangled
+through it would leave two validation paths for one parameter, which is
+the state this whole plan exists to end. Phase 7 takes it whole.</p>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Axis</th>
-<th>Values</th>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Route</td>
-<td>absent, <code>&lt;x&gt;</code>, <code>&lt;path:x&gt;</code>, <code>&lt;int(min=1):x&gt;</code>, non-literal</td>
+<td>1</td>
+<td>xhigh</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>Classify all 75.</strong> Write <code>shakenfist/tests/external_api/test_required_sweep.py</code>, driving a real request per declaration through <code>AuthenticatedStackTestCase</code> (<code>test_request_validation.py</code>; <code>test_instance_create_validation.py</code> is the worked example, including its <code>mock.patch.object(instance_api, 'SCHEDULER', None)</code> containment — copy it, an escaped Scheduler breaks unrelated tests with a 507). Enumerate the 75 from <code>declarations.handlers()</code>, not by hand; the census script is the appendix below and its <code>_defaults()</code> is the shape to reuse. For each, send an otherwise-valid body with that one parameter omitted, and record the status and whether <code>record_exception</code> was called. Emit a table into <code>docs/plans/PLAN-api-input-validation-phase-06-required.md</code> under <em>Sweep results</em> with one row per parameter and a verdict of <code>guarded</code> (handler answers 4xx), <code>faults</code> (5xx or an exception record) or <code>accepted</code> (2xx/3xx). Do <strong>not</strong> change any declaration in this step. Commit subject: <code>Ask every handler what an omission does.</code></td>
 </tr>
 <tr>
-<td>webargs</td>
-<td>none, <code>get_args</code> on the class, on the module, inline dict, <code>location='json'</code></td>
+<td>2</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Correct the declarations.</strong> Using step 1's table: <code>guarded</code> and <code>faults</code> keep <code>required=True</code>; <code>accepted</code> becomes <code>required=False</code>, with a one-line comment on any that is surprising. Touch only the fifth element of the declaration tuples. <code>tools/fix-api-parameter-locations.py</code> does not do this, so it is by hand; <code>test_parameter_declarations.py</code> and <code>test_openapi_spec.py</code> must both stay green, and the published specification changes, so expect <code>test_openapi_spec.py</code>'s expectations to need updating. Commit subject: <code>Say which parameters are really required.</code></td>
 </tr>
 <tr>
-<td><code>request.args</code></td>
-<td>absent, <code>.get()</code>, subscript, on a non-request object</td>
+<td>3</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Enforce it.</strong> Delete the <code>MISSING_REQUIRED</code> filter at <code>shakenfist/external_api/base.py:1906</code> so a missing-required finding is enforceable like any other, keeping the reason code (D37). Rewrite the <code>CompiledEndpoint</code> docstring at <code>validation.py:82</code> and the <code>validate_request</code> docstring at <code>base.py:1817</code>, both of which say required-ness is recorded and never enforced and both of which name phase 6 as the decider. Add tests that an omitted required parameter answers 400 naming the parameter, that an explicit JSON <code>null</code> does the same, and that under <code>warn</code> it answers whatever it answered before. Commit subject: <code>Refuse a request missing a required parameter.</code></td>
 </tr>
 <tr>
-<td>Declaration</td>
-<td>well-formed, wrong arity, non-literal name, raw-body sentinel</td>
+<td>4</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Make the type tokens mean something.</strong> Add a <code>_FORMATS</code> table to <code>validation.py</code> keyed on the exact <code>format</code> strings in <code>ARGTYPES</code> (<code>byte</code>, <code>a CIDR netblock</code>, <code>an IPv4 address as a string</code>, <code>url</code>, <code>uuid</code>), each mapping to a validator function, and consult it in <code>_field()</code> alongside the existing <code>pattern</code> handling. Use <code>base64.b64decode(..., validate=True)</code>, <code>ipaddress.ip_network()</code>, <code>ipaddress.ip_address()</code>, <code>urllib.parse.urlparse()</code> and <code>uuid.UUID()</code> rather than regexes — D33 explains why. Every validator must be a no-op on <code>None</code> (fields are <code>allow_none=True</code> and required-ness is step 3's business, not this one's) and must raise <code>marshmallow.ValidationError</code>, never let a library exception escape. The 13 affected declarations are tabulated in F3; check each still accepts what its handler accepts today, particularly <code>nvram_template</code> and <code>source_url</code>, which may carry scheme forms a strict URL parser would refuse. This closes <a href="https://github.com/shakenfist/shakenfist/issues/3269">#3269</a>. Commit subject: <code>Enforce the formats the API publishes.</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Guard the two that no schema can reach.</strong> In <code>NetworksEndpoint.post</code> (<code>network.py:42</code>), after the existing <code>/29</code> check, refuse a netblock overlapping the floating network — read it the way <code>network.floating_network()</code> does at <code>network.py:707</code>, and answer 400 naming the conflict; if no floating network is configured, do not refuse. In <code>_netdesc_safety_checks</code> (<code>instance.py:329</code>), refuse a <code>macaddress</code> that is not a MAC address, reusing <code>api_base.ARGTYPES['macaddr']['pattern']</code> so the guard and the published format are one string. Both keep working under <code>warn</code>/<code>off</code> (D34). Closes <a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a> and <a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a>. Unit tests for both, plus a cluster CI case for the netblock overlap in <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/</code>. Commit subject: <code>Refuse an overlapping netblock and a bad MAC.</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Documentation and close-out.</strong> <code>docs/developer_guide/writing_an_endpoint.md</code> currently tells authors required-ness is not enforced — correct it, and say what a <code>format</code> token now costs them. Add a v07-v08 release note entry covering the required-ness change, the format enforcement, and the two new guards, listing any declaration step 2 moved to <code>required=False</code> that a caller could notice. Update the master plan's Execution table, the phase split from F7, and the <code>docs/plans/index.md</code> row. Commit subject: <code>Document what required now means.</code></td>
 </tr>
 </tbody>
 </table>
-<p>A few dozen cases, deterministic, well under a second. The oracle
-is free because the source is constructed knowing where the
-parameter comes from, which is what makes this different from
-mutating declarations in the tree: <code>audit()</code> derives the truth
-and compares, so flipping a declared location and asserting drift
-tests the comparison, not the derivation. Every real defect was
-on the other side of that comparison.</p>
-<p>No new dependency. <code>hypothesis</code> is not in the project, and
-randomness buys nothing over enumerating a space this small —
-the value is in covering the axes, not in sampling them.</p>
-<p><code>tools/check-api-declaration-guards.sh</code> stays as it is. It
-mutates the real tree to prove the <em>guards</em> fire, which is a
-different question from whether the <em>derivation</em> is right, and
-the two are complementary.</p>
-<p><strong>D6's query-string fallback shipped early, at three sites.</strong>
-<a href="https://github.com/shakenfist/shakenfist/issues/3629">Issue #3629</a>:
-<code>all</code> on the outstanding-operations endpoints was bound with
-<code>@use_kwargs(get_args, location='query')</code>, and webargs finishes
-with <code>kwargs.update(parsed_args)</code>, so the <code>load_default=False</code>
-from an absent query string overwrote the <code>all=True</code> that
-<code>log_request</code> merged in from the JSON body. The shipped client
-only ever sends a body, so the parameter never worked through
-it.</p>
-<p>This was predicted here to close with phase 3, "or sooner". It
-closed sooner, in <code>0de6c3b5c</code> (2026-08-09), and phase 3 inherits
-the mechanism rather than choosing one:</p>
-<ul>
-<li><code>base.py</code> registers a <strong><code>json_or_query</code> webargs location
-  loader</strong> which merges <code>req.args</code> and the JSON body with the
-  body authoritative, then drops keys the schema does not name
-  (mirroring webargs' <code>unknown=EXCLUDE</code> default for the query
-  location). The instance, artifact and network
-  outstanding-operations endpoints are bound to it.</li>
-<li><strong>A <code>('query', 'json')</code> tuple location was tried and
-  rejected.</strong> webargs keys validation failures by location, and
-  a tuple key is not JSON-serialisable, so a 422 becomes a 500.
-  Phase 3 must not re-derive this: the custom loader is the
-  supported shape.</li>
-<li><code>declarations.py</code> derives a schema bound to <code>json_or_query</code>
-  as a <strong><code>query</code></strong> location, so the published declaration is
-  unchanged and phase 1's audit still holds.</li>
-</ul>
-<p>Phase 3 therefore generalises an existing, tested loader to
-every parameter derived <code>query</code>, rather than introducing a
-second precedence rule alongside it. See
-<a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>.</p>
-<h3 id="carried-into-phase-4-from-phase-3">Carried into phase 4 from phase 3<a class="headerlink" href="#carried-into-phase-4-from-phase-3" title="Permanent link">&para;</a></h3>
-<p>The measurement window found two declaration bugs, and phase 4
-fixes both before it enforces. Their detail is in
-<a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a>; what
-belongs here is the one item phase 4 declined.</p>
-<ul>
-<li><strong>The <code>get_args</code> fold is deferred, and this plan's description
-  of it was wrong.</strong> Phase 4's line above used to read "fold the
-  hand-authored <code>get_args</code> schemas into the compiled path".
-  Read as "delete the four <code>@use_kwargs</code> decorators", that is a
-  defect rather than a refactor: <code>validation.check()</code> returns
-  findings and <code>validate_request</code> calls through, so the compiled
-  path never coerces or injects anything, and <code>log_request</code>
-  merges only the JSON body -- nothing merges
-  <code>flask.request.args</code>. <code>@use_kwargs</code> is therefore the sole
-  mechanism by which a query-string parameter reaches a handler.
-  Removing it from <code>blob.py</code> would silently revert <code>offset</code> and
-  <code>limit</code> to their signature defaults, reading a whole blob where
-  the caller asked for a range.</li>
-</ul>
-<p>The defensible reading is to keep <code>@use_kwargs</code> and generate
-  its schema from the same declaration list <code>swagger_helper()</code>
-  receives, which removes the second source of truth D2 objected
-  to. That needs signature defaults at runtime and moves
-  <code>blob.py</code>'s hand-rolled negative-offset check into a field,
-  changing an error message -- a second request-visible change in
-  the phase that flips enforcement. It is tracked as
-  <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>
-  and remains a candidate for a later phase. Phase 6 did not
-  take it: that phase corrects declarations and enforces them,
-  and deriving the schema from signature defaults is a change to
-  where declarations come from. Enforcement does not depend on
-  it: the compiled check runs first, so the duplication is
-  inert.</p>
-<h2 id="open-questions-for-phase-0">Open questions for phase 0<a class="headerlink" href="#open-questions-for-phase-0" title="Permanent link">&para;</a></h2>
-<p>All answered above; retained as the record of what phase 0
-was asked to decide.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<p><strong>A parameter marked required that a real client omits.</strong> The one that
+matters. Mitigated by D35's rule — required only where the handler
+refuses today — so a client omitting it is already failing. The
+reviewer's specific job (stated in the review effort note) is to look
+for a counter-example. Residual: a client that omits a parameter and
+<em>relies</em> on the resulting 4xx changing shape. Accepted.</p>
+<p><strong>The sweep repeats phase 5's F5.</strong> The same family of analysis over the
+same declarations, and it got the wrong answer last time by asking a
+well-formed question about the wrong property. Mitigated by D36 —
+driving real requests answers "what does the server do" directly rather
+than by inference — and by step 1 producing a table the management
+session can spot-check by hand against three handlers it picks.</p>
+<p><strong>Enforcement degrades a better error message.</strong> <code>POST /instances</code> with
+no <code>disk</code> answers <code>instance must specify at least one disk</code> today and
+would answer <code>disk: declared required but not supplied</code>. Mitigated
+weakly: the parameter is named either way and the shape is unchanged
+(D4). Step 2 should note any message it judges materially worse, and
+step 6 should list them; if there are more than two or three, that is
+an argument to revisit.</p>
+<p><strong>A format validator is stricter than the handler.</strong> <code>url</code> in
+particular: <code>urlparse()</code> accepts almost anything, but a validator that
+demands a scheme would refuse <code>nvram_template</code> values the handler
+accepts. Mitigated by step 4's instruction to check each of the 13
+against its handler, and by the functional suite, which creates
+artifacts from URLs.</p>
+<p><strong>The published OpenAPI changes shape.</strong> Moving declarations to
+<code>required=False</code> changes the specification, which <code>test_openapi_spec.py</code>
+validates and which downstream consumers read. Mitigated: this is a
+correction, not a regression — the specification currently claims things
+the server does not require. Step 6's release note says so explicitly.</p>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>webargs/marshmallow, pydantic, or hand-rolled?</strong> Pydantic is
-   already a core dependency (config and <code>schema/</code>), but webargs
-   is what the four existing sites use and is already wired into
-   Flask request parsing. Which one, and is consistency with
-   <code>schema/</code> worth more than consistency with the existing four
-   endpoints?</li>
-<li><strong>Compile the existing declarations, or author new schemas?</strong>
-   Compiling gets 96% coverage for free but inherits any drift.
-   Authoring is honest but is 254 hand-written declarations.
-   Is there a middle path — compile, then let an endpoint
-   override with an explicit schema where the declaration is
-   insufficient?</li>
-<li><strong>Where does validation sit in <code>method_decorators</code>?</strong> It must
-   run after authentication (so an unauthenticated caller cannot
-   probe the schema) but before the handler. <code>CLAUDE.md</code> warns
-   that this ordering is subtle; what breaks?</li>
-<li><strong>What is the malformed-input response shape?</strong> A single
-   <code>400 {"error": "..."}</code> naming the parameter, or a
-   field-keyed structure? Does anything depend on the current
-   text? What does <code>shakenfist-client</code> do with it?</li>
-<li><strong>How long does warn-only run, and what makes it "quiet
-   enough"?</strong> sfcbr is one cluster with one workload; CI is
-   another. Is that enough evidence to enforce?</li>
-<li><strong>What happens to a query parameter on a GET?</strong> The events
-   endpoints read <code>limit</code> only from the JSON body — a <code>?limit=5</code>
-   query string is silently ignored, which is surprising and
-   fragile (a GET body is not guaranteed to survive proxies).
-   Should the migration accept <code>location=('query', 'json')</code> for
-   these, and is that a breaking change for anyone?</li>
-<li><strong>Do we validate responses too?</strong> Out of scope as written, but
-   the same declarations describe response examples, and
-   <code>external_view()</code> drift is a real source of client bugs.</li>
-<li><strong>Body keys silently overwriting path parameters.</strong> Is that
-   ever intentional? <code>ArtifactVersionEndpoint.delete</code> currently
-   lets a body <code>version_id</code> override the URL segment. If not
-   intentional, the schema layer is where it stops.</li>
+<li><code>docs/plans/PLAN-api-input-validation-phase-06-required.md</code> carries a
+   <em>Sweep results</em> table with one row for each of the 75 declarations
+   from F1, each with a verdict of <code>guarded</code>, <code>faults</code> or <code>accepted</code>,
+   and the count of rows equals the count the census script reports.</li>
+<li><code>grep -n "MISSING_REQUIRED" shakenfist/external_api/base.py</code> shows no
+   line that filters it out of an enforceable set.</li>
+<li>Every declaration still carrying <code>required=True</code> in a <code>body</code> or
+   <code>query</code> location has a row in the sweep table whose verdict is not
+   <code>accepted</code>.</li>
+<li>A test proves that omitting a required body parameter answers 400
+   naming that parameter, and that sending it as an explicit JSON <code>null</code>
+   answers the same; both mutation-tested by restoring the filter from
+   item 2, and both failing when it is restored.</li>
+<li>A test proves that under <code>API_VALIDATION_MODE=warn</code> an omitted
+   required parameter answers what it answered before this phase, for
+   at least one <code>guarded</code> and one <code>faults</code> parameter.</li>
+<li><code>POST /instances</code> with a <code>user_data</code> that is not valid base64 answers
+   400, and <code>shakenfist/instance.py:1930</code> is never reached with it —
+   pinned by a test, not by reading.</li>
+<li>Each of the five format validators has a test for a value it accepts
+   and a value it refuses, and a test that <code>None</code> passes through
+   untouched.</li>
+<li><code>POST /networks</code> with a netblock overlapping the configured floating
+   network answers 400, and with no floating network configured answers
+   what it answers today.</li>
+<li>A networkspec carrying <code>"macaddress": "not-a-mac"</code> answers 400 rather
+   than reaching <code>shakenfist/network/interface.py:143</code>.</li>
+<li>
+<h1 id="3269-323-and-534-are-closed-each-closing-comment-naming-the">3269, #323 and #534 are closed, each closing comment naming the<a class="headerlink" href="#3269-323-and-534-are-closed-each-closing-comment-naming-the" title="Permanent link">&para;</a></h1>
+<p>commit and the check that closed it.</p>
+</li>
+<li>No page states required-ness differently: the
+    <code>CompiledEndpoint</code> docstring, the <code>validate_request</code> docstring,
+    <code>docs/developer_guide/writing_an_endpoint.md</code> and the v07-v08
+    release note all say it is enforced.</li>
+<li>The master plan's Execution table has nine rows, phase 7 is
+    <em>Structured parameter schemas</em>, phase 8 is the push audit, and the
+    <code>docs/plans/index.md</code> row reads <code>6 of 9</code>.</li>
+<li><code>pre-commit run --all-files</code> is clean.</li>
 </ol>
-<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step, back brief the operator on the understanding
+of this plan and how the intended work aligns with it.</p>
+<p><strong>Two gates, both before code moves:</strong></p>
 <ul>
-<li>Rewriting the API surface, changing resource paths, or
-  versioning the API.</li>
-<li>Response-shape validation (see open question 7).</li>
-<li>Authentication or authorization changes.</li>
-<li>The mariadb-layer error semantics in #3373.</li>
+<li><strong>After step 1, before step 2.</strong> The sweep table is the entire
+  evidentiary basis for the phase, and step 2 acts on it irreversibly.
+  Present the table, the counts by verdict, and any parameter whose
+  verdict surprised the agent. The management session picks three rows
+  and checks them by hand against the handlers before step 2 starts.</li>
+<li><strong>After step 2, before step 3.</strong> Enforcement is the contract change.
+  Present the list of declarations moved to <code>required=False</code> and the
+  list still required, and confirm the split before the filter is
+  deleted.</li>
 </ul>
+<h2 id="appendix-the-census-script">Appendix: the census script<a class="headerlink" href="#appendix-the-census-script" title="Permanent link">&para;</a></h2>
+<p>Run from a checkout root with <code>.tox/py3/bin/python</code>. It answers F1, and
+step 1 enumerates its 75 rows rather than a hand-written list. Keeping
+it here rather than in a scratch directory is deliberate: the number it
+produces is the premise of D32 and D35, and a reviewer who cannot re-run
+it has to take those on trust.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">ast</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">'.'</span><span class="p">)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.external_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">declarations</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">_defaults</span><span class="p">(</span><span class="n">fn</span><span class="p">):</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="sd">"""Parameter names of fn which have a default, so may be omitted."""</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">args</span> <span class="o">=</span> <span class="n">fn</span><span class="o">.</span><span class="n">args</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">positional</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">posonlyargs</span> <span class="o">+</span> <span class="n">args</span><span class="o">.</span><span class="n">args</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">out</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">defaults</span><span class="p">:</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">positional</span><span class="p">[</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">defaults</span><span class="p">):]:</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>            <span class="n">out</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">arg</span><span class="p">)</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">kwonlyargs</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">kw_defaults</span><span class="p">):</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="k">if</span> <span class="n">d</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="n">out</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">arg</span><span class="p">)</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="k">return</span> <span class="n">out</span><span class="p">,</span> <span class="p">{</span><span class="n">a</span><span class="o">.</span><span class="n">arg</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">positional</span><span class="p">}</span> <span class="o">|</span> <span class="p">{</span><span class="n">a</span><span class="o">.</span><span class="n">arg</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">kwonlyargs</span><span class="p">}</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="bp">cls</span><span class="p">,</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">declarations</span><span class="o">.</span><span class="n">handlers</span><span class="p">():</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    <span class="n">have_default</span><span class="p">,</span> <span class="n">accepted</span> <span class="o">=</span> <span class="n">_defaults</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>    <span class="k">for</span> <span class="n">dec</span> <span class="ow">in</span> <span class="n">fn</span><span class="o">.</span><span class="n">decorator_list</span><span class="p">:</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>        <span class="k">if</span> <span class="s1">'swagger_helper'</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">unparse</span><span class="p">(</span><span class="n">dec</span><span class="p">):</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>            <span class="k">continue</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>        <span class="n">call</span> <span class="o">=</span> <span class="n">dec</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dec</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Call</span><span class="p">)</span> <span class="ow">and</span> <span class="n">dec</span><span class="o">.</span><span class="n">args</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">call</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Call</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">call</span><span class="o">.</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">3</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">call</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">ast</span><span class="o">.</span><span class="n">List</span><span class="p">)):</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>            <span class="k">continue</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">call</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">elts</span><span class="p">:</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">ast</span><span class="o">.</span><span class="n">Tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">elts</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">)):</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>                <span class="k">continue</span>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>            <span class="n">name</span> <span class="o">=</span> <span class="n">declarations</span><span class="o">.</span><span class="n">literal</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">elts</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>            <span class="n">location</span> <span class="o">=</span> <span class="n">declarations</span><span class="o">.</span><span class="n">literal</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">elts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>            <span class="n">argtype</span> <span class="o">=</span> <span class="n">declarations</span><span class="o">.</span><span class="n">literal</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">elts</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>            <span class="n">required</span> <span class="o">=</span> <span class="n">declarations</span><span class="o">.</span><span class="n">literal</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">elts</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>            <span class="k">if</span> <span class="n">location</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">'body'</span><span class="p">,</span> <span class="s1">'query'</span><span class="p">)</span> <span class="ow">or</span> <span class="n">required</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">True</span><span class="p">:</span>
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>                <span class="k">continue</span>
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">fn</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">argtype</span><span class="p">,</span>
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>                         <span class="n">name</span> <span class="ow">in</span> <span class="n">have_default</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">accepted</span><span class="p">))</span>
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a><span class="nb">print</span><span class="p">(</span><span class="s1">'declared required, body/query:'</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">))</span>
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a><span class="nb">print</span><span class="p">(</span><span class="s1">'  handler gives it a default (omitting works today):'</span><span class="p">,</span>
+<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a>      <span class="nb">len</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">5</span><span class="p">]]))</span>
+<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a><span class="nb">print</span><span class="p">(</span><span class="s1">'  no default (already effectively required):'</span><span class="p">,</span>
+<a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a>      <span class="nb">len</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">r</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="ow">and</span> <span class="n">r</span><span class="p">[</span><span class="mi">6</span><span class="p">]]))</span>
+<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a><span class="nb">print</span><span class="p">(</span><span class="s1">'  not a named handler kwarg:'</span><span class="p">,</span> <span class="nb">len</span><span class="p">([</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">r</span><span class="p">[</span><span class="mi">6</span><span class="p">]]))</span>
+<a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a><span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">5</span><span class="p">]):</span>
+<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a>    <span class="nb">print</span><span class="p">(</span><span class="s1">'  </span><span class="si">%-34s</span><span class="s1"> </span><span class="si">%-8s</span><span class="s1"> </span><span class="si">%-22s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">'</span> <span class="o">%</span> <span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">4</span><span class="p">]))</span>
+</code></pre></div>
+<p>As of <code>92b9caf12</code> this prints 76, 75, 0, 1. Ask it the other question --
+which parameters lack a default -- and it prints zero, which is finding
+F5 of phase 5 and is true and useless. The difference is one <code>not</code>.</p>
+<h2 id="progress">Progress<a class="headerlink" href="#progress" title="Permanent link">&para;</a></h2>
+<p>Not started.</p>
 
 
 
@@ -14596,7 +14474,7 @@ was asked to decide.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-api-input-validation.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-api-input-validation.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-api-input-validation/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-api-input-validation-phase-06-required.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-api-input-validation-phase-06-required.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-api-input-validation-phase-06-required/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
