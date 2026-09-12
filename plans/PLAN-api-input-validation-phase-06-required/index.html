@@ -13726,6 +13726,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#amendments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amendments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13804,10 +13815,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#f5-323-is-not-a-format-problem-and-534-is-not-a-top-level-one" class="md-nav__link">
+  <a href="#f5-323-is-not-a-format-problem-and-534-was-not-a-top-level-one" class="md-nav__link">
     <span class="md-ellipsis">
       
-        F5. #323 is not a format problem, and #534 is not a top-level one
+        F5. #323 is not a format problem, and #534 was not a top-level one
       
     </span>
   </a>
@@ -13865,6 +13876,40 @@ of 75 declarations is telling the truth is not, and the previous phase
 demonstrated how to get a survey of exactly this shape wrong.</p>
 <p><strong>Review effort:</strong> high. A reviewer's job here is to find a parameter
 this phase marks required which some working client omits today.</p>
+<h2 id="amendments">Amendments<a class="headerlink" href="#amendments" title="Permanent link">&para;</a></h2>
+<p><strong>2026-09-13.</strong> Two of the issues this plan was written against moved
+between the planning commit and the phase starting. Both are corrected
+throughout the text below; this note records what changed and why, so a
+reader who remembers the original does not think the plan has drifted.</p>
+<ul>
+<li><strong>#534 was fixed outside this plan.</strong>
+  <a href="https://github.com/shakenfist/shakenfist/pull/4183">PR #4183</a> landed
+  as <code>2fcc0467f</code> on 2026-09-12, about four hours after the planning PR
+  merged, and closed the issue. The automated issue fixer took it. Its
+  fix is the one step 5 briefed and then some: <code>MACADDR_PATTERN</code> and
+  <code>valid_macaddr()</code> in <code>shakenfist/util/network.py:417</code>,
+  <code>ARGTYPES['macaddr']['pattern']</code> repointed at the constant
+  (<code>base.py:408</code>), the guard placed in <code>_netdesc_safety_checks</code>
+  (<code>instance.py:347</code>) so <strong>both</strong> callers are covered — instance create
+  at <code>instance.py:829</code> and interface hotplug at <code>instance.py:1153</code>, a
+  drift test pinning the published pattern to the validator, and a guest
+  CI case in <code>guest_ci_tests/test_networking.py:122</code>. Step 5 keeps only
+  #323; definition-of-done item 9 is gone because it is already true.</li>
+<li><strong>#936 was closed as a duplicate.</strong> Closed 2026-09-12 as a duplicate
+  of <a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a> at a
+  narrower scope, in a cleanup sweep of the oldest open issues. The
+  <em>work</em> is unchanged — element schemas for <code>dict</code> and <code>arrayofdict</code>
+  are still unbuilt and still needed — so the phase 7 split stands on
+  the same reasoning. Only the tracker moves: every reference below now
+  cites #528, since a plan that sends an implementing agent to a closed
+  issue wastes their first half hour.</li>
+</ul>
+<p>This is the second phase running to lose scope this way. The master
+plan already records phase 5 losing three of its four attribution
+issues to the same fixer, and phase 6 named #534 in a <em>merged</em> plan
+and still lost the race. The mitigation, for whoever files next: apply the
+<code>automated-fix-attempted</code> label when filing, which reserves an issue
+against the fixer while a branch is in flight.</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p><code>CompiledEndpoint</code> records required-ness and never enforces it
 (<code>shakenfist/external_api/validation.py:82</code>), and <code>validate_request</code>
@@ -13900,14 +13945,15 @@ top-level half of #4167</strong>, and the two should not be solved twice.</p>
   non-base64 <code>user_data</code> at the API instead of on the hypervisor.</li>
 <li><a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a> — reject a
   network netblock which overlaps the floating network.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a> — validate
-  the caller-supplied MAC address format on interface create.</li>
 </ul>
 <p><strong>Out:</strong></p>
 <ul>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a> — the
+  caller-supplied MAC address format. In scope when this plan was
+  written, fixed by #4183 before the phase started; see <em>Amendments</em>.</li>
 <li><strong>Element schemas for <code>dict</code> and <code>arrayofdict</code>.</strong> This is the other
   half of #4167 and the whole of
-  <a href="https://github.com/shakenfist/shakenfist/issues/936">#936</a>, and it is
+  <a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a>, and it is
   a vocabulary change the size of phase 2. It gets its own phase — see
   <em>A phase split</em> below.</li>
 <li>Response validation (decision D7, out of scope for the plan, not
@@ -14141,8 +14187,8 @@ establishes enforces nothing. The only <code>b64decode</code> of it is
 <p>That runs on the hypervisor, after the API has answered 200 and the
 instance has been scheduled and placed. A <code>binascii.Error</code> there is the
 traceback the issue describes.</p>
-<h3 id="f5-323-is-not-a-format-problem-and-534-is-not-a-top-level-one">F5. #323 is not a format problem, and #534 is not a top-level one<a class="headerlink" href="#f5-323-is-not-a-format-problem-and-534-is-not-a-top-level-one" title="Permanent link">&para;</a></h3>
-<p>Both need saying, because "semantic validators for #534, #3269, #323"
+<h3 id="f5-323-is-not-a-format-problem-and-534-was-not-a-top-level-one">F5. #323 is not a format problem, and #534 was not a top-level one<a class="headerlink" href="#f5-323-is-not-a-format-problem-and-534-was-not-a-top-level-one" title="Permanent link">&para;</a></h3>
+<p>Both needed saying, because "semantic validators for #534, #3269, #323"
 in the master plan reads as though all three are the same kind of work.
 They are not:</p>
 <ul>
@@ -14154,28 +14200,35 @@ They are not:</p>
   handler guard.</li>
 <li><strong>#534</strong> — the caller-supplied MAC arrives inside a <em>networkspec</em>, as
   <code>netdesc['macaddress']</code>, and is consumed at
-  <code>shakenfist/network/interface.py:143</code>. <code>_netdesc_safety_checks</code>
-  (<code>instance.py:329</code>) validates <code>network_uuid</code> and the requested address
-  range and never looks at <code>macaddress</code>. Because networkspecs are
-  declared <code>dict</code>/<code>arrayofdict</code>, <strong>no schema can reach it</strong> — see F6. It
-  is a handler guard too, for now.</li>
+  <code>shakenfist/network/interface.py:143</code>. At planning time
+  <code>_netdesc_safety_checks</code> validated <code>network_uuid</code> and the requested
+  address range and never looked at <code>macaddress</code>. Because networkspecs
+  are declared <code>dict</code>/<code>arrayofdict</code>, <strong>no schema can reach it</strong> — see
+  F6 — so it had to be a handler guard too. It now is one, added by
+  #4183 rather than by this phase (see <em>Amendments</em>), which leaves the
+  finding standing: the guard is at <code>instance.py:347</code> precisely because
+  the schema layer cannot see that far down.</li>
 </ul>
 <h3 id="f6-nested-structures-are-unvalidated-by-construction">F6. Nested structures are unvalidated by construction<a class="headerlink" href="#f6-nested-structures-are-unvalidated-by-construction" title="Permanent link">&para;</a></h3>
 <p><code>dict</code> compiles to <code>fields.Dict()</code> and <code>arrayofdict</code> to
 <code>fields.List(fields.Dict())</code>, neither carrying a value schema. Every
 key inside a diskspec, networkspec or videospec is invisible to the
 validation layer in every mode. This is the structural cause behind</p>
-<h1 id="936-534-and-items-2-and-3-of-4167">936, #534, and items 2 and 3 of #4167.<a class="headerlink" href="#936-534-and-items-2-and-3-of-4167" title="Permanent link">&para;</a></h1>
+<h1 id="528-534-and-items-2-and-3-of-4167-and-534-is-the-proof-since">528, #534, and items 2 and 3 of #4167 — and #534 is the proof, since<a class="headerlink" href="#528-534-and-items-2-and-3-of-4167-and-534-is-the-proof-since" title="Permanent link">&para;</a></h1>
+<p>the only way to reject a malformed MAC today is a hand-written guard in
+the handler.</p>
 <p>It is real, it is worth fixing, and it is not this phase. See below.</p>
 <h3 id="f7-a-phase-split-and-a-correction-to-the-master-plan">F7. A phase split, and a correction to the master plan<a class="headerlink" href="#f7-a-phase-split-and-a-correction-to-the-master-plan" title="Permanent link">&para;</a></h3>
 <p>The master plan's phase 6 row bundles required-ness with "semantic
-validators for #534, #3269, #323, #936". The survey says #936 does not
-belong with the others: the first three are guards and scalar
-validators, and #936 is a vocabulary change — element schemas for
-<code>dict</code> and <code>arrayofdict</code>, plus a decision about how much of
-<code>InstancesEndpoint.post</code> can become declarative at all, given that
-roughly 130 of its lines interleave validation with blob, label and
-artifact <em>resolution</em> that no schema can express.</p>
+validators for #534, #3269, #323, #936". The survey says the last does
+not belong with the others: the first three are guards and scalar
+validators, while #936 — now closed as a duplicate of
+<a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a>, which is
+the tracker the rest of this plan cites — is a vocabulary change:
+element schemas for <code>dict</code> and <code>arrayofdict</code>, plus a decision about
+how much of <code>InstancesEndpoint.post</code> can become declarative at all,
+given that roughly 130 of its lines interleave validation with blob,
+label and artifact <em>resolution</em> that no schema can express.</p>
 <p><strong>This plan therefore splits phase 6 and renumbers the push audit.</strong>
 The master plan's Execution table and the <code>docs/plans/index.md</code> row are
 corrected as part of the planning commit:</p>
@@ -14196,7 +14249,7 @@ corrected as part of the planning commit:</p>
 <tr>
 <td>7</td>
 <td>Push audit</td>
-<td><strong>Structured parameter schemas</strong> — #936, #534's declarative form, #4167 items 2 and 3</td>
+<td><strong>Structured parameter schemas</strong> — #528, the declarative form of the #534 guard, #4167 items 2 and 3</td>
 </tr>
 <tr>
 <td>8</td>
@@ -14237,7 +14290,9 @@ the handler whatever the caller sent, so a guard deleted as "dead" is a
 500 waiting for the next rollback. Phase 5 established this precedent
 deliberately in <code>InstancesEndpoint.post</code>, where the <code>isinstance(name,
 str)</code> arm is documented as unreachable under <code>enforce</code> and kept anyway.
-New guards for #323 and #534 are written to the same standard.</p>
+The new guard for #323 is written to the same standard, and #4183's
+MAC guard already meets it — it runs in the handler, so it holds in
+every mode.</p>
 <p><strong>D35. No warn window for required-ness.</strong> This is the departure from
 the phase 3→4 pattern and the decision most likely to be argued with.</p>
 <p>The case for a window: enforcing required is the change the master plan
@@ -14271,7 +14326,7 @@ and delete the filter, but the reason code is what makes the 20 events
 in F2 legible, and an operator rolling back to <code>warn</code> needs to see
 required failures distinguished from type failures. The filter goes;
 the reason code stays.</p>
-<p><strong>D38. #936 does not get a partial answer here.</strong> Declaring a
+<p><strong>D38. #528 does not get a partial answer here.</strong> Declaring a
 diskspec's shape without also handling the resolution logic tangled
 through it would leave two validation paths for one parameter, which is
 the state this whole plan exists to end. Phase 7 takes it whole.</p>
@@ -14320,14 +14375,14 @@ the state this whole plan exists to end. Phase 7 takes it whole.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td><strong>Guard the two that no schema can reach.</strong> In <code>NetworksEndpoint.post</code> (<code>network.py:42</code>), after the existing <code>/29</code> check, refuse a netblock overlapping the floating network — read it the way <code>network.floating_network()</code> does at <code>network.py:707</code>, and answer 400 naming the conflict; if no floating network is configured, do not refuse. In <code>_netdesc_safety_checks</code> (<code>instance.py:329</code>), refuse a <code>macaddress</code> that is not a MAC address, reusing <code>api_base.ARGTYPES['macaddr']['pattern']</code> so the guard and the published format are one string. Both keep working under <code>warn</code>/<code>off</code> (D34). Closes <a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a> and <a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a>. Unit tests for both, plus a cluster CI case for the netblock overlap in <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/</code>. Commit subject: <code>Refuse an overlapping netblock and a bad MAC.</code></td>
+<td><strong>Guard the one that no schema can reach.</strong> In <code>NetworksEndpoint.post</code> (<code>network.py:42</code>), after the existing <code>/29</code> check, refuse a netblock overlapping the floating network — read it the way <code>network.floating_network()</code> does at <code>network.py:707</code>, and answer 400 naming the conflict; if no floating network is configured, do not refuse. It keeps working under <code>warn</code>/<code>off</code> (D34). Closes <a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a>. Unit tests, plus a cluster CI case for the overlap in <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/</code>. The MAC guard this step also briefed landed in #4183 (see <em>Amendments</em>); <code>_netdesc_safety_checks</code> already refuses a malformed <code>macaddress</code> at <code>instance.py:347</code>, so do not add a second check — if anything here needs the published pattern, use <code>util_network.MACADDR_PATTERN</code>. Commit subject: <code>Refuse an overlapping netblock.</code></td>
 </tr>
 <tr>
 <td>6</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td><strong>Documentation and close-out.</strong> <code>docs/developer_guide/writing_an_endpoint.md</code> currently tells authors required-ness is not enforced — correct it, and say what a <code>format</code> token now costs them. Add a v07-v08 release note entry covering the required-ness change, the format enforcement, and the two new guards, listing any declaration step 2 moved to <code>required=False</code> that a caller could notice. Update the master plan's Execution table, the phase split from F7, and the <code>docs/plans/index.md</code> row. Commit subject: <code>Document what required now means.</code></td>
+<td><strong>Documentation and close-out.</strong> <code>docs/developer_guide/writing_an_endpoint.md</code> currently tells authors required-ness is not enforced — correct it, and say what a <code>format</code> token now costs them. Add a v07-v08 release note entry covering the required-ness change, the format enforcement, and the new netblock guard, listing any declaration step 2 moved to <code>required=False</code> that a caller could notice. Update the master plan's Execution table, the phase split from F7, and the <code>docs/plans/index.md</code> row. Commit subject: <code>Document what required now means.</code></td>
 </tr>
 </tbody>
 </table>
@@ -14389,12 +14444,13 @@ the server does not require. Step 6's release note says so explicitly.</p>
 <li><code>POST /networks</code> with a netblock overlapping the configured floating
    network answers 400, and with no floating network configured answers
    what it answers today.</li>
-<li>A networkspec carrying <code>"macaddress": "not-a-mac"</code> answers 400 rather
-   than reaching <code>shakenfist/network/interface.py:143</code>.</li>
 <li>
-<h1 id="3269-323-and-534-are-closed-each-closing-comment-naming-the">3269, #323 and #534 are closed, each closing comment naming the<a class="headerlink" href="#3269-323-and-534-are-closed-each-closing-comment-naming-the" title="Permanent link">&para;</a></h1>
-<p>commit and the check that closed it.</p>
-</li>
+<h1 id="3269-and-323-are-closed-each-closing-comment-naming-the-commit">3269 and #323 are closed, each closing comment naming the commit<a class="headerlink" href="#3269-and-323-are-closed-each-closing-comment-naming-the-commit" title="Permanent link">&para;</a></h1>
+   and the check that closed it. (#534 was closed by #4183 before this
+   phase started; a networkspec carrying <code>"macaddress": "not-a-mac"</code>
+   already answers 400 rather than reaching
+   <code>shakenfist/network/interface.py:143</code>, and
+   <code>shakenfist/tests/test_macaddr_validation.py</code> holds it there.)</li>
 <li>No page states required-ness differently: the
     <code>CompiledEndpoint</code> docstring, the <code>validate_request</code> docstring,
     <code>docs/developer_guide/writing_an_endpoint.md</code> and the v07-v08

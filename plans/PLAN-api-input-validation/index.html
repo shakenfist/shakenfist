@@ -13967,7 +13967,7 @@ for the required-ness decision and what the semantic type tokens turned
 out to be enforcing. Phase 6's survey split the phase it was planning:
 what was one row covering required-ness and four semantic issues is now
 phase 6 for the scalar half and phase 7 for element schemas on <code>dict</code>
-and <code>arrayofdict</code>, which #936 needs and which nothing in the vocabulary
+and <code>arrayofdict</code>, which #528 needs and which nothing in the vocabulary
 can express today. The push audit moves to phase 8. Neither phase 7 nor
 phase 8 is yet cut into a per-phase file.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
@@ -14080,11 +14080,11 @@ each of which is a real defect in the issue list:</p>
   default of 100 and a cap of 1000; <code>offset</code> on blob reads and
   upload truncate must be non-negative and, for truncate, within
   the object.</li>
-<li><strong>No format-constrained string.</strong> MAC addresses (#534),
-  base64-encoded user data (#3269), netblocks that must not
-  overlap reserved ranges (#323).</li>
+<li><strong>No format-constrained string.</strong> MAC addresses (#534, since
+  fixed outside this plan), base64-encoded user data (#3269),
+  netblocks that must not overlap reserved ranges (#323).</li>
 <li><strong>No structured value types.</strong> Disk, network and video specs
-  are validated imperatively today (#936).</li>
+  are validated imperatively today (#528).</li>
 </ul>
 <h2 id="reported-issues-this-plan-addresses">Reported issues this plan addresses<a class="headerlink" href="#reported-issues-this-plan-addresses" title="Permanent link">&para;</a></h2>
 <p>Found by scanning all 83 open issues. The core group is the
@@ -14109,7 +14109,7 @@ the same decorator chain.</p>
 <tr>
 <td><a href="https://github.com/shakenfist/shakenfist/issues/936">#936</a></td>
 <td>2021-09-02</td>
-<td>Replace hand-rolled instance-create validation with a declarative schema. Video/disk/network specs are validated imperatively in <code>instance.py</code>.</td>
+<td>Replace hand-rolled instance-create validation with a declarative schema. Video/disk/network specs are validated imperatively in <code>instance.py</code>. <strong>Closed 2026-09-12 as a duplicate of #528</strong>, which now carries this work; phase 7 is where it lands.</td>
 </tr>
 <tr>
 <td><a href="https://github.com/shakenfist/shakenfist/issues/3612">#3612</a></td>
@@ -14124,7 +14124,7 @@ the same decorator chain.</p>
 <tr>
 <td><a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a></td>
 <td>2020-11-12</td>
-<td>Validate MAC address <em>format</em> on interface create (uniqueness is already enforced).</td>
+<td>Validate MAC address <em>format</em> on interface create (uniqueness is already enforced). <strong>Closed 2026-09-12 by <a href="https://github.com/shakenfist/shakenfist/pull/4183">#4183</a></strong>, not by this plan — see the note below.</td>
 </tr>
 <tr>
 <td><a href="https://github.com/shakenfist/shakenfist/issues/3269">#3269</a></td>
@@ -14303,12 +14303,12 @@ declarations are good enough to compile.</p>
 <tr>
 <td>6: Required and scalar semantics</td>
 <td>Not started</td>
-<td>Decide whether <code>required</code> is enforced, having found that all 75 body and query declarations carrying <code>required=True</code> are optional in fact — every one has a handler default, so nothing is structurally required and enforcement is a contract change for all of them. Also gives the semantic type tokens something to do: <code>macaddr</code> is the only one of them that validates anything today, and it is declared nowhere. Closes #3269 (base64 <code>user_data</code> failing on the hypervisor rather than at the API), #323 (a netblock overlapping the floating network) and #534 (an unvalidated caller-supplied MAC). See <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a></td>
+<td>Decide whether <code>required</code> is enforced, having found that all 75 body and query declarations carrying <code>required=True</code> are optional in fact — every one has a handler default, so nothing is structurally required and enforcement is a contract change for all of them. Also gives the semantic type tokens something to do: <code>macaddr</code> is the only one of them that validates anything today, and it is declared nowhere. Closes #3269 (base64 <code>user_data</code> failing on the hypervisor rather than at the API) and #323 (a netblock overlapping the floating network). #534 was also in scope until the automated issue fixer closed it with #4183 on 2026-09-12, four hours after the phase plan merged. See <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a></td>
 </tr>
 <tr>
 <td>7: Structured parameter schemas</td>
 <td>Not started</td>
-<td><code>dict</code> compiles to <code>fields.Dict()</code> and <code>arrayofdict</code> to <code>fields.List(fields.Dict())</code>, neither carrying a value schema, so every key inside a diskspec, networkspec or videospec is unvalidated in every mode. Teaching the vocabulary to carry an element schema is what #936 needs, and it is also items 2 and 3 of #4167. Split out of phase 6 by that phase's survey: the other four issues are guards and scalar validators, and this is a vocabulary change the size of phase 2</td>
+<td><code>dict</code> compiles to <code>fields.Dict()</code> and <code>arrayofdict</code> to <code>fields.List(fields.Dict())</code>, neither carrying a value schema, so every key inside a diskspec, networkspec or videospec is unvalidated in every mode. Teaching the vocabulary to carry an element schema is what #528 needs — the scope #936 described before it was closed as a duplicate of #528 on 2026-09-12 — and it is also items 2 and 3 of #4167. Split out of phase 6 by that phase's survey: the other issues in that row are guards and scalar validators, and this is a vocabulary change the size of phase 2</td>
 </tr>
 <tr>
 <td>8: Push audit</td>
@@ -14346,8 +14346,9 @@ it required re-verifying the finding first: an unrelated fix
 three classes the phase 5 survey recorded, so the issue is scoped
 to the two proxy call sites and the local-socket case that fix
 does not cover, not to the survey's original table.</p>
-<p><strong>Still open and still owned by this plan:</strong> #528 (parent), #3612
-(the mechanism), #936, #534, #3269, #323, #2094.</p>
+<p><strong>Still open and still owned by this plan:</strong> #528 (parent, and
+since 2026-09-12 also the tracker for what #936 described), #3612
+(the mechanism), #3269, #323, #2094.</p>
 <p><strong>Phase 5 was overtaken from outside, as predicted.</strong> Three of
 its four attribution issues were picked up by the automated issue
 fixer rather than by this plan — #3615, #3606 and #3371, leaving
@@ -14361,6 +14362,19 @@ validation layer is rejecting the malformed input that broad
 catch absorbs. That is now the fact rather than the forecast.
 Nobody picks that item up incidentally, because on its own it
 looks like a regression risk with no visible benefit.</p>
+<p><strong>Phase 6 was overtaken the same way, four hours after its plan
+merged.</strong> #534 was in phase 6's scope, named in a merged plan,
+and the automated issue fixer landed
+<a href="https://github.com/shakenfist/shakenfist/pull/4183">#4183</a> for
+it on 2026-09-12 — a complete fix, wider than the one phase 6
+briefed, covering both callers of <code>_netdesc_safety_checks</code> with a
+drift test and a guest CI case. Phase 6 step 5 is now #323 alone.
+Being overtaken is not a failure: the work is done and the issue
+is closed. It is recorded because two phases running have lost
+scope this way, and because the mitigation is cheap and was not
+used — an <code>automated-fix-attempted</code> label applied when the issue
+is filed reserves it against the fixer while a branch is in
+flight.</p>
 <h3 id="carried-into-phase-2-from-phase-1">Carried into phase 2 from phase 1<a class="headerlink" href="#carried-into-phase-2-from-phase-1" title="Permanent link">&para;</a></h3>
 <p>Phase 1 corrected which location each parameter declares. It did
 not change how <code>swagger_helper()</code> renders them, which leaves two
