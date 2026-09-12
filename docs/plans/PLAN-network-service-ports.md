@@ -225,16 +225,22 @@ questions include at least:
 
 Provisional, to be re-cut after phase 0.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Research and decisions document | PLAN-network-service-ports-phase-00-decisions.md | Not started |
-| 1. Pool registration with the generic allocator | PLAN-network-service-ports-phase-01-pool.md | Not started |
-| 2. `allocate_service_port` / `release_service_port` API and token issuance | PLAN-network-service-ports-phase-02-api.md | Not started |
-| 3. Carrier-side DNAT programming via the network daemon | PLAN-network-service-ports-phase-03-dnat.md | Not started |
-| 4. Reaper and reconciler | PLAN-network-service-ports-phase-04-reaper.md | Not started |
-| 5. Validation surface (smoke-test caller or first real caller) | PLAN-network-service-ports-phase-05-validate.md | Not started |
-| 6. Operator and developer documentation | PLAN-network-service-ports-phase-06-docs.md | Not started |
-| 7. Push audit | PLAN-network-service-ports-phase-07-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Research and decisions document | PLAN-network-service-ports-phase-00-decisions.md | Not started | — |
+| 1. Pool registration with the generic allocator | PLAN-network-service-ports-phase-01-pool.md | Not started | — |
+| 2. `allocate_service_port` / `release_service_port` API and token issuance | PLAN-network-service-ports-phase-02-api.md | Not started | — |
+| 3. Carrier-side DNAT programming via the network daemon | PLAN-network-service-ports-phase-03-dnat.md | Not started | — |
+| 4. Reaper and reconciler | PLAN-network-service-ports-phase-04-reaper.md | Not started | — |
+| 5. Validation surface (smoke-test caller or first real caller) | PLAN-network-service-ports-phase-05-validate.md | Not started | — |
+| 6. Operator and developer documentation | PLAN-network-service-ports-phase-06-docs.md | Not started | — |
+| 7. Push audit | PLAN-network-service-ports-phase-07-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 **Phase 7 — push audit.** Runs `PUSH-AUDIT.md` over the
 accumulated diff of every phase in this plan against

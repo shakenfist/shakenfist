@@ -36,11 +36,21 @@ Key code locations:
 
 ## Roadmap
 
+The `Merged` line under each phase records what put that phase on `develop`, so that phase 4's
+audit has a range to read once the phases have merged and a diff against `develop` is empty. The
+phase 1 entry was reconstructed after the fact, from the merged pull request list cross-checked
+against the first-parent history rather than from a path-filtered `git log`. Each SHA is the merge
+commit of the pull request named beside it, so `<sha>^1..<sha>` is the whole of what that pull
+request landed. Phase 1 took three: #2929 added the migration framework, #2930 the hash storage
+itself, and #3089 finished the residual etcd usage in the scheduled tasks.
+
 ### Phase 1: Hash Tracking in MariaDB
 
 **Goal**: Move hash storage from etcd to MariaDB with proper indexes, enabling O(1) hash lookups.
 
 **Status**: Complete
+
+**Merged**: `5b1483be2` (#2929), `47ccb2d4a` (#2930), `3c413ddc4` (#3089)
 
 **Prerequisites**: PLAN-reference-counts.md (COMPLETE)
 
@@ -99,6 +109,8 @@ The migration command is idempotent and can be run multiple times safely.
 **Goal**: Enable storage deduplication by converting duplicate blobs to composites that reference shared content.
 
 **Status**: Not started
+
+**Merged**: —
 
 **Prerequisites**: Phase 1 (blob_hashes table with `idx_hash_lookup`)
 
@@ -167,6 +179,8 @@ This provides:
 
 **Status**: Not started
 
+**Merged**: —
+
 A prototype exists in `src/private/flywheel`.
 
 **Prerequisites**: Phase 2 (composite blobs)
@@ -203,6 +217,8 @@ roadmap against `develop`, rather than the last phase's diff alone, so that what
 to each other is caught.
 
 **Status**: Not started
+
+**Merged**: —
 
 **Prerequisites**: Phases 1-3
 

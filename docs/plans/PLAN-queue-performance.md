@@ -2,7 +2,13 @@
 
 ## Status
 
-Complete, 11 of 11 phases.
+In progress, 11 of 12 phases.
+
+Phases 1 to 11 are done. Phase 12, added on 2026-09-10, is the push
+audit of phases 9 to 11: the plan's audit obligation is discharged
+for phases 1 to 8 by phase 8 and by nothing at all for the three
+phases that reopened the plan afterwards. See "Phase 12" below for
+why phase 8 is not moved to the end of the table to cover them.
 
 Phase 11 merged to `develop` as PR #4007 on 2026-09-02, and its
 measurement write-up as PR #4033 on 2026-09-05. What the plan
@@ -68,19 +74,36 @@ Two things this plan changed are deliberately still unproven:
 
 ## Execution
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. Visibility | (in PR #3194) | Complete |
-| 2. Unified batched dequeue | (in PR #3194) | Complete |
-| 3. Coalescible-task metadata | (in PR #3194) | Complete |
-| 4. Worker-side dedup | (in PR #3194) | Complete |
-| 5. Enqueue-side dedup | (in PR #3194) | Complete |
-| 6. Caller-site audit | (in PR #3194) | Complete |
-| 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete |
-| 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete |
-| 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | Complete |
-| 10. Where the pre-execution time goes | [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md) | Complete |
-| 11. Multi-column coalescing key | [PLAN-queue-performance-phase-11-multi-column-key.md](PLAN-queue-performance-phase-11-multi-column-key.md) | Complete |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Visibility | (in PR #3194) | Complete | `57867532c` (#3194, this plan's files only -- see phase 8 decision 2) |
+| 2. Unified batched dequeue | (in PR #3194) | Complete | `57867532c` (#3194, this plan's files only -- see phase 8 decision 2) |
+| 3. Coalescible-task metadata | (in PR #3194) | Complete | `57867532c` (#3194, this plan's files only -- see phase 8 decision 2) |
+| 4. Worker-side dedup | (in PR #3194) | Complete | `57867532c` (#3194, this plan's files only -- see phase 8 decision 2) |
+| 5. Enqueue-side dedup | (in PR #3194) | Complete | `57867532c` (#3194, this plan's files only -- see phase 8 decision 2) |
+| 6. Caller-site audit | (in PR #3194) | Complete | `57867532c` (#3194, this plan's files only -- see phase 8 decision 2) |
+| 7. Re-measure and decide on fairness | [PLAN-queue-performance-phase-07-measure-and-decide.md](PLAN-queue-performance-phase-07-measure-and-decide.md) | Complete | `2daebabc1` (#3865) |
+| 8. Push audit | [PLAN-queue-performance-phase-08-push-audit.md](PLAN-queue-performance-phase-08-push-audit.md) | Complete | `cfb0263e6` (#3880) |
+| 9. Prove coalescing works | [PLAN-queue-performance-phase-09-prove-coalescing.md](PLAN-queue-performance-phase-09-prove-coalescing.md) | Complete | `30168f0dd` (#3905), `9e41f07c6` (#3951) |
+| 10. Where the pre-execution time goes | [PLAN-queue-performance-phase-10-defer-latency.md](PLAN-queue-performance-phase-10-defer-latency.md) | Complete | `fea4af7bd` (#3973) |
+| 11. Multi-column coalescing key | [PLAN-queue-performance-phase-11-multi-column-key.md](PLAN-queue-performance-phase-11-multi-column-key.md) | Complete | `9aab98d94` (#4007), `ff65c622a` (#4033) |
+| 12. Push audit of phases 9 to 11 | PLAN-queue-performance-phase-12-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`. These
+entries were reconstructed after the fact, because the plan did not
+record them as its phases landed; they come from the repository's
+merged pull request list cross-checked against the first-parent
+history, and not from a path-filtered `git log` alone, which cannot
+say which commits arrived inside a pull request. Every SHA is the
+merge commit of the pull request named beside it, so `<sha>^1..<sha>`
+is the whole of what that pull request put on `develop`.
+
+Steps 1 to 6 are the awkward case. They landed inside PR #3194, the
+105-file `network-facade` merge, so `57867532c^1..57867532c` is a
+great deal more than this plan. Phase 8's decision 2 names the ten
+files which are this plan's footprint in that merge, and an audit of
+steps 1 to 6 reads the range restricted to those paths rather than the
+whole of it.
 
 ## Problem
 
@@ -291,6 +314,47 @@ for someone to notice it.
     condition on decision 4 in the phase plan. What has not happened
     yet is step 11h, the `sfcbr` re-measurement -- see "What step 11
     measured" below.
+
+## Phase 12
+
+Added on 2026-09-10. Every master plan ends with a phase that runs
+`PUSH-AUDIT.md` over the whole plan's work, and this plan already had
+one -- phase 8 -- which then stopped being last when phases 9, 10 and
+11 reopened the plan.
+
+**Phase 8 is not moved to the end of the table.** It ran, it found
+that coalescing had never worked, and its findings are recorded
+against the range it actually read: PR #3194 restricted to this
+plan's files, and PR #3865. Moving that section to the end would
+claim it had audited phases 9 to 11, which it could not have, since
+none of them existed when it ran. What it covers is phases 1 to 8,
+and it stays where it is and keeps saying so.
+
+Phase 12 therefore audits the three phases phase 8 did not read, and
+cites phase 8 as the prior coverage of everything before them. The
+baseline is the `Merged` column in the Execution table above and not
+`develop...HEAD`, which is empty: `30168f0dd` and `9e41f07c6` for
+phase 9, `fea4af7bd` for phase 10, and `9aab98d94` and `ff65c622a`
+for phase 11. The accumulated diff of those five merges is one body
+of work, audited as one, because the interesting defects in this plan
+have all been ones the phases did to each other -- phase 8 found a
+join that phases 4 and 5 had each written correctly on their own
+terms, and phase 11's own review found a fold that phase 8's fix
+would have activated across nodes.
+
+Two areas are worth naming for whoever runs it. The coalescing key
+and its three guards were rewritten twice within phase 11, so the
+question is whether the enqueue-time check, the `queue_is_cluster_wide`
+skip and `COALESCIBLE_TASKS` are now three expressions of one rule or
+three copies that can drift apart. And phases 9 and 10 added
+measurement tooling and event fields whose consumers --
+`tools/queue-wait-report.py` among them -- are the kind of
+code that gets no test coverage and no documentation unless
+an audit asks.
+
+Findings land as their own pull request, and the plan is not complete
+until each is resolved or declined in writing here. If the audit
+finds nothing, that is recorded in one sentence.
 
 ## What step 7 measured
 

@@ -230,14 +230,20 @@ questions include at least:
 
 Provisional, to be re-cut after phase 0.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Research and decisions document | PLAN-sticky-transfers-phase-00-decisions.md | Not started |
-| 1. sf-api emits and honours sticky cookies | PLAN-sticky-transfers-phase-01-server.md | Not started |
-| 2. LB configuration docs for the supported LBs | PLAN-sticky-transfers-phase-02-lb-docs.md | Not started |
-| 3. Client verification and any necessary client-side adjustments | PLAN-sticky-transfers-phase-03-client.md | Not started |
-| 4. Failover behaviour and partial-upload recovery | PLAN-sticky-transfers-phase-04-failover.md | Not started |
-| 5. Push audit | PLAN-sticky-transfers-phase-05-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Research and decisions document | PLAN-sticky-transfers-phase-00-decisions.md | Not started | — |
+| 1. sf-api emits and honours sticky cookies | PLAN-sticky-transfers-phase-01-server.md | Not started | — |
+| 2. LB configuration docs for the supported LBs | PLAN-sticky-transfers-phase-02-lb-docs.md | Not started | — |
+| 3. Client verification and any necessary client-side adjustments | PLAN-sticky-transfers-phase-03-client.md | Not started | — |
+| 4. Failover behaviour and partial-upload recovery | PLAN-sticky-transfers-phase-04-failover.md | Not started | — |
+| 5. Push audit | PLAN-sticky-transfers-phase-05-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 **Phase 5 — push audit.** Runs `PUSH-AUDIT.md` over the
 accumulated diff of every phase in this plan against
