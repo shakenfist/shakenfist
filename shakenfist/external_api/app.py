@@ -305,6 +305,23 @@ def log_response_info(response):
 # Tokens are append-only in practice: removing one silently changes
 # behaviour in released clients, which match on substring presence.
 #
+# A client's view of this list can be one rolling deploy stale: the
+# official client fetches the root page once per Client object, so
+# during a rolling sf-api upgrade it can learn a token from an
+# already-upgraded worker and then send the gated parameter to a
+# worker which does not declare it yet. That is accepted (issue 4076)
+# rather than engineered around, because the stale request fails
+# safely: the enforce-mode validation layer refuses an undeclared
+# body key with a 400 naming the parameter before any handler runs,
+# and the same request succeeds once the rollout completes. Two
+# consequences for anyone adding a token which gates request
+# *validity* rather than a feature the client can decline to use:
+# the refusal is the backstop, so do not weaken it by silently
+# dropping undeclared keys (PLAN-api-input-validation chose refusal
+# deliberately); and a token must only ever gate *new* parameters --
+# one which changed the meaning of an already-accepted parameter
+# would misfire across that window instead of being refused.
+#
 # A token whose endpoint only functions under some cluster configuration
 # must be declared as a ConditionalCapability rather than a plain string,
 # so that it is advertised exactly when the endpoint can honour it.

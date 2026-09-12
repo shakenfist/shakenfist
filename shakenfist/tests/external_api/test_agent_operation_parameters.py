@@ -11,6 +11,7 @@
 # timestamp the enforcement phase will read rather than the relative
 # seconds the caller sent.
 
+import copy
 import json
 import time
 from unittest import mock
@@ -20,6 +21,8 @@ from shakenfist import baseobject
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
+from shakenfist.external_api import instance as api_instance
+from shakenfist.external_api import validation
 from shakenfist.instance import Instance
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -198,6 +201,42 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             'progress_timeout_seconds: not declared by this endpoint',
             resp.get_json()['error'])
+        new.assert_not_called()
+
+    def test_a_worker_without_the_declaration_refuses_by_name(self):
+        """Issue #4076, accepted: a stale capability cache costs a clean
+        refusal, never a silent mis-execution.
+
+        The official client caches the capability list once per Client
+        object, so during a rolling sf-api upgrade it can learn
+        agentoperation-deadlines from an already-upgraded worker and
+        then POST deadline_seconds to a worker which does not declare
+        it. Such a worker is simulated by compiling this endpoint's
+        declarations with the timing parameters removed. The acceptance
+        recorded on API_CAPABILITIES in external_api/app.py rests on
+        the refusal naming the parameter in the API's own words and
+        creating nothing, so that is what this pins.
+        """
+        specs = copy.deepcopy(
+            api_instance.InstanceAgentExecuteEndpoint.post.specs_dict)
+        for parameter in specs['parameters']:
+            schema = parameter.get('schema')
+            if schema and schema.get('type') == 'object':
+                for name in ('deadline_seconds', 'progress_timeout_seconds'):
+                    schema['properties'].pop(name, None)
+        stale = validation.compile_parameters(specs['parameters'])
+        self.assertNotIn('deadline_seconds', stale.names)
+
+        with mock.patch.dict(
+                validation.REGISTRY,
+                {('InstanceAgentExecuteEndpoint', 'post'): stale}):
+            resp, new = self._execute(deadline_seconds=30)
+
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(
+            {'error': 'deadline_seconds: not declared by this endpoint',
+             'status': 400},
+            resp.get_json())
         new.assert_not_called()
 
     def test_get_accepts_both_parameters(self):
