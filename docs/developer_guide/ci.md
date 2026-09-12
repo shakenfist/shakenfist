@@ -12,6 +12,8 @@ Every workflow in `.github/workflows/`:
 |----------|---------|---------|
 | `functional-tests.yml` | Main CI: lint, unit tests, functional tests, credential scanning, and the automated reviewer, delinter and exception fixer jobs. The functional jobs deploy nested test clusters via the `shakenfist.shakenfist` Ansible collection (`shakenfist/deploy/collection/`), driven by the reusable `smoke-cluster` workflow in the `shakenfist/actions` repository | PR, merge_group |
 | `docs-tests.yml` | Build and test documentation | PR touching `docs/**` or `mkdocs.yml` |
+| `agent-context.yml` | Lint the agent context -- `AGENTS.md`, `CLAUDE.md` and `.claude/` -- for malformed frontmatter, smuggled instructions, embedded credentials and dangerous hook configuration, by running the `skillsaw` pre-commit hook. Advisory: see Branch Protection | PR or push to `develop` touching the agent context, `.pre-commit-config.yaml` or the workflow itself |
+| `mermaid-lint.yml` | Render every tracked mermaid diagram and fail on one that does not parse (runs `tools/mermaid-lint.sh` in the pinned mermaid-cli container, on a `debian-12-docker` runner because it needs a docker daemon). Advisory: see Branch Protection | PR or push to `develop` touching markdown, the script, its exclude file or the workflow itself |
 | `code-formatting.yml` | Whole-tree formatting sweep | Daily schedule, manual, self-test PR |
 | `codeql-analysis.yml` | CodeQL static analysis | Push, PR, weekly schedule |
 | `pin-indirect-dependencies.yml` | Reconcile pinned indirect dependencies, adding new ones and removing obsolete ones (runs `tools/pin-indirect-dependencies.sh`) | Daily schedule, PR self-test |
@@ -1115,9 +1117,55 @@ caches.
   `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic from
   being routed through the proxy.
 
+## Fork pull requests and the runner pool
+
+Workflow runs from a fork wait for a maintainer's approval:
+`fork-pr-contributor-approval` on this repository is
+`all_external_contributors`, not just first-time ones. That is what
+makes the static runner pool safe to use for jobs that execute
+repository content.
+
+It matters most for `agent-context.yml`. That lane runs on
+`[self-hosted, static]` -- a long-lived, shared host with the fleet
+proxy and devpi reachable -- and it builds its hook environment from
+the pull request head's own `.pre-commit-config.yaml`, which is also
+one of its triggers. So the set of third-party code it installs and
+runs is chosen by the change under test. Nothing else in this
+repository has that shape; every other PR-head job on the static pool
+runs code from a fixed configuration. The fork-approval setting is the
+control, so if it is ever relaxed this lane moves to an ephemeral `vm`
+runner rather than staying where it is.
+
+`mermaid-lint.yml` executes `tools/mermaid-lint.sh` from the pull
+request head under the same rule, but on an ephemeral `vm` runner, and
+the container it starts gets `--network none`.
+
 ## Branch Protection
 
 The develop branch uses:
 - Required status checks: `Can see status`, `Can enqueue`
 - Merge queue with ALLGREEN grouping strategy
 - Configuration exported to `.github/exported-config/`
+
+`agent-context.yml` and `mermaid-lint.yml` are deliberate
+exceptions: both can fail a pull request and neither gates one.
+They are path-filtered, and a path-filtered workflow made a
+required check reports pending forever on the pull requests it
+filters out -- so a required `Mermaid lint` would block every pull
+request that touches no markdown. `needs:` cannot reach across
+workflow files either, so neither is named in `can_enqueue` or
+`can_merge`. A red result on either is visible on the pull request
+and blocks nothing automatically; treat it as something to fix
+before merging rather than as something the queue will catch.
+
+Both lanes are vendored from `shakenfist/development`'s templates:
+`tools/mermaid-lint.sh` is byte-identical to
+`templates/mermaid-lint/mermaid-lint.sh` there and is synced rather
+than edited. What this repository chooses for itself lives beside
+it in `tools/mermaid-lint-exclude`, which drops `docs/components/`
+-- `sync-external-docs.yml` imports those 664 files hourly from the
+sibling repositories and `AGENTS.md` forbids editing them here, so
+a diagram broken upstream is fixed upstream rather than failing a
+pull request here that cannot fix it. GitHub Actions cannot read
+that file, so `mermaid-lint.yml`'s path filters carry the same
+exclusion by hand and the two have to move together.
