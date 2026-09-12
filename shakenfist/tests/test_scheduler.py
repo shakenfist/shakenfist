@@ -1925,3 +1925,351 @@ class WeightedAffinityMappingTestCase(SchedulerTestCase):
         inst = self.mock_mariadb.create_instance('instance-1')
         nodes = scheduler.Scheduler().find_candidates(inst)
         self.assertSetEqual(self._all_hypervisor_uuids(), set(nodes))
+
+
+class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
+    """Unit coverage of _has_sufficient_cpu(), the sufficient_idle_cpu stage
+    predicate (F6). Before this the predicate was not named by any test in
+    this file.
+
+    Pins both sides of the capacity-row boundary (the strictly
+    greater-than comparison ``current_cpu + cpus > limit_cpus``) and the
+    exact shape of the reason dict returned on refusal, since that dict is
+    what the sufficient_idle_cpu audit event publishes and what a later
+    refactor could silently change.
+    """
+
+    def _baseline(self, **overrides):
+        metrics = {
+            'cpu_max_per_instance': 16,
+            'cpu_max': 4,
+            'cpu_schedulable': 4,
+            'cpu_total_instance_vcpus': 0,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def _call(self, inst, node, capacity, **metrics_overrides):
+        self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
+        s = scheduler.Scheduler()
+        log_ctx = s.log.with_fields({'instance': inst})
+        return s._has_sufficient_cpu(log_ctx, inst, node, capacity)
+
+    def test_exactly_at_the_capacity_row_limit_is_sufficient(self):
+        # committed (4) + requested (4) == limit (8). Landing exactly on
+        # the limit still admits, because the check is strictly
+        # greater-than.
+        node = self._node_uuid('node2')
+        capacity = {node: {'limit_cpus': 8, 'used_cpus': 4}}
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', cpus=4)
+
+        ok, reason = self._call(fake_inst, node, capacity)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_one_vcpu_over_the_capacity_row_limit_is_refused(self):
+        node = self._node_uuid('node2')
+        capacity = {node: {'limit_cpus': 8, 'used_cpus': 5}}
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', cpus=4)
+
+        ok, reason = self._call(fake_inst, node, capacity)
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'would exceed hard max CPUs',
+            'current_cpus': 5,
+            'measured_cpus': 0,
+            'committed_cpus': 5,
+            'capacity_row_present': True,
+            'requested_cpus': 4,
+            'limit_cpus': 8,
+            'hard_max_cpus': 4 * fake_config.CPU_OVERCOMMIT_RATIO,
+            'cpu_schedulable': 4,
+            'cpu_schedulable_from_fallback': False,
+        }, reason)
+
+    def test_a_node_with_no_capacity_row_is_bounded_by_its_live_hard_max(self):
+        """An unguarded node (P7) is limited, just not by a ledger.
+
+        ``find_candidates()`` level coverage that such a node stays a
+        candidate already exists (``test_prefilter_keeps_a_node_with_no_
+        capacity_row``). What is pinned here is the arithmetic it keeps
+        the node on: ``limit_cpus`` falls back to the node's own live
+        ``hard_max_cpus``, ``committed_cpus`` is zero because there is no
+        row to read one from, and the boundary is still the strict one.
+        This is the branch ``shakenfist_ci/sizing.py``'s
+        ``effective_cpu_ceiling()`` mirrors when it reads a null
+        ``cpu_limit`` as the node's ``cpu_hard_max``, so the two must
+        agree about what bounds an unguarded node.
+        """
+        node = self._node_uuid('node2')
+        hard_max = 4 * fake_config.CPU_OVERCOMMIT_RATIO
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', cpus=int(hard_max))
+
+        ok, reason = self._call(fake_inst, node, {})
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_refusal_on_the_hard_max_says_there_was_no_capacity_row(self):
+        # The reason dict is what the sufficient_idle_cpu audit event
+        # publishes, and capacity_row_present is the field an operator
+        # reads to tell "this node is full" from "this node was never
+        # sized". Nothing asserted its False case before.
+        node = self._node_uuid('node2')
+        hard_max = 4 * fake_config.CPU_OVERCOMMIT_RATIO
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', cpus=int(hard_max) + 1)
+
+        ok, reason = self._call(fake_inst, node, {})
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'would exceed hard max CPUs',
+            'current_cpus': 0,
+            'measured_cpus': 0,
+            'committed_cpus': 0,
+            'capacity_row_present': False,
+            'requested_cpus': int(hard_max) + 1,
+            'limit_cpus': hard_max,
+            'hard_max_cpus': hard_max,
+            'cpu_schedulable': 4,
+            'cpu_schedulable_from_fallback': False,
+        }, reason)
+
+
+class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
+    """Unit coverage of _has_sufficient_ram(), the sufficient_idle_memory
+    stage predicate (F6).
+
+    Covers all four of its distinct refusal shapes -- insufficient
+    measured memory, a missing memory_max metric, the KSM overcommit
+    ratio, and the capacity-row committed-memory ledger -- pinning both
+    sides of the boundary for the two strict-inequality checks and
+    asserting the whole reason dict for every refusal, since that dict is
+    what the sufficient_idle_memory audit event publishes.
+    """
+
+    def _baseline(self, **overrides):
+        metrics = {
+            'memory_available': 1000000,
+            'memory_reserved_mb': 0,
+            'memory_max': 1000000,
+            'memory_total_instance_actual': 0,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def _call(self, inst, node, capacity, **metrics_overrides):
+        self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
+        s = scheduler.Scheduler()
+        log_ctx = s.log.with_fields({'instance': inst})
+        return s._has_sufficient_ram(log_ctx, inst, node, capacity)
+
+    def test_exactly_the_available_memory_is_sufficient(self):
+        # available - memory == 0.0, not < 0.0, so landing exactly on the
+        # available figure still admits.
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=1024)
+
+        ok, reason = self._call(fake_inst, node, {}, memory_available=1024)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_one_mb_short_of_available_memory_is_refused(self):
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=1024)
+
+        ok, reason = self._call(fake_inst, node, {}, memory_available=1023)
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'insufficient memory',
+            'available_mb': 1023,
+            'requested_memory_mb': 1024,
+            'memory_reserved_mb': 0,
+        }, reason)
+
+    def test_missing_memory_max_is_refused(self):
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=512)
+
+        ok, reason = self._call(fake_inst, node, {}, memory_max=0)
+
+        self.assertFalse(ok)
+        self.assertEqual({'reason': 'no memory_max in node metrics'}, reason)
+
+    def test_exactly_at_the_ksm_overcommit_ratio_is_sufficient(self):
+        # instance_memory / memory_max == RAM_OVERCOMMIT_RATIO (1.5)
+        # exactly. Landing exactly on the configured ratio still admits,
+        # because the check is strictly greater-than.
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
+
+        ok, reason = self._call(
+            fake_inst, node, {}, memory_max=1000, memory_total_instance_actual=1400)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_one_mb_over_the_ksm_overcommit_ratio_is_refused(self):
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
+
+        ok, reason = self._call(
+            fake_inst, node, {}, memory_max=1000, memory_total_instance_actual=1401)
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'KSM overcommit ratio exceeded',
+            'instance_memory_mb': 1501,
+            'memory_max_mb': 1000,
+            'overcommit_ratio': fake_config.RAM_OVERCOMMIT_RATIO,
+        }, reason)
+
+    def test_exactly_at_the_committed_memory_limit_is_sufficient(self):
+        # The capacity-row ledger check: committed (900) + requested
+        # (100) == limit_memory_mb (1000) exactly still admits.
+        node = self._node_uuid('node2')
+        capacity = {node: {'limit_memory_mb': 1000, 'used_memory_mb': 900}}
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
+
+        ok, reason = self._call(fake_inst, node, capacity)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_one_mb_over_the_committed_memory_limit_is_refused(self):
+        node = self._node_uuid('node2')
+        capacity = {node: {'limit_memory_mb': 1000, 'used_memory_mb': 901}}
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
+
+        ok, reason = self._call(fake_inst, node, capacity)
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'would exceed committed memory',
+            'committed_memory_mb': 901,
+            'requested_memory_mb': 100,
+            'limit_memory_mb': 1000,
+        }, reason)
+
+    def test_a_node_with_no_capacity_row_is_not_refused_on_a_missing_ledger(
+            self):
+        """P7, for memory. The CPU predicate has this covered; RAM did not.
+
+        Same figures as the refusal above -- a 100 MB request where a row
+        recording 901 of 1000 MB committed would refuse -- but with no row
+        at all. A node the reconciler has not sized is guarded by nothing
+        and admission will let it through unguarded, so refusing it here
+        would prune a candidate the cluster is willing to place on, for a
+        ledger which does not exist. Only the measured checks above apply
+        there, and the baseline satisfies them.
+
+        This is the state both halves of phase 3's functional coverage
+        deliberately skip on (``cpu_committed_row_present`` false), so
+        without this case nothing in the phase covers it at any level.
+        """
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
+
+        ok, reason = self._call(fake_inst, node, {})
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+
+class HasSufficientDiskPredicateTestCase(SchedulerTestCase):
+    """Unit coverage of _has_sufficient_disk(), the sufficient_free_disk
+    stage predicate (F6). Pins both sides of the disk_free_gb boundary and
+    the reason dict shape published on refusal.
+    """
+
+    def _baseline(self, **overrides):
+        metrics = {
+            'disk_free_instances': 100 * GiB,
+            'disk_reservation_gb': 0,
+        }
+        metrics.update(overrides)
+        return metrics
+
+    def _call(self, inst, node, **metrics_overrides):
+        self.mock_mariadb.set_node_metrics_same(self._baseline(**metrics_overrides))
+        s = scheduler.Scheduler()
+        log_ctx = s.log.with_fields({'instance': inst})
+        return s._has_sufficient_disk(log_ctx, inst, node)
+
+    def test_exactly_the_free_disk_is_sufficient(self):
+        # requested (100) > disk_free (100.0) is False at the boundary, so
+        # a request exactly matching the published free disk still admits.
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', disk_spec=[{'base': 'cirros', 'size': 100}])
+
+        ok, reason = self._call(fake_inst, node)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_one_gb_over_the_free_disk_is_refused(self):
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', disk_spec=[{'base': 'cirros', 'size': 101}])
+
+        ok, reason = self._call(fake_inst, node)
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'insufficient disk',
+            'requested_disk_gb': 101,
+            'disk_free_gb': 100.0,
+            'minimum_free_disk_gb': 0,
+        }, reason)
+
+
+class HasIdleDiskBandwidthPredicateTestCase(SchedulerTestCase):
+    """Unit coverage of _has_idle_disk_bandwidth(), the sufficient_idle_disk
+    stage predicate (F6).
+
+    D25: this is the *only* coverage the predicate gets. DISK_BUSY_PER_SECOND_METRIC
+    is a measured value the resources daemon republishes on a 60 second
+    cadence, it is not carried in /admin/resources at all, so no functional
+    test can force it or observe why it did or did not fire (F5). Pins
+    both sides of the 1200 ms/s threshold from both directions and the
+    reason dict shape the sufficient_idle_disk audit event publishes.
+    """
+
+    def _call(self, inst, node, busy_time):
+        self.mock_mariadb.set_node_metrics_same(
+            {DISK_BUSY_PER_SECOND_METRIC: busy_time})
+        s = scheduler.Scheduler()
+        log_ctx = s.log.with_fields({'instance': inst})
+        return s._has_idle_disk_bandwidth(log_ctx, inst, node)
+
+    def test_exactly_1200ms_per_second_is_idle(self):
+        # The comparison is strictly greater-than, so 1200 exactly is NOT
+        # saturated.
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+
+        ok, reason = self._call(fake_inst, node, 1200)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_1201ms_per_second_is_saturated(self):
+        # One unit over 1200 IS saturated.
+        node = self._node_uuid('node2')
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+
+        ok, reason = self._call(fake_inst, node, 1201)
+
+        self.assertFalse(ok)
+        self.assertEqual({
+            'reason': 'disk bandwidth saturated',
+            'busy_time_delta_per_second': 1201.0,
+            'busy_time_threshold': 1200,
+        }, reason)
