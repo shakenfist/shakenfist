@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-11T10:51:15.615232+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-12T10:19:55.595462+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -42,7 +42,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | kerbside-client | non-compliant | shakenfist/kerbside-client#5 |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#120 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#26 |
@@ -56,7 +56,6 @@ Details for non-compliant projects:
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
 - **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
-- **occystrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
 - **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **visual-digest-rust** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
@@ -80,7 +79,7 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#124 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
@@ -91,7 +90,6 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 Details for non-compliant projects:
 
 - **agent-python** (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_agent/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)
-- **occystrap** (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- occystrap/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)
 
 ## default-branch-naming
 
@@ -199,7 +197,7 @@ Criterion: [diagram-format.md](/components/development/audits/diagram-format/)
 | kerbside-client | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#127 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
@@ -211,7 +209,6 @@ Details for non-compliant projects:
 
 - **clingwrap** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): ARCHITECTURE.md:21
 - **cloudgood** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/memory-mapped-devices.md:729
-- **occystrap** (Status): 1 diagram(s) drawn in ASCII rather than mermaid (convert them, or mark a block that is genuinely better drawn by hand with an "audit-ok: diagram-format" comment above the fence): docs/internals.md:30
 
 ## docs-external-links
 
@@ -264,7 +261,7 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#113 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#14 |
@@ -276,7 +273,6 @@ Details for non-compliant projects:
 
 - **agent-python** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **clingwrap** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-- **occystrap** (Status): 2 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering), python-unit-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **sfui** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **visual-digest-rust** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: ci.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 
@@ -400,7 +396,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#119 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#25 |
@@ -413,7 +409,6 @@ Details for non-compliant projects:
 - **agent-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **clingwrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **occystrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **sfui** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **shakenfist** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **uncalibrated-sextant** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
@@ -438,17 +433,13 @@ Criterion: [llm-context-lint.md](/components/development/audits/llm-context-lint
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#118 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | compliant | - |
-
-Details for non-compliant projects:
-
-- **occystrap** (Status): Markdown that will never load as a skill: .claude/skills/documentation-updates.md, .claude/skills/pr-preparation.md, .claude/skills/testing-discipline.md
 
 ## llm-doc-structure
 
@@ -585,7 +576,7 @@ Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
-| occystrap | N/A | - |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | N/A | - |
@@ -637,7 +628,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#103 |
+| divergulent | compliant | - |
 | instar | non-compliant | shakenfist/instar#554 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -653,7 +644,6 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 
 Details for non-compliant projects:
 
-- **divergulent** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-release-1.0.md (no push audit phase; phase 8 is "Builder robustness and publish safety"); 1 plan(s) with no phases this check can read, not judged: PLAN-curation-cli-ergonomics.md
 - **instar** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
@@ -674,9 +664,9 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
-| kerbside-patches | N/A | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1690 |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#116 |
+| occystrap | compliant | - |
 | private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#24 |
@@ -686,7 +676,7 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 
 Details for non-compliant projects:
 
-- **occystrap** (Status): index has no plan table (it must list plans in a table led by Date and Plan columns, not as prose or a bullet list); 4 master plan(s) not listed in the index: PLAN-make-the-speed.md, PLAN-post-write-verification.md, PLAN-registry-proxy.md, PLAN-structured-logging.md
+- **kerbside-patches** (Status): docs/plans/index.md is missing, so none of the 1 plan(s) in docs/plans/ are registered
 - **sfui** (Status): docs/plans/index.md is missing, so none of the 3 plan(s) in docs/plans/ are registered
 - **uncalibrated-sextant** (Status): 7 status cell(s) outside the shared vocabulary (Proposed, Not started, In progress, Blocked, Complete, Abandoned, Superseded): Locked bootloader ("Complete (commits a7b261d through thi..."), Display-mode keystrokes ("Complete (commits 455d2b5 through thi..."), Audit cleanup ("Complete (commits 1482eb0 through thi..."), Visual on-screen digest ("Complete (commits 55844a5 through thi..."), Continuous multi-channel visual digest ("Complete (commits 8814fab through thi...") (+2 more)
 
@@ -722,7 +712,7 @@ Details for non-compliant projects:
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:54, docs/library-api.md:65, docs/library-api.md:180, docs/library-api.md:182
 - **instar** (Status): 6 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/quirks.md:4199, docs/quirks.md:4205, docs/quirks.md:4206, docs/quirks.md:4407, docs/quirks.md:4463, docs/quirks.md:4464
-- **shakenfist** (Status): 26 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:71, docs/developer_guide/ci.md:133, docs/developer_guide/ci.md:235, docs/developer_guide/ci.md:286, docs/developer_guide/ci.md:287, docs/developer_guide/database_internals.md:346, docs/developer_guide/database_internals.md:360, docs/developer_guide/database_internals.md:364, docs/developer_guide/subsystem_internals.md:51 (+16 more)
+- **shakenfist** (Status): 28 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:198, docs/developer_guide/ci.md:71, docs/developer_guide/ci.md:222, docs/developer_guide/ci.md:228, docs/developer_guide/ci.md:331, docs/developer_guide/ci.md:373, docs/developer_guide/ci.md:424, docs/developer_guide/ci.md:425, docs/developer_guide/database_internals.md:346, docs/developer_guide/database_internals.md:360 (+18 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
 
@@ -771,13 +761,13 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#110 |
+| divergulent | compliant | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#117 |
+| occystrap | compliant | - |
 | private-ci | non-compliant | shakenfist/private-ci#33 |
 | ryll | compliant | - |
 | sfui | N/A | - |
@@ -787,8 +777,6 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 
 Details for non-compliant projects:
 
-- **divergulent** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
-- **occystrap** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **private-ci** (Status): shared block plan-push-audit-phase is stale (v2 embedded, v3 current)
 - **shakenfist** (Status): missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
 - **uncalibrated-sextant** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
@@ -812,7 +800,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#110 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#15 |
@@ -823,7 +811,6 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
-- **occystrap** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 - **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 - **shakenfist** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository)
 - **uncalibrated-sextant** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block comment-proportion (copy it verbatim from templates/shared-blocks/comment-proportion.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
@@ -1022,7 +1009,7 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 | kerbside-client | non-compliant | shakenfist/kerbside-client#2 |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#112 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
@@ -1036,7 +1023,6 @@ Details for non-compliant projects:
 - **clingwrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **kerbside-client** (Status): Missing: .github/workflows/renovate.yml, renovate.json
-- **occystrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **uncalibrated-sextant** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **visual-digest-rust** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 
@@ -1186,7 +1172,7 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#101 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
@@ -1198,7 +1184,6 @@ Details for non-compliant projects:
 
 - **agent-python** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **clingwrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
-- **occystrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **uncalibrated-sextant** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **visual-digest-rust** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 
@@ -1374,7 +1359,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 | kerbside-client | non-compliant | N/A | N/A | N/A | N/A | non-compliant | N/A | N/A | N/A | shakenfist/kerbside-client#4, shakenfist/kerbside-client#6 |
 | kerbside-patches | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | library-utilities | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
-| occystrap | non-compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/occystrap#126, shakenfist/occystrap#67 |
+| occystrap | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | private-ci | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
 | ryll | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | sfui | N/A | compliant | compliant | compliant | compliant | compliant | compliant | compliant | N/A | - |
@@ -1391,8 +1376,6 @@ Details for non-compliant projects:
 - **clingwrap** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **kerbside-client** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **kerbside-client** (Linting): Missing .pre-commit-config.yaml
-- **occystrap** (flake8wrap): Missing shellcheck disable=SC2086 directive
-- **occystrap** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:17 (self-hosted, vm, debian-12), python-unit-tests.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **shakenfist** (VM size): 2 "vm" runner job(s) naming no size: functional-tests.yml:721 (self-hosted, vm, debian-12), pin-indirect-dependencies.yml:50 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **uncalibrated-sextant** (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **uncalibrated-sextant** (Permissions): 1 workflow(s) missing top-level permissions: pre-commit.yml
