@@ -342,9 +342,8 @@ node without a row is admitted against nothing at all: a
 process-local five minute timer left every placement in a new
 cluster's first minutes unguarded, and the first pass then recorded
 the resulting over-limit usage on the row it created (issue 4087).
-The check was a one-shot on the election path until
-`PLAN-transient-capacity-refusals` phase 1, which is why it used to
-miss a cold cluster entirely -- election happens seconds after
+The check used to be a one-shot on the election path, which is why it
+missed a cold cluster entirely -- election happens seconds after
 start-up, before any hypervisor has published, so the pass it forced
 had nothing to size. See
 [the subsystem internals](subsystem_internals.md) for the predicate
@@ -356,13 +355,12 @@ claims, re-derives per-hypervisor limits from the typed
 instances and the decaying expected-demand signal, and rebuilds
 the `cluster_capacity` singleton. The reconciler recomputes the
 three capacity tables (`scheduler_node_capacity`,
-`namespace_claims`, `cluster_capacity`) wholesale; as of
-scheduler-reservations phase 3 the atomic admission and release
-RPCs also write them incrementally, and are the sole *drawdown*
-path against them, so a divergence between what the reconciler
-computes and what the counters hold is drift, healed on the next
-pass rather than expected steady state. Phase 4 added the claim
-CRUD RPCs as a third writer: they move capacity between
+`namespace_claims`, `cluster_capacity`) wholesale; the atomic
+admission and release RPCs also write them incrementally, and are
+the sole *drawdown* path against them, so a divergence between
+what the reconciler computes and what the counters hold is drift,
+healed on the next pass rather than expected steady state. The
+claim CRUD RPCs are a third writer: they move capacity between
 `namespace_claims` and `cluster_capacity` (a claim's limits into
 `claimed_*`, its namespace's existing drawdown out of
 `unclaimed_used_*` and onto the claim, and the reverse on
