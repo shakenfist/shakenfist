@@ -14564,6 +14564,14 @@ artifacts and the like. It is the system namespace's ability to see across
 namespaces, scaled down. A namespace you trust can list and read those
 objects. It cannot delete them, rename them, share them, or change their
 metadata — those all require the object's own namespace, or <code>system</code>.</p>
+<p>A trust also does not outlive the namespace it names. Deleting a namespace
+revokes every trust pointing at it, on every other namespace, at the moment
+of deletion. This matters because a trust names a namespace by name and
+namespace names can be reused once the cluster has finished cleaning the
+deleted one up: without the revocation, whoever created that name next would
+inherit your trust without you doing anything or being told. You will see a
+<code>trust revoked, trusted namespace is gone</code> event on your namespace when this
+happens.</p>
 <p>Giving is a separate question from taking, and it is still allowed: a
 namespace you trust may <em>create</em> an object in your namespace, which is exactly
 the "gift" step in the <code>ci-images</code> example above. Creation is additive, you

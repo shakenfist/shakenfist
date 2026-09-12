@@ -13765,6 +13765,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#trusts-do-not-outlive-the-namespace-they-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusts do not outlive the namespace they name
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#vdi-console-token-trust-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14007,6 +14018,31 @@ filter pins it to <code>TYPE_SNAPSHOT</code> — but it resolves by ownership an
 the next artifact type minted against an instance URL does not have to
 rediscover the rule. When looking for write paths, grep for the sink
 (<code>add_index</code>) rather than for callers of the resolver.</p>
+<h2 id="trusts-do-not-outlive-the-namespace-they-name">Trusts do not outlive the namespace they name<a class="headerlink" href="#trusts-do-not-outlive-the-namespace-they-name" title="Permanent link">&para;</a></h2>
+<p>A trust names a namespace by <em>name</em>, not by uuid, and namespace names
+are reusable: the REST create handler refuses a name whose static row
+still exists, but the cluster maintainer hard deletes deleted
+namespaces after a delay and that removes the row. A trust which
+outlived the namespace it named would therefore be inherited by
+whoever created that name next, without the granting namespace acting
+or being told — the same hazard <code>Namespace.hard_delete()</code> already
+removes mapping rules to avoid.</p>
+<p>So deleting a namespace revokes every trust naming it. This happens in
+two places on purpose:</p>
+<ul>
+<li><code>DELETE /auth/namespaces/&lt;namespace&gt;</code> calls
+  <code>namespace.revoke_inbound_trust()</code> before it moves the namespace to
+  <code>deleted</code>. This is the path that matters: the trust goes when the
+  namespace does, not whenever the hard delete catches up.</li>
+<li><code>Namespace.hard_delete()</code> sweeps again, as a backstop for a namespace
+  which reached a final state by some path that did not revoke.</li>
+</ul>
+<p>Only active namespaces are swept. Deleting a namespace requires it to
+hold no instances or networks and cascade deletes its artifacts, so a
+deleted namespace has nothing left for an inherited trust to expose.</p>
+<p>Both revocations are audited: the trusting namespace records
+<code>trust revoked, trusted namespace is gone</code>, and the namespace being
+deleted records which namespaces it was removed from.</p>
 <h2 id="vdi-console-token-trust-model">VDI console token trust model<a class="headerlink" href="#vdi-console-token-trust-model" title="Permanent link">&para;</a></h2>
 <p>The Kerbside VDI console proxy integration uses <strong>offline signature
 verification</strong>. Shaken Fist is the sole signer: <code>sf-api</code> mints short lived
