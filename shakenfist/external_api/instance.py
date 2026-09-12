@@ -63,6 +63,7 @@ from shakenfist.network.interface import NetworkInterface
 from shakenfist.node import Node
 from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import general as util_general
+from shakenfist.util import network as util_network
 from shakenfist.util import vdi_tokens
 
 
@@ -334,6 +335,19 @@ def _netdesc_safety_checks(netdesc, namespace):
     if 'network_uuid' not in netdesc:
         return sf_api.error(
             400, 'network specification is missing network_uuid')
+
+    # Check the caller supplied MAC before we go anywhere near the
+    # database. A malformed one used to be accepted here, stored on the
+    # network interface, and only rejected much later by libvirt when
+    # the domain XML was defined -- by which point the instance is
+    # mid-create and the error is a long way from the request that
+    # caused it. NetworkInterface.new() generates a MAC when the caller
+    # does not supply one, and those are always well formed.
+    if netdesc.get('macaddress'):
+        if not util_network.valid_macaddr(netdesc['macaddress']):
+            return sf_api.error(
+                400,
+                'network specification requests a malformed MAC address')
 
     # Allow network to be specified by name or UUID (and error early
     # if not found). Scope to the *instance's* namespace, not the
