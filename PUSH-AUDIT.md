@@ -31,8 +31,28 @@ tox
 
 `pre-commit` runs flake8, stestr unit tests, and mypy. `tox`
 runs the full test matrix including any additional envs
-configured (e.g. `genprotos`). If proto files are in the
-diff, also confirm the generated stubs are up to date:
+configured (e.g. `genprotos`).
+
+If the diff touches markdown, also render the diagrams:
+
+```
+tools/mermaid-lint.sh
+```
+
+It is not a pre-commit hook because it needs a docker
+daemon, which not every developer machine has, so it is run
+here instead. It is the mechanical half of the
+`diagram-discipline` rule in wave 2 -- that rule asks a
+reviewer whether a diagram should be mermaid, and this asks
+mermaid whether the diagram parses. Nothing else in CI reads
+a diagram, and a broken one commits cleanly and then renders
+as an error box on GitHub and as nothing at all on the
+mkdocs site. Check the exit status directly: piping it
+through `tail` or `grep` reports the filter's status and
+turns every failure green.
+
+If proto files are in the diff, also confirm the generated
+stubs are up to date:
 
 ```
 tox -e genprotos
@@ -49,10 +69,10 @@ git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\betcd\b'  # new etcd ref
 git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'  # new bulk-scan pushdown violations
 ```
 
-Exit condition: wave 1 passes when pre-commit, tox, proto
-regeneration (if applicable), and the style greps all come
-back clean. If anything fails, fix the cause and re-run
-before spending on wave 2.
+Exit condition: wave 1 passes when pre-commit, tox, the
+mermaid render and proto regeneration (each if applicable),
+and the style greps all come back clean. If anything fails,
+fix the cause and re-run before spending on wave 2.
 
 ### Style conformance — judgment portion
 
