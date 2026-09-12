@@ -24,8 +24,22 @@ repos:
   # CLAUDE.md should fail the commit that introduces it rather than a
   # report up to a day later. Renovate's pre-commit manager keeps the
   # rev current.
+  #
+  # Pinned by commit rather than by tag. A tag is mutable and
+  # pre-commit caches the hook environment by the rev string, so a
+  # moved tag changes what runs on every developer's commit and on the
+  # PR head in CI without changing a line here. Renovate's pre-commit
+  # manager handles a SHA pin and keeps the trailing comment in step.
+  #
+  # Known, accepted warnings at this rev: CLAUDE.md trips
+  # context-budget and content-progressive-disclosure at ~8,100
+  # estimated tokens against a 6,000 threshold. Warnings do not fail
+  # the hook. skillsaw's rule set moves between releases, so if a bump
+  # promotes either to an error the fix is to move the MariaDB storage
+  # inventory and the State class detail out of CLAUDE.md into the
+  # docs/ pages it already summarises, not to pin the rev back.
   - repo: https://github.com/stbenjam/skillsaw
-    rev: v0.20.0
+    rev: ec30cf07c9a00cf5ea5e7bfe0c351366f99d09a1  # v0.20.0
     hooks:
       - id: skillsaw
 
