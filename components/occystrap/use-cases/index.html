@@ -10228,6 +10228,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-workflow-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: Refactor Developer Automation Workflows to Shared Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
@@ -15104,6 +15132,16 @@ library output (requests, urllib3, etc.).</p>
 <a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>occystrap<span class="w"> </span>--debug<span class="w"> </span>process<span class="w"> </span>registry://docker.io/library/busybox:latest<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">    </span>tar://busybox.tar
 </code></pre></div>
+<p><code>--debug</code> is what surfaces a dependency's informational records, and
+there are a lot of them: httpx logs a line per HTTP request, so a
+multi-layer image narrates every manifest, token and blob fetch.
+Neither flag is needed to see a dependency's warnings and errors, which
+always print.</p>
+<p>Library records are named by the logger which emitted them --
+<code>httpx</code> or <code>urllib3.connectionpool</code>, for instance -- because a record
+from a dependency is only useful once you know which dependency
+produced it, and they go to stderr so that they cannot corrupt the
+output of a command asked for JSON.</p>
 <p>When running in a terminal, registry downloads and uploads display
 interactive progress bars. In non-TTY environments (CI, pipes),
 periodic log messages are emitted instead.</p>

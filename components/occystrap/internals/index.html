@@ -9999,6 +9999,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-workflow-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: Refactor Developer Automation Workflows to Shared Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
@@ -14321,25 +14349,18 @@ resolves to zero or many images.</p>
 <p>The <code>quay://</code> scheme is not implemented as an <code>ImageInput</code> subclass.
 Instead, it is a <strong>resolver</strong> that expands a single URI into a list of
 standard <code>(registry, image, tag)</code> tuples:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>quay://kolla/*:latest
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    │
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    ▼
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>resolve_quay_uri('kolla', '*', 'latest')
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    │
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    ├── QuayClient.list_repositories('kolla')     ← quay.io API v1
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    ├── fnmatch filter by glob pattern
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    ├── QuayClient.has_tag('kolla', repo, 'latest') for each match (parallel)
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    │
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    ▼
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>[('quay.io', 'kolla/nova-api', 'latest'),
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a> ('quay.io', 'kolla/keystone', 'latest'),
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a> ...]
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    │
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    ▼
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>For each tuple (concurrently, up to -J workers):
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>build a standard registry.Image input and run
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>through the existing pipeline
-</code></pre></div>
+<pre class="mermaid"><code>flowchart TD
+    uri["quay://kolla/*:latest"]
+    resolve["resolve_quay_uri('kolla', '*', 'latest')"]
+    list["QuayClient.list_repositories('kolla')&lt;br/&gt;quay.io API v1, paginated"]
+    glob["fnmatch filter by glob pattern"]
+    hastag["QuayClient.has_tag(...) for each match&lt;br/&gt;in parallel, -j workers"]
+    tuples["[('quay.io', 'kolla/nova-api', 'latest'),&lt;br/&gt;('quay.io', 'kolla/keystone', 'latest'), ...]"]
+    pipeline["For each tuple, concurrently up to -J workers:&lt;br/&gt;build a registry.Image input and run it&lt;br/&gt;through the existing pipeline"]
+
+    uri --&gt; resolve
+    resolve --&gt; list --&gt; glob --&gt; hastag --&gt; tuples
+    tuples --&gt; pipeline</code></pre>
 <h3 id="module-occystrapquaypy">Module: <code>occystrap/quay.py</code><a class="headerlink" href="#module-occystrapquaypy" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>QuayClient</code> - Wraps the quay.io proprietary REST API v1
@@ -14440,19 +14461,19 @@ the actual <code>manifest.json</code>, occystrap falls back to buffered processi
 <p>See <a href="/components/occystrap/docker-tarball-formats/">docker-tarball-formats.md</a> for detailed
 documentation on tarball formats, entry ordering, and the inspect API.</p>
 <h3 id="streaming-pipeline">Streaming Pipeline<a class="headerlink" href="#streaming-pipeline" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>fetch() generator
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    └── Call inspect API to get config hash and DiffIDs
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    └── Stream tarball sequentially (mode='r|')
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    └── Detect format from first entry (blobs/ prefix = OCI)
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    └── If OCI: pre-compute manifest from DiffIDs
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    └── If legacy: identify config early from inspect hash
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    └── For each file in stream:
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        ├── If ordered=True:
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        │   ├── If next expected layer: yield directly (no disk I/O)
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        │   └── If out-of-order: buffer to temp file for later
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        └── If ordered=False:
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>            └── Any known layer: yield immediately with layer_index
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    └── After stream ends: yield remaining buffered layers
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>fetch() generator
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    └── Call inspect API to get config hash and DiffIDs
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    └── Stream tarball sequentially (mode='r|')
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    └── Detect format from first entry (blobs/ prefix = OCI)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    └── If OCI: pre-compute manifest from DiffIDs
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    └── If legacy: identify config early from inspect hash
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    └── For each file in stream:
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        ├── If ordered=True:
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        │   ├── If next expected layer: yield directly (no disk I/O)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        │   └── If out-of-order: buffer to temp file for later
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        └── If ordered=False:
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>            └── Any known layer: yield immediately with layer_index
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    └── After stream ends: yield remaining buffered layers
 </code></pre></div>
 <p>Key design considerations:
 - Uses tarfile streaming mode (<code>r|</code>) - files read sequentially as they appear
@@ -14470,17 +14491,17 @@ Docker Engine API's <code>/images/{name}/get</code> endpoint (which returns a si
 sequential tarball), it starts an embedded HTTPS server implementing the Docker
 Registry V2 push-path API, then uses Docker's own push mechanism to transfer
 layers.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>fetch() generator
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    └── Generate ephemeral self-signed TLS certificate (via openssl)
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    └── Start ThreadingHTTPServer on 127.0.0.1:0 (ephemeral port, TLS-wrapped)
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    └── Tag image for localhost push
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    └── POST /images/{name}/push (Docker pushes in parallel)
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    └── Wait for manifest event from registry handler
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    └── Parse manifest and config
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    └── For each layer:
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        ├── If fetch_callback returns False: yield with data=None
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        └── If True: read blob, decompress, yield ImageElement
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    └── Cleanup: untag, stop server, delete temp files
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>fetch() generator
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    └── Generate ephemeral self-signed TLS certificate (via openssl)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    └── Start ThreadingHTTPServer on 127.0.0.1:0 (ephemeral port, TLS-wrapped)
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    └── Tag image for localhost push
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    └── POST /images/{name}/push (Docker pushes in parallel)
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    └── Wait for manifest event from registry handler
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    └── Parse manifest and config
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    └── For each layer:
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        ├── If fetch_callback returns False: yield with data=None
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        └── If True: read blob, decompress, yield ImageElement
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    └── Cleanup: untag, stop server, delete temp files
 </code></pre></div>
 <p>The embedded registry implements six V2 push-path endpoints:
 - <code>GET /v2/</code> - Version check
@@ -14517,9 +14538,9 @@ on localhost that receives pushes, applies filters, and forwards images to a
 downstream registry. Unlike <code>dockerpush://</code> (which is a single-image-per-session
 embedded registry), the proxy handles multiple images concurrently across its
 lifetime.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>occystrap proxy --listen 127.0.0.1:5050 \
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    --downstream ghcr.io/myorg \
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    -f normalize-timestamps
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>occystrap proxy --listen 127.0.0.1:5050 \
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    --downstream ghcr.io/myorg \
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    -f normalize-timestamps
 </code></pre></div>
 <p><strong>Architecture:</strong></p>
 <p>The proxy consists of four main components:</p>
@@ -14552,19 +14573,19 @@ lifetime.</p>
 </li>
 </ul>
 <p><strong>Manifest processing flow:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>1. Client pushes blobs (layers + config) via standard V2 upload flow
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>2. Client PUTs manifest
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>3. Handler parses manifest, extracts referenced blob set
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>4. Under lock: increment blob refcounts, snapshot blob paths,
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>   increment active_processing counter
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>5. Acquire processing semaphore (backpressure)
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>6. Handler creates _ProxyInput from received blobs
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>7. PipelineBuilder builds output + filters (fresh per image)
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>8. Pipeline runs: _ProxyInput.fetch() -&gt; filters -&gt; RegistryWriter
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>9. Release semaphore, decrement refcounts, delete blobs at refcount 0,
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>   decrement active_processing
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>10. On success: 201 to client
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>11. On failure: 500 to client
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>1. Client pushes blobs (layers + config) via standard V2 upload flow
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>2. Client PUTs manifest
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>3. Handler parses manifest, extracts referenced blob set
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>4. Under lock: increment blob refcounts, snapshot blob paths,
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>   increment active_processing counter
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>5. Acquire processing semaphore (backpressure)
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>6. Handler creates _ProxyInput from received blobs
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>7. PipelineBuilder builds output + filters (fresh per image)
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>8. Pipeline runs: _ProxyInput.fetch() -&gt; filters -&gt; RegistryWriter
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>9. Release semaphore, decrement refcounts, delete blobs at refcount 0,
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>   decrement active_processing
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>10. On success: 201 to client
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>11. On failure: 500 to client
 </code></pre></div>
 <p><strong>Concurrent processing and blob reference counting:</strong></p>
 <p><code>ThreadingHTTPServer</code> creates a new thread for each HTTP request, so
@@ -14604,10 +14625,10 @@ cache. Clients can pull images via standard Docker V2 GET endpoints.
 The proxy checks the downstream registry first (acting as a persistent
 cache), and on a cache miss, fetches from the upstream registry, applies
 filters, pushes the filtered image to downstream, then serves it.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Client GET manifest → proxy → downstream HEAD → 200 → serve from downstream
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>                                              → 404 → acquire per-image lock
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                                                     → upstream fetch → filter
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>                                                     → push downstream → serve
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Client GET manifest → proxy → downstream HEAD → 200 → serve from downstream
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>                                              → 404 → acquire per-image lock
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                                                     → upstream fetch → filter
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>                                                     → push downstream → serve
 </code></pre></div>
 <p>Pull-through reuses the existing pipeline infrastructure:
 - <code>_build_output_pipeline()</code> constructs the filter chain + registry
@@ -14626,17 +14647,17 @@ push and pull paths for unified backpressure.</p>
 <h2 id="parallel-downloads">Parallel Downloads<a class="headerlink" href="#parallel-downloads" title="Permanent link">&para;</a></h2>
 <p>The registry input (<code>inputs/registry.py</code>) uses <code>ThreadPoolExecutor</code> for parallel
 layer downloads:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>fetch() generator
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    └── Yield config file first (synchronous)
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    └── Submit all layer downloads to ThreadPoolExecutor
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    └── If ordered=True: yield layers in manifest order
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    └── If ordered=False: yield layers as downloads complete
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        (each with layer_index for reordering)
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>_download_layer() worker
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    └── Fetch layer blob from registry
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    └── Decompress to temp file with hash verification
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    └── Retry on connection failures (exponential backoff)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>fetch() generator
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    └── Yield config file first (synchronous)
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    └── Submit all layer downloads to ThreadPoolExecutor
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    └── If ordered=True: yield layers in manifest order
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    └── If ordered=False: yield layers as downloads complete
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        (each with layer_index for reordering)
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>_download_layer() worker
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    └── Fetch layer blob from registry
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    └── Decompress to temp file with hash verification
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    └── Retry on connection failures (exponential backoff)
 </code></pre></div>
 <p>Key design considerations:
 - All layers are downloaded in parallel to maximize throughput
@@ -14651,16 +14672,16 @@ layer downloads:</p>
 <h2 id="parallel-compression-and-uploads">Parallel Compression and Uploads<a class="headerlink" href="#parallel-compression-and-uploads" title="Permanent link">&para;</a></h2>
 <p>The registry output (<code>outputs/registry.py</code>) uses <code>ThreadPoolExecutor</code> for both
 layer compression and uploads in parallel:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>process_image_element() called for each layer
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    └── Read layer data
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    └── Submit (compress + upload) task to ThreadPoolExecutor (non-blocking)
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    └── Main thread continues to next layer immediately
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>finalize()
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    └── Wait for all compression/upload futures to complete
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    └── Collect layer metadata from futures (in submission order)
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    └── Check for any failures
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    └── Push manifest only after all blobs uploaded
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>process_image_element() called for each layer
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    └── Read layer data
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    └── Submit (compress + upload) task to ThreadPoolExecutor (non-blocking)
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    └── Main thread continues to next layer immediately
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>finalize()
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    └── Wait for all compression/upload futures to complete
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    └── Collect layer metadata from futures (in submission order)
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    └── Check for any failures
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    └── Push manifest only after all blobs uploaded
 </code></pre></div>
 <p>Key design considerations:
 - Both compression and upload run in the thread pool, allowing multiple layers
@@ -14744,17 +14765,17 @@ so the entire filter chain respects the final output's ordering needs.</p>
 DiffIDs to their compressed output digests. When pushing multiple images that
 share base layers (common in CI), the cache allows subsequent invocations to
 skip layers entirely -- no fetch, no filter, no compress, no upload.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>fetch_callback(digest)
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    └── Check cache for (digest, filters_hash)
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    └── If found: HEAD request to verify registry still has blob
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    └── If registry has blob: skip layer entirely
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    └── If not: process normally
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>_compress_and_upload_layer()
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    └── After successful compress + upload: record to cache
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>finalize()
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    └── Save cache to disk (atomic write via temp file + rename)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>fetch_callback(digest)
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    └── Check cache for (digest, filters_hash)
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    └── If found: HEAD request to verify registry still has blob
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    └── If registry has blob: skip layer entirely
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    └── If not: process normally
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>_compress_and_upload_layer()
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    └── After successful compress + upload: record to cache
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>finalize()
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    └── Save cache to disk (atomic write via temp file + rename)
 </code></pre></div>
 <p>Key design considerations:
 - Cache keyed by <code>(input_diffid, filters_hash)</code> so different pipeline
@@ -14798,22 +14819,22 @@ httpx instead of requests. Since <code>httpx.Client</code> is not thread-safe, e
 worker thread in a <code>ThreadPoolExecutor</code> gets its own client via the
 <code>ThreadSafeClientMixin</code> in <code>util.py</code>. The main thread is seeded with the
 primary client, and worker threads lazily create their own:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># util.py — shared mixin used by Image and RegistryWriter</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ThreadSafeClientMixin</span><span class="p">:</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_init_thread_clients</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_thread_client</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_close_thread_clients</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># util.py — shared mixin used by Image and RegistryWriter</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ThreadSafeClientMixin</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_init_thread_clients</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_thread_client</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_close_thread_clients</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
 </code></pre></div>
 <p>The <code>create_client()</code> factory in <code>util.py</code> creates each client with connection
 pooling and optional HTTP/2:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">limits</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Limits</span><span class="p">(</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">max_connections</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">max_keepalive_connections</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">http2</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">limits</span><span class="o">=</span><span class="n">limits</span><span class="p">,</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="n">follow_redirects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">timeout</span><span class="o">=</span><span class="n">httpx</span><span class="o">.</span><span class="n">Timeout</span><span class="p">(</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">connect</span><span class="o">=</span><span class="mf">10.0</span><span class="p">))</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">limits</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Limits</span><span class="p">(</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">max_connections</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">max_keepalive_connections</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">http2</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">limits</span><span class="o">=</span><span class="n">limits</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">follow_redirects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">timeout</span><span class="o">=</span><span class="n">httpx</span><span class="o">.</span><span class="n">Timeout</span><span class="p">(</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">connect</span><span class="o">=</span><span class="mf">10.0</span><span class="p">))</span>
 </code></pre></div>
 <p>When no client is provided to <code>request_url()</code>, a temporary client is created
 and closed after the request — this is the fallback for one-off calls.</p>

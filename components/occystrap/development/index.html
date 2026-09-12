@@ -8993,6 +8993,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#supply-chain-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supply chain checks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supply chain checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#credential-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credential scanning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-context-lint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent context lint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#releasing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9008,6 +9058,17 @@
     <span class="md-ellipsis">
       
         Developer automation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workflows-taken-from-the-fleet-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflows taken from the fleet templates
       
     </span>
   </a>
@@ -9768,6 +9829,34 @@
     
   
     Phase 5: Filter by tag age (`since` parameter)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-workflow-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: Refactor Developer Automation Workflows to Shared Actions
   
 
     
@@ -13824,6 +13913,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#supply-chain-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supply chain checks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supply chain checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#credential-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credential scanning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-context-lint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent context lint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#releasing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13839,6 +13978,17 @@
     <span class="md-ellipsis">
       
         Developer automation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workflows-taken-from-the-fleet-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflows taken from the fleet templates
       
     </span>
   </a>
@@ -13890,6 +14040,8 @@ with:</p>
 </code></pre></div>
 <p>The hooks run:</p>
 <ul>
+<li><code>skillsaw</code> - Lints the agent context (<code>AGENTS.md</code>, <code>CLAUDE.md</code>, the
+  skills) for malformed frontmatter, smuggled unicode and pasted secrets</li>
 <li><code>actionlint</code> - GitHub Actions workflow validation</li>
 <li><code>shellcheck</code> - Shell script linting</li>
 <li><code>check-log-levels</code> - Enforces max LOG.info() calls per file</li>
@@ -13904,11 +14056,80 @@ with:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tox -epy3
 </code></pre></div>
 <p>Functional tests are in <code>deploy/occystrap_ci/tests/</code> and are run in CI.</p>
+<p>Both CI lanes -- <code>Sanity checks</code> and <code>Functional tests</code> -- run on
+ephemeral VM runners and skip changes that touch only <code>docs/**</code> or
+markdown at the top of the tree, because nothing they run reads those
+files. To test a documentation-only branch anyway, run the functional
+workflow by hand (<code>workflow_dispatch</code>, which path filters do not apply
+to) or comment <code>@shakenfist-bot please retest</code> on the pull request. The
+<code>Supply chain</code> lane is deliberately not filtered.</p>
+<p>Every lane that runs on a pull request checks out the pull request's own
+tree and runs scripts from it, so a pull request can change what CI
+executes -- <code>tools/gitleaks-scan.sh</code> and <code>tools/mermaid-lint.sh</code> as much
+as the test suite. That is contained by the runner rather than by the
+workflow: the <code>vm</code> label means an ephemeral virtual machine which is
+discarded after the job, and the <code>debian-12-docker</code> image the mermaid
+lane needs has its docker daemon inside that VM. Fork pull requests
+additionally need a maintainer to approve the run before any of it
+starts, which is a repository setting rather than something these files
+can assert. A lane which needed more than that would have to run from
+the base branch's copy of the script instead.</p>
+<h2 id="supply-chain-checks">Supply chain checks<a class="headerlink" href="#supply-chain-checks" title="Permanent link">&para;</a></h2>
+<p>The <code>Supply chain</code> workflow runs the two checks which look at the
+content of the repository itself rather than at the code it builds:
+credential scanning, and the agent context lint.</p>
+<h3 id="credential-scanning">Credential scanning<a class="headerlink" href="#credential-scanning" title="Permanent link">&para;</a></h3>
+<p>It scans every commit reachable from <code>HEAD</code> for
+leaked credentials with <a href="https://github.com/gitleaks/gitleaks">gitleaks</a>,
+on every pull request, on pushes to <code>develop</code>, and weekly. It is
+deliberately not path filtered: a credential pasted into a documentation
+code sample is still a credential.</p>
+<p>To run the same scan locally:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo apt-get install -y gitleaks    # Debian 13 or later
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tools/gitleaks-scan.sh
+</code></pre></div>
+<p>The script needs a full clone, not a shallow one -- a secret which was
+committed and later reverted is still in the history, and still needs
+rotating. Before it trusts a clean result it plants a GitHub token and
+an SSH private key in a scratch directory and fails if gitleaks does not
+report both, so a pass means "scanned and found nothing" rather than
+"the scanner is broken". Pass <code>--gitleaks PATH</code> to use a downloaded
+binary instead of the packaged one.</p>
+<p>If the scan reports something, the credential needs rotating wherever it
+was trusted -- history cannot be rewritten to unpublish it. A recurring
+false positive (a documentation placeholder, a test fixture) is
+allowlisted by adding a <code>.gitleaks.toml</code> keyed on the text; there is no
+such file yet, because there has been nothing to forgive.</p>
+<h3 id="agent-context-lint">Agent context lint<a class="headerlink" href="#agent-context-lint" title="Permanent link">&para;</a></h3>
+<p>The <code>agent context</code> job runs the <code>skillsaw</code> pre-commit hook over the
+files an agent obeys. CI runs the hook rather than the linter, so
+<code>.pre-commit-config.yaml</code> stays the only place the skillsaw version is
+written down, and running it in both places is deliberate: a hook can be
+skipped with <code>--no-verify</code>, or by a clone which never ran <code>pre-commit
+install</code>.</p>
+<h2 id="diagrams">Diagrams<a class="headerlink" href="#diagrams" title="Permanent link">&para;</a></h2>
+<p>Diagrams of structure or flow are written as fenced <code>mermaid</code> blocks
+rather than drawn in characters: GitHub renders them natively, and one
+source is then a picture everywhere rather than a picture nowhere.
+Character art that is not a diagram -- a file tree, an on-disk byte
+layout, captured terminal output -- stays in a plain code fence, because
+converting it would destroy the column alignment that carries its
+meaning.</p>
+<p>Mermaid fails at render time rather than at commit time, so a broken
+diagram commits cleanly and then shows an error box on the rendered
+page. The <code>Mermaid lint</code> workflow renders every tracked markdown file
+that contains a diagram and fails if any of them does not parse. To run
+it locally, with a docker daemon available:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tools/mermaid-lint.sh              # every tracked markdown file
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>tools/mermaid-lint.sh docs/foo.md  # just this one
+</code></pre></div>
+<p>It is not in the <code>Supply chain</code> workflow because it needs a docker
+daemon and therefore a different runner image.</p>
 <h2 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h2>
 <p>Releases are automated via GitHub Actions. Push a version tag to trigger the
 pipeline:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git tag -s v0.5.0 -m "Release v0.5.0"
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git push origin v0.5.0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git tag -s v0.5.0 -m "Release v0.5.0"
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git push origin v0.5.0
 </code></pre></div>
 <p>The workflow builds the package, signs the tag with Sigstore, publishes to
 PyPI, and creates a GitHub Release. See
@@ -13919,17 +14140,85 @@ for one-time configuration steps.</p>
 commands, comment on a pull request with one of the following:</p>
 <ul>
 <li><code>@shakenfist-bot please retest</code> - Re-run the functional test suite</li>
-<li><code>@shakenfist-bot please attempt to fix</code> - Have Claude Code attempt to fix
-  test failures</li>
+<li><code>@shakenfist-bot please attempt to fix</code> - Have Claude Code attempt to
+  fix unit test failures</li>
 <li><code>@shakenfist-bot please re-review</code> - Request another automated code review</li>
-<li><code>@shakenfist-bot please address comments</code> - Have Claude Code address the
-  automated review comments</li>
 </ul>
-<p>These commands are only available to repository collaborators with write access.</p>
+<p>These commands are only available to repository collaborators with write
+access, on pull requests from this repository rather than from a fork.</p>
+<p><code>please attempt to fix</code> runs <code>tox -epy3</code>, and only that. It lands on
+the shared <code>claude-code</code> runner pool, which has docker but no root, so
+the functional suite in <code>deploy/occystrap_ci/</code> -- which mounts overlays
+and drives runc against a local registry -- cannot run there at all. A
+functional failure needs a person, or <code>please retest</code> if it looked like
+a flake.</p>
+<p>There used to be a <code>please address comments</code> command, which had Claude
+Code push fixes for the review's findings onto the branch. It is retired
+across the fleet: it held write access to the pull request branch for a
+feature nobody used, and applying a review is work for whoever wrote the
+change.</p>
+<h2 id="workflows-taken-from-the-fleet-templates">Workflows taken from the fleet templates<a class="headerlink" href="#workflows-taken-from-the-fleet-templates" title="Permanent link">&para;</a></h2>
+<p>Five files here are byte-identical copies of templates in
+<a href="https://github.com/shakenfist/development">shakenfist/development</a>,
+kept that way so that drift is a <code>diff</code> rather than a judgement:</p>
+<table>
+<thead>
+<tr>
+<th>This repository</th>
+<th>Template</th>
+<th>Taken at</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.github/workflows/pr-re-review.yml</code></td>
+<td><code>templates/ci-review-automation/pr-re-review.yml</code></td>
+<td><code>c6f3a88</code></td>
+</tr>
+<tr>
+<td><code>.github/workflows/pr-retest.yml</code></td>
+<td><code>templates/ci-review-automation/pr-retest.yml</code></td>
+<td><code>c6f3a88</code></td>
+</tr>
+<tr>
+<td><code>.github/workflows/pr-fix-tests.yml</code></td>
+<td><code>templates/test-drift-fix/pr-fix-tests.yml</code></td>
+<td><code>aec16db</code></td>
+</tr>
+<tr>
+<td><code>.github/workflows/mermaid-lint.yml</code></td>
+<td><code>templates/mermaid-lint/mermaid-lint.yml</code></td>
+<td><code>ff991f8</code></td>
+</tr>
+<tr>
+<td><code>tools/mermaid-lint.sh</code></td>
+<td><code>templates/mermaid-lint/mermaid-lint.sh</code></td>
+<td><code>b83f1f9</code></td>
+</tr>
+</tbody>
+</table>
+<p>Fix them upstream and re-copy, rather than editing them here: the
+comments they carry are the template's, and the reason the bot trigger
+was rewritten was that the previous hand-rolled copy had quietly
+diverged from the shared action's fork handling. Anything genuinely
+occystrap-specific belongs in this file instead, which is why the note
+about runner containment above is here and not in a workflow header.</p>
+<p><code>test-drift-fix.yml</code> is the one copy that cannot be byte-identical:
+the template ships <code>{{PLACEHOLDER}}</code> markers for the dependency
+install, the test command and the Claude prompt, because those are the
+project's to write. It tracks
+<code>templates/test-drift-fix/test-drift-fix.yml</code> at <code>4cb0c43</code> and differs
+only at those three points, each marked in the file, so a diff against
+the template still reads cleanly.</p>
 <h2 id="claude-code-skills">Claude Code skills<a class="headerlink" href="#claude-code-skills" title="Permanent link">&para;</a></h2>
 <p>The <code>.claude/skills/</code> directory contains guidance for AI agents working on
 this codebase, covering documentation updates, testing discipline, and PR
 preparation.</p>
+<p>Each skill lives in its own directory as <code>.claude/skills/&lt;name&gt;/SKILL.md</code>,
+with <code>name</code> and <code>description</code> frontmatter. That layout is what an agent
+discovers -- a bare markdown file directly in <code>.claude/skills/</code> is never
+loaded, and is not linted by skillsaw either, so it looks like guidance
+while doing nothing.</p>
 
 
 

@@ -9182,6 +9182,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM planning documents
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -9198,6 +9216,36 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#master-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Master plans
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -9667,6 +9715,34 @@
     
   
     Phase 5: Filter by tag age (`since` parameter)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-workflow-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: Refactor Developer Automation Workflows to Shared Actions
   
 
     
@@ -13683,6 +13759,25 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#master-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Master plans
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -13704,12 +13799,82 @@
 
 <h1 id="llm-planning-documents">LLM planning documents<a class="headerlink" href="#llm-planning-documents" title="Permanent link">&para;</a></h1>
 <p>I am playing with a more formal style of planning for LLM assisted
-coding sessions. This directory contains plans negotiated by myself
-and a LLM before implementation starts.</p>
-<ul>
-<li><a href="/components/occystrap/plans/PLAN-info-check/">Implementation plan for the info and check subcommands</a>.</li>
-<li><a href="/components/occystrap/plans/PLAN-quay-label-search/">Quay.io tag-based bulk image discovery and download</a>.</li>
-</ul>
+coding sessions. This directory contains plans negotiated by myself and
+a LLM before implementation starts. New plans start from
+<code>PLAN-TEMPLATE.md</code> at the repository root, and a plan that is not listed
+here is invisible: registering it is part of writing it rather than a
+tidy-up afterwards.</p>
+<p>Master plans decompose their work into numbered phases. Where the
+phases are large enough to want their own documents they are named for
+their master plan with <code>-phase-NN-descriptive</code> appended, and they are
+tracked in the master plan's Execution table rather than listed here.</p>
+<p>The <code>Status</code> column holds exactly one term from the shared vocabulary in
+<code>PLAN-TEMPLATE.md</code>: <code>Proposed</code>, <code>Not started</code>, <code>In progress</code>, <code>Blocked</code>,
+<code>Complete</code>, <code>Abandoned</code> or <code>Superseded</code>. Anything a reader needs beyond
+that term belongs in the plan file, with a one line summary in <code>Intent</code>.</p>
+<h2 id="master-plans">Master plans<a class="headerlink" href="#master-plans" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Plan</th>
+<th>Intent</th>
+<th>Status</th>
+<th>Phases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-02-07</td>
+<td><a href="/components/occystrap/plans/PLAN-workflow-refactor/">Refactor developer automation workflows to shared actions</a></td>
+<td>Take the PR bot workflows from imago's copies to shakenfist/actions, with occystrap as the first consumer</td>
+<td>Complete</td>
+<td>Phases in the plan; the comment addresser it added has since been retired fleet-wide</td>
+</tr>
+<tr>
+<td>2026-02-14</td>
+<td><a href="/components/occystrap/plans/PLAN-info-check/">Implementing <code>info</code> and <code>check</code> subcommands</a></td>
+<td>Report what an image contains, and verify that a copy of one is complete and intact, with text and JSON output</td>
+<td>Complete</td>
+<td>Steps 1-8 in the plan</td>
+</tr>
+<tr>
+<td>2026-02-17</td>
+<td><a href="/components/occystrap/plans/PLAN-structured-logging/">A more structured and less verbose approach to logging</a></td>
+<td>Make INFO mean milestones, adopt <code>with_fields()</code> summaries, and keep it that way with a pre-commit log level check</td>
+<td>Complete</td>
+<td>Six commits, summarised in the plan</td>
+</tr>
+<tr>
+<td>2026-02-26</td>
+<td><a href="/components/occystrap/plans/PLAN-registry-proxy/">Registry proxy mode</a></td>
+<td>Run occystrap as a long-lived filtering registry so a batch build can push through it</td>
+<td>Complete</td>
+<td>1. Persistent proxy, 2. Concurrent images, 3. Pull-through</td>
+</tr>
+<tr>
+<td>2026-03-23</td>
+<td><a href="/components/occystrap/plans/PLAN-quay-label-search/">Quay.io tag-based bulk image discovery and download</a></td>
+<td>Expand a <code>quay://</code> URI into every matching repository in an organization and process them all</td>
+<td>Complete</td>
+<td>1. API client, 2. URI and input, 3. Commands, 4. Tests and docs, 5. Since filter</td>
+</tr>
+<tr>
+<td>2026-03-24</td>
+<td><a href="/components/occystrap/plans/PLAN-make-the-speed/">Make the speed: occystrap performance overhaul</a></td>
+<td>Replace requests with httpx and make resolution, image processing and output I/O concurrent</td>
+<td>Complete</td>
+<td>1. httpx, 2. Parallel resolution, 3. Multi-image concurrency, 4. Parallel output I/O, 5. Benchmarking, 6. Processing summary</td>
+</tr>
+<tr>
+<td>2026-03-25</td>
+<td><a href="/components/occystrap/plans/PLAN-post-write-verification/">Post-write verification for output integrity</a></td>
+<td>Read back what each output writer produced and confirm it matches the image that was fetched</td>
+<td>Complete</td>
+<td>1. Framework and DirWriter, 2. Tar and Docker writers, 3. Registry writer, 4. Docs and functional tests</td>
+</tr>
+</tbody>
+</table>
 
 
 
