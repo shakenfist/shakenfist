@@ -6,6 +6,12 @@
 # making this a required status check -- a path-filtered workflow that
 # a merge queue requires never reports, and blocks the queue.
 #
+# The two '!docs/components/**' lines below are this repository's only
+# divergence from the template, and are the half of
+# tools/mermaid-lint-exclude that GitHub Actions cannot read for
+# itself. tools/mermaid-lint.sh is byte-identical to the template;
+# sync it rather than editing it.
+#
 # The runner label is not a typo. This needs a docker daemon, and
 # static runners do not have one: `debian-12-docker` is the fleet's
 # docker-capable image. Add it to .github/actionlint.yaml's runner
@@ -43,7 +49,9 @@ on:
       - '**.md'
       - '.github/workflows/mermaid-lint.yml'
       - 'tools/mermaid-lint.sh'
+      - 'tools/mermaid-lint-exclude'
       - '!REVIEWS.md'
+      - '!docs/components/**'
   pull_request:
     # Markdown can break a diagram, and so can the checker itself: a
     # pull request that edits the script or this workflow and no
@@ -61,11 +69,20 @@ on:
     # and the two must stay in step: the script lints the whole tree
     # every run, so a file excluded here but linted there fails
     # somebody else's pull request over a diagram they did not write.
+    #
+    # A repository that excludes a tree of its own names it in
+    # tools/mermaid-lint-exclude and adds the matching '!path/**'
+    # here, in both lists, last. GitHub Actions cannot read that file,
+    # so that pair of edits is the one divergence from this template a
+    # repository is expected to carry. The file is named above so that
+    # changing an exclusion runs the lane that acts on it.
     paths:
       - '**.md'
       - '.github/workflows/mermaid-lint.yml'
       - 'tools/mermaid-lint.sh'
+      - 'tools/mermaid-lint-exclude'
       - '!REVIEWS.md'
+      - '!docs/components/**'
   workflow_dispatch:
 
 permissions:

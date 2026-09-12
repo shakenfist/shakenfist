@@ -72,6 +72,69 @@ else
     # thousands of markdown files nobody here wrote, several of which
     # contain diagrams that are not ours to fix.
     cd "${repo_root}"
+
+    # Repository-local exclusions, one path per line, '#' comments and
+    # blank lines ignored. Optional: a repository with nothing to exclude
+    # does not carry the file, which is why a missing one is silence
+    # rather than an error.
+    #
+    # Each line is read as a literal path and turned into a git pathspec,
+    # not passed through as one. A repository writing ':(exclude)x' or a
+    # glob here would otherwise get a pathspec meaning something other
+    # than it reads, and an exclusion that quietly matches nothing leaves
+    # the tree linted while the file says it is not -- the shape of
+    # fail-open this script exists to prevent. A directory name excludes
+    # everything beneath it, the same way naming one to git ls-files
+    # includes everything beneath it.
+    #
+    # The workflow's path filter is the other half and does not read this
+    # file -- GitHub Actions has no way to. A repository that adds a line
+    # here adds the matching '!path/**' (or '!path' for a single file) to
+    # both of the workflow's paths lists, last, because a later pattern
+    # wins. The two must agree for the reason the REVIEWS.md comment
+    # below gives: this script reads the whole tree on every run, so a
+    # path the workflow skips but the script still lints fails somebody
+    # else's pull request over a diagram they did not write.
+    #
+    # A line that matches no tracked file is an error rather than a
+    # no-op, and what is excluded is printed before the run rather
+    # than left implicit. Both for the same reason: an exclusion is a
+    # statement about what was not looked at, and the way this
+    # mechanism fails is silently. A misspelled path excludes nothing
+    # and reads, in a green run, exactly like one that excluded a
+    # tree -- so the run says what it dropped, and a name that drops
+    # nothing stops the run instead of being believed.
+    #
+    # That is deliberately stricter than the REVIEWS.md pathspec built
+    # in above, which a repository keeps whether or not the file
+    # exists so that the exclusion is in force from the first commit
+    # of one. This file is for excluding a tree that is already here
+    # -- an imported one -- so an anticipatory line does not belong in
+    # it; add it when the tree lands.
+    repo_excludes=()
+    exclude_file="${repo_root}/tools/mermaid-lint-exclude"
+    if [ -f "${exclude_file}" ]; then
+        while IFS= read -r line || [ -n "${line}" ]; do
+            line="${line%%#*}"
+            # Leading and trailing whitespace, so that an indented or
+            # trailing-space line names the path it appears to name.
+            # [:space:] covers the carriage return too, so a file
+            # committed with CRLF endings names the path it looks
+            # like rather than one ending in a control character.
+            line="${line#"${line%%[![:space:]]*}"}"
+            line="${line%"${line##*[![:space:]]}"}"
+            [ -n "${line}" ] || continue
+            # -- so that a path beginning with a dash is a path.
+            if [ -z "$(git ls-files -- "${line}")" ]; then
+                echo "mermaid-lint: excludes nothing tracked: ${line}" \
+                    "(tools/mermaid-lint-exclude)" >&2
+                exit 1
+            fi
+            repo_excludes+=(":(exclude)${line}")
+            echo "mermaid-lint: excluding ${line} (tools/mermaid-lint-exclude)"
+        done < "${exclude_file}"
+    fi
+
     # NUL-delimited, because git C-quotes a path it cannot print
     # literally: a non-ASCII byte unless core.quotePath is off, and a
     # double quote, a backslash or a control character whatever that
@@ -94,6 +157,16 @@ else
     # repository root and not a docs/REVIEWS.md -- the same scope the
     # workflow's '!REVIEWS.md' has.
     #
+    # tools/mermaid-lint-exclude adds to that list, and is how a
+    # repository excludes a tree of its own without editing this file.
+    # The case it exists for is a machine-synced import of somebody
+    # else's documentation -- shakenfist/shakenfist's docs/components,
+    # refreshed hourly from the sibling repositories and forbidden to
+    # edit locally. A diagram broken upstream would otherwise fail this
+    # lane here, naming a file the author cannot fix, which is the
+    # same complaint the REVIEWS.md exclusion answers. Lint it where
+    # it can be fixed: in the repository it came from.
+    #
     # Into a file with the status checked, rather than through a
     # process substitution. A process substitution does not trip
     # set -e, so an ls-files that failed after rev-parse had
@@ -104,7 +177,7 @@ else
     # the same reason. A file rather than a variable because the
     # listing is NUL delimited and a bash variable cannot hold a NUL.
     if ! git ls-files -z '*.md' ':(exclude)REVIEWS.md' \
-            > "${workdir}/candidates"; then
+            "${repo_excludes[@]}" > "${workdir}/candidates"; then
         echo "mermaid-lint: could not list tracked markdown files" >&2
         exit 1
     fi
