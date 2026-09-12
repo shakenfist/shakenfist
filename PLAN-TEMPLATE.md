@@ -176,14 +176,22 @@ copy lives in shakenfist/development at
     the `Merged` column belongs in the Execution table above.
     `tools/check-plan-status.py` reads the `Status` column by
     name rather than by position, so a `Merged` column added
-    after it does not disturb the index arithmetic.
+    after it does not disturb the index arithmetic. A phase
+    which has not landed reads `—` -- in a table cell or a
+    `**Merged**:` line alike -- rather than an empty cell,
+    `TBD` or `n/a`.
 
     A few of this repository's older roadmaps write their
-    phases as prose sections rather than as a table --
-    `blob-storage-roadmap.md` and
-    `api-query-batching-roadmap.md`. Those carry a `**Merged**:`
-    line in each phase's own section instead, directly under
-    the phase heading, and `—` until the phase lands. Nothing
+    phases as prose sections rather than as a table:
+    `blob-storage-roadmap.md`, `api-query-batching-roadmap.md`
+    and `PLAN-attribute-field-masks.md`, which are the three
+    named in `check-plan-status.py`'s `HAND_COUNTED`. The
+    first two carry a `**Merged**:` line in the phase's own
+    section -- beside `**Status**` where the phase has one,
+    otherwise directly under the heading. The third carries no
+    such line, which is a decision rather than an oversight:
+    it is `Complete` and has no push-audit phase, so the
+    shared block's do-not-reopen rule leaves it alone. Nothing
     checks either form, so a wrong SHA is caught only in
     review.
 

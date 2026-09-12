@@ -786,12 +786,18 @@ request, and the plan is not complete until each is resolved or
 declined in writing here. If the audit finds nothing, that is
 recorded in one sentence.
 
-Two of this plan's phases may land outside this repository -- phase
-2's suite wrapper touches the CI harness, and phase 5 may not
-produce code at all -- so where a phase landed elsewhere its row
-names the repository, and it is audited against that repository's
+Phase 2 may land partly outside this repository: its suite wrapper
+touches the CI harness. Where it does, its row names the
+repository, and that half is audited against that repository's
 default branch as part of the pull request that lands it, with this
 phase citing that audit rather than re-running it.
+
+Phase 5 is a different situation needing a different response. It
+is a decision phase which may produce no code at all, and if it
+closes as Abandoned there is nothing here for the audit to read.
+That is recorded as such -- an audit which says what it had no
+diff to scope over is a result; one which reports a clean run over
+an empty range is not.
 
 ## Agent guidance
 

@@ -305,9 +305,21 @@ from phase 8's own decision 1 table, which the audit built
 from the merged pull request list and the first-parent history
 rather than from a path-filtered `git log`; phase 7's and
 phase 8's own merges are added here and were recovered the
-same way. Every SHA is the merge commit of the pull request
-named beside it, so `<sha>^1..<sha>` is the whole of what that
-pull request put on `develop`. Phases 1 and 3 shared a pull
+same way.
+
+One row of that table is corrected here rather than
+transcribed. It attributes phases 2-4 to #3473, but the
+orphan-client deletion that *is* phase 3 (`ff69d8d0c Remove
+the orphaned database.py gRPC client`) arrived in #3466, so
+phase 3 reads `dcd3b32b1` above. The audit's coverage is
+unaffected -- #3466's range is in the same decision 1 table,
+as phase 1's row -- so only the label was wrong, and the
+phase 8 plan is left alone as the record of what that audit
+actually read.
+
+Every SHA is the merge commit of the pull request named
+beside it, so `<sha>^1..<sha>` is the whole of what that pull
+request put on `develop`. Phases 1 and 3 shared a pull
 request, as did phases 2 and 4.
 
 Phase summaries:
