@@ -230,6 +230,10 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
         exc = self.assertRaises(
             apiclient.InsufficientResourcesException,
+            # raw-create: the 507 is the assertion. The wrapper would wait
+            # the whole 420s deadline for capacity which cannot arrive --
+            # the request is beyond every node's ledger ceiling by
+            # construction -- and then fail for the wrong reason.
             self.test_client.create_instance,
             'impossible-cpu', requested_cpus, 128, None,
             [{'size': 1, 'type': 'disk'}], None, None)
@@ -289,6 +293,9 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
         exc = self.assertRaises(
             apiclient.InsufficientResourcesException,
+            # raw-create: the 507 is the assertion, and the request is
+            # beyond every node's RAM ceiling by construction, so waiting
+            # for capacity can only burn the deadline. See the CPU test.
             self.test_client.create_instance,
             'impossible-memory', 1, requested_memory_mb, None,
             [{'size': 1, 'type': 'disk'}], None, None)
@@ -355,6 +362,9 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
         exc = self.assertRaises(
             apiclient.InsufficientResourcesException,
+            # raw-create: the 507 is the assertion, and the request exceeds
+            # the whole cluster's free disk by construction, so waiting for
+            # capacity can only burn the deadline. See the CPU test.
             self.test_client.create_instance,
             'impossible-disk', 1, 128, None,
             [{'size': requested_disk_gb, 'type': 'disk'}], None, None)
@@ -507,6 +517,12 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         test is best placed to catch, while leaving up to a whole create
         budget of stray instances on the siblings D23 exists to protect.
         """
+        # raw-create: filling a node to its ledger limit means walking
+        # into the refusal deliberately, and both callers below handle the
+        # InsufficientResourcesException themselves -- the fill loop reads
+        # it as "a sibling took the last slot", and the full-node test
+        # asserts it. A wrapper which waited one out would convert the
+        # boundary this file exists to measure into a timeout.
         inst = self.test_client.create_instance(
             'nodefill-%d' % index, 1, 128, None, [{'size': 1, 'type': 'disk'}],
             None, None, force_placement=node_name)
