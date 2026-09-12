@@ -155,6 +155,7 @@ nav:
                 - "Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation": components/development/plans/PLAN-scope-coverage.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
+                - "Plan: onboarding hunkydory, and what TypeScript means for the fleet": components/development/plans/PLAN-typescript-onboarding.md
                 - "Plan: restructure the audit scripts into a package of check classes": components/development/plans/PLAN-audit-scripts-restructure.md
                 - "Plan: shared blocks for PLAN-TEMPLATE.md, and a managed sub-agent model roster": components/development/plans/PLAN-plan-template-blocks.md
                 - "Plan: split the generated compliance tables out of the audit specifications": components/development/plans/PLAN-audit-compliance-split.md
