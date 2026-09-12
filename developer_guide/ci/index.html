@@ -13731,6 +13731,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#creating-instances-in-the-functional-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating instances in the functional suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ci-headroom-instrumentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13758,6 +13769,17 @@
     <span class="md-ellipsis">
       
         Where the output lands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-third-file-the-capacity-wait-trace-waits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A third file: the capacity-wait trace (--waits)
       
     </span>
   </a>
@@ -14276,6 +14298,90 @@ wedged, which is a state a test may well have just put it in. ssh's
 that connects and then stops responding; without this the job would stall
 until the CI runner's own timeout killed it, with no indication of which test
 was to blame.</p>
+<h2 id="creating-instances-in-the-functional-suite">Creating instances in the functional suite<a class="headerlink" href="#creating-instances-in-the-functional-suite" title="Permanent link">&para;</a></h2>
+<p>Every functional test creates instances through <code>self.create_instance()</code> on
+<code>BaseTestCase</code> (<code>shakenfist/deploy/shakenfist_ci/base.py</code>), never through a
+client's <code>create_instance()</code> directly. The wrapper forwards its arguments
+unchanged and waits out a transient <code>InsufficientResourcesException</code> (a 507)
+rather than failing the test on it.</p>
+<p>The reason is that a 507 on a shared CI cluster is usually a statement about
+a moment, not about the cluster: the capacity the refusing node is holding is
+very often already being returned by a sibling test that is mid-delete.
+Failing the test on that makes a run's pass/fail a coin flip on sibling
+timing. The wrapper polls <code>/admin/resources</code> for room for up to
+<code>CLUSTER_HEADROOM_WAIT</code> -- 420 seconds, which
+<code>cluster_ci_tests/test_namespace_claims.py</code> imports from <code>base.py</code> rather
+than keeping its own copy of -- and only for a plain 507: an
+<code>AffinityConstraintUnsatisfiable</code> 409 is never caught, because that refusal
+does not become satisfiable by waiting.</p>
+<p>"Room" means room for the whole create, on one node. The scheduler
+pre-filters a candidate on cpus, memory and disk, and refuses for whichever
+of the three binds, so the wait models all three
+(<code>retries.wait_for_capacity()</code>): a node satisfies the wait only when every
+dimension the create asks for fits on that node, and the wait record names
+the dimension it was short of. Reading just one dimension is not a smaller
+version of the same thing but a different failure -- a predicate that is
+permanently satisfied while the server is permanently refusing, which turns
+one 507 into a retry loop rather than a wait.</p>
+<p>For the same reason the loop is paced. The first wait after a refusal may
+hand control straight back, because capacity returning between the refusal
+and the poll is both common and the case the whole mechanism exists for.
+Every wait after that sleeps at least one poll interval, because a second
+refusal following a satisfied wait means the create is being refused for
+something the predicate cannot see, and an unpaced loop there re-issues as
+fast as two HTTP round trips allow until the deadline -- leaving an
+error-deleted instance behind on every turn. <code>MAX_CREATE_ATTEMPTS</code> is a
+ceiling under that, and a failure that cites it says so rather than
+blaming the cluster's capacity.</p>
+<p>A retry uses a fresh name, because the refused instance holds the caller's
+name until its error delete completes: the instance object is created and
+then error-deleted, and <code>Instance.ACTIVE_STATES</code> includes the error states,
+so the name still resolves while that delete is in flight. The base name is
+trimmed so that the name plus the retry suffix stays inside the server's 63
+character limit.</p>
+<p><strong>This means the instance's name is not always the name you asked for.</strong> A
+test that looks an instance up by the literal it passed in will 404 after a
+wait; read the name back from the returned dict (<code>inst['name']</code>) instead,
+which is what <code>test_object_names.py</code> does. A test whose subject <em>is</em> the
+name -- one asserting that two namespaces can hold the same name -- cannot
+be renamed at all without silently asserting nothing, and so uses a
+<code># raw-create:</code> marker rather than the wrapper.</p>
+<p>If the deadline passes, which is what it means for a test that is genuinely
+asking for more than the cloud has, the test fails with the last refusal's
+body, the node the wrapper waited for (or "unpinned" if the create had no
+placement), and the <code>per_node</code> capacity roster from the last successful
+poll, plus the dimensions the waits were short of -- so the failure carries
+the diagnosis a reader needs rather than a bare 507.</p>
+<p>A raw call -- <code>self.test_client.create_instance(...)</code>, a local client,
+another test's client, anything that does not go through
+<code>self.create_instance()</code> -- skips the wait silently, and needs a
+<code># raw-create: &lt;reason&gt;</code> comment in the block of comment lines immediately
+above it, with a non-empty reason. A unit test in <code>shakenfist/tests/</code>
+(<code>test_ci_raw_creates.py</code>) walks the suite's source with <code>ast</code> looking for
+exactly this, rather than importing the suite, which depends on
+<code>shakenfist_client</code> -- not a test dependency of this repository. An empty
+reason fails the same as no marker at all, so the allowlist cannot grow by
+copy-pasting an existing line.</p>
+<p>A call is not the only way to reach a client's <code>create_instance()</code>.
+<code>assertRaises(Exc, self.test_client.create_instance, ...)</code> hands the bound
+method over as a reference and lets <code>assertRaises</code> do the calling, and the
+guard checks those too -- the marker goes on the line above the reference,
+inside the <code>assertRaises</code> call. Six sites in the suite use that shape, each
+asserting a 400, 404 or 409 that must not be waited out, and each carries a
+marker saying which.</p>
+<p>The marker exists for a caller that must see the 507 rather than have it
+waited out. <code>cluster_ci_tests/test_coalescing.py</code>'s mesh burst is the
+current example: it pins instances round robin across the hypervisors
+inside a <code>try</code> that tolerates and records a capacity refusal as a normal
+outcome on a shared cluster, and carries on -- wrapping that create would
+break it twice, since the wrapper's own deadline failure is a test failure
+rather than an <code>APIException</code> the <code>except</code> clause could catch, and waiting
+up to seven minutes per refusal would serialise a burst whose simultaneity
+is the thing under test. The other reserved use is the wrapper's own call
+inside <code>base.py</code>, which has to reach the client somehow. The CI cloud
+sizing plan's phase 3 saturation tests are expected to need the marker
+too, to assert that a genuinely full cluster refuses rather than have the
+refusal waited away.</p>
 <h2 id="ci-headroom-instrumentation">CI headroom instrumentation<a class="headerlink" href="#ci-headroom-instrumentation" title="Permanent link">&para;</a></h2>
 <p>Phase 1 of <code>docs/plans/PLAN-ci-cloud-sizing.md</code> (see
 <code>docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</code> for the
@@ -14367,6 +14473,45 @@ wrong cannot be the thing that empties the last good dataset; and any
 harvest whose output is going to be committed names both ends of its
 window, because <code>--since</code> alone grows with every merge and <code>--limit</code>
 moves with the day it is run on.</p>
+<h3 id="a-third-file-the-capacity-wait-trace-waits">A third file: the capacity-wait trace (<code>--waits</code>)<a class="headerlink" href="#a-third-file-the-capacity-wait-trace-waits" title="Permanent link">&para;</a></h3>
+<p>A third file lands beside the other two, written by a different
+mechanism. <code>PLAN-transient-capacity-refusals</code> phase 2's
+<code>self.create_instance()</code> wrapper (see "Creating instances in the
+functional suite" above) appends one JSON line to
+<code>/srv/ci/traces/instance-waits.jsonl</code> every time a create waits out a
+transient 507. It reaches the bundle through the same "Gather logs"
+scp as <code>headroom.jsonl</code> and <code>headroom-census.json</code>, with no separate
+plumbing needed to get it there.</p>
+<p><code>tools/ci_headroom_report.py --waits &lt;file&gt;</code> summarises it: total
+seconds waited, the number of waits, the longest wait and the test it
+came from, and the split between waits that were informed by a
+capacity read and waits that had to sleep blind because
+<code>/admin/resources</code> itself could not be read (<code>mode: degraded</code>). Each
+line also carries the create's three request dimensions, the
+<code>binding_dimension</code> it was short of, and <code>attempt_number</code> -- a
+1-indexed position, not a count, so a create refused three times
+writes three lines carrying 1, 2 and 3. <code>node</code> is the placement the
+test asked for, and <code>roster_key</code> is the <code>per_node</code> entry the wait
+actually watched: <code>/admin/resources</code> keys that mapping by node UUID
+while the suite pins by node name, so the two differ and the wait has
+to resolve one to the other before it can read anything.
+Because the report already runs over a downloaded bundle rather than
+only inside a live job, this summary is available from the moment the
+phase that writes the trace merges -- the evidence does not wait for
+<code>ci_headroom_collect.sh</code> to grow its own <code>--waits</code> plumbing and print
+it into the job log, which is a separate, later change.</p>
+<p>An absent or empty file reports as unknown, never as zero waits, for
+the same reason an absent or empty census reports as unknown rather
+than as zero refusals (see "Nothing here is a quality gate" below): "no
+one collected this" and "the wrapper never had to wait" are different
+findings, and the reading that looks reassuring -- zero -- is exactly
+the wrong one to print when the file was never written or never read.
+A file that was read but whose every line was malformed is reported
+the same way, for the same reason, and carries its own <code>state</code> of
+<code>unparseable</code> in the machine-readable record rather than an
+<code>available</code> file with a count of zero -- the prose and the record have
+to say the same thing, because the later phases that read this are
+consumers of the record.</p>
 <h3 id="the-series-record-format">The series record format<a class="headerlink" href="#the-series-record-format" title="Permanent link">&para;</a></h3>
 <p>Phase 2 parses <code>headroom.jsonl</code> as a contract, so treat the shape
 below as load-bearing rather than as prose to paraphrase; the tool's
