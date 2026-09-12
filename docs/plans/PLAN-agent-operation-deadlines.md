@@ -587,7 +587,14 @@ Phase 8 also filed four advisory issues against this work:
 [#4075](https://github.com/shakenfist/shakenfist/issues/4075) (the
 expiry reason is not on the wire),
 [#4076](https://github.com/shakenfist/shakenfist/issues/4076) (a stale
-capability cache across a rolling upgrade),
+capability cache across a rolling upgrade -- resolved by accepting it,
+the issue's own first option: since `PLAN-api-input-validation` phase 4
+made refusal the default, a stale client's gated parameter costs a 400
+naming the parameter at the not-yet-upgraded worker rather than a
+silent mis-execution, and a retry after the deploy succeeds; the
+reasoning is recorded on `API_CAPABILITIES` in `external_api/app.py`
+and in the v0.8 release notes, and the refusal is pinned by a test in
+`test_agent_operation_parameters.py`),
 [#4077](https://github.com/shakenfist/shakenfist/issues/4077)
 (functional coverage gaps), and in the client repository
 [client-python#388](https://github.com/shakenfist/client-python/issues/388),
