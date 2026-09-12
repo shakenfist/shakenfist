@@ -2,10 +2,10 @@
 
 Shaken Fist ships native Ansible modules for orchestration of cloud
 resources as part of the `shakenfist.shakenfist` collection:
-`sf_namespace`, `sf_network`, `sf_instance` and `sf_snapshot`. Earlier
-releases shipped the modules as bash shims that redirected to the command
-line client; those shims have been removed, and this documentation covers
-the native collection modules.
+`sf_namespace`, `sf_network`, `sf_instance`, `sf_snapshot` and `sf_claim`.
+Earlier releases shipped the modules as bash shims that redirected to the
+command line client; those shims have been removed, and this documentation
+covers the native collection modules.
 
 ## Installation
 
@@ -71,6 +71,11 @@ omitted, the module auto-discovers credentials from the environment and
 `sfrc` / `~/.shakenfist` / `/etc/sf/shakenfist.json` exactly like the
 `sf-client` command line client does (see
 [Authentication and Namespaces](../developer_guide/authentication.md)).
+
+`sf_claim` is the exception, because claim management is administrator
+only and the caller is therefore acting on somebody else's namespace:
+there `namespace` names the namespace the claim covers, and the namespace
+to authenticate as is `auth_namespace`.
 
 ## Namespaces
 
@@ -269,4 +274,120 @@ Snapshot an instance and update a label:
     instance_uuid: "{{ ci_worker['meta']['uuid'] }}"
     label: ciimage
     state: present
+```
+
+## Capacity claims
+
+A capacity claim reserves aggregate cluster capacity for a namespace, so that
+placements the namespace makes later are drawn from capacity the cluster has
+already promised it rather than won from whatever happens to be free at the
+time. Claim management requires cluster administrator rights.
+
+The server permits only one **active** claim per namespace and refuses a
+second creation, so `sf_claim` has no separate "update" state: with
+`state: present` it creates the claim when the namespace holds no active one,
+and re-dates the existing claim (adjusting its limits if they differ) when it
+does.
+
+### Parameters
+
+| **Parameter** | **Comments** |
+|---|---|
+| namespace<br/>*string* | The namespace the claim covers. This must always be specified, and is **not** the namespace the module authenticates as — see `auth_namespace`. |
+| limit_cpus<br/>*integer* | The number of vCPUs the namespace may hold at once. Required when `state` is `present`. |
+| limit_memory_mb<br/>*integer* | The instance memory, in megabytes, the namespace may hold at once. Required when `state` is `present`. |
+| limit_disk_gb<br/>*integer* | The instance disk, in gigabytes, the namespace may hold at once. Required when `state` is `present`. |
+| expires_in_seconds<br/>*integer* | How long the claim should cover placements for, in seconds from now. Required when `state` is `present`, and must be positive. A duration rather than a timestamp: the expiry is computed from the cluster's clock, which is the only clock the expiry sweep ever compares against. Every run re-dates the claim to exactly this far in the future, which can shorten a claim as well as extend one. |
+| state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
+| auth_namespace<br/>*string* | The namespace to authenticate as, which is normally `system`. |
+
+### Idempotence
+
+The module reports `changed` when it created a claim, when any of the three
+limits differed from the claim on the server, or when a re-date actually moved
+the claim's expiry. A re-date alone is therefore reported as a change, because
+it is one: the claim now holds cluster capacity for longer than it did, and
+admission decisions elsewhere on the cluster depend on that. The test is made
+against the server's own `expires_at` before and after the write, so the
+control node's clock is never compared against the cluster's. A play which
+renews on a schedule and does not want the renewal in its change count should
+set `changed_when` on the task.
+
+### A lapsed claim
+
+The server refuses to re-date a claim which is no longer active, and says to
+delete it and create a new one. The module does that, in that order — it
+creates the replacement first and only then removes the lapsed rows, so a
+capacity refusal leaves the namespace exactly as it was found. An expired
+claim holds no cluster capacity, so nothing is released by the removal and
+nothing is lost by the failure.
+
+### Refusals
+
+Creating or growing a claim is a guarded admission against the cluster, so the
+cluster may refuse it with HTTP 507 when there is not enough capacity to
+promise. That is an answer about the cluster, not a fault in the module: the
+task fails and `refusal` carries the status code and the server's
+per-dimension detail, so a play which can proceed without the claim should
+rescue it explicitly. HTTP 503 means the cluster capacity accounting is not
+ready yet, or the claim row was contended, and is worth retrying with `until`.
+
+!!! warning
+    Removal is not symmetric with creation. `state: absent` hands the reserved
+    capacity straight back to the general pool, which takes effect
+    immediately, while getting it back is a fresh admission decision which a
+    busy cluster may refuse. Deleting a standing claim is easy to do and may
+    not be possible to undo.
+
+### Return value
+
+Unless an error is experienced the full REST API information for the claim is
+returned in a dictionary element called `meta`. An example returned dictionary
+is:
+
+```python
+{
+    "changed": true,
+    "failed": false,
+    "log": [...],
+    "meta": {
+        "uuid": "0b1c1bbf-2b04-4e67-9b35-9fc1b27c0d40",
+        "namespace": "static-runners",
+        "state": "created",
+        "coverage_state": "active",
+        "limit_cpus": 32,
+        "limit_memory_mb": 65536,
+        "limit_disk_gb": 1200,
+        "used_cpus": 32,
+        "used_memory_mb": 65536,
+        "used_disk_gb": 1200,
+        "expires_at": 1755300000.0,
+        "updated_at": 1755213600.0
+    }
+}
+```
+
+### Examples
+
+Hold a standing claim for a fleet of static instances, renewing it on every
+reconcile run:
+
+```yaml
+- name: Hold a standing claim for the static runner fleet
+  shakenfist.shakenfist.sf_claim:
+    namespace: static-runners
+    limit_cpus: 32
+    limit_memory_mb: 65536
+    limit_disk_gb: 1200
+    expires_in_seconds: 2592000
+    state: present
+```
+
+Give the reserved capacity back to the cluster:
+
+```yaml
+- name: Release the static runner claim
+  shakenfist.shakenfist.sf_claim:
+    namespace: static-runners
+    state: absent
 ```

@@ -59,7 +59,7 @@ node whose database rows have drifted.
 
 ## Modules
 
-The collection ships four native Ansible modules (under
+The collection ships five native Ansible modules (under
 `plugins/modules/`) for managing Shaken Fist resources from a playbook. They
 import the `shakenfist_client` SDK and call the Shaken Fist REST API directly
 — they do **not** shell out to `sf-client`.
@@ -70,12 +70,15 @@ import the `shakenfist_client` SDK and call the Shaken Fist REST API directly
 | `shakenfist.shakenfist.sf_network` | Idempotently create or delete a network (`name`/`uuid`, `netblock`, `nat`, `dhcp`, `dns`, `state`). A changed specification deletes and recreates the network. |
 | `shakenfist.shakenfist.sf_instance` | Idempotently create, replace or delete an instance (`name`/`uuid`, `cpu`, `ram`, `disks`/`diskspecs`, `networks`/`networkspecs`, `metadata`, `await`, `state`). A changed specification deletes and recreates the instance. |
 | `shakenfist.shakenfist.sf_snapshot` | Snapshot an instance's disks (optionally updating a label) or delete a snapshot artifact (`instance_uuid`/`uuid`, `all`, `label`, `state`). |
+| `shakenfist.shakenfist.sf_claim` | Idempotently create, resize, re-date or delete a namespace's capacity claim (`namespace`, `limit_cpus`, `limit_memory_mb`, `limit_disk_gb`, `expires_in_seconds`, `state`). Administrator only. |
 
 Every module accepts optional `api_url`, `namespace` and `key` connection
 parameters. When all three are supplied they are used verbatim; when omitted,
 the module auto-discovers credentials from the environment and
 `sfrc`/`~/.shakenfist`/`/etc/sf/shakenfist.json` exactly like the `sf-client`
-CLI. Each module returns `changed`, `failed`, a `meta` object describing the
+CLI. `sf_claim` is the exception: claim management is administrator only, so
+there `namespace` names the namespace the claim covers and the namespace to
+authenticate as is `auth_namespace`. Each module returns `changed`, `failed`, a `meta` object describing the
 resource, and a `log` list of progress messages for debugging.
 
 ## Requirements
