@@ -15357,6 +15357,17 @@ catch <code>AgentOperationFailed</code> as well, or catch both.</p>
 advertising the <code>agentoperation-deadlines</code> capability. A client which
 does not see it advertised sends neither timing parameter, so it
 cannot fail against a cluster which predates them.</p>
+<p>One narrow caveat on that gate (issue #4076, accepted as a property
+of the capability mechanism): the client reads the capability list
+once, when it connects. During a rolling upgrade of <code>sf-api</code> behind a
+load balancer, a client can read the capabilities from an
+already-upgraded worker and then send <code>deadline_seconds</code> to a worker
+which has not restarted yet. That request fails outright -- the old
+worker refuses the parameter it does not declare -- rather than being
+silently accepted without a deadline, and the same request succeeds
+once the rollout completes. The exposure window is the single deploy,
+and a visible, retryable refusal is the safe side of it; on any v0.8
+worker the refusal is a 400 naming the parameter.</p>
 <p>Two things do change across the upgrade, and neither is gated:</p>
 <ul>
 <li><strong>An old client against a new cluster inherits the new defaults.</strong>
