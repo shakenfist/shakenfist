@@ -411,6 +411,35 @@ def discover_interfaces() -> tuple[
     return mac_to_iface, iface_to_mac, vxid_to_mac
 
 
+# The one definition of what a MAC address looks like on the wire. The
+# REST API publishes this exact string as the pattern for the 'macaddr'
+# parameter type (see external_api/base.py ARGTYPES), and
+# valid_macaddr() enforces it, so the published contract and the check
+# cannot drift apart.
+_MACADDR_BODY = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}'
+MACADDR_PATTERN = f'^{_MACADDR_BODY}$'
+
+# Matched with fullmatch() against the unanchored body rather than
+# match() against MACADDR_PATTERN, because Python's '$' also matches
+# immediately before a trailing newline. '02:00:00:19:e4:b4\n' would
+# otherwise validate and go on to be written into the libvirt domain
+# XML. JSON Schema's '$' has no such quirk, so the published pattern
+# keeps its anchors.
+_MACADDR_RE = re.compile(_MACADDR_BODY)
+
+
+def valid_macaddr(macaddr: Any) -> bool:
+    """Is this a correctly formatted MAC address?
+
+    Colon separated hex only, which is the form libvirt wants in the
+    domain XML and the form random_macaddr() produces. Either case is
+    accepted because MAC addresses are not case sensitive.
+    """
+    if not isinstance(macaddr, str):
+        return False
+    return bool(_MACADDR_RE.fullmatch(macaddr))
+
+
 def random_macaddr() -> str:
     b1 = random.randint(0, 255)
     b2 = random.randint(0, 255)

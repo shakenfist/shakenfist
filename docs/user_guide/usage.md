@@ -282,7 +282,9 @@ of the following keys:
   instance will fail to start. If you don't want an address on this interface,
   use "none" as the value for address. If you do not specify any value for
   address, an address on the network will be assigned to you.
-* _macaddress_ the mac address to use for the interface.
+* _macaddress_ the mac address to use for the interface, in the colon
+  separated form `02:00:00:ea:3a:28`. Either case is accepted, and a value
+  in any other form is rejected.
 * _model_ is the model of the network device, with options being ne2k_isa,
   i82551, i82557b, i82559er, ne2k_pci, pcnet, rtl8139, e1000, and virtio. The
   default model is virtio.
