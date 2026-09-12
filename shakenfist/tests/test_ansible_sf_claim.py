@@ -37,6 +37,10 @@ class FakeInsufficientResourcesException(FakeAPIException):
     ...
 
 
+class FakeResourceStateConflictException(FakeAPIException):
+    ...
+
+
 def _load_sf_claim():
     stubs = {}
 
@@ -63,6 +67,7 @@ def _load_sf_claim():
     apiclient.APIException = FakeAPIException
     apiclient.ResourceNotFoundException = FakeResourceNotFoundException
     apiclient.InsufficientResourcesException = FakeInsufficientResourcesException
+    apiclient.ResourceStateConflictException = FakeResourceStateConflictException
     apiclient.UnconfiguredException = Exception
     apiclient.ASYNC_BLOCK = 'block'
     apiclient.Client = mock.MagicMock()
@@ -117,6 +122,7 @@ class FakeModule:
             'limit_memory_mb': 65536,
             'limit_disk_gb': 1200,
             'expires_in_seconds': 2592000,
+            'renew_within_seconds': None,
             'state': 'present'
         }
         self.params.update(params)
@@ -222,8 +228,11 @@ class SfClaimPresentTestCase(base.ShakenFistTestCase):
 
         result = self._present(client, FakeModule())
         self.assertTrue(result['changed'])
+        # By keyword, because the SDK is in another repository and these
+        # are four mutually type-compatible integers.
         client.create_namespace_claim.assert_called_once_with(
-            'static-runners', 32, 65536, 1200, 2592000)
+            'static-runners', limit_cpus=32, limit_memory_mb=65536,
+            limit_disk_gb=1200, expires_in_seconds=2592000)
         client.delete_namespace_claim.assert_not_called()
 
     def test_a_lapsed_claim_is_replaced_and_reaped_afterwards(self):
@@ -410,3 +419,310 @@ class SfClaimAbsentTestCase(base.ShakenFistTestCase):
 
         result = self._absent(client, FakeModule(state='absent'))
         self.assertTrue(result['changed'])
+
+
+class SfClaimReapingTestCase(base.ShakenFistTestCase):
+    """Lapsed rows are reaped on both paths, and reaping is not a change."""
+
+    def _present(self, client, module):
+        try:
+            sf_claim._ensure_present(client, module, [])
+        except ModuleExited as e:
+            return e.result
+        self.fail('the module did not exit')
+
+    def _present_failure(self, client, module):
+        try:
+            sf_claim._ensure_present(client, module, [])
+        except ModuleFailed as e:
+            return e.result
+        self.fail('the module did not fail')
+
+    def test_lapsed_rows_beside_an_active_claim_are_reaped(self):
+        # Without this the rows accumulate forever: the server has no soft
+        # delete and no sweep which removes them.
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [
+            _claim(uuid='a'), _claim(uuid='old', coverage_state='expired')]
+        client.update_namespace_claim.return_value = _claim(
+            uuid='a', expires_at=2000.0)
+
+        result = self._present(client, FakeModule())
+        self.assertTrue(result['changed'])
+        client.delete_namespace_claim.assert_called_once_with(
+            'static-runners', 'old')
+
+    def test_reaping_alone_is_not_a_change(self):
+        # An expired claim holds no cluster capacity and no admission
+        # decision depends on it, so removing the row alters nothing an
+        # operator can observe about the namespace's coverage.
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [
+            _claim(uuid='a', expires_at=1000.0),
+            _claim(uuid='old', coverage_state='expired')]
+        client.update_namespace_claim.return_value = _claim(
+            uuid='a', expires_at=1000.0)
+
+        result = self._present(client, FakeModule())
+        self.assertFalse(result['changed'])
+        client.delete_namespace_claim.assert_called_once_with(
+            'static-runners', 'old')
+
+    def test_check_mode_reaps_nothing(self):
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [
+            _claim(uuid='a'), _claim(uuid='old', coverage_state='expired')]
+
+        self._present(client, FakeModule(check_mode=True))
+        client.delete_namespace_claim.assert_not_called()
+
+    def test_a_failed_reap_after_a_create_still_reports_the_new_claim(self):
+        # The create half succeeded, and a failure which hides it leaves the
+        # play with no claim details for a claim which now exists.
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [
+            _claim(uuid='old', coverage_state='expired')]
+        client.create_namespace_claim.return_value = _claim(uuid='new')
+        client.delete_namespace_claim.side_effect = FakeAPIException(
+            'boom', 'DELETE', '/claims/old', 500, 'detail')
+
+        result = self._present_failure(client, FakeModule())
+        self.assertEqual('new', result['meta']['uuid'])
+        self.assertEqual(500, result['refusal']['status_code'])
+
+    def test_a_failed_reap_after_a_redate_still_reports_the_claim(self):
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [
+            _claim(uuid='a'), _claim(uuid='old', coverage_state='expired')]
+        client.update_namespace_claim.return_value = _claim(
+            uuid='a', expires_at=2000.0)
+        client.delete_namespace_claim.side_effect = FakeAPIException(
+            'boom', 'DELETE', '/claims/old', 500, 'detail')
+
+        result = self._present_failure(client, FakeModule())
+        self.assertEqual('a', result['meta']['uuid'])
+        self.assertEqual(2000.0, result['meta']['expires_at'])
+
+    def test_a_reap_failure_on_absent_reports_no_claim(self):
+        # state: absent wrote no claim, so there is nothing to hand back.
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim(uuid='a')]
+        client.delete_namespace_claim.side_effect = FakeAPIException(
+            'boom', 'DELETE', '/claims/a', 500, 'detail')
+
+        try:
+            sf_claim._ensure_absent(client, FakeModule(state='absent'), [])
+        except ModuleFailed as e:
+            self.assertIsNone(e.result['meta'])
+        else:
+            self.fail('the module did not fail')
+
+
+class SfClaimRenewalWindowTestCase(base.ShakenFistTestCase):
+    """renew_within_seconds, the opt in which makes repeat runs converge."""
+
+    def _present(self, client, module, now=0.0):
+        with mock.patch.object(sf_claim.time, 'time', return_value=now):
+            try:
+                sf_claim._ensure_present(client, module, [])
+            except ModuleExited as e:
+                return e.result
+        self.fail('the module did not exit')
+
+    def test_without_a_window_every_run_redates(self):
+        # The default, and D10's "four chances to re-date before a lapse".
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim(expires_at=1000.0)]
+        client.update_namespace_claim.return_value = _claim(expires_at=2000.0)
+
+        result = self._present(client, FakeModule(), now=100.0)
+        self.assertTrue(result['changed'])
+        client.update_namespace_claim.assert_called_once()
+
+    def test_a_claim_outside_the_window_is_left_alone(self):
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim(expires_at=1000.0)]
+
+        result = self._present(
+            client, FakeModule(renew_within_seconds=100), now=100.0)
+        self.assertFalse(result['changed'])
+        self.assertEqual('11111111-1111-1111-1111-111111111111',
+                         result['meta']['uuid'])
+        client.update_namespace_claim.assert_not_called()
+
+    def test_a_claim_inside_the_window_is_redated(self):
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim(expires_at=1000.0)]
+        client.update_namespace_claim.return_value = _claim(expires_at=3592000.0)
+
+        result = self._present(
+            client, FakeModule(renew_within_seconds=100), now=950.0)
+        self.assertTrue(result['changed'])
+        client.update_namespace_claim.assert_called_once_with(
+            'static-runners', '11111111-1111-1111-1111-111111111111',
+            expires_in_seconds=2592000)
+
+    def test_check_mode_converges_when_a_window_is_set(self):
+        # The point of the option: --check on an already correct claim
+        # reports no change rather than a change it cannot know about.
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim(expires_at=1000.0)]
+
+        result = self._present(
+            client, FakeModule(renew_within_seconds=100, check_mode=True),
+            now=100.0)
+        self.assertFalse(result['changed'])
+        client.update_namespace_claim.assert_not_called()
+
+    def test_a_resize_is_made_even_outside_the_window(self):
+        # The window governs the re-date, not the limits. A resize is an
+        # instruction and is carried out whenever it differs.
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim(expires_at=1000.0)]
+        client.update_namespace_claim.return_value = _claim(
+            expires_at=1000.0, limit_cpus=40)
+
+        result = self._present(
+            client, FakeModule(renew_within_seconds=100, limit_cpus=40),
+            now=100.0)
+        self.assertTrue(result['changed'])
+        client.update_namespace_claim.assert_called_once_with(
+            'static-runners', '11111111-1111-1111-1111-111111111111',
+            expires_in_seconds=2592000, limit_cpus=40)
+
+    def test_a_claim_with_no_expiry_is_redated(self):
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim(expires_at=None)]
+        client.update_namespace_claim.return_value = _claim(expires_at=2000.0)
+
+        result = self._present(
+            client, FakeModule(renew_within_seconds=100), now=100.0)
+        self.assertTrue(result['changed'])
+        client.update_namespace_claim.assert_called_once()
+
+    def test_lapsed_rows_are_still_reaped_when_nothing_is_written(self):
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [
+            _claim(uuid='a', expires_at=1000.0),
+            _claim(uuid='old', coverage_state='expired')]
+
+        result = self._present(
+            client, FakeModule(renew_within_seconds=100), now=100.0)
+        self.assertFalse(result['changed'])
+        client.update_namespace_claim.assert_not_called()
+        client.delete_namespace_claim.assert_called_once_with(
+            'static-runners', 'old')
+
+
+class SfClaimConflictTestCase(base.ShakenFistTestCase):
+    def test_a_409_names_the_two_things_it_can_mean(self):
+        # The server answers 409 for a shrink below current usage and for a
+        # claim which is no longer active. Both are the caller's to fix, so
+        # the message says which they are rather than reporting a bare
+        # failure with the body attached.
+        client = mock.MagicMock()
+        client.get_namespace_claims.return_value = [_claim()]
+        client.update_namespace_claim.side_effect = (
+            FakeResourceStateConflictException(
+                'a claim cannot be shrunk below what it is already using',
+                'PUT', '/claims/x', 409, 'detail'))
+
+        try:
+            sf_claim._ensure_present(client, FakeModule(limit_cpus=1), [])
+        except ModuleFailed as e:
+            self.assertIn('shrunk below what it is already using', e.result['msg'])
+            self.assertIn('no longer active', e.result['msg'])
+            self.assertEqual(409, e.result['refusal']['status_code'])
+        else:
+            self.fail('the module did not fail')
+
+
+class SfClaimClientVerbsTestCase(base.ShakenFistTestCase):
+    """The claim verbs are newer than any released client."""
+
+    class OldClient:
+        def get_namespace_claims(self, namespace):
+            ...
+
+    class NewClient(OldClient):
+        def create_namespace_claim(self, namespace, **kwargs):
+            ...
+
+        def update_namespace_claim(self, namespace, claim_uuid, **kwargs):
+            ...
+
+        def delete_namespace_claim(self, namespace, claim_uuid):
+            ...
+
+    def test_a_client_without_the_verbs_fails_with_advice(self):
+        try:
+            sf_claim._require_claim_verbs(self.OldClient(), FakeModule(), [])
+        except ModuleFailed as e:
+            self.assertIn('create_namespace_claim', e.result['msg'])
+            self.assertIn('client-python@develop', e.result['msg'])
+        else:
+            self.fail('the module did not fail')
+
+    def test_a_client_with_the_verbs_is_accepted(self):
+        # Returns rather than failing, so this starts passing on its own
+        # once a release carries the verbs.
+        self.assertIsNone(
+            sf_claim._require_claim_verbs(self.NewClient(), FakeModule(), []))
+
+
+class SfClaimArgumentSpecTestCase(base.ShakenFistTestCase):
+    """run_module()'s validation, which the decision functions do not see.
+
+    AnsibleModule itself is not importable here, so the spec it is handed
+    is asserted rather than exercised. That is the whole of what the module
+    controls: required_together and required_if are enforced by ansible.
+    """
+
+    def _run_module(self, **params):
+        module = FakeModule(**params)
+        client = mock.MagicMock()
+        with mock.patch.object(sf_claim, 'AnsibleModule') as ansible_module, \
+                mock.patch.object(sf_claim, '_make_client') as make_client, \
+                mock.patch.object(sf_claim, '_ensure_present') as present, \
+                mock.patch.object(sf_claim, '_ensure_absent') as absent:
+            ansible_module.return_value = module
+            make_client.return_value = client
+            try:
+                sf_claim.run_module()
+                failure = None
+            except ModuleFailed as e:
+                failure = e.result
+            return ansible_module.call_args, failure, present, absent
+
+    def test_the_connection_triple_is_all_or_nothing(self):
+        # Otherwise a partial triple is silently ignored in favour of the
+        # ambient credentials, which may be a different cluster -- and this
+        # module's namespace parameter names the claim target rather than
+        # the identity, so a playbook written against the rest of the
+        # collection lands exactly there.
+        call, failure, _present, _absent = self._run_module()
+        self.assertIsNone(failure)
+        self.assertEqual(
+            [['api_url', 'auth_namespace', 'key']],
+            call.kwargs['required_together'])
+
+    def test_a_non_positive_expiry_is_rejected(self):
+        _call, failure, present, _absent = self._run_module(
+            expires_in_seconds=0)
+        self.assertIn('expires_in_seconds must be positive', failure['msg'])
+        present.assert_not_called()
+
+    def test_a_non_positive_renewal_window_is_rejected(self):
+        # A negative window would silently mean "never renew", which is the
+        # opposite of what somebody setting it wants.
+        _call, failure, present, _absent = self._run_module(
+            renew_within_seconds=-1)
+        self.assertIn('renew_within_seconds must be positive', failure['msg'])
+        present.assert_not_called()
+
+    def test_the_claim_verbs_are_checked_before_anything_is_done(self):
+        with mock.patch.object(sf_claim, '_require_claim_verbs') as require:
+            call, _failure, present, _absent = self._run_module()
+        self.assertEqual(1, require.call_count)
+        self.assertEqual(1, present.call_count)
+        self.assertIn('renew_within_seconds', call.kwargs['argument_spec'])

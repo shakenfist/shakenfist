@@ -21,6 +21,20 @@ The modules import the `shakenfist_client` python SDK and call the Shaken
 Fist REST API directly — they do not shell out to `sf-client`, and the
 control node never needs the Shaken Fist server package installed.
 
+`sf_claim` is the exception to that `pip3 install`. It calls the namespace
+capacity claim verbs, which are on the client's `develop` branch and are not
+in any release yet, so there is no minimum released version to ask for. A
+control node which uses `sf_claim` installs the client from git instead:
+
+```bash
+pip3 install git+https://github.com/shakenfist/client-python@develop
+```
+
+which is how the Shaken Fist CI conductor installs it. The module checks the
+client for those verbs and fails with this advice, naming the verb it could
+not find, rather than raising an `AttributeError`. Every other module works
+with the released client.
+
 ???+ note
     This example installs the Shaken Fist client in the system pip so that it
     is globally available to all Ansible users. The system pip is protected on
@@ -75,7 +89,11 @@ omitted, the module auto-discovers credentials from the environment and
 `sf_claim` is the exception, because claim management is administrator
 only and the caller is therefore acting on somebody else's namespace:
 there `namespace` names the namespace the claim covers, and the namespace
-to authenticate as is `auth_namespace`.
+to authenticate as is `auth_namespace`. Because that rename makes it easy
+to supply `api_url` and `key` while leaving `auth_namespace` unset,
+`sf_claim` treats a partly specified connection as an error rather than
+quietly falling back to the control node's ambient credentials — which
+might be pointed at another cluster entirely.
 
 ## Namespaces
 
@@ -298,6 +316,7 @@ does.
 | limit_memory_mb<br/>*integer* | The instance memory, in megabytes, the namespace may hold at once. Required when `state` is `present`. |
 | limit_disk_gb<br/>*integer* | The instance disk, in gigabytes, the namespace may hold at once. Required when `state` is `present`. |
 | expires_in_seconds<br/>*integer* | How long the claim should cover placements for, in seconds from now. Required when `state` is `present`, and must be positive. A duration rather than a timestamp: the expiry is computed from the cluster's clock, which is the only clock the expiry sweep ever compares against. Every run re-dates the claim to exactly this far in the future, which can shorten a claim as well as extend one. |
+| renew_within_seconds<br/>*integer* | Re-date the claim only when it has less than this long left to run. Optional, must be positive when set, and ignored when `state` is `absent`. See [Idempotence](#idempotence). |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
 | auth_namespace<br/>*string* | The namespace to authenticate as, which is normally `system`. |
 
@@ -313,6 +332,20 @@ control node's clock is never compared against the cluster's. A play which
 renews on a schedule and does not want the renewal in its change count should
 set `changed_when` on the task.
 
+Re-dating on every run is the default because it is what a scheduled
+reconcile wants: every run is another chance to re-date before the claim
+lapses, so a weekly play against a thirty day expiry has four of them. A play
+which would rather converge than renew sets `renew_within_seconds`, and the
+module then leaves the claim alone — writing nothing and reporting no
+change — while it is further from its expiry than that window and its limits
+already match. Check mode says the same, so `--check` converges too. The
+remaining life is measured as the server's own `expires_at` against the
+control node's clock, which is the only comparison the module makes that
+spans two clocks and is deliberately a coarse one: skew moves the moment the
+renewal happens by the amount of the skew and decides nothing else, and never
+decides what is reported as changed. Choose a window comfortably larger than
+both the play's cadence and any plausible skew.
+
 ### A lapsed claim
 
 The server refuses to re-date a claim which is no longer active, and says to
@@ -321,6 +354,14 @@ creates the replacement first and only then removes the lapsed rows, so a
 capacity refusal leaves the namespace exactly as it was found. An expired
 claim holds no cluster capacity, so nothing is released by the removal and
 nothing is lost by the failure.
+
+Lapsed rows are reaped beside an active claim as well, so that a namespace
+which expired and was recreated out of band does not accumulate them — the
+server has no sweep which removes them, and otherwise somebody has to delete
+them by hand. That reaping is deliberately **not** reported as a change: an
+expired claim holds no cluster capacity and no admission decision anywhere
+depends on it, so removing the row alters nothing an operator can observe
+about the namespace's coverage. It is recorded in `log`.
 
 ### Refusals
 
@@ -331,6 +372,17 @@ task fails and `refusal` carries the status code and the server's
 per-dimension detail, so a play which can proceed without the claim should
 rescue it explicitly. HTTP 503 means the cluster capacity accounting is not
 ready yet, or the claim row was contended, and is worth retrying with `until`.
+HTTP 409 on a change to an existing claim means either that the shrink asked
+for is below what the namespace is already using, or that the claim stopped
+being active between the read and the write; the module says both rather than
+reporting a bare failure, because the first is a likely operator mistake.
+
+A refusal happens before anything is written, so it leaves the namespace
+exactly as it was found. The one exception is a failure while reaping lapsed
+rows, which happens after the claim itself was created or re-dated: the task
+fails, `meta` carries the claim that was written so the failure does not hide
+the half which succeeded, and the lapsed rows are still there. They hold no
+capacity, and the next run reaps them.
 
 !!! warning
     Removal is not symmetric with creation. `state: absent` hands the reserved
@@ -380,6 +432,21 @@ reconcile run:
     limit_memory_mb: 65536
     limit_disk_gb: 1200
     expires_in_seconds: 2592000
+    state: present
+```
+
+Renew only once the claim is inside its last week, so that a play which runs
+more often than that converges instead of re-dating every time:
+
+```yaml
+- name: Hold a standing claim for the static runner fleet
+  shakenfist.shakenfist.sf_claim:
+    namespace: static-runners
+    limit_cpus: 32
+    limit_memory_mb: 65536
+    limit_disk_gb: 1200
+    expires_in_seconds: 2592000
+    renew_within_seconds: 604800
     state: present
 ```
 

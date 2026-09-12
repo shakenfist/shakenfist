@@ -9,6 +9,8 @@
 # entire contract this module implements.
 from __future__ import annotations
 
+import time
+
 from ansible.module_utils.basic import AnsibleModule
 
 from shakenfist_client import apiclient
@@ -18,6 +20,14 @@ DOCUMENTATION = r'''
 ---
 module: sf_claim
 short_description: Manage a Shaken Fist namespace capacity claim.
+requirements:
+  - >-
+    shakenfist-client on the ansible control node, built from a source tree
+    which carries the namespace claim verbs. No release carries them yet, so
+    today that means installing the client from git - pip install
+    git+https://github.com/shakenfist/client-python@develop. The module says
+    so, and names the verb it could not find, rather than raising an
+    AttributeError at the first call.
 description:
   - Idempotently ensure a namespace holds a capacity claim of a given size,
     or holds none at all.
@@ -42,8 +52,8 @@ description:
     C(expires_at) before and after the write, so it never compares the
     control node's clock against the cluster's. A play which renews on a
     schedule and does not want the renewal in its change count should set
-    C(changed_when) on the task rather than expecting the module to decide
-    the renewal was uninteresting.
+    C(changed_when) on the task, or set O(renew_within_seconds) so that the
+    module re-dates only a claim which is actually near its expiry.
   - >-
     A lapsed claim. The server refuses to re-date a claim which is no longer
     active, and says to delete it and create a new one. This module does
@@ -53,6 +63,21 @@ description:
     nothing is released by the removal and nothing is lost by the failure.
     Restoring coverage is the whole point of running the play, and failing
     instead would leave the fleet uncovered until somebody noticed.
+  - >-
+    Lapsed rows are reaped beside an active claim as well, so that a
+    namespace which expired and was recreated out of band does not
+    accumulate them. That reaping is deliberately B(not) reported as a
+    change: an expired claim holds no cluster capacity and no admission
+    decision anywhere depends on it, so removing the row alters nothing an
+    operator can observe about the namespace's coverage. It is recorded in
+    RV(log).
+  - >-
+    What a failure leaves behind. A refusal happens before anything is
+    written, so it leaves the namespace exactly as it was found. The one
+    exception is a failure while reaping lapsed rows, which happens after
+    the claim itself was created or re-dated: the task fails, RV(meta)
+    carries the claim that was written, and the lapsed rows are still
+    there. They hold no capacity and the next run reaps them.
   - >-
     Capacity refusals. Creating or growing a claim is a guarded admission
     against the cluster, so the cluster may refuse it with HTTP 507 when
@@ -107,6 +132,30 @@ options:
         extend one.
     required: false
     type: int
+  renew_within_seconds:
+    description:
+      - Re-date the claim only when it has less than this long left to run.
+        Must be positive when it is set, and is ignored when
+        O(state=absent).
+      - >-
+        When this is not set, which is the default, every O(state=present)
+        run re-dates the claim. That is what a play which reconciles on a
+        schedule wants: every run is another chance to re-date before the
+        claim lapses, so a weekly play against a thirty day expiry has four
+        of them.
+      - >-
+        Set it when the play would rather converge than renew. With a
+        window set, a run which finds the limits already correct and the
+        claim further from its expiry than the window writes nothing and
+        reports no change, and check mode says the same. The remaining life
+        is the server's own C(expires_at) against the control node's clock,
+        which is the only comparison in this module spanning two clocks and
+        is deliberately a coarse one: skew moves the moment the renewal
+        happens and decides nothing else, and in particular never decides
+        what is reported as changed. Choose a window comfortably larger
+        than both the play's cadence and any plausible skew.
+    required: false
+    type: int
   state:
     description: Whether the namespace should hold a claim or not.
     required: false
@@ -116,10 +165,12 @@ options:
   api_url:
     description:
       - Base URL of the Shaken Fist API (for example
-        C(http://sf-1:13000)). When omitted (together with O(auth_namespace)
-        and O(key)) the module auto-discovers credentials from the
-        environment and C(sfrc)/C(~/.shakenfist)/C(/etc/sf/shakenfist.json)
-        exactly like the C(sf-client) CLI.
+        C(http://sf-1:13000)). This, O(auth_namespace) and O(key) are all
+        supplied together or not at all, and supplying only some of them is
+        an error. When all three are omitted the module auto-discovers
+        credentials from the environment and
+        C(sfrc)/C(~/.shakenfist)/C(/etc/sf/shakenfist.json) exactly like the
+        C(sf-client) CLI.
     required: false
     type: str
   auth_namespace:
@@ -158,6 +209,15 @@ EXAMPLES = r'''
     expires_in_seconds: 2592000
   changed_when: false
 
+- name: Renew the claim only once it is inside its last week
+  shakenfist.shakenfist.sf_claim:
+    namespace: static-runners
+    limit_cpus: 32
+    limit_memory_mb: 65536
+    limit_disk_gb: 1200
+    expires_in_seconds: 2592000
+    renew_within_seconds: 604800
+
 - name: Give the reserved capacity back to the cluster
   shakenfist.shakenfist.sf_claim:
     namespace: static-runners
@@ -174,8 +234,12 @@ failed:
   returned: always
   type: bool
 meta:
-  description: The claim object as returned by the API, when available.
-  returned: success
+  description:
+    - The claim object as returned by the API, when available. It is also
+      returned when the claim itself was written and the reaping of a
+      lapsed row afterwards failed, so that the failure does not hide the
+      half of the operation which succeeded.
+  returned: success, and on a failure to reap a lapsed claim
   type: dict
 refusal:
   description:
@@ -201,6 +265,13 @@ log:
 COVERAGE_ACTIVE = 'active'
 
 LIMIT_FIELDS = ('limit_cpus', 'limit_memory_mb', 'limit_disk_gb')
+
+# The client SDK verbs this module calls. They are newer than any released
+# shakenfist-client, so a control node which installed the client from PyPI
+# has an apiclient.Client without them and every call here would be an
+# AttributeError traceback. See _require_claim_verbs().
+CLAIM_VERBS = ('get_namespace_claims', 'create_namespace_claim',
+               'update_namespace_claim', 'delete_namespace_claim')
 
 
 def _make_client(module):
@@ -229,6 +300,32 @@ def _make_client(module):
     except apiclient.UnconfiguredException as e:
         module.fail_json(
             msg='Could not configure the Shaken Fist client: %s' % e, meta=None, log=[])
+
+
+def _require_claim_verbs(client, module, log):
+    """Fail clearly when the installed client SDK predates the claim verbs.
+
+    The verbs landed on client-python's develop branch and no release
+    carries them yet, so "your client is too old" is the most likely
+    reason this module does not work on a control node which has done
+    nothing wrong. An AttributeError traceback names the attribute and
+    nothing an operator can act on, so name the fix instead. The check is
+    against the client which was actually built, so it starts passing on
+    its own once a release does carry the verbs.
+    """
+    missing = [verb for verb in CLAIM_VERBS
+               if not callable(getattr(client, verb, None))]
+    if not missing:
+        return
+
+    module.fail_json(
+        msg='The installed shakenfist-client does not have the namespace '
+            'claim verbs this module needs (missing: %s). They are not in a '
+            'released client yet, so install the client from git on the '
+            'ansible control node: pip install '
+            'git+https://github.com/shakenfist/client-python@develop'
+            % ', '.join(missing),
+        meta=None, log=log)
 
 
 def _live_claims(claims):
@@ -272,22 +369,67 @@ def _limit_differences(claim, module):
     return differences
 
 
-def _fail_api(module, log, message, e):
+def _renewal_is_due(claim, module, log):
+    """Whether this run should re-date the claim.
+
+    Without renew_within_seconds every run re-dates, which is the default
+    because it is what a scheduled reconcile wants: each run is another
+    chance to re-date before the claim lapses.
+
+    With a window set the claim is left alone while it has more than that
+    long to run, so a repeat run and a check mode run both converge. The
+    remaining life is the server's own expires_at against the control
+    node's clock. That is the only comparison in this module which spans
+    two clocks and it is deliberately a coarse one: skew moves the moment
+    the renewal happens by the amount of the skew and decides nothing else.
+    In particular it never decides what is reported as changed, which stays
+    a comparison of two of the server's own timestamps.
+    """
+    window = module.params.get('renew_within_seconds')
+    if not window:
+        return True
+
+    expires_at = claim.get('expires_at')
+    if expires_at is None:
+        # The server did not say when this claim expires, so there is
+        # nothing for the window to be measured against. Re-date, which is
+        # what this module does when there is no window at all.
+        log.append('Claim %s has no expiry to measure the renewal window '
+                   'against, re-dating' % claim.get('uuid'))
+        return True
+
+    remaining = expires_at - time.time()
+    log.append(
+        'Claim %s has about %d seconds left against a %d second renewal '
+        'window' % (claim.get('uuid'), remaining, window))
+    return remaining <= window
+
+
+def _fail_api(module, log, message, e, meta=None):
     # An API refusal is an answer, not a crash, and the play needs enough of
     # it to tell a capacity refusal from a malformed request. sf_api.error()
     # carries the per-dimension detail of a capacity refusal in the response
     # body, so the body goes back to the play rather than only the summary.
+    #
+    # meta is the claim this module wrote before the failure, when there is
+    # one. A reap which fails after a successful create or re-date must not
+    # hide the claim it wrote from the play.
     module.fail_json(
-        msg='%s: %s' % (message, e.message), meta=None, log=log,
+        msg='%s: %s' % (message, e.message), meta=meta, log=log,
         refusal={'status_code': e.status_code, 'text': e.text})
 
 
 def _create_claim(client, module, log):
     try:
+        # By keyword: the SDK lives in another repository and these are
+        # four mutually type-compatible integers, so a reordering there
+        # would silently mis-assign limits rather than raising.
         return client.create_namespace_claim(
-            module.params['namespace'], module.params['limit_cpus'],
-            module.params['limit_memory_mb'], module.params['limit_disk_gb'],
-            module.params['expires_in_seconds'])
+            module.params['namespace'],
+            limit_cpus=module.params['limit_cpus'],
+            limit_memory_mb=module.params['limit_memory_mb'],
+            limit_disk_gb=module.params['limit_disk_gb'],
+            expires_in_seconds=module.params['expires_in_seconds'])
     except apiclient.InsufficientResourcesException as e:
         _fail_api(
             module, log,
@@ -297,7 +439,9 @@ def _create_claim(client, module, log):
         _fail_api(module, log, 'Creating the namespace claim failed', e)
 
 
-def _delete_claims(client, module, log, claims, description):
+def _delete_claims(client, module, log, claims, description, meta=None):
+    # meta is the claim this run wrote, when it wrote one, so that a reap
+    # which fails still hands the play the claim which succeeded.
     for c in claims:
         log.append('Deleting %s claim %s' % (description, c.get('uuid')))
         try:
@@ -307,7 +451,7 @@ def _delete_claims(client, module, log, claims, description):
             log.append('Claim %s was already gone' % c.get('uuid'))
         except apiclient.APIException as e:
             _fail_api(module, log, 'Deleting namespace claim %s failed'
-                      % c.get('uuid'), e)
+                      % c.get('uuid'), e, meta=meta)
 
 
 def _ensure_present(client, module, log):
@@ -345,19 +489,31 @@ def _ensure_present(client, module, log):
             module.exit_json(changed=True, meta=None, log=log)
 
         c = _create_claim(client, module, log)
-        _delete_claims(client, module, log, inactive, 'lapsed')
+        _delete_claims(client, module, log, inactive, 'lapsed', meta=c)
         module.exit_json(changed=True, meta=c, log=log)
 
     differences = _limit_differences(active, module)
     if differences:
         log.append('Claim %s limits differ: %s' % (active.get('uuid'), differences))
 
+    if not differences and not _renewal_is_due(active, module, log):
+        # There is nothing to write: the limits match and the claim is
+        # further from its expiry than the renewal window the play asked
+        # for. Lapsed rows are still worth reaping, and reaping is not a
+        # change, so this run converges.
+        log.append('Claim %s needs nothing' % active.get('uuid'))
+        if not module.check_mode:
+            _delete_claims(client, module, log, inactive, 'lapsed', meta=active)
+        module.exit_json(changed=False, meta=active, log=log)
+
     if module.check_mode:
         # Check mode reports the re-date it cannot perform as a change,
         # because performing it would be one. There is no way to know
         # whether the server's clock has moved without asking it to move
         # the expiry, and guessing from the control node's clock is exactly
-        # the comparison this module avoids making.
+        # the comparison this module avoids making. A play which wants
+        # check mode to converge sets renew_within_seconds, which is
+        # answered above without writing anything.
         module.exit_json(changed=True, meta=active, log=log)
 
     # Only the limits which actually differ are named in the field mask, so
@@ -374,6 +530,19 @@ def _ensure_present(client, module, log):
             module, log,
             'The cluster refused to grow this claim, it does not have the '
             'capacity to promise it', e)
+    except apiclient.ResourceStateConflictException as e:
+        # The server answers 409 for a shrink below what the namespace is
+        # already using, and for a claim which stopped being active between
+        # the listing above and this write. Both are the caller's to fix
+        # and neither is a fault in the cluster, so say which they are
+        # rather than reporting a bare failure. The wording follows
+        # CLAIM_REFUSAL_MESSAGE in the server's external_api/auth.py.
+        _fail_api(
+            module, log,
+            'The cluster refused this change to claim %s: a claim cannot be '
+            'shrunk below what it is already using, and a claim which is no '
+            'longer active cannot be changed (delete it and create a new '
+            'one)' % active['uuid'], e)
     except apiclient.APIException as e:
         _fail_api(module, log, 'Updating namespace claim %s failed'
                   % active['uuid'], e)
@@ -384,6 +553,12 @@ def _ensure_present(client, module, log):
     if redated:
         log.append('Claim %s expiry moved to %s'
                    % (active.get('uuid'), updated.get('expires_at')))
+
+    # Reap here as well as on the create path, so that lapsed rows beside an
+    # active claim do not accumulate until somebody removes them by hand.
+    # Not a change: an expired claim holds no cluster capacity, so removing
+    # it alters nothing the namespace's coverage depends on.
+    _delete_claims(client, module, log, inactive, 'lapsed', meta=updated)
 
     module.exit_json(changed=bool(differences) or redated, meta=updated, log=log)
 
@@ -418,6 +593,7 @@ def run_module():
         'limit_memory_mb': {'required': False, 'type': 'int'},
         'limit_disk_gb': {'required': False, 'type': 'int'},
         'expires_in_seconds': {'required': False, 'type': 'int'},
+        'renew_within_seconds': {'required': False, 'type': 'int'},
         'state': {
             'default': 'present',
             'choices': ['present', 'absent'],
@@ -434,7 +610,14 @@ def run_module():
             ('state', 'present',
              ['limit_cpus', 'limit_memory_mb', 'limit_disk_gb',
               'expires_in_seconds'])
-        ])
+        ],
+        # All three connection parameters or none of them. A partial triple
+        # is otherwise ignored in favour of whatever ambient credentials the
+        # control node holds, which may be a different cluster entirely --
+        # and this module's namespace parameter names the claim's target
+        # rather than the identity, so a playbook written against the rest
+        # of the collection lands exactly there.
+        required_together=[['api_url', 'auth_namespace', 'key']])
 
     log = []
 
@@ -446,7 +629,16 @@ def run_module():
         module.fail_json(
             msg='expires_in_seconds must be positive', meta=None, log=log)
 
+    renew_within = module.params['renew_within_seconds']
+    if state == 'present' and renew_within is not None and renew_within < 1:
+        # A negative window would silently mean "never renew", which is the
+        # opposite of what somebody setting it wants.
+        module.fail_json(
+            msg='renew_within_seconds must be positive when it is set',
+            meta=None, log=log)
+
     client = _make_client(module)
+    _require_claim_verbs(client, module, log)
 
     if state == 'present':
         _ensure_present(client, module, log)
