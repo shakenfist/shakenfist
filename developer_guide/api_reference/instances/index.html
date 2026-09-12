@@ -14032,8 +14032,9 @@ in the OpenAPI interface, so are documented here instead.</p>
 <p>Similarly, a <code>networkspec</code> consists of the following fields in a JSON dictionary:</p>
 <ul>
 <li>network_uuid (uuid): the UUID of the network the interface should exist on.</li>
-<li>macaddress (string): the MAC address of the interface. Omit this value to be allocated
-  a MAC address automatically.</li>
+<li>macaddress (string): the MAC address of the interface, in the colon separated form
+  <code>02:00:00:ea:3a:28</code>. Either case is accepted. A value in any other form is rejected
+  with a 400. Omit this value to be allocated a MAC address automatically.</li>
 <li>address (string): the IPv4 address to assign to the interface. Omit this value to be
   allocated a random address.</li>
 <li>model (enum): the model of the network interface card. In general you should not have
