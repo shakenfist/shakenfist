@@ -306,6 +306,21 @@ The same treatment applies to a `get_cluster_resources()` call that
 raises: log it into the wait record and keep waiting. The endpoint
 being briefly unavailable is not evidence about capacity.
 
+*Amended by the automated review of PR #4166: survey finding 4's three
+causes were not all of them, and the fourth was a bug in this decision
+rather than in the code implementing it. `/admin/resources` keys
+`per_node` by node **uuid** (`summarize_resources()` builds it from
+`get_active_node_metrics()`, which keys by `str(n.uuid)`), while the
+suite pins by name almost everywhere. So a name-pinned create missed on
+every poll, and "absent means zero available, keep waiting" turned one
+transient 507 into a guaranteed seven-minute failure whose message said
+there was room everywhere -- strictly worse than the behaviour this
+phase set out to fix. `BaseTestCase._placement_roster_key()` now
+resolves a pin into the roster's key space before waiting. The rule
+above still holds for a genuine absence; a pin which resolves to
+nothing waits blind and records `mode: degraded`, because not knowing
+which entry to read is not evidence that the entry is empty.*
+
 ### D10 -- A degraded capacity read falls back to a blind wait
 
 When `total['capacity_degraded']` is set, the capacity mapping the
@@ -518,12 +533,28 @@ Falsifiable, in order:
    `cpu_available` but a binding `cpu_limit - cpu_committed` does not
    satisfy the wait predicate, and deleting the `cpu_limit` clause
    from `wait_for_capacity()` makes that test fail.
+
+   *Amended at closeout: met, by
+   `test_a_binding_limit_beats_generous_published_headroom`. But read
+   this item as narrower than what shipped. The review of #4166 found
+   the cpu-only predicate was not a rough version of the right answer
+   but a permanently-satisfied one, since the scheduler pre-filters on
+   memory and disk too and turns all three into the same 507 -- so the
+   ledger clause is now applied per dimension, and
+   `test_a_node_must_cover_every_dimension_at_once` and the per-instance
+   ceiling tests carry the weight this item was written to carry.*
 4. A unit test asserts that a target absent from `per_node`
    continues the wait rather than raising, and that it proceeds when
    the target appears.
 5. A unit test asserts that `total['capacity_degraded']` produces a
    blind wait recorded as `mode: degraded`, and that an unpinned
    create never consults `total['cpu_available']`.
+
+   *Amended at closeout: met, by
+   `test_a_degraded_read_waits_blind_and_admits_to_it` and
+   `test_an_unpinned_create_reads_nodes_and_never_the_cluster_total`.
+   `mode: degraded` acquired a second producer in review -- a pin which
+   does not resolve to a roster key -- for the reason under D9 below.*
 6. A unit test asserts a 409 affinity refusal is not retried.
 7. `retries.py` still imports nothing from the suite or from
    `shakenfist_client`, and the tests which load it by path still
@@ -582,3 +613,140 @@ Before implementation begins, the implementer confirms in writing:
 redo. It does not start until 2a has merged, or at minimum until
 `create_instance()`'s signature is agreed -- a signature change after
 2b means editing 117 call sites twice.
+
+## Outcome
+
+Complete. Steps 2a-2e merged as
+[#4166](https://github.com/shakenfist/shakenfist/pull/4166); step 2f is
+prepared and awaiting an operator push, and this section is 2g.
+
+### The measurement (definition of done item 9)
+
+Three real waits, read from downloaded merge-run bundles with
+`tools/ci_headroom_report.py --waits`. Both runs carry the phase 2
+suite; both `debian-12-slim-tier`:
+
+| Run | Waits | Total | Longest | Test |
+|-----|-------|-------|---------|------|
+| [34663526177](https://github.com/shakenfist/shakenfist/actions/runs/34663526177) | 1 | 190.5 s | 190.5 s | `test_imagefetch.TestHTTPFetch.test_vanished_source_server_instance` |
+| [34681505274](https://github.com/shakenfist/shakenfist/actions/runs/34681505274) | 2 | 301.0 s | 160.4 s | `test_network_lifecycle.TestNetworkPlumbingLifecycle.test_network_plumbing_lifecycle` |
+
+All three are `mode: informed` -- the predicate, not the blind
+fallback, ended every one of them -- and all three record
+`binding_dimension: cpus`, which is the dimension the master plan's
+journal reading predicted and the one the original cpu-only predicate
+would also have caught. Each was a test failure before this phase.
+
+Three things in that data are worth carrying forward rather than
+leaving in a table:
+
+* **The waits are long.** 140-190 s each, against a 420 s deadline.
+  These are not "the poll caught it on the second tick"; they are a
+  third to a half of the budget. Phase 5 should read that as the
+  central number rather than the totals, because a deadline reached is
+  a failed run and the margin here is smaller than the totals suggest.
+* **`roster_key` earned its place immediately.** The second run's
+  first wait records `node: "sf1"` with
+  `roster_key: "1290c690-57c3-4849-8dab-74b320af6a1f"` -- a name pin
+  resolved into the uuid-keyed roster. That is exactly the case the
+  second review round fixed (see the amendment under D9); without it
+  this wait could not have been satisfied at all and would have become
+  a seven-minute failure.
+* **The `slim-primary` bundles of both runs have no waits file at
+  all.** That is the wrapper behaving correctly -- the file is created
+  on first write -- and the report reads it honestly as *unknown*
+  rather than as zero. See the finding below.
+
+The two runs' D3 band verdicts (0.500 `WITHIN BAND`, 0.833
+`OVERSUBSCRIBED`) are recorded here only because the same command
+prints them. They belong to the sizing plan, and nothing here reads
+them.
+
+### A defect this phase's own guard found on `develop`
+
+The AST guard added by step 2b was failing on `develop` when this
+closeout began, and had blocked the merge queue since 04:47 on
+2026-09-12.
+
+[#4170](https://github.com/shakenfist/shakenfist/pull/4170) (the
+sizing plan's phase 3a) landed
+`cluster_ci_tests/test_saturation.py` with four raw
+`create_instance` calls and no markers, about five hours after #4166
+added the guard. Neither pull request was wrong and neither could see
+the other: #4170's branch predates the guard, and the guard cannot
+see a file which does not exist yet. The merge queue did not catch
+the pair either, and at least two subsequent `merge_group` runs
+([34681505274](https://github.com/shakenfist/shakenfist/actions/runs/34681505274),
+[34685164595](https://github.com/shakenfist/shakenfist/actions/runs/34685164595))
+failed `Sanity checks` on
+`test_ci_raw_creates.RawCreateInstanceMarkerTestCase.test_no_unmarked_raw_create_calls_in_the_suite`
+as a result.
+
+Fixed here, as markers rather than as routing, which is what this
+phase's scope already said those tests would need: "the sizing plan's
+phase 3 saturation tests must call the raw client and assert the
+refusal; the allowlist marker exists for them." All four sites must
+see the raw refusal -- three are the `assertRaises` in the impossible
+-request tests, and the fourth is `_create_fill_instance()`, whose
+two callers each handle the `InsufficientResourcesException`
+themselves. `test_saturation.py:1137` already carried a comment
+saying so in as many words: "Deliberately not wrapped in
+`retries.retry_while_transient()`: a refusal under assertion must
+never be retried away."
+
+This is the collision the guard exists to make loud, and it made it
+loud on the first try. It is recorded as an outcome rather than as a
+bug in either plan.
+
+### Step 2f
+
+Prepared on the `capacity-wait-summary` branch of
+`shakenfist/actions`, not yet pushed: `tools/ci_headroom_collect.sh`
+scp's `/srv/ci/traces/instance-waits.jsonl` beside the series and the
+census, and passes `--waits` when the report understands the flag and
+the file is non-empty, with an `else` branch saying what an absent
+file does and does not mean. `pre-commit run --all-files` passes
+there.
+
+Nothing depends on it, exactly as D14 arranged: the measurement above
+was read from bundles produced without it. All it buys is the summary
+being printed in the job log rather than only being readable by
+downloading the artifact -- which is worth having, but was never
+allowed to gate this phase.
+
+### A finding for phase 5
+
+**An absent waits file and a run with no waits are the same
+artifact.** The wrapper creates the file on its first write, so a run
+which was never refused leaves nothing behind, and
+`tools/ci_headroom_report.py --waits` correctly declines to read that
+as zero. A human with the run in front of them can tell the two
+apart; a harvest over twenty bundles cannot, and phase 5's denominator
+is exactly that harvest.
+
+Not fixed here -- it is a change to the wrapper, and this phase is
+closed. The cheap fix is for the suite to write an empty file once at
+start-up, which turns "absent" back into "the suite predates this or
+its writes failed" and lets "empty" mean zero. Recorded in the master
+plan's Future work.
+
+### Deviations from this plan
+
+Three, all recorded above or at their source rather than only here:
+
+1. **D8's predicate widened from cpus to every dimension**, plus the
+   two per-instance ceilings, and the loop gained pacing and an
+   attempt ceiling. From the automated review of #4166; see the
+   amendment under D8 and the note added to definition-of-done item 3.
+   The original predicate was not a rough version of the right answer
+   but a permanently-satisfied one.
+2. **D9 acquired a fourth cause of an absent roster entry**, which was
+   a bug in the decision rather than in its implementation:
+   `/admin/resources` keys `per_node` by uuid and the suite pins by
+   name. See the amendment under D9.
+3. **The saturation-test markers above**, which are new work this
+   phase did not plan for because the file did not exist when it was
+   planned.
+
+Definition-of-done items 3, 5 and 9 carry closeout amendments saying
+what was actually checked where it differs from what was written.
