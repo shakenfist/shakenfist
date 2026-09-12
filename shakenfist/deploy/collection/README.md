@@ -59,7 +59,7 @@ node whose database rows have drifted.
 
 ## Modules
 
-The collection ships four native Ansible modules (under
+The collection ships five native Ansible modules (under
 `plugins/modules/`) for managing Shaken Fist resources from a playbook. They
 import the `shakenfist_client` SDK and call the Shaken Fist REST API directly
 — they do **not** shell out to `sf-client`.
@@ -70,13 +70,19 @@ import the `shakenfist_client` SDK and call the Shaken Fist REST API directly
 | `shakenfist.shakenfist.sf_network` | Idempotently create or delete a network (`name`/`uuid`, `netblock`, `nat`, `dhcp`, `dns`, `state`). A changed specification deletes and recreates the network. |
 | `shakenfist.shakenfist.sf_instance` | Idempotently create, replace or delete an instance (`name`/`uuid`, `cpu`, `ram`, `disks`/`diskspecs`, `networks`/`networkspecs`, `metadata`, `await`, `state`). A changed specification deletes and recreates the instance. |
 | `shakenfist.shakenfist.sf_snapshot` | Snapshot an instance's disks (optionally updating a label) or delete a snapshot artifact (`instance_uuid`/`uuid`, `all`, `label`, `state`). |
+| `shakenfist.shakenfist.sf_claim` | Idempotently create, resize, re-date or delete a namespace's capacity claim (`namespace`, `limit_cpus`, `limit_memory_mb`, `limit_disk_gb`, `expires_in_seconds`, `renew_within_seconds`, `state`). Administrator only. |
 
 Every module accepts optional `api_url`, `namespace` and `key` connection
 parameters. When all three are supplied they are used verbatim; when omitted,
 the module auto-discovers credentials from the environment and
 `sfrc`/`~/.shakenfist`/`/etc/sf/shakenfist.json` exactly like the `sf-client`
-CLI. Each module returns `changed`, `failed`, a `meta` object describing the
-resource, and a `log` list of progress messages for debugging.
+CLI. `sf_claim` is the exception: claim management is administrator only, so
+there `namespace` names the namespace the claim covers and the namespace to
+authenticate as is `auth_namespace`, and supplying only some of `api_url`,
+`auth_namespace` and `key` is an error rather than a silent fall back to
+whatever credentials the control node happens to hold. Each module returns
+`changed`, `failed`, a `meta` object describing the resource, and a `log`
+list of progress messages for debugging.
 
 ## Requirements
 
@@ -89,6 +95,21 @@ pip install shakenfist-client
 (or `pip install -r requirements.txt` from the collection root). The control
 node never needs the Shaken Fist server package. The roles additionally
 require `ansible >= 2.15` (see `meta/runtime.yml`).
+
+`sf_claim` needs more than that. It calls the namespace capacity claim verbs
+(`get_namespace_claims`, `create_namespace_claim`, `update_namespace_claim`
+and `delete_namespace_claim`), which are on the client's `develop` branch and
+are **not in any release yet**, so there is no minimum released version to
+ask for. A control node which uses `sf_claim` installs the client from git:
+
+```bash
+pip install git+https://github.com/shakenfist/client-python@develop
+```
+
+which is how the Shaken Fist CI conductor installs it. The module checks the
+client it built for those verbs and fails with this advice, naming the verb
+it could not find, rather than raising an `AttributeError`. Every other
+module in the collection works with the released client.
 
 The `internal_ca` role generates certificates on the control node with
 `certtool` from the `gnutls-bin` package (Debian/Ubuntu). The role installs it
