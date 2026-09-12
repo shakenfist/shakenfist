@@ -119,6 +119,30 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertEqual('', results['stderr'])
         self.assertTrue('04:ed:33:c0:2e:6c' in results['stdout'])
 
+    def test_malformed_macaddress_request(self):
+        self.assertRaises(
+            apiclient.RequestMalformedException,
+            # raw-create: asserts the 400 a malformed MAC gets, which is
+            # raised validating the request, not scheduling it. Before
+            # issue 534 this was accepted, stored on the network
+            # interface, and only failed when libvirt was handed the
+            # domain XML.
+            self.test_client.create_instance,
+            'test-malformed-macaddress', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_four['uuid'],
+                    'macaddress': 'not-a-mac-address'
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian-12',
+                    'type': 'disk'
+                }
+            ], None, None)
+
     def test_interface_delete(self):
         inst1 = self.create_instance(
             'test-iface-delete', 1, 1024,

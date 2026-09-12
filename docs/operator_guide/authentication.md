@@ -410,6 +410,15 @@ namespaces, scaled down. A namespace you trust can list and read those
 objects. It cannot delete them, rename them, share them, or change their
 metadata — those all require the object's own namespace, or `system`.
 
+A trust also does not outlive the namespace it names. Deleting a namespace
+revokes every trust pointing at it, on every other namespace, at the moment
+of deletion. This matters because a trust names a namespace by name and
+namespace names can be reused once the cluster has finished cleaning the
+deleted one up: without the revocation, whoever created that name next would
+inherit your trust without you doing anything or being told. You will see a
+`trust revoked, trusted namespace is gone` event on your namespace when this
+happens.
+
 Giving is a separate question from taking, and it is still allowed: a
 namespace you trust may *create* an object in your namespace, which is exactly
 the "gift" step in the `ci-images` example above. Creation is additive, you

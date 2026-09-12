@@ -36,6 +36,7 @@ from shakenfist.mapping_rule import MAX_KEY_TTL_SECONDS
 from shakenfist.mapping_rule import RuleValidationError
 from shakenfist.namespace import Namespace
 from shakenfist.namespace import namespace_is_trusted
+from shakenfist.namespace import revoke_inbound_trust
 from shakenfist.namespace import Namespaces
 from shakenfist.namespace_claim import ClaimRefused
 from shakenfist.namespace_claim import NamespaceClaim
@@ -366,6 +367,21 @@ class AuthNamespaceEndpoint(api_base.Resource):
             a.add_event(
                 EVENT_TYPE_AUDIT, 'deletion request via namespace deletion from REST API')
             a.delete()
+
+        # Revoke every trust naming this namespace before it goes. A
+        # trust names a namespace by name and namespace names can be
+        # reused once the cluster maintainer hard deletes the static
+        # row, so a trust left behind is inherited by whoever creates
+        # the name next. Namespace.hard_delete() sweeps again as a
+        # backstop, but waiting for it would leave the trust standing
+        # for the length of the hard delete delay, and there is no
+        # reason for a deleted namespace to be trusted for a moment
+        # longer than it exists. See namespace.revoke_inbound_trust().
+        revoked = revoke_inbound_trust(namespace, 'namespace deleted')
+        if revoked:
+            namespace_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'revoked trusts naming this namespace',
+                extra={'revoked-from': revoked})
 
         namespace_from_db.state = dbo.STATE_DELETED
         namespace_from_db.add_event(EVENT_TYPE_AUDIT, 'deletion request from REST API')

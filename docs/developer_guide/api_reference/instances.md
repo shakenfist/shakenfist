@@ -97,8 +97,9 @@ A full example of a `diskspec` is therefore:
 Similarly, a `networkspec` consists of the following fields in a JSON dictionary:
 
 * network_uuid (uuid): the UUID of the network the interface should exist on.
-* macaddress (string): the MAC address of the interface. Omit this value to be allocated
-  a MAC address automatically.
+* macaddress (string): the MAC address of the interface, in the colon separated form
+  `02:00:00:ea:3a:28`. Either case is accepted. A value in any other form is rejected
+  with a 400. Omit this value to be allocated a MAC address automatically.
 * address (string): the IPv4 address to assign to the interface. Omit this value to be
   allocated a random address.
 * model (enum): the model of the network interface card. In general you should not have

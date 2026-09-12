@@ -48,9 +48,15 @@ for the measurement that closed it, and
 for the reading that unlocked the flip and what the flip changed for
 callers, and
 [`PLAN-api-input-validation-phase-05-narrow.md`](PLAN-api-input-validation-phase-05-narrow.md)
-for the narrowing and the two leaks it closed. Phase 6 is the next
-phase to start, and neither it nor phase 7 is yet cut into a per-phase
-file.
+for the narrowing and the two leaks it closed, and
+[`PLAN-api-input-validation-phase-06-required.md`](PLAN-api-input-validation-phase-06-required.md)
+for the required-ness decision and what the semantic type tokens turned
+out to be enforcing. Phase 6's survey split the phase it was planning:
+what was one row covering required-ness and four semantic issues is now
+phase 6 for the scalar half and phase 7 for element schemas on `dict`
+and `arrayofdict`, which #528 needs and which nothing in the vocabulary
+can express today. The push audit moves to phase 8. Neither phase 7 nor
+phase 8 is yet cut into a per-phase file.
 
 ## Situation
 
@@ -182,11 +188,11 @@ each of which is a real defect in the issue list:
   default of 100 and a cap of 1000; `offset` on blob reads and
   upload truncate must be non-negative and, for truncate, within
   the object.
-* **No format-constrained string.** MAC addresses (#534),
-  base64-encoded user data (#3269), netblocks that must not
-  overlap reserved ranges (#323).
+* **No format-constrained string.** MAC addresses (#534, since
+  fixed outside this plan), base64-encoded user data (#3269),
+  netblocks that must not overlap reserved ranges (#323).
 * **No structured value types.** Disk, network and video specs
-  are validated imperatively today (#936).
+  are validated imperatively today (#528).
 
 ## Reported issues this plan addresses
 
@@ -200,10 +206,10 @@ the same decorator chain.
 | Issue | Filed | Summary |
 |-------|-------|---------|
 | [#528](https://github.com/shakenfist/shakenfist/issues/528) | 2020-11-11 | **Broaden declarative type/validity checking across all API endpoints.** The parent issue; explicitly notes only ~4 endpoint files use `use_kwargs` today. |
-| [#936](https://github.com/shakenfist/shakenfist/issues/936) | 2021-09-02 | Replace hand-rolled instance-create validation with a declarative schema. Video/disk/network specs are validated imperatively in `instance.py`. |
+| [#936](https://github.com/shakenfist/shakenfist/issues/936) | 2021-09-02 | Replace hand-rolled instance-create validation with a declarative schema. Video/disk/network specs are validated imperatively in `instance.py`. **Closed 2026-09-12 as a duplicate of #528**, which now carries this work; phase 7 is where it lands. |
 | [#3612](https://github.com/shakenfist/shakenfist/issues/3612) | 2026-08-03 | Body parameters merged into handler kwargs untyped; broad `except TypeError` returns interpreter messages. The mechanism description above. |
 | [#3609](https://github.com/shakenfist/shakenfist/issues/3609) | 2026-08-02 | `GET /nodes/<node>/events` with a string `limit` returns a 400 containing a Python type error. The trigger. |
-| [#534](https://github.com/shakenfist/shakenfist/issues/534) | 2020-11-12 | Validate MAC address *format* on interface create (uniqueness is already enforced). |
+| [#534](https://github.com/shakenfist/shakenfist/issues/534) | 2020-11-12 | Validate MAC address *format* on interface create (uniqueness is already enforced). **Closed 2026-09-12 by [#4183](https://github.com/shakenfist/shakenfist/pull/4183)**, not by this plan — see the note below. |
 | [#3269](https://github.com/shakenfist/shakenfist/issues/3269) | 2026-06-13 | Enforce base64-encoded user data at the API instead of failing later on the hypervisor with a traceback. |
 | [#323](https://github.com/shakenfist/shakenfist/issues/323) | 2020-09-26 | Reject virtual networks that overlap reserved ranges (e.g. the floating network). |
 
@@ -303,8 +309,9 @@ declarations are good enough to compile.
 | 3: Compile and warn | Complete | Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is *already* a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared `namespace` of #3739 and fourteen metadata `value` declarations narrower than their handlers — which phase 4 fixes before it enforces. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) |
 | 4: Enforce | Complete | Landed 2026-09-09 via [#4141](https://github.com/shakenfist/shakenfist/pull/4141). Fixed the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moved to Future work as [#4098](https://github.com/shakenfist/shakenfist/issues/4098): read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) |
 | 5: Narrow the handlers | Complete | Deleted the `except TypeError` arm from `handle_authorization_exceptions` (D23): a handler-internal `TypeError` is now a recorded 500 like any other server fault, and under the `warn`/`off` rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed [#3523](https://github.com/shakenfist/shakenfist/issues/3523) (a partial `cpuinfo` probe raising `KeyError` in `get_user_agent`) and removed two `requires_namespace_exist_if_specified` applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried `repr(e)` (F11): every 500 response now answers a bare `server error` with no exception detail at all, for any cause (D31). Filed [#4161](https://github.com/shakenfist/shakenfist/issues/4161) for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix ([#3743](https://github.com/shakenfist/shakenfist/issues/3743)) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See [phase 5](PLAN-api-input-validation-phase-05-narrow.md) |
-| 6: Required and semantics | Not started | Enforce `required` — or decide not to, since it is the change most likely to break working clients; semantic validators for #534, #3269, #323, #936 |
-| 7: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
+| 6: Required and scalar semantics | Not started | Decide whether `required` is enforced, having found that all 75 body and query declarations carrying `required=True` are optional in fact — every one has a handler default, so nothing is structurally required and enforcement is a contract change for all of them. Also gives the semantic type tokens something to do: `macaddr` is the only one of them that validates anything today, and it is declared nowhere. Closes #3269 (base64 `user_data` failing on the hypervisor rather than at the API) and #323 (a netblock overlapping the floating network). #534 was also in scope until the automated issue fixer closed it with #4183 on 2026-09-12, four hours after the phase plan merged. See [phase 6](PLAN-api-input-validation-phase-06-required.md) |
+| 7: Structured parameter schemas | Not started | `dict` compiles to `fields.Dict()` and `arrayofdict` to `fields.List(fields.Dict())`, neither carrying a value schema, so every key inside a diskspec, networkspec or videospec is unvalidated in every mode. Teaching the vocabulary to carry an element schema is what #528 needs — the scope #936 described before it was closed as a duplicate of #528 on 2026-09-12 — and it is also items 2 and 3 of #4167. Split out of phase 6 by that phase's survey: the other issues in that row are guards and scalar validators, and this is a vocabulary change the size of phase 2 |
+| 8: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence |
 
 ### Where the tracked issues stand
 
@@ -340,8 +347,9 @@ three classes the phase 5 survey recorded, so the issue is scoped
 to the two proxy call sites and the local-socket case that fix
 does not cover, not to the survey's original table.
 
-**Still open and still owned by this plan:** #528 (parent), #3612
-(the mechanism), #936, #534, #3269, #323, #2094.
+**Still open and still owned by this plan:** #528 (parent, and
+since 2026-09-12 also the tracker for what #936 described), #3612
+(the mechanism), #3269, #323, #2094.
 
 **Phase 5 was overtaken from outside, as predicted.** Three of
 its four attribution issues were picked up by the automated issue
@@ -356,6 +364,20 @@ validation layer is rejecting the malformed input that broad
 catch absorbs. That is now the fact rather than the forecast.
 Nobody picks that item up incidentally, because on its own it
 looks like a regression risk with no visible benefit.
+
+**Phase 6 was overtaken the same way, four hours after its plan
+merged.** #534 was in phase 6's scope, named in a merged plan,
+and the automated issue fixer landed
+[#4183](https://github.com/shakenfist/shakenfist/pull/4183) for
+it on 2026-09-12 — a complete fix, wider than the one phase 6
+briefed, covering both callers of `_netdesc_safety_checks` with a
+drift test and a guest CI case. Phase 6 step 5 is now #323 alone.
+Being overtaken is not a failure: the work is done and the issue
+is closed. It is recorded because two phases running have lost
+scope this way, and because the mitigation is cheap and was not
+used — an `automated-fix-attempted` label applied when the issue
+is filed reserves it against the fixer while a branch is in
+flight.
 
 ### Carried into phase 2 from phase 1
 
@@ -538,9 +560,12 @@ belongs here is the one item phase 4 declined.
   changing an error message -- a second request-visible change in
   the phase that flips enforcement. It is tracked as
   [#4098](https://github.com/shakenfist/shakenfist/issues/4098)
-  and is a candidate for phase 6, which already touches how
-  values reach handlers. Enforcement does not depend on it: the
-  compiled check runs first, so the duplication is inert.
+  and remains a candidate for a later phase. Phase 6 did not
+  take it: that phase corrects declarations and enforces them,
+  and deriving the schema from signature defaults is a change to
+  where declarations come from. Enforcement does not depend on
+  it: the compiled check runs first, so the duplication is
+  inert.
 
 ## Open questions for phase 0
 

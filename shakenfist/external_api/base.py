@@ -50,6 +50,7 @@ from shakenfist.util.access_tokens import parse_jwt_identity
 from shakenfist.util.access_tokens import request_namespace
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import general as util_general
+from shakenfist.util import network as util_network
 
 
 LOG, _ = logs.setup(__name__)
@@ -404,7 +405,7 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     'ipv4': {'type': 'string', 'format': 'an IPv4 address as a string'},
     'macaddr': {
         'type': 'string', 'format': 'a MAC address',
-        'pattern': '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'},
+        'pattern': util_network.MACADDR_PATTERN},
     'namespace': {'type': 'string', 'format': 'the name of a namespace'},
     # Deliberately format-only, with no pattern. An IPv4 CIDR
     # pattern would describe the API as narrower than it is:

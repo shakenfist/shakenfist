@@ -354,6 +354,16 @@ class Namespace(dbo):
         for rule in mapping_rule.rules_in_namespace(self.uuid):
             rule.hard_delete()
 
+        # Trusts naming this namespace are *not* owned by it -- they
+        # live on whichever other namespaces granted them -- but they
+        # have to go for the same reason the mapping rules do, and the
+        # consequence of missing one is the same. See
+        # revoke_inbound_trust() for why a stale trust is dangerous
+        # rather than merely untidy. This is the backstop: the REST
+        # delete handler revokes at soft delete, so by the time we get
+        # here there is usually nothing left to do.
+        revoke_inbound_trust(self.uuid, 'namespace hard deleted')
+
         # Capacity claims are owned the same way, and leaving one behind
         # is worse than leaving a key or a rule behind: a claim holds
         # cluster capacity in cluster_capacity.claimed_*, and with its
@@ -387,6 +397,59 @@ class Namespace(dbo):
             retval['keys'].append(k)
 
         return retval
+
+
+def revoke_inbound_trust(namespace, reason):
+    """Remove `namespace` from the trust list of every other namespace.
+
+    A trust names a namespace by name, not by uuid, and namespace names
+    become available for reuse: the REST create handler refuses a name
+    whose static row still exists, but the cluster maintainer hard
+    deletes deleted namespaces after a delay and that removes the row.
+    So a trust which outlives the namespace it names is a latent
+    privilege escalation -- whoever next creates that name inherits
+    every trust still pointing at it, without the granting namespace
+    doing anything or being told.
+
+    Namespace.hard_delete() already removes this namespace's mapping
+    rules with exactly this reasoning. Trust was the other half of it.
+
+    Returns the names of the namespaces which were changed.
+
+    Only active namespaces are swept. A deleted namespace cannot be
+    the victim of an inherited trust: deleting one requires it to hold
+    no instances or networks and cascade deletes its artifacts, so
+    there is nothing left for a trust to expose.
+
+    This walks the active namespaces rather than querying for the ones
+    which trust `namespace`. Trust is a JSON list in
+    namespace_attributes, so a pushdown would need JSON_CONTAINS and a
+    new RPC; namespaces number in the tens and deleting one is rare and
+    already expensive, so the scan is not worth that. Revisit if either
+    changes.
+    """
+    revoked = []
+
+    for ns in Namespaces([], prefilter='active'):
+        if ns.uuid == namespace:
+            continue
+        if namespace not in ns.trust:
+            continue
+
+        ns.remove_trust(namespace)
+        ns.add_event(
+            EVENT_TYPE_AUDIT, 'trust revoked, trusted namespace is gone',
+            extra={'untrusted-namespace': namespace, 'reason': reason})
+        revoked.append(ns.uuid)
+
+    if revoked:
+        LOG.with_fields({
+            'namespace': namespace,
+            'revoked-from': revoked,
+            'reason': reason
+        }).info('Revoked trusts naming a deleted namespace')
+
+    return revoked
 
 
 class Namespaces(dbo_iter):

@@ -124,6 +124,22 @@ whether the suite got quieter because the system got better.
 * Chasing #3565's scheduler question. It closed as a test bug on a
   test change (scheduler-reservations phase 6), and phase 0's row
   was corrected to say so on 2026-09-01.
+* **The deterministic affinity reproduction phase 0's #3565 row
+  still asks phase 3 for**, and this exclusion was missing until
+  step 3f found it. The bullet above excludes *chasing the scheduler
+  question*, which is not the same thing: phase 0's row, even after
+  its 2026-09-01 correction, says "the deterministic reproduction
+  phase 3 owes it is still worth having -- it is now coverage of a
+  documented guarantee rather than a hunt for a bug". This phase
+  does not write it, and the reason is D23. A reproduction of the
+  kind phase 0 describes -- fill the affinity target, then place --
+  has to fill a *named* node chosen by the affinity test rather than
+  the roomiest one, so it cannot use D26's "skip unless this node is
+  comfortably free" escape: if the target is busy the test has
+  nothing to do but wait or fail. That is a different risk profile
+  from 3c, and pricing it needs the merge-run evidence 3c is about
+  to produce about how often a single-node fill skips. **Phase 4
+  inherits it as an explicit debt, not as an oversight.**
 * The master plan's other *Future work* entries -- the under-cloud
   probe, per-suite concurrency, `test_coalescing`'s burst, the two
   uninstrumented cluster jobs.
@@ -140,11 +156,13 @@ in the planning commit -- do not redo them.
 including the umbrella the phase is framed around.** #3772 closed
 **2026-09-09T13:09:41Z** as `COMPLETED`, #3496 on 2026-08-29,
 #3696 on 2026-09-05; #3813, #3565 and #3907 were already closed
-when phase 0 wrote the table. Only #3718 (the second shape of the
-runner-communication family, out of scope per D8) is still open.
-The master plan's phase 3 section says "the issue records what it
-should do, so growing the clouds cannot quietly close it" -- there
-is no longer an open issue holding that record.
+when phase 0 wrote the table. Of the six, only #3718 (the second
+shape of the runner-communication family, out of scope per D8) was
+still open when this plan was written. The master plan's phase 3
+section says "the issue records what it should do, so growing the
+clouds cannot quietly close it" -- and at that point no open issue
+held that record. **#3772 has since been reopened; see the
+resolution below.**
 
 Two further facts about #3772's closure, because they change what
 this phase can assume:
@@ -161,16 +179,50 @@ this phase can assume:
   node's committed vCPU at peak fraction 1.000. So the signature was
   still occurring hours before the issue was closed.
 
-The reading this phase adopts is that the record moved rather than
-the problem, and that the durable statement of what a capacity
-refusal *should* do is now
-[PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md)
-rather than an issue. That plan still describes #3772 as open (at
-its *Related issues* section); correcting it belongs to that plan's
-own next phase and is reported rather than done here. **This is the
-finding the back brief asks the operator to confirm**, because if
-#3772 was instead closed as *fixed*, phase 3's tests are asserting
-behaviour someone believes has changed.
+**Resolved 2026-09-10: the closure was an error, and #3772 is
+reopened.** The back brief asked the operator which reading was
+intended, because if #3772 had been closed as *fixed* then this
+phase's tests would be asserting a contract someone expects to
+change. It was not. Three recurrences postdate the closure --
+[34398770295](https://github.com/shakenfist/shakenfist/actions/runs/34398770295)
+on `fd617fe72`,
+[34426395717](https://github.com/shakenfist/shakenfist/actions/runs/34426395717)
+and
+[34433668437](https://github.com/shakenfist/shakenfist/actions/runs/34433668437)
+on `cd379c627` -- all three in merge groups for changes that cannot
+reach admission (a keyed `cluster_config` read, and two Renovate
+type-stub bumps). The second is decisive, because its census
+separates the two candidate causes: capacity-row coverage was
+complete **0 seconds** after the first sample, so #4087's warm-up
+fix was live, and yet two of the three hypervisors sat at
+committed-vCPU peak *and* p90 fraction 1.000 for the whole
+1665-second window. That is genuine exhaustion of the admission
+ledger, not a node recorded above its limit during an unguarded
+window. The issue was reopened carrying that evidence, and the
+`automated-fix-attempted` label was left in place so the issue-fix
+workflow does not race this phase.
+
+So the record is held by the issue *and* by
+[PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md),
+which owns making a refusal transient and which this plan does not
+touch; that plan's *Related issues* section describing #3772 as
+open is correct again, and needs no edit. **This phase's tests
+assert today's behaviour unchanged, and 3a's helper docstring is
+right about what will change it.**
+
+One thing in the evidence did move, and it weakens an assumption
+made elsewhere in this plan. The 2026-09-08 research into #3772
+found that every post-#4106 507 was a `force_placement`
+single-candidate create onto one of the 3-vCPU infra nodes
+(`NODE_CPU_RESERVATION_THREADS=4` on a 4-thread node yields
+`cpu_schedulable=1`, hence limit 3) *while the cluster still held
+3-9 of its 12 vCPU*. The runs above have far less slack than that:
+two nodes pinned for a whole window. D23 sizes its fill from the
+node's own `cpu_limit - cpu_committed` and so still works, but the
+risks table's reading -- that one node can be filled without
+disturbing the other four workers -- is less safe than when it was
+written, and D26's skip is doing more of the work than the table
+credits it with.
 
 **F2 -- A stale line reference.** Phase 0's inventory cites
 `_has_idle_disk_bandwidth()` at `shakenfist/scheduler.py:329`; it is
@@ -300,11 +352,38 @@ This gives deterministic coverage of three stages:
 | Stage | Impossible request | Sized from |
 |-------|--------------------|------------|
 | `sufficient_idle_cpu` | vCPUs greater than `max(cpu_limit)` over all nodes | `/admin/resources` |
-| `sufficient_idle_memory` | memory greater than `max(ram_available)` | `/admin/resources` |
-| `sufficient_free_disk` | a disk larger than `max(disk_available)` | `/admin/resources` |
+| `sufficient_idle_memory` | memory greater than `max(ram_max)` | `/admin/resources` |
+| `sufficient_free_disk` | a disk larger than `max(disk_available) + sum(disk_available)` | `/admin/resources` |
 
 The sizes are read from the API rather than hardcoded, because a
 hardcoded "impossible" number is a number phase 4 can make possible.
+
+*Correction (2026-09-10, found implementing 3b):* the memory and
+disk rows of that table originally named `max(ram_available)` and
+`max(disk_available)`. Those are **headroom** figures, and headroom
+moves *upward* whenever a sibling stestr worker deletes an instance
+or a blob. A request sized one unit beyond the largest headroom at
+read time therefore becomes satisfiable the moment any worker frees
+more than one unit on that node -- the create is admitted, no
+exception is raised, and the test fails. That is the "the new tests
+become the flake source" risk in the table below, introduced by this
+decision's own sizing rule. The CPU row was already correct because
+`cpu_limit` is a **ceiling**: it is what the node is guarded to,
+whether it is idle or full.
+
+The rows above are the corrected sizings. Memory has a published
+ceiling, `ram_max` (`scheduler.py:1109-1111`,
+`memory_max * RAM_OVERCOMMIT_RATIO`), and a guarded node can be
+bounded below it by its row's `limit_memory_mb`, recoverable as
+`ram_available + ram_committed`; the test takes the larger of the
+two so the request exceeds whichever ceiling binds. Disk has **no
+published ceiling at all** -- nothing in `summarize_resources()`
+publishes a node's total disk -- so the disk test cannot be made
+load-proof the way the other two are. It uses the cluster's whole
+free-disk total as a margin, which exceeds what the largest node
+could reach even if every other node's free space were released onto
+it, and its docstring says plainly that this is a generous margin
+rather than a proof of impossibility.
 
 D23 and D24 are complementary and both are needed: D24 proves the
 refusal *contract* (which status, which stage name, which event),
@@ -363,6 +442,18 @@ Today's contract, from `scheduler.py:540` and the create path:
 * HTTP **507**, from `external_api/instance.py:901-906`, raised
   as `exceptions.LowResourceException`.
 * Message `No nodes remaining at scheduling stage <stage>`.
+
+*Correction (2026-09-10, found implementing 3c):* there is a
+**second** 507 with a different message. When a stage pre-filter
+prunes every candidate the message above is raised; when the
+pre-filter passes a candidate and the atomic capacity guard inside
+`Instance.place_instance()` then refuses it, the create path returns
+507 carrying `no node had capacity for this instance, N candidates
+refused it` (`external_api/instance.py:975-982`). The helper matches
+only the first, deliberately -- the two mean different things, and
+conflating them would let a guard refusal satisfy an assertion about
+a stage refusal. See D28 for what a test does when it meets the
+second.
 * An audit event `schedule has no candidates at stage <stage>,
   aborting`, carrying `candidates` and `dropped` in its extra.
 
@@ -389,6 +480,22 @@ node produces:
   `Requested node lacks resources`
   (`operations/node_inst_netdesc_op.py:207`), which surfaces as an
   errored instance rather than as an HTTP status.
+
+*Correction (2026-09-10, found implementing 3c):* there are
+**three** paths, not two. The first bullet above is really two, per
+D27's correction: the stage pre-filter's 507 and the capacity
+guard's 507 carry different messages. The distinction is not
+cosmetic. `_has_sufficient_cpu()`'s docstring
+(`scheduler.py:321-350`) says it is "a cheap CPU pre-filter (P2) ...
+not the admission decision", and that it reads the capacity row's
+`limit_cpus` and charges `max(measured_cpus, committed_cpus)`
+precisely so it sees what the guard sees. A node deliberately filled
+to its `cpu_limit` therefore fails the pre-filter, and the **stage**
+message is the expected answer. Reaching the guard instead means the
+pre-filter believed there was room -- that the ledger the test sized
+itself from was already stale. That is not a refusal to assert and
+not a failure: it is an invalid premise, and 3c skips on it, saying
+so. The third path stays as this decision describes it.
 
 The implementing step observes which occurs, asserts that, and
 writes a sentence in the test explaining which path produced it. If
@@ -454,11 +561,11 @@ have used them. 3g is last.
 
 | Risk | Mitigation | Who checks |
 |------|-----------|------------|
-| The fill in 3c starves the other four stestr workers and manufactures the very 507s this plan exists to remove. | D23 bounds the fill to a single hypervisor, and D26 skips when that node is not comfortably free. On `slim-tier` (three nodes, 12 vCPU) filling one 6 vCPU node is half the cluster, which is the worst case; if the merge-run evidence after 3c shows a rise in other tests' 507s, the test is restricted to `slim-primary` by a topology skip rather than kept and tuned. | The operator, over the merge runs following 3c, against the phase 1 census. |
+| The fill in 3c starves the other four stestr workers and manufactures the very 507s this plan exists to remove. | D23 bounds the fill to a single hypervisor, and D26 skips when that node is not comfortably free. On `slim-tier` (three nodes, 12 vCPU) filling one 6 vCPU node is half the cluster, which is the worst case; if the merge-run evidence after 3c shows a rise in other tests' 507s, the test is restricted to `slim-primary` by a topology skip rather than kept and tuned. **Amended 2026-09-10:** F1's newest runs show two of three `slim-tier` hypervisors pinned at their ceiling for a whole run, so the headroom this row assumed is not reliably there and D26's skip, not the single-node bound, is the load-bearing mitigation. Expect 3c to skip often on `slim-tier`; a 3c that never skips there is evidence the skip predicate is wrong, not that the cluster is roomy. | The operator, over the merge runs following 3c, against the phase 1 census. |
 | The new tests become the flake source. | Every test skips on ambient shortage (D26), and the Definition of done requires clean merge runs after landing, not just a green branch. | 3g, and the operator. |
 | A test asserts a refusal produced by an unreadable capacity table rather than by a full one, and passes for the wrong reason. | D26 skips on `capacity_degraded` and on a missing capacity row -- the exact distinction phase 2's D19 added the flag to make answerable. | 3b and 3c briefs; mutation testing in 3c. |
 | The refusal contract changes under us when the sibling plan's phase 4 lands, and eight tests need editing. | D27's single helper, and its docstring naming the plan that will change it. | 3a. |
-| #3772 was closed as *fixed* rather than *superseded*, so this phase asserts behaviour someone believes has changed. | The back brief asks the operator directly before any step runs. F1 records both readings and the evidence for each. | The operator, before 3a. |
+| ~~#3772 was closed as *fixed* rather than *superseded*, so this phase asserts behaviour someone believes has changed.~~ **Retired 2026-09-10:** the closure was an error and the issue is reopened, so the contract this phase asserts is not expected to change. See F1. | n/a. | Resolved before 3a. |
 | 3e cannot be verified before it merges, the same seam that made phase 2's 2e awkward. | Sequenced early, reviewed as a diff, and confirmed from a real merge run's census section before 3f reads the census. | The operator. |
 
 ## Definition of done
@@ -502,10 +609,148 @@ Falsifiable, in order:
     worker's load: for each, the failure modes are enumerated in
     its docstring and each is either asserted or skipped.
 11. The master plan's phase 3 section describes what this phase did
-    rather than what it was expected to do in August, and the
-    `#3772 is open` framing is gone from it.
+    rather than what it was expected to do in August, and every
+    statement it makes about #3772's state matches
+    `gh issue view 3772 --json state,stateReason` on the day the
+    phase closes out.
 12. `python3 tools/check-plan-status.py` passes, and `pre-commit
     run --all-files` passes in the main repository.
+
+## Outcome
+
+Every step has landed except the parts which by the plan's own
+ordering cannot: 3a, 3b, 3c, 3d and the reachable half of 3f are
+committed; 3e is written but sits uncommitted in the
+`shakenfist/actions` repository, because only the operator pushes
+there.
+
+**The phase is not Complete, and its status rows still say
+`In progress` deliberately.** Two Definition of done items cannot be
+satisfied before this branch merges and CI runs it, and marking the
+phase done on a green branch would be exactly the "a status column is
+a claim, not evidence" failure that the phase-completion check exists
+to catch. What remains is named below, not implied.
+
+Each Definition of done item was run rather than read:
+
+| # | Result | How it was checked |
+|---|--------|--------------------|
+| 1 | **pass** | `grep -rc` over `shakenfist_ci/` returns the stage string once, in `base.py` alone |
+| 2 | **partial** | The file exists with four tests covering all three of D24's stages, and since the #4170 review its sizing arithmetic is unit tested here (`test_ci_saturation.py`, 17 tests, mutation tested). That the tests pass *on a cluster with no free capacity* is the half no worktree can check |
+| 3 | **pass** | Read from the diff: 19 `skipTest()` paths, 8 `capacity_degraded` references |
+| 4 | **pass** | Mutation tested: with the in-body release deleted, the ledger assertion fails rather than the test passing |
+| 5 | **pass** | 3c reported 33 mutations across both CI topologies and a fractional-limit one, with no unexpected outcome |
+| 6 | **pass** | All four predicates are named by unit tests; three of the four were zero before |
+| 7 | **pending the operator** | Needs a merge run carrying 3e, which is unmerged. Unchanged from what the item already said |
+| 8 | **pass** | Every `file:line` citation in the inventory re-resolved, and every issue state refreshed against `gh` |
+| 9 | **pass** | 3f links a discharging test per row, or states why none exists |
+| 10 | **pass** | Read from the diff: each test's docstring enumerates its failure modes, each marked asserted or skipped |
+| 11 | **pass** | `gh issue view 3772` reports `OPEN`/`REOPENED`, which is what the master plan's phase 3 section now says |
+| 12 | **pass** | `check-plan-status.py` agrees; `pre-commit run --all-files` passes all ten hooks |
+
+What close-out still owes, once this merges and a merge run uses it:
+
+* **Item 7**, the census section reporting a count rather than a
+  "not collected" notice, which needs 3e pushed first.
+* **Item 2's other half**, and with it the question 3c was written to
+  answer and could not: which of the three refusal paths a real full
+  node actually gives. 3c records it with `addDetail`, so the first
+  merge run answers it -- read that detail rather than the reasoning
+  in 3c's docstring, which is argument, not observation.
+* **The skip rate on `slim-tier`.** The plan predicts 3c skips often
+  there and says a 3c which never skips is evidence the predicate is
+  wrong. Nobody can know yet.
+* **Whether the fill disturbs the other four stestr workers**, which
+  is D23's whole premise and which F1's amendment already weakened.
+* **The cost of 3c's ownership listing** against
+  `load_budget.py`'s database-load budget. It lists every instance in
+  the cluster, and still needs measuring. The #4170 review reduced the
+  worst case from one listing per 5 s poll to one per 30 s plus one at
+  each deadline -- roughly 36 listings down to 7 on a run that waits
+  the full ledger-return deadline -- but a smaller unmeasured cost is
+  still unmeasured.
+
+Only after those are answered should the Execution table and
+`docs/plans/index.md` move to `Complete` and `4 of 7`.
+
+### Code review, 2026-09-11 (PR #4170)
+
+CLAUDE.md asks for a code review at the end of a plan. The automated
+reviewer raised one `[FIX]` and eight `[CONSIDER]` items on #4170;
+eight were taken and one was declined. What changed, because three of
+these moved a decision rather than just the code:
+
+* **A forced fill create is now asserted to have landed on the node it
+  named** (`_create_fill_instance()`). This was the `[FIX]`, and it is
+  the most serious thing the review found: a wrong-node placement is
+  issue #3496, and without the assertion it degraded to a *skip* --
+  the ours/foreign split would count zero vCPUs of this test's own on
+  the target node and read the shortfall as ambient load, reporting
+  nothing about the one defect the test sits closest to, while leaving
+  a create budget of stray instances on the siblings D23 exists to
+  protect.
+* **D23's ledger-return assertion now skips on a delete backlog.** It
+  fails only once the cluster has finished deleting what the test
+  released, asked of the instance listing rather than assumed. The
+  assertion's text claims a ledger regression, and a queue backlog on
+  the shared cluster produces the identical shape -- so as written it
+  was the file's most likely flake, making a claim the evidence did not
+  support. A ledger still charging an instance the cluster has not
+  finished deleting is correct; one charging an instance that is gone
+  is the regression, and that is now what fails.
+* **D24's sizing arithmetic moved to `shakenfist_ci/sizing.py`** and is
+  unit tested by `shakenfist/tests/test_ci_saturation.py`, which loads
+  it by path -- the arrangement `retries.py` and
+  `test_ci_claims_headroom.py` already use. This is the one part of the
+  phase whose correctness never needed a cluster, and it was the part
+  with no test at any level. 17 unit tests now cover it, each mutation
+  tested: dropping the increment, dropping the minimum clamp, reading a
+  null `cpu_limit` as zero and sizing memory from headroom are all
+  caught. The same file carries the AST guard the repository already
+  applies to the claims suite, pinning the `apiclient` names and the
+  `async_request` keyword the saturation suite depends on and nothing
+  here can import.
+
+The five smaller items: the CPU test now **skips** when any node's
+published `cpu_max_per_instance` is below the computed request, rather
+than letting an earlier stage's refusal surface as a stage-name
+mismatch; the whole-cluster instance listing is rate limited to once
+per 30 s plus one read at each deadline, rather than once per 5 s poll,
+which was the unmeasured database-load cost the Outcome section above
+already conceded; polled `/admin/resources` readings are attached with
+`addDetailUniqueName()` so a failed run keeps the ledger's whole
+trajectory instead of only its last read; a tautological `assertIn()`
+inside the branch whose condition it restated is gone, with the
+evidence left to the `addDetail()` above it; and
+`_resolve_unexpected_admission()`'s docstring no longer claims it never
+returns normally, which was false for exactly the path D28 asked it to
+record.
+
+**Declined, with reasoning:** the review asked for unit coverage of the
+`placement_filter()` re-place discount in both ledger predicates. That
+branch is already covered, at the `find_candidates()` level rather than
+the predicate level, by `test_scheduler.py`'s
+`test_prefilter_does_not_charge_an_instance_for_itself` (CPU) and
+`test_ram_prefilter_does_not_charge_an_instance_for_itself` (RAM), both
+of which sit exactly on the boundary the discount moves. Duplicating
+them at the predicate level would add no failure the existing pair does
+not already catch. The *other* half of that item was a real gap and was
+taken: nothing asserted the no-capacity-row refusal's reason dict
+(`capacity_row_present: False`, `limit_cpus` falling back to the live
+hard maximum), and the memory predicate had no P7 coverage at any level
+-- three tests were added for those, taking the file to 108.
+
+**One defect the review did not find, fixed here:** `one_unit_beyond()`
+justified its `math.floor` by claiming a truncating `int()` cast could
+round a negative reading back into servable range. It cannot --
+truncation rounds a negative value *towards* zero, so it returns a
+figure which still strictly exceeds the reading, and with the minimum
+clamped at 1 the two are indistinguishable for every input. The code
+was right and its stated reason was wrong, which is worse than a
+comment being absent. The docstring now says what is actually true, and
+the unit tests assert the two properties a caller depends on -- the
+result strictly exceeds the reading, and stays a size a create could
+ask for -- rather than enshrining particular return values.
 
 ## What phase 4 inherits
 
@@ -526,21 +771,35 @@ Falsifiable, in order:
 * A written answer on `sufficient_idle_disk`: it is the stage
   sizing cannot fix *and* the stage no functional test can force,
   so if it recurs after phase 4 the evidence will be census data.
+* **One debt, named rather than dropped:** the deterministic
+  affinity reproduction phase 0's #3565 row asks for, which this
+  phase declines in its Scope section with the reasoning. It is the
+  only inventory row that names a test phase 3 owes and still has
+  none; everything else in the table is discharged by a test that
+  now exists, or explicitly cannot be.
+* **Two questions only a merge run answers**, both recorded at their
+  rows by 3f: which of the three refusal paths a real full node
+  gives 3c (the #3496 row), and how often the demand guard's waive
+  fails to save a create, which needs a run carrying 3e's widened
+  census filter (the #3813 row). 3f assessed dispositions against
+  measured frequencies, but no test this phase wrote has ever
+  executed, and nothing in the inventory claims otherwise.
 
 ## Back brief
 
 Before executing any step, back brief the operator on the
 understanding of this plan, and in particular on:
 
-* **F1 -- why #3772 was closed.** It closed by hand on 2026-09-09
-  with no comment, hours after two fresh recurrences and six hours
-  after the #4087 warm-up fix, and no commit claims it. This phase
-  assumes the record moved to
-  `PLAN-transient-capacity-refusals.md` and the tests should assert
-  today's behaviour unchanged. If the intent was instead that the
-  warm-up fix *fixed* it, some of these tests are asserting a
-  contract that is expected to change, and 3a's helper docstring is
-  wrong about what changes it. This should be settled before 3a.
+* **F1 -- why #3772 was closed. Settled 2026-09-10, before 3a: the
+  closure was an error and the issue is reopened.** The question was
+  whether the #4087 warm-up fix was thought to have *fixed* it, in
+  which case some of these tests would assert a contract expected to
+  change and 3a's helper docstring would be wrong about what changes
+  it. Three recurrences postdating the closure answer it -- one with
+  the warm-up fix demonstrably live and two hypervisors at their
+  ledger ceiling for the whole run. The tests assert today's
+  behaviour unchanged, as planned. No gate remains here; F1 carries
+  the evidence and the one assumption it weakened.
 * **D23 and D24 together**, which replace the master plan's "fill a
   cluster to its ledger" with "fill one node, and prove the
   contract with a request no cluster could satisfy". This is the
