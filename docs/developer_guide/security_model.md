@@ -188,6 +188,35 @@ the next artifact type minted against an instance URL does not have to
 rediscover the rule. When looking for write paths, grep for the sink
 (`add_index`) rather than for callers of the resolver.
 
+## Trusts do not outlive the namespace they name
+
+A trust names a namespace by *name*, not by uuid, and namespace names
+are reusable: the REST create handler refuses a name whose static row
+still exists, but the cluster maintainer hard deletes deleted
+namespaces after a delay and that removes the row. A trust which
+outlived the namespace it named would therefore be inherited by
+whoever created that name next, without the granting namespace acting
+or being told — the same hazard `Namespace.hard_delete()` already
+removes mapping rules to avoid.
+
+So deleting a namespace revokes every trust naming it. This happens in
+two places on purpose:
+
+- `DELETE /auth/namespaces/<namespace>` calls
+  `namespace.revoke_inbound_trust()` before it moves the namespace to
+  `deleted`. This is the path that matters: the trust goes when the
+  namespace does, not whenever the hard delete catches up.
+- `Namespace.hard_delete()` sweeps again, as a backstop for a namespace
+  which reached a final state by some path that did not revoke.
+
+Only active namespaces are swept. Deleting a namespace requires it to
+hold no instances or networks and cascade deletes its artifacts, so a
+deleted namespace has nothing left for an inherited trust to expose.
+
+Both revocations are audited: the trusting namespace records
+`trust revoked, trusted namespace is gone`, and the namespace being
+deleted records which namespaces it was removed from.
+
 ## VDI console token trust model
 
 The Kerbside VDI console proxy integration uses **offline signature
