@@ -17,6 +17,42 @@ demonstrated how to get a survey of exactly this shape wrong.
 **Review effort:** high. A reviewer's job here is to find a parameter
 this phase marks required which some working client omits today.
 
+## Amendments
+
+**2026-09-13.** Two of the issues this plan was written against moved
+between the planning commit and the phase starting. Both are corrected
+throughout the text below; this note records what changed and why, so a
+reader who remembers the original does not think the plan has drifted.
+
+* **#534 was fixed outside this plan.**
+  [PR #4183](https://github.com/shakenfist/shakenfist/pull/4183) landed
+  as `2fcc0467f` on 2026-09-12, about four hours after the planning PR
+  merged, and closed the issue. The automated issue fixer took it. Its
+  fix is the one step 5 briefed and then some: `MACADDR_PATTERN` and
+  `valid_macaddr()` in `shakenfist/util/network.py:417`,
+  `ARGTYPES['macaddr']['pattern']` repointed at the constant
+  (`base.py:408`), the guard placed in `_netdesc_safety_checks`
+  (`instance.py:347`) so **both** callers are covered — instance create
+  at `instance.py:829` and interface hotplug at `instance.py:1153`, a
+  drift test pinning the published pattern to the validator, and a guest
+  CI case in `guest_ci_tests/test_networking.py:122`. Step 5 keeps only
+  #323; definition-of-done item 9 is gone because it is already true.
+* **#936 was closed as a duplicate.** Closed 2026-09-12 as a duplicate
+  of [#528](https://github.com/shakenfist/shakenfist/issues/528) at a
+  narrower scope, in a cleanup sweep of the oldest open issues. The
+  *work* is unchanged — element schemas for `dict` and `arrayofdict`
+  are still unbuilt and still needed — so the phase 7 split stands on
+  the same reasoning. Only the tracker moves: every reference below now
+  cites #528, since a plan that sends an implementing agent to a closed
+  issue wastes their first half hour.
+
+This is the second phase running to lose scope this way. The master
+plan already records phase 5 losing three of its four attribution
+issues to the same fixer, and phase 6 named #534 in a *merged* plan
+and still lost the race. The mitigation, for whoever files next: apply the
+`automated-fix-attempted` label when filing, which reserves an issue
+against the fixer while a branch is in flight.
+
 ## Context
 
 `CompiledEndpoint` records required-ness and never enforces it
@@ -59,14 +95,15 @@ top-level half of #4167**, and the two should not be solved twice.
   non-base64 `user_data` at the API instead of on the hypervisor.
 * [#323](https://github.com/shakenfist/shakenfist/issues/323) — reject a
   network netblock which overlaps the floating network.
-* [#534](https://github.com/shakenfist/shakenfist/issues/534) — validate
-  the caller-supplied MAC address format on interface create.
 
 **Out:**
 
+* [#534](https://github.com/shakenfist/shakenfist/issues/534) — the
+  caller-supplied MAC address format. In scope when this plan was
+  written, fixed by #4183 before the phase started; see *Amendments*.
 * **Element schemas for `dict` and `arrayofdict`.** This is the other
   half of #4167 and the whole of
-  [#936](https://github.com/shakenfist/shakenfist/issues/936), and it is
+  [#528](https://github.com/shakenfist/shakenfist/issues/528), and it is
   a vocabulary change the size of phase 2. It gets its own phase — see
   *A phase split* below.
 * Response validation (decision D7, out of scope for the plan, not
@@ -195,9 +232,9 @@ That runs on the hypervisor, after the API has answered 200 and the
 instance has been scheduled and placed. A `binascii.Error` there is the
 traceback the issue describes.
 
-### F5. #323 is not a format problem, and #534 is not a top-level one
+### F5. #323 is not a format problem, and #534 was not a top-level one
 
-Both need saying, because "semantic validators for #534, #3269, #323"
+Both needed saying, because "semantic validators for #534, #3269, #323"
 in the master plan reads as though all three are the same kind of work.
 They are not:
 
@@ -209,11 +246,14 @@ They are not:
   handler guard.
 * **#534** — the caller-supplied MAC arrives inside a *networkspec*, as
   `netdesc['macaddress']`, and is consumed at
-  `shakenfist/network/interface.py:143`. `_netdesc_safety_checks`
-  (`instance.py:329`) validates `network_uuid` and the requested address
-  range and never looks at `macaddress`. Because networkspecs are
-  declared `dict`/`arrayofdict`, **no schema can reach it** — see F6. It
-  is a handler guard too, for now.
+  `shakenfist/network/interface.py:143`. At planning time
+  `_netdesc_safety_checks` validated `network_uuid` and the requested
+  address range and never looked at `macaddress`. Because networkspecs
+  are declared `dict`/`arrayofdict`, **no schema can reach it** — see
+  F6 — so it had to be a handler guard too. It now is one, added by
+  #4183 rather than by this phase (see *Amendments*), which leaves the
+  finding standing: the guard is at `instance.py:347` precisely because
+  the schema layer cannot see that far down.
 
 ### F6. Nested structures are unvalidated by construction
 
@@ -221,20 +261,24 @@ They are not:
 `fields.List(fields.Dict())`, neither carrying a value schema. Every
 key inside a diskspec, networkspec or videospec is invisible to the
 validation layer in every mode. This is the structural cause behind
-#936, #534, and items 2 and 3 of #4167.
+#528, #534, and items 2 and 3 of #4167 — and #534 is the proof, since
+the only way to reject a malformed MAC today is a hand-written guard in
+the handler.
 
 It is real, it is worth fixing, and it is not this phase. See below.
 
 ### F7. A phase split, and a correction to the master plan
 
 The master plan's phase 6 row bundles required-ness with "semantic
-validators for #534, #3269, #323, #936". The survey says #936 does not
-belong with the others: the first three are guards and scalar
-validators, and #936 is a vocabulary change — element schemas for
-`dict` and `arrayofdict`, plus a decision about how much of
-`InstancesEndpoint.post` can become declarative at all, given that
-roughly 130 of its lines interleave validation with blob, label and
-artifact *resolution* that no schema can express.
+validators for #534, #3269, #323, #936". The survey says the last does
+not belong with the others: the first three are guards and scalar
+validators, while #936 — now closed as a duplicate of
+[#528](https://github.com/shakenfist/shakenfist/issues/528), which is
+the tracker the rest of this plan cites — is a vocabulary change:
+element schemas for `dict` and `arrayofdict`, plus a decision about
+how much of `InstancesEndpoint.post` can become declarative at all,
+given that roughly 130 of its lines interleave validation with blob,
+label and artifact *resolution* that no schema can express.
 
 **This plan therefore splits phase 6 and renumbers the push audit.**
 The master plan's Execution table and the `docs/plans/index.md` row are
@@ -243,7 +287,7 @@ corrected as part of the planning commit:
 | Phase | Was | Now |
 |-------|-----|-----|
 | 6 | Required and semantics | Required and scalar semantics (this plan) |
-| 7 | Push audit | **Structured parameter schemas** — #936, #534's declarative form, #4167 items 2 and 3 |
+| 7 | Push audit | **Structured parameter schemas** — #528, the declarative form of the #534 guard, #4167 items 2 and 3 |
 | 8 | — | Push audit |
 
 The index arithmetic moves from `6 of 8` to `6 of 9`. The push audit
@@ -284,7 +328,9 @@ the handler whatever the caller sent, so a guard deleted as "dead" is a
 500 waiting for the next rollback. Phase 5 established this precedent
 deliberately in `InstancesEndpoint.post`, where the `isinstance(name,
 str)` arm is documented as unreachable under `enforce` and kept anyway.
-New guards for #323 and #534 are written to the same standard.
+The new guard for #323 is written to the same standard, and #4183's
+MAC guard already meets it — it runs in the handler, so it holds in
+every mode.
 
 **D35. No warn window for required-ness.** This is the departure from
 the phase 3→4 pattern and the decision most likely to be argued with.
@@ -325,7 +371,7 @@ in F2 legible, and an operator rolling back to `warn` needs to see
 required failures distinguished from type failures. The filter goes;
 the reason code stays.
 
-**D38. #936 does not get a partial answer here.** Declaring a
+**D38. #528 does not get a partial answer here.** Declaring a
 diskspec's shape without also handling the resolution logic tangled
 through it would leave two validation paths for one parameter, which is
 the state this whole plan exists to end. Phase 7 takes it whole.
@@ -338,8 +384,8 @@ the state this whole plan exists to end. Phase 7 takes it whole.
 | 2 | high | opus | none | **Correct the declarations.** Using step 1's table: `guarded` and `faults` keep `required=True`; `accepted` becomes `required=False`, with a one-line comment on any that is surprising. Touch only the fifth element of the declaration tuples. `tools/fix-api-parameter-locations.py` does not do this, so it is by hand; `test_parameter_declarations.py` and `test_openapi_spec.py` must both stay green, and the published specification changes, so expect `test_openapi_spec.py`'s expectations to need updating. Commit subject: `Say which parameters are really required.` |
 | 3 | medium | sonnet | none | **Enforce it.** Delete the `MISSING_REQUIRED` filter at `shakenfist/external_api/base.py:1906` so a missing-required finding is enforceable like any other, keeping the reason code (D37). Rewrite the `CompiledEndpoint` docstring at `validation.py:82` and the `validate_request` docstring at `base.py:1817`, both of which say required-ness is recorded and never enforced and both of which name phase 6 as the decider. Add tests that an omitted required parameter answers 400 naming the parameter, that an explicit JSON `null` does the same, and that under `warn` it answers whatever it answered before. Commit subject: `Refuse a request missing a required parameter.` |
 | 4 | high | opus | none | **Make the type tokens mean something.** Add a `_FORMATS` table to `validation.py` keyed on the exact `format` strings in `ARGTYPES` (`byte`, `a CIDR netblock`, `an IPv4 address as a string`, `url`, `uuid`), each mapping to a validator function, and consult it in `_field()` alongside the existing `pattern` handling. Use `base64.b64decode(..., validate=True)`, `ipaddress.ip_network()`, `ipaddress.ip_address()`, `urllib.parse.urlparse()` and `uuid.UUID()` rather than regexes — D33 explains why. Every validator must be a no-op on `None` (fields are `allow_none=True` and required-ness is step 3's business, not this one's) and must raise `marshmallow.ValidationError`, never let a library exception escape. The 13 affected declarations are tabulated in F3; check each still accepts what its handler accepts today, particularly `nvram_template` and `source_url`, which may carry scheme forms a strict URL parser would refuse. This closes [#3269](https://github.com/shakenfist/shakenfist/issues/3269). Commit subject: `Enforce the formats the API publishes.` |
-| 5 | medium | sonnet | none | **Guard the two that no schema can reach.** In `NetworksEndpoint.post` (`network.py:42`), after the existing `/29` check, refuse a netblock overlapping the floating network — read it the way `network.floating_network()` does at `network.py:707`, and answer 400 naming the conflict; if no floating network is configured, do not refuse. In `_netdesc_safety_checks` (`instance.py:329`), refuse a `macaddress` that is not a MAC address, reusing `api_base.ARGTYPES['macaddr']['pattern']` so the guard and the published format are one string. Both keep working under `warn`/`off` (D34). Closes [#323](https://github.com/shakenfist/shakenfist/issues/323) and [#534](https://github.com/shakenfist/shakenfist/issues/534). Unit tests for both, plus a cluster CI case for the netblock overlap in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`. Commit subject: `Refuse an overlapping netblock and a bad MAC.` |
-| 6 | medium | sonnet | none | **Documentation and close-out.** `docs/developer_guide/writing_an_endpoint.md` currently tells authors required-ness is not enforced — correct it, and say what a `format` token now costs them. Add a v07-v08 release note entry covering the required-ness change, the format enforcement, and the two new guards, listing any declaration step 2 moved to `required=False` that a caller could notice. Update the master plan's Execution table, the phase split from F7, and the `docs/plans/index.md` row. Commit subject: `Document what required now means.` |
+| 5 | medium | sonnet | none | **Guard the one that no schema can reach.** In `NetworksEndpoint.post` (`network.py:42`), after the existing `/29` check, refuse a netblock overlapping the floating network — read it the way `network.floating_network()` does at `network.py:707`, and answer 400 naming the conflict; if no floating network is configured, do not refuse. It keeps working under `warn`/`off` (D34). Closes [#323](https://github.com/shakenfist/shakenfist/issues/323). Unit tests, plus a cluster CI case for the overlap in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`. The MAC guard this step also briefed landed in #4183 (see *Amendments*); `_netdesc_safety_checks` already refuses a malformed `macaddress` at `instance.py:347`, so do not add a second check — if anything here needs the published pattern, use `util_network.MACADDR_PATTERN`. Commit subject: `Refuse an overlapping netblock.` |
+| 6 | medium | sonnet | none | **Documentation and close-out.** `docs/developer_guide/writing_an_endpoint.md` currently tells authors required-ness is not enforced — correct it, and say what a `format` token now costs them. Add a v07-v08 release note entry covering the required-ness change, the format enforcement, and the new netblock guard, listing any declaration step 2 moved to `required=False` that a caller could notice. Update the master plan's Execution table, the phase split from F7, and the `docs/plans/index.md` row. Commit subject: `Document what required now means.` |
 
 ## Risks and mitigations
 
@@ -405,18 +451,20 @@ the server does not require. Step 6's release note says so explicitly.
 8. `POST /networks` with a netblock overlapping the configured floating
    network answers 400, and with no floating network configured answers
    what it answers today.
-9. A networkspec carrying `"macaddress": "not-a-mac"` answers 400 rather
-   than reaching `shakenfist/network/interface.py:143`.
-10. #3269, #323 and #534 are closed, each closing comment naming the
-    commit and the check that closed it.
-11. No page states required-ness differently: the
+9. #3269 and #323 are closed, each closing comment naming the commit
+   and the check that closed it. (#534 was closed by #4183 before this
+   phase started; a networkspec carrying `"macaddress": "not-a-mac"`
+   already answers 400 rather than reaching
+   `shakenfist/network/interface.py:143`, and
+   `shakenfist/tests/test_macaddr_validation.py` holds it there.)
+10. No page states required-ness differently: the
     `CompiledEndpoint` docstring, the `validate_request` docstring,
     `docs/developer_guide/writing_an_endpoint.md` and the v07-v08
     release note all say it is enforced.
-12. The master plan's Execution table has nine rows, phase 7 is
+11. The master plan's Execution table has nine rows, phase 7 is
     *Structured parameter schemas*, phase 8 is the push audit, and the
     `docs/plans/index.md` row reads `6 of 9`.
-13. `pre-commit run --all-files` is clean.
+12. `pre-commit run --all-files` is clean.
 
 ## Back brief
 
