@@ -20,6 +20,35 @@ independent and can be spawned in parallel.
 The management session reviews all findings, fixes any
 issues, and confirms the push.
 
+### What `$RANGE` means
+
+Every diff command below reads `$RANGE`. Set it once, before
+starting, because what it should be depends on why the audit
+is running.
+
+Auditing work that has not landed yet -- the ordinary
+pre-push case -- `$RANGE` is `develop...HEAD`.
+
+Running as a plan's push-audit phase, it is **not**. By then
+the plan's phases have merged, `develop...HEAD` is empty, and
+every command here would come back clean while reading
+nothing. The range comes from the plan's `Merged` column
+instead: for a phase recorded as a single merge commit, that
+phase's range is `<sha>^1..<sha>`; where a phase names several
+merges, each is its own range and the commands are run once
+per range. A phase whose cell names another repository is
+audited there, as part of the pull request that lands it, and
+this audit cites that one rather than re-running it. A phase
+whose cell records paths rather than a range is scoped to
+those paths.
+
+Run the whole audit once per range and pool the findings; a
+plan with four merges gets four passes, not one pass over a
+union that git cannot express. If a plan's `Merged` column is
+missing or a cell is blank, stop and say so -- that is an
+unauditable plan, and reporting a clean run against an empty
+diff is the failure this range rule exists to prevent.
+
 ## Wave 1: Mechanical checks
 
 Run the following, stopping on the first failure:
@@ -59,14 +88,13 @@ tox -e genprotos
 git diff --exit-code shakenfist/protos
 ```
 
-Then a few grep-level style checks on the diff against
-`develop`:
+Then a few grep-level style checks on the diff:
 
 ```
-git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].{120,}'  # lines > 120 chars
-git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\bprint\('  # stray print()s in new code
-git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\betcd\b'  # new etcd references
-git diff develop...HEAD -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'  # new bulk-scan pushdown violations
+git diff $RANGE -- '*.py' | grep -nE '^\+[^+].{120,}'  # lines > 120 chars
+git diff $RANGE -- '*.py' | grep -nE '^\+[^+].*\bprint\('  # stray print()s in new code
+git diff $RANGE -- '*.py' | grep -nE '^\+[^+].*\betcd\b'  # new etcd references
+git diff $RANGE -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'  # new bulk-scan pushdown violations
 ```
 
 Exit condition: wave 1 passes when pre-commit, tox, the
@@ -86,7 +114,7 @@ style questions need a sub-agent to read code:
 
 **Brief for sub-agent (only if wave 1 passes):**
 
-Check `git diff develop...HEAD` for adherence to project
+Check `git diff $RANGE` for adherence to project
 conventions in `CLAUDE.md` and `AGENTS.md`:
 
 - Python conventions: import ordering, logging via the
@@ -129,20 +157,20 @@ Start with the mechanical sweep on the diff:
 
 ```
 # TODO / FIXME / HACK / XXX in changed files
-git diff develop...HEAD -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'
+git diff $RANGE -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'
 
 # New `# noqa`, `# type: ignore`, or `pragma: no cover`
-git diff develop...HEAD -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'
+git diff $RANGE -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'
 
 # New test functions vs files changed (sanity ratio)
-git diff develop...HEAD --stat | tail -1
-git diff develop...HEAD -- '*.py' | grep -cE '^\+\s*def test_'
+git diff $RANGE --stat | tail -1
+git diff $RANGE -- '*.py' | grep -cE '^\+\s*def test_'
 
 # Documentation files touched (warns if none — the diff may have merited doc updates)
-git diff develop...HEAD --name-only -- 'docs/*' '*.md'
+git diff $RANGE --name-only -- 'docs/*' '*.md'
 
 # New direct subprocess / shell calls — might need sanitisation review
-git diff develop...HEAD -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'
+git diff $RANGE -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'
 ```
 
 These report only — they do not block. Treat the output as
@@ -165,7 +193,7 @@ comments, new `# noqa` / `# type: ignore`, and subprocess
 calls. Take that report as input.
 
 Add the judgment-level review on the diff
-(`git diff develop...HEAD`):
+(`git diff $RANGE`):
 
 - **Duplicated code:** Are there significant blocks of
   duplicated logic that the mechanical scan can't see?
@@ -267,7 +295,7 @@ push) or advisory (can address later).
 
 **Brief for sub-agent:**
 
-Review the diff (`git diff develop...HEAD`) for test
+Review the diff (`git diff $RANGE`) for test
 coverage:
 
 - Does every new public function or significant code path
@@ -332,7 +360,7 @@ Report findings as a bullet list grouped by file.
 **Brief for sub-agent:**
 
 Check that documentation matches the current code state.
-Read the diff (`git diff develop...HEAD`) and verify:
+Read the diff (`git diff $RANGE`) and verify:
 
 <!-- shared-block: readme-discipline v1 -->
 README discipline (shared block; do not edit -- the canonical
@@ -477,7 +505,7 @@ found" is a valid answer.
 
 **Brief for sub-agent:**
 
-Security review of the diff (`git diff develop...HEAD`).
+Security review of the diff (`git diff $RANGE`).
 This requires careful judgment — read the actual code, not
 just the diff summary.
 

@@ -40,7 +40,16 @@ Known affected areas:
 
 ## Proposed Solution
 
+No phase of this roadmap has landed, so every `Merged` line below reads
+`—`. The line is opened now rather than when the first phase lands, so that
+phase 4's audit has somewhere to read a range from instead of a diff against
+`develop` that will be empty by the time it runs. Each phase records the
+merge commit of the pull request that put it on `develop`, so
+`<sha>^1..<sha>` is the whole of what that phase landed.
+
 ### Phase 1: Batch Query Infrastructure
+
+**Merged**: —
 
 Add batch query functions to the database layer that can fetch related data
 for multiple objects in a single query.
@@ -65,6 +74,8 @@ def get_valid_checksums_batch(
 
 ### Phase 2: Prefetch Pattern in API Layer
 
+**Merged**: —
+
 Modify API endpoints to prefetch related data before rendering objects.
 
 ```python
@@ -81,6 +92,8 @@ return [b.external_view(prefetched_checksums=checksums.get(str(b.uuid)))
 ```
 
 ### Phase 3: Generic Prefetch Framework
+
+**Merged**: —
 
 Consider a more generic approach where `external_view()` can declare what
 related data it needs, and the API layer automatically batches those fetches.
@@ -99,6 +112,8 @@ class Blob(DatabaseBackedObject):
 ```
 
 ### Phase 4: Push audit
+
+**Merged**: —
 
 Run the checks in `PUSH-AUDIT.md` over the accumulated diff of every phase in
 this roadmap against `develop`, not the last phase's diff alone -- what the

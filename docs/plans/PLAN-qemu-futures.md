@@ -1087,12 +1087,18 @@ they're not lost:
 To be filled in once the Stage 0 feature triage is done.
 The expected shape:
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Decisions and feasibility | TBD | Not started |
-| 1. QMP socket plumbing + first feature (dynamic EDID) | TBD | Not started |
-| 2. Remaining Stage 0 features | TBD | Not started |
-| ...   | ...  | ...    |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Decisions and feasibility | TBD | Not started | — |
+| 1. QMP socket plumbing + first feature (dynamic EDID) | TBD | Not started | — |
+| 2. Remaining Stage 0 features | TBD | Not started | — |
+| ...   | ...  | ...    | ... |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 Phase 0 should land the socket-location decision, the API
 shape decision, the permissions model, and a sized list of

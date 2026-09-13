@@ -251,16 +251,22 @@ significantly when this plan moves out of stub status.
 out of stub status. Phases are tentatively expected to
 look like:)
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 1. `RecurringOperation` object and persistence | TBD | Not started |
-| 2. Dispatcher max-wait for `runs_after` + continue-on-failure recurrence semantics | TBD | Not started |
-| 3. Tick mechanism and gating policies | TBD | Not started |
-| 4. Migrate cluster + cleaner `scheduled_tasks.py` as first internal consumers | TBD | Not started |
-| 5. Network-maintain-pass op + migrate `maintain.py` | TBD | Not started |
-| 6. REST API and user-facing template vocabulary | TBD | Not started |
-| 7. Documentation and tests | TBD | Not started |
-| 8. Push audit | PLAN-recurring-operations-phase-08-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. `RecurringOperation` object and persistence | TBD | Not started | — |
+| 2. Dispatcher max-wait for `runs_after` + continue-on-failure recurrence semantics | TBD | Not started | — |
+| 3. Tick mechanism and gating policies | TBD | Not started | — |
+| 4. Migrate cluster + cleaner `scheduled_tasks.py` as first internal consumers | TBD | Not started | — |
+| 5. Network-maintain-pass op + migrate `maintain.py` | TBD | Not started | — |
+| 6. REST API and user-facing template vocabulary | TBD | Not started | — |
+| 7. Documentation and tests | TBD | Not started | — |
+| 8. Push audit | PLAN-recurring-operations-phase-08-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 **Phase 8 — push audit.** Runs `PUSH-AUDIT.md` over the
 accumulated diff of every phase in this plan against

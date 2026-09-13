@@ -173,17 +173,23 @@ Many. This plan is intentionally less formed.
 Provisional. To be re-cut after phase 0 produces a
 decisions document.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Research and decisions document | PLAN-embrace-tls-phase-00-decisions.md | Not started |
-| 1. Cert-reload mechanism and lifecycle events | PLAN-embrace-tls-phase-01-reload.md | Not started |
-| 2. mTLS for the `sf-database` gRPC channel | PLAN-embrace-tls-phase-02-database-mtls.md | Not started |
-| 3. mTLS for the remaining inter-daemon gRPC channels | PLAN-embrace-tls-phase-03-other-grpc.md | Not started |
-| 4. TLS for the MariaDB connection | PLAN-embrace-tls-phase-04-mariadb-tls.md | Not started |
-| 5. Optional TLS for sf-api; document operator-LB story | PLAN-embrace-tls-phase-05-api-tls.md | Not started |
-| 6. Cert-expiry monitoring (event log + prometheus) | PLAN-embrace-tls-phase-06-expiry-monitoring.md | Not started |
-| 7. Repurpose `pki_internal_ca` as dev/test convenience | PLAN-embrace-tls-phase-07-dev-ca.md | Not started |
-| 8. Push audit | PLAN-embrace-tls-phase-08-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Research and decisions document | PLAN-embrace-tls-phase-00-decisions.md | Not started | — |
+| 1. Cert-reload mechanism and lifecycle events | PLAN-embrace-tls-phase-01-reload.md | Not started | — |
+| 2. mTLS for the `sf-database` gRPC channel | PLAN-embrace-tls-phase-02-database-mtls.md | Not started | — |
+| 3. mTLS for the remaining inter-daemon gRPC channels | PLAN-embrace-tls-phase-03-other-grpc.md | Not started | — |
+| 4. TLS for the MariaDB connection | PLAN-embrace-tls-phase-04-mariadb-tls.md | Not started | — |
+| 5. Optional TLS for sf-api; document operator-LB story | PLAN-embrace-tls-phase-05-api-tls.md | Not started | — |
+| 6. Cert-expiry monitoring (event log + prometheus) | PLAN-embrace-tls-phase-06-expiry-monitoring.md | Not started | — |
+| 7. Repurpose `pki_internal_ca` as dev/test convenience | PLAN-embrace-tls-phase-07-dev-ca.md | Not started | — |
+| 8. Push audit | PLAN-embrace-tls-phase-08-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 Notes on sequencing:
 

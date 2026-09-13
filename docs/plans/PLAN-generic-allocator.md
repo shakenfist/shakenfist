@@ -213,16 +213,22 @@ questions include at least:
 
 Provisional, to be re-cut after phase 0.
 
-| Phase | Plan | Status |
-|-------|------|--------|
-| 0. Research and decisions document | PLAN-generic-allocator-phase-00-decisions.md | Not started |
-| 1. `resource_pool_allocations` schema and primitive | PLAN-generic-allocator-phase-01-primitive.md | Not started |
-| 2. Port VXLAN ID allocator | PLAN-generic-allocator-phase-02-vxlan.md | Not started |
-| 3. Port console / VDI port allocator | PLAN-generic-allocator-phase-03-ports.md | Not started |
-| 4. Port vsock CID allocator | PLAN-generic-allocator-phase-04-vsock.md | Not started |
-| 5. Port MAC allocator | PLAN-generic-allocator-phase-05-mac.md | Not started |
-| 6. Documentation and audit-log surface | PLAN-generic-allocator-phase-06-docs.md | Not started |
-| 7. Push audit | PLAN-generic-allocator-phase-07-push-audit.md | Not started |
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 0. Research and decisions document | PLAN-generic-allocator-phase-00-decisions.md | Not started | — |
+| 1. `resource_pool_allocations` schema and primitive | PLAN-generic-allocator-phase-01-primitive.md | Not started | — |
+| 2. Port VXLAN ID allocator | PLAN-generic-allocator-phase-02-vxlan.md | Not started | — |
+| 3. Port console / VDI port allocator | PLAN-generic-allocator-phase-03-ports.md | Not started | — |
+| 4. Port vsock CID allocator | PLAN-generic-allocator-phase-04-vsock.md | Not started | — |
+| 5. Port MAC allocator | PLAN-generic-allocator-phase-05-mac.md | Not started | — |
+| 6. Documentation and audit-log surface | PLAN-generic-allocator-phase-06-docs.md | Not started | — |
+| 7. Push audit | PLAN-generic-allocator-phase-07-push-audit.md | Not started | — |
+
+The `Merged` column records what put each phase on `develop`:
+the merge commit of its pull request, or an explicit
+`first..last` range where the phase landed directly. It is
+filled in as each phase lands, so `—` means the phase has not
+landed yet.
 
 **Phase 7 — push audit.** Runs `PUSH-AUDIT.md` over the
 accumulated diff of every phase in this plan against
