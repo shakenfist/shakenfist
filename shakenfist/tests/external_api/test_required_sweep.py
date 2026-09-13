@@ -53,7 +53,6 @@ A verdict is one of three words, from the step 1 brief:
 Nothing here changes a declaration or a handler. Step 1 measures.
 """
 
-import ast
 import json
 import shutil
 import tempfile
@@ -118,7 +117,7 @@ RELAXED_BY_STEP_2 = {
 def required_declarations():
     """Every body or query parameter the API declares required.
 
-    Returns ``(class, method, name, location, argtype, has_default,
+    Returns ``(class, method, name, location, has_default,
     is_handler_kwarg, declared_required)`` tuples, sorted. Path
     parameters are excluded
     because required-ness there is a tautology: werkzeug does not match
@@ -127,35 +126,41 @@ def required_declarations():
     A declaration named in ``RELAXED_BY_STEP_2`` is included even
     though it no longer says ``required=True``, so that the table below
     keeps covering exactly the declarations step 1 measured.
+
+    Read through ``declarations.declarations()`` rather than by walking
+    the decorator here. A census whose whole claim is that it is
+    derived from the source must be reading the source the same way the
+    published specification and the enforced schemas do -- a second
+    walk is a second answer waiting to happen. It also matters that the
+    shared helper returns a marker row with None fields for a
+    declaration it cannot read statically, where a private copy would
+    have to remember to; ``_unreadable`` below turns one into a loud
+    failure, because a completeness check which silently skips a row it
+    could not parse gives a wrong answer rather than no answer.
     """
     rows = []
+    unreadable = []
     for _, _, cls, fn in declarations.handlers():
         have_default, accepted = _handler_defaults(fn)
-        for dec in fn.decorator_list:
-            if 'swagger_helper' not in ast.unparse(dec):
+        for dec in declarations.declarations(fn, cls=cls.name):
+            if dec.name is None or dec.location is None:
+                unreadable.append('%s.%s' % (cls.name, fn.name))
                 continue
-            call = (dec.args[0]
-                    if isinstance(dec, ast.Call) and dec.args else None)
-            if not (isinstance(call, ast.Call) and len(call.args) >= 3
-                    and isinstance(call.args[2], ast.List)):
+            if dec.location not in ('body', 'query'):
                 continue
-            for item in call.args[2].elts:
-                if not (isinstance(item, ast.Tuple)
-                        and len(item.elts) in (5, 6)):
-                    continue
-                name = declarations.literal(item.elts[0])
-                location = declarations.literal(item.elts[1])
-                argtype = declarations.literal(item.elts[2])
-                required = declarations.literal(item.elts[4])
-                if location not in ('body', 'query'):
-                    continue
-                if (required is not True
-                        and (cls.name, fn.name, name)
-                        not in RELAXED_BY_STEP_2):
-                    continue
-                rows.append((cls.name, fn.name, name, location, argtype,
-                             name in have_default, name in accepted,
-                             required is True))
+            if (dec.required is not True
+                    and (cls.name, fn.name, dec.name)
+                    not in RELAXED_BY_STEP_2):
+                continue
+            rows.append((cls.name, fn.name, dec.name, dec.location,
+                         dec.name in have_default, dec.name in accepted,
+                         dec.required is True))
+    if unreadable:
+        raise AssertionError(
+            'declarations on %s cannot be read statically, so this census '
+            'cannot claim to be complete; test_parameter_declarations.py '
+            'audits the same declarations and will say what is wrong with '
+            'them' % ', '.join(sorted(set(unreadable))))
     return sorted(rows)
 
 
@@ -872,7 +877,7 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         out of the table the rest of this phase is built on.
         """
         declared = {(cls, method)
-                    for cls, method, _, _, _, _, _, _
+                    for cls, method, _, _, _, _, _
                     in required_declarations()}
         self.assertEqual(
             set(), declared - set(RECIPES),
@@ -896,12 +901,12 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         """
         rows = required_declarations()
         self.assertEqual(76, len(rows))
-        self.assertEqual(75, len([r for r in rows if r[5]]))
-        self.assertEqual(0, len([r for r in rows if not r[5] and r[6]]))
-        self.assertEqual(1, len([r for r in rows if not r[6]]))
+        self.assertEqual(75, len([r for r in rows if r[4]]))
+        self.assertEqual(0, len([r for r in rows if not r[4] and r[5]]))
+        self.assertEqual(1, len([r for r in rows if not r[5]]))
         self.assertEqual(
             [RAW_BODY_DECLARATION],
-            [(r[0], r[1], r[2]) for r in rows if not r[6]])
+            [(r[0], r[1], r[2]) for r in rows if not r[5]])
 
     def test_step_2_relaxed_exactly_what_it_said_it_did(self):
         """The declarations step 2 moved, held where it put them.
@@ -915,7 +920,7 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         happen without this file saying so.
         """
         relaxed = {(r[0], r[1], r[2]) for r in required_declarations()
-                   if not r[7]}
+                   if not r[6]}
         self.assertEqual(RELAXED_BY_STEP_2, relaxed)
 
     def test_the_sweep(self):
@@ -927,7 +932,7 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         """
         mismatches = []
         actual = {}
-        for cls, method, name, _, _, _, _, _ in required_declarations():
+        for cls, method, name, _, _, _, _ in required_declarations():
             recipe = RECIPES[(cls, method)]
 
             control, control_recorded, body = self._request(method, recipe)

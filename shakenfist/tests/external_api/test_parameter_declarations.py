@@ -156,29 +156,17 @@ def _declared_types():
     """(cls, method, name, location, argtype) for every declared
     parameter in the tree.
 
-    declarations.Declaration never carries the type token -- nothing
-    in phase 3's derivation needs it -- so this mirrors
-    declarations.declarations()'s AST walk far enough to pull out
-    item.elts[2] as well, which is all pinning 'any' usage needs.
+    A thin projection of declarations.declarations(), which carries the
+    type token since phase 6. It used to be a second copy of that AST
+    walk, kept only because Declaration had no argtype field; the copy
+    also silently skipped a declaration the walk could not read, where
+    the shared helper returns a marker row with None fields so the
+    audit sees it. The filter below is on argtype, so a marker row
+    falls out of it harmlessly.
     """
-    out = []
-    for _, _, cls, fn in declarations.handlers():
-        for dec in fn.decorator_list:
-            if 'swagger_helper' not in ast.unparse(dec):
-                continue
-            call = dec.args[0] if isinstance(dec, ast.Call) and dec.args else None
-            if not (isinstance(call, ast.Call) and len(call.args) >= 3
-                    and isinstance(call.args[2], ast.List)):
-                continue
-            for item in call.args[2].elts:
-                if not (isinstance(item, ast.Tuple) and len(item.elts) in (5, 6)):
-                    continue
-                out.append((
-                    cls.name, fn.name,
-                    declarations.literal(item.elts[0]),
-                    declarations.literal(item.elts[1]),
-                    declarations.literal(item.elts[2])))
-    return out
+    return [(d.cls, d.method, d.name, d.location, d.argtype)
+            for _, _, cls, fn in declarations.handlers()
+            for d in declarations.declarations(fn, cls=cls.name)]
 
 
 class ParameterDeclarationTestCase(base.ShakenFistTestCase):
