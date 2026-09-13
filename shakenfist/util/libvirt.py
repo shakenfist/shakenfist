@@ -189,6 +189,31 @@ class LibvirtConnection():
             except self.libvirt.libvirtError:
                 pass
 
+    def get_active_domain_ids(self) -> set[int]:
+        """Cheap active domain id set, for change detection only.
+
+        A single listDomainsID() call, unlike get_all_domains() which
+        follows it with a lookupByID() and a name() per domain. That
+        N+1 cost is fine for the callers get_all_domains() already
+        has, but this method exists for a 5 second poll loop that only
+        needs to know whether the set of running domains changed, so
+        it deliberately does not resolve ids to domains.
+
+        Two consequences of skipping that resolution, both accepted:
+
+        - It does not filter to the "sf:" prefix, because filtering
+          requires the lookupByID()/name() pair this method exists to
+          avoid. A non-SF domain appearing on a hypervisor would
+          trigger a spurious publish, which is harmless -- a publish
+          is never wrong, only occasionally unnecessary -- and SF
+          hypervisors do not run foreign domains.
+        - Domain ids are unique within a libvirtd run but reassigned
+          across restarts, so a libvirtd restart produces one spurious
+          publish. Also harmless, and arguably correct: a metrics
+          publish after a libvirtd restart is reasonable behaviour.
+        """
+        return set(self.conn.listDomainsID())
+
     def get_all_domains(self) -> Iterator[Any]:
         # Active VMs have an ID. Active means running in libvirt
         # land.

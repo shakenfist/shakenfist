@@ -177,6 +177,35 @@ class UtilLibvirtPowerState(base.ShakenFistTestCase):
         self.assertEqual({}, _connection().extract_disk_errors(domain))
 
 
+class UtilLibvirtActiveDomainIds(base.ShakenFistTestCase):
+    def test_returns_set_of_ids(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listDomainsID.return_value = [1, 2, 3]
+
+        self.assertEqual({1, 2, 3}, lc.get_active_domain_ids())
+
+    def test_empty(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listDomainsID.return_value = []
+
+        self.assertEqual(set(), lc.get_active_domain_ids())
+
+    def test_issues_exactly_one_call(self):
+        # This is the point of the method: a single listDomainsID() call,
+        # with no per-domain lookupByID() round trip. If a future change
+        # reworks this into a per-domain lookup, this assertion must fail.
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listDomainsID.return_value = [4, 5]
+
+        lc.get_active_domain_ids()
+
+        self.assertEqual(1, lc.conn.listDomainsID.call_count)
+        self.assertEqual(0, lc.conn.lookupByID.call_count)
+
+
 class UtilLibvirtStatistics(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
