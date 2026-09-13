@@ -1,0 +1,484 @@
+# Phase 3: publish metrics when the running-domain set changes
+
+Parent plan:
+[PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md).
+
+**Planning effort:** medium, as the master plan specifies -- "the
+pattern is the existing loop", and that is true of the mechanism. What
+takes the planning above mechanical is not the loop but the bill: the
+publish this phase makes conditional is not one database write, it is
+a ten-round-trip sweep, and the master plan's section costed it as
+though the cheap half (the libvirt poll) were the whole of it. The
+decisions below are mostly about that.
+
+This phase continues the plan's decision sequence at **D18**; phases 1
+and 2 used D1-D17.
+
+## Context
+
+The master plan's open question 4 asks why a node keeps refusing for
+about a minute after its instances are deleted, and answers it: the
+CPU pre-filter charges `max(measured, committed)`, and while the
+committed side is released inside the delete transaction, the measured
+side is a 60 s poll of libvirt.
+
+The survey confirms that answer at the line. `_has_sufficient_cpu()`
+(`shakenfist/scheduler.py:321`) computes
+
+```python
+current_cpu = max(measured_cpus, committed_cpus)
+```
+
+where `measured_cpus` is `cpu_total_instance_vcpus` out of the node's
+`node_metrics` row. The docstring above it is explicit that the
+`max()` is deliberate and load-bearing in the *other* direction -- it
+is what stops a node whose ledger is full but whose instances are
+still fetching images from winning the load ordering and then being
+refused by the guard. So the rule is right and this phase does not
+touch it. Only the cadence of the measurement is wrong.
+
+The master plan's own evidence is run 34119030297: `measured 6 /
+committed 0 / limit 3`, thirty-two seconds after six instances were
+deleted and their ledger correctly released. The node was empty and
+refused anyway, for as long as it took the next 60 s tick to arrive.
+
+## Scope
+
+In scope:
+
+- A cheap poll of the active-domain set in `sf-resources`, and an
+  immediate metrics publish when that set changes.
+- Whatever is required in `shakenfist/util/libvirt.py` to make that
+  poll one libvirt call rather than N+1.
+- Restructuring `_run_inner()`'s cadence decision enough that it can
+  be unit tested without driving the daemon loop.
+- Declaring the changed load in `shakenfist/data/database_load_budget.yaml`,
+  including the two `(operation, caller_daemon)` pairs the survey
+  found are absent from it entirely.
+- One functional test that the published measurement follows a delete
+  within seconds rather than within a minute.
+- Documentation of the new cadence where the old one is currently
+  stated as a flat 60 s.
+
+Out of scope, explicitly:
+
+- **The `max(measured, committed)` rule itself.** It is correct. This
+  phase makes one of its two inputs fresher and changes nothing about
+  how they are combined.
+- **Releasing the ledger earlier in `Instance.delete()`.** The master
+  plan already considered and rejected it, for the reason that the
+  measured side is what binds after a teardown; nothing in the survey
+  disturbs that.
+- **A partial or capacity-only metrics upsert.** See D20 -- it is the
+  rejected alternative there, and the reason is recorded so that a
+  later measurement can reopen it on evidence.
+- **Re-deriving the load budget from a post-change measurement
+  window.** That needs the change running on `sfcbr` for days. D23
+  records it as follow-up rather than pretending this phase can do it.
+- **Anything in `client-python` or `shakenfist/actions`.** Unlike
+  phase 2 this phase is single-repository.
+
+## What the survey found
+
+The master plan's phase 3 section is short and mostly right. Four of
+its claims needed correcting, and all four have been corrected at
+source in the planning commit -- in the master plan's phase 3 section,
+its open question 4, and the `index.md` row -- so a later step should
+not redo it.
+
+### The premise holds, and is now located
+
+`scheduler.py:321` `_has_sufficient_cpu()` charges
+`max(measured_cpus, committed_cpus)` against `limit_cpus`, and
+`measured_cpus` is `cpu_total_instance_vcpus` from the metrics row.
+`summarize_resources()` (`scheduler.py:1083-1089`) publishes both
+inputs separately as `cpu_measured` and `cpu_committed` over
+`/admin/resources`, which is what makes the functional test in step 3c
+possible without reading the database.
+
+### The publish is not cheap, and the master plan costed only the poll
+
+The section says the poll touches no database, which is true, and
+leaves the impression that a publish is therefore nearly free. It is
+not. A publish is `update_metrics()` -> `_get_stats()`
+(`shakenfist/daemons/resources/main.py:215`), which makes, per call:
+
+| Call | Site | Count |
+|------|------|-------|
+| `Node.from_db(config.NODE_NAME)` | `main.py:221` | 1 |
+| `mariadb.get_node_metrics()` | `main.py:226` | 1 |
+| `mariadb.get_work_queue_length()` | `main.py:429`, driven from `:448` and `:456` | 7 |
+| `mariadb.upsert_node_metrics()` | `main.py:658` | 1 |
+
+Seven of the ten are queue-depth reads: three node-scoped user-facing
+queues from `get_node_user_facing_node_queues()`, and four from
+`get_all_background_node_queues()` (two node-scoped, two `any-`
+scoped), all in `shakenfist/operations/baseoperation.py:68-100`. They
+have nothing to do with capacity and they are the majority of the
+bill. D20 decides what to do about that, and it is the decision in
+this plan most likely to be argued with.
+
+### Three other pre-filter stages read the same stale row, and two have no ledger to fall back on
+
+The master plan frames phase 3 as a CPU fix. The same metrics row
+feeds:
+
+- `_has_sufficient_ram()` `scheduler.py:399` -- `memory_available`,
+  a raw measurement with **no** `max()` against the ledger.
+- `_has_sufficient_ram()` `scheduler.py:412` -- `memory_total_instance_actual`
+  for the KSM overcommit ratio, likewise unbacked.
+- `_has_sufficient_disk()` `scheduler.py:481` -- `disk_free_instances`.
+- `_has_idle_disk_bandwidth()` `scheduler.py:495` -- the disk-busy rate.
+
+Because a publish rewrites the whole row, a domain-set-change trigger
+refreshes all of these at once. This is a larger win than the section
+claims and it settles a scope question before it is asked: the
+*trigger* only needs to watch the domain set, even though the *effect*
+is a full refresh. A memory-valued trigger would be wrong anyway --
+`memory_total_instance_actual` moves continuously as guests balloon,
+so it would fire on every poll forever.
+
+### `UpsertNodeMetrics` is not in the load budget at all
+
+The section says to "declare the new publish rate in
+`database_load_budget.yaml` as `activity_coupled`". There is no entry
+to amend. `grep -n 'caller_daemon: resources'` yields exactly five
+pairs -- `GetNodeDaemonState`, `GetQueueLength`, `GetInstanceAttributes`,
+`GetNodeByFqdn`, `GetObjectState` -- and neither `UpsertNodeMetrics`
+nor `GetNodeMetrics` is among them, presumably because neither cleared
+the derivation's significance threshold over the fit window. So D23 is
+about adding entries, not editing a rate.
+
+Two further facts the section does not carry, both of which change
+what "declare it as `activity_coupled`" means:
+
+- `activity_coupled` **disables enforcement**. `enforced()` in
+  `shakenfist/deploy/shakenfist_ci/load_budget.py:443-450` returns
+  false for any entry carrying it, and
+  `test_database_load_budget.py:106` holds that behaviour up. Marking
+  the resources pairs is therefore not a modelling refinement, it is
+  surrendering CI's ability to catch a regression in them.
+- The file is generated (`tools/derive-database-load-budget.py`) and
+  its header says in terms: "DO NOT hand-edit levels to make a check
+  pass." The mark itself does survive re-derivation --
+  `derive-database-load-budget.py:476` carries `activity_coupled`
+  forward from the previous file -- so a mark added here is not lost
+  the next time the budget is derived.
+
+### `listAllDomains` is not what the code calls
+
+Open question 4 says "a `listAllDomains` every few seconds costs
+nothing". `LibvirtConnection.get_all_domains()`
+(`shakenfist/util/libvirt.py:192`) is `listDomainsID()` followed by a
+`lookupByID()` and a `name()` per domain -- N+1 libvirt round trips,
+not one. D22 decides what the poll uses instead. Three callers exist
+(`daemons/cleaner/scheduled_tasks.py:222`,
+`daemons/resources/main.py:401`, and `util/libvirt.py:183`), so
+reworking the helper itself is not free either.
+
+### Smaller corrections
+
+- The section says this is "the only change in this plan that touches
+  a daemon other than the cluster daemon". Phase 4 changes
+  `shakenfist/external_api/instance.py`, which runs under `sf-api`.
+  Reworded at source to say what was meant: it is the only change
+  outside the scheduler, the API and the test suite.
+- Master plan line 205 cites `resources/main.py:645, 704`.
+  `update_metrics()` is at `:648` and the 60 s gate at `:704`; the
+  first has drifted by three lines. Corrected.
+- No CPU hotplug path exists (`setVcpus` appears nowhere under
+  `shakenfist/`), which is what makes D18 sound.
+- Nothing of this phase has been built already: no
+  `domain_set`/`last_domains`/`force_publish` symbol exists anywhere
+  in the tree.
+- No test drives `_run_inner()`. The eleven test cases in
+  `shakenfist/tests/test_daemon_resources.py` cover pure helpers and
+  `_get_stats()`'s node-deletion race. D24 is about that gap.
+
+## Decisions
+
+### D18 -- The trigger is the active-domain *set*, not a count and not a vCPU total
+
+The master plan says "the set of running domains or their vCPU total".
+The disjunction is unnecessary in one direction and insufficient in
+the other.
+
+Unnecessary: there is no CPU hotplug in Shaken Fist, so a running
+domain's vCPU count never changes. The total can only move when the
+set does, and watching it as well buys nothing.
+
+Insufficient: a count would miss a same-count change. During a CI
+teardown-and-recreate a poll interval can easily contain one delete
+and one create, leaving the count identical and the capacity picture
+completely different -- and a create is exactly the case where a stale
+*low* measurement lets the scheduler over-admit, which is the failure
+the `max()` exists to prevent. Compare set membership.
+
+### D19 -- Poll from the existing loop at 5 s, not from a new thread
+
+`_run_inner()`'s `while` loop already ticks at 1 s via `self.idle(1)`
+(`shakenfist/daemons/daemon.py:534`, which also pets the watchdog and
+checks the abort path), and already contains two
+`time.time() - last_x > interval` gates. A third is the pattern, not a
+departure from it.
+
+The alternative in this file is a thread, and `_run_health_checks` is
+one for a stated reason: a resource probe can block for the whole
+timeout when a hard NFS mount hangs, and the loop holds the nodelock.
+A libvirt list against the local socket is not that. The poll runs
+inline.
+
+Five seconds, not "a few": it is the largest interval that still turns
+"up to 60 s stale" into "at most 5 s plus a publish", it divides the
+60 s tick evenly, and it bounds the worst case in D20 to a number that
+can be written down.
+
+### D20 -- A change publishes the ordinary full sweep; do not build a cheaper partial one
+
+This is the decision to argue with, so here is the arithmetic in full.
+
+Baseline is one `_get_stats()` per node per 60 s: about ten database
+round trips, so 0.17/s per node. With a 5 s poll and a domain set that
+changes in every single interval -- the worst case, not the expected
+one -- it becomes ten round trips per 5 s, or 2/s per node. On the
+six-node reference cluster that is an added 11/s at full churn against
+a whole-cluster target of under 100/s.
+
+The cheaper design is available and the survey costed it: skip the
+seven `get_work_queue_length()` reads on a change-triggered publish
+and carry the previous sweep's queue figures forward, refreshing them
+only on the 60 s tick. That is a 3.3x reduction and it is not hard to
+write.
+
+It is rejected anyway, for now, because it buys a factor of three by
+introducing an invariant nobody asked for: that a `node_metrics` row
+may carry capacity fields from two seconds ago beside queue fields
+from fifty-eight seconds ago. `node_queue_waiting` is a typed column
+the scheduler reads (`_has_reasonable_queue_state()`,
+`scheduler.py:186`, and again as a skip condition in
+`summarize_resources()` at `:1040`), so the mixed-age row is not
+inert -- it is read by the same decision the fresh half is there to
+improve. One publish path that always means "everything in this row
+was true at `timestamp`" is worth three times the round trips until
+somebody measures that it is not.
+
+What makes this reversible rather than merely opinionated: the
+worst-case figure above is the thing to check. If `sf-ctl
+database-load` on a busy cluster shows the resources pairs materially
+over model after this ships, the queue-read split is the lever, it is
+localised to `_get_stats()`, and this decision is the record of why it
+was not pulled first.
+
+### D21 -- Any publish resets the 60 s clock
+
+`last_metrics` is set by every publish, whichever gate caused it. The
+60 s tick then means "at most 60 s since this node last published",
+not "every 60 s regardless", so a change-triggered publish two seconds
+before the tick suppresses the tick rather than being followed by a
+near-duplicate. This also makes the poll interval a floor on the
+publish rate for free, which is what bounds D20's arithmetic.
+
+### D22 -- The poll is one `listDomainsID()`, and `get_all_domains()` is left alone
+
+Add `get_active_domain_ids()` to `LibvirtConnection` beside
+`get_all_domains()`: a single `self.conn.listDomainsID()`, returned as
+a set, with no per-domain lookup.
+
+Two consequences, both accepted:
+
+- It does not filter to the `sf:` prefix, because filtering requires
+  the `lookupByID()`/`name()` pair that makes the call N+1. A non-SF
+  domain appearing on a hypervisor would trigger a publish that was
+  not needed. A publish is never *wrong*, only occasionally
+  unnecessary, and SF hypervisors do not run foreign domains.
+- Domain IDs are unique within a libvirtd run but reassigned across
+  restarts, so a libvirtd restart produces one spurious publish. Also
+  harmless, and a metrics publish after a libvirtd restart is arguably
+  the correct behaviour anyway.
+
+`get_all_domains()` itself is not reworked into `listAllDomains`. It
+would be a genuine improvement and it has three callers; that is a
+tidy-up with its own blast radius and it is not what this phase is
+for. The master plan's wording has been corrected instead.
+
+### D23 -- Declare only the pairs the change moves, and add the two that are missing
+
+Do not blanket-mark the resources daemon `activity_coupled`. Of its
+five existing budget pairs, `GetInstanceAttributes` and
+`GetNodeDaemonState` are not on the `_get_stats()` path at all and
+must keep their enforcement.
+
+The pairs to declare are those the survey traced to a publish:
+`GetQueueLength`, `GetNodeByFqdn` and `GetObjectState` for `resources`
+(existing entries, to be marked), plus `UpsertNodeMetrics` and
+`GetNodeMetrics` for `resources` (absent, to be added). The
+implementing step must confirm that list against the code rather than
+taking it from here -- the mapping from a Python call to a
+`(operation, caller_daemon)` pair is the sort of thing that drifts.
+
+Every entry touched carries a note naming this phase and saying why
+the rate is now coupled to instance churn. A rate is not invented for
+the new pairs; where the derivation had no measurement, the entry says
+so rather than carrying a number somebody guessed. Re-deriving the
+budget from a window that includes this behaviour is follow-up work,
+recorded in the master plan's Future work rather than attempted here,
+and the mark survives that re-derivation
+(`derive-database-load-budget.py:476`).
+
+### D24 -- Extract the cadence decision so it can be tested without the loop
+
+The master plan asks for "a unit test that a domain disappearing
+between polls produces a publish before the 60 s tick". Nothing
+currently tests `_run_inner()`, and driving that loop in a test means
+standing up the nodelock, the health-check thread and the abort path
+to observe one boolean.
+
+So the decision is a function: given the last publish time, the last
+poll time, the last observed domain-ID set, the current set and the
+current time, return whether to publish and whether to poll. Pure,
+no libvirt, no database, no clock of its own. `_run_inner()` calls it
+and acts on the answer; the tests call it directly. This is the same
+shape as `_compute_reservations()` in the same file, which is pure for
+the same reason and is tested by seven cases at
+`test_daemon_resources.py:87`.
+
+## Step plan
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 3a | medium | sonnet | none | The libvirt helper. Add `get_active_domain_ids()` to `LibvirtConnection` in `shakenfist/util/libvirt.py` beside `get_all_domains()` (`:192`): return `set(self.conn.listDomainsID())`, typed `set[int]`, with a docstring saying why it does not filter on the `sf:` prefix and why a libvirtd restart may produce one spurious publish (D22). Do **not** change `get_all_domains()` -- it has three callers (`daemons/cleaner/scheduled_tasks.py:222`, `daemons/resources/main.py:401`, `util/libvirt.py:183`) and reworking it is out of scope. Unit test it against a fake `conn` in `shakenfist/tests/`, including the empty case. Single quotes, 120 columns, no trailing whitespace. Commit subject: `libvirt: cheap active domain id listing.` |
+| 3b | high | opus | none | The cadence. In `shakenfist/daemons/resources/main.py`, add a module-level pure function implementing D24 -- inputs last publish time, last poll time, last observed domain-ID set, current set (or `None` when the poll has not run this tick), and now; outputs whether to poll and whether to publish. Model it on `_compute_reservations()` (`:102`) for shape and on its tests (`test_daemon_resources.py:87`) for how to test it. Rules: poll when 5 s have elapsed since the last poll (D19); publish when the polled set differs from the last observed set (D18), or when 60 s have elapsed since the last publish; a publish of either kind updates `last_metrics` (D21). Then wire it into `_run_inner()`'s `while` loop (`:698-708`), replacing the bare `if time.time() - last_metrics > 60:` gate, keeping `emit_billing_statistics()`/`identify_libvirt_processes()` on their own untouched gate, and keeping the whole thing inside the existing `try`/`except Exception` so a libvirt failure is swallowed by `util_exceptions.ignore_exception()` exactly as a metrics failure is today. The poll opens its own `util_libvirt.LibvirtConnection()`; it must never hold one across iterations. On a poll that raises, leave the last observed set unchanged and let the 60 s gate carry -- do not treat an error as "the set became empty", which would publish a fabricated zero. Unit tests for the pure function: a first call with no history publishes; an unchanged set inside 60 s does not; a changed set inside 60 s does; a same-size but different set does (the D18 case -- assert it, and confirm that comparing lengths instead of membership makes this test fail); 60 s elapsed with an unchanged set does; a publish resets the 60 s clock. Plus one test driving the wiring with `_get_stats` and the libvirt connection mocked, asserting a vanished domain produces an `upsert_node_metrics` before the tick. Commit subject: `resources: publish when the domain set changes.` |
+| 3c | medium | sonnet | none | Functional coverage, which `CLAUDE.md` prefers to unit coverage where only one is possible -- here we can have both. In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`, add a test that creates an instance, reads `/admin/resources` via `self.system_client.get_cluster_resources()` and records `per_node[node]['cpu_measured']`, deletes the instance, and asserts `cpu_measured` for that node drops by the instance's vCPUs within 20 s. Follow `test_nodes.py:33-60`, which is the existing precedent for asserting against this endpoint and already documents that `node_metrics` rows are not exposed over REST. Use `self.create_instance()`, never a raw client call -- the phase 2 AST guard (`shakenfist/tests/test_ci_raw_creates.py`) will fail the build otherwise. 20 s, not 5: the assertion is "seconds, not a minute", and a tighter bound would flake on a loaded CI node for no extra signal. Pin the create so the node under assertion is known, and note in a comment that the pin is the assertion's subject rather than a capacity workaround. Commit subject: `ci: assert measurement follows a delete.` |
+| 3d | medium | sonnet | none | The load budget, per D23. First derive the pair list from the code rather than from the plan: for each `mariadb.*` call reachable from `update_metrics()` -> `_get_stats()`, find the gRPC operation it issues (`shakenfist/mariadb.py`) and confirm the `caller_daemon` is `resources`. Expect `GetQueueLength`, `GetNodeByFqdn`, `GetObjectState` (all three already in `shakenfist/data/database_load_budget.yaml`) plus `UpsertNodeMetrics` and `GetNodeMetrics` (both absent). Mark each `activity_coupled: true` and give each a `note` naming this phase and saying the rate is now coupled to instance churn. Add the two missing pairs with base terms only where the derivation actually supports one -- do not invent a rate to fill a field, and say in the note that no fit exists. Do **not** mark `GetInstanceAttributes` or `GetNodeDaemonState`, which are not on this path. Read the file's header before editing: it is generated by `tools/derive-database-load-budget.py` and forbids hand-editing levels to make a check pass; marks and notes are not levels, and the mark is carried across re-derivation at `derive-database-load-budget.py:476`. Run `shakenfist/tests/test_database_load_budget.py` and `test_derive_database_load_budget.py`. Commit subject: `budget: metrics publish is activity coupled.` |
+| 3e | low | haiku | none | Documentation. Correct every place that states the metrics cadence as a flat 60 s and is still read as current: `docs/operator_guide/` wherever it describes what the resources daemon publishes and how fresh a capacity reading is, and the scheduler's own operator documentation if it explains why a node can refuse work it has room for. Say the new rule in one sentence -- the row is republished within about five seconds of the active-domain set changing, and otherwise at least once a minute. Do **not** edit the sibling plan files that state 60 s (`PLAN-scheduler-reservations.md:52`, `:855`, `PLAN-scheduler-reservations-phase-04a-demand-guard.md:167`, `PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md:261`): a plan records what was true when it was written, and rewriting history in them is worse than the staleness. `AGENTS.md` does not change -- no convention moves. `ARCHITECTURE.md` does not change -- no component boundary moves. Commit subject: `docs: metrics follow the domain set.` |
+| 3f | low | haiku | none | Closeout. Set the phase 3 row to `Complete` in the master plan's Execution table and in `docs/plans/index.md`, update the index arithmetic to `3 of 7`, then run `python3 tools/check-plan-status.py`. Only after 3a-3e are reviewed and merged, and a real CI run has been read for the functional assertion in 3c. Record the reading in an Outcome section, as phases 1 and 2 did. Add the budget re-derivation deferred by D23 to the master plan's Future work if it is not already there. |
+
+The survey corrections described at the end of *What the survey found*
+were made in the planning commit and are not a step here.
+
+## Risks and mitigations
+
+**A publish storm during CI teardown.** Six instances deleted in
+quick succession on one node produce up to one publish per 5 s poll
+while the set keeps moving, each costing ten database round trips.
+Bounded by D19 and D21 to 12 publishes per node per minute worst case
+-- 2/s per node, 11/s on the six-node reference cluster. *Mitigation:*
+the worst case is written down here so it can be checked rather than
+argued about. Step 3f's Outcome reads `sf-ctl database-load` for the
+five pairs in D23 against a run that includes a teardown, and if the
+resources pairs are materially over model the queue-read split named
+in D20 is the pre-agreed remedy. Checked by whoever writes the
+Outcome, not deferred to a future reader.
+
+**A hung libvirtd is now hit twelve times as often.** `libvirt.open()`
+against a wedged libvirtd can block, and a block inside `_run_inner()`'s
+`try` never reaches `self.idle(1)`, so the systemd watchdog fires and
+the daemon is restarted. This is today's behaviour at 60 s intervals;
+the phase raises the exposure to 5 s. *Mitigation:* accepted, not
+removed -- the failure mode is unchanged and its handling (watchdog
+restart) is correct. The alternative, holding one connection across
+polls, trades a rarer hang for a stale handle and is worse. Noted here
+so that a spike in `sf-resources` watchdog restarts after this ships
+is read as "libvirtd is unwell on that node" rather than as a
+regression in this change.
+
+**The `activity_coupled` marks quietly disable regression detection on
+three pairs that were previously enforced.** *Mitigation:* D23 limits
+the marks to pairs actually on the publish path and requires the
+implementing step to re-derive that list from the code. The
+enforcement loss is real and is the price of the change being
+activity-coupled at all; the compensating control is the re-derivation
+recorded as Future work in 3f, after which the pairs can carry fitted
+rates again.
+
+**The functional test in 3c flakes on a loaded node.** A 20 s bound on
+a cluster whose `sf-resources` is competing for CPU could miss.
+*Mitigation:* 20 s is four poll intervals plus a publish, chosen with
+that margin deliberately; and the assertion is a drop by the
+instance's vCPUs, not a drop to zero, so a sibling instance landing on
+the same node during the window does not break it.
+
+**Publishing more often makes `instances_active` sampling denser, and
+the load budget's own instance count is `sum(instances_active)`.**
+*Mitigation:* the value is unchanged, only its sampling rate; the
+budget's fit is against the quantity, not against how often it is
+observed. Recorded because the header of
+`database_load_budget.yaml` warns that every consumer must count
+standing instances the same way, and a reader could mistake this for
+a change in that.
+
+## Definition of done
+
+Falsifiable, in order:
+
+1. `LibvirtConnection.get_active_domain_ids()` exists, issues exactly
+   one call on `self.conn`, and returns a set. A unit test asserts the
+   call count is one, and fails if the implementation is changed to
+   `lookupByID()` per domain.
+2. The cadence function is module-level and pure: a unit test calls it
+   with no libvirt connection, no database, and an injected clock.
+3. A test asserts that a domain set of the same size but different
+   membership publishes, and deleting the membership comparison in
+   favour of a length comparison makes that test fail. Confirmed by
+   running it both ways, not by reading it.
+4. A test asserts that a change-triggered publish resets the 60 s
+   clock, so the next tick is 60 s after the change and not 60 s after
+   the previous tick.
+5. A test asserts that a poll which raises leaves the last observed
+   set unchanged and does not publish a zeroed measurement.
+6. A test drives `_run_inner()`'s wiring with `_get_stats` and the
+   libvirt connection mocked and asserts `upsert_node_metrics` is
+   called before 60 s have elapsed when a domain vanishes.
+7. `get_all_domains()` is byte-for-byte unchanged, and its three
+   callers are unchanged.
+8. The functional test in `cluster_ci_tests/` uses
+   `self.create_instance()` and `shakenfist/tests/test_ci_raw_creates.py`
+   passes.
+9. Every `(operation, caller_daemon)` pair marked `activity_coupled`
+   in this phase is reachable from `_get_stats()`, and
+   `GetInstanceAttributes`/`resources` and `GetNodeDaemonState`/`resources`
+   are still enforced. Check by reading `enforced()`'s inputs, not by
+   reading the diff.
+10. `tools/derive-database-load-budget.py` run against the existing
+    fixture round-trips the new marks and notes without dropping them.
+11. No document states the metrics cadence as a flat 60 s except plan
+    files recording history, and none implies the capacity ledger
+    itself became fresher -- only the measurement did.
+12. A real CI run shows `cpu_measured` for a node falling within 20 s
+    of a delete, read from the run's own artifacts rather than
+    asserted. Read from a downloaded bundle, as phases 1 and 2 did.
+13. `python3 tools/check-plan-status.py` passes and
+    `pre-commit run --all-files` passes.
+
+## What later phases inherit
+
+Phase 4 gains a slightly better `Retry-After` story: with the
+measurement following the domain set, a `507` caused by a
+just-completed teardown clears in seconds, so a 15 s hint is a
+truthful number rather than an optimistic one.
+
+Phase 5 gains a cleaner denominator. The phase 2 wait records measure
+how long the suite waits for capacity; before this phase, an unknown
+fraction of every wait was the metrics period rather than a genuinely
+full cloud. After it, a wait that remains is much more likely to be
+real contention, which is the question phase 5 is deciding on.
+
+Neither is a dependency. Both are reasons to land this before phase 5
+reads its numbers.
+
+## Back brief
+
+Restate before starting: which of the two ledgers this phase makes
+fresher and which it deliberately leaves alone; why the trigger
+watches set membership rather than a count or a vCPU total; the
+ten-round-trip cost of a publish and the worst-case rate D19 and D21
+bound it to; and which budget pairs lose enforcement and what is meant
+to restore it.
+
+**Gate before 3d.** The budget edit is cheap to propose and annoying
+to redo, and D23 deliberately does not hand over a final pair list.
+Bring the list derived from the code, with the call-to-operation
+mapping shown, before editing the file.
+
+No other gate. 3a, 3b, 3c and 3e are each small enough to review as a
+commit.

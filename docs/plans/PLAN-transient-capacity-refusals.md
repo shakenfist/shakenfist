@@ -202,7 +202,7 @@ exposure, and it is not what fails the runs.
 34119030297 refusal was `measured 6 / committed 0 / limit 3`: six
 warm-up instances had been deleted and released 32 s earlier and
 the ledger was correctly zero, but `cpu_total_instance_vcpus` is
-republished every 60 s (`resources/main.py:645, 704`) and still
+republished every 60 s (`resources/main.py:648, 704`) and still
 counted six running domains. The next sample read zero. Because
 `_has_sufficient_cpu()` charges `max(measured, committed)`, a node
 refuses forced creates for up to a minute after a teardown even
@@ -356,9 +356,11 @@ charges the larger of measurement and ledger.** The rule is right:
 it is what makes the ledger safe against instances the reconciler
 has not yet counted. What is wrong is the cadence. Phase 3 has
 `sf-resources` notice a change in the running-domain set cheaply
-(a `listAllDomains` every few seconds costs nothing and touches no
-database) and publish immediately when it changes, keeping the
-full 60 s publish for everything else. That is activity-coupled
+(a `listDomainsID` every few seconds costs one local libvirt call
+and touches no database -- note that `get_all_domains()` is not
+that call, it is `listDomainsID` plus a lookup per domain) and
+publish immediately when it changes, keeping the full 60 s publish
+for everything else. That is activity-coupled
 rather than fixed-rate, so it does not move the database load
 budget's idle figure, and it is declared in
 `database_load_budget.yaml` as such.
@@ -499,7 +501,7 @@ spelling above is the one to write.
 |-------|------|--------|--------|
 | 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete | `7cc93750d` (#4147), `e20dd7d4b` (#4153) |
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete | `5ad9651ee` (#4166), `2c6206941` (#4187) |
-| 3. Publish metrics when the running-domain set changes | PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md | Not started | — |
+| 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | In progress | — |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started | — |
 | 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started | — |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
@@ -704,19 +706,30 @@ repositories are where a light brief goes wrong.
 ### Phase 3 -- Publish metrics when the running-domain set changes
 
 In `shakenfist/daemons/resources/main.py`, beside the 60 s publish,
-poll libvirt's domain list every few seconds (no database access)
-and, when the set of running domains or their vCPU total differs
-from what was last published, publish immediately. Keep the 60 s
-full publish unchanged. Declare the new publish rate in
-`shakenfist/data/database_load_budget.yaml` as `activity_coupled`
-so the load-budget check models it correctly, and add a unit test
-that a domain disappearing between polls produces a publish before
-the 60 s tick.
+poll the set of active libvirt domain ids every few seconds (no
+database access) and, when that set differs from what was last
+published, publish immediately. Keep the 60 s full publish
+unchanged, resetting its clock on any publish. Declare the changed
+load in `shakenfist/data/database_load_budget.yaml`, and add a unit
+test that a domain disappearing between polls produces a publish
+before the 60 s tick.
 
 This is what makes "the node is empty" true within seconds of a
 teardown rather than within a minute, and it is the only change in
-this plan that touches a daemon other than the cluster daemon.
+this plan outside the scheduler, the API and the test suite.
 Plan at medium effort; the pattern is the existing loop.
+
+Three things this section originally got wrong, corrected when
+phase 3 was planned and set out in full under *What the survey
+found* there. A publish is not a single write: it is a ten
+round-trip `_get_stats()` sweep, seven of them queue-depth reads,
+so the cadence change has a bill worth bounding. There is no
+`UpsertNodeMetrics` entry in the budget file to amend -- entries
+must be added -- and `activity_coupled` does not refine the model,
+it switches enforcement off (`load_budget.py:443-450`), so it is
+applied only to the pairs the publish path actually reaches. And a
+vCPU total is not a second trigger worth watching: with no CPU
+hotplug it can only move when the domain set does.
 
 ### Phase 4 -- `Retry-After` and a machine-readable transient refusal
 
@@ -1066,6 +1079,36 @@ canonical copy lives in shakenfist/development at
 We should list obvious extensions, known issues, unrelated bugs we
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.
+
+- **Re-derive the load budget once the change-triggered publish has
+  run for a measurement window.** Phase 3 marks the
+  `(operation, caller_daemon)` pairs on the metrics publish path
+  `activity_coupled`, which switches their enforcement off
+  (`shakenfist/deploy/shakenfist_ci/load_budget.py:443-450`),
+  because the publish rate is now coupled to instance churn and the
+  existing fit was made against a fixed 60 s cadence. That is the
+  honest declaration and it costs regression detection on three
+  pairs which previously had it. Running
+  `tools/derive-database-load-budget.py` over a window that
+  includes the new behaviour would give those pairs fitted
+  activity-coupled rates again. It needs the change running on
+  `sfcbr` for days, so it could not be part of phase 3. The marks
+  survive re-derivation
+  (`tools/derive-database-load-budget.py:476`), so this is an
+  addition rather than a repair. Found at phase 3's planning
+  survey; see D23 there.
+
+- **Make `get_all_domains()` one libvirt call.**
+  `LibvirtConnection.get_all_domains()`
+  (`shakenfist/util/libvirt.py:192`) is `listDomainsID()` followed
+  by a `lookupByID()` and a `name()` per domain, where
+  `listAllDomains(VIR_CONNECT_LIST_DOMAINS_ACTIVE)` would return
+  the objects in one round trip. It has three callers
+  (`daemons/cleaner/scheduled_tasks.py:222`,
+  `daemons/resources/main.py:401`, `util/libvirt.py:183`), so it is
+  a small change with a blast radius rather than a free one, and
+  phase 3 deliberately added a separate id-only helper instead of
+  reworking it. Found at phase 3's planning survey; see D22 there.
 
 - **Stop re-scheduling an already-charged placement.**
   `NodeInstNetdescOp._instance_preflight()`
