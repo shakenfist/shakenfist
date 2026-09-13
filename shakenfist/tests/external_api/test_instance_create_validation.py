@@ -6,14 +6,20 @@ Phase 5 of PLAN-api-input-validation deleted the `except TypeError` arm
 from handle_authorization_exceptions (decision D23), which had been
 answering every handler-internal TypeError as a 400 carrying the
 interpreter's own words. That arm was load bearing for one input on the
-default path: `name` is declared required, required-ness is deliberately
-not enforced (decision D17) and the compiled field is nullable, so both
-an omitted name and an explicit JSON null reach the handler as None.
-`validators.hostname(None, ...)` *returns* a falsy ValidationError
-rather than raising, so execution used to reach `'.' in name`, raise
-TypeError, and be answered as a 400 by the arm that is now gone --
-turning a plain caller mistake into a recorded 500 with a file under
-/srv/shakenfist/exceptions/ and an ERROR `Server error` log line.
+default path: `name` is declared required, and at the time required-ness
+was deliberately not enforced (decision D17) while the compiled field
+was nullable, so both an omitted name and an explicit JSON null reached
+the handler as None. `validators.hostname(None, ...)` *returns* a falsy
+ValidationError rather than raising, so execution used to reach
+`'.' in name`, raise TypeError, and be answered as a 400 by the arm that
+is now gone -- turning a plain caller mistake into a recorded 500 with a
+file under /srv/shakenfist/exceptions/ and an ERROR `Server error` log
+line.
+
+Phase 6's step 3 resolved D17: `enforce`, the default, now refuses an
+omitted or null `name` at the validation layer, before the handler with
+the TypeError bug ever sees it. That story is only still true in `warn`
+and `off`, which InstanceCreateNameRollbackTestCase below pins.
 
 These drive real authenticated requests through the whole decorator
 stack, for the reason AuthenticatedStackTestCase documents: phase 3's
@@ -94,36 +100,38 @@ class InstanceCreateNameTestCase(AuthenticatedStackTestCase):
                 'the refusal leaked interpreter text: %s' % body)
 
     def test_an_omitted_name_is_a_bad_request(self):
-        """The default path, and the regression phase 5 introduced.
+        """The default path, and no longer the regression phase 5
+        introduced.
 
-        `name` is declared required and D17 says the validation layer
-        does not enforce that, so this body produces a
-        missing-required finding, is not refused for it, and reaches
-        the handler with name=None. Before the guard this was the
-        TypeError described in the module docstring; the property
-        pinned here is that a caller who forgot a name is told so
-        rather than being told the cluster broke.
+        `name` is declared required, and phase 6's step 3 deleted the
+        filter that used to leave a missing-required finding recorded
+        and unenforced (decision D17, resolved). The omission is now
+        refused by the validation layer itself, before the handler
+        whose TypeError the module docstring describes ever sees it --
+        that story is only reachable in 'warn' or 'off' now, which
+        InstanceCreateNameRollbackTestCase overrides this test to pin.
         """
         response, recorded = self._post(dict(VALID_REMAINDER))
 
         self.assertEqual(400, response.status_code, response.get_json())
         self.assertEqual(
-            {'error': 'instance name must be specified', 'status': 400},
+            {'error': 'name: declared required but not supplied',
+             'status': 400},
             response.get_json())
         self.assertNoInterpreterText(response)
         recorded.assert_not_called()
 
     def test_an_explicitly_null_name_is_a_bad_request(self):
-        """The same defect by the other route.
+        """The same refusal by the other route.
 
-        The compiled field is allow_none=True (see validation._field:
-        a JSON null reaches the handler as None today and several
-        handlers read that as "not supplied"), so an explicit null is
-        not a type mismatch and is not refused by the layer either. It
-        is worth its own test because it arrives through a different
-        branch of the compiler than an omitted key does, and a guard
-        keyed on falsiness rather than on None would pass one of these
-        two and not the other.
+        Every compiled field is allow_none=True (see
+        validation._field's docstring), so without phase 6's step 3 an
+        explicit null would slip past both the required check (the key
+        is present) and the schema check (null is accepted) and reach
+        the handler as None -- exactly the omission's old path. The
+        required check now treats a required parameter's null the same
+        as its absence, so this answers identically to the omission
+        above instead of separately reaching the handler's guard.
         """
         body = dict(VALID_REMAINDER)
         body['name'] = None
@@ -131,7 +139,8 @@ class InstanceCreateNameTestCase(AuthenticatedStackTestCase):
 
         self.assertEqual(400, response.status_code, response.get_json())
         self.assertEqual(
-            {'error': 'instance name must be specified', 'status': 400},
+            {'error': 'name: declared required but not supplied',
+             'status': 400},
             response.get_json())
         self.assertNoInterpreterText(response)
         recorded.assert_not_called()
@@ -247,6 +256,41 @@ class InstanceCreateNameRollbackTestCase(InstanceCreateNameTestCase):
         self.assertEqual(400, response.status_code, response.get_json())
         self.assertEqual(
             {'error': 'instance name must be a string', 'status': 400},
+            response.get_json())
+        self.assertNoInterpreterText(response)
+        recorded.assert_not_called()
+
+    def test_an_omitted_name_is_a_bad_request(self):
+        """Overridden: 'warn' does not enforce required-ness, so this
+        is the mode where the omission still reaches the handler and
+        its own guard answers -- the exact property the base class
+        used to pin for every mode before phase 6's step 3 turned
+        enforcement on. The TypeError story the module docstring
+        describes lives here now.
+        """
+        response, recorded = self._post(dict(VALID_REMAINDER))
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'instance name must be specified', 'status': 400},
+            response.get_json())
+        self.assertNoInterpreterText(response)
+        recorded.assert_not_called()
+
+    def test_an_explicitly_null_name_is_a_bad_request(self):
+        """Overridden for the same reason: an explicit null and an
+        omission both still reach the handler unchanged under 'warn',
+        by two different branches of the compiler -- a guard keyed on
+        falsiness rather than on None would pass one of these two and
+        not the other.
+        """
+        body = dict(VALID_REMAINDER)
+        body['name'] = None
+        response, recorded = self._post(body)
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'instance name must be specified', 'status': 400},
             response.get_json())
         self.assertNoInterpreterText(response)
         recorded.assert_not_called()

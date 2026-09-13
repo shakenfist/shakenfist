@@ -878,4 +878,20 @@ is published above under *Sweep results*.
 
 Step 2 done: one declaration moved to `required=False`, and the
 reasoning for each of the six `accepted` rows is above under *Step 2:
-which declarations are really required*. Steps 3 to 6 not started.
+which declarations are really required*.
+
+Step 3 done: the `MISSING_REQUIRED` filter at `base.py:1914` is
+deleted, so every finding is enforceable and the reason code survives
+only as telemetry (D37). An explicit JSON `null` on a required
+parameter is now treated the same as its absence (`validation.check()`),
+which the `CompiledEndpoint` and `validate_request` docstrings no
+longer contradict. `RequiredSweepTestCase` now runs at `warn` rather
+than `enforce` -- an `enforce` run would answer the layer's own generic
+refusal for every omission before any handler saw it, which is not the
+question that file measures -- so its 76-row sweep is now also the
+evidence for definition-of-done item 5, not merely the guarded/faults
+pair the step brief names. Tests were added or corrected in
+`test_request_validation.py`, `test_instance_create_validation.py`,
+`test_auth.py` and `test_external_api.py` for every message the
+*Messages and statuses enforcement will change* table above predicted.
+Steps 4 to 6 not started.

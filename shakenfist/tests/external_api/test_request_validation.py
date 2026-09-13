@@ -200,23 +200,65 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertTrue(body['error'].startswith('zzz: '), body['error'])
         self.assertNotIn('unexpected keyword argument', body['error'])
 
-    def test_enforce_mode_never_rejects_missing_required(self):
-        """required is recorded and never enforced -- even in enforce
-        mode. Several parameters are declared required while omitting
-        them has always worked, so a missing-required finding is
-        telemetry for phase 6's decision, not grounds for rejection.
-        The second review round proved the first cut of the enforce
-        branch rejected on any finding, contradicting this three times
-        over in the documentation.
+    def test_enforce_mode_rejects_missing_required(self):
+        """Phase 6's step 3: missing-required is enforced like any
+        other reason now. Until this step, `key` on POST /auth being
+        omitted answered the handler's own `missing key in request` --
+        this test used to pin that as `never rejects`, three review
+        rounds deep in the documentation saying so. Deleting the
+        filter at base.py:1914 makes this the same generic refusal
+        every other reason produces, naming the parameter and never
+        reaching the handler.
         """
         config.API_VALIDATION_MODE = 'enforce'
 
         response, findings = self._post_auth({'namespace': 'sys'})
 
+        self.assertEqual(
+            [(validation.MISSING_REQUIRED, 'key')],
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            'key: declared required but not supplied',
+            response.get_json()['error'])
+
+    def test_enforce_mode_rejects_an_explicit_null_the_same_way(self):
+        """A caller who sends `{"key": null}` gets the same refusal as
+        one who sends no `key` at all -- both tell the handler nothing,
+        and every compiled field is `allow_none=True` (see _field()'s
+        docstring), so without this a null would slip past both the
+        required check (the key is present) and the schema check (null
+        is accepted) and reach the handler as the very thing #4167
+        described.
+        """
+        config.API_VALIDATION_MODE = 'enforce'
+
+        response, findings = self._post_auth({'namespace': 'sys', 'key': None})
+
+        self.assertEqual(
+            [(validation.MISSING_REQUIRED, 'key')],
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            'key: declared required but not supplied',
+            response.get_json()['error'])
+
+    def test_warn_mode_still_answers_the_handlers_own_message(self):
+        """D34/D35's promise, pinned directly: an operator rolled back
+        to 'warn' after this phase gets the exact response a caller got
+        before it -- the handler's own guard, in its own words, with
+        the finding recorded and logged rather than acted on.
+        RequiredSweepTestCase makes the same assertion for all 76
+        declarations, including the `faults` population this single
+        example cannot reach without that file's fixtures; this one is
+        the readable pin for the `guarded` case the step 3 brief names.
+        """
+        config.API_VALIDATION_MODE = 'warn'
+
+        response, findings = self._post_auth({'namespace': 'sys'})
+
         self.assertIn(
             validation.MISSING_REQUIRED, [f.reason for f in findings])
-        # The handler's own guard answered, in its own words --
-        # validation did not preempt it.
         self.assertEqual(400, response.status_code)
         self.assertEqual(
             'missing key in request', response.get_json()['error'])
@@ -959,27 +1001,20 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
                 fragment, raw,
                 'the server error leaked interpreter text: %s' % raw)
 
-    def test_an_omitted_required_parameter_still_reaches_the_handler(self):
-        """Decision D17, and the one filter in the enforce branch.
+    def test_an_omitted_required_parameter_is_refused_by_name(self):
+        """Decision D17, resolved: the one filter that used to live in
+        the enforce branch is gone, and this is the request it used to
+        wave through.
 
-        A missing-required finding is telemetry and never grounds for
-        rejection, so the request reaches the handler and the handler
-        answers. Phase 6 decides whether that stays true.
-
-        The example used to be `shared` on POST /artifacts, which was
-        declared required while the handler's signature defaulted it to
-        False. Phase 6's step 2 corrected that declaration, so it no
-        longer produces a finding at all and cannot demonstrate
-        anything here. `command_line` on the agent execute route is the
-        replacement, and it is a sharper example: its declaration is
-        right and the handler is what is lenient. Omitting it queues an
-        `execute` operation whose commandline is null -- asserted
-        below, because that null is precisely the acceptance phase 6
-        is deciding about.
-
-        The finding is asserted as well as the 200: without it this
-        test would pass just as happily if `command_line` stopped being
-        declared required, which would make it a check of nothing.
+        `command_line` on the agent execute route was step 3's example
+        of a declaration that is right while the handler is lenient --
+        omitting it used to queue an `execute` operation whose
+        commandline is null, a 200 the guest agent could only fail on.
+        Enforcement means the request never reaches that handler at
+        all: the finding is still produced (asserted below, so this
+        test would fail just as loudly if `command_line` stopped being
+        declared required), but it is now grounds for rejection rather
+        than telemetry for it.
         """
         findings, patcher = self._spy_on_check()
 
@@ -993,13 +1028,36 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
         self.assertEqual(
             [(validation.MISSING_REQUIRED, 'command_line')],
             [(f.reason, f.parameter) for f in findings])
-        self.assertEqual(200, response.status_code, response.get_json())
-        # And the handler really ran, rather than something upstream
-        # answering 200 for it.
+        self.assertEqual(400, response.status_code, response.get_json())
         self.assertEqual(
-            [{'command': 'execute', 'commandline': None,
-              'block-for-result': True}],
-            response.get_json()['commands'])
+            {'error': 'command_line: declared required but not supplied',
+             'status': 400},
+            response.get_json())
+
+    def test_an_explicit_null_is_refused_the_same_way(self):
+        """`{"command_line": null}` tells the agent operation exactly
+        as little as omitting `command_line` altogether, so it must be
+        refused identically rather than reaching the handler and
+        queuing the same broken operation this phase closed the
+        omission path on.
+        """
+        findings, patcher = self._spy_on_check()
+
+        with patcher:
+            response = self.client.post(
+                '/instances/%s/agent/execute' % self.instance.uuid,
+                data=json.dumps({'command_line': None}),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+
+        self.assertEqual(
+            [(validation.MISSING_REQUIRED, 'command_line')],
+            [(f.reason, f.parameter) for f in findings])
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'command_line: declared required but not supplied',
+             'status': 400},
+            response.get_json())
 
     def test_a_body_key_colliding_with_a_path_parameter_is_refused(self):
         """Decision D18. The window observed none of these, so this is

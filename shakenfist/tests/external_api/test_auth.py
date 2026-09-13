@@ -53,11 +53,16 @@ class AuthTestCase(base.ShakenFistTestCase):
         self.client = external_api.app.test_client()
 
     def test_post_auth_no_args(self):
+        # Both `namespace` and `key` are missing, so the validation
+        # layer refuses the request before the handler's own
+        # `missing namespace in request` guard ever runs -- naming
+        # `key` because required_names is walked in sorted order and
+        # 'key' sorts ahead of 'namespace'.
         resp = self.client.post('/auth', data=json.dumps({}))
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
-                'error': 'missing namespace in request',
+                'error': 'key: declared required but not supplied',
                 'status': 400
             },
             resp.get_json())
@@ -68,7 +73,7 @@ class AuthTestCase(base.ShakenFistTestCase):
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
-                'error': 'missing key in request',
+                'error': 'key: declared required but not supplied',
                 'status': 400
             },
             resp.get_json())
@@ -440,7 +445,7 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
         self.assertEqual(400, resp.status_code)
         self.assertEqual(
             {
-                'error': 'no namespace specified',
+                'error': 'namespace: declared required but not supplied',
                 'status': 400
             },
             resp.get_json())
@@ -673,7 +678,8 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
             data=json.dumps({}))
 
         self.assertEqual(400, resp.status_code)
-        self.assertEqual('no key specified', resp.get_json()['error'])
+        self.assertEqual(
+            'key: declared required but not supplied', resp.get_json()['error'])
 
         unchanged = Namespace.from_db('system').lookup_key('rotate-me')
         self.assertEqual(original.nonce, unchanged.nonce)

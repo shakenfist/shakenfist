@@ -1819,22 +1819,27 @@ def validate_request(func):
     """Check a request against its published parameter declarations.
 
     PLAN-api-input-validation. While API_VALIDATION_MODE is 'enforce'
-    -- the default since phase 4 -- a finding other than
-    missing-required answers 400 in the API error shape, naming the
-    parameter. 'warn' is the operator's rollback and changes nothing
-    about any request: it records what it would have refused and calls
-    through. app.py emits those records once the response status is
-    known in both modes, because whether a finding represents a
-    rejection enforcement *introduced* or a status code it merely
-    *changed* depends on what the request returned anyway.
+    -- the default since phase 4 -- any finding answers 400 in the API
+    error shape, naming the parameter. Phase 6 closed the last
+    exemption: a missing-required finding used to be recorded and
+    never acted on, because several parameters were declared required
+    while omitting them had always worked; step 2 of that phase
+    corrected every declaration that was actually optional, and step 3
+    is what you are reading, so missing-required is refused like any
+    other reason now. 'warn' is the operator's rollback and changes
+    nothing about any request: it records what it would have refused
+    and calls through. app.py emits those records once the response
+    status is known in both modes, because whether a finding
+    represents a rejection enforcement *introduced* or a status code
+    it merely *changed* depends on what the request returned anyway.
 
-    A refusal names the **first** enforceable finding only, so a
-    request with several problems is fixed one round trip at a time.
-    Every finding is emitted to the log either way, so an operator sees
-    the whole picture even when the caller does not. Answering with all
-    of them would mean deciding on a wire format for a list of errors,
-    which is a change to the API's error shape rather than to this
-    layer; phase 6 can have that argument if callers ask for it.
+    A refusal names the **first** finding only, so a request with
+    several problems is fixed one round trip at a time. Every finding
+    is emitted to the log either way, so an operator sees the whole
+    picture even when the caller does not. Answering with all of them
+    would mean deciding on a wire format for a list of errors, which is
+    a change to the API's error shape rather than to this layer; no
+    caller has asked for it.
 
     A refused request never reaches a per-method decorator, and
     log_token_use is one of those, so the namespace audit event that a
@@ -1905,15 +1910,13 @@ def validate_request(func):
             pass
 
         if config.API_VALIDATION_MODE == 'enforce':
-            # required is recorded and never enforced, even here:
-            # several parameters are declared required while omitting
-            # them has always worked (CompiledEndpoint's docstring has
-            # the example), so a missing-required finding is telemetry
-            # for phase 6's decision, not grounds for rejection.
-            enforceable = [f for f in findings
-                           if f.reason != validation.MISSING_REQUIRED]
-            if enforceable:
-                first = enforceable[0]
+            # Every reason code is enforceable, missing-required
+            # included (decision D37 of phase 6 keeps the reason code
+            # itself, in the log and in findings, so an operator on
+            # 'warn' can still tell a required failure from a type
+            # one -- only the exemption from rejection is gone).
+            if findings:
+                first = findings[0]
                 _record_refused_token_use(first)
                 return sf_api.error(
                     400, '%s: %s' % (first.parameter, first.detail))

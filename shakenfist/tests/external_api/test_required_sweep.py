@@ -610,13 +610,24 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
     documents: phase 3's review found a handler tested in isolation and
     the deployed behaviour giving different answers.
 
-    Runs at ``enforce``, the default since phase 4 and therefore the
-    mode a deployment is in. Required-ness is not enforced in any mode
-    yet (the filter at base.py:1914), so what answers here is the
-    handler -- which is exactly the question.
+    Runs at ``warn``, not ``enforce``. Step 3 deleted the filter that
+    used to keep a missing-required finding out of the enforceable
+    set, so an ``enforce`` run now answers a generic ``<parameter>:
+    declared required but not supplied`` for every omission before any
+    handler sees it -- the validation layer's answer, not the
+    handler's, and the opposite of what this file exists to measure.
+    ``warn`` still runs ``check()`` and still logs every finding
+    (decision D34: an operator's rollback keeps the same
+    observability), it just does not act on one, so a request reaches
+    its handler exactly as it did before this phase and the table
+    below still describes real handler behaviour. That also makes
+    this file definition-of-done item 5 for all 76 rows, not merely
+    the ``guarded`` and ``faults`` pair the step 3 brief names: every
+    row here is evidence that ``warn`` reproduces this phase's
+    pre-enforcement answers.
     """
 
-    mode = 'enforce'
+    mode = 'warn'
 
     def setUp(self):
         super().setUp()

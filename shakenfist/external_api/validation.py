@@ -82,11 +82,21 @@ _SCALARS: dict[str, type[fields.Field[Any]]] = {
 class CompiledEndpoint:
     """The schemas one handler's declarations compile to.
 
-    ``required_names`` is recorded rather than enforced. The plan found
-    ``mode`` on the agent-put endpoint declared required while omitting
-    it has always been accepted, so enforcing required-ness would break
-    working clients; phase 6 decides that, and warn-only exists to give
-    it the numbers.
+    ``required_names`` is recorded here and enforced by
+    ``validate_request`` in ``shakenfist/external_api/base.py`` --
+    phase 6's step 3 turned that on, once step 2 had corrected every
+    declaration a handler's own defaults had quietly made optional.
+
+    Enforcement is a property of the decorator, not of this compiler:
+    a declaration can still be more required than its handler is.
+    ``command_line`` on ``InstanceAgentExecuteEndpoint.post`` is one --
+    declared required, but an omission has always reached a handler
+    which queues an ``execute`` operation carrying a null
+    ``commandline`` (the comment at the declaration, and
+    ``instance.py:2097``). Enforcement changes what such an omission
+    answers -- 400, naming the parameter, instead of a 200 the guest
+    agent can only fail on -- without touching the handler, which still
+    behaves the old way under ``warn`` and ``off`` (decision D34).
     """
 
     def __init__(self, body: Optional[marshmallow.Schema],
@@ -553,10 +563,19 @@ def check(compiled: CompiledEndpoint, body: Any,
                 '%d further undeclared keys not reported individually'
                 % (len(unknown) - MAX_UNKNOWN_PARAMETER_FINDINGS)))
 
+    # An explicit JSON null counts as missing too, for a required
+    # parameter only: every compiled field is allow_none=True (see
+    # _field()), so a null reaches the schema check indistinguishable
+    # from a value that just happens to be absent, and a caller who
+    # sent `{"key": null}` gets exactly the same answer as one who
+    # sent no `key` at all -- one reason code, one message, for what
+    # is one fact from the handler's side: it was not given a key.
     supplied = dict(body)
     supplied.update(query)
     for name in sorted(compiled.required_names):
-        if name not in supplied and name not in compiled.path_names:
+        if name in compiled.path_names:
+            continue
+        if name not in supplied or supplied[name] is None:
             findings.append(Finding(
                 MISSING_REQUIRED, name, 'declared required but not supplied'))
 
