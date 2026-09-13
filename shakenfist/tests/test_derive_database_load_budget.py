@@ -289,6 +289,72 @@ class EmitRoundTripTestCase(base.ShakenFistTestCase):
             self.assertIn(key, doc)
         self.assertIn('3708', doc['coverage_caveat'])
 
+    def test_an_unfitted_pair_survives_a_window_that_cannot_see_it(self):
+        # A pair with no measured block was never fitted -- to_entry()
+        # always sets one -- so it is there because somebody wrote it by
+        # hand for a call the fit could not see. entries is built from the
+        # pairs which cleared the inclusion cut, so such a pair is absent
+        # from every future re-derivation's entries, and before this it was
+        # therefore deleted: the mark, the note and the issue behind them
+        # all went, and the pair silently became unbudgeted polling again.
+        unfitted = [(e['operation'], e['caller_daemon'])
+                    for e in self.previous['entries']
+                    if 'measured' not in e]
+        self.assertNotEqual(
+            0, len(unfitted),
+            'the shipped budget has no unfitted entry, so this test is '
+            'vacuous and the carry-forward it guards is untested')
+
+        entries = []
+        for e in self.previous['entries']:
+            if (e['operation'], e['caller_daemon']) in unfitted:
+                # The whole point: this window did not measure it.
+                continue
+            entry = dict(e)
+            entry['note'] = tool.PLACEHOLDER_NOTE
+            entry.pop('provisional', None)
+            entry.pop('activity_coupled', None)
+            entries.append(entry)
+
+        out = io.StringIO()
+        tool.emit(entries, self.by_time, self.args, out,
+                  coverage=self.coverage, previous=self.previous)
+        parsed = budget.DatabaseLoadBudget.model_validate(
+            yaml.safe_load(io.StringIO(out.getvalue())))
+        kept = {e.key: e for e in parsed.entries}
+
+        for key in unfitted:
+            self.assertIn(key, kept, '%s/%s was dropped by a re-derivation '
+                          'which did not measure it' % key)
+            before = [e for e in self.previous['entries']
+                      if (e['operation'], e['caller_daemon']) == key][0]
+            self.assertEqual(before['note'], kept[key].note)
+            self.assertEqual(before.get('activity_coupled', False),
+                             kept[key].activity_coupled)
+            # Still unfitted: a carried forward pair must not acquire a
+            # measurement from a window it was not measured in.
+            self.assertIsNone(kept[key].measured)
+
+    def test_a_fitted_pair_below_the_cut_is_still_dropped(self):
+        # The other half of the rule above, and the reason it keys on the
+        # absence of a measurement rather than carrying everything
+        # forward. A pair which was measured once and has now fallen below
+        # the inclusion cut has a measurement saying it used to matter and
+        # no longer does. Dropping it is what the cut is for.
+        fitted = [e for e in self.previous['entries'] if 'measured' in e][0]
+        key = (fitted['operation'], fitted['caller_daemon'])
+
+        entries = [dict(e, note=tool.PLACEHOLDER_NOTE)
+                   for e in self.previous['entries']
+                   if (e['operation'], e['caller_daemon']) != key
+                   and 'measured' in e]
+        out = io.StringIO()
+        tool.emit(entries, self.by_time, self.args, out,
+                  coverage=self.coverage, previous=self.previous)
+        parsed = budget.DatabaseLoadBudget.model_validate(
+            yaml.safe_load(io.StringIO(out.getvalue())))
+        self.assertNotIn(key, {e.key for e in parsed.entries})
+
     def test_notes_and_provisional_markings_survive_a_rederivation(self):
         # Both are judgement which lives only in the budget file, and both
         # were dropped on the floor by a re-derivation.

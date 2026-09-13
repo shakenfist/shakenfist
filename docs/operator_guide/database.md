@@ -723,8 +723,9 @@ extracted server-side in `_direct_upsert_node_metrics()` so rows written by
 an older resources daemon during a rolling upgrade still get their columns
 populated once `sf-database` is upgraded. After running `sf-ctl
 ensure-mariadb-schema` to add the columns (run it before rolling the
-daemons, as always), existing rows keep NULL columns until the next 60
-second upsert cycle repopulates every live node — no backfill needed for a
+daemons, as always), existing rows keep NULL columns until the next upsert
+cycle repopulates every live node, which is within a minute and sooner
+on a node whose instances are changing — no backfill needed for a
 table whose rows are ephemeral by design.
 
 The three capacity tables (`scheduler_node_capacity`, `namespace_claims` and

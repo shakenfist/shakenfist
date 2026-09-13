@@ -373,10 +373,20 @@ def to_entry(key, stats, nodes):
 
 
 def wrapped_block(out, key, text, indent):
-    """A YAML folded block, wrapped so the file stays readable."""
+    """A YAML folded block, wrapped so the file stays readable.
+
+    Neither hyphens nor long words are break points. A folded scalar
+    turns the newline back into a space when it is read, so a break
+    inside "one-per-publish" does not survive the round trip as a line
+    break -- it survives as "one-per- publish", and the next
+    re-derivation wraps the damage in somewhere new. Text a human wrote
+    must come back out of this file the way it went in, so the only
+    thing allowed to move is which space becomes the newline.
+    """
     out.write('%s%s: >-\n' % (' ' * indent, key))
     out.write(textwrap.fill(
         ' '.join(text.split()), width=72,
+        break_on_hyphens=False, break_long_words=False,
         initial_indent=' ' * (indent + 2),
         subsequent_indent=' ' * (indent + 2)) + '\n')
 
@@ -458,36 +468,83 @@ def emit(entries, by_time, args, out, coverage=None, previous=None):
     for entry in entries:
         key = (entry['operation'], entry['caller_daemon'])
         before = carried.get(key, {})
-        out.write('  - operation: %s\n' % entry['operation'])
-        out.write('    caller_daemon: %s\n' % entry['caller_daemon'])
-        for k in ('per_node_base_qps', 'cluster_base_qps',
-                  'per_instance_qps'):
-            if k in entry:
-                out.write('    %s: %s\n' % (k, entry[k]))
-        # An activity coupled marking says "the level of this pair is set
-        # by how much work is flowing, not by one of our loops, so it is
-        # not a floor worth failing a build over". to_entry() can only
-        # derive that from the caller, which catches api, ctl and unknown
-        # and cannot catch a queue worker's per-work-item reads. Those are
-        # marked by hand, and a re-derivation used to silently delete
-        # them: the flag was emitted from the freshly fitted entry alone
-        # while the note and provisional marking beside it were read from
-        # the file. That is issue 4092.
-        if entry.get('activity_coupled') or before.get('activity_coupled'):
-            out.write('    activity_coupled: true\n')
+        write_entry(out, entry, before)
 
-        # A provisional marking says "there is an open bug about this pair
-        # and its level is not a floor worth defending". That is still
-        # true of the pair after a re-measurement, so it survives one.
-        provisional = before.get('provisional')
-        if provisional:
-            out.write('    provisional:\n      issue: %d\n'
-                      % int(provisional['issue']))
-            wrapped_block(out, 'reason', provisional['reason'], 6)
+    # A pair which carries no measurement was never fitted: to_entry()
+    # always sets one, so the only way an entry reaches the file without a
+    # measured block is somebody writing it by hand for a call the fit
+    # could not see. Those must survive a re-derivation which does not see
+    # it either, and until this loop existed they did not -- entries is
+    # built from the pairs which cleared the inclusion cut, so a
+    # hand-written pair below the cut was silently deleted, taking its
+    # activity coupling with it and turning the pair back into unbudgeted
+    # polling on the next CI run.
+    #
+    # This deliberately does not carry forward a pair which *was* fitted
+    # and has now fallen below the cut. That one has a measurement saying
+    # it used to matter and no longer does, and dropping it is what the
+    # cut is for.
+    fitted = {(e['operation'], e['caller_daemon']) for e in entries}
+    for key in sorted(k for k in carried
+                      if k not in fitted and not carried[k].get('measured')):
+        write_entry(out, carried[key], carried[key])
 
+
+def write_entry(out, entry, before):
+    """One budget entry, merging this measurement with prior judgement.
+
+    ``entry`` is the freshly fitted pair and ``before`` the same pair as
+    the previous file had it, which for a hand-written entry carried
+    forward unfitted are the same object.
+    """
+    out.write('  - operation: %s\n' % entry['operation'])
+    out.write('    caller_daemon: %s\n' % entry['caller_daemon'])
+    for k in ('per_node_base_qps', 'cluster_base_qps',
+              'per_instance_qps'):
+        if k in entry:
+            out.write('    %s: %s\n' % (k, entry[k]))
+    # An activity coupled marking says "the level of this pair is set
+    # by how much work is flowing, not by one of our loops, so it is
+    # not a floor worth failing a build over". to_entry() can only
+    # derive that from the caller, which catches api, ctl and unknown
+    # and cannot catch a queue worker's per-work-item reads. Those are
+    # marked by hand, and a re-derivation used to silently delete
+    # them: the flag was emitted from the freshly fitted entry alone
+    # while the note and provisional marking beside it were read from
+    # the file. That is issue 4092.
+    if entry.get('activity_coupled') or before.get('activity_coupled'):
+        out.write('    activity_coupled: true\n')
+
+    # A provisional marking says "there is an open bug about this pair
+    # and its level is not a floor worth defending". That is still
+    # true of the pair after a re-measurement, so it survives one.
+    provisional = before.get('provisional')
+    if provisional:
+        out.write('    provisional:\n      issue: %d\n'
+                  % int(provisional['issue']))
+        wrapped_block(out, 'reason', provisional['reason'], 6)
+
+    # A pair the derivation never fitted carries no measurement to
+    # write. That is not an error and not a gap to paper over with a
+    # zero: an entry can be added by hand for a call this window could
+    # not see (a publish whose rate the workload sets, say), and the
+    # schema allows it precisely so the note can say "floor, not fit".
+    # Writing the block unconditionally made the first such entry
+    # raise KeyError here on the next re-derivation, which is a budget
+    # file that cannot be regenerated.
+    #
+    # There is deliberately no fallback to the previous file's block.
+    # Unlike the note, the provisional marking and the activity
+    # coupling -- all judgement, all still true after a
+    # re-measurement -- a measured block is a fact about one specific
+    # window, and the _doc block above now describes a different one.
+    # Stamping an unfitted pair with a window it was never measured in
+    # would be the one carried-forward value that is simply false.
+    measured = entry.get('measured')
+    if measured:
         out.write('    measured:\n      mean_qps: %s\n      r2: %s\n'
-                  % (entry['measured']['mean_qps'], entry['measured']['r2']))
-        wrapped_block(out, 'note', before.get('note') or entry['note'], 4)
+                  % (measured['mean_qps'], measured['r2']))
+    wrapped_block(out, 'note', before.get('note') or entry['note'], 4)
 
 
 def coverage_text(coverage):

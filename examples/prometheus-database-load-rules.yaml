@@ -238,6 +238,8 @@ groups:
           or
           label_replace(label_replace(vector(0.032), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(0.017), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "resources", "", "")
+          or
           label_replace(label_replace(vector(0.099), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.155), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
@@ -299,6 +301,8 @@ groups:
           label_replace(label_replace(vector(0.066), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(0.066), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.017), "operation", "UpsertNodeMetrics", "", ""), "caller_daemon", "resources", "", "")
 
       # Work done once for the whole cluster rather than once per node. This
       # one can be negative: the elected cluster daemon polls its daemon
@@ -454,6 +458,8 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "resources", "", "")
+          or
           label_replace(label_replace(vector(0.0), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
@@ -515,6 +521,8 @@ groups:
           label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpsertNodeMetrics", "", ""), "caller_daemon", "resources", "", "")
 
       # Load which scales with how many instances are standing.
       - record: sf_database:budget:per_instance
@@ -667,6 +675,8 @@ groups:
           or
           label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "queues", "", "")
           or
+          label_replace(label_replace(vector(0.0), "operation", "GetNodeMetrics", "", ""), "caller_daemon", "resources", "", "")
+          or
           label_replace(label_replace(vector(0.078), "operation", "GetObjectMetadata", "", ""), "caller_daemon", "api", "", "")
           or
           label_replace(label_replace(vector(0.09), "operation", "GetObjectState", "", ""), "caller_daemon", "api", "", "")
@@ -728,6 +738,8 @@ groups:
           label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(0.0), "operation", "UpdateNodeAttributes", "", ""), "caller_daemon", "sentinel-last", "", "")
+          or
+          label_replace(label_replace(vector(0.0), "operation", "UpsertNodeMetrics", "", ""), "caller_daemon", "resources", "", "")
 
       # The pairs worth alerting on. A pair is left out when its budget is
       # provisional -- it records a known defect rather than a floor worth
@@ -823,8 +835,6 @@ groups:
           or
           label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "queues", "", "")
           or
-          label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "resources", "", "")
-          or
           label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-first", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetNodeByFqdn", "", ""), "caller_daemon", "sentinel-last", "", "")
@@ -858,8 +868,6 @@ groups:
           label_replace(label_replace(vector(1), "operation", "GetObjectsByState", "", ""), "caller_daemon", "cluster", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetQueueLength", "", ""), "caller_daemon", "net", "", "")
-          or
-          label_replace(label_replace(vector(1), "operation", "GetQueueLength", "", ""), "caller_daemon", "resources", "", "")
           or
           label_replace(label_replace(vector(1), "operation", "GetReferencesFrom", "", ""), "caller_daemon", "cleaner", "", "")
           or

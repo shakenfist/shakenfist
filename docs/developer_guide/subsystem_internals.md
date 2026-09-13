@@ -197,10 +197,14 @@ qualifying phantom (a `node_metrics` row that outlived its node) and
 force the five-minute job every maintenance pass forever. The
 maintenance loop runs at most once every 60s, so this closes the
 warm-up window to roughly a minute after a hypervisor's metrics
-become visible, not immediately — the larger remaining term is the
-resources daemon's own publication cadence for those metrics, which
-this does not shorten (see
-[PLAN-transient-capacity-refusals](../plans/PLAN-transient-capacity-refusals.md)).
+become visible, not immediately — the other term used to be the
+resources daemon's own publication cadence, and used to be the larger
+of the two. Phase 3 of
+[PLAN-transient-capacity-refusals](../plans/PLAN-transient-capacity-refusals.md)
+reduced it by republishing within about five seconds of the
+active-domain set changing. At cluster start-up, where no domains are
+yet running for the set to change, that publish still waits out the
+once-a-minute floor.
 The check also forces at most once per distinct unguarded set: a node
 that qualifies here but which the reconciler declines to size anyway
 costs one forced pass, not a permanent every-minute one, and

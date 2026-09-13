@@ -93,8 +93,11 @@ class TestNodes(base.BaseNamespacedTestCase):
 
     def test_cluster_resources_charges_unbooted_placements(self):
         # A node's cpu_total_instance_vcpus metric counts only *running*
-        # libvirt domains and is republished once a minute, so an instance
-        # which has been placed but has not booted is invisible to it. If
+        # libvirt domains, so an instance which has been placed but has not
+        # booted is invisible to it -- and stays invisible however promptly
+        # the metric is republished, which since
+        # PLAN-transient-capacity-refusals phase 3 is within about five
+        # seconds of the running-domain set changing. If
         # admission trusted that measurement alone, a burst of creates
         # would all see the same idle node, all land on it, and push it
         # well past its hard maximum -- after which every later request
@@ -185,3 +188,148 @@ class TestNodes(base.BaseNamespacedTestCase):
                 per_node['cpu_available'])
         finally:
             self.test_client.delete_instance(inst['uuid'])
+
+    def _safe_delete_instance(self, instance_uuid):
+        """Delete an instance, tolerating if it's already gone."""
+        try:
+            self.system_client.delete_instance(instance_uuid)
+        except apiclient.ResourceNotFoundException:
+            pass
+
+    def test_cluster_resources_measured_drops_after_delete(self):
+        # Regression coverage for PLAN-transient-capacity-refusals-phase-03
+        # ("metrics on change"). The CPU pre-filter charges
+        # max(cpu_measured, cpu_committed): cpu_committed is released
+        # inside the delete transaction, but cpu_measured used to be
+        # published on a flat 60 s cadence, so a node kept refusing new
+        # work for up to a minute after its last instance was deleted even
+        # though the ledger had already cleared. sf-resources now
+        # republishes within about 5 s of the active-domain set changing,
+        # which this asserts against the same /admin/resources fields
+        # test_cluster_resources_reservations() does above -- raw
+        # node_metrics rows are not exposed over REST.
+        resources = self.system_client.get_cluster_resources()
+        candidates = [
+            n for n in self._hypervisor_nodes()
+            if resources['per_node'].get(n['uuid'], {}).get(
+                'cpu_available', 0) >= 1]
+        if not candidates:
+            self.skipTest('No hypervisor with a vCPU of headroom')
+        # The emptiest, not the first, for the same reason
+        # test_cluster_resources_charges_unbooted_placements above picks
+        # that way: the suite runs several tests at once, and the node with
+        # the most headroom is the one least likely to have a sibling's
+        # instance arrive on it while this test is watching.
+        node = max(
+            candidates,
+            key=lambda n: resources['per_node'][n['uuid']]['cpu_available'])
+
+        # What the node measured before this test put anything on it.
+        # Taken here rather than after the create, because the rise below
+        # has to be measured against a reading which certainly predates
+        # the new domain.
+        idle_measured = resources['per_node'][node['uuid']]['cpu_measured']
+
+        # The instance is pinned so the node this test watches is known
+        # in advance -- the pin is the assertion's subject (which node's
+        # cpu_measured to read), not a workaround for capacity. The node
+        # was already chosen above for having room for one more vCPU, so
+        # the pin is not doing any capacity work either.
+        cpus = 1
+        inst = self.create_instance(
+            'metrics-drop', cpus, 128, None, [{'size': 1, 'type': 'disk'}],
+            None, None, force_placement=node['name'])
+        self.addCleanup(self._safe_delete_instance, inst['uuid'])
+        self.addDetail('instance', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
+        self.assertEqual(node['uuid'], inst['node'])
+
+        # cpu_measured counts running libvirt domains, not placements
+        # (that is what test_cluster_resources_charges_unbooted_placements
+        # above exercises), so the domain has to actually start before a
+        # baseline read of it means anything.
+        self._await_instance_create(inst['uuid'])
+
+        # ...and starting is not enough either. _await_instance_create()
+        # returns as soon as the instance reaches 'created', which
+        # Instance.create() sets immediately after power_on(), while the
+        # figure read here has to travel through a five second domain poll,
+        # a publish, and the scheduler's SCHEDULER_CACHE_TIMEOUT cache. A
+        # baseline taken before that arrives is the node's *idle*
+        # measurement, the threshold below it is one the node can never
+        # return to, and the test then fails at its deadline for the
+        # opposite of the reason it exists.
+        #
+        # So wait for the rise first. That wait is not overhead: a
+        # measurement which follows a domain starting is the same claim as
+        # one which follows a domain going away, so this asserts the
+        # phase's behaviour in the other direction, and says so distinctly
+        # when it is publish-on-start that is broken.
+        baseline_measured = self._await_cpu_measured(
+            node['uuid'], lambda measured: measured >= idle_measured + cpus,
+            'rise to at least %d, including the %d vCPUs of an instance '
+            'which has started' % (idle_measured + cpus, cpus))
+        self.addDetail('resources before delete', content.text_content(
+            json.dumps(self.system_client.get_cluster_resources(),
+                       indent=4, sort_keys=True)))
+
+        # self.system_client uses ASYNC_PAUSE, so this blocks until the
+        # instance's state is 'deleted' -- the 20 s poll below starts
+        # counting from that point, not from when the request was issued.
+        self.system_client.delete_instance(inst['uuid'])
+
+        # A drop by the instance's vCPUs rather than a drop to zero,
+        # because the node is not assumed to be otherwise idle -- this
+        # suite's cluster is shared and the node may be carrying load this
+        # test did not create. It does not make the assertion immune to a
+        # sibling *arriving* mid-window, which would raise cpu_measured by
+        # its own vCPUs and could hold the value above the threshold; the
+        # emptiest-node choice above reduces that, and it remains the one
+        # known flake source here.
+        self._await_cpu_measured(
+            node['uuid'], lambda measured: measured <= baseline_measured - cpus,
+            'fall to at most %d, by the %d vCPUs of a deleted instance'
+            % (baseline_measured - cpus, cpus))
+        self.addDetail('resources after delete', content.text_content(
+            json.dumps(self.system_client.get_cluster_resources(),
+                       indent=4, sort_keys=True)))
+
+    # 20 s, not 5: the claim under test is "seconds, not a minute", and
+    # this leaves margin for a loaded CI node rather than being the
+    # tightest bound that could pass -- four 5 s domain polls plus a
+    # publish plus the scheduler's cache. Before this phase either wait
+    # could take 60 s.
+    CPU_MEASURED_DEADLINE_SECONDS = 20
+    CPU_MEASURED_POLL_SECONDS = 5
+
+    def _await_cpu_measured(self, node_uuid, predicate, expectation):
+        """Wait for a node's published cpu_measured to satisfy predicate.
+
+        Returns the value which satisfied it. ``expectation`` completes
+        the sentence "cpu_measured did not ..." in the failure message, so
+        a broken publish-on-start and a broken publish-on-delete do not
+        report identically.
+        """
+        deadline = time.time() + self.CPU_MEASURED_DEADLINE_SECONDS
+        measured = None
+        while True:
+            resources = self.system_client.get_cluster_resources()
+            per_node = resources['per_node'].get(node_uuid)
+            self.assertIsNotNone(
+                per_node,
+                'Node %s is absent from /admin/resources per_node'
+                % node_uuid)
+            measured = per_node['cpu_measured']
+            if predicate(measured):
+                return measured
+
+            if time.time() > deadline:
+                break
+            time.sleep(self.CPU_MEASURED_POLL_SECONDS)
+
+        self.fail(
+            'Node %s publishes cpu_measured %r, which did not %s within '
+            '%ds. The measurement should follow the running-domain set '
+            'within seconds, not within a minute.'
+            % (node_uuid, measured, expectation,
+               self.CPU_MEASURED_DEADLINE_SECONDS))
