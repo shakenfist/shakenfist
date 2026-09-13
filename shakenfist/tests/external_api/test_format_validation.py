@@ -105,9 +105,10 @@ class FormatValidatorTestCase(base.ShakenFistTestCase):
         The second value is the first with a newline in the middle,
         which is what `base64 user-data.yaml` emits (it wraps at 76
         columns) and therefore what `-U "$(base64 user-data.yaml)"`
-        sends. b64decode's default accepts it and the config drive
-        decodes it today, so this validator must too -- which is why
-        it does not pass validate=True.
+        sends. The config drive decodes it today, so this validator
+        must too -- which is why the validator takes the whitespace
+        out before it decodes strictly, rather than decoding
+        leniently.
         """
         encoded = str(base64.b64encode(b'#cloud-config\n'), 'utf-8')
         self.assertAccepts(validation._format_byte, encoded,
@@ -135,6 +136,39 @@ class FormatValidatorTestCase(base.ShakenFistTestCase):
         # cannot be base64, and one character of padding too few.
         self.assertRefuses(validation._format_byte, 'a')
         self.assertRefuses(validation._format_byte, 'aGVsbG8')
+
+    # Raw cloud-config which the lenient decode accepts. b64decode's
+    # default throws away every character outside the alphabet -- the
+    # hashes, colons, spaces and newlines of a YAML document included --
+    # and then decodes whatever is left, so whether a raw payload is
+    # caught by a lenient decode is a coin flip on the filtered length
+    # modulo 4. These two land on the wrong side of it.
+    #
+    # An earlier revision of _format_byte decoded leniently and let both
+    # of these through to the hypervisor, which is most of #3269 still
+    # open. They are here rather than in the case above because the
+    # assertion that matters is the opposite one: the lenient decode
+    # must *succeed* on them, or they have stopped being the values
+    # that slipped through and the regression is no longer pinned.
+    LENIENTLY_DECODABLE_RAW = (
+        '#cloud-config\npackages:\n  - nginx\n',
+        '#cloud-config\nwrite_files:\n- path: /tmp/a\n  content: hi\n',
+    )
+
+    def test_byte_refuses_raw_config_the_lenient_decode_accepted(self):
+        """The half of #3269 a lenient decode left open.
+
+        The review of this phase found that the validator as first
+        written refused raw cloud-config only by luck. Both values
+        below are realistic raw cloud-config, both decode without
+        complaint under b64decode's default arguments, and both
+        therefore reached the config drive.
+        """
+        for raw in self.LENIENTLY_DECODABLE_RAW:
+            # Load bearing: if this raises, the sample no longer
+            # demonstrates the hole and the test below proves nothing.
+            base64.b64decode(raw)
+            self.assertRefuses(validation._format_byte, raw)
 
     def test_netblock_takes_what_ip_network_takes(self):
         """The same function the handler already calls.

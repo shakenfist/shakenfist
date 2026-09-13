@@ -128,7 +128,7 @@ def _invalid(what: str) -> marshmallow.ValidationError:
 
 
 def _format_byte(value: Any) -> Any:
-    """base64, decoded exactly the way the hypervisor decodes it.
+    """base64, strictly, once whitespace has been taken out.
 
     Issue 3269: `user_data` is the only declaration carrying this
     format, and its only consumer is the `base64.b64decode()` in
@@ -138,15 +138,33 @@ def _format_byte(value: Any) -> Any:
     instead of encoding it got a binascii.Error in a daemon log and an
     instance which never booted.
 
-    Deliberately *not* `validate=True`, although base64 validation
-    normally wants it. b64decode's default discards characters outside
-    the alphabet, which means it accepts base64 wrapped at 76 columns
-    -- exactly what `base64 somefile` emits, and exactly what a caller
-    passing `sf-client instance create -U "$(base64 user-data.yaml)"`
-    sends. validate=True refuses that, so it would refuse input the
-    config drive decodes happily today. The rule here is to be the same
-    width as the decode this exists to protect, not to be correct about
-    base64 in the abstract.
+    Two properties are wanted at once, and the order of the two
+    operations here is what gets both.
+
+    Wrapped base64 has to be accepted. `base64 somefile` emits 76
+    column lines, and `sf-client instance create -U "$(base64
+    user-data.yaml)"` sends them newlines and all, so a check which
+    refuses embedded whitespace refuses input the config drive decodes
+    happily today.
+
+    Raw cloud-config has to be refused, which is the whole of #3269.
+    b64decode's *default* discards every character outside the
+    alphabet, so it does not merely tolerate the newlines: it throws
+    away the colons, hashes and spaces in a raw payload too and then
+    decodes whatever alphabet characters are left. Whether that raises
+    is a coin flip on the filtered length modulo 4 -- of five realistic
+    raw cloud-config samples, two decoded without complaint and passed.
+    An earlier revision of this validator argued for `validate=False`
+    on the strength of the wrapping alone; that reasoning was wrong,
+    because it read the default's whitespace tolerance as the only
+    thing the default does.
+
+    So strip the whitespace first and then decode with `validate=True`.
+    Wrapped base64 survives the strip and decodes; raw cloud-config
+    reaches a strict decoder with its non-alphabet characters intact
+    and is refused deterministically. The only input this is narrower
+    than the config drive on is one carrying non-alphabet junk which
+    happens to survive the filter -- which is the defect, not a use.
     """
     if value is None:
         return value
@@ -154,7 +172,7 @@ def _format_byte(value: Any) -> Any:
         raise _invalid('a valid base64 string')
     try:
         # binascii.Error subclasses ValueError.
-        base64.b64decode(value)
+        base64.b64decode(''.join(value.split()), validate=True)
     except Exception as e:
         raise _invalid('a valid base64 string') from e
     return value
