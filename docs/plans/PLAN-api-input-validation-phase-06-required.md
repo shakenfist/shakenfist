@@ -300,6 +300,186 @@ The `except TypeError` narrowing the row once described belongs to
 phase 5 and is done. The three attribution issues it also listed are
 closed.
 
+## Sweep results
+
+Step 1's measurement, and the evidentiary basis for steps 2 and 3.
+
+Produced by `shakenfist/tests/external_api/test_required_sweep.py` at
+`a5f12bec5`, which enumerates the declarations from
+`declarations.handlers()` -- the census script in the appendix, not a
+hand written list -- and drives one real authenticated request per row
+through the whole decorator stack, in the default `enforce` mode. For
+each declaration it sends a complete valid request (the *control*) and
+then the same request with that one parameter removed, recording the
+status and whether `record_exception` was called.
+
+The controls are not incidental. A request which 404s because a fixture
+was not built is indistinguishable, from the outside, from a handler
+refusing an omission, and that is precisely the shape of mistake the
+phase 5 survey made. Every recipe therefore declares the status its
+complete request answers and the test asserts it on every run, so a
+rotted fixture fails the test rather than quietly publishing a wrong
+verdict. Four verdicts in a first draft turned out to be fixture
+artefacts and were caught this way, including one -- `blob_uuid` on the
+agent-put route -- where a blob stub that resolved *any* uuid made a
+fault look like an acceptance.
+
+The table is pinned in the test as `SWEEP`, so a handler which starts
+answering an omission differently fails CI rather than silently
+invalidating this evidence.
+
+**76 rows, the number the census reports.** 75 of them are finding F1's
+declarations whose handler gives them a default; the 76th is the
+raw-body marker discussed below.
+
+| Verdict | Count |
+|---------|-------|
+| `guarded` -- the handler answers 4xx | 63 |
+| `faults` -- 5xx, or an exception was recorded | 7 |
+| `accepted` -- 2xx | 6 |
+
+| Endpoint | Method | Parameter | In | Type | Status | Verdict | What the server does |
+|----------|--------|-----------|----|------|--------|---------|----------------------|
+| `ArtifactMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `ArtifactMetadatasEndpoint` | post | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `ArtifactMetadatasEndpoint` | post | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `ArtifactsEndpoint` | delete | `confirm` | body | boolean | 400 | **guarded** | `parameter confirm is not set true` |
+| `ArtifactsEndpoint` | post | `shared` | body | boolean | 200 | **accepted** | defaults to False; the artifact is created unshared |
+| `ArtifactsEndpoint` | post | `url` | body | url | 500 | **faults** | `Artifact.new()` does `source_url.split('/')` (`artifact.py:355`) |
+| `AuthEndpoint` | post | `key` | body | string | 400 | **guarded** | `missing key in request` |
+| `AuthEndpoint` | post | `namespace` | body | string | 400 | **guarded** | `missing namespace in request` |
+| `AuthFederatedEndpoint` | post | `namespace` | body | string | 400 | **guarded** | `no namespace specified` |
+| `AuthFederatedEndpoint` | post | `rule` | body | string | 400 | **guarded** | `no rule specified` |
+| `AuthFederatedEndpoint` | post | `token` | body | string | 400 | **guarded** | `no token specified` |
+| `AuthIssuerEndpoint` | put | `audience` | body | string | 400 | **guarded** | `no audience specified` |
+| `AuthIssuerEndpoint` | put | `issuer_url` | body | string | 400 | **guarded** | `no issuer_url specified` |
+| `AuthIssuerEndpoint` | put | `jwks_uri` | body | url | 400 | **guarded** | `no jwks_uri specified` |
+| `AuthIssuersEndpoint` | post | `audience` | body | string | 400 | **guarded** | `no audience specified` |
+| `AuthIssuersEndpoint` | post | `issuer_url` | body | string | 400 | **guarded** | `no issuer_url specified` |
+| `AuthIssuersEndpoint` | post | `jwks_uri` | body | url | 400 | **guarded** | `no jwks_uri specified` |
+| `AuthIssuersEndpoint` | post | `name` | body | string | 400 | **guarded** | `no name specified` |
+| `AuthMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `AuthMetadatasEndpoint` | post | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `AuthMetadatasEndpoint` | post | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `AuthNamespaceClaimsEndpoint` | post | `expires_in_seconds` | body | integer | 400 | **guarded** | `no expires_in_seconds specified` |
+| `AuthNamespaceClaimsEndpoint` | post | `limit_cpus` | body | unsignedinteger | 400 | **guarded** | `no limit_cpus specified` |
+| `AuthNamespaceClaimsEndpoint` | post | `limit_disk_gb` | body | unsignedinteger | 400 | **guarded** | `no limit_disk_gb specified` |
+| `AuthNamespaceClaimsEndpoint` | post | `limit_memory_mb` | body | unsignedinteger | 400 | **guarded** | `no limit_memory_mb specified` |
+| `AuthNamespaceKeyEndpoint` | put | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `AuthNamespaceKeysEndpoint` | post | `key_name` | body | string | 400 | **guarded** | `no key name specified` |
+| `AuthNamespaceRuleEndpoint` | put | `bound_claims` | body | dict | 400 | **guarded** | `missing required field(s): bound_claims` |
+| `AuthNamespaceRuleEndpoint` | put | `issuer` | body | string | 400 | **guarded** | `missing required field(s): issuer` |
+| `AuthNamespaceRuleEndpoint` | put | `key_name_prefix` | body | string | 400 | **guarded** | `missing required field(s): key_name_prefix` |
+| `AuthNamespaceRuleEndpoint` | put | `key_ttl` | body | integer | 400 | **guarded** | `missing required field(s): key_ttl` |
+| `AuthNamespaceRuleEndpoint` | put | `scopes` | body | arrayofstring | 400 | **guarded** | `missing required field(s): scopes` |
+| `AuthNamespaceRulesEndpoint` | post | `bound_claims` | body | dict | 400 | **guarded** | `missing required field(s): bound_claims` |
+| `AuthNamespaceRulesEndpoint` | post | `issuer` | body | string | 400 | **guarded** | `missing required field(s): issuer` |
+| `AuthNamespaceRulesEndpoint` | post | `key_name_prefix` | body | string | 400 | **guarded** | `missing required field(s): key_name_prefix` |
+| `AuthNamespaceRulesEndpoint` | post | `key_ttl` | body | integer | 400 | **guarded** | `missing required field(s): key_ttl` |
+| `AuthNamespaceRulesEndpoint` | post | `name` | body | string | 400 | **guarded** | `no name specified` |
+| `AuthNamespaceRulesEndpoint` | post | `scopes` | body | arrayofstring | 400 | **guarded** | `missing required field(s): scopes` |
+| `AuthNamespaceTrustsEndpoint` | post | `external_namespace` | body | namespace | 400 | **guarded** | `no external namespace specified` |
+| `AuthNamespacesEndpoint` | post | `namespace` | body | string | 400 | **guarded** | `no namespace specified` |
+| `BlobMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `BlobMetadatasEndpoint` | post | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `BlobMetadatasEndpoint` | post | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `ClusterOperationsEndpoint` | get | `target_object_type` | query | string | 400 | **guarded** | `target_object_type parameter is required` |
+| `ClusterOperationsEndpoint` | get | `target_uuid` | query | uuid | 400 | **guarded** | `target_uuid parameter is required` |
+| `InstanceAgentExecuteEndpoint` | post | `command_line` | body | string | 200 | **accepted** | queues an `execute` operation whose `commandline` is null |
+| `InstanceAgentGetEndpoint` | post | `path` | body | string | 200 | **accepted** | queues a `get-file` operation whose `path` is null |
+| `InstanceAgentPutEndpoint` | post | `blob_uuid` | body | uuid | 500 | **faults** | the 404 is written `self.api_error(...)`, which does not exist (`instance.py:1955`) |
+| `InstanceAgentPutEndpoint` | post | `mode` | body | string | 500 | **faults** | `int(None)` raises TypeError, and only ValueError is caught (`instance.py:1946`) |
+| `InstanceAgentPutEndpoint` | post | `path` | body | string | 200 | **accepted** | queues `put-blob` and `chmod` operations whose `path` is null |
+| `InstanceInterfacesEndpoint` | post | `network` | body | dict | 400 | **guarded** | `network specification should contain JSON objects` |
+| `InstanceMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `InstanceMetadatasEndpoint` | post | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `InstanceMetadatasEndpoint` | post | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `InstancesEndpoint` | delete | `confirm` | body | boolean | 400 | **guarded** | `parameter confirm is not set true` |
+| `InstancesEndpoint` | post | `cpus` | body | unsignedinteger | 500 | **faults** | `InstanceData` refuses a null `cpus` (`instance.py:360`) |
+| `InstancesEndpoint` | post | `disk` | body | arrayofdict | 400 | **guarded** | `instance must specify at least one disk` |
+| `InstancesEndpoint` | post | `memory` | body | unsignedinteger | 500 | **faults** | `InstanceData` refuses a null `memory` (`instance.py:360`) |
+| `InstancesEndpoint` | post | `name` | body | string | 400 | **guarded** | `instance name must be specified` |
+| `InterfaceMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `InterfaceMetadatasEndpoint` | post | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `InterfaceMetadatasEndpoint` | post | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `LabelEndpoint` | post | `blob_uuid` | body | uuid | 500 | **faults** | `add_index(None)` raises `BlobMissing` (`artifact.py:665`) |
+| `NetworkDNSAddressEndpoint` | delete | `name` | body | string | 406 | **guarded** | `invalid DNS name` |
+| `NetworkDNSAddressEndpoint` | post | `name` | body | string | 406 | **guarded** | `invalid DNS name` |
+| `NetworkDNSAddressEndpoint` | post | `value` | body | ipv4 | 200 | **accepted** | stores `hosteddns[name] = None` and enqueues the dnsmasq update |
+| `NetworkMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `NetworkMetadatasEndpoint` | post | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `NetworkMetadatasEndpoint` | post | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `NetworksEndpoint` | delete | `confirm` | body | boolean | 400 | **guarded** | `parameter confirm is not set true` |
+| `NetworksEndpoint` | post | `name` | body | string | 500 | **faults** | `NetworkData` refuses a null `name` (`network.py:277`) |
+| `NetworksEndpoint` | post | `netblock` | body | netblock | 400 | **guarded** | `cannot parse netblock: None does not appear to be an IPv4 or IPv6 network` |
+| `NodeMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `NodeMetadatasEndpoint` | post | `key` | body | string | 400 | **guarded** | `no key specified` |
+| `NodeMetadatasEndpoint` | post | `value` | body | any | 400 | **guarded** | `no value specified` |
+| `UploadDataEndpoint` | post | `body` | body | binary | 200 | **accepted** | appends nothing and answers the unchanged length; this is the raw body marker, which never reaches `required_names` |
+
+### What the sweep says that F1 did not
+
+**The 7 `faults` are the population #4167 describes, and two of them are
+bugs independent of required-ness.**
+
+* `InstanceAgentPutEndpoint.post` writes its blob refusal as
+  `self.api_error(404, 'blob not found')` (`instance.py:1955`).
+  `api_base.Resource` has no `api_error`, so *any* caller naming a blob
+  which does not resolve -- not merely one who omitted the parameter --
+  gets an `AttributeError`, a recorded exception and an opaque 500
+  instead of the documented 404. Enforcing required-ness closes the
+  omission path and leaves the bad-uuid path exactly as it is.
+* The `mode` guard immediately above it is `try: int(mode) except
+  ValueError`, and `int(None)` raises `TypeError`. This is the example
+  `CompiledEndpoint`'s docstring cites as a parameter "declared
+  required while omitting it has always been accepted"; that was true
+  while `handle_authorization_exceptions` still caught `TypeError` and
+  answered 400, and phase 5 deleted that arm (decision D23). It is now
+  a recorded 500.
+
+The other five faults are a null reaching a constructor: `Artifact.new()`
+splits `source_url`, `Instance.new()` and `Network.new()` hand a null to
+a pydantic model which refuses it, and `Artifact.add_index(None)` raises
+`BlobMissing`. All five are closed by enforcing required-ness, which is
+D32's argument restated in measurements.
+
+**The 6 `accepted` are the contract change.** Four of them are the three
+agent routes, which cheerfully queue an operation carrying a null
+`commandline` or `path` for the guest agent to fail on later; one is
+`NetworkDNSAddressEndpoint.post`, which stores a DNS name pointing at
+null; and one -- `shared` on `ArtifactsEndpoint.post` -- is a genuine
+optional parameter with a sensible default which has simply been
+declared wrongly. Only that last one is a declaration step 2 should
+relax on the evidence here; the other five are cases where the
+declaration is right and the handler is what is lenient.
+
+**The raw body is a special case, and F1 mis-identifies it.** The census
+counts one declaration which is not a handler keyword argument. F1 names
+that as `namespace` on `AuthFederatedEndpoint.post`, "consumed by a
+decorator rather than named by the handler". That is wrong: the
+signature is `post(self, token=None, namespace=None, rule=None)`, so the
+parameter has a default like the other 74. The actual odd one out is
+`UploadDataEndpoint.post`'s `body`, declared with
+`api_base.RAW_BODY_PARAMETER`. `compile_parameters()`
+(`validation.py:225`) sets `raw_body` for it and `continue`s *before*
+adding anything to `required_names`, so this declaration can never
+produce a missing-required finding and step 3's enforcement will never
+reach it whatever step 2 does to the tuple. The counts F1 reports --
+76, 75, 0, 1 -- are unchanged and were re-run on this branch; only the
+example is corrected.
+
+**The better-message risk is smaller than feared.** The plan's risks
+section worries that enforcement replaces a handler's specific message
+with a generic one. 63 of 76 rows are already a 4xx whose message names
+the problem, so step 3 will replace 63 hand-written messages with
+`<parameter>: declared required but not supplied`. Most are already
+generic (`no value specified` on 14 rows, `no key specified` on
+8), but three are materially more informative than the replacement and
+are worth listing in step 6's release note:
+`parameter confirm is not set true` (3 rows),
+`instance must specify at least one disk`, and
+`cannot parse netblock: ...`.
+
 ## Decisions
 
 **D32. The declarations get corrected before required-ness is
@@ -551,4 +731,6 @@ F5 of phase 5 and is true and useless. The difference is one `not`.
 
 ## Progress
 
-Not started.
+Step 1 done: the sweep is
+`shakenfist/tests/external_api/test_required_sweep.py` and its table
+is published above under *Sweep results*. Steps 2 to 6 not started.
