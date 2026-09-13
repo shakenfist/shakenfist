@@ -549,7 +549,7 @@ sentence; a row that does not is the more valuable finding.
 | 3d | medium | sonnet | none | Unit tests in `shakenfist/tests/test_scheduler.py` for the four stage predicates, which have none today (F6): `_has_sufficient_cpu` (`scheduler.py:321`), `_has_sufficient_ram` (`scheduler.py:391`), `_has_sufficient_disk` (`scheduler.py:467`) and `_has_idle_disk_bandwidth` (`scheduler.py:495`). For each, pin both sides of the boundary and the shape of the reason dict it returns, since the reason dict is what the audit event publishes and what a later refactor can silently change. `_has_idle_disk_bandwidth` is the one D25 makes load-bearing: pin the 1200 ms/s threshold from both directions. Follow the existing fixture style in that file; mock metrics the way the surrounding tests do. |
 | 3e | low | sonnet | none | In the `shakenfist/actions` repository, widen the capacity guard census LogQL filter by the two alternations named in D29. Change nothing else. The operator pushes this; it cannot be tested before it merges. Report the exact diff for review rather than assuming it can be verified locally. |
 | 3f | high | opus | none | Re-check phase 0's scarcity inventory against phase 2's dataset and today's issue tracker (D30), and rewrite the dispositions in `docs/plans/PLAN-ci-cloud-sizing-phase-00-decisions.md:253-298` in place. For each row: refresh the issue state, say whether the census frequency in `docs/plans/data/ci-cloud-sizing-baseline/` supports the disposition phase 0 gave it, and link the test from 3b/3c/3d that discharges it. Record that #3907's row was already discharged by `test_claim_lifecycle_and_refusals` (F8) rather than by anything this phase wrote. File issues for anything 3c exposed. Do not re-litigate #3565, which is out of scope. |
-| 3g | medium | sonnet | none | Close-out: set this phase `Complete` in both the master plan's Execution table and the `docs/plans/index.md` row (3 of 7 becomes 4 of 7), write the *What phase 4 inherits* section against what was actually found, run `python3 tools/check-plan-status.py` and `pre-commit run --all-files`, and confirm every Definition of done item below by running it rather than by reading it. |
+| 3g | medium | sonnet | none | Close-out: set this phase `Complete` in both the master plan's Execution table and the `docs/plans/index.md` row (3 of 8 becomes 4 of 8), write the *What phase 4 inherits* section against what was actually found, run `python3 tools/check-plan-status.py` and `pre-commit run --all-files`, and confirm every Definition of done item below by running it rather than by reading it. |
 
 Steps 3a, 3d and 3e are independent of each other. 3b needs 3a.
 3c needs 3a and should follow 3b, because 3b proves the helper
@@ -561,12 +561,12 @@ have used them. 3g is last.
 
 | Risk | Mitigation | Who checks |
 |------|-----------|------------|
-| The fill in 3c starves the other four stestr workers and manufactures the very 507s this plan exists to remove. | D23 bounds the fill to a single hypervisor, and D26 skips when that node is not comfortably free. On `slim-tier` (three nodes, 12 vCPU) filling one 6 vCPU node is half the cluster, which is the worst case; if the merge-run evidence after 3c shows a rise in other tests' 507s, the test is restricted to `slim-primary` by a topology skip rather than kept and tuned. **Amended 2026-09-10:** F1's newest runs show two of three `slim-tier` hypervisors pinned at their ceiling for a whole run, so the headroom this row assumed is not reliably there and D26's skip, not the single-node bound, is the load-bearing mitigation. Expect 3c to skip often on `slim-tier`; a 3c that never skips there is evidence the skip predicate is wrong, not that the cluster is roomy. | The operator, over the merge runs following 3c, against the phase 1 census. |
-| The new tests become the flake source. | Every test skips on ambient shortage (D26), and the Definition of done requires clean merge runs after landing, not just a green branch. | 3g, and the operator. |
+| The fill in 3c starves the other four stestr workers and manufactures the very 507s this plan exists to remove. | D23 bounds the fill to a single hypervisor, and D26 skips when that node is not comfortably free. On `slim-tier` (three nodes, 12 vCPU) filling one 6 vCPU node is half the cluster, which is the worst case; if the merge-run evidence after 3c shows a rise in other tests' 507s, the test is restricted to `slim-primary` by a topology skip rather than kept and tuned. **Amended 2026-09-10:** F1's newest runs show two of three `slim-tier` hypervisors pinned at their ceiling for a whole run, so the headroom this row assumed is not reliably there and D26's skip, not the single-node bound, is the load-bearing mitigation. Expect 3c to skip often on `slim-tier`; a 3c that never skips there is evidence the skip predicate is wrong, not that the cluster is roomy. | The operator, over the merge runs following 3c, against the phase 1 census. **First run, 2026-09-12: no rise.** Five to seven schedule aborts per job, approximately the tests' own, and every guard refusal on the demand dimension rather than on vCPU ledger -- see *What the first merge run answered*. One run, so the row stays open. |
+| The new tests become the flake source. | Every test skips on ambient shortage (D26), and the Definition of done requires clean merge runs after landing, not just a green branch. **First run, 2026-09-12: all four `ok` in all three cluster jobs, none skipped.** That is one run against a prediction of frequent skipping, so it says the tests are not fragile rather than that the predicate is calibrated -- D26 has not yet been seen to fire in anger. | 3g, and the operator. |
 | A test asserts a refusal produced by an unreadable capacity table rather than by a full one, and passes for the wrong reason. | D26 skips on `capacity_degraded` and on a missing capacity row -- the exact distinction phase 2's D19 added the flag to make answerable. | 3b and 3c briefs; mutation testing in 3c. |
 | The refusal contract changes under us when the sibling plan's phase 4 lands, and eight tests need editing. | D27's single helper, and its docstring naming the plan that will change it. | 3a. |
 | ~~#3772 was closed as *fixed* rather than *superseded*, so this phase asserts behaviour someone believes has changed.~~ **Retired 2026-09-10:** the closure was an error and the issue is reopened, so the contract this phase asserts is not expected to change. See F1. | n/a. | Resolved before 3a. |
-| 3e cannot be verified before it merges, the same seam that made phase 2's 2e awkward. | Sequenced early, reviewed as a diff, and confirmed from a real merge run's census section before 3f reads the census. | The operator. |
+| ~~3e cannot be verified before it merges, the same seam that made phase 2's 2e awkward.~~ **Resolved 2026-09-12:** run 34681505274 carried it and its census reports guard refusal counts in all three cluster jobs. | Sequenced early, reviewed as a diff, and confirmed from a real merge run's census section. | The operator, done. |
 
 ## Definition of done
 
@@ -618,60 +618,108 @@ Falsifiable, in order:
 
 ## Outcome
 
-Every step has landed except the parts which by the plan's own
-ordering cannot: 3a, 3b, 3c, 3d and the reachable half of 3f are
-committed; 3e is written but sits uncommitted in the
-`shakenfist/actions` repository, because only the operator pushes
-there.
+**Complete.** Every step has landed: 3a, 3b, 3c, 3d, 3f and 3g in
+this repository, 3e in `shakenfist/actions` (`0c87e8d` through
+`5fe6292`, pushed by the operator 2026-09-05 to 09-08). The two
+Definition of done items which by the plan's own ordering could not
+be satisfied from a worktree were answered by the first merge run to
+carry the phase, and that run's evidence is recorded below rather than
+summarised as "green".
 
-**The phase is not Complete, and its status rows still say
-`In progress` deliberately.** Two Definition of done items cannot be
-satisfied before this branch merges and CI runs it, and marking the
-phase done on a green branch would be exactly the "a status column is
-a claim, not evidence" failure that the phase-completion check exists
-to catch. What remains is named below, not implied.
+The phase deliberately stayed `In progress` for a day after #4170
+merged, because marking it done on a green *branch* would have been
+exactly the "a status column is a claim, not evidence" failure the
+phase-completion check exists to catch. What closed it is a merge run,
+not a branch.
 
 Each Definition of done item was run rather than read:
 
 | # | Result | How it was checked |
 |---|--------|--------------------|
 | 1 | **pass** | `grep -rc` over `shakenfist_ci/` returns the stage string once, in `base.py` alone |
-| 2 | **partial** | The file exists with four tests covering all three of D24's stages, and since the #4170 review its sizing arithmetic is unit tested here (`test_ci_saturation.py`, 17 tests, mutation tested). That the tests pass *on a cluster with no free capacity* is the half no worktree can check |
+| 2 | **pass** | The file exists with four tests covering all three of D24's stages, and its sizing arithmetic is unit tested here (`test_ci_saturation.py`, 17 tests, mutation tested). All four tests reported `... ok` -- not `SKIPPED` -- in all three cluster jobs of run 34681505274, on clusters whose censuses record 30, 13 and 7 nodes dropped for `would exceed hard max CPUs` in the same window |
 | 3 | **pass** | Read from the diff: 19 `skipTest()` paths, 8 `capacity_degraded` references |
 | 4 | **pass** | Mutation tested: with the in-body release deleted, the ledger assertion fails rather than the test passing |
 | 5 | **pass** | 3c reported 33 mutations across both CI topologies and a fractional-limit one, with no unexpected outcome |
 | 6 | **pass** | All four predicates are named by unit tests; three of the four were zero before |
-| 7 | **pending the operator** | Needs a merge run carrying 3e, which is unmerged. Unchanged from what the item already said |
+| 7 | **pass** | Run 34681505274 carried 3e. Its *Capacity guard census* reports `Placements refused by the guard:` 176, 139 and 163 in its three cluster jobs, not a "not collected" notice |
 | 8 | **pass** | Every `file:line` citation in the inventory re-resolved, and every issue state refreshed against `gh` |
 | 9 | **pass** | 3f links a discharging test per row, or states why none exists |
 | 10 | **pass** | Read from the diff: each test's docstring enumerates its failure modes, each marked asserted or skipped |
 | 11 | **pass** | `gh issue view 3772` reports `OPEN`/`REOPENED`, which is what the master plan's phase 3 section now says |
-| 12 | **pass** | `check-plan-status.py` agrees; `pre-commit run --all-files` passes all ten hooks |
+| 12 | **pass** | Re-run at close-out on `develop`: `check-plan-status.py` reports agreement, and `pre-commit run --all-files` passes all ten configured hooks |
 
-What close-out still owes, once this merges and a merge run uses it:
+### What the first merge run answered, 2026-09-12
 
-* **Item 7**, the census section reporting a count rather than a
-  "not collected" notice, which needs 3e pushed first.
-* **Item 2's other half**, and with it the question 3c was written to
-  answer and could not: which of the three refusal paths a real full
-  node actually gives. 3c records it with `addDetail`, so the first
-  merge run answers it -- read that detail rather than the reasoning
-  in 3c's docstring, which is argument, not observation.
-* **The skip rate on `slim-tier`.** The plan predicts 3c skips often
-  there and says a 3c which never skips is evidence the predicate is
-  wrong. Nobody can know yet.
-* **Whether the fill disturbs the other four stestr workers**, which
-  is D23's whole premise and which F1's amendment already weakened.
-* **The cost of 3c's ownership listing** against
-  `load_budget.py`'s database-load budget. It lists every instance in
-  the cluster, and still needs measuring. The #4170 review reduced the
-  worst case from one listing per 5 s poll to one per 30 s plus one at
-  each deadline -- roughly 36 listings down to 7 on a run that waits
-  the full ledger-return deadline -- but a smaller unmeasured cost is
-  still unmeasured.
+Run [34681505274](https://github.com/shakenfist/shakenfist/actions/runs/34681505274)
+is the merge-queue run which produced `f3b245304`, the commit that put
+this phase on `develop`. It carried 3e. Every functional test in all
+three of its cluster jobs passed; the only failing test in the whole
+run was the one described in *The raw-create collision* below, which
+is not a saturation test. Each owed item, against that run:
 
-Only after those are answered should the Execution table and
-`docs/plans/index.md` move to `Complete` and `4 of 7`.
+* **Item 7 -- the census reports a count.** *Capacity guard census*,
+  per job, counted over the whole test window:
+
+  | job | hypervisors seen | guard refusals | measured-load alone | D13 carried it | worst shortfall |
+  |-----|-----|-----|-----|-----|-----|
+  | Debian 12 tier | 3 | 176 | 138 | 38 | 11.649 |
+  | Ubuntu 24.04 cluster | 5 | 139 | 45 | 94 | 9.906 |
+  | Debian 12 cluster | 5 | 163 | 54 | 109 | 11.649 |
+
+  Every refusal in all three was at stage `node` and on the `demand`
+  dimension alone, with 0 forced ground-truth writes past the guard
+  (P5). Two things in that table matter to phase 4. The *three*-node
+  job refuses most often, which is the expected direction. But the
+  attribution inverts with size: on the small cluster measured load
+  alone was already over the bound in 78% of refusals, while on the
+  five-hypervisor jobs it is the D13 feedforward estimate that carries
+  two thirds of them over. Adding hypervisors does not make this bound
+  recede, it changes which half of it binds -- and the feedforward half
+  is a rate prediction, not a cloud out of room. The "hypervisors seen"
+  column is what the samples could see, which as the census itself
+  warns is not the same as how many the cluster had.
+* **Item 2's other half, partly.** The fill test passed on every
+  topology, so a real full node does refuse. **Which** of the three
+  refusal paths it gave is still unrecorded, and the reason is a seam
+  this phase should have seen: 3c records the path with
+  `addDetail()`, and stestr prints details only on a non-`ok`
+  verdict. A test which passes is therefore silent about the one thing
+  the run was supposed to tell us. The census's stage tallies are
+  consistent with the pre-filter having fired -- 2, 3 and 4
+  `sufficient_idle_cpu` aborts across the three jobs against one
+  deliberate abort per impossible-request test -- but that is inference
+  over aggregate counts, not the test's own evidence. The artifact
+  bundle does not rescue it either: the only per-test files in
+  `traces/` are `_emit_tracing_event()`'s timing records, and the
+  full-node test does not write one. **Phase 5 should not
+  repeat this shape:** a fact worth a merge run is worth an assertion
+  or a census field, not an `addDetail()` on the happy path.
+* **The skip rate on `slim-tier`: zero of four.** The plan predicted
+  3c would skip often there and said a 3c which never skips is
+  evidence the predicate is wrong rather than the cluster roomy. One
+  run is not a rate, and this one does not settle it -- but it is the
+  opposite of what F1's amendment led the risk table to expect, and it
+  happened on the hardest job: the three-node one dropped 30 nodes for
+  `would exceed hard max CPUs` where the five-hypervisor jobs dropped
+  13 and 7, so the fill completed there (35.5 s) under more ledger
+  pressure rather than less. Watch it over several runs before
+  concluding either way.
+* **The fill did not disturb the other workers.** Five to seven
+  schedule aborts per job across a whole window -- at most 4 at
+  `sufficient_idle_cpu` and one each at `sufficient_idle_memory`,
+  `sufficient_free_disk` and `affinity_constraints` -- which is
+  approximately the four tests' own deliberate refusals and no blast
+  radius. Every guard refusal in all three jobs was on the `demand`
+  dimension, which is pre-existing D13 noise: this phase claims vCPU
+  ledger, and the ledger dimensions recorded nothing.
+* **The ownership listing's cost was not separately measured**, but it
+  did not breach the budget: `test_no_unbudgeted_fixed_rate_database_polling`
+  passed in both jobs that ran it (246.8 s, 246.9 s). That is weaker
+  evidence than a measurement, and it is weak for a specific reason --
+  the listing is reached only from the skip and failure branches, and
+  nothing skipped or failed, so the expensive path was barely
+  exercised. A run where 3c *does* skip is the one that tests this.
 
 ### Code review, 2026-09-11 (PR #4170)
 
@@ -752,6 +800,56 @@ the unit tests assert the two properties a caller depends on -- the
 result strictly exceeds the reading, and stays a size a create could
 ask for -- rather than enshrining particular return values.
 
+### The raw-create collision, 2026-09-12 (PR #4186)
+
+This phase broke `develop` for most of a day -- from #4170's merge at
+04:47 on 2026-09-12 to the fix at 15:31. The full account, including
+why markers rather than routing was the right fix, is in
+[PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md)
+under *A defect this phase's own guard found on `develop`* -- the
+sibling plan owns the guard, so it owns the story, and this section
+deliberately does not restate it.
+
+In short: phase 2's [#4166] added an AST guard requiring every
+`create_instance()` in the functional suite either to go through
+`BaseTestCase`'s waiting wrapper or to carry a `# raw-create:
+<reason>` marker; this phase's #4170 added `test_saturation.py` with
+four unmarked calls five hours later. Neither was wrong and neither
+could see the other. [#4186] added the markers at 15:31 and run
+34698074952 confirms `Sanity checks` green again.
+
+Three things belong here rather than there, because they are about
+this plan's remaining phases:
+
+* **The blast radius was larger than the pair.** `Sanity checks` is
+  not a required status check, so the queue went on merging over the
+  breakage: `f654d4a05`, `f8c801ebe` and `6435e3fde` all failed the
+  same test and two of them merged anyway. It was briefly invisible
+  as well -- the documentation-sync run in between *skipped* `Sanity
+  checks` on the changed-paths filter rather than passing it, so a
+  green tick sat on a red tree. Whether that check should be required
+  is a repository-configuration question, recorded rather than
+  decided; it would have stopped the follow-on batches but not the
+  original pair.
+* **Phase 5's guardrails are the same shape of change** -- an
+  assertion every topology must satisfy, landing across a tree with
+  other work in flight. A guard which constrains how tests are written
+  needs a story at design time for branches cut before it existed,
+  because no author of such a branch can satisfy it however careful
+  they are. Phase 5 should say what that story is before it writes the
+  assertion.
+* **This phase's own sequencing hid the risk.** 3a through 3d were
+  planned as independent of the sibling plan, and in terms of the code
+  they touch they were. The coupling was a *convention*, which the
+  step plan had no column for. Phase 2's own *What later phases
+  inherit* had even named the dependency -- "a `# raw-create:`
+  convention the sizing plan's phase 3 saturation tests need in order
+  to assert a refusal" -- and this plan still did not read it as
+  something 3c had to do.
+
+[#4166]: https://github.com/shakenfist/shakenfist/pull/4166
+[#4186]: https://github.com/shakenfist/shakenfist/pull/4186
+
 ## What phase 4 inherits
 
 * Deterministic assertions at three of the four capacity stages
@@ -777,13 +875,18 @@ ask for -- rather than enshrining particular return values.
   only inventory row that names a test phase 3 owes and still has
   none; everything else in the table is discharged by a test that
   now exists, or explicitly cannot be.
-* **Two questions only a merge run answers**, both recorded at their
-  rows by 3f: which of the three refusal paths a real full node
-  gives 3c (the #3496 row), and how often the demand guard's waive
-  fails to save a create, which needs a run carrying 3e's widened
-  census filter (the #3813 row). 3f assessed dispositions against
-  measured frequencies, but no test this phase wrote has ever
-  executed, and nothing in the inventory claims otherwise.
+* **The first merge run's answers to 3f's two open questions**, and
+  one of them is still open. How often the demand guard's waive
+  fails to save a create (the #3813 row) is answered and is larger
+  than expected: every guard refusal in all three cluster jobs was on
+  the `demand` dimension alone -- 176, 139 and 163 of them, nothing on
+  an allocation dimension -- so phase 4's resizing arithmetic has to
+  account for a bound its resize does not move. Which of the three refusal paths a real full node
+  gives 3c (the #3496 row) is **not** answered, because 3c records
+  it with `addDetail()` and a passing test prints no details -- see
+  *What the first merge run answered*. Phase 4 either reads it from
+  a census field or asserts it; it should not wait for another run
+  to volunteer it.
 
 ## Back brief
 

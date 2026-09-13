@@ -959,7 +959,7 @@ those are corrected here as well.
 | 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete |
 | 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete |
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete |
-| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | In progress |
+| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete |
 | 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started |
 | 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started |
@@ -1079,6 +1079,22 @@ August, and both are recorded in
   [PLAN-transient-capacity-refusals.md](PLAN-transient-capacity-refusals.md)
   -- a sibling plan which owns making a capacity refusal
   transient, and which this plan deliberately does not touch.
+
+Phase 3 landed on 2026-09-12 and its first merge run settled two
+things this section could only assume. The four saturation tests ran
+without skipping on every topology, including `slim-tier`, where the
+risk table expected frequent skips -- so "growing a cloud cannot
+silence a defect" is now asserted rather than intended. And every
+capacity-guard refusal in that run, in all three cluster jobs, was on
+the `demand` dimension alone -- 176, 139 and 163 of them, none on an
+allocation dimension. Phase 4 resizes against a ledger; the bound that
+actually refused placements in the measured window was a rate
+prediction, and the two are not the same arithmetic. Worse for phase
+4's purposes, the attribution moves the wrong way with size: on the
+three-node job measured load alone was already over the bound in 78%
+of refusals, while on the five-hypervisor jobs the D13 feedforward
+estimate carries two thirds of them. Adding hypervisors changes which
+half of the demand bound binds rather than retiring it.
 
 ### Phase 4 -- Re-shape the topologies
 
