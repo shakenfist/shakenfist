@@ -569,6 +569,92 @@ class NetworkCreateFloatingOverlapTestCase(base.ShakenFistTestCase):
         resp = self._create_network('10.0.2.0/24')
         self.assertEqual(200, resp.status_code)
 
+    @mock.patch('shakenfist.network.network.net_create_and_enqueue')
+    def test_a_row_with_no_netblock_falls_back_to_the_configuration(
+            self, _mock_enqueue):
+        """A floating network row carrying no netblock is not an answer.
+
+        "There is a row" and "the row says what the floating block is"
+        are different facts, and only the second one can turn the guard
+        off. Reading the row's netblock without asking whether it has
+        one would skip the whole guard on an empty value -- the same
+        failure the fallback to the configuration exists to prevent,
+        reached by a different route.
+
+        The row is a stub rather than a real one because Network.new()
+        cannot make this row: it builds an IPAM from the netblock and
+        ipaddress.ip_network('') raises. An empty netblock here is a
+        damaged or half-written row, which is the case a guard is
+        supposed to survive rather than one a caller can ask for.
+        """
+        stub = mock.MagicMock()
+        stub.netblock = ''
+
+        with mock.patch.object(
+                api_network.config, 'FLOATING_NETWORK', '192.168.20.0/24'), \
+                mock.patch.object(api_network.network.Network, 'from_db',
+                                  return_value=stub):
+            resp = self._create_network('192.168.20.0/24')
+        self.assertEqual(400, resp.status_code)
+        self.assertIn('overlaps the floating network', resp.get_json()['error'])
+
+    @mock.patch('shakenfist.external_api.network.LOG')
+    @mock.patch('shakenfist.network.network.net_create_and_enqueue')
+    def test_an_unparseable_configuration_warns(self, _mock_enqueue, mock_log):
+        """Failing open is right, failing open silently is not.
+
+        The guard cannot refuse every network create because a
+        deployment's FLOATING_NETWORK is malformed. But an operator
+        whose safety check has turned itself off has to be able to find
+        out, and the request which triggered it is the only moment
+        anything knows.
+        """
+        with mock.patch.object(
+                api_network.config, 'FLOATING_NETWORK', 'not-a-netblock'):
+            resp = self._create_network('192.168.20.0/24')
+        self.assertEqual(200, resp.status_code)
+
+        mock_log.with_fields.assert_called_with(
+            {'floating_netblock': 'not-a-netblock'})
+        mock_log.with_fields.return_value.warning.assert_called_once()
+        self.assertIn(
+            'the overlap guard is disabled',
+            mock_log.with_fields.return_value.warning.call_args.args[0])
+
+    @mock.patch('shakenfist.network.network.net_create_and_enqueue')
+    def test_an_unauthorised_caller_is_not_told_the_floating_netblock(
+            self, _mock_enqueue):
+        """401 beats 400, and the guard must not leak on the way past.
+
+        The floating network has namespace=None, so an ordinary caller
+        cannot read it. A refusal naming its netblock therefore tells
+        them something the API otherwise does not -- and tells it to a
+        caller whose request was going to be refused as unauthorised
+        anyway. The guard sits below the authorisation check for that
+        reason.
+        """
+        self._create_floating_network('192.168.20.0/24')
+        self.mock_mariadb.create_namespace('tenant', 'key1', 'tenantkey')
+
+        resp = self.client.post(
+            '/auth',
+            data=json.dumps({'namespace': 'tenant', 'key': 'tenantkey'}))
+        self.assertEqual(200, resp.status_code)
+        tenant_token = 'Bearer %s' % resp.get_json()['access_token']
+
+        resp = self.client.post(
+            '/networks',
+            headers={'Authorization': tenant_token},
+            data=json.dumps({
+                'name': 'overlapnet',
+                'netblock': '192.168.20.0/24',
+                'namespace': 'system',
+            }))
+        self.assertEqual(401, resp.status_code)
+        self.assertNotIn(
+            'overlaps the floating network', resp.get_json()['error'])
+        self.assertNotIn('192.168.20.0/24', resp.get_json()['error'])
+
 
 class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
     """Regression tests for step 4f: REST handlers call raise_for_error()

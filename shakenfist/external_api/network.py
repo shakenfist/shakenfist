@@ -20,8 +20,8 @@ from webargs.flaskparser import use_kwargs
 from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist.network import network
-from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
@@ -267,39 +267,6 @@ class NetworksEndpoint(api_base.Resource):
             return sf_api.error(
                 400, 'cannot parse netblock: %s' % e, suppress_traceback=True)
 
-        # Refuse a netblock which overlaps the floating network. This is a
-        # handler guard rather than a schema check (issue 323): whether a
-        # netblock overlaps depends on the deployed floating network, which
-        # is cluster configuration the compiled schema cannot see. D34 keeps
-        # it working under warn/off for the same reason.
-        #
-        # network.floating_network() creates the object on first use, so a
-        # cluster which has not needed a floating IP yet has the netblock in
-        # its configuration but no row to read. Look the object up the way
-        # that function does, minus the create -- a guard which brought a
-        # network into being as a side effect of validating a request would
-        # be a poor trade -- and fall back to the configuration when there
-        # is no row, so the guard also holds before the network node
-        # bootstraps. The row wins where both exist: FLOATING_NETWORK can be
-        # edited after the network is created, and the row is what floating
-        # IPs are actually allocated from.
-        fn = network.Network.from_db(FLOATING_NETWORK_UUID, suppress_failure_audit=True)
-        floating_netblock = fn.netblock if fn else config.FLOATING_NETWORK
-        if floating_netblock:
-            try:
-                floating_block = ipaddress.ip_network(floating_netblock)
-            except ValueError:
-                # A floating netblock we cannot parse is a deployment
-                # problem, and refusing every network create until it is
-                # fixed would be a worse one. Let the create through.
-                floating_block = None
-            if floating_block and n.overlaps(floating_block):
-                return sf_api.error(
-                    400,
-                    'netblock %s overlaps the floating network (%s)'
-                    % (n, floating_block),
-                    suppress_traceback=True)
-
         if not namespace:
             namespace = request_namespace()
 
@@ -307,6 +274,52 @@ class NetworksEndpoint(api_base.Resource):
         if request_namespace() not in [namespace, 'system']:
             return sf_api.error(
                 401, 'only admins can create resources in a different namespace')
+
+        # Refuse a netblock which overlaps the floating network. This is a
+        # handler guard rather than a schema check (issue 323): whether a
+        # netblock overlaps depends on the deployed floating network, which
+        # is cluster configuration the compiled schema cannot see. D34 keeps
+        # it working under warn/off for the same reason.
+        #
+        # Below the authorisation check on purpose, unlike the netblock
+        # parse above it. The parse is a pure input check and can answer
+        # anyone; this reads cluster state and names the floating netblock
+        # in its refusal, which a caller with no rights in this namespace
+        # has no other way to learn -- the floating network has
+        # namespace=None. An unauthorised request must get its 401.
+        #
+        # network.floating_network() creates the object on first use, so a
+        # cluster which has not needed a floating IP yet has the netblock in
+        # its configuration but no row to read. Look the object up the way
+        # that function does, minus the create -- a guard which brought a
+        # network into being as a side effect of validating a request would
+        # be a poor trade -- and fall back to the configuration when the row
+        # is absent *or* carries no netblock, so the guard also holds before
+        # the network node bootstraps. The row wins where both exist:
+        # FLOATING_NETWORK can be edited after the network is created, and
+        # the row is what floating IPs are actually allocated from.
+        fn = network.Network.from_db(FLOATING_NETWORK_UUID, suppress_failure_audit=True)
+        floating_netblock = fn.netblock if fn and fn.netblock else config.FLOATING_NETWORK
+        if floating_netblock:
+            try:
+                floating_block = ipaddress.ip_network(floating_netblock)
+            except ValueError:
+                # A floating netblock we cannot parse is a deployment
+                # problem, and refusing every network create until it is
+                # fixed would be a worse one. Let the create through -- but
+                # say so, because a safety check which turns itself off
+                # silently leaves the deployment problem invisible until a
+                # real collision finds it.
+                LOG.with_fields({'floating_netblock': floating_netblock}).warning(
+                    'Cannot parse the floating network netblock; the overlap '
+                    'guard is disabled')
+                floating_block = None
+            if floating_block and n.overlaps(floating_block):
+                return sf_api.error(
+                    400,
+                    'netblock %s overlaps the floating network (%s)'
+                    % (n, floating_block),
+                    suppress_traceback=True)
 
         n = network.Network.new(name, namespace, netblock, provide_dhcp,
                                 provide_nat, provide_dns=provide_dns)
