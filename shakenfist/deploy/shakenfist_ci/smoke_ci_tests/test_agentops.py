@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import uuid
 
 from testtools import content
 
@@ -176,6 +177,13 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
 
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
+
+        # A well-formed blob uuid which names no blob is a 404, not an
+        # opaque 500 (issue 4194).
+        self.assertRaises(
+            apiclient.ResourceNotFoundException,
+            self.test_client.instance_put_blob,
+            inst['uuid'], str(uuid.uuid4()), '/tmp/foo', 'ugo+r')
 
         aop = self.test_client.instance_put_blob(
             inst['uuid'], blob_uuid, '/tmp/foo', 'ugo+r')

@@ -285,6 +285,24 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
                         return_value=mock.MagicMock()):
             return self._post(body, path='agent/put')
 
+    def test_put_of_a_missing_blob_is_a_404_not_a_500(self):
+        # Issue #4194: this arm used to call self.api_error, a method
+        # which does not exist, so a well-formed uuid naming no blob
+        # raised AttributeError and answered an opaque 500. The uuid is
+        # valid and passes every schema check; Blob.from_db returning
+        # None is exactly what a deleted blob, a typo or a uuid from
+        # another cluster produces.
+        with mock.patch('shakenfist.external_api.instance.Blob.from_db',
+                        return_value=None):
+            resp, new = self._post(
+                {'blob_uuid': str(uuid4()), 'path': '/tmp/README.md',
+                 'mode': '33188'},
+                path='agent/put')
+        self.assertEqual(404, resp.status_code, resp.get_json())
+        self.assertEqual(
+            {'error': 'blob not found', 'status': 404}, resp.get_json())
+        new.assert_not_called()
+
     def test_put_accepts_both_parameters(self):
         resp, new = self._put(deadline_seconds=45,
                               progress_timeout_seconds=15)

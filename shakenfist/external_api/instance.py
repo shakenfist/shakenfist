@@ -1952,7 +1952,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
 
         b = Blob.from_db(blob_uuid)
         if not b:
-            return self.api_error(404, 'blob not found')
+            return sf_api.error(404, 'blob not found')
 
         commands = [
             {
