@@ -7,7 +7,8 @@ Parent plan:
 pattern is the existing loop", and that is true of the mechanism. What
 takes the planning above mechanical is not the loop but the bill: the
 publish this phase makes conditional is not one database write, it is
-a ten-round-trip sweep, and the master plan's section costed it as
+a fifteen-round-trip sweep, and the master plan's section costed it
+as
 though the cheap half (the libvirt poll) were the whole of it. The
 decisions below are mostly about that.
 
@@ -399,11 +400,41 @@ it.
 
 This is a real defect in the tool rather than a reason to give the new
 entries fabricated measurements, and definition-of-done item 10
-already requires the round trip to work. The fix is to emit the block
-only when there is one, the way `note` and `provisional` are already
-handled a few lines above. It is in scope for 3d despite being outside
-the yaml, because a budget file that cannot be re-derived is not a
-budget file.
+already requires the round trip to work. It is in scope for 3d despite
+being outside the yaml, because a budget file that cannot be
+re-derived is not a budget file.
+
+*Amended after review of the PR, which found this decision had stopped
+one symptom short of the disease.* Not raising `KeyError` is not the
+same as surviving, and the two new entries would not have survived.
+`main()` builds `entries` only from the pairs which clear
+`--minimum-mean-qps`, and `emit()` iterates `entries`, consulting the
+previous file per key. A pair the new measurement does not see is
+therefore never written at all -- and a pair with no measurement is
+exactly a pair no measurement saw. The marks, the notes and #4197
+would have gone with them, turning `UpsertNodeMetrics` back into
+unbudgeted polling, which the coverage text says the CI check treats
+as a new poll and fails on.
+
+Three fixes rather than one, then:
+
+1. `emit()` also writes carried pairs which have **no** `measured:`
+   block. That absence is the signal, and it needs no new field to
+   carry it: `to_entry()` always sets a measurement, so an entry
+   without one can only have been written by hand for a call the fit
+   could not see. A pair which *was* fitted and has now fallen below
+   the cut is still dropped -- it has a measurement saying it used to
+   matter and no longer does, and dropping it is what the cut is for.
+2. No fallback to the previous file's `measured:` block. Every other
+   carried value is judgement, which stays true across a
+   re-measurement; a measurement is a fact about one window, and the
+   emitted `_doc.window` names a different one. It would be the single
+   carried value that is false.
+3. `wrapped_block()` breaks on neither hyphens nor long words. A
+   folded scalar turns the newline back into a space, so a wrap inside
+   `one-per-publish` came back as `one-per- publish` -- text degrading
+   a little on every re-derivation. Found because the new round-trip
+   test compares notes exactly.
 
 ### D27 -- Regenerate the Prometheus rules in the same commit
 
@@ -457,7 +488,8 @@ were made in the planning commit and are not a step here.
 
 **A publish storm during CI teardown.** Six instances deleted in
 quick succession on one node produce up to one publish per 5 s poll
-while the set keeps moving, each costing ten database round trips.
+while the set keeps moving, each costing fifteen database round
+trips.
 Bounded by D19 and D21 to 12 publishes per node per minute worst case
 -- 3/s per node, 17/s on the six-node reference cluster. *Mitigation:*
 the worst case is written down here so it can be checked rather than
@@ -538,8 +570,12 @@ Falsifiable, in order:
    and `GetNodeDaemonState`/`resources` are all still enforced. Check
    by reading `enforced()`'s inputs, not by reading the diff.
 10. `tools/derive-database-load-budget.py` round-trips the new marks
-    and notes without dropping them, and without raising on an entry
-    that carries no `measured:` block (D26). The whole of
+    and notes (D26): a re-derivation whose measurement window does not
+    contain them neither raises nor drops them, does not stamp them
+    with a window they were not measured in, and returns their note
+    text byte for byte. A pair which was fitted and has fallen below
+    the cut is still dropped. Both halves are tested, and deleting the
+    carry-forward makes exactly one test fail. The whole of
     `test_derive_database_load_budget.py` passes.
 11. `examples/prometheus-database-load-rules.yaml` is regenerated in
     the same commit as the budget, the two newly marked pairs are gone
@@ -575,7 +611,8 @@ reads its numbers.
 Restate before starting: which of the two ledgers this phase makes
 fresher and which it deliberately leaves alone; why the trigger
 watches set membership rather than a count or a vCPU total; the
-ten-round-trip cost of a publish and the worst-case rate D19 and D21
+fifteen-round-trip cost of a publish and the worst-case rate D19
+and D21
 bound it to; and which budget pairs lose enforcement and what is meant
 to restore it.
 

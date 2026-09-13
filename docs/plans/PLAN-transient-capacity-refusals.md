@@ -721,8 +721,8 @@ Plan at medium effort; the pattern is the existing loop.
 
 Three things this section originally got wrong, corrected when
 phase 3 was planned and set out in full under *What the survey
-found* there. A publish is not a single write: it is a ten
-round-trip `_get_stats()` sweep, seven of them queue-depth reads,
+found* there. A publish is not a single write: it is a fifteen
+round-trip `_get_stats()` sweep, twelve of them queue-depth reads,
 so the cadence change has a bill worth bounding. There is no
 `UpsertNodeMetrics` entry in the budget file to amend -- entries
 must be added -- and `activity_coupled` does not refine the model,
