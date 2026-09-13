@@ -69,6 +69,7 @@ The following projects are subject to consistency audits:
 - cloudgood
 - development
 - divergulent
+- hunkydory
 - instar
 - kerbside
 - kerbside-client
