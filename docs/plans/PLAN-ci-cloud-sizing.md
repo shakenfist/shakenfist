@@ -1166,25 +1166,34 @@ from journals: `slim-tier`'s three hypervisors publish ledgers of
 its two small nodes sat at 1.000 peak, which is the whole argument
 for sizing per node.
 
-**The cause of those ledger-3 nodes is an open question, and phase
-4 gates on it.** An earlier draft of this section attributed them
-to a 4-thread `NODE_CPU_RESERVATION_THREADS` on the infra nodes.
-That value is 2 everywhere -- one definition at
-`deploy/collection/roles/node/defaults/main.yml:24`, templated once
-at `roles/node/templates/config:30`, with no per-host or per-role
-override anywhere in the collection or in `shakenfist/actions` --
-and `max(1, 4 threads - 2)` gives `cpu_schedulable` 2 and a ledger
-of 6, which is what four of `slim-primary`'s five hypervisors
-actually show. Every topology file creates every node with
-`cpu: 4`, so identically sized guests are reporting different
-thread counts, and the ones reporting fewer are exactly those
-carrying an infra role beyond plain hypervisor. Since this phase's
-thesis is that a larger guest raises the infra hypervisors'
-ledger, and that follows only if their `cpu_schedulable` tracks
-their vCPU count, the mechanism has to be established before a
-shape is chosen. See
-[PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md)
-F2 and D1.
+**Those ledger-3 nodes are the infra hypervisors, and the cause is
+now pinned to a line.** The per-host CPU thread reservation is
+computed by the deployment playbook CI actually runs, at
+`examples/_shared/site.yml:359-363`:
+`(1 + ((node_is_network_node or node_is_database_node) ? 1 : 0)) * 2`.
+So a node carrying the network or database role reserves **4**
+threads and a plain hypervisor reserves 2. On a 4 vCPU guest that
+makes `cpu_schedulable` `max(1, 4 - 4)` = 1 -- the degenerate case
+floored by the helper at
+`daemons/resources/main.py:126` -- and a ledger of
+`floor(1 x 3.0)` = 3, against `max(1, 4 - 2)` = 2 and a ledger of 6
+on a plain hypervisor. Verified against the rendered
+`/etc/sf/config` of every node in phase 3's merge run, not derived.
+Note that the value appears nowhere in the collection or in
+`shakenfist/actions`: the role default of 2
+(`deploy/collection/roles/node/defaults/main.yml:24`) is only the
+fallback for a caller that does not set it, and this caller always
+does. Anything reasoning about how a CI node is configured has to
+read that playbook as well as the collection and the CI harness.
+
+The reservation is absolute rather than proportional, so it does not
+scale with the guest: raising an infra node from 4 to 6 vCPU takes
+its ledger 3 -> 6, and to 8 vCPU takes it to 12, while the same
+change on a plain hypervisor gives 12 and 18. Phase 4's own D3
+records the consequence the candidate table does not -- uniform 6
+vCPU sizing gives `slim-tier` ledgers of 6 / 6 / **12**, because the
+plain node gains proportionally more, and 6 vCPU only lifts an infra
+node to where a plain hypervisor already sits today.
 
 Two further things the shape has to answer to. The master plan's
 criterion stands -- any shape that leaves an infra hypervisor at a

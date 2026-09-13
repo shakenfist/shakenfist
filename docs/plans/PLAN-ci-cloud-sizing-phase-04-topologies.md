@@ -77,63 +77,49 @@ The candidate-shapes table's `Ledger` column (`slim-primary` 27,
 claim that the binding number is per node: `slim-tier`'s cluster p90
 committed/ledger was 0.833 while its two small nodes sat at 1.000.
 
-### F2 -- ...but the stated cause of the ledger-3 nodes does not exist
+### F2 -- ~~the stated cause of the ledger-3 nodes does not exist~~ **WRONG, and corrected by 4a**
 
-**This is the finding that changes the phase.** The phase 4 section
-explains those ledgers as:
+**This finding was mistaken, and the mistake is recorded rather than
+deleted because it is the reason this phase has a gate at all.** See
+*4a -- what the gate found* below for the truth: the infra-role
+reservation bump is real, it is 4 threads, and it lives in
+`examples/_shared/site.yml:359-363` in this repository -- the
+deployment playbook CI actually runs
+(`actions/tools/deploy-collection.sh:65`). The master plan's original
+explanation was right.
 
-> the binding constraint is `NODE_CPU_RESERVATION_THREADS=4` on the
-> 4-thread infra nodes -> `cpu_schedulable=max(1,0)=1` -> limit 3
+What this finding got right: the measured ledgers (F1), that
+`node_cpu_reservation_threads` is **2** in
+`deploy/collection/roles/node/defaults/main.yml:24`, that nothing in
+the collection or in `shakenfist/actions` overrides it, and that the
+ledger-3 nodes correlate exactly with carrying an infra role.
 
-There is no 4 anywhere. `node_cpu_reservation_threads` is **2**, set
-once at
-`shakenfist/deploy/collection/roles/node/defaults/main.yml:24` and
-templated once at `roles/node/templates/config:30`. Nothing in the
-collection, nothing in `shakenfist/actions` (no match for
-`reservation` in its `ansible/` or `.github/` trees), and nothing in
-the CI inventory overrides it per host or per role.
+What it got wrong, and why: it concluded from those greps that no 4
+exists anywhere. The role default is only the fallback for a caller
+that does not set the variable, and CI's caller always sets it, so the
+value never appears in the role, the collection or the CI repository
+at all -- it is computed by the playbook and arrives as a
+caller-supplied fact. Two things in the tree actively encouraged the
+wrong conclusion: `scheduler.py:213-214` states "there is no longer an
+infra-role bump", which is true of the synthetic fallback it annotates
+and false as a statement about the system; and `config.py:614`
+describes the templating as "folding in any historical infra-role
+bump", where "historical" reads as "since removed" rather than as
+"still applied, by the deployer".
 
-The arithmetic is not in doubt:
-`_compute_reservations()` publishes
-`cpu_schedulable = max(1, cpu_threads - cpu_reservation_threads)`
-(`shakenfist/daemons/resources/main.py:126`), and
-`_derive_cpu_memory_limits()` takes
-`limit_cpus = floor(cpu_schedulable x CPU_OVERCOMMIT_RATIO)` with the
-ratio at 3.0 (`shakenfist/mariadb.py:24596`,
-`shakenfist/config.py:568`). A 4-thread guest with a reservation of 2
-therefore has `cpu_schedulable` 2 and a ledger of **6** -- which is
-what four of `slim-primary`'s five hypervisors show. The ledger-3
-nodes have `cpu_schedulable` 1, which needs `cpu_threads <= 3`.
+**The lesson for the rest of this plan, and for phase 5.** A grep over
+the collection and the CI repository is not a survey of how a CI node
+is configured: the answer was in a third place, the example deployment
+playbook, which is neither the product nor the CI harness but is what
+CI runs. Any later phase reasoning about a CI node's configuration has
+to read `examples/_shared/site.yml` as well.
 
-Every topology file creates every node with `cpu: 4`. So identically
-sized guests are reporting different thread counts, and the nodes that
-report fewer are exactly the ones carrying an infra role beyond plain
-hypervisor:
-
-| Node | Groups | Measured ledger |
-|---|---|---|
-| `slim-primary` sf1 | `hypervisors, network_node, allsf` | 3 |
-| `slim-primary` sf2-sf5 | `hypervisors, allsf` | 6 |
-| `slim-tier` primary | `allsf,database_node,primary_node,network_node,hypervisors` | 3 |
-| `slim-tier` sf1 | `hypervisors, database_node, allsf` | 3 |
-| `slim-tier` sf2 | `hypervisors, allsf` | 6 |
-
-The correlation is perfect and the mechanism is unknown. One candidate
-worth checking first: `config.py:614`'s own description says the
-Ansible templating folds in "any historical infra-role bump", which
-reads like documentation of a mechanism that has since been removed --
-so the bump may have been deleted while the observed behaviour has
-another cause entirely.
-
-**Why this gates the phase.** Phase 4's thesis is that giving the
-infra hypervisors more vCPU raises their ledger. That follows only if
-their `cpu_schedulable` tracks their guest vCPU count. If it does not
--- if something else is holding it at 1 -- then growing those guests
-buys nothing on the nodes that actually refuse, and the phase spends
-under-cloud capacity to move the four nodes that were never the
-problem. Choosing a shape before this is known would be sizing against
-an unexplained number, which is the same mistake the master plan's own
-*A node can record twice its own ledger* section exists to prevent.
+D1's gate therefore rested on a false premise, and was still worth
+running -- not because the reshape was in doubt, but because the same
+step established the exact arithmetic D3 needs, found that 6 vCPU only
+brings an infra node up to where a plain hypervisor already sits, and
+turned up the silent-clamp defect below. That is a weaker
+justification than the one D1 was written with, and D1 says so now.
 
 ### F3 -- The bound that refused placements is not the one being resized
 
@@ -225,32 +211,155 @@ is right (F1) and the shapes remain the right menu; the reader just
 has to know which column is scheduling capacity and which is
 under-cloud spend.
 
+### 4a -- what the gate found
+
+**The mechanism exists, F2 was looking in the wrong repository, and the
+master plan's original arithmetic was right all along.**
+`NODE_CPU_RESERVATION_THREADS` really is **4** on the infra nodes. It
+is not in the collection and not in `shakenfist/actions`; it is
+computed by the deployment playbook in *this* repository, at
+`examples/_shared/site.yml:359-363`:
+
+```yaml
+- name: Default the per-host CPU thread reservation
+  ansible.builtin.set_fact:
+    node_cpu_reservation_threads: >-
+      {{ (1 + ((node_is_network_node or node_is_database_node) | ternary(1, 0))) * 2 }}
+  when: node_cpu_reservation_threads is not defined
+```
+
+The infra-role bump was not removed. It was *moved* -- out of the
+server and into the deployer -- which is exactly what
+`config.py:614`'s "folding in any historical infra-role bump" is
+describing, and what `scheduler.py:213-214`'s "there is no longer an
+infra-role bump" means (it is a statement about the scheduler's
+*synthetic fallback* only, covered by
+`test_old_dialect_fallback_ignores_infra_role`). F2's grep of the
+collection role and of `shakenfist/actions` could not find it because
+the value reaches the role as a caller-supplied variable;
+`roles/node/defaults/main.yml:24`'s 2 is only the fallback for a
+caller that does not set it, and CI's caller always sets it
+(`actions/tools/deploy-collection.sh:65` runs
+`examples/_shared/site.yml`).
+
+Proven from the run-34681505274 bundles, the rendered `/etc/sf/config`
+of every node:
+
+| Topology | Node | Roles | `..._CPU_RESERVATION_THREADS` | `cpu_schedulable` | Ledger |
+|---|---|---|---|---|---|
+| `slim-tier` | primary | hyp, network, database | 4 | 1 | 3 |
+| `slim-tier` | sf1 | hyp, database | 4 | 1 | 3 |
+| `slim-tier` | sf2 | hyp | 2 | 2 | 6 |
+| `slim-primary` | primary | database (**not** hyp) | 4 | n/a | n/a |
+| `slim-primary` | sf1 | hyp, network | 4 | 1 | 3 |
+| `slim-primary` | sf2-sf5 | hyp | 2 | 2 | 6 |
+
+So on the infra nodes `cpu_schedulable = max(1, 4 - 4) = max(1, 0) =
+1` -- the degenerate case that
+`test_schedulable_floors_at_one` exists to cover -- and
+`limit_cpus = floor(1 x 3.0) = 3`. On the plain hypervisors
+`max(1, 4 - 2) = 2` and `floor(2 x 3.0) = 6`. Nothing is
+guessing, nothing is stale and nothing is on the scheduler's fallback:
+`cpu_schedulable` is published and truthy on all five nodes in all 237
+samples across the two series, `cpu_committed_row_present` is true
+throughout, and `_get_hybrid_core_counts()`
+(`shakenfist/daemons/resources/main.py:72-99`) returns only
+`cpu_cores_performance` / `cpu_cores_efficiency` so it cannot overwrite
+`cpu_schedulable`, `cpu_threads` or `cpu_cores`. `psutil` sees a
+perfectly ordinary 4-thread guest; the cross-check is that all three
+`slim-tier` nodes publish `ram_max` 35880 = 11960 x
+`RAM_OVERCOMMIT_RATIO` 3.0, so they are identically sized and only the
+reservation differs.
+
+**The RAM reservation is clamped on the same nodes, for the same
+reason.** `site.yml:352-357` gives infra nodes
+`max(2.0, 10% of RAM) + 4.0` = 6.0 GB, and `_compute_reservations()`
+caps a reservation at half the machine
+(`shakenfist/daemons/resources/main.py:119-120`), so the published
+`memory_reserved_mb` is 5980 = 11960 // 2 rather than 6144. Both of
+the production reservations are saturating their safety clamps on
+these guests. A 4 vCPU / 12 GB guest is simply too small to carry an
+infra role at production reservation values: the bump assumes a node
+where 4 threads and 6 GB are a modest slice, and on this guest they
+are 100% of the CPU and 51% of the RAM.
+
+**Answer to the question the phase turns on: yes, growing the guest
+raises `cpu_schedulable`, linearly, because the reservation is
+absolute and does not scale with the guest.** The bump is a fixed 4
+threads whatever the node's size, so:
+
+| Guest vCPU | Infra node (`res` 4) | Plain hypervisor (`res` 2) |
+|---|---|---|
+| 4 (today) | sched 1, ledger **3** | sched 2, ledger **6** |
+| 6 | sched 2, ledger **6** | sched 4, ledger **12** |
+| 8 | sched 4, ledger **12** | sched 6, ledger **18** |
+
+Two consequences for D3 and D4, which are for the operator to rule on:
+
+1. D3's three 6 vCPU `slim-tier` nodes give ledgers **6, 6, 12** (24
+   total, up from 12), not 6, 6, 6. The infra nodes double, and the
+   plain node quadruples as a side effect of the uniform size.
+2. Six vCPU only lifts the infra nodes to where today's *plain*
+   hypervisors already sit. If the intent is that no hypervisor is
+   materially smaller than another, the infra nodes need **8** vCPU to
+   reach a ledger of 12, or the topology needs a per-host
+   `node_cpu_reservation_threads` in inventory -- which the playbook
+   explicitly supports (`when: ... is not defined`) but which would be
+   a deliberate departure from production values and therefore a D1
+   question, not a free choice.
+
+**Is it a defect?** The arithmetic is correct behaviour, and the
+correlation with roles is a property of the deployment playbook rather
+than of the CI under-cloud. Two small real defects fall out, neither
+of which this phase fixes:
+
+- `shakenfist/scheduler.py:213-214` asserts "there is no longer an
+  infra-role bump". True of the fallback it is commented on, false as
+  a statement about the system, and it is what sent F2 looking in the
+  wrong place. Worth narrowing to "the *synthetic fallback* no longer
+  applies a role-aware bump; the deployer does, per host".
+- A node whose reservation meets or exceeds its thread count is
+  rescued silently by `max(1, ...)`, and a node whose RAM reservation
+  exceeds half the machine is rescued silently by the `// 2` cap.
+  Nothing logs, events or publishes a flag when either clamp engages,
+  so a node reserving 100% of its CPU looks indistinguishable from a
+  node with one spare thread. Had either clamp emitted an audit event,
+  this gate would have been a single `/admin/resources` read. Filed as
+  [#4201](https://github.com/shakenfist/shakenfist/issues/4201), whose
+  body says explicitly that the clamps themselves are the right
+  failure mode and must not be removed, that the CI reservation must
+  not be lowered to dodge them, and that the scheduler must not be
+  made to tolerate a zero ledger -- the defect is that they are quiet.
+  Out of scope here by this plan's Scope section.
+
 ## Decisions
 
-### D1 -- F2 is a gate, not a step
+### D1 -- F2 was a gate, and it has been discharged
 
-Step 4a establishes why the infra nodes publish `cpu_schedulable` 1,
-and **no topology file is edited until it reports.** If it finds the
-cause is the guest's thread count and that a larger guest raises it,
-the rest of the phase proceeds as the master plan intended. If it
-finds something else -- a resources-daemon defect, a libvirt topology
-artefact, a stale metrics row -- then 4c's shape choice is made with
-that knowledge, and the phase may correctly conclude that reshaping is
-not the fix and stop.
+**Status: closed by 4a on 2026-09-13, and the premise it rested on was
+wrong.** The gate said no topology file could be edited until the
+mechanism behind `cpu_schedulable` 1 was established. 4a established
+it: the infra-role reservation bump is real, is 4 threads, and lives at
+`examples/_shared/site.yml:359-363`. The master plan's original
+explanation was correct and F2's contradiction of it was a bad survey,
+so the question the gate existed to answer did not actually need
+asking.
 
-The reviewer most likely to object will say this is over-caution for
-an obvious change: four of five nodes behave as the arithmetic
-predicts, so the fifth is probably a quirk that a bigger guest fixes
-anyway. The counter-argument is that this phase's entire justification
-is spending more under-cloud capacity per run to raise a specific
-number on specific nodes, the master plan says in as many words that
-"any shape that leaves an infra hypervisor at a ledger of 3 leaves the
-failure in place", and the cited explanation for that ledger is
-demonstrably absent from the tree. Spending the capacity and finding
-out afterwards is the expensive order to do this in -- a merge run
-costs six clouds, and the answer is one reading of `/admin/resources`
-against one node's metrics row.
+The record stays rather than being tidied away, because the honest
+account of the cost is useful. The gate was justified on "the cited
+cause is demonstrably absent from the tree", which was false. It was
+*worth running anyway*, for three things that were not in the plan
+before it: the exact per-guest-size arithmetic D3 now uses; the
+finding that 6 vCPU lifts an infra node only to where a plain
+hypervisor already sits, which changes the shape question; and the
+silent-clamp defect. But "the gate paid for itself" is not the same
+claim as "the gate was correctly motivated", and only the first is
+true here.
 
+What a reviewer should take from it: the cheap check that would have
+avoided the whole detour is reading `examples/_shared/site.yml`
+alongside the collection, because that playbook is what CI deploys
+with. F2 now says so, and phase 5 inherits it.
 ### D2 -- Land `slim-tier` first, and alone
 
 The master plan says "land one topology at a time so a regression is
@@ -260,21 +369,51 @@ it is where the evidence is strongest (two of three nodes pinned at
 job rather than three), and because at 3 x 6 vCPU it is the cheapest
 shape in the table that changes anything: +6 vCPU, no extra RAM.
 
-### D3 -- `slim-tier` becomes three 6 vCPU nodes
+### D3 -- `slim-tier` becomes three 6 vCPU nodes, and the case for 8 is real
 
-Of the menu, this is the smallest shape that raises the infra
-hypervisors rather than only the total, which is the master plan's own
-criterion. Predicted per-node ledgers 6 / 6 / 12 for a total of 24,
-doubling the tier -- **conditional on F2 resolving in the direction D1
-describes.** `tier as 3 x 8 vCPU` reaches 42 but costs +12 vCPU for a
-ledger the tier has never needed; the measured p90 is 10 committed
-vCPU against a ledger of 12, so 24 leaves real headroom without
-buying a third more under-cloud CPU.
+Of the menu, three 6 vCPU nodes is the smallest shape that raises the
+infra hypervisors rather than only the total, which is the master
+plan's own criterion. With 4a's arithmetic the predicted per-node
+ledgers are **6 / 6 / 12** for a total of 24, doubling the tier:
+the two infra nodes go `max(1, 6-4) = 2` so `floor(2 x 3) = 6`, and
+the plain node goes `max(1, 6-2) = 4` so `floor(4 x 3) = 12`. The
+plain node gains proportionally more, which the candidate table's flat
+"Ledger 24" does not show.
+
+**The argument against, which 4a surfaced and which a reviewer may
+prefer:** 6 vCPU only lifts an infra hypervisor to a ledger of 6,
+which is exactly where a *plain* hypervisor sits today. If the goal is
+that no hypervisor is materially smaller than its siblings -- and the
+master plan's criterion is that any shape leaving an infra hypervisor
+small "leaves the failure in place" -- then 8 vCPU is the shape that
+delivers it: ledgers 12 / 12 / 18, and a `SCHEDULER_TARGET_LOAD` bound
+of 3.0 rather than 1.5 on the nodes that refuse.
+
+This decision stays at 6 for now, for two reasons, and it is the
+decision in this plan most likely to be argued with. First, cost: 8
+vCPU is +12 vCPU per tier cloud against 6's +6, on an under-cloud the
+master plan's *The under-cloud budget this spends* section treats as
+the binding resource. Second, evidence: the measured p90 is 10
+committed vCPU against a ledger of 12, so 24 already leaves real
+headroom, and the refusals in phase 3's window were on the demand
+bound (F3), where 6 vCPU already triples the infra nodes' bound from
+0.75 to 1.5. If 4d's merge runs show demand refusals persisting at 6
+vCPU, the answer is 8 -- and D3 should be revised then, on evidence,
+rather than guessed at now.
+
+A third option exists and is deliberately not taken: setting
+`node_cpu_reservation_threads` per host in the CI inventory, which
+`examples/_shared/site.yml:363`'s `when: ... is not defined` explicitly
+supports. That would raise the infra nodes' ledger without buying any
+vCPU at all. It is rejected because it departs from production
+reservation values in CI, which the master plan's D1 keeps deliberately
+-- the clouds are meant to admit the way a real cluster admits. It is
+recorded here because it is the cheapest option and a reviewer should
+see that it was considered and why it lost.
 
 Node count stays at three, which F6 shows is forced: two would break
 both `test_network_lifecycle` and the two `>=3 nodes` scheduler tests,
 and the tier's purpose is its two database nodes.
-
 ### D4 -- `slim-primary` is a separate step, and may not happen in this phase
 
 It has one ledger-3 node out of five, a cluster p90 fraction well
@@ -330,6 +469,178 @@ claims 4a does not touch (F4, F5, F6, F8); the F2 correction waits.
 4c needs 4a. 4d needs 4c applied and a merge run. 4e needs 4d. 4f
 needs five runs after 4c. 4g is last.
 
+## Prepared changes
+
+### `slim-tier`: three 4 vCPU nodes become three 6 vCPU nodes
+
+Prepared by 4c under D6, because F7 means this phase cannot push the
+change itself. **Repository: `shakenfist/actions`** -- not this one --
+**file: `ansible/ci-topology-slim-tier.yml`.** Three lines change, one
+`cpu:` value per `sf_instance` block, and nothing else: `ram: 12288`
+and every `groups:` line are deliberately untouched, because the role
+assignments are what make primary and sf-1 infra nodes and F6 records
+that the tier is already exactly at `test_network_lifecycle`'s minimum
+of two hypervisors that are not the network node.
+
+```diff
+--- a/ansible/ci-topology-slim-tier.yml
++++ b/ansible/ci-topology-slim-tier.yml
+@@ -35,7 +35,7 @@
+     - name: Create a primary instance
+       shakenfist.shakenfist.sf_instance:
+         name: "t-{{instance_suffix}}-primary"
+-        cpu: 4
++        cpu: 6
+         ram: 12288
+         disks:
+           - "100@{{base_image}}"
+@@ -72,7 +72,7 @@
+     - name: Create sf-1
+       shakenfist.shakenfist.sf_instance:
+         name: "t-{{instance_suffix}}-1"
+-        cpu: 4
++        cpu: 6
+         ram: 12288
+         disks:
+           - "100@{{base_image}}"
+@@ -102,7 +102,7 @@
+     - name: Create sf-2
+       shakenfist.shakenfist.sf_instance:
+         name: "t-{{instance_suffix}}-2"
+-        cpu: 4
++        cpu: 6
+         ram: 12288
+         disks:
+           - "100@{{base_image}}"
+```
+
+Nothing else in the file scales with `cpu`. Both disks are fixed sizes
+(`100@{{base_image}}` and `60@sf://label/ci-images/dependencies`), the
+two `networkspecs` entries are fixed addresses, and the remaining
+plays configure apt, pip, the mesh interface and the wheels. There is
+no flavour indirection to satisfy -- `sf_instance` takes `cpu` and
+`ram` directly.
+
+### Predictions, and the arithmetic they come from
+
+Three formulae, each verified in this worktree as part of writing this
+section:
+
+* `cpu_schedulable = max(1, cpu_threads - cpu_reservation_threads)`,
+  `shakenfist/daemons/resources/main.py:126`. `cpu_threads` is
+  `psutil.cpu_count(logical=True)` inside the guest, so it is the
+  under-cloud instance's `cpu`.
+* `limit_cpus = floor(cpu_schedulable * CPU_OVERCOMMIT_RATIO)`,
+  `shakenfist/mariadb.py:24596`, with the ratio defaulting to **3.0**
+  at `shakenfist/config.py:568`.
+* The demand bound is `SCHEDULER_TARGET_LOAD * cpu_schedulable`, with
+  the target defaulting to **0.75** at `shakenfist/config.py:523`. The
+  guarded comparison is `cpu_load_1 + expected_demand <= target_load *
+  cpu_schedulable` in `_demand_guard_clause()`
+  (`shakenfist/mariadb.py:26024-26078`, the clause at `:26076-26077`).
+
+The reservation itself is `(1 + ((network or database) ? 1 : 0)) * 2`
+at `examples/_shared/site.yml:359-363` per 4a, so 4 threads on primary
+and sf-1 and 2 on sf-2, and it is absolute: it does not move when the
+guest grows.
+
+| Node | Roles | Reserved threads | `cpu_schedulable` before -> after | `limit_cpus` (ledger) before -> after | Demand bound before -> after |
+|---|---|---|---|---|---|
+| primary | hypervisor, network, database | 4 | 1 -> 2 | 3 -> 6 | 0.75 -> 1.50 |
+| sf-1 | hypervisor, database | 4 | 1 -> 2 | 3 -> 6 | 0.75 -> 1.50 |
+| sf-2 | hypervisor | 2 | 2 -> 4 | 6 -> 12 | 1.50 -> 3.00 |
+
+The "before" column is not a derivation: it is what run
+[34681505274](https://github.com/shakenfist/shakenfist/actions/runs/34681505274)
+measured (F1: ledgers 3, 3, 6), so the model reproduces the observed
+state before it is used to predict the new one.
+
+**Cluster totals.** Ledger **12 -> 24**, schedulable threads **4 -> 8**,
+summed demand bound **3.00 -> 6.00**. Under-cloud spend rises from 12
+to 18 vCPU for the tier cloud, with RAM unchanged at 3 x 12288 MiB.
+
+**What 4d should see.** In the first merge run on the new shape, the
+headroom probe's *Committed vCPU, per node* section should report
+per-node ledgers of **6, 6 and 12** for a cluster total of **24**,
+where the same section reported 3, 3 and 6 for a total of 12.
+
+One under-cloud side effect to be aware of, since it is a consequence
+of changing `cpu` specifically and not of the tier getting bigger:
+each of these three under-cloud instances now draws 6 rather than 4
+vCPU from its under-cloud hypervisor's ledger, and the under-cloud's
+own feedforward term `demand_add = cpus * SCHEDULER_DEMAND_PER_VCPU`
+(0.6, `shakenfist/config.py:532-533`) rises from 2.4 to 3.6 per
+instance. That makes an under-cloud 507 on *creating* the tier
+marginally more likely, which is the #3772 family rather than anything
+this phase introduces, and it would show up as an ansible failure in
+the `Create a primary instance` / `Create sf-1` / `Create sf-2` tasks
+rather than as a test failure.
+
+### How this prediction is falsified
+
+Three distinguishable readings of the first merge run after the diff
+is applied, which point at three different next actions:
+
+1. **The model is wrong.** *Committed vCPU, per node* reports anything
+   other than 6, 6, 12 for the three `slim-tier` nodes -- in
+   particular, primary and sf-1 still reporting a ledger of **3**
+   while sf-2 moves to 12, which would mean the infra-role reservation
+   is not the absolute 4 threads 4a measured but something that scales
+   with guest size. Next action: re-read the rendered `/etc/sf/config`
+   and the `node_metrics` row for primary, not buy more vCPU. The
+   sharper single reading is `cpu_schedulable` itself: it must be 2 on
+   primary and sf-1 and 4 on sf-2.
+2. **The model is right and F3's bound is what binds.** The ledgers
+   read 6, 6, 12 *and* the *Capacity guard census* still shows
+   refusals of the same order as the 176 / 139 / 163 in F3's window,
+   still falling on the `demand` dimension alone. The reshape did what
+   it predicted and was not enough; next action is D3's recorded
+   revision to 8 vCPU (ledgers 12, 12, 18; bound 3.00 on the infra
+   nodes) or the sibling plan's guard work, not a re-derivation of the
+   arithmetic.
+3. **The binding dimension moved.** The ledgers read 6, 6, 12 and the
+   census refusals shift off `demand` onto an allocation dimension
+   (`cpus`, `memory_mb` or `disk_gb`), which F3 saw *none* of. That
+   would be a genuinely new finding -- the tier would then be limited
+   by the ledger or by RAM rather than by load -- and it is an
+   argument about `ram: 12288`, which this diff deliberately does not
+   touch.
+
+A job that still fails while the ledgers read 6, 6, 12 is reading 2 or
+3, not a falsification of this section on its own; the census
+dimension split is what separates them.
+
+### Operator checklist
+
+D2 lands one topology at a time so a regression is attributable, and
+F7 means every step below happens in a repository this session cannot
+push to.
+
+1. In the **`shakenfist/actions`** checkout -- a separate repository
+   with its own pull request, not this one -- branch off `main`.
+2. Apply the diff above to `ansible/ci-topology-slim-tier.yml`: three
+   `cpu: 4` lines become `cpu: 6`, at the `primary`, `sf-1` and `sf-2`
+   `sf_instance` blocks (`:35`, `:72`, `:102`).
+3. Confirm the change is exactly three lines in one file:
+   `git diff --stat` shows `1 file changed, 3 insertions(+), 3
+   deletions(-)`, and `git diff | grep -E '^[+-] *(ram:|groups:)'`
+   prints nothing.
+4. **Do not change `ci-topology-slim-primary.yml` or
+   `ci-topology-slim-primary-released.yml` in this commit or this pull
+   request.** They are 4e's decision (D4), F4 records that they are
+   not structurally identical to each other, and landing them together
+   would make a regression unattributable.
+5. Open and merge the pull request in `shakenfist/actions`. Note that
+   `.github/workflows/functional-tests.yml` calls
+   `shakenfist/actions/.github/workflows/smoke-cluster.yml@main`, so
+   there is no pin to bump here and the new shape is live for the very
+   next PR and merge-queue run, including any already in flight --
+   merge it when the queue is quiet.
+6. Tell 4d which merge run is the first on the new shape, so it reads
+   the right three runs.
+7. Leave `timeout_minutes: 70` on the `Debian 12 tier` matrix entry
+   alone (D5); 4f revisits it after five merge runs.
+
 ## Risks and mitigations
 
 | Risk | Mitigation | Who checks |
@@ -350,10 +661,15 @@ Falsifiable, in order:
    which a CI hypervisor comes to publish `cpu_schedulable` 1, and
    states whether raising its guest `cpu` raises it. A reader can
    check the claim against the named code without re-deriving it.
-2. `grep -rn 'NODE_CPU_RESERVATION_THREADS=4\|reservation leaves'
-   docs/plans/PLAN-ci-cloud-sizing.md` returns nothing: the phase 4
-   section no longer attributes the ledger to a value that is not in
-   the tree.
+   **Met by 4a:** `examples/_shared/site.yml:359-363` and
+   `daemons/resources/main.py:126`, with the per-guest-size table in
+   D3.
+2. The master plan's phase 4 section attributes the ledger to the
+   line that actually sets it, so a reader is not sent to the wrong
+   repository as F2 was. `grep -c 'examples/_shared/site.yml'
+   docs/plans/PLAN-ci-cloud-sizing.md` is at least 1, and
+   `grep -c 'is 2 everywhere' docs/plans/PLAN-ci-cloud-sizing.md` is
+   0.
 3. The master plan's phase 4 section names exactly the topology files
    that exist. `ls shakenfist/actions/ansible/ci-topology-slim-*` has
    three entries matching `slim-primary`, `slim-tier` and
@@ -388,6 +704,49 @@ Falsifiable, in order:
     empty for this phase's commits.
 11. `python3 tools/check-plan-status.py` passes, and `pre-commit run
     --all-files` passes in the main repository.
+
+## Outcome
+
+**In progress.** Three of seven steps have landed; the remaining four
+are blocked on the operator and on merge runs, not on work this
+session can do.
+
+| Step | State |
+|---|---|
+| 4a | **Done.** Gate discharged, and it corrected F2 rather than the master plan. See *4a -- what the gate found*. Filed [#4201](https://github.com/shakenfist/shakenfist/issues/4201). |
+| 4b | **Done**, though not as the step table specifies -- see the deviation below. |
+| 4c | **Done.** The diff is in *Prepared changes*, with predictions, a three-way falsification statement and the operator's checklist. |
+| 4d | **Blocked** on the operator applying 4c to `shakenfist/actions` and on three merge runs after it. |
+| 4e | Blocked behind 4d. |
+| 4f | Blocked: D5 requires five merge runs on the new shape first. |
+| 4g | Blocked: its Definition of done items depend on 4d-4f. |
+
+**Deviation from the step plan, declared rather than buried.** 4b is
+listed as a `sonnet` sub-agent step. It was done inline by the
+management session instead, because by the time it ran its content had
+changed: 4a had shown that the text 4b was meant to correct was text
+*this plan's own survey* had got wrong, and the correction touched the
+same three files the session was already holding open. Dispatching it
+would have raced those edits for no benefit. 4a and 4c went to
+sub-agents as the table specifies.
+
+**What the operator owes, in order.** Apply *Prepared changes* to
+`shakenfist/actions` as its own pull request, when the merge queue is
+quiet -- `.github/workflows/functional-tests.yml:485` references
+`shakenfist/actions/.../smoke-cluster.yml@main` unpinned, so the new
+shape takes effect on the next run, including runs already in flight.
+Then 4d reads the first three merge runs.
+
+**One thing 4c found that the plan did not anticipate**, recorded here
+because it is a cost of this specific change rather than of reshaping
+in general: the under-cloud charges each instance a feedforward demand
+of `cpus x SCHEDULER_DEMAND_PER_VCPU` (0.6, `config.py:532`), so a tier
+node's charge against the *under-cloud's* scheduler rises from 2.4 to
+3.6 and its under-cloud ledger draw from 4 to 6. A refusal there is the
+#3772 family arriving one level up, and it would surface as an ansible
+failure in the `Create a primary instance` / `Create sf-1` / `Create
+sf-2` tasks rather than as a test failure. Only `primary` carries
+`await: true`, so sf-1 and sf-2 would fail at create-API time.
 
 ## Back brief
 
