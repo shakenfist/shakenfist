@@ -1,0 +1,262 @@
+# Tests: sf_claim, the namespace capacity claim lifecycle
+#
+# The claim here is deliberately tiny. A claim is a promise of aggregate
+# cluster capacity and the cluster refuses one it cannot keep, so a CI
+# scenario which asked for a realistic fleet's worth would fail on a busy
+# cluster for reasons which have nothing to do with the module.
+#
+# Every claim task retries the refusals the claim API documents as
+# transient, which is the discipline cluster_ci_tests/test_namespace_claims.py
+# applies to every request in the functional suite. A 503 means the
+# reconciler has not built the cluster_capacity singleton yet (it is built on
+# the first reconcile pass, which is a genuine cold start on the freshly
+# deployed cluster this scenario runs against) or that the claim row was
+# contended. A 507 means the cluster was full at that instant, and capacity
+# the rest of a CI run is releasing comes back asynchronously. Both are
+# waited out here rather than failed on, because every task below asserts
+# success: 42 retries at 10 seconds is the 420 second budget and the ten
+# second cadence the functional suite uses, for the same reasons. Anything
+# else -- a refusal the module should not have provoked -- fails at once.
+
+- hosts: localhost
+  gather_facts: no
+  collections:
+    - shakenfist.shakenfist
+
+  tasks:
+    - name: Create a unique namespace name
+      shell: pwgen 10 -n 1
+      register: unique
+
+    - name: Store unique name
+      set_fact:
+        namespace_name: "ansibleci-006-{{ unique['stdout'] }}"
+
+    - name: Log namespace name
+      debug:
+        msg: "Test namespace is {{ namespace_name }}"
+
+    - name: Create a namespace to hold the claim
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: present
+
+    - name: Assert the namespace holds no claim yet
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        state: absent
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert removing a claim which is not there is not a change
+      assert:
+        that: not ci_claim['changed']
+        fail_msg: "changed should be false in {{ ci_claim }}"
+
+    - name: Create a claim
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        limit_cpus: 1
+        limit_memory_mb: 128
+        limit_disk_gb: 1
+        expires_in_seconds: 3600
+        state: present
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert the claim is new
+      assert:
+        that: ci_claim['changed']
+        fail_msg: "changed should be true in {{ ci_claim }}"
+
+    - name: Assert no errors
+      assert:
+        that: not ci_claim['failed']
+        fail_msg: "failed should be false in {{ ci_claim }}"
+
+    - name: Assert the claim covers what was asked for
+      assert:
+        that:
+          - ci_claim['meta']['limit_cpus'] == 1
+          - ci_claim['meta']['limit_memory_mb'] == 128
+          - ci_claim['meta']['limit_disk_gb'] == 1
+          - ci_claim['meta']['coverage_state'] == 'active'
+        fail_msg: "claim is not as requested in {{ ci_claim }}"
+
+    - name: Re-present the same claim
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        limit_cpus: 1
+        limit_memory_mb: 128
+        limit_disk_gb: 1
+        expires_in_seconds: 3600
+        state: present
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    # Deliberately no assertion on changed here. The module reports a
+    # re-date as a change when the server's expiry actually moved, and
+    # expires_at has one second resolution, so two tasks in the same second
+    # legitimately report no change. What must hold either way is that the
+    # server did not refuse the second create (it would: only one active
+    # claim per namespace) and that the limits are untouched.
+    - name: Assert the re-presentation was accepted and changed no limits
+      assert:
+        that:
+          - not ci_claim['failed']
+          - ci_claim['meta']['limit_cpus'] == 1
+          - ci_claim['meta']['limit_memory_mb'] == 128
+          - ci_claim['meta']['limit_disk_gb'] == 1
+        fail_msg: "re-presentation was not idempotent in {{ ci_claim }}"
+
+    # renew_within_seconds is how a play asks for convergence rather than
+    # renewal, and it is what lets this scenario assert idempotence at all.
+    # The claim above was just re-dated to an hour out, which is well
+    # outside a sixty second window, and its limits already match, so there
+    # is nothing to write and the module must say so.
+    - name: Re-present the claim inside a renewal window
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        limit_cpus: 1
+        limit_memory_mb: 128
+        limit_disk_gb: 1
+        expires_in_seconds: 3600
+        renew_within_seconds: 60
+        state: present
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert a claim outside its renewal window is not a change
+      assert:
+        that:
+          - not ci_claim['failed']
+          - not ci_claim['changed']
+          - ci_claim['meta']['limit_cpus'] == 1
+        fail_msg: "renew_within_seconds did not converge in {{ ci_claim }}"
+
+    - name: Re-present the claim in check mode inside a renewal window
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        limit_cpus: 1
+        limit_memory_mb: 128
+        limit_disk_gb: 1
+        expires_in_seconds: 3600
+        renew_within_seconds: 60
+        state: present
+      check_mode: true
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert check mode converges with a renewal window
+      assert:
+        that:
+          - not ci_claim['failed']
+          - not ci_claim['changed']
+        fail_msg: "check mode did not converge in {{ ci_claim }}"
+
+    - name: Re-date the claim to a longer expiry
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        limit_cpus: 1
+        limit_memory_mb: 128
+        limit_disk_gb: 1
+        expires_in_seconds: 7200
+        state: present
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert a re-date which moves the expiry is a change
+      assert:
+        that: ci_claim['changed']
+        fail_msg: "changed should be true in {{ ci_claim }}"
+
+    - name: Grow the claim
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        limit_cpus: 2
+        limit_memory_mb: 256
+        limit_disk_gb: 2
+        expires_in_seconds: 7200
+        state: present
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert the claim grew
+      assert:
+        that:
+          - ci_claim['changed']
+          - ci_claim['meta']['limit_cpus'] == 2
+          - ci_claim['meta']['limit_memory_mb'] == 256
+          - ci_claim['meta']['limit_disk_gb'] == 2
+        fail_msg: "claim did not grow in {{ ci_claim }}"
+
+    - name: Delete the claim
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        state: absent
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert the claim was deleted
+      assert:
+        that: ci_claim['changed']
+        fail_msg: "changed should be true in {{ ci_claim }}"
+
+    - name: Delete the claim again
+      sf_claim:
+        namespace: "{{ namespace_name }}"
+        state: absent
+      register: ci_claim
+      until: >-
+        not (ci_claim['failed'] | default(false))
+        or (ci_claim['refusal']['status_code'] | default(0)) not in [503, 507]
+      retries: 42
+      delay: 10
+
+    - name: Assert the second deletion is not a change
+      assert:
+        that: not ci_claim['changed']
+        fail_msg: "changed should be false in {{ ci_claim }}"
+
+    - name: Delete the namespace
+      sf_namespace:
+        name: "{{ namespace_name }}"
+        state: absent
+      register: ci_namespace
+
+    - name: Assert the namespace was deleted
+      assert:
+        that: ci_namespace['changed']
+        fail_msg: "changed should be true in {{ ci_namespace }}"

@@ -1,11 +1,26 @@
 # Control-node Python requirements for the shakenfist.shakenfist collection.
 #
 # The native modules under plugins/modules/ (sf_namespace, sf_network,
-# sf_instance, sf_snapshot) import the shakenfist_client SDK to talk to the
-# Shaken Fist REST API. Install this on the Ansible control node with:
+# sf_instance, sf_snapshot, sf_claim) import the shakenfist_client SDK to
+# talk to the Shaken Fist REST API. Install this on the Ansible control node
+# with:
 #
 #     pip install -r requirements.txt
 #
 # The control node only needs the client package -- never the Shaken Fist
 # server package.
+#
+# sf_claim is the exception to the line below, and deliberately not pinned
+# here. It needs the namespace capacity claim verbs (get_namespace_claims,
+# create_namespace_claim, update_namespace_claim, delete_namespace_claim),
+# which are on client-python's develop branch and are in no release yet --
+# there is no version to name. A control node which uses sf_claim therefore
+# installs the client from git instead of from this file:
+#
+#     pip install git+https://github.com/shakenfist/client-python@develop
+#
+# which is how the CI conductor installs it. sf_claim checks for the verbs
+# on the client it builds and says this if they are missing, so an older
+# client is a diagnosable failure rather than an AttributeError traceback.
+# Every other module here works with the released client.
 shakenfist-client
