@@ -1824,6 +1824,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/eol-distro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: End-of-life distributions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/expensive-lane-path-filter/" class="md-nav__link">
         
   
@@ -3147,6 +3175,34 @@
     
   
     Plan: stestr / testtools version pin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-image-supply-chain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: the image supply chain, from end-of-life migration to production that reports its own failures
   
 
     
@@ -14092,6 +14148,14 @@ repository the work has to happen in, labelled <code>consistency</code> (the lab
 is created if missing). The body names the failing check, quotes the
 detail the check produced, and links the spec file and template so
 whoever picks it up has the implementation to hand.</p>
+<p>A check whose fix is per item can carry the items as well. Returning a
+<code>missing</code> list renders them as bullets under <strong>Missing items</strong>, and a
+<code>findings</code> list under <strong>Findings</strong> -- the same mechanism, worded for a
+check that reports things present which should not be rather than
+things absent. <code>details</code> still has to stand alone, because that is what
+the compliance page prints into a table cell, so it carries the count
+and the guidance while the list carries the locations. The worked
+examples are <code>review-scope-completeness</code> and <code>eol-distro</code>.</p>
 <p>Aggregate across the fleet with:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gh search issues 'org:shakenfist label:consistency is:open'
 </code></pre></div>
