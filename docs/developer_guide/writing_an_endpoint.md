@@ -380,10 +380,35 @@ the handler supplies a sensible default on omission, declare
 declaration claiming more than the handler enforces is now a caller
 visible lie, not a documentation nit.
 
+Adding a `required=True` `body` or `query` declaration also owes the
+evidence sweep an entry, and CI will say so:
+`shakenfist/tests/external_api/test_required_sweep.py` enumerates every
+such declaration from the source and fails if one has no recipe, or if
+its measured answer differs from the `SWEEP` table published in the
+phase 6 plan. So a new one needs three things there — a `RECIPES` entry
+for the handler (a complete, valid request plus the status that request
+answers), a `SWEEP` row for the parameter, and the counts in
+`test_the_census_still_finds_seventy_six` bumped.
+
+The control status in the recipe is the part worth understanding rather
+than copying. The sweep sends each request twice, once complete and
+once with the one parameter removed, and asserts the complete one still
+answers the status the recipe claims. Without that, a request which
+404s because a fixture was never built is indistinguishable from a
+handler refusing an omission — which is exactly how an earlier audit of
+these same declarations reached the wrong answer. A control that starts
+failing means the fixture rotted, and no verdict measured against it can
+be trusted.
+
 The `format` a type token renders is documentation unless
 `validation._FORMATS` knows it. Five of them do, and each compiles to
 a validator calling the library function the handler itself uses:
-`base64` decodes with `base64.b64decode()`, `netblock` parses with
+`base64` has its whitespace removed and is then decoded strictly with
+`base64.b64decode(..., validate=True)` — strictly, because the lenient
+default discards every character outside the alphabet and so decodes
+much of what it is meant to refuse; whitespace first, because `base64
+file` wraps its output at 76 columns and callers send that verbatim.
+`netblock` parses with
 `ipaddress.ip_network()`, `ipv4` with `ipaddress.ip_address()`, `url`
 with `urllib.parse.urlparse()` and `uuid` with `uuid.UUID()`. The
 formats on `uuidorname`, `namespace` and `node` stay documentation —

@@ -152,3 +152,136 @@ class TestNamespaceBodyParameterStillWorks(base.BaseNamespacedTestCase):
             'found',
             content.text_content(json.dumps(found, indent=4, sort_keys=True)))
         self.assertEqual(net['uuid'], found['uuid'])
+
+
+class TestOmittedRequiredParameterRefused(base.BaseNamespacedTestCase):
+    """PLAN-api-input-validation-phase-06-required.md, step 3.
+
+    A parameter declared `required=True` used to be documentation: every
+    one of them had a default in its handler's signature, so an omission
+    reached the handler and was answered by whatever that handler did
+    next. Enforcement makes an omission a 400 naming the parameter,
+    before any handler runs.
+
+    This is a contract change for callers, which is why it is tested
+    here as well as in the unit suite: what the shipped client and the
+    Ansible collection send is not something a unit test can see.
+    `confirm` on a delete-all is the case to pick -- it is a parameter
+    a caller really does omit by mistake, and the handler's own refusal
+    (`parameter confirm is not set true`) is one of the few messages
+    enforcement makes less specific, so this pins the replacement.
+
+    In its own namespace because the request under test is a delete-all.
+    If enforcement ever stopped working, this test would delete the
+    namespace's instances -- and it must not be sharing one.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'apivalidationreq'
+        super().__init__(*args, **kwargs)
+
+    def test_delete_all_without_confirm_refused(self):
+        # delete_all_instances() always sends confirm, which is the
+        # point: no public client method omits a required parameter, so
+        # the omission has to be built by hand.
+        try:
+            self.test_client._request_url(
+                'DELETE', '/instances', data={'namespace': self.namespace})
+            self.fail('A delete-all with no confirm was not refused')
+        except apiclient.RequestMalformedException as e:
+            self.addDetail('response', content.text_content(str(e.text)))
+            self.assertEqual(400, e.status_code)
+
+            body = json.loads(e.text)
+            self.assertEqual(
+                {'error': 'confirm: declared required but not supplied',
+                 'status': 400},
+                body)
+
+            for marker in _INTERPRETER_TEXT_MARKERS:
+                self.assertNotIn(
+                    marker, e.text,
+                    'Validation refusal leaked interpreter text: %s' % e.text)
+
+
+class TestUserDataFormatEnforced(base.BaseNamespacedTestCase):
+    """PLAN-api-input-validation-phase-06-required.md, step 4, and #3269.
+
+    `user_data` publishes a `byte` format and, until this phase, was
+    compiled to a string field which accepted anything. A caller who
+    pasted raw cloud-config instead of the base64 of it got a 200, an
+    instance which was scheduled and placed, and then a binascii error
+    in a daemon log on a different machine when the config drive was
+    built. The API now decodes it.
+
+    Both halves are here because only one of them is the risk. Refusing
+    raw cloud-config is the fix; still accepting everything the config
+    drive accepts is the regression, and it is the one no unit test can
+    honestly settle -- the decode this validator is standing in for
+    happens in a different daemon, on a hypervisor, from a config drive
+    this process never builds.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'apivalidationb64'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.243.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
+        self._await_networks_ready([self.net['uuid']])
+
+    def test_unencoded_user_data_refused(self):
+        """Issue 3269's input, at the real API."""
+        try:
+            # raw-create: the refusal is the assertion. create_instance()
+            # in the base class waits out a 507, which would turn a
+            # validation failure into a seven minute timeout rather than
+            # the 400 this test is here to see.
+            self.test_client.create_instance(
+                'userdata-raw', 1, 1024,
+                [{'network_uuid': self.net['uuid']}],
+                [{'size': 8, 'base': base.CLUSTER_CI_IMAGE, 'type': 'disk'}],
+                None, '#cloud-config\nruncmd:\n  - echo hello\n')
+            self.fail('Unencoded user_data was not refused')
+        except apiclient.RequestMalformedException as e:
+            self.addDetail('response', content.text_content(str(e.text)))
+            self.assertEqual(400, e.status_code)
+            self.assertIn('user_data', e.text)
+
+    def test_wrapped_base64_user_data_still_boots(self):
+        """And the half which proves nothing was narrowed.
+
+        `base64 user-data.yaml` wraps its output at 76 columns, and a
+        caller running `sf-client instance create -U "$(base64
+        user-data.yaml)"` sends those newlines to the API. The wrapping
+        is rebuilt here rather than taken from load_userdata(), which
+        emits a single line, because the wrapped form is the one a
+        strict decoder would refuse and therefore the one worth
+        driving through a real cluster.
+
+        Reaching `ready` is the assertion. An instance whose config
+        drive cannot be built does not get there, so a boot is the
+        evidence that the value the API accepted is a value the
+        hypervisor could still decode.
+        """
+        userdata = base.load_userdata('cluster_ci_tests', 'console_scribbler')
+        wrapped = '\n'.join(
+            userdata[i:i + 76] for i in range(0, len(userdata), 76)) + '\n'
+        self.assertIn('\n', wrapped)
+
+        inst = self.create_instance(
+            'userdata-wrapped', 1, 1024,
+            [{'network_uuid': self.net['uuid']}],
+            [{'size': 8, 'base': base.CLUSTER_CI_IMAGE, 'type': 'disk'}],
+            None, wrapped)
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
+
+        self.assertIsNotNone(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
