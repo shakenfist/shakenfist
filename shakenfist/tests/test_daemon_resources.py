@@ -397,3 +397,199 @@ class CollectProcessMetricsTestCase(base.ShakenFistTestCase):
         self.assertGreater(metrics['process_cpu_fraction_sf_net'], 0.25)
         self.assertEqual(1, n.add_event.call_count)
         self.assertIn('sf_net is a CPU hog', n.add_event.call_args[0][1])
+
+
+class ShouldPollDomainsTestCase(base.ShakenFistTestCase):
+    """The poll gate, with an injected clock and no libvirt connection."""
+
+    def test_polls_when_the_interval_has_elapsed(self):
+        self.assertTrue(resources_main._should_poll_domains(1000.0, 1005.0))
+
+    def test_does_not_poll_inside_the_interval(self):
+        self.assertFalse(resources_main._should_poll_domains(1000.0, 1004.9))
+
+    def test_polls_on_the_first_iteration(self):
+        # The daemon starts with no poll history at all, which must not be
+        # mistaken for "polled at the epoch, so never poll again".
+        self.assertTrue(resources_main._should_poll_domains(0, 1000.0))
+
+
+class ShouldPublishMetricsTestCase(base.ShakenFistTestCase):
+    """The publish gate, with an injected clock, no libvirt connection and no
+    database. Everything the cadence decides is decided here."""
+
+    def test_first_call_with_no_history_publishes(self):
+        # Daemon startup: no publish has happened and no poll has run yet.
+        self.assertTrue(resources_main._should_publish_metrics(
+            0, None, None, 1000.0))
+
+    def test_first_poll_publishes(self):
+        # The first observation has nothing to compare against, so it is
+        # treated as a change. That costs one extra publish per daemon start
+        # and closes the window where the row published at startup is stale
+        # but we have no earlier set to notice it against.
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, None, {17, 18}, 1005.0))
+
+    def test_unchanged_set_inside_the_interval_does_not_publish(self):
+        self.assertFalse(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, {17, 18}, 1005.0))
+
+    def test_changed_set_inside_the_interval_publishes(self):
+        # The case the phase exists for: an instance was deleted two seconds
+        # after the last publish, and the measurement must not wait for the
+        # interval to expire.
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, {17}, 1002.0))
+
+    def test_same_size_different_membership_publishes(self):
+        # A poll interval can easily contain one delete and one create during
+        # a CI teardown-and-recreate, leaving the count identical and the
+        # capacity picture completely different. Comparing lengths rather than
+        # membership would miss this, and the create half is exactly where a
+        # stale low measurement lets the scheduler over-admit.
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, {18, 19}, 1002.0))
+
+    def test_interval_elapsed_with_unchanged_set_publishes(self):
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, {17, 18}, 1060.0))
+
+    def test_a_publish_resets_the_interval(self):
+        # A change-triggered publish is a publish, so the caller records it as
+        # last_metrics and the next interval runs from the change rather than
+        # from the previous tick. Publishing at 1000, then again on a change at
+        # 1010, means the next unchanged-set publish is due at 1070 and not at
+        # 1060.
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, {17}, 1010.0))
+        self.assertFalse(resources_main._should_publish_metrics(
+            1010.0, {17}, {17}, 1060.0))
+        self.assertTrue(resources_main._should_publish_metrics(
+            1010.0, {17}, {17}, 1070.0))
+
+    def test_no_poll_this_tick_falls_through_to_the_interval(self):
+        # Most ticks do not poll, because the loop ticks at 1 s and the poll
+        # interval is 5 s.
+        self.assertFalse(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, None, 1003.0))
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, None, 1060.0))
+
+    def test_a_failed_poll_does_not_publish_a_fabricated_zero(self):
+        # A poll which raised is reported as None, not as an empty set. An
+        # empty set would look like every domain on the node vanishing at once
+        # -- a publish on the strength of a fabrication, and then a second
+        # publish when the next successful poll appeared to repopulate the
+        # node.
+        self.assertFalse(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, None, 1005.0))
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, {17, 18}, set(), 1005.0))
+
+
+class _FakeClock:
+    """A clock the test advances by hand, so the loop's cadence is exact."""
+
+    def __init__(self, now):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
+
+
+class RunInnerCadenceTestCase(base.ShakenFistTestCase):
+    """The wiring: _run_inner() must actually act on the cadence decision.
+
+    The pure gates above say what should happen; these drive the loop with
+    _get_stats and the libvirt connection mocked to prove that it does."""
+
+    def _drive(self, poll_results, iterations=3, clock_step=5):
+        m = resources_main.Monitor.__new__(resources_main.Monitor)
+        m.abort_path = '/nonexistent-abort-path'
+        m.last_logged_resources = 0
+        m.wait_for_nodelock = mock.MagicMock()
+        m._get_stats = mock.MagicMock(
+            return_value={'cpu_total_instance_vcpus': 2})
+
+        clock = _FakeClock(1000.0)
+        # The loop's own pacing call is where time passes in this test.
+        m.idle = mock.MagicMock(side_effect=lambda _: clock.advance(clock_step))
+
+        lc = mock.MagicMock()
+        lc.get_active_domain_ids.side_effect = poll_results
+        self.connection = mock.MagicMock()
+        self.connection.return_value.__enter__.return_value = lc
+
+        init = mock.MagicMock()
+        init.children.return_value = []
+
+        with mock.patch.object(resources_main.time, 'time', clock), \
+                mock.patch.object(resources_main, 'Gauge'), \
+                mock.patch.object(resources_main.util_libvirt,
+                                  'LibvirtConnection', self.connection), \
+                mock.patch.object(resources_main.mariadb,
+                                  'get_all_node_metrics', return_value=[]), \
+                mock.patch.object(resources_main.mariadb,
+                                  'upsert_node_metrics') as mock_upsert, \
+                mock.patch.object(resources_main.Node, 'from_db',
+                                  return_value=mock.MagicMock()), \
+                mock.patch.object(resources_main.node_health,
+                                  'build_for_this_node',
+                                  return_value=([], {})), \
+                mock.patch.object(resources_main.threading, 'Thread'), \
+                mock.patch.object(resources_main.network, 'Networks',
+                                  return_value=[]), \
+                mock.patch.object(resources_main.psutil, 'Process',
+                                  return_value=init), \
+                mock.patch.object(resources_main.util_exceptions,
+                                  'ignore_exception') as mock_ignore, \
+                mock.patch.object(
+                    resources_main.daemon, 'check_abort_path',
+                    side_effect=[True] * iterations + [False]):
+            m._run_inner()
+
+        return mock_upsert, mock_ignore
+
+    def test_vanished_domain_publishes_before_the_interval(self):
+        # Two domains at startup, one of them gone five seconds later. The
+        # measurement must follow the delete rather than waiting out the
+        # sixty second interval.
+        mock_upsert, _ = self._drive([{17, 18}, {17}, {17}])
+
+        self.assertEqual(2, mock_upsert.call_count)
+        # upsert_node_metrics(node_uuid, node_name, timestamp, stats)
+        first = mock_upsert.call_args_list[0][0][2]
+        second = mock_upsert.call_args_list[1][0][2]
+        self.assertEqual(1000.0, first)
+        self.assertEqual(1005.0, second)
+        self.assertLess(second - first,
+                        resources_main.METRICS_PUBLISH_INTERVAL_SECONDS)
+
+    def test_unchanged_domains_do_not_publish(self):
+        # The same three iterations with a stable domain set publish once, at
+        # startup, and then say nothing.
+        mock_upsert, _ = self._drive([{17, 18}, {17, 18}, {17, 18}])
+        self.assertEqual(1, mock_upsert.call_count)
+
+    def test_failed_poll_keeps_the_previous_domain_set(self):
+        # The middle poll raises. It must not publish, and it must not be
+        # recorded as an observation -- if it were treated as an empty set the
+        # third poll would look like two domains appearing and would publish.
+        mock_upsert, mock_ignore = self._drive(
+            [{17, 18}, ConnectionError('libvirtd is unwell'), {17, 18}])
+
+        self.assertEqual(1, mock_upsert.call_count)
+        self.assertEqual(1, mock_ignore.call_count)
+        self.assertEqual('resource statistics', mock_ignore.call_args[0][0])
+
+    def test_poll_never_holds_a_connection_across_iterations(self):
+        # Each poll opens and closes its own connection rather than caching a
+        # handle across the life of the daemon, which a libvirtd restart would
+        # silently invalidate.
+        self._drive([{17}, {17}, {17}])
+        self.assertEqual(3, self.connection.call_count)
+        self.assertEqual(3, self.connection.return_value.__exit__.call_count)

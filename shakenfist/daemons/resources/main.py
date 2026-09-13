@@ -129,6 +129,53 @@ def _compute_reservations(cpu_cores, cpu_threads, cpu_reservation_threads,
     }
 
 
+# How often the resources daemon looks at the set of running domains, and the
+# longest it will go without publishing a metrics row regardless of whether
+# anything changed. Five seconds is the largest poll interval which still turns
+# "a capacity measurement up to sixty seconds stale" into "up to five seconds
+# plus a publish", and it divides the publish interval evenly.
+DOMAIN_POLL_INTERVAL_SECONDS = 5
+METRICS_PUBLISH_INTERVAL_SECONDS = 60
+
+
+# The cadence decision lives here, outside the daemon loop, so it can be
+# exercised with an injected clock and no libvirt connection -- the same reason
+# _compute_reservations() above is a function rather than inline arithmetic.
+# It is two functions rather than one because the two answers are wanted at two
+# different moments: whether to poll must be decided before the poll happens,
+# and whether to publish cannot be decided until its result is in hand.
+def _should_poll_domains(last_poll: float, now: float) -> bool:
+    """Is it time to look at the set of running domains again?"""
+    return now - last_poll >= DOMAIN_POLL_INTERVAL_SECONDS
+
+
+def _should_publish_metrics(last_publish: float, last_domains: set[int] | None,
+                            polled_domains: set[int] | None, now: float) -> bool:
+    """Is it time to publish a metrics row?
+
+    Either because the set of running domains moved since we last looked, or
+    because the publish interval has elapsed and the row is due regardless.
+
+    The trigger is set membership, not a count and not a vCPU total. A count
+    misses a poll interval which contains one delete and one create -- a
+    routine occurrence during a CI teardown-and-recreate, and precisely the
+    case where a stale measurement lets the scheduler over-admit. A vCPU total
+    buys nothing on top of membership, because Shaken Fist has no CPU hotplug
+    path, so a running domain's vCPU count cannot change while it runs.
+
+    polled_domains is None when no poll ran this tick, either because the poll
+    interval had not elapsed or because the poll raised. Neither is an
+    observation, so neither can trigger a change publish: reading a failed poll
+    as "the set became empty" would publish on the strength of a fabrication,
+    and would then publish a second time when the next successful poll appeared
+    to repopulate the node. A failed poll falls through to the interval gate,
+    which is the behaviour this daemon had before the poll existed.
+    """
+    if polled_domains is not None and polled_domains != last_domains:
+        return True
+    return now - last_publish >= METRICS_PUBLISH_INTERVAL_SECONDS
+
+
 def _safe_metric_name(name):
     name = name.lower()
     return re.sub(r'[^a-z0-9_]', '_', name)
@@ -642,8 +689,10 @@ class Monitor(daemon.Daemon):
             target=self._run_health_checks, name='node-health',
             args=(health_checks, health_types), daemon=True).start()
 
-        last_metrics = 0
+        last_metrics = 0.0
         last_billing = 0
+        last_domain_poll = 0.0
+        last_domains = None
 
         def update_metrics():
             stats = self._get_stats()
@@ -701,9 +750,47 @@ class Monitor(daemon.Daemon):
             self.wait_for_nodelock()
 
             try:
-                if time.time() - last_metrics > 60:
+                now = time.time()
+
+                # Ask libvirt what is running far more often than we publish.
+                # The scheduler's CPU pre-filter charges the larger of the
+                # measured and committed vCPU counts, and the committed side is
+                # released inside the delete transaction while the measured
+                # side is whatever this daemon last published -- so a node which
+                # has just been emptied goes on refusing work until the next
+                # publish. Asking the cheap question ("did anything start or
+                # stop?") often is what lets us keep the expensive answer (a
+                # publish, which is fifteen database round trips) rare.
+                #
+                # The connection is opened and dropped inside the poll rather
+                # than held across iterations. A handle cached for the lifetime
+                # of the daemon survives a libvirtd restart in name only, and
+                # holding one to avoid a connect trades a hang we recover from
+                # (the watchdog restarts us) for a stale handle we would not
+                # notice.
+                polled_domains = None
+                if _should_poll_domains(last_domain_poll, now):
+                    last_domain_poll = now
+                    with util_libvirt.LibvirtConnection() as lc:
+                        polled_domains = lc.get_active_domain_ids()
+
+                if _should_publish_metrics(last_metrics, last_domains,
+                                           polled_domains, now):
                     update_metrics()
-                    last_metrics = time.time()
+                    # Every publish resets the interval, whichever gate caused
+                    # it, so that a change-triggered publish moments before the
+                    # tick suppresses the tick instead of being followed by a
+                    # near-duplicate.
+                    last_metrics = now
+
+                # Only a poll which returned a set updates what we believe is
+                # running. A poll which raised does not reach this line at all
+                # -- the exception is swallowed below exactly as a metrics
+                # failure is -- so the previous observation stands and the next
+                # successful poll is compared against real data rather than
+                # against an empty set we invented.
+                if polled_domains is not None:
+                    last_domains = polled_domains
 
                 if time.time() - last_billing > config.USAGE_EVENT_FREQUENCY:
                     emit_billing_statistics()
