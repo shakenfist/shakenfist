@@ -47,7 +47,7 @@ the operation's own deadline, and is never taken by `execute` operations.
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
   [*] --> error
@@ -93,7 +93,7 @@ stateDiagram-v2
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
 
@@ -119,7 +119,7 @@ stateDiagram-v2
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
 
@@ -167,7 +167,7 @@ caller deletes it.
 The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
   [*] --> error
@@ -229,7 +229,7 @@ namespace. Writing a rule is atomic, so there is no error state.
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
   initial --> created
@@ -263,7 +263,7 @@ still a `created` object. See
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
   initial --> created
@@ -279,7 +279,7 @@ stateDiagram-v2
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> created
   created --> deleted
@@ -302,7 +302,7 @@ A network is regarded as "dead" when it is in state `deleted`, `delete-wait` or
 The following transitions are possible (note that hyphens have been replaced with
 underscores in some state names due to limitations in the diagram renderer):
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
 
@@ -332,7 +332,7 @@ stateDiagram-v2
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
 
@@ -375,7 +375,7 @@ stateDiagram-v2
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
 
@@ -433,7 +433,7 @@ willing to validate. Configuring one is atomic, so there is no error state.
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> initial
   initial --> created
@@ -449,7 +449,7 @@ stateDiagram-v2
 
 The following transitions are possible:
 
-``` mermaid
+```mermaid
 stateDiagram-v2
   [*] --> created
   created --> deleted

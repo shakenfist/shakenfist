@@ -47,7 +47,12 @@ jobs:
     # The apt steps below need passwordless sudo (build deps + the gh
     # install), which the shared static pool does not grant, so this stays
     # on an ephemeral vm runner.
-    runs-on: [self-hosted, vm, debian-12]
+    #
+    # The size element is explicit because the conductor falls back to
+    # xs (1 vCPU / 2048 MB, no swap) when the labels name none. The
+    # resolve below builds an isolated venv and resolves the whole
+    # dependency tree, which wants more headroom than that.
+    runs-on: [self-hosted, vm, debian-12, s]
     timeout-minutes: 60
     env:
       http_proxy: http://192.168.1.15:3128

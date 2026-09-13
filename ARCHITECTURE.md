@@ -191,14 +191,14 @@ publishes the schedulable remainder (`cpu_schedulable`,
 See [`docs/operator_guide/scheduler.md`](docs/operator_guide/scheduler.md)
 for the full pipeline, the configuration knobs, the admission RPCs at the
 bottom of it, and how to diagnose a placement decision from audit events.
-Atomic reservation-table scheduling is being built in phases per
-`docs/plans/PLAN-scheduler-reservations.md`; the capacity tables and their
-reconciler are described under
+Atomic reservation-table scheduling is being built per
+[`docs/plans/PLAN-scheduler-reservations.md`](docs/plans/PLAN-scheduler-reservations.md);
+the capacity tables and their reconciler are described under
 [Cluster Operation Storage and Work Queues](docs/developer_guide/database_internals.md#cluster-operation-storage-and-work-queues).
-Placement admission consumes them as of phase 3, and phase 4 added
-per-namespace capacity claims whose ceilings are advisory this release;
-later phases enforce those ceilings and move more pre-filter logic into
-SQL.
+Placement admission consumes those tables, and per-namespace capacity
+claims exist but their ceilings are advisory this release. Enforcing
+those ceilings and moving more pre-filter logic into SQL is still to
+come; the plan is where that work is tracked.
 
 ## State Machines
 

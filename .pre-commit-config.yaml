@@ -16,6 +16,33 @@ repos:
         name: Lint GitHub Actions workflows
         description: Static checker for GitHub Actions workflow files
 
+  # Lints the agent context -- AGENTS.md, CLAUDE.md and the skills
+  # under .claude/ -- for malformed frontmatter, smuggled instructions,
+  # embedded credentials and dangerous hook or settings configuration.
+  # The llm-context-lint-ci audit requires this here and in CI: the
+  # daily consistency audit is a backstop, so a secret pasted into
+  # CLAUDE.md should fail the commit that introduces it rather than a
+  # report up to a day later. Renovate's pre-commit manager keeps the
+  # rev current.
+  #
+  # Pinned by commit rather than by tag. A tag is mutable and
+  # pre-commit caches the hook environment by the rev string, so a
+  # moved tag changes what runs on every developer's commit and on the
+  # PR head in CI without changing a line here. Renovate's pre-commit
+  # manager handles a SHA pin and keeps the trailing comment in step.
+  #
+  # Known, accepted warnings at this rev: CLAUDE.md trips
+  # context-budget and content-progressive-disclosure at ~8,100
+  # estimated tokens against a 6,000 threshold. Warnings do not fail
+  # the hook. skillsaw's rule set moves between releases, so if a bump
+  # promotes either to an error the fix is to move the MariaDB storage
+  # inventory and the State class detail out of CLAUDE.md into the
+  # docs/ pages it already summarises, not to pin the rev back.
+  - repo: https://github.com/stbenjam/skillsaw
+    rev: ec30cf07c9a00cf5ea5e7bfe0c351366f99d09a1  # v0.20.0
+    hooks:
+      - id: skillsaw
+
   # Ansible linter for the shakenfist.shakenfist deployer collection
   # Requires: pip install ansible-lint
   # Note: Uses 'local' repo because the upstream pre-commit hook has Python 3.13

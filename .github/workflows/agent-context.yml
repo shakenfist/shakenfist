@@ -1,0 +1,96 @@
+# Lints the agent context -- AGENTS.md, CLAUDE.md and the skills under
+# .claude/ -- for malformed frontmatter, smuggled instructions,
+# embedded credentials and dangerous hook or settings configuration.
+#
+# The job runs the pre-commit hook rather than invoking skillsaw
+# directly, so .pre-commit-config.yaml's rev is the only place the
+# skillsaw version is written down. skillsaw's rule set moves between
+# releases, and Renovate's pre-commit manager raises the hook bump as
+# its own reviewable pull request, so a second pin here would drift
+# without anyone choosing it. pre-commit itself is pinned, in
+# tools/ci/pre-commit-requirements.txt: the harness that enforces the
+# hook rev should not be the one floating thing in the job.
+#
+# This is its own workflow rather than a job in functional-tests.yml
+# because that workflow's expensive lanes are gated on code_changed:
+# sharing it would either leave this job unable to trigger on a
+# documentation-only change, or widen that gate.
+#
+# Living in its own file has one consequence worth stating. This job
+# can fail a pull request, but a needs: list in another workflow cannot
+# reach across workflow files, so it is named in neither can_enqueue's
+# nor can_merge's. It is not a required status check either -- see the
+# note on the push trigger below for why a path-filtered required check
+# is a trap. So a red Agent context is visible on the pull request and
+# blocks nothing automatically.
+
+name: Agent context
+
+on:
+  # Also on push, because a commit that lands on develop without a pull
+  # request -- an admin push, a bot commit -- would otherwise never be
+  # linted, and AGENTS.md and .claude/ are exactly the files where an
+  # unreviewed change is worth catching late if it was not caught early.
+  # There is deliberately no merge_group trigger: this is not a required
+  # check, and a path-filtered workflow made required reports pending
+  # forever on the pull requests it filters out.
+  push:
+    branches:
+      - develop
+    paths:
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.claude/**'
+      - '.pre-commit-config.yaml'
+      - 'tools/ci/pre-commit-requirements.txt'
+      - '.github/workflows/agent-context.yml'
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.claude/**'
+      - '.pre-commit-config.yaml'
+      - 'tools/ci/pre-commit-requirements.txt'
+      - '.github/workflows/agent-context.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  http_proxy: http://192.168.1.15:3128
+  https_proxy: http://192.168.1.15:3128
+  PIP_INDEX_URL: https://devpi.home.stillhq.com/root/pypi/+simple/
+  # Fall back to pypi so a devpi cold-cache miss (empty index on a
+  # first-touch package) cannot hard-fail the job.
+  PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
+
+jobs:
+  skillsaw:
+    name: skillsaw
+    runs-on: [self-hosted, static]
+    timeout-minutes: 15
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-skillsaw
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Into a venv, not the system python: the runners enforce PEP 668,
+      # so a bare pip install is refused with
+      # "error: externally-managed-environment". pre-commit then builds
+      # the skillsaw hook its own environment from the pinned rev.
+      - name: Install pre-commit
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/venv-skillsaw"
+          "${RUNNER_TEMP}/venv-skillsaw/bin/pip" install --quiet \
+              --disable-pip-version-check \
+              -r tools/ci/pre-commit-requirements.txt
+          echo "${RUNNER_TEMP}/venv-skillsaw/bin" >> "${GITHUB_PATH}"
+
+      # Only the skillsaw hook: every other hook in the config wants
+      # tox, ansible-lint or a built shakenfist, which this lane
+      # deliberately does not install.
+      - name: Lint the agent context
+        run: pre-commit run skillsaw --all-files --show-diff-on-failure

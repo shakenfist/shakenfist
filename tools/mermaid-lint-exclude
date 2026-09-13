@@ -1,0 +1,19 @@
+# Trees tools/mermaid-lint.sh leaves alone. One path per line; a line
+# matching no tracked file fails the run.
+#
+# Every line here also needs the matching '!path/**' on both of the
+# paths lists in .github/workflows/mermaid-lint.yml. The script reads
+# this file and GitHub Actions cannot, so the two halves are kept in
+# step by hand -- and they have to be, because the script lints the
+# whole tree on every run. A path the workflow skips but the script
+# still reads fails somebody else's pull request over a diagram they
+# did not write.
+
+# An automated import of the sibling repositories' documentation,
+# refreshed hourly by sync-external-docs.yml with no local review.
+# AGENTS.md forbids editing it here -- a diagram broken in instar,
+# kerbside, ryll or occystrap is fixed in the repository it came from,
+# where the sibling's own mermaid lane is what catches it. 664 of this
+# repository's 918 tracked markdown files live here, so linting them
+# would also spend most of the lane on content that is not ours.
+docs/components

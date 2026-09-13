@@ -12,6 +12,8 @@ Every workflow in `.github/workflows/`:
 |----------|---------|---------|
 | `functional-tests.yml` | Main CI: lint, unit tests, functional tests, credential scanning, and the automated reviewer, delinter and exception fixer jobs. The functional jobs deploy nested test clusters via the `shakenfist.shakenfist` Ansible collection (`shakenfist/deploy/collection/`), driven by the reusable `smoke-cluster` workflow in the `shakenfist/actions` repository | PR, merge_group |
 | `docs-tests.yml` | Build and test documentation | PR touching `docs/**` or `mkdocs.yml` |
+| `agent-context.yml` | Lint the agent context -- `AGENTS.md`, `CLAUDE.md` and `.claude/` -- for malformed frontmatter, smuggled instructions, embedded credentials and dangerous hook configuration, by running the `skillsaw` pre-commit hook. Advisory: see Branch Protection | PR or push to `develop` touching the agent context, `.pre-commit-config.yaml` or the workflow itself |
+| `mermaid-lint.yml` | Render every tracked mermaid diagram and fail on one that does not parse (runs `tools/mermaid-lint.sh` in the pinned mermaid-cli container, on a `debian-12-docker` runner because it needs a docker daemon). Advisory: see Branch Protection | PR or push to `develop` touching markdown, the script, its exclude file or the workflow itself |
 | `code-formatting.yml` | Whole-tree formatting sweep | Daily schedule, manual, self-test PR |
 | `codeql-analysis.yml` | CodeQL static analysis | Push, PR, weekly schedule |
 | `pin-indirect-dependencies.yml` | Reconcile pinned indirect dependencies, adding new ones and removing obsolete ones (runs `tools/pin-indirect-dependencies.sh`) | Daily schedule, PR self-test |
@@ -68,13 +70,13 @@ That leaves a released client mattering to exactly one audience -- operators
 -- which is worth knowing before treating a release as a prerequisite for
 anything internal.
 
-Phase 4 of `docs/plans/PLAN-scheduler-reservations.md` reasoned from the
+Work on `docs/plans/PLAN-scheduler-reservations.md` reasoned from the
 opposite belief and deliberately wrote its functional coverage against
 `apiclient.Client._request_url()` to work around a constraint which had
-already been gone for seven weeks. Its phase 4b then made the same mistake
-about the conductor, in the same document that corrected the first one --
-because it checked this repository's install path and took the conductor's
-from another plan. If you find yourself about to do something similar, check
+already been gone for seven weeks. It then made the same mistake about the
+conductor, in the same document that corrected the first one -- because it
+checked this repository's install path and took the conductor's from
+another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.
 
@@ -218,20 +220,21 @@ break it twice, since the wrapper's own deadline failure is a test failure
 rather than an `APIException` the `except` clause could catch, and waiting
 up to seven minutes per refusal would serialise a burst whose simultaneity
 is the thing under test. The other reserved use is the wrapper's own call
-inside `base.py`, which has to reach the client somehow. The CI cloud
-sizing plan's phase 3 saturation tests are expected to need the marker
-too, to assert that a genuinely full cluster refuses rather than have the
-refusal waited away.
+inside `base.py`, which has to reach the client somehow. The saturation
+tests planned in
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) are expected to
+need the marker too, to assert that a genuinely full cluster refuses
+rather than have the refusal waited away.
 
 ## CI headroom instrumentation
 
-Phase 1 of `docs/plans/PLAN-ci-cloud-sizing.md` (see
-`docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md` for the
-decisions behind it) added two data-gathering instruments to every
-functional cluster job, so that later phases can size CI's clouds from
-a distribution instead of the handful of hand-collected numbers the
-plan started from. Neither instrument gates anything itself -- see
-"Nothing here is a quality gate" below -- but the poller's own traffic
+Every functional cluster job carries two data-gathering instruments,
+so that CI's clouds can be sized from a distribution instead of the
+handful of hand-collected numbers
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) started from;
+`docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md` records
+the decisions behind them. Neither instrument gates anything itself
+-- see "Nothing here is a quality gate" below -- but the poller's own traffic
 does interact with a check that gates, which is the one reason a
 reader troubleshooting a CI failure might need this section; see "The
 probe's traffic is exempted from the idle-load check". Otherwise it
@@ -328,9 +331,8 @@ moves with the day it is run on.
 ### A third file: the capacity-wait trace (`--waits`)
 
 A third file lands beside the other two, written by a different
-mechanism. `PLAN-transient-capacity-refusals` phase 2's
-`self.create_instance()` wrapper (see "Creating instances in the
-functional suite" above) appends one JSON line to
+mechanism. The `self.create_instance()` wrapper (see "Creating
+instances in the functional suite" above) appends one JSON line to
 `/srv/ci/traces/instance-waits.jsonl` every time a create waits out a
 transient 507. It reaches the bundle through the same "Gather logs"
 scp as `headroom.jsonl` and `headroom-census.json`, with no separate
@@ -370,9 +372,9 @@ consumers of the record.
 
 ### The series record format
 
-Phase 2 parses `headroom.jsonl` as a contract, so treat the shape
-below as load-bearing rather than as prose to paraphrase; the tool's
-own docstring is the source of truth if the two ever disagree. Each
+`headroom.jsonl` is parsed as a contract, so treat the shape below as
+load-bearing rather than as prose to paraphrase; the tool's own
+docstring is the source of truth if the two ever disagree. Each
 line is one JSON object. A successful sample carries:
 
 * `sampled_at` -- float, unix epoch seconds, wall clock at sample
@@ -416,14 +418,16 @@ evidence the cloud needs more disk capacity.
 
 ### Nothing here is a quality gate
 
-Every workflow step this phase added is `continue-on-error`, and
-`ci_headroom_report.py` always exits 0 whatever it finds -- even an
-internal error in the report is printed, not raised. The band verdict
-it prints (committed vCPU as a fraction of the admission ledger,
-against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
-phase 0 set those bounds with no distribution to check them against,
-phase 2 replaces or defends them, and any enforcement is phase 5's to
-add. No verdict this instrumentation prints can fail a job.
+Every workflow step this instrumentation added is
+`continue-on-error`, and `ci_headroom_report.py` always exits 0
+whatever it finds -- even an internal error in the report is printed,
+not raised. The band verdict it prints (committed vCPU as a fraction
+of the admission ledger, against bounds of 0.35 and 0.70) is
+explicitly labelled PROVISIONAL: those bounds were set with no
+distribution to check them against, and replacing or defending them --
+and turning any of this into something that gates -- is work
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) still has
+ahead of it. No verdict this instrumentation prints can fail a job.
 
 That is not the same as the instrumentation being invisible to the
 checks that do gate, which is what this section used to say and what
@@ -1113,9 +1117,55 @@ caches.
   `localhost,127.0.0.1,10.0.0.0/8` to prevent local service traffic from
   being routed through the proxy.
 
+## Fork pull requests and the runner pool
+
+Workflow runs from a fork wait for a maintainer's approval:
+`fork-pr-contributor-approval` on this repository is
+`all_external_contributors`, not just first-time ones. That is what
+makes the static runner pool safe to use for jobs that execute
+repository content.
+
+It matters most for `agent-context.yml`. That lane runs on
+`[self-hosted, static]` -- a long-lived, shared host with the fleet
+proxy and devpi reachable -- and it builds its hook environment from
+the pull request head's own `.pre-commit-config.yaml`, which is also
+one of its triggers. So the set of third-party code it installs and
+runs is chosen by the change under test. Nothing else in this
+repository has that shape; every other PR-head job on the static pool
+runs code from a fixed configuration. The fork-approval setting is the
+control, so if it is ever relaxed this lane moves to an ephemeral `vm`
+runner rather than staying where it is.
+
+`mermaid-lint.yml` executes `tools/mermaid-lint.sh` from the pull
+request head under the same rule, but on an ephemeral `vm` runner, and
+the container it starts gets `--network none`.
+
 ## Branch Protection
 
 The develop branch uses:
 - Required status checks: `Can see status`, `Can enqueue`
 - Merge queue with ALLGREEN grouping strategy
 - Configuration exported to `.github/exported-config/`
+
+`agent-context.yml` and `mermaid-lint.yml` are deliberate
+exceptions: both can fail a pull request and neither gates one.
+They are path-filtered, and a path-filtered workflow made a
+required check reports pending forever on the pull requests it
+filters out -- so a required `Mermaid lint` would block every pull
+request that touches no markdown. `needs:` cannot reach across
+workflow files either, so neither is named in `can_enqueue` or
+`can_merge`. A red result on either is visible on the pull request
+and blocks nothing automatically; treat it as something to fix
+before merging rather than as something the queue will catch.
+
+Both lanes are vendored from `shakenfist/development`'s templates:
+`tools/mermaid-lint.sh` is byte-identical to
+`templates/mermaid-lint/mermaid-lint.sh` there and is synced rather
+than edited. What this repository chooses for itself lives beside
+it in `tools/mermaid-lint-exclude`, which drops `docs/components/`
+-- `sync-external-docs.yml` imports those 664 files hourly from the
+sibling repositories and `AGENTS.md` forbids editing them here, so
+a diagram broken upstream is fixed upstream rather than failing a
+pull request here that cannot fix it. GitHub Actions cannot read
+that file, so `mermaid-lint.yml`'s path filters carry the same
+exclusion by hand and the two have to move together.
