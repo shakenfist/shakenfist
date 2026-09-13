@@ -185,3 +185,103 @@ class TestNodes(base.BaseNamespacedTestCase):
                 per_node['cpu_available'])
         finally:
             self.test_client.delete_instance(inst['uuid'])
+
+    def _safe_delete_instance(self, instance_uuid):
+        """Delete an instance, tolerating if it's already gone."""
+        try:
+            self.system_client.delete_instance(instance_uuid)
+        except apiclient.ResourceNotFoundException:
+            pass
+
+    def test_cluster_resources_measured_drops_after_delete(self):
+        # Regression coverage for PLAN-transient-capacity-refusals-phase-03
+        # ("metrics on change"). The CPU pre-filter charges
+        # max(cpu_measured, cpu_committed): cpu_committed is released
+        # inside the delete transaction, but cpu_measured used to be
+        # published on a flat 60 s cadence, so a node kept refusing new
+        # work for up to a minute after its last instance was deleted even
+        # though the ledger had already cleared. sf-resources now
+        # republishes within about 5 s of the active-domain set changing,
+        # which this asserts against the same /admin/resources fields
+        # test_cluster_resources_reservations() does above -- raw
+        # node_metrics rows are not exposed over REST.
+        resources = self.system_client.get_cluster_resources()
+        candidates = [
+            n for n in self._hypervisor_nodes()
+            if resources['per_node'].get(n['uuid'], {}).get(
+                'cpu_available', 0) >= 1]
+        if not candidates:
+            self.skipTest('No hypervisor with a vCPU of headroom')
+        node = candidates[0]
+
+        # The instance is pinned so the node this test watches is known
+        # in advance -- the pin is the assertion's subject (which node's
+        # cpu_measured to read), not a workaround for capacity. The node
+        # was already chosen above for having room for one more vCPU, so
+        # the pin is not doing any capacity work either.
+        cpus = 1
+        inst = self.create_instance(
+            'metrics-drop', cpus, 128, None, [{'size': 1, 'type': 'disk'}],
+            None, None, force_placement=node['name'])
+        self.addCleanup(self._safe_delete_instance, inst['uuid'])
+        self.addDetail('instance', content.text_content(json.dumps(
+            inst, indent=4, sort_keys=True)))
+        self.assertEqual(node['uuid'], inst['node'])
+
+        # cpu_measured counts running libvirt domains, not placements
+        # (that is what test_cluster_resources_charges_unbooted_placements
+        # above exercises), so the domain has to actually start before a
+        # baseline read of it means anything.
+        self._await_instance_create(inst['uuid'])
+
+        resources = self.system_client.get_cluster_resources()
+        self.addDetail('resources before delete', content.text_content(
+            json.dumps(resources, indent=4, sort_keys=True)))
+        baseline_node = resources['per_node'].get(node['uuid'])
+        self.assertIsNotNone(
+            baseline_node,
+            'Node %s vanished from /admin/resources per_node right after '
+            'an instance was placed and started on it' % node['uuid'])
+        baseline_measured = baseline_node['cpu_measured']
+
+        # self.system_client uses ASYNC_PAUSE, so this blocks until the
+        # instance's state is 'deleted' -- the 20 s poll below starts
+        # counting from that point, not from when the request was issued.
+        self.system_client.delete_instance(inst['uuid'])
+
+        # A drop by the instance's vCPUs, not a drop to zero: a sibling
+        # instance landing on the same node during the window must not
+        # break this, and asserting against zero would assume the node
+        # was otherwise idle, which this suite's shared cluster does not
+        # guarantee.
+        threshold = baseline_measured - cpus
+
+        # 20 s, not 5: this is "seconds, not a minute", with margin for a
+        # loaded CI node rather than the tightest bound that could pass --
+        # four 5 s poll intervals plus a publish. Before this phase the
+        # same wait needed up to 60 s.
+        deadline_seconds = 20
+        poll_interval_seconds = 5
+        deadline = time.time() + deadline_seconds
+        last_measured = baseline_measured
+        while True:
+            resources = self.system_client.get_cluster_resources()
+            per_node = resources['per_node'].get(node['uuid'])
+            if per_node is not None:
+                last_measured = per_node['cpu_measured']
+                if last_measured <= threshold:
+                    self.addDetail(
+                        'resources after delete', content.text_content(
+                            json.dumps(resources, indent=4, sort_keys=True)))
+                    return
+
+            if time.time() > deadline:
+                break
+            time.sleep(poll_interval_seconds)
+
+        self.fail(
+            'Node %s still publishes cpu_measured %r, %ds after deleting a '
+            '%d-vCPU instance (baseline was %r). The measurement should '
+            'follow a delete within seconds, not within a minute.'
+            % (node['uuid'], last_measured, deadline_seconds, cpus,
+               baseline_measured))
