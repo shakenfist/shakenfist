@@ -16,7 +16,7 @@
         <link rel="prev" href="../merge-queue-config/">
       
       
-        <link rel="next" href="../pin-indirect-dependencies/">
+        <link rel="next" href="../npm-unused-declared-dependency/">
       
       
         
@@ -2280,6 +2280,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../npm-unused-declared-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: npm dependencies declared but never used
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../npm-undeclared-direct-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: npm imports satisfied only by a transitive dependency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pin-indirect-dependencies/" class="md-nav__link">
         
   
@@ -2288,6 +2344,34 @@
     
   
     Audit: Pinning indirect dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../npm-pin-indirect-dependencies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pinning indirect npm dependencies
   
 
     
@@ -14128,6 +14212,17 @@ pull request comes next -- and every developer's pre-push audit --
 naming a file that author never touched. <code>MermaidLintDeploymentTest</code>
 asserts the two exclusions agree, and that the two triggers filter on
 the same paths.</p>
+<p>A repository with a tree of its own to leave alone -- a machine-synced
+import of somebody else's documentation is the case this exists for --
+names it in <code>tools/mermaid-lint-exclude</code>, one path per line, each
+turned into an <code>:(exclude,literal)</code> pathspec so that a line is the
+path it reads as rather than a glob or pathspec magic. The script
+reads that file and the workflow cannot, so the same move-together
+rule applies: a line added there is added to both of the workflow's
+<code>paths</code> lists as <code>!path/**</code>. A line that drops no tracked markdown
+file fails the run, and so does an exclude file that is present but
+not committed, because an exclusion that silently drops nothing
+leaves the tree linted while the file says it is not.</p>
 <h3 id="the-runner">The runner<a class="headerlink" href="#the-runner" title="Permanent link">&para;</a></h3>
 <p><code>[self-hosted, vm, debian-12-docker, s]</code>, not <code>static</code>. Static runners
 have no docker daemon. The label must also appear in

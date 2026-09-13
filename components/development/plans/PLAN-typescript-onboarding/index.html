@@ -2159,6 +2159,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../audits/npm-unused-declared-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: npm dependencies declared but never used
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../audits/npm-undeclared-direct-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: npm imports satisfied only by a transitive dependency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../audits/pin-indirect-dependencies/" class="md-nav__link">
         
   
@@ -2167,6 +2223,34 @@
     
   
     Audit: Pinning indirect dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../audits/npm-pin-indirect-dependencies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pinning indirect npm dependencies
   
 
     
@@ -3065,10 +3149,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d5-33fl-is-not-touched-by-this-plans-author" class="md-nav__link">
+  <a href="#d5-33fl-is-not-touched-by-this-plans-author-until-released" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D5. 33fl is not touched by this plan's author
+        D5. 33fl is not touched by this plan's author until released
       
     </span>
   </a>
@@ -14293,10 +14377,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d5-33fl-is-not-touched-by-this-plans-author" class="md-nav__link">
+  <a href="#d5-33fl-is-not-touched-by-this-plans-author-until-released" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D5. 33fl is not touched by this plan's author
+        D5. 33fl is not touched by this plan's author until released
       
     </span>
   </a>
@@ -14803,11 +14887,13 @@ invented shape that no test would catch and no check would read. If
 such a facility is ever wanted it is a change to
 <code>detect_repo_properties()</code> with its own phase and its own test, not a
 line in this plan's phase 1.</p>
-<h3 id="d5-33fl-is-not-touched-by-this-plans-author">D5. 33fl is not touched by this plan's author<a class="headerlink" href="#d5-33fl-is-not-touched-by-this-plans-author" title="Permanent link">&para;</a></h3>
-<p>Another session is editing <code>33fl</code> concurrently. The runner phase
-below specifies the change and its risks but is not to be executed
-until that work has landed and the operator says so. Nothing else in
-the plan writes to that repository.</p>
+<h3 id="d5-33fl-is-not-touched-by-this-plans-author-until-released">D5. 33fl is not touched by this plan's author until released<a class="headerlink" href="#d5-33fl-is-not-touched-by-this-plans-author-until-released" title="Permanent link">&para;</a></h3>
+<p>Another session was editing <code>33fl</code> concurrently when this plan was
+written, so the runner phase below specified the change and its
+risks but was not to be executed until that work had landed and the
+operator said so. <strong>The operator released it on 2026-09-13.</strong> Phase
+4 is executable; it still runs in plan order, after phases 2 and 3.
+Nothing else in the plan writes to that repository.</p>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -14820,8 +14906,8 @@ the plan writes to that repository.</p>
 <tbody>
 <tr>
 <td>1. Register hunkydory in the audit scope</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>a7f4798 (#125)</td>
 </tr>
 <tr>
 <td>2. hunkydory adopts the local tooling</td>
@@ -14830,12 +14916,12 @@ the plan writes to that repository.</p>
 </tr>
 <tr>
 <td>3. npm dependency criteria</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
 <td>4. Static runners gain node</td>
-<td>Blocked</td>
+<td>Not started</td>
 <td></td>
 </tr>
 <tr>
@@ -14860,12 +14946,13 @@ the plan writes to that repository.</p>
 </tr>
 </tbody>
 </table>
-<p>Phase 4 is blocked on D5: <code>33fl</code> has another session working in it.
-Phase 5 depends on phase 4, because a CI workflow that runs <code>npm ci</code>
-on a runner without npm is a workflow that fails on arrival. Phase 7
-is blocked on the publisher account and <code>VSCE_PAT</code> from D3.</p>
-<p>Phases 1, 2, 3 and 6 have no such dependency and can proceed in any
-order. Phase 1 should go first regardless: see its section.</p>
+<p>Phase 4 was blocked on D5 and was released on 2026-09-13; see that
+decision for what changed. Phase 5 depends on phase 4, because a CI
+workflow that runs <code>npm ci</code> on a runner without npm is a workflow
+that fails on arrival. Phase 7 is blocked on the publisher account
+and <code>VSCE_PAT</code> from D3.</p>
+<p>Phases 2, 3 and 6 have no such dependency and can proceed in any
+order. Phase 1 went first regardless: see its section.</p>
 <h3 id="1-register-hunkydory-in-the-audit-scope">1. Register hunkydory in the audit scope<a class="headerlink" href="#1-register-hunkydory-in-the-audit-scope" title="Permanent link">&para;</a></h3>
 <p>The <code>scope-coverage</code> criterion reconciles the audit lists against
 the organisation every morning and reports a repository that appears
@@ -15003,7 +15090,8 @@ That is not drift and must not be read as drift.</p>
 checks will run against <code>development</code> too, find no <code>package.json</code>,
 and must report not-applicable rather than failing.</p>
 <h3 id="4-static-runners-gain-node">4. Static runners gain node<a class="headerlink" href="#4-static-runners-gain-node" title="Permanent link">&para;</a></h3>
-<p><strong>Do not execute without the operator's say-so; see D5.</strong></p>
+<p><strong>Released by the operator on 2026-09-13; see D5.</strong> It was held
+until then because another session was editing <code>33fl</code>.</p>
 <p>In <code>33fl/static_runner.yml</code>:</p>
 <ul>
 <li>Line 229, the disk specification in "Create the missing runner
@@ -15208,7 +15296,7 @@ patterns already worked out elsewhere in the fleet.</p>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td><strong>Hold.</strong> See D5. Includes rewording the node half of the mermaid-lint rationale in the four files the phase 4 section names.</td>
+<td>Released 2026-09-13; see D5. Includes rewording the node half of the mermaid-lint rationale in the four files the phase 4 section names.</td>
 </tr>
 <tr>
 <td>5</td>
@@ -15295,12 +15383,12 @@ establishes that hunkydory is the only repository with a
 issues. The five exemptions in phase 3 are the guard against those
 three being false. Issue filing is exercised with <code>--dry-run</code> only,
 per the review checklist.</p>
-<p><strong>Another session is editing <code>33fl</code> concurrently</strong> (D5), so phase 4
-could collide with work in flight. <em>Mitigation:</em> phase 4 is marked
-<code>Blocked</code> in the Execution table, restated as <strong>Hold</strong> in the step
-guidance, and carries "Do not execute without the operator's say-so"
-at the head of its section. Nothing else in the plan writes to that
-repository.</p>
+<p><strong>Another session was editing <code>33fl</code> concurrently</strong> (D5), so phase 4
+could have collided with work in flight. <em>Mitigation:</em> phase 4 was
+marked <code>Blocked</code> in the Execution table and restated as <strong>Hold</strong> in
+the step guidance until the operator released it on 2026-09-13.
+Nothing else in the plan writes to that repository, and phase 4 still
+runs in plan order rather than being pulled forward.</p>
 <p><strong>Phase 7 handles a Marketplace publish token.</strong> <code>VSCE_PAT</code> can
 publish under the <code>shakenfist</code> publisher id. <em>Mitigation:</em> the
 constraints in phase 7 -- an ephemeral runner, a tag-protected

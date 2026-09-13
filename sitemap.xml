@@ -209,6 +209,18 @@
          <lastmod>2026-09-13</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/npm-pin-indirect-dependencies/</loc>
+         <lastmod>2026-09-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/audits/npm-undeclared-direct-dependency/</loc>
+         <lastmod>2026-09-13</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/development/audits/npm-unused-declared-dependency/</loc>
+         <lastmod>2026-09-13</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/pin-indirect-dependencies/</loc>
          <lastmod>2026-09-13</lastmod>
     </url>

@@ -2161,6 +2161,62 @@
   
   
     <li class="md-nav__item">
+      <a href="npm-unused-declared-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: npm dependencies declared but never used
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="npm-undeclared-direct-dependency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: npm imports satisfied only by a transitive dependency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pin-indirect-dependencies/" class="md-nav__link">
         
   
@@ -2169,6 +2225,34 @@
     
   
     Audit: Pinning indirect dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="npm-pin-indirect-dependencies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Pinning indirect npm dependencies
   
 
     
@@ -14189,6 +14273,18 @@ attached rather than quietly disappearing from the table.</p>
 <tr>
 <td><a href="/components/development/audits/undeclared-direct-dependency/">undeclared-direct-dependency.md</a></td>
 <td>Nothing imported is left resting on a generated transitive pin</td>
+</tr>
+<tr>
+<td><a href="/components/development/audits/npm-pin-indirect-dependencies/">npm-pin-indirect-dependencies.md</a></td>
+<td>package-lock.json is committed, current, and honoured by CI</td>
+</tr>
+<tr>
+<td><a href="/components/development/audits/npm-unused-declared-dependency/">npm-unused-declared-dependency.md</a></td>
+<td>Declared npm dependencies are imported, run, or named where they are used</td>
+</tr>
+<tr>
+<td><a href="/components/development/audits/npm-undeclared-direct-dependency/">npm-undeclared-direct-dependency.md</a></td>
+<td>Nothing imported is left resting on a transitive npm resolution</td>
 </tr>
 <tr>
 <td><a href="/components/development/audits/export-repo-config/">export-repo-config.md</a></td>
