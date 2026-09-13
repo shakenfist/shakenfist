@@ -209,9 +209,20 @@ class Scheduler:
         # cpu_schedulable. For those we approximate the reservation the
         # node will publish once its daemon restarts by subtracting this
         # node's own thread reservation. We cannot know a remote node's
-        # exact per-host value, and there is no longer an infra-role bump,
-        # so we use the local config value; this fallback is transient and
-        # stops the moment that node's daemon republishes cpu_schedulable.
+        # exact per-host value, and *this fallback* applies no role-aware
+        # bump (test_old_dialect_fallback_ignores_infra_role), so we use
+        # the local config value; the fallback is transient and stops the
+        # moment that node's daemon republishes cpu_schedulable.
+        #
+        # The deployer does still bump infra roles, per host, so a real
+        # node's reservation is usually not the local config value:
+        # examples/_shared/site.yml gives a network or database node twice
+        # the plain-hypervisor thread reservation. On a small node that is
+        # load-bearing -- CI's 4-thread infra hypervisors reserve all four
+        # and are floored at one schedulable thread by
+        # _compute_reservations() -- so do not read this comment as saying
+        # the bump is gone. It is not applied *here*, which is a statement
+        # about the fallback and not about the system (issue 4201).
         metrics = self.metrics[node]
         threads = metrics.get('cpu_schedulable')
         if threads:

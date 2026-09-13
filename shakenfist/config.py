@@ -606,9 +606,9 @@ class SFConfig(BaseSettings):
         description=(
             'How much RAM (in GB) is reserved for the operating system and '
             'host-level system services on this node. This is a single '
-            'absolute per-node value; Ansible templates it per host '
-            '(folding in any historical infra-role bump) and an operator '
-            'may override it from the inventory.'
+            'absolute per-node value; Ansible templates it per host, '
+            'adding a bump for network and database nodes, and an '
+            'operator may override it from the inventory.'
         )
     )
     NODE_CPU_RESERVATION_THREADS: int = Field(
