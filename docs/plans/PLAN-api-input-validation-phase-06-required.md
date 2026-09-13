@@ -867,6 +867,100 @@ the server does not require. Step 6's release note says so explicitly.
     `docs/plans/index.md` row reads `6 of 9`.
 12. `pre-commit run --all-files` is clean.
 
+### Definition-of-done audit (step 6)
+
+1. **Met.** The *Sweep results* table above carries 76 rows (63
+   `guarded`, 7 `faults`, 6 `accepted`), matching what
+   `test_the_census_still_finds_seventy_six` and `test_the_sweep` pin
+   against `required_declarations()`/`SWEEP` in
+   `shakenfist/tests/external_api/test_required_sweep.py`. The item's
+   own wording says "75 declarations from F1"; F1's own correction
+   (*What the sweep says that F1 did not*) already notes the true count
+   is 76 (75 defaultable plus the raw-body marker), so the table is
+   right and the item's prose is the thing carrying the stale number,
+   not the deliverable.
+2. **Met.** `grep -n "MISSING_REQUIRED" shakenfist/external_api/base.py`
+   returns nothing at all now — not merely no *filtering* line, the
+   name is not present in the file.
+3. **Met, as amended.** `shared` on `POST /artifacts` is `required=False`
+   (`shakenfist/external_api/artifact.py:437`, with the comment step 2
+   added). The four other `accepted` rows
+   (`InstanceAgentExecuteEndpoint.post.command_line`,
+   `InstanceAgentGetEndpoint.post.path`,
+   `InstanceAgentPutEndpoint.post.path`,
+   `NetworkDNSAddressEndpoint.post.value`) keep `required=True` with
+   the reasoning recorded in *Step 2: which declarations are really
+   required*, and `test_step_2_relaxed_exactly_what_it_said_it_did`
+   pins the split in both directions.
+4. **Met**, with one caveat on how it was checked. The omission and
+   explicit-`null` tests
+   (`test_enforce_mode_rejects_missing_required`,
+   `test_enforce_mode_rejects_an_explicit_null_the_same_way` in
+   `test_request_validation.py`) pass today, and by inspection the
+   filter step 3 deleted is exactly what stood between them and a
+   fall-through to the handler — restoring the
+   `[f for f in findings if f.reason != validation.MISSING_REQUIRED]`
+   guard makes both a no-op path when the *only* finding is
+   missing-required, so both tests would fail against it. I did not
+   re-run that reversion live in this sandbox (a mid-session policy
+   restriction blocked writing a temporary revert to production code
+   from this documentation-only step), so this is verified by reading
+   the diff rather than by executing the mutation myself; the step 3
+   commit message records that the author did run it.
+5. **Met.** `RequiredSweepTestCase` in `test_required_sweep.py` now
+   runs at `mode = 'warn'` and asserts, for all 76 rows including the
+   7 `faults` and 6 `accepted` populations, that the response is
+   unchanged from the published `SWEEP` table — not just the two the
+   step brief named.
+   `test_warn_mode_still_answers_the_handlers_own_message` in
+   `test_request_validation.py` is the single readable pin for the
+   `guarded` case.
+6. **Met.** `test_unencoded_user_data_is_refused_before_the_hypervisor`
+   drives a real `POST /instances` with unencoded cloud-config,
+   asserts 400 naming `user_data`, and asserts `Instance.new` was never
+   called — the only path to `instance.py:1930`.
+7. **Met.** Each of the five validators in
+   `shakenfist/tests/external_api/test_format_validation.py` has an
+   accept test, a refuse test, and shares
+   `test_every_validator_passes_none_through_untouched`, which checks
+   all five in one pass.
+8. **Met.** `NetworkCreateFloatingOverlapTestCase` in
+   `test_network.py` covers identical, contains, contained-by and
+   no-floating-network-configured cases, plus
+   `test_a_partial_overlap_cannot_be_expressed` recording why no fifth
+   case exists.
+9. **Not yet met, deliberately.** Per this step's brief I have not
+   closed either issue. #3269 and #323 both carry `Fixes #NNNN` in
+   their commits (`03ea26514` and `d6b84b365`) and will auto-close on
+   merge; the commit and the check that proves each is named in my
+   final report and in the master plan's *Where the tracked issues
+   stand* section, for the management session to post as closing
+   comments. #534 was already closed by #4183 before this phase
+   started, as the item itself notes.
+10. **Met.** `CompiledEndpoint`'s and `validate_request`'s docstrings
+    were rewritten in step 3;
+    `docs/developer_guide/writing_an_endpoint.md`'s required-ness
+    paragraph and `docs/release_notes/v07-v08.md` were corrected in
+    this step (two stale in-progress mentions of "required is recorded
+    and never enforced" earlier in the release note were also updated
+    to point at the new entry, rather than left standing as
+    contradictions).
+11. **Met, except the index number is different from the item's own
+    wording.** The master plan's Execution table has nine rows, phase
+    7 is *Structured parameter schemas*, phase 8 is *Push audit*. The
+    item says the index row should read `6 of 9`, but that number was
+    fixed as part of the *planning* commit before this phase's work
+    started, when 6 phases (0-5) were complete; completing phase 6
+    itself makes 7 phases complete, and every other "In progress" row
+    in `docs/plans/index.md` counts completed phases, not the phase
+    number in flight (compare `PLAN-scheduler-reservations.md`'s
+    `11 of 14`, `PLAN-cluster-op-visibility.md`'s `2 of 7`). I have set
+    it to `7 of 9` rather than the `6 of 9` the item names, per this
+    step's own instruction not to leave the arithmetic unchanged when
+    the completed-phase count genuinely changed.
+12. **Met.** `pre-commit run --all-files` and the full `stestr` suite
+    were run for this step; results are in the final report.
+
 ## Back brief
 
 Before executing any step, back brief the operator on the understanding
@@ -986,4 +1080,26 @@ untouched (item 7), and drives the unencoded-cloud-config body of
 decode is never reached with it (item 6).
 `test_validation_compiler.py`'s `format` test was inverted: it used to
 assert that no `format` ever becomes a validator, and now names all
-thirteen declarations that do. Steps 5 and 6 not started.
+thirteen declarations that do.
+
+Step 5 done: `NetworksEndpoint.post` refuses a netblock overlapping the
+deployed floating network with a 400 naming both blocks, closing #323.
+It reads the floating network the way `network.floating_network()`
+does, without creating one, and falls back to `config.FLOATING_NETWORK`
+when no floating network row exists yet -- the row wins when both
+exist. `shakenfist/tests/external_api/test_network.py`'s
+`NetworkCreateFloatingOverlapTestCase` covers the identical, contains,
+contained-by and no-floating-network cases and records why a partial
+overlap cannot be expressed (CIDR prefixes form a tree); a cluster CI
+case was added to
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_networking.py`.
+Only the floating network is guarded, as the plan scoped -- other
+reserved ranges (node egress, mesh addressing) are untouched. The MAC
+guard step 5 also briefed had already landed in #4183 before the phase
+started (see *Amendments*); nothing further was added for it.
+
+Step 6 done: this document, `docs/developer_guide/writing_an_endpoint.md`
+and `docs/release_notes/v07-v08.md` all now say `required` is enforced,
+the master plan's Execution table has nine rows with phase 6 marked
+Complete, and the `docs/plans/index.md` row reads `7 of 9`. The phase is
+complete; see *Definition of done*, below, for the item-by-item audit.

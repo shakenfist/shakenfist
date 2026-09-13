@@ -32,7 +32,7 @@ appended.
 I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.
 
-**Status: phases 0 to 5 planned; 0, 1, 2, 3, 4 and 5 complete.**
+**Status: phases 0 to 6 planned; 0, 1, 2, 3, 4, 5 and 6 complete.**
 The open questions at the bottom are answered in the Decisions
 section; see
 [`PLAN-api-input-validation-phase-00-decisions.md`](PLAN-api-input-validation-phase-00-decisions.md)
@@ -309,7 +309,7 @@ declarations are good enough to compile.
 | 3: Compile and warn | Complete | Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is *already* a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared `namespace` of #3739 and fourteen metadata `value` declarations narrower than their handlers — which phase 4 fixes before it enforces. See [phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md) | `3790aa487` (#3726), `0c7eacf48` (#3742), `6274cd924` (#3835) |
 | 4: Enforce | Complete | Landed 2026-09-09 via [#4141](https://github.com/shakenfist/shakenfist/pull/4141). Fixed the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moved to Future work as [#4098](https://github.com/shakenfist/shakenfist/issues/4098): read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) | `1c203b111` (#4101), `f1040a23b` (#4141) |
 | 5: Narrow the handlers | Complete | Deleted the `except TypeError` arm from `handle_authorization_exceptions` (D23): a handler-internal `TypeError` is now a recorded 500 like any other server fault, and under the `warn`/`off` rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed [#3523](https://github.com/shakenfist/shakenfist/issues/3523) (a partial `cpuinfo` probe raising `KeyError` in `get_user_agent`) and removed two `requires_namespace_exist_if_specified` applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried `repr(e)` (F11): every 500 response now answers a bare `server error` with no exception detail at all, for any cause (D31). Filed [#4161](https://github.com/shakenfist/shakenfist/issues/4161) for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix ([#3743](https://github.com/shakenfist/shakenfist/issues/3743)) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See [phase 5](PLAN-api-input-validation-phase-05-narrow.md) | `b3de0a44f` (#4162) |
-| 6: Required and scalar semantics | Not started | Decide whether `required` is enforced, having found that all 75 body and query declarations carrying `required=True` are optional in fact — every one has a handler default, so nothing is structurally required and enforcement is a contract change for all of them. Also gives the semantic type tokens something to do: `macaddr` is the only one of them that validates anything today, and it is declared nowhere. Closes #3269 (base64 `user_data` failing on the hypervisor rather than at the API) and #323 (a netblock overlapping the floating network). #534 was also in scope until the automated issue fixer closed it with #4183 on 2026-09-12, four hours after the phase plan merged. See [phase 6](PLAN-api-input-validation-phase-06-required.md) | — |
+| 6: Required and scalar semantics | Complete | A sweep drove one real request per declaration through the whole decorator stack: of the 75 body/query declarations carrying `required=True` (every one had a handler default, so none was structurally required), 63 were already refused by a handler guard, 7 reached a null-hostile constructor and 500'd, and only 6 were accepted outright — of those, only `shared` on `POST /artifacts` was genuinely optional and moved to `required=False`; the other 5 committed a broken operation on omission (a queued agent command with a null path, a DNS record pointing at null) and kept `required=True` so enforcement turns that into a 400 instead. The `MISSING_REQUIRED` filter in `validate_request` was then deleted, so an omitted or explicit-null required parameter now answers 400 naming it, in every mode but `warn`/`off`. Separately, five of the nine semantic type tokens (`byte`, `a CIDR netblock`, `an IPv4 address as a string`, `url`, `uuid`) were given real validators keyed on the exact `format` string they publish, closing #3269 by rejecting non-base64 `user_data` at the API instead of on the hypervisor; `macaddr` already validated via PR #4183 and is unchanged. `POST /networks` gained a handler guard refusing a netblock that overlaps the deployed floating network, closing #323. #534 was closed outside this plan by #4183 before the phase started (see the note below). See [phase 6](PLAN-api-input-validation-phase-06-required.md) | — |
 | 7: Structured parameter schemas | Not started | `dict` compiles to `fields.Dict()` and `arrayofdict` to `fields.List(fields.Dict())`, neither carrying a value schema, so every key inside a diskspec, networkspec or videospec is unvalidated in every mode. Teaching the vocabulary to carry an element schema is what #528 needs — the scope #936 described before it was closed as a duplicate of #528 on 2026-09-12 — and it is also items 2 and 3 of #4167. Split out of phase 6 by that phase's survey: the other issues in that row are guards and scalar validators, and this is a vocabulary change the size of phase 2 | — |
 | 8: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence | — |
 
@@ -361,9 +361,21 @@ three classes the phase 5 survey recorded, so the issue is scoped
 to the two proxy call sites and the local-socket case that fix
 does not cover, not to the survey's original table.
 
+**Closed by phase 6:** #3269 (`03ea26514`, step 4's commit `Enforce
+the formats the API publishes.` — proven by
+`test_format_validation.py`'s `test_wrapped_base64_user_data_still_reaches_placement`,
+which drives an unencoded `user_data` through a real
+`POST /instances` and asserts the config drive decode at
+`instance.py:1930` is never reached) and #323 (`d6b84b365`, step 5's commit
+`Refuse an overlapping netblock.` — proven by
+`shakenfist/tests/external_api/test_network.py`'s overlap cases and
+the cluster CI case in
+`shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_networking.py`).
+Both commits carry `Fixes #NNNN` and will auto-close on merge.
+
 **Still open and still owned by this plan:** #528 (parent, and
 since 2026-09-12 also the tracker for what #936 described), #3612
-(the mechanism), #3269, #323, #2094.
+(the mechanism), #2094.
 
 **Phase 5 was overtaken from outside, as predicted.** Three of
 its four attribution issues were picked up by the automated issue

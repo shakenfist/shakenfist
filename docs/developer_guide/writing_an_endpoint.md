@@ -364,11 +364,21 @@ Reasons are counted separately because they answer different
 questions: `unknown-parameter`, `type-mismatch`, `missing-required`
 and `body-path-collision`.
 
-One thing it deliberately does not do. `required` is recorded but
-never enforced — not even in `enforce` mode, where missing-required
-findings are filtered out of the rejection decision before the 400 is
-built. Several parameters are declared required while omitting them
-has always worked, and what to do about that is still open — see [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
+`required` is enforced. An omitted parameter and an explicit JSON
+`null` both answer `400 <parameter>: declared required but not
+supplied`, in every `API_VALIDATION_MODE` but `warn` and `off`. That
+was not always true: several parameters were declared required while
+omitting them had always worked, so
+[phase 6](../plans/PLAN-api-input-validation-phase-06-required.md)
+audited every `body`/`query` declaration carrying `required=True`
+against what its handler actually does with an omission before
+turning enforcement on, and corrected the one that was genuinely
+optional (`shared` on `POST /artifacts`). Declare `required=True` only
+where the handler refuses the request without the parameter today; if
+the handler supplies a sensible default on omission, declare
+`required=False` and let the schema say what is already true — a
+declaration claiming more than the handler enforces is now a caller
+visible lie, not a documentation nit.
 
 The `format` a type token renders is documentation unless
 `validation._FORMATS` knows it. Five of them do, and each compiles to
