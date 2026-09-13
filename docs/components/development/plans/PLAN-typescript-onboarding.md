@@ -230,7 +230,7 @@ the plan writes to that repository.
 
 | Phase | Status | Merged |
 |-------|--------|--------|
-| 1. Register hunkydory in the audit scope | Not started | |
+| 1. Register hunkydory in the audit scope | In progress | |
 | 2. hunkydory adopts the local tooling | Not started | |
 | 3. npm dependency criteria | Not started | |
 | 4. Static runners gain node | Blocked | |
