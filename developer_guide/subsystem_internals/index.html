@@ -13959,8 +13959,8 @@ placed, non-deleted instance, whereas the resources daemon's
 only active libvirt domains. A powered-off instance holds its
 reservation in the ledger and is absent from the measurement, so the
 two legitimately disagree, and any counter-based admission has to
-choose between them explicitly rather than assume parity. Phase 3 chose
-the ledger. Admission is the guarded UPDATE the
+choose between them explicitly rather than assume parity. Admission
+uses the ledger, and is the guarded UPDATE the
 <code>AdmitInstancePlacement</code> RPC makes against <code>scheduler_node_capacity</code>,
 in the same transaction that writes the <code>placement</code> attribute and
 rewrites the instance's <code>INSTANCE_LOCATION</code> reference rows — so a
@@ -14014,7 +14014,7 @@ older <code>sf-database</code> reads as "no breakdown available" rather than a
 breakdown of zeroes; the three allocation dimensions never carry the
 keys.</p>
 <p>Every dimension detail also carries <code>shortfall</code>
-(<code>_capacity_dimension()</code>, phase 7): <code>max(0.0, effective_used -
+(<code>_capacity_dimension()</code>): <code>max(0.0, effective_used -
 limit)</code>, where <code>effective_used</code> is <code>used + requested</code> on a charged
 dimension and <code>used</code> alone on the uncharged demand dimension -- the
 same <code>effective_used</code> the <code>exceeded</code> flag above compares against
@@ -14081,10 +14081,8 @@ toward neither the total nor the unclaimed-used side (a claim's
 wherever they are stranded). If you add a capacity consumer, it
 inherits these filters by reading the tables — do not re-derive
 capacity from <code>node_metrics</code> directly. The tables are consumed for
-admission as of phase 3
-(<code>docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md</code>), and
-<code>namespace_claims</code> became writable in phase 4 — see <a href="#the-claim-admission-transaction">The claim admission
-transaction</a> below.</p>
+admission, and <code>namespace_claims</code> is writable — see <a href="#the-claim-admission-transaction">The claim
+admission transaction</a> below.</p>
 <p>A capacity row is created only by a reconcile pass, so a hypervisor
 with none is admitted against nothing at all (the placement fail-open
 described above). Waiting out the five-minute cadence for that first
@@ -14106,7 +14104,7 @@ maintenance loop runs at most once every 60s, so this closes the
 warm-up window to roughly a minute after a hypervisor's metrics
 become visible, not immediately — the larger remaining term is the
 resources daemon's own publication cadence for those metrics, which
-this does not shorten (phase 3 of
+this does not shorten (see
 <a href="../../plans/PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals</a>).
 The check also forces at most once per distinct unguarded set: a node
 that qualifies here but which the reconciler declines to size anyway
@@ -14132,9 +14130,9 @@ case-sensitive collation makes a binding that confuses the two fail.
 Operator-facing documentation is
 <a href="../../operator_guide/scheduler/"><code>scheduler.md</code></a>.</p>
 <h3 id="the-claim-admission-transaction">The claim admission transaction<a class="headerlink" href="#the-claim-admission-transaction" title="Permanent link">&para;</a></h3>
-<p>Phase 4 made <code>namespace_claims</code> writable. A claim is a namespace's
-promise of aggregate cluster capacity, so creating, growing or shrinking
-one is an admission decision in its own right — against the
+<p><code>namespace_claims</code> is writable. A claim is a namespace's promise of
+aggregate cluster capacity, so creating, growing or shrinking one is an
+admission decision in its own right — against the
 <code>cluster_capacity</code> singleton rather than against a node — and the five
 CRUD RPCs (<code>CreateNamespaceClaim</code>, <code>GetNamespaceClaim</code>,
 <code>GetNamespaceClaims</code>, <code>UpdateNamespaceClaim</code>, <code>DeleteNamespaceClaim</code>)
@@ -14184,7 +14182,7 @@ bargain the branch probe strikes.</p>
   against totals nothing has computed, which the next pass folds into
   <code>claimed_*</code> whether it fits or not.</li>
 <li><strong>Claim ceilings are advisory</strong> for one release.
-  <code>_direct_admit_instance_placement()</code> splits phase 3's single
+  <code>_direct_admit_instance_placement()</code> splits what was a single
   <code>guarded = enforce and node_present</code> into <code>node_guarded</code>,
   <code>cluster_guarded</code> (both unchanged) and <code>claim_guarded = enforce and
   CLAIM_ENFORCEMENT_HARD</code>, a module constant set <code>False</code>. The node and
@@ -14198,16 +14196,16 @@ bargain the branch probe strikes.</p>
   <code>claim_over_limit</code> / <code>claim_dimensions</code>, deliberately separate from
   <code>failing_stage</code> and <code>dimensions</code>, which both mean "this was refused".
   <code>Instance._event_claim_over_limit()</code> turns them into the audit
-  events -- one on the instance and, since phase 7 (G2), the same
-  facts again on the namespace, because a claim's own events die
-  with the claim and the namespace is where the calibration history
-  needs to survive one. See <a href="../../operator_guide/scheduler/#namespace-capacity-claims">Namespace capacity
+  events -- one on the instance and the same facts again on the
+  namespace, because a claim's own events die with the claim and the
+  namespace is where the calibration history needs to survive one.
+  See <a href="../../operator_guide/scheduler/#namespace-capacity-claims">Namespace capacity
   claims</a>.
   Read-back rather than the probe-then-force idiom beside it because
   probe-then-force would make every create in a claimed namespace pay a
   probe round trip, and the namespaces that want claims are the ones
-  creating instances hardest; it also leaves phase 5's flip as moving an
-  existing predicate into a <code>WHERE</code> clause.</li>
+  creating instances hardest; it also leaves the eventual flip to hard
+  enforcement as moving an existing predicate into a <code>WHERE</code> clause.</li>
 </ul>
 <p><code>NamespaceClaim</code> (<code>shakenfist/namespace_claim.py</code>) is an ordinary
 <code>DatabaseBackedObject</code> over these rows, with two states that are two
@@ -14498,9 +14496,9 @@ a placement. References are single-row inserts and deletes, needing no
 cross-writer coordination. <code>Node.instances</code> queries them via
 <code>mariadb.get_references_from()</code> filtered by <code>INSTANCE_LOCATION</code>. Unlike
 <code>BLOB_LOCATION</code>, these rows key the node by UUID, not FQDN. The dual-write and the
-read-side union were removed in scheduler-reservations phase 3, once every
-placement writer had moved onto the atomic admission primitive; the column
-itself remains declared in the table (nullable, no longer read or written)
+read-side union were removed once every placement writer had moved onto
+the atomic admission primitive; the column itself remains declared in
+the table (nullable, no longer read or written)
 so upgraded databases keep a rollback fallback, and is dropped in a later
 release — the same treatment as the legacy <code>daemon_states</code> column.</p>
 <p>Placement rows are written only by two <code>sf-database</code> RPCs,

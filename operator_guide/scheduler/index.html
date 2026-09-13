@@ -14926,11 +14926,11 @@ starts at <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> of anticipated load an
 decays linearly to zero over <code>SCHEDULER_DEMAND_DECAY_SECONDS</code> of
 instance age. The purpose is to stop a burst of placements all choosing
 the same node because none of them have started doing any work yet.</p>
-<p>Since scheduler-reservations phase 3 they do affect placement: each
-successful admission adds <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> to the
-target node's <code>expected_demand</code> counter in the same transaction, and
-the admission guard refuses a node whose existing load is <em>already</em>
-above its target:</p>
+<p>Expected demand affects placement directly: each successful
+admission adds <code>vcpus × SCHEDULER_DEMAND_PER_VCPU</code> to the target
+node's <code>expected_demand</code> counter in the same transaction, and the
+admission guard refuses a node whose existing load is <em>already</em> above
+its target:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cpu_load_1 + expected_demand &lt;= SCHEDULER_TARGET_LOAD × cpu_schedulable
 </code></pre></div>
 <p>A denial on this clause is reported as the <code>demand</code> dimension. Because

@@ -14228,9 +14228,8 @@ node without a row is admitted against nothing at all: a
 process-local five minute timer left every placement in a new
 cluster's first minutes unguarded, and the first pass then recorded
 the resulting over-limit usage on the row it created (issue 4087).
-The check was a one-shot on the election path until
-<code>PLAN-transient-capacity-refusals</code> phase 1, which is why it used to
-miss a cold cluster entirely -- election happens seconds after
+The check used to be a one-shot on the election path, which is why it
+missed a cold cluster entirely -- election happens seconds after
 start-up, before any hypervisor has published, so the pass it forced
 had nothing to size. See
 <a href="../subsystem_internals/">the subsystem internals</a> for the predicate
@@ -14242,13 +14241,12 @@ claims, re-derives per-hypervisor limits from the typed
 instances and the decaying expected-demand signal, and rebuilds
 the <code>cluster_capacity</code> singleton. The reconciler recomputes the
 three capacity tables (<code>scheduler_node_capacity</code>,
-<code>namespace_claims</code>, <code>cluster_capacity</code>) wholesale; as of
-scheduler-reservations phase 3 the atomic admission and release
-RPCs also write them incrementally, and are the sole <em>drawdown</em>
-path against them, so a divergence between what the reconciler
-computes and what the counters hold is drift, healed on the next
-pass rather than expected steady state. Phase 4 added the claim
-CRUD RPCs as a third writer: they move capacity between
+<code>namespace_claims</code>, <code>cluster_capacity</code>) wholesale; the atomic
+admission and release RPCs also write them incrementally, and are
+the sole <em>drawdown</em> path against them, so a divergence between
+what the reconciler computes and what the counters hold is drift,
+healed on the next pass rather than expected steady state. The
+claim CRUD RPCs are a third writer: they move capacity between
 <code>namespace_claims</code> and <code>cluster_capacity</code> (a claim's limits into
 <code>claimed_*</code>, its namespace's existing drawdown out of
 <code>unclaimed_used_*</code> and onto the claim, and the reverse on

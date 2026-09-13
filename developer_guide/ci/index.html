@@ -14187,6 +14187,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fork-pull-requests-and-the-runner-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fork pull requests and the runner pool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#branch-protection" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14242,6 +14253,16 @@ commands available on a PR.</p>
 <td><code>docs-tests.yml</code></td>
 <td>Build and test documentation</td>
 <td>PR touching <code>docs/**</code> or <code>mkdocs.yml</code></td>
+</tr>
+<tr>
+<td><code>agent-context.yml</code></td>
+<td>Lint the agent context -- <code>AGENTS.md</code>, <code>CLAUDE.md</code> and <code>.claude/</code> -- for malformed frontmatter, smuggled instructions, embedded credentials and dangerous hook configuration, by running the <code>skillsaw</code> pre-commit hook. Advisory: see Branch Protection</td>
+<td>PR or push to <code>develop</code> touching the agent context, <code>.pre-commit-config.yaml</code> or the workflow itself</td>
+</tr>
+<tr>
+<td><code>mermaid-lint.yml</code></td>
+<td>Render every tracked mermaid diagram and fail on one that does not parse (runs <code>tools/mermaid-lint.sh</code> in the pinned mermaid-cli container, on a <code>debian-12-docker</code> runner because it needs a docker daemon). Advisory: see Branch Protection</td>
+<td>PR or push to <code>develop</code> touching markdown, the script, its exclude file or the workflow itself</td>
 </tr>
 <tr>
 <td><code>code-formatting.yml</code></td>
@@ -14358,13 +14379,13 @@ on its next deploy, and a release is not what gets a verb to it.</p>
 <p>That leaves a released client mattering to exactly one audience -- operators
 -- which is worth knowing before treating a release as a prerequisite for
 anything internal.</p>
-<p>Phase 4 of <code>docs/plans/PLAN-scheduler-reservations.md</code> reasoned from the
+<p>Work on <code>docs/plans/PLAN-scheduler-reservations.md</code> reasoned from the
 opposite belief and deliberately wrote its functional coverage against
 <code>apiclient.Client._request_url()</code> to work around a constraint which had
-already been gone for seven weeks. Its phase 4b then made the same mistake
-about the conductor, in the same document that corrected the first one --
-because it checked this repository's install path and took the conductor's
-from another plan. If you find yourself about to do something similar, check
+already been gone for seven weeks. It then made the same mistake about the
+conductor, in the same document that corrected the first one -- because it
+checked this repository's install path and took the conductor's from
+another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.</p>
 <h2 id="running-commands-from-the-functional-suite">Running commands from the functional suite<a class="headerlink" href="#running-commands-from-the-functional-suite" title="Permanent link">&para;</a></h2>
@@ -14490,18 +14511,19 @@ break it twice, since the wrapper's own deadline failure is a test failure
 rather than an <code>APIException</code> the <code>except</code> clause could catch, and waiting
 up to seven minutes per refusal would serialise a burst whose simultaneity
 is the thing under test. The other reserved use is the wrapper's own call
-inside <code>base.py</code>, which has to reach the client somehow. The CI cloud
-sizing plan's phase 3 saturation tests are expected to need the marker
-too, to assert that a genuinely full cluster refuses rather than have the
-refusal waited away.</p>
+inside <code>base.py</code>, which has to reach the client somehow. The saturation
+tests planned in
+<a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a> are expected to
+need the marker too, to assert that a genuinely full cluster refuses
+rather than have the refusal waited away.</p>
 <h2 id="ci-headroom-instrumentation">CI headroom instrumentation<a class="headerlink" href="#ci-headroom-instrumentation" title="Permanent link">&para;</a></h2>
-<p>Phase 1 of <code>docs/plans/PLAN-ci-cloud-sizing.md</code> (see
-<code>docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</code> for the
-decisions behind it) added two data-gathering instruments to every
-functional cluster job, so that later phases can size CI's clouds from
-a distribution instead of the handful of hand-collected numbers the
-plan started from. Neither instrument gates anything itself -- see
-"Nothing here is a quality gate" below -- but the poller's own traffic
+<p>Every functional cluster job carries two data-gathering instruments,
+so that CI's clouds can be sized from a distribution instead of the
+handful of hand-collected numbers
+<a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a> started from;
+<code>docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</code> records
+the decisions behind them. Neither instrument gates anything itself
+-- see "Nothing here is a quality gate" below -- but the poller's own traffic
 does interact with a check that gates, which is the one reason a
 reader troubleshooting a CI failure might need this section; see "The
 probe's traffic is exempted from the idle-load check". Otherwise it
@@ -14587,9 +14609,8 @@ window, because <code>--since</code> alone grows with every merge and <code>--li
 moves with the day it is run on.</p>
 <h3 id="a-third-file-the-capacity-wait-trace-waits">A third file: the capacity-wait trace (<code>--waits</code>)<a class="headerlink" href="#a-third-file-the-capacity-wait-trace-waits" title="Permanent link">&para;</a></h3>
 <p>A third file lands beside the other two, written by a different
-mechanism. <code>PLAN-transient-capacity-refusals</code> phase 2's
-<code>self.create_instance()</code> wrapper (see "Creating instances in the
-functional suite" above) appends one JSON line to
+mechanism. The <code>self.create_instance()</code> wrapper (see "Creating
+instances in the functional suite" above) appends one JSON line to
 <code>/srv/ci/traces/instance-waits.jsonl</code> every time a create waits out a
 transient 507. It reaches the bundle through the same "Gather logs"
 scp as <code>headroom.jsonl</code> and <code>headroom-census.json</code>, with no separate
@@ -14625,9 +14646,9 @@ the same way, for the same reason, and carries its own <code>state</code> of
 to say the same thing, because the later phases that read this are
 consumers of the record.</p>
 <h3 id="the-series-record-format">The series record format<a class="headerlink" href="#the-series-record-format" title="Permanent link">&para;</a></h3>
-<p>Phase 2 parses <code>headroom.jsonl</code> as a contract, so treat the shape
-below as load-bearing rather than as prose to paraphrase; the tool's
-own docstring is the source of truth if the two ever disagree. Each
+<p><code>headroom.jsonl</code> is parsed as a contract, so treat the shape below as
+load-bearing rather than as prose to paraphrase; the tool's own
+docstring is the source of truth if the two ever disagree. Each
 line is one JSON object. A successful sample carries:</p>
 <ul>
 <li><code>sampled_at</code> -- float, unix epoch seconds, wall clock at sample
@@ -14666,14 +14687,16 @@ caught the mistake, which is why it is worth calling out here: read a
 <code>sufficient_idle_disk</code> row in a census as a disk I/O problem, never as
 evidence the cloud needs more disk capacity.</p>
 <h3 id="nothing-here-is-a-quality-gate">Nothing here is a quality gate<a class="headerlink" href="#nothing-here-is-a-quality-gate" title="Permanent link">&para;</a></h3>
-<p>Every workflow step this phase added is <code>continue-on-error</code>, and
-<code>ci_headroom_report.py</code> always exits 0 whatever it finds -- even an
-internal error in the report is printed, not raised. The band verdict
-it prints (committed vCPU as a fraction of the admission ledger,
-against bounds of 0.35 and 0.70) is explicitly labelled PROVISIONAL:
-phase 0 set those bounds with no distribution to check them against,
-phase 2 replaces or defends them, and any enforcement is phase 5's to
-add. No verdict this instrumentation prints can fail a job.</p>
+<p>Every workflow step this instrumentation added is
+<code>continue-on-error</code>, and <code>ci_headroom_report.py</code> always exits 0
+whatever it finds -- even an internal error in the report is printed,
+not raised. The band verdict it prints (committed vCPU as a fraction
+of the admission ledger, against bounds of 0.35 and 0.70) is
+explicitly labelled PROVISIONAL: those bounds were set with no
+distribution to check them against, and replacing or defending them --
+and turning any of this into something that gates -- is work
+<a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a> still has
+ahead of it. No verdict this instrumentation prints can fail a job.</p>
 <p>That is not the same as the instrumentation being invisible to the
 checks that do gate, which is what this section used to say and what
 issue 3975 disproved -- see below.</p>
@@ -15306,11 +15329,51 @@ caches.
 - <strong>Proxy bypass</strong>: <code>no_proxy</code>/<code>NO_PROXY</code> set to
   <code>localhost,127.0.0.1,10.0.0.0/8</code> to prevent local service traffic from
   being routed through the proxy.</p>
+<h2 id="fork-pull-requests-and-the-runner-pool">Fork pull requests and the runner pool<a class="headerlink" href="#fork-pull-requests-and-the-runner-pool" title="Permanent link">&para;</a></h2>
+<p>Workflow runs from a fork wait for a maintainer's approval:
+<code>fork-pr-contributor-approval</code> on this repository is
+<code>all_external_contributors</code>, not just first-time ones. That is what
+makes the static runner pool safe to use for jobs that execute
+repository content.</p>
+<p>It matters most for <code>agent-context.yml</code>. That lane runs on
+<code>[self-hosted, static]</code> -- a long-lived, shared host with the fleet
+proxy and devpi reachable -- and it builds its hook environment from
+the pull request head's own <code>.pre-commit-config.yaml</code>, which is also
+one of its triggers. So the set of third-party code it installs and
+runs is chosen by the change under test. Nothing else in this
+repository has that shape; every other PR-head job on the static pool
+runs code from a fixed configuration. The fork-approval setting is the
+control, so if it is ever relaxed this lane moves to an ephemeral <code>vm</code>
+runner rather than staying where it is.</p>
+<p><code>mermaid-lint.yml</code> executes <code>tools/mermaid-lint.sh</code> from the pull
+request head under the same rule, but on an ephemeral <code>vm</code> runner, and
+the container it starts gets <code>--network none</code>.</p>
 <h2 id="branch-protection">Branch Protection<a class="headerlink" href="#branch-protection" title="Permanent link">&para;</a></h2>
 <p>The develop branch uses:
 - Required status checks: <code>Can see status</code>, <code>Can enqueue</code>
 - Merge queue with ALLGREEN grouping strategy
 - Configuration exported to <code>.github/exported-config/</code></p>
+<p><code>agent-context.yml</code> and <code>mermaid-lint.yml</code> are deliberate
+exceptions: both can fail a pull request and neither gates one.
+They are path-filtered, and a path-filtered workflow made a
+required check reports pending forever on the pull requests it
+filters out -- so a required <code>Mermaid lint</code> would block every pull
+request that touches no markdown. <code>needs:</code> cannot reach across
+workflow files either, so neither is named in <code>can_enqueue</code> or
+<code>can_merge</code>. A red result on either is visible on the pull request
+and blocks nothing automatically; treat it as something to fix
+before merging rather than as something the queue will catch.</p>
+<p>Both lanes are vendored from <code>shakenfist/development</code>'s templates:
+<code>tools/mermaid-lint.sh</code> is byte-identical to
+<code>templates/mermaid-lint/mermaid-lint.sh</code> there and is synced rather
+than edited. What this repository chooses for itself lives beside
+it in <code>tools/mermaid-lint-exclude</code>, which drops <code>docs/components/</code>
+-- <code>sync-external-docs.yml</code> imports those 664 files hourly from the
+sibling repositories and <code>AGENTS.md</code> forbids editing them here, so
+a diagram broken upstream is fixed upstream rather than failing a
+pull request here that cannot fix it. GitHub Actions cannot read
+that file, so <code>mermaid-lint.yml</code>'s path filters carry the same
+exclusion by hand and the two have to move together.</p>
 
 
 
