@@ -959,7 +959,7 @@ those are corrected here as well.
 | 0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches | [PLAN-ci-cloud-sizing-phase-00-decisions.md](PLAN-ci-cloud-sizing-phase-00-decisions.md) | Complete | `d03ab340e` (#3939) |
 | 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete | `078772504` (#3940) |
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete | `e951ee42d` (#4089), `3546fabed` (#4138) |
-| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete | `ead1ccba5` (#4152), `f3b245304` (#4170), `210fb4469` (#4193) |
+| 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete | `ead1ccba5` (#4152), `f3b245304` (#4170), `c13d2c6fd` (#4186), `210fb4469` (#4193) |
 | 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started | — |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started | — |
 | 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started | — |
@@ -974,6 +974,17 @@ say which commits arrived inside a pull request. Every SHA is the
 merge commit of the pull request named beside it, so
 `<sha>^1..<sha>` is the whole of what that pull request put on
 `develop`. A phase which has not landed reads `—`.
+
+Phase 3 records a fourth merge which did not put it on `develop` but
+repaired what did. `c13d2c6fd` (#4186) added the `# raw-create:`
+markers that `f3b245304` (#4170) landed without, which broke the
+`test_ci_raw_creates` guard on `develop` and blocked the merge queue
+(shakenfist#4185). It is recorded here rather than left out because
+the column is what the push audit reads: a repair to this phase's own
+code that sits in no range is a diff nothing audits. It is recorded
+*here* rather than against
+`PLAN-transient-capacity-refusals.md`, whose phase 2 added the guard,
+because the defect was in this phase's test file.
 
 The master plan itself landed as `ab2158cb2` (#3938), ahead of
 phase 0. Phase 1's other half -- the invocation in the reusable
