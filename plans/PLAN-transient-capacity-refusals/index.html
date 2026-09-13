@@ -14470,7 +14470,7 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>2. The suite waits, and says so: an informed <code>create_instance</code> wrapper and a per-run wait summary</td>
 <td><a href="../PLAN-transient-capacity-refusals-phase-02-suite-wait/">PLAN-transient-capacity-refusals-phase-02-suite-wait.md</a></td>
-<td>Not started</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>3. Publish metrics when the running-domain set changes</td>
@@ -15017,6 +15017,17 @@ chosen to defer to here, so that we do not forget them.</p>
   suite concurrency queue depth is exactly what spikes; it did not
   fire in the runs read here but it is untracked and worth a
   census line.</li>
+<li><strong>An absent waits file reads as "unknown", not as zero.</strong> The
+  phase 2 wrapper creates
+  <code>/srv/ci/traces/instance-waits.jsonl</code> on its first write, so a run
+  which was refused nothing leaves no file, and
+  <code>tools/ci_headroom_report.py --waits</code> declines to call that zero
+  waits -- correctly, since it is also what a component ref predating
+  the wrapper and a run whose writes all failed look like. Phase 5
+  harvests over many bundles and cannot tell the three apart. Writing
+  an empty file once at suite start-up would make "empty" mean zero
+  and leave "absent" meaning the other two. Found at phase 2's
+  closeout; see that phase's Outcome.</li>
 <li><strong>Every refused create is a full create-and-delete.</strong>
   <code>enqueue_delete_due_error</code> at the 507 site means each refusal
   costs an object, IPAM allocations, an event trail and a delete

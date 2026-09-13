@@ -13951,6 +13951,78 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-measurement-definition-of-done-item-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The measurement (definition of done item 9)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-defect-this-phases-own-guard-found-on-develop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A defect this phase's own guard found on develop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2f" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2f
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-finding-for-phase-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A finding for phase 5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deviations-from-this-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deviations from this plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14240,6 +14312,20 @@ the diagnosis a reader needs.</p>
 <p>The same treatment applies to a <code>get_cluster_resources()</code> call that
 raises: log it into the wait record and keep waiting. The endpoint
 being briefly unavailable is not evidence about capacity.</p>
+<p><em>Amended by the automated review of PR #4166: survey finding 4's three
+causes were not all of them, and the fourth was a bug in this decision
+rather than in the code implementing it. <code>/admin/resources</code> keys
+<code>per_node</code> by node </em><em>uuid</em><em> (<code>summarize_resources()</code> builds it from
+<code>get_active_node_metrics()</code>, which keys by <code>str(n.uuid)</code>), while the
+suite pins by name almost everywhere. So a name-pinned create missed on
+every poll, and "absent means zero available, keep waiting" turned one
+transient 507 into a guaranteed seven-minute failure whose message said
+there was room everywhere -- strictly worse than the behaviour this
+phase set out to fix. <code>BaseTestCase._placement_roster_key()</code> now
+resolves a pin into the roster's key space before waiting. The rule
+above still holds for a genuine absence; a pin which resolves to
+nothing waits blind and records <code>mode: degraded</code>, because not knowing
+which entry to read is not evidence that the entry is empty.</em></p>
 <h3 id="d10-a-degraded-capacity-read-falls-back-to-a-blind-wait">D10 -- A degraded capacity read falls back to a blind wait<a class="headerlink" href="#d10-a-degraded-capacity-read-falls-back-to-a-blind-wait" title="Permanent link">&para;</a></h3>
 <p>When <code>total['capacity_degraded']</code> is set, the capacity mapping the
 whole predicate rests on could not be read, so <code>cpu_limit</code> is <code>None</code>
@@ -14483,37 +14569,51 @@ the survey found</em>.</p>
    <code>cpu_available</code> but a binding <code>cpu_limit - cpu_committed</code> does not
    satisfy the wait predicate, and deleting the <code>cpu_limit</code> clause
    from <code>wait_for_capacity()</code> makes that test fail.</li>
-<li>A unit test asserts that a target absent from <code>per_node</code>
+</ol>
+<p><em>Amended at closeout: met, by
+   <code>test_a_binding_limit_beats_generous_published_headroom</code>. But read
+   this item as narrower than what shipped. The review of #4166 found
+   the cpu-only predicate was not a rough version of the right answer
+   but a permanently-satisfied one, since the scheduler pre-filters on
+   memory and disk too and turns all three into the same 507 -- so the
+   ledger clause is now applied per dimension, and
+   <code>test_a_node_must_cover_every_dimension_at_once</code> and the per-instance
+   ceiling tests carry the weight this item was written to carry.</em>
+4. A unit test asserts that a target absent from <code>per_node</code>
    continues the wait rather than raising, and that it proceeds when
-   the target appears.</li>
-<li>A unit test asserts that <code>total['capacity_degraded']</code> produces a
+   the target appears.
+5. A unit test asserts that <code>total['capacity_degraded']</code> produces a
    blind wait recorded as <code>mode: degraded</code>, and that an unpinned
-   create never consults <code>total['cpu_available']</code>.</li>
-<li>A unit test asserts a 409 affinity refusal is not retried.</li>
-<li><code>retries.py</code> still imports nothing from the suite or from
+   create never consults <code>total['cpu_available']</code>.</p>
+<p><em>Amended at closeout: met, by
+   <code>test_a_degraded_read_waits_blind_and_admits_to_it</code> and
+   <code>test_an_unpinned_create_reads_nodes_and_never_the_cluster_total</code>.
+   <code>mode: degraded</code> acquired a second producer in review -- a pin which
+   does not resolve to a roster key -- for the reason under D9 below.</em>
+6. A unit test asserts a 409 affinity refusal is not retried.
+7. <code>retries.py</code> still imports nothing from the suite or from
    <code>shakenfist_client</code>, and the tests which load it by path still
-   pass.</li>
-<li><code>tools/ci_headroom_report.py --waits</code> prints the five figures in
+   pass.
+8. <code>tools/ci_headroom_report.py --waits</code> prints the five figures in
    D14 for a populated file, says so for an empty or absent one, and
    counts rather than dies on a malformed line. Unit tests for all
-   four.</li>
-<li>A real CI bundle read with <code>--waits</code> shows a populated summary, or
+   four.
+9. A real CI bundle read with <code>--waits</code> shows a populated summary, or
    shows zero waits with the run's own evidence that no create was
    refused. Read from a downloaded artifact, as phase 1's item 9
    ultimately was -- this is checkable from a worktree and is not to
-   be written off as operator-only.</li>
-<li><code>test_imagefetch.py</code>'s first test has one pin, not two, and its
+   be written off as operator-only.
+10. <code>test_imagefetch.py</code>'s first test has one pin, not two, and its
     second test still has both. <code>test_system_namespace.py</code>'s inline
     instance has an <code>addCleanup</code>. <code>test_commandline_artifacts.py</code> is
-    unchanged.</li>
-<li>The prose above <code>HARNESS_DRIVEN_PAIRS</code> names the wrapper, and
-    <code>test_the_suite_still_probes_cluster_headroom</code> passes.</li>
-<li>No document states the wait deadline as a number different from
+    unchanged.
+11. The prose above <code>HARNESS_DRIVEN_PAIRS</code> names the wrapper, and
+    <code>test_the_suite_still_probes_cluster_headroom</code> passes.
+12. No document states the wait deadline as a number different from
     <code>CLUSTER_HEADROOM_WAIT</code>, and none implies the wrapper makes
-    refusals rarer.</li>
-<li><code>python3 tools/check-plan-status.py</code> passes and
-    <code>pre-commit run --all-files</code> passes.</li>
-</ol>
+    refusals rarer.
+13. <code>python3 tools/check-plan-status.py</code> passes and
+    <code>pre-commit run --all-files</code> passes.</p>
 <h2 id="what-later-phases-inherit">What later phases inherit<a class="headerlink" href="#what-later-phases-inherit" title="Permanent link">&para;</a></h2>
 <ul>
 <li>A suite that survives a transient refusal, so a run's pass/fail
@@ -14546,6 +14646,148 @@ the survey found</em>.</p>
 redo. It does not start until 2a has merged, or at minimum until
 <code>create_instance()</code>'s signature is agreed -- a signature change after
 2b means editing 117 call sites twice.</p>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Complete. Steps 2a-2e merged as
+<a href="https://github.com/shakenfist/shakenfist/pull/4166">#4166</a>; step 2f is
+prepared and awaiting an operator push, and this section is 2g.</p>
+<h3 id="the-measurement-definition-of-done-item-9">The measurement (definition of done item 9)<a class="headerlink" href="#the-measurement-definition-of-done-item-9" title="Permanent link">&para;</a></h3>
+<p>Three real waits, read from downloaded merge-run bundles with
+<code>tools/ci_headroom_report.py --waits</code>. Both runs carry the phase 2
+suite; both <code>debian-12-slim-tier</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Waits</th>
+<th>Total</th>
+<th>Longest</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/34663526177">34663526177</a></td>
+<td>1</td>
+<td>190.5 s</td>
+<td>190.5 s</td>
+<td><code>test_imagefetch.TestHTTPFetch.test_vanished_source_server_instance</code></td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/34681505274">34681505274</a></td>
+<td>2</td>
+<td>301.0 s</td>
+<td>160.4 s</td>
+<td><code>test_network_lifecycle.TestNetworkPlumbingLifecycle.test_network_plumbing_lifecycle</code></td>
+</tr>
+</tbody>
+</table>
+<p>All three are <code>mode: informed</code> -- the predicate, not the blind
+fallback, ended every one of them -- and all three record
+<code>binding_dimension: cpus</code>, which is the dimension the master plan's
+journal reading predicted and the one the original cpu-only predicate
+would also have caught. Each was a test failure before this phase.</p>
+<p>Three things in that data are worth carrying forward rather than
+leaving in a table:</p>
+<ul>
+<li><strong>The waits are long.</strong> 140-190 s each, against a 420 s deadline.
+  These are not "the poll caught it on the second tick"; they are a
+  third to a half of the budget. Phase 5 should read that as the
+  central number rather than the totals, because a deadline reached is
+  a failed run and the margin here is smaller than the totals suggest.</li>
+<li><strong><code>roster_key</code> earned its place immediately.</strong> The second run's
+  first wait records <code>node</code> as the name <code>sf1</code> and <code>roster_key</code> as that
+  node's uuid -- a name pin resolved into the uuid-keyed roster. (The
+  uuid itself is not quoted here: a bare uuid after a <code>key:</code> reads as a
+  high-entropy secret to the credential scan, and the reading costs
+  nothing to avoid.) That is exactly the case the
+  second review round fixed (see the amendment under D9); without it
+  this wait could not have been satisfied at all and would have become
+  a seven-minute failure.</li>
+<li><strong>The <code>slim-primary</code> bundles of both runs have no waits file at
+  all.</strong> That is the wrapper behaving correctly -- the file is created
+  on first write -- and the report reads it honestly as <em>unknown</em>
+  rather than as zero. See the finding below.</li>
+</ul>
+<p>The two runs' D3 band verdicts (0.500 <code>WITHIN BAND</code>, 0.833
+<code>OVERSUBSCRIBED</code>) are recorded here only because the same command
+prints them. They belong to the sizing plan, and nothing here reads
+them.</p>
+<h3 id="a-defect-this-phases-own-guard-found-on-develop">A defect this phase's own guard found on <code>develop</code><a class="headerlink" href="#a-defect-this-phases-own-guard-found-on-develop" title="Permanent link">&para;</a></h3>
+<p>The AST guard added by step 2b was failing on <code>develop</code> when this
+closeout began, and had blocked the merge queue since 04:47 on
+2026-09-12.</p>
+<p><a href="https://github.com/shakenfist/shakenfist/pull/4170">#4170</a> (the
+sizing plan's phase 3a) landed
+<code>cluster_ci_tests/test_saturation.py</code> with four raw
+<code>create_instance</code> calls and no markers, about five hours after #4166
+added the guard. Neither pull request was wrong and neither could see
+the other: #4170's branch predates the guard, and the guard cannot
+see a file which does not exist yet. The merge queue did not catch
+the pair either, and at least two subsequent <code>merge_group</code> runs
+(<a href="https://github.com/shakenfist/shakenfist/actions/runs/34681505274">34681505274</a>,
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/34685164595">34685164595</a>)
+failed <code>Sanity checks</code> on
+<code>test_ci_raw_creates.RawCreateInstanceMarkerTestCase.test_no_unmarked_raw_create_calls_in_the_suite</code>
+as a result.</p>
+<p>Fixed here, as markers rather than as routing, which is what this
+phase's scope already said those tests would need: "the sizing plan's
+phase 3 saturation tests must call the raw client and assert the
+refusal; the allowlist marker exists for them." All four sites must
+see the raw refusal -- three are the <code>assertRaises</code> in the impossible
+-request tests, and the fourth is <code>_create_fill_instance()</code>, whose
+two callers each handle the <code>InsufficientResourcesException</code>
+themselves. <code>test_saturation.py:1137</code> already carried a comment
+saying so in as many words: "Deliberately not wrapped in
+<code>retries.retry_while_transient()</code>: a refusal under assertion must
+never be retried away."</p>
+<p>This is the collision the guard exists to make loud, and it made it
+loud on the first try. It is recorded as an outcome rather than as a
+bug in either plan.</p>
+<h3 id="step-2f">Step 2f<a class="headerlink" href="#step-2f" title="Permanent link">&para;</a></h3>
+<p>Prepared on the <code>capacity-wait-summary</code> branch of
+<code>shakenfist/actions</code>, not yet pushed: <code>tools/ci_headroom_collect.sh</code>
+scp's <code>/srv/ci/traces/instance-waits.jsonl</code> beside the series and the
+census, and passes <code>--waits</code> when the report understands the flag and
+the file is non-empty, with an <code>else</code> branch saying what an absent
+file does and does not mean. <code>pre-commit run --all-files</code> passes
+there.</p>
+<p>Nothing depends on it, exactly as D14 arranged: the measurement above
+was read from bundles produced without it. All it buys is the summary
+being printed in the job log rather than only being readable by
+downloading the artifact -- which is worth having, but was never
+allowed to gate this phase.</p>
+<h3 id="a-finding-for-phase-5">A finding for phase 5<a class="headerlink" href="#a-finding-for-phase-5" title="Permanent link">&para;</a></h3>
+<p><strong>An absent waits file and a run with no waits are the same
+artifact.</strong> The wrapper creates the file on its first write, so a run
+which was never refused leaves nothing behind, and
+<code>tools/ci_headroom_report.py --waits</code> correctly declines to read that
+as zero. A human with the run in front of them can tell the two
+apart; a harvest over twenty bundles cannot, and phase 5's denominator
+is exactly that harvest.</p>
+<p>Not fixed here -- it is a change to the wrapper, and this phase is
+closed. The cheap fix is for the suite to write an empty file once at
+start-up, which turns "absent" back into "the suite predates this or
+its writes failed" and lets "empty" mean zero. Recorded in the master
+plan's Future work.</p>
+<h3 id="deviations-from-this-plan">Deviations from this plan<a class="headerlink" href="#deviations-from-this-plan" title="Permanent link">&para;</a></h3>
+<p>Three, all recorded above or at their source rather than only here:</p>
+<ol>
+<li><strong>D8's predicate widened from cpus to every dimension</strong>, plus the
+   two per-instance ceilings, and the loop gained pacing and an
+   attempt ceiling. From the automated review of #4166; see the
+   amendment under D8 and the note added to definition-of-done item 3.
+   The original predicate was not a rough version of the right answer
+   but a permanently-satisfied one.</li>
+<li><strong>D9 acquired a fourth cause of an absent roster entry</strong>, which was
+   a bug in the decision rather than in its implementation:
+   <code>/admin/resources</code> keys <code>per_node</code> by uuid and the suite pins by
+   name. See the amendment under D9.</li>
+<li><strong>The saturation-test markers above</strong>, which are new work this
+   phase did not plan for because the file did not exist when it was
+   planned.</li>
+</ol>
+<p>Definition-of-done items 3, 5 and 9 carry closeout amendments saying
+what was actually checked where it differs from what was written.</p>
 
 
 
