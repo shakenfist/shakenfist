@@ -960,7 +960,7 @@ those are corrected here as well.
 | 1. Headroom instrumentation: sample `/admin/resources` through every cluster job and publish the series | [PLAN-ci-cloud-sizing-phase-01-headroom-probe.md](PLAN-ci-cloud-sizing-phase-01-headroom-probe.md) | Complete | `078772504` (#3940) |
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete | `e951ee42d` (#4089), `3546fabed` (#4138) |
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete | `ead1ccba5` (#4152), `f3b245304` (#4170), `c13d2c6fd` (#4186), `210fb4469` (#4193) |
-| 4. Re-shape the topologies against the phase 2 data | PLAN-ci-cloud-sizing-phase-04-topologies.md | Not started | — |
+| 4. Re-shape the topologies against the phase 2 data | [PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md) | In progress | — |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | PLAN-ci-cloud-sizing-phase-05-guardrails.md | Not started | — |
 | 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started | — |
 | 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started | — |
@@ -1125,30 +1125,86 @@ half of the demand bound binds rather than retiring it.
 
 ### Phase 4 -- Re-shape the topologies
 
-Apply the phase 2 decision to `ci-topology-slim-primary.yml` and
-`ci-topology-slim-tier.yml` (and the `-released` variants), keeping
-the `sf-absent` phantom, honouring the structural minimums
-(`test_network_lifecycle` needs two hypervisors that are not the
-network node; `test_affinity` needs three nodes;
-`test_database_tier` needs two database nodes), and updating any
-hardcoded node lists in `functional-tests.yml`. Land one topology
-at a time so a regression is attributable.
+Apply the phase 2 decision to the three topology files that exist
+in `shakenfist/actions/ansible/`:
+`ci-topology-slim-primary.yml`, `ci-topology-slim-tier.yml` and
+`ci-topology-slim-primary-released.yml`. **There is no
+`ci-topology-slim-tier-released.yml`**, and the released variant of
+`slim-primary` is not a copy of the other: its primary carries
+`network_node` and is not in `hypervisors` (`:62`), where plain
+`slim-primary` has sf1 as the network node, and only the
+non-released file carries the `sf-absent` phantom (`:29`). A diff
+applied mechanically to both would be wrong. Keep the phantom,
+and land one topology at a time so a regression is attributable.
 
-The number that binds is per node, not per cluster. The 2026-09-08
-journal reading recorded in *A node can record twice its own
-ledger* found every post-#4106 `sufficient_idle_cpu` refusal on
-`slim-tier` was a pinned create onto `primary` or `sf1`, whose
-4-thread reservation leaves `cpu_schedulable` 1 and a ledger of 3,
-while `sf2` and the cluster had room. The victim tests select
-those nodes deterministically ("first non-network hypervisor").
-So the shape this phase chooses has to raise the *infra
-hypervisors'* ledger, not only the total: of the candidate shapes
-above, "tier as 3 x 6 vCPU" is the smallest that does (6 / 6 /
-12), and any shape that leaves an infra hypervisor at a ledger of
-3 leaves the failure in place. The
+Honour the structural minimums, all three verified at phase 4's
+planning:
+`test_network_lifecycle` needs two hypervisors that are **not** the
+network node
+(`cluster_ci_tests/test_network_lifecycle.py:53`), and `slim-tier`
+is already exactly at that minimum, because its primary is the
+network node; three nodes are needed by **two** tests rather than
+one, both counting every node rather than only hypervisors
+(`cluster_ci_tests/test_scheduler.py:128` and `:292`);
+`test_database_tier` needs two database nodes
+(`cluster_ci_tests/test_database_tier.py:37`).
+
+`functional-tests.yml` is in *this* repository
+(`.github/workflows/functional-tests.yml:436`) and holds no
+hardcoded node lists -- only topology names, concurrency and a
+per-job timeout. What it does hold is `slim-tier` at
+`timeout_minutes: 70` against `slim-primary`'s 60, justified by a
+comment (`:471`) that the tier runs the same suite on half the
+hypervisor capacity. If a reshape works, that premise weakens and
+the timeout coming back down is a falsifiable way to say so.
+
+The number that binds is per node, not per cluster, and phase 3's
+first merge run measures it directly rather than reconstructing it
+from journals: `slim-tier`'s three hypervisors publish ledgers of
+3, 3 and 6, and `slim-primary`'s five publish 3, 6, 6, 6 and 6.
+`slim-tier`'s cluster-wide p90 committed/ledger was 0.833 while
+its two small nodes sat at 1.000 peak, which is the whole argument
+for sizing per node.
+
+**The cause of those ledger-3 nodes is an open question, and phase
+4 gates on it.** An earlier draft of this section attributed them
+to a 4-thread `NODE_CPU_RESERVATION_THREADS` on the infra nodes.
+That value is 2 everywhere -- one definition at
+`deploy/collection/roles/node/defaults/main.yml:24`, templated once
+at `roles/node/templates/config:30`, with no per-host or per-role
+override anywhere in the collection or in `shakenfist/actions` --
+and `max(1, 4 threads - 2)` gives `cpu_schedulable` 2 and a ledger
+of 6, which is what four of `slim-primary`'s five hypervisors
+actually show. Every topology file creates every node with
+`cpu: 4`, so identically sized guests are reporting different
+thread counts, and the ones reporting fewer are exactly those
+carrying an infra role beyond plain hypervisor. Since this phase's
+thesis is that a larger guest raises the infra hypervisors'
+ledger, and that follows only if their `cpu_schedulable` tracks
+their vCPU count, the mechanism has to be established before a
+shape is chosen. See
+[PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md)
+F2 and D1.
+
+Two further things the shape has to answer to. The master plan's
+criterion stands -- any shape that leaves an infra hypervisor at a
+ledger of 3 leaves the failure in place, and of the candidate
+shapes above "tier as 3 x 6 vCPU" is the smallest that raises them
+(6 / 6 / 12) -- but the candidate table's `vCPU` column counts
+every under-cloud instance including `slim-primary`'s primary,
+which is **not** a hypervisor (`:84`) and contributes no ledger at
+all. That column is under-cloud spend; `Ledger` is scheduling
+capacity. And phase 3's census found every capacity-guard refusal
+in its window falling on the `demand` bound rather than on the
+ledger this phase resizes. That bound is `SCHEDULER_TARGET_LOAD`
+(0.75) per *schedulable thread*, so it scales with the same number
+-- on a ledger-3 node it is 0.75 of one thread -- which means a
+reshape may help more than the ledger arithmetic alone suggests,
+through a mechanism this section did not previously name, and
+conditional on the same open question. The
 [transient-capacity-refusals](PLAN-transient-capacity-refusals.md)
-plan's phase 2 wait summary is the instrument that will say
-whether the chosen shape was enough.
+plan's phase 2 wait summary and phase 3's census are the
+instruments that will say whether the chosen shape was enough.
 
 ### Phase 5 -- Guardrails
 
