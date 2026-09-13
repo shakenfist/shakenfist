@@ -192,6 +192,7 @@ attached rather than quietly disappearing from the table.
 | [review-scope-completeness.md](/components/development/audits/review-scope-completeness/) | Nothing leaves the human review queue by omission from the scope config |
 | [sfui-vendor.md](/components/development/audits/sfui-vendor/) | Vendored sfui copies are verbatim and current |
 | [scope-coverage.md](/components/development/audits/scope-coverage/) | Every repository in the organisation is audited or documented as excluded |
+| [eol-distro.md](/components/development/audits/eol-distro/) | Nothing runs on, or is built from, a distribution release that has reached end of life |
 
 ## Beyond the audits
 

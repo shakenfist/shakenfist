@@ -106,6 +106,15 @@ is created if missing). The body names the failing check, quotes the
 detail the check produced, and links the spec file and template so
 whoever picks it up has the implementation to hand.
 
+A check whose fix is per item can carry the items as well. Returning a
+`missing` list renders them as bullets under **Missing items**, and a
+`findings` list under **Findings** -- the same mechanism, worded for a
+check that reports things present which should not be rather than
+things absent. `details` still has to stand alone, because that is what
+the compliance page prints into a table cell, so it carries the count
+and the guidance while the list carries the locations. The worked
+examples are `review-scope-completeness` and `eol-distro`.
+
 Aggregate across the fleet with:
 
 ```
