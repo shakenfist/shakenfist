@@ -14547,9 +14547,17 @@
 - Hash lookup API: <code>shakenfist/external_api/blob.py:345-358</code>
 - Scheduled verification: <code>shakenfist/daemons/cluster/scheduled_tasks.py:95-111</code></p>
 <h2 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">&para;</a></h2>
+<p>The <code>Merged</code> line under each phase records what put that phase on <code>develop</code>, so that phase 4's
+audit has a range to read once the phases have merged and a diff against <code>develop</code> is empty. The
+phase 1 entry was reconstructed after the fact, from the merged pull request list cross-checked
+against the first-parent history rather than from a path-filtered <code>git log</code>. Each SHA is the merge
+commit of the pull request named beside it, so <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull
+request landed. Phase 1 took three: #2929 added the migration framework, #2930 the hash storage
+itself, and #3089 finished the residual etcd usage in the scheduled tasks.</p>
 <h3 id="phase-1-hash-tracking-in-mariadb">Phase 1: Hash Tracking in MariaDB<a class="headerlink" href="#phase-1-hash-tracking-in-mariadb" title="Permanent link">&para;</a></h3>
 <p><strong>Goal</strong>: Move hash storage from etcd to MariaDB with proper indexes, enabling O(1) hash lookups.</p>
 <p><strong>Status</strong>: Complete</p>
+<p><strong>Merged</strong>: <code>5b1483be2</code> (#2929), <code>47ccb2d4a</code> (#2930), <code>3c413ddc4</code> (#3089)</p>
 <p><strong>Prerequisites</strong>: PLAN-reference-counts.md (COMPLETE)</p>
 <p><strong>What it enables</strong>:
 - O(1) "find blob by hash" queries via <code>idx_hash_lookup</code> index
@@ -14597,6 +14605,7 @@
 <h3 id="phase-2-composite-blobs-and-lazy-deduplication">Phase 2: Composite Blobs and Lazy Deduplication<a class="headerlink" href="#phase-2-composite-blobs-and-lazy-deduplication" title="Permanent link">&para;</a></h3>
 <p><strong>Goal</strong>: Enable storage deduplication by converting duplicate blobs to composites that reference shared content.</p>
 <p><strong>Status</strong>: Not started</p>
+<p><strong>Merged</strong>: —</p>
 <p><strong>Prerequisites</strong>: Phase 1 (blob_hashes table with <code>idx_hash_lookup</code>)</p>
 <p><strong>What it enables</strong>:
 - Storage savings when identical content is uploaded multiple times
@@ -14647,6 +14656,7 @@
 <h3 id="phase-3-content-defined-chunking">Phase 3: Content-Defined Chunking<a class="headerlink" href="#phase-3-content-defined-chunking" title="Permanent link">&para;</a></h3>
 <p><strong>Goal</strong>: Break large blobs into variable-sized chunks based on content boundaries, enabling cross-blob deduplication.</p>
 <p><strong>Status</strong>: Not started</p>
+<p><strong>Merged</strong>: —</p>
 <p>A prototype exists in <code>src/private/flywheel</code>.</p>
 <p><strong>Prerequisites</strong>: Phase 2 (composite blobs)</p>
 <p><strong>What it enables</strong>:
@@ -14673,6 +14683,7 @@
 roadmap against <code>develop</code>, rather than the last phase's diff alone, so that what the phases did
 to each other is caught.</p>
 <p><strong>Status</strong>: Not started</p>
+<p><strong>Merged</strong>: —</p>
 <p><strong>Prerequisites</strong>: Phases 1-3</p>
 <p>Findings land as their own pull request, and this roadmap is not complete until each is resolved
 or declined in writing here. If the audit finds nothing, that is recorded in one sentence.</p>

@@ -14510,6 +14510,7 @@ rules. Phase 0 picks between the two nftables options.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14517,44 +14518,57 @@ rules. Phase 0 picks between the two nftables options.</p>
 <td>0. Research and decisions document</td>
 <td>PLAN-replace-exec-with-netlink-phase-00-decisions.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1. Introduce <code>pyroute2</code> dependency; port <code>ip link / addr / route / neigh</code> operations</td>
 <td>PLAN-replace-exec-with-netlink-phase-01-rtnetlink.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Port bridge management off <code>brctl</code> via <code>IFLA_BR_*</code></td>
 <td>PLAN-replace-exec-with-netlink-phase-02-bridges.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Port iptables rules to nftables via netlink, table by table</td>
 <td>PLAN-replace-exec-with-netlink-phase-03-nftables.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Stand up <code>sf-net-privexec</code> with a typed network API; net-worker becomes its only client</td>
 <td>PLAN-replace-exec-with-netlink-phase-04-net-privexec.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Drop <code>CAP_NET_ADMIN</code> from <code>sf-privexec</code>; remove the network RPCs from its surface</td>
 <td>PLAN-replace-exec-with-netlink-phase-05-privexec-shrink.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Close out the <code>sf-net</code> direct-exec sites and the remaining narrow corners (sysctl, arping)</td>
 <td>PLAN-replace-exec-with-netlink-phase-06-cleanup.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
 <td>PLAN-replace-exec-with-netlink-phase-07-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. It is
+filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet.</p>
 <p>Notes on sequencing:</p>
 <ul>
 <li><strong>Phase 0 is decisions.</strong> No code. Output is appended to

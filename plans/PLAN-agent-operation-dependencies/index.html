@@ -14138,39 +14138,52 @@ report per-operation outcomes from the chain on failure.</p>
 <tr>
 <th>Phase</th>
 <th>Content</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>0</td>
 <td>Resolve open questions; record decisions; re-cut this table</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1</td>
 <td>Schema and object: dependency fields on <code>AgentOperation</code>, <code>AGENTOPERATION</code> admitted to the dependency model, API parameters</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2</td>
 <td>Dispatch evaluation: same-instance edges, cascade, settle attribute</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Cross-instance edges and namespace enforcement</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4</td>
 <td>client-python: chain submission helpers, await-the-chain UX, failure reporting</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5</td>
 <td>Documentation: developer-guide agent operation model, worked examples; <code>client-python-k3s</code> adopts dependencies (rolling update via one submitted chain) as the first example application</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6</td>
 <td>Push audit: runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. Nothing in
+this plan has landed, so every cell reads <code>—</code>; phase 0 re-cuts
+this table and the column comes with it.</p>
 
 
 

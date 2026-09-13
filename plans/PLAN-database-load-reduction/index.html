@@ -14402,6 +14402,7 @@ so the phase plans do not reopen them:</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14409,44 +14410,73 @@ so the phase plans do not reopen them:</p>
 <td>1. Stop the idle-loop polls</td>
 <td><a href="../PLAN-database-load-reduction-phase-01-idle-loop/">PLAN-database-load-reduction-phase-01-idle-loop.md</a></td>
 <td>Complete</td>
+<td><code>dcd3b32b1</code> (#3466)</td>
 </tr>
 <tr>
 <td>2. Static object value caching</td>
 <td><a href="../PLAN-database-load-reduction-phase-02-static-cache/">PLAN-database-load-reduction-phase-02-static-cache.md</a></td>
 <td>Complete</td>
+<td><code>926060406</code> (#3473)</td>
 </tr>
 <tr>
 <td>3. Consolidate the gRPC client stacks</td>
 <td><a href="../PLAN-database-load-reduction-phase-03-client-consolidation/">PLAN-database-load-reduction-phase-03-client-consolidation.md</a></td>
 <td>Complete</td>
+<td><code>dcd3b32b1</code> (#3466)</td>
 </tr>
 <tr>
 <td>4. Caller attribution on counters</td>
 <td><a href="../PLAN-database-load-reduction-phase-04-attribution/">PLAN-database-load-reduction-phase-04-attribution.md</a></td>
 <td>Complete</td>
+<td><code>926060406</code> (#3473)</td>
 </tr>
 <tr>
 <td>5. Next-tier reductions</td>
 <td><a href="../PLAN-database-load-reduction-phase-05-next-tier/">PLAN-database-load-reduction-phase-05-next-tier.md</a></td>
 <td>Complete</td>
+<td><code>706f8db81</code> (#3504), <code>ff259930d</code> (#3506), <code>c64ef3afe</code> (#3508), <code>6e2948ee9</code> (#3509)</td>
 </tr>
 <tr>
 <td>6. Residual load and the regression</td>
 <td><a href="../PLAN-database-load-reduction-phase-06-residual-load/">PLAN-database-load-reduction-phase-06-residual-load.md</a></td>
 <td>Complete</td>
+<td><code>89d4ec294</code> (#3818), <code>19f6783d4</code> (#3825), <code>accea7f20</code> (#3877)</td>
 </tr>
 <tr>
 <td>7. Deployer-visible regression detection</td>
 <td><a href="../PLAN-database-load-reduction-phase-07-regression-detection/">PLAN-database-load-reduction-phase-07-regression-detection.md</a></td>
 <td>Complete</td>
+<td><code>5af155827</code> (#3893)</td>
 </tr>
 <tr>
 <td>8. Push audit</td>
 <td><a href="../PLAN-database-load-reduction-phase-08-push-audit/">PLAN-database-load-reduction-phase-08-push-audit.md</a></td>
 <td>Complete</td>
+<td><code>c45f14c2f</code> (#3950), <code>d76ac9b77</code> (#3969)</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>.
+These entries were reconstructed after the fact, because the
+plan did not record them as its phases landed. The merges come
+from phase 8's own decision 1 table, which the audit built
+from the merged pull request list and the first-parent history
+rather than from a path-filtered <code>git log</code>; phase 7's and
+phase 8's own merges are added here and were recovered the
+same way.</p>
+<p>One row of that table is corrected here rather than
+transcribed. It attributes phases 2-4 to #3473, but the
+orphan-client deletion that <em>is</em> phase 3 (<code>ff69d8d0c Remove
+the orphaned database.py gRPC client</code>) arrived in #3466, so
+phase 3 reads <code>dcd3b32b1</code> above. The audit's coverage is
+unaffected -- #3466's range is in the same decision 1 table,
+as phase 1's row -- so only the label was wrong, and the
+phase 8 plan is left alone as the record of what that audit
+actually read.</p>
+<p>Every SHA is the merge commit of the pull request named
+beside it, so <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull
+request put on <code>develop</code>. Phases 1 and 3 shared a pull
+request, as did phases 2 and 4.</p>
 <p>Phase summaries:</p>
 <p><strong>Phase 1 — stop the idle-loop polls.</strong> Two independent
 changes in <code>daemons/daemon.py</code>: (a) <code>check_daemon_state()</code>

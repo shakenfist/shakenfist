@@ -14320,6 +14320,7 @@ questions include at least:</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14327,44 +14328,57 @@ questions include at least:</p>
 <td>0. Research and decisions document</td>
 <td>PLAN-generic-allocator-phase-00-decisions.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1. <code>resource_pool_allocations</code> schema and primitive</td>
 <td>PLAN-generic-allocator-phase-01-primitive.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Port VXLAN ID allocator</td>
 <td>PLAN-generic-allocator-phase-02-vxlan.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Port console / VDI port allocator</td>
 <td>PLAN-generic-allocator-phase-03-ports.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Port vsock CID allocator</td>
 <td>PLAN-generic-allocator-phase-04-vsock.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Port MAC allocator</td>
 <td>PLAN-generic-allocator-phase-05-mac.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Documentation and audit-log surface</td>
 <td>PLAN-generic-allocator-phase-06-docs.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
 <td>PLAN-generic-allocator-phase-07-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. It is
+filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet.</p>
 <p><strong>Phase 7 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
 accumulated diff of every phase in this plan against
 <code>develop</code>, not the last phase's diff alone. Findings land as

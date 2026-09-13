@@ -14776,6 +14776,7 @@ the slot at all.</p>
 <th>Plan</th>
 <th>Status</th>
 <th>Content</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14784,57 +14785,81 @@ the slot at all.</p>
 <td><a href="../PLAN-agent-operation-deadlines-phase-00-decisions/">PLAN-agent-operation-deadlines-phase-00-decisions.md</a></td>
 <td>Complete</td>
 <td>Open questions resolved into the decisions section above; measurement and state-audit results recorded in the phase plan</td>
+<td><code>87bbffcf4</code> (#3761)</td>
 </tr>
 <tr>
 <td>1</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-01-groundwork/">PLAN-agent-operation-deadlines-phase-01-groundwork.md</a></td>
 <td>Complete</td>
 <td>Field mask for <code>update_agent_operation_attributes</code>; per-command handler classes replacing the dispatch if/elif chain, declaring <code>reports_progress</code> and <code>retryable</code> for phases 4 and 5 to read (no behaviour change); initialising the get-file transfer state so its existing guard raises <code>GetException</code> rather than <code>AttributeError</code></td>
+<td><code>f21d5da3a</code> (#3773)</td>
 </tr>
 <tr>
 <td>2</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-02-schema/">PLAN-agent-operation-deadlines-phase-02-schema.md</a></td>
 <td>Complete</td>
 <td>Schema: <code>deadline</code>/<code>progress_timeout</code> columns, <code>last_progress</code>/<code>attempts</code> attributes, both table versions 2 -&gt; 3, additive migrations, and a live-MariaDB test that they migrate. Survey corrections applied at source: NULL means "server default" rather than "no deadline", and there is deliberately no object version bump</td>
+<td><code>cb9e10bba</code> (#3858)</td>
 </tr>
 <tr>
 <td>3</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-03-api/">PLAN-agent-operation-deadlines-phase-03-api.md</a></td>
 <td>Complete</td>
 <td>API: <code>deadline_seconds</code> on all three creating endpoints and <code>progress_timeout_seconds</code> on get/put only, their declarations and <code>STRUCTURED_PARAMETERS</code> entries, a 400 guard backing the published bound, and the two config defaults. Survey correction applied at source: <code>execute</code> does not publish a progress timeout it can never honour, and the API writes a computed deadline rather than NULL</td>
+<td><code>08807c83f</code> (#3883)</td>
 </tr>
 <tr>
 <td>4</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-04-enforcement/">PLAN-agent-operation-deadlines-phase-04-enforcement.md</a></td>
 <td>Complete</td>
 <td>Enforcement: dequeue expiry, preflight expiry, executor deadline + progress timeout, <code>observe_progress()</code> hooks; remove <code>AGENT_OPERATION_EXECUTION_TIMEOUT</code>; the <code>expired</code> state with its audit-enumerated obligations (<code>state_targets</code>, <code>FINAL_OBJECT_STATES</code>, guarded error writes, command-abort check). Survey corrections applied at source: every address in decision 1 was refreshed after phase 1's refactor, the reaper is phase 5's rather than this phase's, and preflight is a fourth enforcement point the design sketch never listed. The phase plan also decides that an expiry records its reason as a state message and an audit event rather than as <code>.error</code>, which the <code>error</code> setter refuses from a non-<code>error</code> state</td>
+<td><code>291054e98</code> (#3898)</td>
 </tr>
 <tr>
 <td>5</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-05-retry/">PLAN-agent-operation-deadlines-phase-05-retry.md</a></td>
 <td>Complete</td>
 <td>Retry: <code>EXECUTING -&gt; QUEUED</code> edge, terminal-only lazy pop, attempt bound, partial-result cleanup; the node-local reaper, covering a dead executor thread, no executor at all after a daemon restart, and a live executor wedged in the pre-connection wait. Survey corrections applied at source: decision 5's address for <code>reap_instance_executors()</code>, that retryability is evaluated over the whole command list rather than the command in flight, and that partial-result cleanup has a registered-blob case the design sketch did not cover. The phase plan also decides that the terminal-only pop and the reaper must land in one commit, because the pop rule alone turns a daemon restart from a leak into a wedge</td>
+<td><code>185de6b32</code> (#3941)</td>
 </tr>
 <tr>
 <td>6</td>
 <td><code>PLAN-agent-operation-deadlines-phase-06-client.md</code> (in shakenfist/client-python, branch <code>agent-operation-deadlines-phase-06-client</code>)</td>
 <td>Complete</td>
 <td>client-python: deadline from await timeout, CLI flags, terminal-state handling (includes fixing <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/363" title="GitHub Issue: shakenfist/client-python #363">client-python#363</a>: await loops poll to their full timeout on terminal failure states instead of failing fast). The plan file lives in the client repository because the code does, following the <code>PLAN-vdi-console-tokens.md</code> precedent; a relative link cannot cross repositories, so it is named here rather than linked. Survey corrections applied at source: the new parameters need a capability token before a client can send them safely, which phase 3 did not add and phase 6 does. The phase plan also decides to repair <code>await_agent_fetch()</code>'s three hardcoded timeout windows, which make its <code>timeout</code> argument a lie, because the phase rewrites those same loops. The phase also landed two pull requests in this repository, which the row above does not name because the phase plan lives elsewhere: #4005 added the capability token in <code>shakenfist/external_api/app.py</code> that a client needs before it can safely send the new parameters, and #4015 moved the CI suite onto the new client</td>
+<td>client-python <code>4557100ce</code> (#380); shakenfist <code>4afa29476</code> (#4005), <code>864608276</code> (#4015)</td>
 </tr>
 <tr>
 <td>7</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-07-docs-and-ci/">PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md</a></td>
 <td>Complete</td>
 <td>Documentation and CI coverage. Survey corrections applied at source, because this row was written before phases 3 to 6 executed and was wrong in four places. (a) The documentation was <strong>not</strong> deferred from phase 3: <code>cf094551b</code> wrote both the API reference at <code>docs/developer_guide/api_reference/instances.md:657-710</code> and the release note section at <code>docs/release_notes/v07-v08.md:731-782</code>. What is missing is phase 5 (retry, attempts and the reaper), phase 6 (the CLI flags and the <code>AgentCommandError</code> to <code>AgentOperationFailed</code> change), and an operator-guide page for agent operations, of which there is none. (b) <code>base.AGENT_OPERATION_FAILURES</code> must <strong>not</strong> narrow to a plain <code>AgentOperationFailed</code> reference: the <code>getattr()</code> shim goes, but the tuple stays and gains <code>AgentAwaitTimeout</code>, because <code>await_agent_command()</code> raises three unrelated exceptions and the two catch sites are <code>_await_instance_ready</code>'s retry loop, which wants all of them. Only the two <code>test_get_missing_file</code> assertions narrow. (c) There is a <strong>third</strong> event-renewed await, <code>_await_objects_ready</code>, which backs the network, artifact and blob readiness helpers and so sits on nearly every test in the suite; #3770 is not fixed without it. (d) Commit <code>a0cc243ad</code> fixed the shared-clock flake in <code>guest_ci_tests/test_agentops.py</code> only, and the identical <code>smoke_ci_tests</code> copy -- the suite that runs on every pull request -- still has it. Note <code>docs/developer_guide/state_machine.md</code> is <strong>not</strong> this phase's: it is a rendering of <code>state_targets</code>, so phase 4 updated it when it added <code>expired</code> rather than leaving the tree self-contradictory for three phases, and phase 5 added its one further edge</td>
+<td><code>4a122bcd3</code> (#4053)</td>
 </tr>
 <tr>
 <td>8</td>
 <td><a href="../PLAN-agent-operation-deadlines-phase-08-push-audit/">PLAN-agent-operation-deadlines-phase-08-push-audit.md</a></td>
 <td>Complete</td>
 <td>Push audit: runs <code>PUSH-AUDIT.md</code> over this plan's work as one body, not the last phase's diff alone. Survey correction applied at source: the "accumulated diff against <code>develop</code>" this row used to describe cannot be taken, because every phase is merged and <code>git diff develop...HEAD</code> is empty; the baseline is instead the explicit merge list in decision 1 of the phase plan, which also pulls in the three defect fixes that landed against this plan's code outside its phase branches (#3933, #3970, #4025). Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
+<td><code>45debf843</code> (#4078), <code>9bca46412</code> (#4090)</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>. These
+entries were reconstructed after the fact, because the plan did not
+record them as its phases landed; they come from the repository's
+merged pull request list cross-checked against the first-parent
+history, and not from a path-filtered <code>git log</code>, which cannot say
+which commits arrived inside a pull request. Every SHA is the merge
+commit of the pull request named beside it, so <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is
+the whole of what that pull request put on <code>develop</code>.</p>
+<p>Phase 6's code lives in <code>shakenfist/client-python</code>, so its row names
+that repository's merge as well as the two pull requests this
+repository needed for it. Three defect fixes on this plan's code
+landed outside its phase branches and belong to no phase row:
+<code>2341ae0c4</code> (#3933), <code>2e19bb1ea</code> (#3970) and <code>91d565a05</code> (#4025).
+Phase 8's decision 2 lists them, and its audit read them alongside
+the phase merges.</p>
 <p>Each phase gets its own detailed plan file before implementation.
 Unit tests land with each phase; the functional test in phase 7
 exercises at minimum: an explicit short deadline expiring a queued

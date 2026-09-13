@@ -15512,6 +15512,7 @@ superseded.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -15519,44 +15520,76 @@ superseded.</p>
 <td>0. Decisions: what each topology is for, widen-versus-reservation, and an inventory of what scarcity currently catches</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-00-decisions/">PLAN-ci-cloud-sizing-phase-00-decisions.md</a></td>
 <td>Complete</td>
+<td><code>d03ab340e</code> (#3939)</td>
 </tr>
 <tr>
 <td>1. Headroom instrumentation: sample <code>/admin/resources</code> through every cluster job and publish the series</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-01-headroom-probe/">PLAN-ci-cloud-sizing-phase-01-headroom-probe.md</a></td>
 <td>Complete</td>
+<td><code>078772504</code> (#3940)</td>
 </tr>
 <tr>
 <td>2. Baseline measurement window: the peak-demand distribution that has never existed</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-02-baseline/">PLAN-ci-cloud-sizing-phase-02-baseline.md</a></td>
 <td>Complete</td>
+<td><code>e951ee42d</code> (#4089), <code>3546fabed</code> (#4138)</td>
 </tr>
 <tr>
 <td>3. Explicit saturation coverage, so that growing a cloud cannot silence a defect</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-03-saturation-coverage/">PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md</a></td>
 <td>Complete</td>
+<td><code>ead1ccba5</code> (#4152), <code>f3b245304</code> (#4170), <code>c13d2c6fd</code> (#4186), <code>210fb4469</code> (#4193)</td>
 </tr>
 <tr>
 <td>4. Re-shape the topologies against the phase 2 data</td>
 <td>PLAN-ci-cloud-sizing-phase-04-topologies.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger</td>
 <td>PLAN-ci-cloud-sizing-phase-05-guardrails.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Documentation and downstream propagation</td>
 <td>PLAN-ci-cloud-sizing-phase-06-docs.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
 <td>PLAN-ci-cloud-sizing-phase-07-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>. These
+entries were reconstructed after the fact, because the plan did not
+record them as its phases landed; they come from the repository's
+merged pull request list cross-checked against the first-parent
+history, and not from a path-filtered <code>git log</code> alone, which cannot
+say which commits arrived inside a pull request. Every SHA is the
+merge commit of the pull request named beside it, so
+<code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull request put on
+<code>develop</code>. A phase which has not landed reads <code>—</code>.</p>
+<p>Phase 3 records a fourth merge which did not put it on <code>develop</code> but
+repaired what did. <code>c13d2c6fd</code> (#4186) added the <code># raw-create:</code>
+markers that <code>f3b245304</code> (#4170) landed without, which broke the
+<code>test_ci_raw_creates</code> guard on <code>develop</code> and blocked the merge queue
+(<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4185" title="GitHub Issue: shakenfist/shakenfist #4185">shakenfist#4185</a>). It is recorded here rather than left out because
+the column is what the push audit reads: a repair to this phase's own
+code that sits in no range is a diff nothing audits. It is recorded
+<em>here</em> rather than against
+<code>PLAN-transient-capacity-refusals.md</code>, whose phase 2 added the guard,
+because the defect was in this phase's test file.</p>
+<p>The master plan itself landed as <code>ab2158cb2</code> (#3938), ahead of
+phase 0. Phase 1's other half -- the invocation in the reusable
+<code>smoke-cluster</code> workflow -- lives in <code>shakenfist/actions</code>, and is
+not in this repository's history at all; phase 7 reads it against
+that repository's default branch.</p>
 <h3 id="phase-0-decisions-and-scarcity-inventory">Phase 0 -- Decisions and scarcity inventory<a class="headerlink" href="#phase-0-decisions-and-scarcity-inventory" title="Permanent link">&para;</a></h3>
 <p>Settle the open questions above, and produce the inventory that
 phase 3 is built from: every distinct failure signature the
@@ -15710,10 +15743,25 @@ that consume the reusable workflow, per the copy-paste-drift
 finding in <code>project-sf-ecosystem-ci</code>.</p>
 <h3 id="phase-7-push-audit">Phase 7 -- Push audit<a class="headerlink" href="#phase-7-push-audit" title="Permanent link">&para;</a></h3>
 <p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
-this plan against <code>develop</code>, not the last phase's diff alone.
-Findings land as their own pull request, and the plan is not
-complete until each is resolved or declined in writing here. If
-the audit finds nothing, that is recorded in one sentence.</p>
+this plan, not the last phase's diff alone. By the time it runs
+most of those phases will have merged, so the baseline is the
+<code>Merged</code> column above rather than <code>develop...HEAD</code>, which will be
+empty. Findings land as their own pull request, and the plan is
+not complete until each is resolved or declined in writing here.
+If the audit finds nothing, that is recorded in one sentence.</p>
+<p>Two things make this plan's audit unusual and are worth planning
+for rather than discovering. The work is split across
+repositories -- the probe and its tooling live here, the
+invocation lives in <code>shakenfist/actions</code> -- so the audit of the
+half that landed elsewhere runs against that repository's default
+branch, as part of the pull request that lands it, and this phase
+cites that audit rather than re-running it. And most of the
+change is CI configuration and measurement tooling rather than
+product code, so the wave 2 code-quality and security lenses have
+less to read than usual while the documentation lens has more:
+the sizing model, the ledger arithmetic and the band all have to
+say the same thing in <code>docs/developer_guide/ci.md</code> as the
+topology files do.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-execution-model v1 -->

@@ -15055,6 +15055,7 @@ not land anywhere else.</p>
 <th>Repo</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -15063,69 +15064,97 @@ not land anywhere else.</p>
 <td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1. JWT validation refactor (split issuance from validation; introduce per-issuer validators)</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
 <td>Superseded</td>
+<td>Superseded -- landed as <code>PLAN-auth-federation.md</code> phase 3 steps 3a-3c and 3f: <code>72187d2ff</code> (#3556), <code>c64269e63</code> (#3625)</td>
 </tr>
 <tr>
 <td>2. OIDC validator (discovery, JWKS fetch + cache, signature + claim verification)</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-auth-federation-phase-03-exchange/">PLAN-auth-federation-phase-03-exchange.md</a></td>
 <td>Superseded</td>
+<td>Superseded -- landed as <code>PLAN-auth-federation.md</code> phase 3 step 3f: <code>c64269e63</code> (#3625), <code>1e7a167ea</code> (#3641)</td>
 </tr>
 <tr>
 <td>3. OIDC discovery</td>
 <td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Claim-driven namespace authorisation, including multi-namespace</td>
 <td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Admin as a claim</td>
 <td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Service-account framing of namespace keys</td>
 <td>shakenfist, client-python</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Interactive CLI flows and token cache</td>
 <td>client-python</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>8. Worked operator examples for Keycloak and Authentik</td>
 <td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>9. Functional coverage against a containerised IdP</td>
 <td>shakenfist</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>10. Push audit</td>
 <td>shakenfist</td>
 <td>PLAN-oidc-authentication-phase-10-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. It is
+filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet. Phases 1 and 2 are the exception: they were
+superseded rather than abandoned, so their cells name the
+merges that landed the work under another plan, and phase
+10's audit reads those ranges directly rather than following
+a pointer. <code>PLAN-auth-federation.md</code> is <code>Complete</code> and so
+carries no <code>Merged</code> column of its own -- a Complete plan is
+not reopened to acquire one -- which is why the merges are
+written out here. They were reconstructed from that plan's
+phase 3 step table, whose per-step commit subjects were
+matched against the first-parent history rather than a
+path-filtered <code>git log</code>: #3556 landed steps 3a-3d, #3625
+landed 3e-3i, and #3641 added trust anchors for a private
+JWKS endpoint.</p>
 <p><strong>Phase 0 — research and decisions.</strong> Settles open question
 13, direct-bearer versus exchange-based human sessions, and
 open question 14, multi-namespace authorisation. Both are

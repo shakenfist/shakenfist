@@ -14339,7 +14339,14 @@ bottleneck.</p>
 <li><strong>Artifact listings</strong>: May fetch version/blob info per artifact</li>
 </ul>
 <h2 id="proposed-solution">Proposed Solution<a class="headerlink" href="#proposed-solution" title="Permanent link">&para;</a></h2>
+<p>No phase of this roadmap has landed, so every <code>Merged</code> line below reads
+<code>—</code>. The line is opened now rather than when the first phase lands, so that
+phase 4's audit has somewhere to read a range from instead of a diff against
+<code>develop</code> that will be empty by the time it runs. Each phase records the
+merge commit of the pull request that put it on <code>develop</code>, so
+<code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that phase landed.</p>
 <h3 id="phase-1-batch-query-infrastructure">Phase 1: Batch Query Infrastructure<a class="headerlink" href="#phase-1-batch-query-infrastructure" title="Permanent link">&para;</a></h3>
+<p><strong>Merged</strong>: —</p>
 <p>Add batch query functions to the database layer that can fetch related data
 for multiple objects in a single query.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Example batch function signature</span>
@@ -14359,6 +14366,7 @@ for multiple objects in a single query.</p>
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="c1">#               AND verification_status = 'valid'</span>
 </code></pre></div>
 <h3 id="phase-2-prefetch-pattern-in-api-layer">Phase 2: Prefetch Pattern in API Layer<a class="headerlink" href="#phase-2-prefetch-pattern-in-api-layer" title="Permanent link">&para;</a></h3>
+<p><strong>Merged</strong>: —</p>
 <p>Modify API endpoints to prefetch related data before rendering objects.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Before (N+1 queries):</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">blobs</span> <span class="o">=</span> <span class="n">get_blobs</span><span class="p">()</span>
@@ -14372,6 +14380,7 @@ for multiple objects in a single query.</p>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">]</span>
 </code></pre></div>
 <h3 id="phase-3-generic-prefetch-framework">Phase 3: Generic Prefetch Framework<a class="headerlink" href="#phase-3-generic-prefetch-framework" title="Permanent link">&para;</a></h3>
+<p><strong>Merged</strong>: —</p>
 <p>Consider a more generic approach where <code>external_view()</code> can declare what
 related data it needs, and the API layer automatically batches those fetches.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Blob</span><span class="p">(</span><span class="n">DatabaseBackedObject</span><span class="p">):</span>
@@ -14386,6 +14395,7 @@ related data it needs, and the API layer automatically batches those fetches.</p
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="p">]</span>
 </code></pre></div>
 <h3 id="phase-4-push-audit">Phase 4: Push audit<a class="headerlink" href="#phase-4-push-audit" title="Permanent link">&para;</a></h3>
+<p><strong>Merged</strong>: —</p>
 <p>Run the checks in <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
 this roadmap against <code>develop</code>, not the last phase's diff alone -- what the
 phases did to each other is only visible in the whole. Findings land as their

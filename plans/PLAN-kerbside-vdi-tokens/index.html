@@ -14521,6 +14521,7 @@ Recommendations are recorded inline.</p>
 <th>Repo</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14529,81 +14530,104 @@ Recommendations are recorded inline.</p>
 <td>shakenfist</td>
 <td>Folded into this document (no separate plan file)</td>
 <td>Complete</td>
+<td>shakenfist <code>9d41a1716</code> (#3491)</td>
 </tr>
 <tr>
 <td>1. Cluster signing key + pubkey publication</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-kerbside-vdi-tokens-phase-01-signing-key/">PLAN-kerbside-vdi-tokens-phase-01-signing-key.md</a></td>
 <td>Complete</td>
+<td>shakenfist <code>9d41a1716</code> (#3491)</td>
 </tr>
 <tr>
 <td>2. vdiconsoleproxy endpoint</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint/">PLAN-kerbside-vdi-tokens-phase-02-proxy-endpoint.md</a></td>
 <td>Complete</td>
+<td>shakenfist <code>9d41a1716</code> (#3491)</td>
 </tr>
 <tr>
 <td>3. Pip-installable ryll</td>
 <td>ryll</td>
 <td>PLAN-pip-distribution.md (in ryll's docs/plans/)</td>
 <td>Complete</td>
+<td>ryll <code>fa7ee21d8</code> (#190)</td>
 </tr>
 <tr>
 <td>4. Client, CLI, and viewer launch</td>
 <td>client-python</td>
 <td>PLAN-vdi-console-tokens.md (in that repo, branch <code>vdi-console-tokens-client</code>)</td>
 <td>Complete</td>
+<td>client-python <code>b426e1f86</code> (#350)</td>
 </tr>
 <tr>
 <td>5. Kerbside exchange endpoint</td>
 <td>kerbside</td>
 <td>PLAN-kerbside-vdi-tokens-phase-05-exchange.md (in kerbside, branch <code>sf-vdi-tokens</code>)</td>
 <td>Complete</td>
+<td>kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>6. Cluster-wide scrape and host_subject</td>
 <td>kerbside + shakenfist</td>
 <td>PLAN-kerbside-vdi-tokens-phase-06-scrape.md (in kerbside)</td>
 <td>Complete</td>
+<td>shakenfist <code>9d41a1716</code> (#3491); kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>7. Functional test: SF mint path</td>
 <td>shakenfist</td>
 <td>PLAN-kerbside-vdi-tokens-phase-07-ci.md (in kerbside)</td>
 <td>Complete</td>
+<td>shakenfist <code>9d41a1716</code> (#3491); kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>8. Documentation</td>
 <td>all</td>
 <td>PLAN-kerbside-vdi-tokens-phase-08-docs.md</td>
 <td>Complete</td>
+<td>shakenfist <code>9d41a1716</code> (#3491); kerbside <code>f50ea59c2</code> (#167)</td>
 </tr>
 <tr>
 <td>9. Full cross-repo end-to-end + kerbside exchange lane (post-merge, real SF)</td>
 <td>all</td>
 <td>PLAN-kerbside-vdi-tokens-phase-09-e2e.md (in kerbside)</td>
 <td>Complete</td>
+<td>kerbside <code>115416ccc</code> (#194), <code>78033687d</code> (#201); shakenfist <code>07d7081b7</code> (#3580)</td>
+</tr>
+<tr>
+<td>11. Close out the post-completion defects (#4003, #4004, #4009)</td>
+<td>shakenfist</td>
+<td>See <em>Post-completion defects</em> below</td>
+<td>Complete</td>
+<td>shakenfist <code>5ef83c065</code> (#4016), <code>913411586</code> (#4018), <code>f2df423d8</code> (#4024)</td>
 </tr>
 <tr>
 <td>10. Push audit</td>
 <td>all</td>
 <td><a href="../PLAN-kerbside-vdi-tokens-phase-10-push-audit/">PLAN-kerbside-vdi-tokens-phase-10-push-audit.md</a></td>
 <td>Complete</td>
-</tr>
-<tr>
-<td>11. Close out the post-completion defects (#4003, #4009)</td>
-<td>shakenfist</td>
-<td>See <em>Post-completion defects</em> below</td>
-<td>Complete</td>
+<td>shakenfist <code>2d585cd1a</code> (#4099), <code>ccc1b5ff2</code> (#4137); kerbside <code>e2a493ea6</code> (#412), <code>29323fb85</code> (#413); ryll <code>aac25cf3c</code> (#358), <code>0113f0ff7</code> (#366)</td>
 </tr>
 </tbody>
 </table>
-<p>The table above names plan files rather than pull requests, which
-meant phase 10 had to reconstruct the merge history from <code>git log</code> in
-four working copies before it could audit anything. That
-reconstruction is recorded once, in
+<p>The push audit is the last row of the table, and phase 11 sits above
+it, because that is the order the work actually happened in: the
+post-completion defects were fixed first and the audit read them. The
+phase <em>numbers</em> record when each phase was planned and are left alone,
+since the phase 10 plan file, and kerbside's and ryll's own pull
+requests, all name it by that number.</p>
+<p>The <code>Merged</code> column records what put each phase on its repository's
+default branch. A phase that landed elsewhere names the repository, as
+the shared block asks. The column was reconstructed after the fact --
+the table originally named plan files rather than pull requests, which
+meant phase 10 had to rebuild the merge history in four working copies
+before it could audit anything. That reconstruction is recorded once, in
 <a href="../PLAN-kerbside-vdi-tokens-phase-10-push-audit/">phase 10's decision 1</a>,
-and is the authoritative list of what this plan actually merged:</p>
+and the table below is it: the same merges as the column, grouped by
+pull request rather than by phase, which is the only way to show the
+six pull requests phase 10 took and the work that belongs to no phase
+at all.</p>
 <table>
 <thead>
 <tr>
@@ -14666,25 +14690,25 @@ and is the authoritative list of what this plan actually merged:</p>
 <td>client-python</td>
 <td>4</td>
 <td>#350</td>
-<td><code>b426e1f</code></td>
+<td><code>b426e1f86</code></td>
 </tr>
 <tr>
 <td>kerbside</td>
 <td>5, 6, 7, 8 (kerbside half)</td>
 <td>#167</td>
-<td><code>f50ea59</code></td>
+<td><code>f50ea59c2</code></td>
 </tr>
 <tr>
 <td>kerbside</td>
 <td>9 (SF end-to-end lane)</td>
 <td>#194</td>
-<td><code>115416c</code></td>
+<td><code>115416ccc</code></td>
 </tr>
 <tr>
 <td>kerbside</td>
 <td>post-phase-9 scrape fix</td>
 <td>#201</td>
-<td><code>7803368</code></td>
+<td><code>78033687d</code></td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -14702,7 +14726,7 @@ and is the authoritative list of what this plan actually merged:</p>
 <td>ryll</td>
 <td>3</td>
 <td>#190</td>
-<td><code>fa7ee21</code></td>
+<td><code>fa7ee21d8</code></td>
 </tr>
 <tr>
 <td>ryll</td>

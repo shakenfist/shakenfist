@@ -14386,6 +14386,7 @@ trustworthy first.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14393,39 +14394,50 @@ trustworthy first.</p>
 <td>0. Decisions: mechanism per RPC class, caller taxonomy, bound policy</td>
 <td>PLAN-grpc-bounded-replies-phase-00-decisions.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1. Audit and measure: classify every <code>repeated</code> reply field and every caller; add a server-side reply-size histogram</td>
 <td>PLAN-grpc-bounded-replies-phase-01-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Bounded by construction: convert sweep-style callers to explicit "next N, oldest first" queries with an explicit more-available signal</td>
 <td>PLAN-grpc-bounded-replies-phase-02-sweeps.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. The general mechanism for genuinely unbounded reads (<code>GetObjectEvents</code>, <code>GetObjectsByState</code>, the <code>Get*Uuids</code> family)</td>
 <td>PLAN-grpc-bounded-replies-phase-03-mechanism.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Enforcement: CI fails when a new unbounded <code>repeated</code> reply field appears unregistered</td>
 <td>PLAN-grpc-bounded-replies-phase-04-enforcement.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Lower the client cap, retire the stopgaps, document the contract</td>
 <td>PLAN-grpc-bounded-replies-phase-05-closeout.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Push audit</td>
 <td>PLAN-grpc-bounded-replies-phase-06-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>: the merge
+commit of its pull request, or an explicit <code>first..last</code> range where the
+phase landed directly. It is filled in as each phase lands, so <code>—</code> means
+the phase has not landed yet.</p>
 <p>Named for phase 1's audit scope, so they are not rediscovered one
 review round at a time: <code>_direct_get_expired_blob_uuids()</code> and
 <code>_direct_get_stale_transcoded_blob_uuids()</code> both still end in <code>except

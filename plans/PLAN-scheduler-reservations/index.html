@@ -14445,6 +14445,7 @@ table entirely (decision D8).</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14452,74 +14453,113 @@ table entirely (decision D8).</p>
 <td>00a. Load-aware ordering and system reservations (static quick wins)</td>
 <td><a href="../PLAN-scheduler-reservations-phase-00a-load-aware-ordering/">PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md</a></td>
 <td>Complete</td>
+<td><code>113e4efb5</code> (#3436), <code>c27ad9bf2</code> (#3930), <code>2fcfe8afc</code> (#3956)</td>
 </tr>
 <tr>
 <td>0. Research and decisions document</td>
 <td><a href="../PLAN-scheduler-reservations-phase-00-decisions/">PLAN-scheduler-reservations-phase-00-decisions.md</a></td>
 <td>Complete</td>
+<td><code>87a58a81e</code> (#3566), <code>a16d32aec</code> (#3731), <code>b93539322</code> (#3783)</td>
 </tr>
 <tr>
 <td>1. Promote node capacity fields to typed columns</td>
 <td><a href="../PLAN-scheduler-reservations-phase-01-node-metrics-columns/">PLAN-scheduler-reservations-phase-01-node-metrics-columns.md</a></td>
 <td>Complete</td>
+<td><code>80bffad56</code> (#3578)</td>
 </tr>
 <tr>
 <td>2. Capacity tables, reconciler and migration</td>
 <td><a href="../PLAN-scheduler-reservations-phase-02-capacity-tables/">PLAN-scheduler-reservations-phase-02-capacity-tables.md</a></td>
 <td>Complete</td>
+<td><code>d3a91cdef</code> (#3614)</td>
 </tr>
 <tr>
 <td>3. Claim primitive and placement integration</td>
 <td><a href="../PLAN-scheduler-reservations-phase-03-primitive/">PLAN-scheduler-reservations-phase-03-primitive.md</a></td>
 <td>Complete</td>
+<td><code>0144e36ed</code> (#3754), <code>921573c47</code> (#3888)</td>
 </tr>
 <tr>
 <td>4. Namespace claims object and API</td>
 <td><a href="../PLAN-scheduler-reservations-phase-04-claims-api/">PLAN-scheduler-reservations-phase-04-claims-api.md</a></td>
 <td>Complete</td>
+<td><code>7bd7bbd03</code> (#3790), <code>921573c47</code> (#3888)</td>
 </tr>
 <tr>
 <td>4a. A satisfiable demand guard, and the phase 3/4 soaks</td>
 <td><a href="../PLAN-scheduler-reservations-phase-04a-demand-guard/">PLAN-scheduler-reservations-phase-04a-demand-guard.md</a></td>
 <td>Complete</td>
+<td><code>b02ec6e5e</code> (#3843), <code>921573c47</code> (#3888)</td>
 </tr>
 <tr>
 <td>4b. Client support for claims</td>
 <td><a href="../PLAN-scheduler-reservations-phase-04b-client/">PLAN-scheduler-reservations-phase-04b-client.md</a></td>
 <td>Complete</td>
+<td><code>c27ad9bf2</code> (#3930), <code>a5014b6ba</code> (#3949)</td>
 </tr>
 <tr>
 <td>4c. Conductor claim integration</td>
 <td><a href="../PLAN-scheduler-reservations-phase-04c-conductor-claims/">PLAN-scheduler-reservations-phase-04c-conductor-claims.md</a></td>
 <td>Complete</td>
+<td><code>c273627a2</code> (#3952), <code>948055063</code> (#4008), <code>8fc8ba961</code> (#4139), <code>2b767a9b1</code> (#4154)</td>
 </tr>
 <tr>
 <td>5. Caller migration and hard ceiling</td>
 <td>PLAN-scheduler-reservations-phase-05-callers.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Affinity model rework</td>
 <td><a href="../PLAN-scheduler-reservations-phase-06-affinity/">PLAN-scheduler-reservations-phase-06-affinity.md</a></td>
 <td>Complete</td>
+<td><code>597312d2a</code> (#3957), <code>b54f126e5</code> (#3971), <code>c37012c89</code> (#3972), <code>96c78fd63</code> (#4006)</td>
 </tr>
 <tr>
 <td>7. Capacity diagnostics</td>
 <td><a href="../PLAN-scheduler-reservations-phase-07-diagnostics/">PLAN-scheduler-reservations-phase-07-diagnostics.md</a></td>
 <td>Complete</td>
+<td><code>30a02a918</code> (#4052)</td>
 </tr>
 <tr>
 <td>8. Documentation and operator guide</td>
 <td>PLAN-scheduler-reservations-phase-08-docs.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>9. Push audit</td>
 <td>PLAN-scheduler-reservations-phase-09-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>.
+These entries were reconstructed after the fact, because the
+plan did not record them as its phases landed; they come from
+the repository's merged pull request list cross-checked against
+the first-parent history, and not from a path-filtered
+<code>git log</code>, which cannot say which commits arrived inside a
+pull request. Every SHA is the merge commit of the pull request named
+beside it, so <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull
+request put on <code>develop</code>. A phase which has not landed reads
+<code>—</code>.</p>
+<p>Several phases took more than one pull request, because the
+plan's habit is to land the work and then close the phase out in
+a later documentation change. Two pull requests therefore appear
+in more than one row: #3888 closed out phases 3, 4 and 4a
+together, so it appears in three, and #3930 closed out 00a while
+landing 4b's server half, so it appears in two. Phase 4c took
+four between its first landing and the measurement window
+closing in #4154.</p>
+<p>Three defect fixes on this plan's code landed outside its phase
+branches and belong to no phase row: <code>49e98a67c</code> (#3722, ranking
+affinity above transient load shedding, issue #3565),
+<code>45332ff81</code> (#3918, the claims tests' unreserved-headroom
+assumption, issue #3907) and <code>a5c621633</code> (#3937, RAM-aware
+ranking and gating, issue #3636). Phase 9's audit reads them
+alongside the phase merges.</p>
 <h3 id="phase-status-notes">Phase status notes<a class="headerlink" href="#phase-status-notes" title="Permanent link">&para;</a></h3>
 <p>Where a phase's status does not tell the whole story, the rest of it
 is here.</p>

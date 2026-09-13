@@ -14249,6 +14249,7 @@ decisions document.</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14256,49 +14257,63 @@ decisions document.</p>
 <td>0. Research and decisions document</td>
 <td>PLAN-embrace-tls-phase-00-decisions.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1. Cert-reload mechanism and lifecycle events</td>
 <td>PLAN-embrace-tls-phase-01-reload.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. mTLS for the <code>sf-database</code> gRPC channel</td>
 <td>PLAN-embrace-tls-phase-02-database-mtls.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. mTLS for the remaining inter-daemon gRPC channels</td>
 <td>PLAN-embrace-tls-phase-03-other-grpc.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. TLS for the MariaDB connection</td>
 <td>PLAN-embrace-tls-phase-04-mariadb-tls.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Optional TLS for sf-api; document operator-LB story</td>
 <td>PLAN-embrace-tls-phase-05-api-tls.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Cert-expiry monitoring (event log + prometheus)</td>
 <td>PLAN-embrace-tls-phase-06-expiry-monitoring.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Repurpose <code>pki_internal_ca</code> as dev/test convenience</td>
 <td>PLAN-embrace-tls-phase-07-dev-ca.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>8. Push audit</td>
 <td>PLAN-embrace-tls-phase-08-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. It is
+filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet.</p>
 <p>Notes on sequencing:</p>
 <ul>
 <li><strong>Phase 0 is research-and-decide.</strong> The number of open

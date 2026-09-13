@@ -14189,6 +14189,7 @@ resolved. A plausible decomposition, <em>for discussion only</em>:</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14196,14 +14197,20 @@ resolved. A plausible decomposition, <em>for discussion only</em>:</p>
 <td>0. Decisions pass</td>
 <td><em>to be created</em></td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>(later phases)</td>
 <td><em>to be created</em></td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>: the merge commit
+of its pull request, or an explicit <code>first..last</code> range where the phase landed
+directly. It is filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet.</p>
 <h3 id="push-audit">Push audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h3>
 <p>However the later phases are cut, the last one is the push audit. It runs
 <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against

@@ -14283,6 +14283,7 @@ look like:)</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14290,44 +14291,57 @@ look like:)</p>
 <td>1. <code>RecurringOperation</code> object and persistence</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Dispatcher max-wait for <code>runs_after</code> + continue-on-failure recurrence semantics</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Tick mechanism and gating policies</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Migrate cluster + cleaner <code>scheduled_tasks.py</code> as first internal consumers</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Network-maintain-pass op + migrate <code>maintain.py</code></td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. REST API and user-facing template vocabulary</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Documentation and tests</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>8. Push audit</td>
 <td>PLAN-recurring-operations-phase-08-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. It is
+filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet.</p>
 <p><strong>Phase 8 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
 accumulated diff of every phase in this plan against
 <code>develop</code>, not the last phase's diff alone. Findings land as

@@ -14298,6 +14298,7 @@ questions include at least:</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14305,44 +14306,57 @@ questions include at least:</p>
 <td>0. Research and decisions document</td>
 <td>PLAN-network-service-ports-phase-00-decisions.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1. Pool registration with the generic allocator</td>
 <td>PLAN-network-service-ports-phase-01-pool.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. <code>allocate_service_port</code> / <code>release_service_port</code> API and token issuance</td>
 <td>PLAN-network-service-ports-phase-02-api.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>3. Carrier-side DNAT programming via the network daemon</td>
 <td>PLAN-network-service-ports-phase-03-dnat.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>4. Reaper and reconciler</td>
 <td>PLAN-network-service-ports-phase-04-reaper.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>5. Validation surface (smoke-test caller or first real caller)</td>
 <td>PLAN-network-service-ports-phase-05-validate.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>6. Operator and developer documentation</td>
 <td>PLAN-network-service-ports-phase-06-docs.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
 <td>PLAN-network-service-ports-phase-07-push-audit.md</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. It is
+filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet.</p>
 <p><strong>Phase 7 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
 accumulated diff of every phase in this plan against
 <code>develop</code>, not the last phase's diff alone. Findings land as

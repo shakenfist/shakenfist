@@ -15266,6 +15266,7 @@ The expected shape:</p>
 <th>Phase</th>
 <th>Plan</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -15273,24 +15274,33 @@ The expected shape:</p>
 <td>0. Decisions and feasibility</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>1. QMP socket plumbing + first feature (dynamic EDID)</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
 <td>2. Remaining Stage 0 features</td>
 <td>TBD</td>
 <td>Not started</td>
+<td>—</td>
 </tr>
 <tr>
+<td>...</td>
 <td>...</td>
 <td>...</td>
 <td>...</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>:
+the merge commit of its pull request, or an explicit
+<code>first..last</code> range where the phase landed directly. It is
+filled in as each phase lands, so <code>—</code> means the phase has not
+landed yet.</p>
 <p>Phase 0 should land the socket-location decision, the API
 shape decision, the permissions model, and a sized list of
 which features from the inventory are in scope for Phase 1.</p>

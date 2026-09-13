@@ -14407,6 +14407,7 @@ declarations are good enough to compile.</p>
 <th>Phase</th>
 <th>Status</th>
 <th>Description</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
@@ -14414,49 +14415,70 @@ declarations are good enough to compile.</p>
 <td>0: Research and decisions</td>
 <td>Complete</td>
 <td>Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See <a href="../PLAN-api-input-validation-phase-00-decisions/">phase 0</a></td>
+<td><code>25e03b764</code> (#3620)</td>
 </tr>
 <tr>
 <td>1: Declaration audit</td>
 <td>Complete</td>
 <td>Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. <code>sshkey</code>/<code>userdata</code> in the published OpenAPI) and 20 undeclared parameters; make <code>swagger_helper()</code> reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See <a href="../PLAN-api-input-validation-phase-01-declaration-audit/">phase 1</a></td>
+<td><code>25e03b764</code> (#3620)</td>
 </tr>
 <tr>
 <td>2: Type vocabulary</td>
 <td>Complete</td>
 <td>The specification-validation test (#3626) plus <code>schemes</code>/<code>securityDefinitions</code> template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; <code>unsignedinteger</code>/<code>macaddr</code>/<code>base64</code>/<code>netblock</code> tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events <code>limit</code> cap are visible to callers. See <a href="../PLAN-api-input-validation-phase-02-type-vocabulary/">phase 2</a></td>
+<td><code>ad759f25e</code> (#3666), <code>e9b28a65a</code> (#3685)</td>
 </tr>
 <tr>
 <td>3: Compile and warn</td>
 <td>Complete</td>
 <td>Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared <code>namespace</code> of #3739 and fourteen metadata <code>value</code> declarations narrower than their handlers — which phase 4 fixes before it enforces. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
+<td><code>3790aa487</code> (#3726), <code>0c7eacf48</code> (#3742), <code>6274cd924</code> (#3835)</td>
 </tr>
 <tr>
 <td>4: Enforce</td>
 <td>Complete</td>
 <td>Landed 2026-09-09 via <a href="https://github.com/shakenfist/shakenfist/pull/4141">#4141</a>. Fixed the two declaration bugs the warn window found (#3739's undeclared <code>namespace</code> on 55 handlers, and fourteen metadata <code>value</code> declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The <code>get_args</code> fold moved to Future work as <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>: read as "delete the four <code>@use_kwargs</code> decorators" it is a bug, because the compiled path is check-only and <code>@use_kwargs</code> is the only thing that gets a query parameter to a handler. See <a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a></td>
+<td><code>1c203b111</code> (#4101), <code>f1040a23b</code> (#4141)</td>
 </tr>
 <tr>
 <td>5: Narrow the handlers</td>
 <td>Complete</td>
 <td>Deleted the <code>except TypeError</code> arm from <code>handle_authorization_exceptions</code> (D23): a handler-internal <code>TypeError</code> is now a recorded 500 like any other server fault, and under the <code>warn</code>/<code>off</code> rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed <a href="https://github.com/shakenfist/shakenfist/issues/3523">#3523</a> (a partial <code>cpuinfo</code> probe raising <code>KeyError</code> in <code>get_user_agent</code>) and removed two <code>requires_namespace_exist_if_specified</code> applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried <code>repr(e)</code> (F11): every 500 response now answers a bare <code>server error</code> with no exception detail at all, for any cause (D31). Filed <a href="https://github.com/shakenfist/shakenfist/issues/4161">#4161</a> for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix (<a href="https://github.com/shakenfist/shakenfist/issues/3743">#3743</a>) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See <a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a></td>
+<td><code>b3de0a44f</code> (#4162)</td>
 </tr>
 <tr>
 <td>6: Required and scalar semantics</td>
 <td>Not started</td>
 <td>Decide whether <code>required</code> is enforced, having found that all 75 body and query declarations carrying <code>required=True</code> are optional in fact — every one has a handler default, so nothing is structurally required and enforcement is a contract change for all of them. Also gives the semantic type tokens something to do: <code>macaddr</code> is the only one of them that validates anything today, and it is declared nowhere. Closes #3269 (base64 <code>user_data</code> failing on the hypervisor rather than at the API) and #323 (a netblock overlapping the floating network). #534 was also in scope until the automated issue fixer closed it with #4183 on 2026-09-12, four hours after the phase plan merged. See <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a></td>
+<td>—</td>
 </tr>
 <tr>
 <td>7: Structured parameter schemas</td>
 <td>Not started</td>
 <td><code>dict</code> compiles to <code>fields.Dict()</code> and <code>arrayofdict</code> to <code>fields.List(fields.Dict())</code>, neither carrying a value schema, so every key inside a diskspec, networkspec or videospec is unvalidated in every mode. Teaching the vocabulary to carry an element schema is what #528 needs — the scope #936 described before it was closed as a duplicate of #528 on 2026-09-12 — and it is also items 2 and 3 of #4167. Split out of phase 6 by that phase's survey: the other issues in that row are guards and scalar validators, and this is a vocabulary change the size of phase 2</td>
+<td>—</td>
 </tr>
 <tr>
 <td>8: Push audit</td>
 <td>Not started</td>
 <td>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>Merged</code> column records what put each phase on <code>develop</code>.
+These entries were reconstructed after the fact, because the plan
+did not record them as its phases landed; they come from the
+repository's merged pull request list cross-checked against the
+first-parent history, and not from a path-filtered <code>git log</code>,
+which cannot say which commits arrived inside a pull request.
+Every SHA is the merge commit of the pull request named beside
+it, so <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull request
+put on <code>develop</code>. A phase which has not landed reads <code>—</code>.</p>
+<p>Phases 0 and 1 shared a pull request: #3620 carried the master
+plan, the phase 0 decisions and the declaration audit together.
+Phase 4 landed across two pull requests, #4101 and #4141.</p>
 <h3 id="where-the-tracked-issues-stand">Where the tracked issues stand<a class="headerlink" href="#where-the-tracked-issues-stand" title="Permanent link">&para;</a></h3>
 <p>Recorded here rather than by editing the tables above, so there
 is one place to maintain and the tables stay a record of what
