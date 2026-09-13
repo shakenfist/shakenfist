@@ -96,13 +96,37 @@ def _handler_defaults(fn):
     return out, {a.arg for a in positional} | {a.arg for a in args.kwonlyargs}
 
 
+# The declarations step 2 moved to ``required=False`` on this file's
+# evidence, and the only ones it moved. ``shared`` on
+# ``ArtifactsEndpoint.post`` has a real and sensible default in the
+# handler's own signature (``shared=False``), so the ``accepted``
+# verdict below says the declaration was wrong rather than the handler.
+# The other five ``accepted`` rows keep ``required=True``, because what
+# they accept is a broken operation rather than a sensible default --
+# the reasoning for each is in *Step 2: which declarations are really
+# required* in the plan.
+#
+# They stay in the sweep. The enumeration is derived from the
+# declarations, so a relaxed one would otherwise fall out of the census
+# and take its measured verdict out of the table with it, and this file
+# is where the evidence steps 2 and 3 rest on is re-measured.
+RELAXED_BY_STEP_2 = {
+    ('ArtifactsEndpoint', 'post', 'shared'),
+}
+
+
 def required_declarations():
     """Every body or query parameter the API declares required.
 
     Returns ``(class, method, name, location, argtype, has_default,
-    is_handler_kwarg)`` tuples, sorted. Path parameters are excluded
+    is_handler_kwarg, declared_required)`` tuples, sorted. Path
+    parameters are excluded
     because required-ness there is a tautology: werkzeug does not match
     the route without the segment.
+
+    A declaration named in ``RELAXED_BY_STEP_2`` is included even
+    though it no longer says ``required=True``, so that the table below
+    keeps covering exactly the declarations step 1 measured.
     """
     rows = []
     for _, _, cls, fn in declarations.handlers():
@@ -123,10 +147,15 @@ def required_declarations():
                 location = declarations.literal(item.elts[1])
                 argtype = declarations.literal(item.elts[2])
                 required = declarations.literal(item.elts[4])
-                if location not in ('body', 'query') or required is not True:
+                if location not in ('body', 'query'):
+                    continue
+                if (required is not True
+                        and (cls.name, fn.name, name)
+                        not in RELAXED_BY_STEP_2):
                     continue
                 rows.append((cls.name, fn.name, name, location, argtype,
-                             name in have_default, name in accepted))
+                             name in have_default, name in accepted,
+                             required is True))
     return sorted(rows)
 
 
@@ -832,7 +861,8 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         out of the table the rest of this phase is built on.
         """
         declared = {(cls, method)
-                    for cls, method, _, _, _, _, _ in required_declarations()}
+                    for cls, method, _, _, _, _, _, _
+                    in required_declarations()}
         self.assertEqual(
             set(), declared - set(RECIPES),
             'a handler declares a required parameter and has no recipe')
@@ -846,6 +876,12 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         D32 and D35 both rest on the shape of this census rather than
         on its exact total, but a number that has moved means the table
         below is describing a different API than the one in the tree.
+
+        Counted over the declarations step 1 measured, which is the
+        declarations now saying ``required=True`` plus the ones step 2
+        relaxed. The census script in the plan's appendix knows nothing
+        about the latter, so it reports one fewer per relaxed
+        declaration from step 2 onwards.
         """
         rows = required_declarations()
         self.assertEqual(76, len(rows))
@@ -856,6 +892,21 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
             [RAW_BODY_DECLARATION],
             [(r[0], r[1], r[2]) for r in rows if not r[6]])
 
+    def test_step_2_relaxed_exactly_what_it_said_it_did(self):
+        """The declarations step 2 moved, held where it put them.
+
+        Each of these was measured ``accepted`` below and judged to
+        have a sensible default, so it is declared optional. Every
+        other row in the table still claims to be required, including
+        the five ``accepted`` ones the step deliberately left alone --
+        pinning both directions means neither a quiet revert nor a
+        later mechanical sweep of the remaining ``accepted`` rows can
+        happen without this file saying so.
+        """
+        relaxed = {(r[0], r[1], r[2]) for r in required_declarations()
+                   if not r[7]}
+        self.assertEqual(RELAXED_BY_STEP_2, relaxed)
+
     def test_the_sweep(self):
         """The measurement, and the whole of this step's evidence.
 
@@ -865,7 +916,7 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         """
         mismatches = []
         actual = {}
-        for cls, method, name, _, _, _, _ in required_declarations():
+        for cls, method, name, _, _, _, _, _ in required_declarations():
             recipe = RECIPES[(cls, method)]
 
             control, control_recorded, body = self._request(method, recipe)

@@ -1908,6 +1908,8 @@ class InstanceAgentPutEndpoint(api_base.Resource):
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('blob_uuid', 'body', 'uuid',
              'The UUID of the blob to put onto the instance.', True),
+            # Required, although the handler does not refuse the omission today:
+            # it queues put-blob and chmod with a null path (phase 6 sweep).
             ('path', 'body', 'string',
              'The path to write the file at inside the instance.', True),
             ('mode', 'body', 'string',
@@ -1994,6 +1996,8 @@ class InstanceAgentGetEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('namespace', 'body', 'namespace',
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+            # Required, although the handler does not refuse the omission today:
+            # it queues a get-file with a null path (phase 6 sweep).
             ('path', 'body', 'string',
              'The path to fetch the file from inside the instance.', True),
             ('deadline_seconds', 'body', 'number',
@@ -2057,6 +2061,8 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('namespace', 'body', 'namespace',
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+            # Required, although the handler does not refuse the omission today:
+            # it queues an execute with a null commandline (phase 6 sweep).
             ('command_line', 'body', 'string', 'The command to execute.', True),
             ('deadline_seconds', 'body', 'number',
              DEADLINE_SECONDS_DESCRIPTION, False,

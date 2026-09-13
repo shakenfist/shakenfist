@@ -432,9 +432,11 @@ class ArtifactsEndpoint(api_base.Resource):
         'artifacts', ('Fetch an image artifact into the cluster.'),
         [
             ('url', 'body', 'url', 'The URL to fetch.', True),
+            # Not required: the handler's signature is shared=False, which is a
+            # real default and creates an unshared artifact (phase 6 sweep).
             ('shared', 'body', 'boolean',
              ('Should this artifact be shared? You must be authenticated against '
-              'the system namespace to set this option to True.'), True),
+              'the system namespace to set this option to True.'), False),
             ('namespace', 'body', 'namespace',
              ('Which namespace to store the artifact in. You must be authenticated '
               'against the system namespace to set this option.'), False)

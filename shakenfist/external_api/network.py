@@ -740,6 +740,8 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
             ('namespace', 'body', 'namespace',
              api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
             ('name', 'body', 'string', 'The DNS entry', True),
+            # Required, although the handler does not refuse the omission today:
+            # it stores the DNS name pointing at null (phase 6 sweep).
             ('value', 'body', 'ipv4',
              'The IP address the DNS entry resolves to', True)
         ],

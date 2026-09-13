@@ -480,6 +480,141 @@ are worth listing in step 6's release note:
 `instance must specify at least one disk`, and
 `cannot parse netblock: ...`.
 
+## Step 2: which declarations are really required
+
+Step 2's output, and the list the second gate reviews.
+
+**One declaration moved.** `shared` on `ArtifactsEndpoint.post`
+(`artifact.py:437`) is now `required=False`. Every other declaration in
+the sweep table keeps `required=True`, unchanged.
+
+### The rule, and the qualifier it carries
+
+The step 2 brief states the rule mechanically -- `guarded` and `faults`
+keep `required=True`, `accepted` becomes `required=False`. D35 states
+it with a qualifier: "If the handler accepts the omission *and does
+something sensible*, the declaration is wrong and gets corrected to
+`required=False`." The six `accepted` rows are not alike on that
+second clause, and the step is decided on it, which is also what the
+sweep results section already concluded in prose ("only that last one
+is a declaration step 2 should relax on the evidence here").
+
+Four of the six answer 2xx and commit a broken operation: an agent
+operation carrying a null `commandline` or `path`, or a DNS name
+resolving to null. Nothing downstream of the API can do anything with
+those but fail, at a point where the caller is no longer holding the
+request. Publishing `required=false` for them would make that broken
+acceptance the documented contract, and would deny step 3 the one
+change that improves it -- turning a silent bad write into a 400 the
+caller sees. Enforcing required-ness on a parameter the handler already
+mishandles is not a contract regression; the request never worked.
+
+Against that: an `accepted` verdict means some client could be omitting
+the parameter today and getting a 200. D35's residual risk is exactly
+this, and it is accepted here for the four, because what such a client
+receives today is a queued operation that cannot succeed -- a 200 which
+is not a success. The remaining case for relaxing them would be a
+client that omits `path` and relies on the agent operation failing,
+which is not a use.
+
+### The six, one at a time
+
+| Endpoint | Parameter | Decision | Why |
+|----------|-----------|----------|-----|
+| `ArtifactsEndpoint.post` | `shared` | **`required=False`** | The handler's signature is `shared=False` and the omission creates an unshared artifact, which is the documented default behaviour and what every client that never passes `shared` already relies on. A real optional parameter, declared wrongly. The only row where D35's "does something sensible" is satisfied. |
+| `InstanceAgentExecuteEndpoint.post` | `command_line` | keeps `required=True` | Queues an `execute` operation whose `commandline` is null (`instance.py:2097`). The agent has no command to run; the operation exists only to fail. |
+| `InstanceAgentGetEndpoint.post` | `path` | keeps `required=True` | Queues a `get-file` whose `path` is null (`instance.py:2032`). No file is named, so nothing can be fetched. |
+| `InstanceAgentPutEndpoint.post` | `path` | keeps `required=True` | Queues `put-blob` and `chmod` whose `path` is null (`instance.py:1961`), after the blob has been resolved -- so a real blob is queued for delivery to nowhere. |
+| `NetworkDNSAddressEndpoint.post` | `value` | keeps `required=True` | Stores `hosteddns[name] = None` and enqueues the dnsmasq rewrite (`network.py:765`). The record is written and the network reconfigured around an address that does not exist. |
+| `UploadDataEndpoint.post` | `body` | keeps `required=True`, and it is inert | The raw-body marker. `compile_parameters()` sets `raw_body` and `continue`s before `required_names` is touched (`validation.py:228`), so this declaration cannot produce a missing-required finding whatever its fifth element says, and step 3's enforcement will never reach it. There is also no such thing as omitting a request body -- the sweep's "omission" is a zero-length one -- so the published `required: true` is not a false claim. Left exactly as it is. |
+
+The four kept rows carry a one-line comment at the declaration saying
+the handler does not refuse the omission today, because the next author
+to read that tuple will not have this plan open.
+
+### What this costs elsewhere
+
+* **The published specification changes by one line.** `shared` leaves
+  the `required` array of the `POST /artifacts` body schema. The
+  parameter-level `required: true` on the body object itself is
+  unchanged, because `url` is still required. Nothing else in the
+  document moves, and `test_openapi_spec.py` needed no new
+  `STRUCTURED_PARAMETERS` entry: that table is about structured and
+  bounded types, and `shared` is a plain boolean.
+* **The sweep keeps measuring all 76.** `required_declarations()` is
+  derived from the declarations, so a relaxed one would otherwise drop
+  out of the census and take its verdict out of the pinned table with
+  it. `RELAXED_BY_STEP_2` in `test_required_sweep.py` names what step 2
+  moved and keeps it enumerated, and a new test pins the split in both
+  directions -- so neither a quiet revert of `shared` nor a later
+  mechanical sweep of the four kept rows can happen without that file
+  saying so. No verdict changed; no handler was touched.
+* **The census script in the appendix now prints 75, not 76.** It knows
+  nothing about `RELAXED_BY_STEP_2`, and one declaration it used to
+  count is no longer declared required. Definition-of-done item 1 is a
+  statement about step 1's deliverable and is unaffected; a reader
+  re-running the script after step 2 should expect 75.
+* **`test_request_validation.py` lost its example.**
+  `test_an_omitted_required_parameter_still_reaches_the_handler` used
+  `shared` precisely because it was declared required and optional in
+  fact. It is repointed at `command_line` on the agent execute route,
+  which is a sharper example of the same property and asserts the null
+  `commandline` the omission queues.
+
+### Definition of done item 3
+
+Item 3 as written -- "every declaration still carrying `required=True`
+in a `body` or `query` location has a row in the sweep table whose
+verdict is not `accepted`" -- is the mechanical rule, and this step
+does not satisfy it: four `accepted` rows deliberately keep
+`required=True`. It was written before the sweep existed, when
+`accepted` was expected to mean "the handler copes". It does not mean
+that in four cases out of six. The item should read: every declaration
+still carrying `required=True` in a `body` or `query` location has a
+row in the sweep table, and any row whose verdict is `accepted` has a
+recorded reason in this section for staying required.
+
+### Messages and statuses enforcement will change
+
+For step 6's release note, and the Risks section's instruction to
+count them. After step 3, an omitted required parameter answers
+`400 <parameter>: declared required but not supplied`. 63 rows are
+already a 4xx, and on 57 of them the existing message is a bare
+restatement of the same fact (`no value specified` on 14 rows, `no key
+specified` on 8, `missing required field(s): X` on 10, `no X
+specified` on most of the rest), so the replacement loses nothing.
+
+Materially worse, all of them only on the pure-omission path:
+
+| Request | Today | After step 3 |
+|---------|-------|--------------|
+| `DELETE /artifacts`, `/instances`, `/networks` with no `confirm` | `400 parameter confirm is not set true` | `400 confirm: declared required but not supplied` |
+| `POST /instances` with no `disk` | `400 instance must specify at least one disk` | `400 disk: declared required but not supplied` |
+| `POST /instances/<i>/interfaces` with no `network` | `400 network specification should contain JSON objects` | `400 network: declared required but not supplied` |
+
+Each of those three messages survives for the case that actually
+carries the information: `confirm: false`, `disk: []` and a malformed
+networkspec all still reach the handler and still get the specific
+message. Only the omission, where the specific message was not telling
+the caller anything the generic one does not, changes. That is five
+rows, and on the Risks section's threshold ("more than two or three is
+an argument to revisit") it is worth the gate looking at, but three of
+the five are the same message on three routes.
+
+A status code change, which is not a message change and is worth the
+release note stating separately:
+
+| Request | Today | After step 3 |
+|---------|-------|--------------|
+| `POST`/`DELETE /networks/<n>/dns` with no `name` | `406 invalid DNS name` | `400 name: declared required but not supplied` |
+
+And two improvements, recorded so the release note is not one-sided:
+`POST /networks` with no `netblock` currently answers `400 cannot parse
+netblock: None does not appear to be an IPv4 or IPv6 network`, which
+tells the caller the server saw a `None` it should never have been
+sent; and every one of the 7 `faults` rows stops being a 500 with an
+exception record and becomes a 400 naming the parameter.
+
 ## Decisions
 
 **D32. The declarations get corrected before required-ness is
@@ -613,8 +748,14 @@ the server does not require. Step 6's release note says so explicitly.
 2. `grep -n "MISSING_REQUIRED" shakenfist/external_api/base.py` shows no
    line that filters it out of an enforceable set.
 3. Every declaration still carrying `required=True` in a `body` or
-   `query` location has a row in the sweep table whose verdict is not
-   `accepted`.
+   `query` location has a row in the sweep table, and any row whose
+   verdict is `accepted` has a recorded reason for staying required.
+   (Amended by step 2, which found four `accepted` rows where the
+   handler accepts the omission and commits a broken operation, so
+   D35's "does something sensible" qualifier keeps them required. The
+   original wording, which said no `accepted` row may stay required, is
+   the mechanical rule without that qualifier -- see *Step 2: which
+   declarations are really required*.)
 4. A test proves that omitting a required body parameter answers 400
    naming that parameter, and that sending it as an explicit JSON `null`
    answers the same; both mutation-tested by restoring the filter from
@@ -733,4 +874,8 @@ F5 of phase 5 and is true and useless. The difference is one `not`.
 
 Step 1 done: the sweep is
 `shakenfist/tests/external_api/test_required_sweep.py` and its table
-is published above under *Sweep results*. Steps 2 to 6 not started.
+is published above under *Sweep results*.
+
+Step 2 done: one declaration moved to `required=False`, and the
+reasoning for each of the six `accepted` rows is above under *Step 2:
+which declarations are really required*. Steps 3 to 6 not started.

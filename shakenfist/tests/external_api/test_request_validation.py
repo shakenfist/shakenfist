@@ -19,17 +19,21 @@ in answers did.
 """
 
 import json
+import time
 from unittest import mock
 
 from marshmallow import ValidationError
 import shakenfist_utilities.api as sf_utils_api
 import werkzeug
 
+from shakenfist import baseobject
 from shakenfist import exceptions
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import validation
+from shakenfist.instance import Instance
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -836,6 +840,24 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
 
     mode = 'enforce'
 
+    def setUp(self):
+        super().setUp()
+
+        # An instance with a ready agent, for the one test here which
+        # needs a handler that accepts an omission rather than refusing
+        # it. Built here rather than in the parent because only this
+        # class uses it, and a fixture every test pays for is a fixture
+        # every test can be broken by.
+        self.instance = self.mock_mariadb.create_instance(
+            'validationfixture', namespace='system',
+            set_state=dbo.STATE_CREATED)
+        agent_state = mock.patch.object(
+            Instance, 'agent_state', new_callable=mock.PropertyMock,
+            return_value=baseobject.State(
+                value='ready', update_time=time.time()))
+        agent_state.start()
+        self.addCleanup(agent_state.stop)
+
     def assertNoInterpreterText(self, response):
         """The absence, asserted positively.
 
@@ -940,34 +962,44 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
     def test_an_omitted_required_parameter_still_reaches_the_handler(self):
         """Decision D17, and the one filter in the enforce branch.
 
-        `shared` on POST /artifacts is declared required and has always
-        been optional in fact -- the handler's signature defaults it to
-        False. Enforcing required-ness is phase 6's decision and would
-        break working callers, so a missing-required finding is
-        telemetry and never grounds for rejection.
+        A missing-required finding is telemetry and never grounds for
+        rejection, so the request reaches the handler and the handler
+        answers. Phase 6 decides whether that stays true.
+
+        The example used to be `shared` on POST /artifacts, which was
+        declared required while the handler's signature defaulted it to
+        False. Phase 6's step 2 corrected that declaration, so it no
+        longer produces a finding at all and cannot demonstrate
+        anything here. `command_line` on the agent execute route is the
+        replacement, and it is a sharper example: its declaration is
+        right and the handler is what is lenient. Omitting it queues an
+        `execute` operation whose commandline is null -- asserted
+        below, because that null is precisely the acceptance phase 6
+        is deciding about.
 
         The finding is asserted as well as the 200: without it this
-        test would pass just as happily if `shared` stopped being
+        test would pass just as happily if `command_line` stopped being
         declared required, which would make it a check of nothing.
         """
         findings, patcher = self._spy_on_check()
 
         with patcher:
             response = self.client.post(
-                '/artifacts',
-                data=json.dumps({'url': 'http://example.com/image.qcow2'}),
+                '/instances/%s/agent/execute' % self.instance.uuid,
+                data=json.dumps({}),
                 content_type='application/json',
                 headers={'Authorization': self.token})
 
         self.assertEqual(
-            [(validation.MISSING_REQUIRED, 'shared')],
+            [(validation.MISSING_REQUIRED, 'command_line')],
             [(f.reason, f.parameter) for f in findings])
         self.assertEqual(200, response.status_code, response.get_json())
         # And the handler really ran, rather than something upstream
         # answering 200 for it.
         self.assertEqual(
-            'http://example.com/image.qcow2',
-            response.get_json()['source_url'])
+            [{'command': 'execute', 'commandline': None,
+              'block-for-result': True}],
+            response.get_json()['commands'])
 
     def test_a_body_key_colliding_with_a_path_parameter_is_refused(self):
         """Decision D18. The window observed none of these, so this is
