@@ -438,11 +438,20 @@ entries:
   - operation: GetQueueLength
     caller_daemon: resources
     per_node_base_qps: 0.229
+    activity_coupled: true
     measured:
       mean_qps: 1.375
       r2: 0.004
     note: >-
-      Queue depth gauge published by the resources daemon.
+      Queue depth gauge published by the resources daemon. Twelve of
+      these per publish, or seventeen on the network node, which makes
+      them the bulk of a publish's database cost.
+      PLAN-transient-capacity-refusals phase 3 made a publish follow
+      the running-domain set rather than a fixed 60s tick, so this
+      pair's rate is now coupled to instance churn instead of a
+      steady per-node cadence. Activity coupled for that reason
+      (#4197), which also tracks re-deriving it against a window that
+      includes the new cadence.
   - operation: GetBlobAttributes
     caller_daemon: cluster
     cluster_base_qps: 1.333
@@ -1002,12 +1011,20 @@ entries:
   - operation: GetNodeByFqdn
     caller_daemon: resources
     per_node_base_qps: 0.033
+    activity_coupled: true
     measured:
       mean_qps: 0.199
       r2: 0.0
     note: >-
       Resolving this node's own name to its record. Every daemon does
-      it at startup, and several re-resolve during their loops.
+      it at startup, and several re-resolve during their loops. For
+      the resources daemon this call is also the first step of every
+      metrics publish (main.py:221), and PLAN-transient-capacity-
+      refusals phase 3 made a publish follow the running-domain set
+      rather than a fixed 60s tick, so this pair's rate is now
+      coupled to instance churn. Activity coupled for that reason
+      (#4197), which also tracks re-deriving it against a window that
+      includes the new cadence.
   - operation: GetExistingLocks
     caller_daemon: queues
     per_node_base_qps: 0.033
@@ -1146,7 +1163,11 @@ entries:
       mean_qps: 0.125
       r2: 0.648
     note: >-
-      State reads while the resources daemon assembles node metrics.
+      Not the metrics publish -- nothing in _get_stats() reads
+      .state. This is node_health.apply_result()
+      (node_health.py:152) reading node.state.value via
+      _run_health_checks(), a separate thread on its own interval
+      (PLAN-transient-capacity-refusals phase 3 D23).
   - operation: Resolve
     caller_daemon: queues
     per_instance_qps: 0.006
@@ -1181,3 +1202,30 @@ entries:
     note: >-
       Part of the elected cluster maintenance sweep, which runs once
       cluster-wide rather than once per node.
+  - operation: GetNodeMetrics
+    caller_daemon: resources
+    per_node_base_qps: 0.017
+    activity_coupled: true
+    note: >-
+      The stale metrics row read at the start of every publish
+      (main.py:226), one call per publish. No prior window exists for
+      this pair to fit -- PLAN-transient-capacity-refusals phase 3 is
+      what gives it a budget entry at all -- so the rate is the
+      one-per-publish floor rather than a fit: one publish per node
+      per 60s, so 1/60 = 0.017/s. Activity coupled for the same
+      reason as GetNodeByFqdn and GetQueueLength above (#4197): the
+      publish now follows the running-domain set instead of a fixed
+      tick.
+  - operation: UpsertNodeMetrics
+    caller_daemon: resources
+    per_node_base_qps: 0.017
+    activity_coupled: true
+    note: >-
+      The metrics row write that completes every publish
+      (main.py:658), one call per publish. This operation had no
+      budget entry for any daemon before PLAN-transient-capacity-
+      refusals phase 3. As with GetNodeMetrics above, the rate is the
+      one-per-publish floor -- one publish per node per 60s, so
+      1/60 = 0.017/s -- not a fit from measured data, and it is
+      activity coupled (#4197) because the publish now follows the
+      running-domain set rather than a fixed tick.

@@ -485,8 +485,18 @@ def emit(entries, by_time, args, out, coverage=None, previous=None):
                       % int(provisional['issue']))
             wrapped_block(out, 'reason', provisional['reason'], 6)
 
-        out.write('    measured:\n      mean_qps: %s\n      r2: %s\n'
-                  % (entry['measured']['mean_qps'], entry['measured']['r2']))
+        # A pair the derivation never fitted carries no measurement to
+        # write. That is not an error and not a gap to paper over with a
+        # zero: an entry can be added by hand for a call this window could
+        # not see (a publish whose rate the workload sets, say), and the
+        # schema allows it precisely so the note can say "floor, not fit".
+        # Writing the block unconditionally made the first such entry
+        # raise KeyError here on the next re-derivation, which is a
+        # budget file that cannot be regenerated.
+        measured = entry.get('measured') or before.get('measured')
+        if measured:
+            out.write('    measured:\n      mean_qps: %s\n      r2: %s\n'
+                      % (measured['mean_qps'], measured['r2']))
         wrapped_block(out, 'note', before.get('note') or entry['note'], 4)
 
 

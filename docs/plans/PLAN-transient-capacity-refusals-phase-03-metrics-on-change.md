@@ -103,20 +103,32 @@ leaves the impression that a publish is therefore nearly free. It is
 not. A publish is `update_metrics()` -> `_get_stats()`
 (`shakenfist/daemons/resources/main.py:215`), which makes, per call:
 
-| Call | Site | Count |
-|------|------|-------|
-| `Node.from_db(config.NODE_NAME)` | `main.py:221` | 1 |
-| `mariadb.get_node_metrics()` | `main.py:226` | 1 |
-| `mariadb.get_work_queue_length()` | `main.py:429`, driven from `:448` and `:456` | 7 |
-| `mariadb.upsert_node_metrics()` | `main.py:658` | 1 |
+| Call | Site | RPC | Count |
+|------|------|-----|-------|
+| `Node.from_db(config.NODE_NAME)` | `main.py:221` | `GetNodeByFqdn` | 1 |
+| `mariadb.get_node_metrics()` | `main.py:226` | `GetNodeMetrics` | 1 |
+| `mariadb.get_work_queue_length()` | `main.py:429`, driven from `:447`, `:455`, `:485`, `:508` | `GetQueueLength` | 12, or 17 on the network node |
+| `mariadb.upsert_node_metrics()` | `main.py:658` | `UpsertNodeMetrics` | 1 |
 
-Seven of the ten are queue-depth reads: three node-scoped user-facing
-queues from `get_node_user_facing_node_queues()`, and four from
-`get_all_background_node_queues()` (two node-scoped, two `any-`
-scoped), all in `shakenfist/operations/baseoperation.py:68-100`. They
-have nothing to do with capacity and they are the majority of the
-bill. D20 decides what to do about that, and it is the decision in
-this plan most likely to be argued with.
+Fifteen round trips on an ordinary hypervisor, twenty on the elected
+network node. Twelve of the fifteen are queue-depth reads, from
+`shakenfist/operations/baseoperation.py:68-120`. They have nothing to
+do with capacity and they are the overwhelming majority of the bill.
+D20 decides what to do about that, and it is the decision in this plan
+most likely to be argued with.
+
+*Corrected after the D23 gate ran, which is the point of having had
+one. The first draft of this section said seven queue reads and ten
+round trips, having found two of the four loops that drive them. The
+decisions below use the corrected figures.*
+
+Three further calls are reachable from `_get_stats()` and are
+deliberately **not** counted here: `GetNodeAttributes` once and
+`UpdateNodeAttributes` up to four times, from the version and
+process-metrics block at `main.py:527-574`. That block is gated by its
+own 300 s wall clock rather than by the publish, so publishing more
+often does not raise its rate -- it only changes which publish it
+lands on. D23 leaves them alone.
 
 ### Three other pre-filter stages read the same stale row, and two have no ledger to fall back on
 
@@ -237,18 +249,18 @@ can be written down.
 
 This is the decision to argue with, so here is the arithmetic in full.
 
-Baseline is one `_get_stats()` per node per 60 s: about ten database
-round trips, so 0.17/s per node. With a 5 s poll and a domain set that
+Baseline is one `_get_stats()` per node per 60 s: fifteen database
+round trips, so 0.25/s per node. With a 5 s poll and a domain set that
 changes in every single interval -- the worst case, not the expected
-one -- it becomes ten round trips per 5 s, or 2/s per node. On the
-six-node reference cluster that is an added 11/s at full churn against
+one -- it becomes fifteen round trips per 5 s, or 3/s per node. On the
+six-node reference cluster that is an added 17/s at full churn against
 a whole-cluster target of under 100/s.
 
 The cheaper design is available and the survey costed it: skip the
-seven `get_work_queue_length()` reads on a change-triggered publish
+twelve `get_work_queue_length()` reads on a change-triggered publish
 and carry the previous sweep's queue figures forward, refreshing them
-only on the 60 s tick. That is a 3.3x reduction and it is not hard to
-write.
+only on the 60 s tick. That is a five-fold reduction and it is not
+hard to write.
 
 It is rejected anyway, for now, because it buys a factor of three by
 introducing an invariant nobody asked for: that a `node_metrics` row
@@ -259,8 +271,15 @@ the scheduler reads (`_has_reasonable_queue_state()`,
 `summarize_resources()` at `:1040`), so the mixed-age row is not
 inert -- it is read by the same decision the fresh half is there to
 improve. One publish path that always means "everything in this row
-was true at `timestamp`" is worth three times the round trips until
+was true at `timestamp`" is worth five times the round trips until
 somebody measures that it is not.
+
+The five-fold figure is larger than the three-fold one this decision
+was first written against, and it is fair to say that moves the
+argument. It does not move it far enough to reverse: the objection was
+never the size of the saving, it was that a row carrying two ages is
+read by `_has_reasonable_queue_state()` and by `summarize_resources()`'s
+own skip condition, and that stays true at any multiple.
 
 What makes this reversible rather than merely opinionated: the
 worst-case figure above is the thing to check. If `sf-ctl
@@ -308,22 +327,100 @@ five existing budget pairs, `GetInstanceAttributes` and
 `GetNodeDaemonState` are not on the `_get_stats()` path at all and
 must keep their enforcement.
 
-The pairs to declare are those the survey traced to a publish:
-`GetQueueLength`, `GetNodeByFqdn` and `GetObjectState` for `resources`
-(existing entries, to be marked), plus `UpsertNodeMetrics` and
-`GetNodeMetrics` for `resources` (absent, to be added). The
-implementing step must confirm that list against the code rather than
-taking it from here -- the mapping from a Python call to a
-`(operation, caller_daemon)` pair is the sort of thing that drifts.
+The gate this decision required has run, and the list below is its
+result rather than a guess. Exactly four pairs are on the publish
+path:
+
+| Pair | Per publish | In the budget? |
+|------|-------------|----------------|
+| `GetNodeByFqdn` / `resources` | 1 | yes, to be marked |
+| `GetQueueLength` / `resources` | 12, or 17 on the network node | yes, to be marked |
+| `GetNodeMetrics` / `resources` | 1 | **no, to be added** |
+| `UpsertNodeMetrics` / `resources` | 1 | **no, to be added** -- the operation has no entry for any daemon |
+
+The gate was worth running. This decision's first draft named
+`GetObjectState` / `resources` as a fourth existing entry to mark, and
+it is not on the publish path at all: it comes from
+`node_health.apply_result()` (`shakenfist/node_health.py:152`) by way
+of `_run_health_checks()`, a separate thread on its own interval, and
+nothing in `_get_stats()` reads `.state`. Marking it would have
+switched enforcement off on a pair this phase does not touch. Its
+existing note in the budget file says otherwise and is wrong;
+correcting that note is a one-line accuracy fix in a file being edited
+anyway, so 3d makes it.
+
+`GetNodeDaemonState` / `resources` (the base `Daemon.check_daemon_state()`
+poll) and `GetInstanceAttributes` / `resources`
+(`identify_libvirt_processes()`, on the billing interval) are likewise
+untouched, as is the 300 s-gated attributes block noted in the survey.
 
 Every entry touched carries a note naming this phase and saying why
-the rate is now coupled to instance churn. A rate is not invented for
-the new pairs; where the derivation had no measurement, the entry says
-so rather than carrying a number somebody guessed. Re-deriving the
-budget from a window that includes this behaviour is follow-up work,
-recorded in the master plan's Future work rather than attempted here,
-and the mark survives that re-derivation
-(`derive-database-load-budget.py:476`).
+the rate is now coupled to instance churn. For the two new entries a
+rate is not left blank: `BudgetEntry._has_a_term()`
+(`shakenfist/schema/database_load_budget.py:88-96`) rejects an entry
+with no rate term, on the grounds that "an entry which predicts
+nothing cannot be over or under budget", and that is right. The rate
+is derived rather than invented -- each runs exactly once per publish
+and the floor on publishes is one per node per 60 s, so
+`per_node_base_qps: 0.017` -- and the note says it is the
+one-per-publish floor and not a fit.
+
+### D25 -- The hand marking cites an issue, because the convention is right
+
+`test_a_hand_marked_pair_says_why_in_its_note`
+(`shakenfist/tests/test_derive_database_load_budget.py`) requires any
+`activity_coupled` entry whose caller is not one of `api`, `unknown`
+or `ctl` to cite an issue matching `#\d{3,}` in its note. The two
+existing hand markings cite #4092 and #3999.
+
+The test's own comment says why, and it is the same argument this plan
+makes about enforcement: a hand marking "is the only thing standing
+between a deliberate exemption and a pair which quietly stopped being
+checked", and it is carried forward verbatim by every future
+re-derivation. A marking with no issue behind it is an exemption
+nobody owns.
+
+So this phase files one rather than weakening the test, and the issue
+is the same one the master plan's Future work entry describes: the
+four pairs are exempt until the budget is re-derived over a window
+that includes the new cadence. Filing it is the one action in this
+phase that reaches outside the repository, so it is put to the user
+rather than done unilaterally, and the four notes carry the number it
+comes back with.
+
+### D26 -- Fix the re-derivation bug this phase exposes
+
+`emit()` in `tools/derive-database-load-budget.py` writes
+`entry['measured']['mean_qps']` unconditionally, so a schema-legal
+entry carrying no `measured:` block -- which is exactly what D23's two
+new pairs are, having never been fitted -- raises `KeyError` the next
+time the budget is derived. Eight `EmitRoundTripTestCase` cases catch
+it.
+
+This is a real defect in the tool rather than a reason to give the new
+entries fabricated measurements, and definition-of-done item 10
+already requires the round trip to work. The fix is to emit the block
+only when there is one, the way `note` and `provisional` are already
+handled a few lines above. It is in scope for 3d despite being outside
+the yaml, because a budget file that cannot be re-derived is not a
+budget file.
+
+### D27 -- Regenerate the Prometheus rules in the same commit
+
+`examples/prometheus-database-load-rules.yaml` is a rendering of the
+budget, and `test_enforced_series_matches_the_budget` asserts the
+committed file is byte for byte what
+`tools/generate-database-load-rules.py` produces from the committed
+budget. The whole point of generating it, as its own header says, is
+that an operator's alerts, the CI check and `sf-ctl` cannot hold
+different opinions about what normal load is.
+
+So the marks in D23 have a second effect nobody would guess from the
+yaml alone: `GetNodeByFqdn`/`resources` and `GetQueueLength`/`resources`
+leave the alerting flag, and the two new pairs join the coefficient
+series at 0.017 without ever entering that flag. Regenerate rather
+than hand-edit, and do it in the same commit as the budget change --
+the test exists precisely to catch the two drifting apart.
 
 ### D24 -- Extract the cadence decision so it can be tested without the loop
 
@@ -349,7 +446,7 @@ the same reason and is tested by seven cases at
 | 3a | medium | sonnet | none | The libvirt helper. Add `get_active_domain_ids()` to `LibvirtConnection` in `shakenfist/util/libvirt.py` beside `get_all_domains()` (`:192`): return `set(self.conn.listDomainsID())`, typed `set[int]`, with a docstring saying why it does not filter on the `sf:` prefix and why a libvirtd restart may produce one spurious publish (D22). Do **not** change `get_all_domains()` -- it has three callers (`daemons/cleaner/scheduled_tasks.py:222`, `daemons/resources/main.py:401`, `util/libvirt.py:183`) and reworking it is out of scope. Unit test it against a fake `conn` in `shakenfist/tests/`, including the empty case. Single quotes, 120 columns, no trailing whitespace. Commit subject: `libvirt: cheap active domain id listing.` |
 | 3b | high | opus | none | The cadence. In `shakenfist/daemons/resources/main.py`, add a module-level pure function implementing D24 -- inputs last publish time, last poll time, last observed domain-ID set, current set (or `None` when the poll has not run this tick), and now; outputs whether to poll and whether to publish. Model it on `_compute_reservations()` (`:102`) for shape and on its tests (`test_daemon_resources.py:87`) for how to test it. Rules: poll when 5 s have elapsed since the last poll (D19); publish when the polled set differs from the last observed set (D18), or when 60 s have elapsed since the last publish; a publish of either kind updates `last_metrics` (D21). Then wire it into `_run_inner()`'s `while` loop (`:698-708`), replacing the bare `if time.time() - last_metrics > 60:` gate, keeping `emit_billing_statistics()`/`identify_libvirt_processes()` on their own untouched gate, and keeping the whole thing inside the existing `try`/`except Exception` so a libvirt failure is swallowed by `util_exceptions.ignore_exception()` exactly as a metrics failure is today. The poll opens its own `util_libvirt.LibvirtConnection()`; it must never hold one across iterations. On a poll that raises, leave the last observed set unchanged and let the 60 s gate carry -- do not treat an error as "the set became empty", which would publish a fabricated zero. Unit tests for the pure function: a first call with no history publishes; an unchanged set inside 60 s does not; a changed set inside 60 s does; a same-size but different set does (the D18 case -- assert it, and confirm that comparing lengths instead of membership makes this test fail); 60 s elapsed with an unchanged set does; a publish resets the 60 s clock. Plus one test driving the wiring with `_get_stats` and the libvirt connection mocked, asserting a vanished domain produces an `upsert_node_metrics` before the tick. Commit subject: `resources: publish when the domain set changes.` |
 | 3c | medium | sonnet | none | Functional coverage, which `CLAUDE.md` prefers to unit coverage where only one is possible -- here we can have both. In `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`, add a test that creates an instance, reads `/admin/resources` via `self.system_client.get_cluster_resources()` and records `per_node[node]['cpu_measured']`, deletes the instance, and asserts `cpu_measured` for that node drops by the instance's vCPUs within 20 s. Follow `test_nodes.py:33-60`, which is the existing precedent for asserting against this endpoint and already documents that `node_metrics` rows are not exposed over REST. Use `self.create_instance()`, never a raw client call -- the phase 2 AST guard (`shakenfist/tests/test_ci_raw_creates.py`) will fail the build otherwise. 20 s, not 5: the assertion is "seconds, not a minute", and a tighter bound would flake on a loaded CI node for no extra signal. Pin the create so the node under assertion is known, and note in a comment that the pin is the assertion's subject rather than a capacity workaround. Commit subject: `ci: assert measurement follows a delete.` |
-| 3d | medium | sonnet | none | The load budget, per D23. First derive the pair list from the code rather than from the plan: for each `mariadb.*` call reachable from `update_metrics()` -> `_get_stats()`, find the gRPC operation it issues (`shakenfist/mariadb.py`) and confirm the `caller_daemon` is `resources`. Expect `GetQueueLength`, `GetNodeByFqdn`, `GetObjectState` (all three already in `shakenfist/data/database_load_budget.yaml`) plus `UpsertNodeMetrics` and `GetNodeMetrics` (both absent). Mark each `activity_coupled: true` and give each a `note` naming this phase and saying the rate is now coupled to instance churn. Add the two missing pairs with base terms only where the derivation actually supports one -- do not invent a rate to fill a field, and say in the note that no fit exists. Do **not** mark `GetInstanceAttributes` or `GetNodeDaemonState`, which are not on this path. Read the file's header before editing: it is generated by `tools/derive-database-load-budget.py` and forbids hand-editing levels to make a check pass; marks and notes are not levels, and the mark is carried across re-derivation at `derive-database-load-budget.py:476`. Run `shakenfist/tests/test_database_load_budget.py` and `test_derive_database_load_budget.py`. Commit subject: `budget: metrics publish is activity coupled.` |
+| 3d | medium | sonnet | none | The load budget, per D23, whose gate has already run -- that decision's table is derived from the code and is the list to use. In `shakenfist/data/database_load_budget.yaml`: mark `GetNodeByFqdn`/`resources` and `GetQueueLength`/`resources` `activity_coupled: true`, and add `GetNodeMetrics`/`resources` and `UpsertNodeMetrics`/`resources`, also `activity_coupled: true`, each with `per_node_base_qps: 0.017` -- one call per publish against a floor of one publish per node per 60 s. `BudgetEntry._has_a_term()` (`shakenfist/schema/database_load_budget.py:88-96`) rejects an entry with no rate term, so the field cannot be omitted; the note must say the figure is the one-per-publish floor rather than a fit. Every note names this phase, says the rate is now coupled to instance churn, and cites the issue from D25. Do **not** mark `GetObjectState`, `GetInstanceAttributes` or `GetNodeDaemonState` for `resources`: none is on the publish path. Correct `GetObjectState`/`resources`'s existing note, which claims "State reads while the resources daemon assembles node metrics" -- the RPC comes from `node_health.apply_result()` (`shakenfist/node_health.py:152`) by way of `_run_health_checks()`, a separate thread on its own interval. Then fix D26: `emit()` in `tools/derive-database-load-budget.py` writes `entry['measured'][...]` unconditionally and raises `KeyError` on an entry with no `measured:` block, which is what the two new pairs are; emit the block only when present, the way `note` and `provisional` are handled just above it. Read the yaml header before editing: it forbids hand-editing **levels** to make a check pass, and marks and notes are not levels. Match the neighbouring entries' YAML shape, including the folded `note: >-` block. Run `shakenfist/tests/test_database_load_budget.py` and the whole of `test_derive_database_load_budget.py`. Commit subject: `budget: metrics publish is activity coupled.` |
 | 3e | low | haiku | none | Documentation. Correct every place that states the metrics cadence as a flat 60 s and is still read as current: `docs/operator_guide/` wherever it describes what the resources daemon publishes and how fresh a capacity reading is, and the scheduler's own operator documentation if it explains why a node can refuse work it has room for. Say the new rule in one sentence -- the row is republished within about five seconds of the active-domain set changing, and otherwise at least once a minute. Do **not** edit the sibling plan files that state 60 s (`PLAN-scheduler-reservations.md:52`, `:855`, `PLAN-scheduler-reservations-phase-04a-demand-guard.md:167`, `PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md:261`): a plan records what was true when it was written, and rewriting history in them is worse than the staleness. `AGENTS.md` does not change -- no convention moves. `ARCHITECTURE.md` does not change -- no component boundary moves. Commit subject: `docs: metrics follow the domain set.` |
 | 3f | low | haiku | none | Closeout. Set the phase 3 row to `Complete` in the master plan's Execution table and in `docs/plans/index.md`, update the index arithmetic to `3 of 7`, then run `python3 tools/check-plan-status.py`. Only after 3a-3e are reviewed and merged, and a real CI run has been read for the functional assertion in 3c. Record the reading in an Outcome section, as phases 1 and 2 did. Add the budget re-derivation deferred by D23 to the master plan's Future work if it is not already there. |
 
@@ -362,7 +459,7 @@ were made in the planning commit and are not a step here.
 quick succession on one node produce up to one publish per 5 s poll
 while the set keeps moving, each costing ten database round trips.
 Bounded by D19 and D21 to 12 publishes per node per minute worst case
--- 2/s per node, 11/s on the six-node reference cluster. *Mitigation:*
+-- 3/s per node, 17/s on the six-node reference cluster. *Mitigation:*
 the worst case is written down here so it can be checked rather than
 argued about. Step 3f's Outcome reads `sf-ctl database-load` for the
 five pairs in D23 against a run that includes a teardown, and if the
@@ -434,20 +531,27 @@ Falsifiable, in order:
 8. The functional test in `cluster_ci_tests/` uses
    `self.create_instance()` and `shakenfist/tests/test_ci_raw_creates.py`
    passes.
-9. Every `(operation, caller_daemon)` pair marked `activity_coupled`
-   in this phase is reachable from `_get_stats()`, and
-   `GetInstanceAttributes`/`resources` and `GetNodeDaemonState`/`resources`
-   are still enforced. Check by reading `enforced()`'s inputs, not by
-   reading the diff.
-10. `tools/derive-database-load-budget.py` run against the existing
-    fixture round-trips the new marks and notes without dropping them.
-11. No document states the metrics cadence as a flat 60 s except plan
+9. Exactly four `(operation, caller_daemon)` pairs are marked
+   `activity_coupled` by this phase, they are the four named in D23,
+   each note cites the issue filed under D25, and
+   `GetObjectState`/`resources`, `GetInstanceAttributes`/`resources`
+   and `GetNodeDaemonState`/`resources` are all still enforced. Check
+   by reading `enforced()`'s inputs, not by reading the diff.
+10. `tools/derive-database-load-budget.py` round-trips the new marks
+    and notes without dropping them, and without raising on an entry
+    that carries no `measured:` block (D26). The whole of
+    `test_derive_database_load_budget.py` passes.
+11. `examples/prometheus-database-load-rules.yaml` is regenerated in
+    the same commit as the budget, the two newly marked pairs are gone
+    from the alerting flag, and the two new pairs are present in the
+    coefficient series and absent from the flag (D27).
+12. No document states the metrics cadence as a flat 60 s except plan
     files recording history, and none implies the capacity ledger
     itself became fresher -- only the measurement did.
-12. A real CI run shows `cpu_measured` for a node falling within 20 s
+13. A real CI run shows `cpu_measured` for a node falling within 20 s
     of a delete, read from the run's own artifacts rather than
     asserted. Read from a downloaded bundle, as phases 1 and 2 did.
-13. `python3 tools/check-plan-status.py` passes and
+14. `python3 tools/check-plan-status.py` passes and
     `pre-commit run --all-files` passes.
 
 ## What later phases inherit
@@ -475,10 +579,15 @@ ten-round-trip cost of a publish and the worst-case rate D19 and D21
 bound it to; and which budget pairs lose enforcement and what is meant
 to restore it.
 
-**Gate before 3d.** The budget edit is cheap to propose and annoying
-to redo, and D23 deliberately does not hand over a final pair list.
-Bring the list derived from the code, with the call-to-operation
-mapping shown, before editing the file.
+**Gate before 3d.** *Discharged during implementation.* The
+derivation was run against the code before the budget file was opened,
+and it found three errors in this plan's first draft: the publish
+costs fifteen round trips rather than ten, `GetObjectState` is not on
+the publish path, and the schema forbids the rate-less entry D23
+originally called for. Implementing 3d then found two more things the
+plan had not anticipated, now D25 and D26. All five are corrected
+above; this note stands as the record that the gate earned its
+place.
 
 No other gate. 3a, 3b, 3c and 3e are each small enough to review as a
 commit.
