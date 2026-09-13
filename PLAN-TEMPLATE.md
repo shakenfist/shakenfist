@@ -173,7 +173,19 @@ copy lives in shakenfist/development at
 !!! note "In this project"
 
     The runbook is `PUSH-AUDIT.md` at the repository root, and
-    the `Merged` column belongs in the Execution table above.
+    it reads its `$RANGE` from the `Merged` column, so a plan
+    without one cannot be audited once its phases have merged.
+
+    The column goes in the master plan's Execution table, last:
+
+        | Phase | Plan | Status | Merged |
+
+    The worked example in the `plan-file-conventions` block
+    above still shows the three-column form, because it
+    predates this column and its canonical copy lives in
+    shakenfist/development; add `Merged` after `Status` rather
+    than copying that example as-is.
+
     `tools/check-plan-status.py` reads the `Status` column by
     name rather than by position, so a `Merged` column added
     after it does not disturb the index arithmetic. A phase

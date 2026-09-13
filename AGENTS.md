@@ -36,7 +36,9 @@ pages, in reading order, is the `nav:` section of
 [PUSH-AUDIT.md](PUSH-AUDIT.md) is the pre-push audit runbook — two waves
 of build, lint and test checks followed by parallel code-quality, test,
 documentation and security review — and it runs as the last phase of every
-master plan, over the accumulated diff of all of that plan's phases.
+master plan, over the accumulated diff of all of that plan's phases. When it
+runs for a plan, its `$RANGE` comes from that plan's `Merged` column, not
+from `develop...HEAD`, which is empty once the phases have merged.
 
 ## The rules that exist because we broke something
 
