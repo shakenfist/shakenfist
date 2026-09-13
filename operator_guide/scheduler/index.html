@@ -14387,8 +14387,9 @@
 <p>The scheduler decides which hypervisor a new instance lands on. It
 runs in-process in each <code>sf-api</code> worker (there is no scheduler
 daemon), consulting the <code>node_metrics</code> table that the resources
-daemon refreshes roughly every 60 seconds and caching its view for
-<code>SCHEDULER_CACHE_TIMEOUT</code> (default 5s). Placement is therefore
+daemon republishes within about five seconds of the active-domain set
+changing and otherwise at least once a minute, and caching its view
+for <code>SCHEDULER_CACHE_TIMEOUT</code> (default 5s). Placement is therefore
 always made against a slightly stale snapshot; the ordering
 behaviour described below is designed around that fact.</p>
 <h2 id="the-placement-pipeline">The placement pipeline<a class="headerlink" href="#the-placement-pipeline" title="Permanent link">&para;</a></h2>
@@ -14646,8 +14647,9 @@ refused until they drain.</p>
 <p>This is a pre-filter, not the admission decision, but it is sized
 from both of the figures admission cares about. A node is charged
 whichever is larger of <code>cpu_total_instance_vcpus</code> -- the resources
-daemon's count of <em>running</em> libvirt domains, republished roughly once
-a minute -- and <code>used_cpus</code> from that node's capacity counters. The
+daemon's count of <em>running</em> libvirt domains, republished within about
+five seconds of the active-domain set changing, and otherwise at least
+once a minute -- and <code>used_cpus</code> from that node's capacity counters. The
 measurement alone lags reality, because an instance still fetching
 its image has no domain to measure yet, so a node whose capacity is
 fully claimed can measure as completely idle for minutes. Reading the
@@ -14671,10 +14673,11 @@ rather than waiting out the reconciler's five-minute cadence (see
 <a href="../../developer_guide/database_internals/">the database internals
 guide</a>). That minute is not
 the dominant term -- most of the wait is for the resources daemon to
-publish metrics at all, on its own roughly 60-second cadence, which
-this does not shorten -- and an admission made inside either window
-says so on the instance's <code>instance placed without capacity guard</code>
-event with a <code>reason</code> of <code>never_reconciled</code>.</p>
+publish metrics at all, and a cluster which has just started has no
+running domains whose set could change, so that publish waits out the
+once-a-minute floor -- and an admission made inside either window says
+so on the instance's <code>instance placed without capacity guard</code> event
+with a <code>reason</code> of <code>never_reconciled</code>.</p>
 <p>See <a href="#admission-is-a-guarded-capacity-claim">Admission is a guarded capacity
 claim</a> for the check that
 actually admits or refuses a placement, and closes the burst window

@@ -14330,7 +14330,7 @@ exposure, and it is not what fails the runs.</p>
 34119030297 refusal was <code>measured 6 / committed 0 / limit 3</code>: six
 warm-up instances had been deleted and released 32 s earlier and
 the ledger was correctly zero, but <code>cpu_total_instance_vcpus</code> is
-republished every 60 s (<code>resources/main.py:645, 704</code>) and still
+republished every 60 s (<code>resources/main.py:648, 704</code>) and still
 counted six running domains. The next sample read zero. Because
 <code>_has_sufficient_cpu()</code> charges <code>max(measured, committed)</code>, a node
 refuses forced creates for up to a minute after a teardown even
@@ -14468,9 +14468,11 @@ charges the larger of measurement and ledger.</strong> The rule is right:
 it is what makes the ledger safe against instances the reconciler
 has not yet counted. What is wrong is the cadence. Phase 3 has
 <code>sf-resources</code> notice a change in the running-domain set cheaply
-(a <code>listAllDomains</code> every few seconds costs nothing and touches no
-database) and publish immediately when it changes, keeping the
-full 60 s publish for everything else. That is activity-coupled
+(a <code>listDomainsID</code> every few seconds costs one local libvirt call
+and touches no database -- note that <code>get_all_domains()</code> is not
+that call, it is <code>listDomainsID</code> plus a lookup per domain) and
+publish immediately when it changes, keeping the full 60 s publish
+for everything else. That is activity-coupled
 rather than fixed-rate, so it does not move the database load
 budget's idle figure, and it is declared in
 <code>database_load_budget.yaml</code> as such.</p>
@@ -14617,8 +14619,8 @@ every phase has been completed, abandoned or superseded.</p>
 </tr>
 <tr>
 <td>3. Publish metrics when the running-domain set changes</td>
-<td>PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-transient-capacity-refusals-phase-03-metrics-on-change/">PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -14824,18 +14826,28 @@ the load-budget declaration and the bundle plumbing across two
 repositories are where a light brief goes wrong.</p>
 <h3 id="phase-3-publish-metrics-when-the-running-domain-set-changes">Phase 3 -- Publish metrics when the running-domain set changes<a class="headerlink" href="#phase-3-publish-metrics-when-the-running-domain-set-changes" title="Permanent link">&para;</a></h3>
 <p>In <code>shakenfist/daemons/resources/main.py</code>, beside the 60 s publish,
-poll libvirt's domain list every few seconds (no database access)
-and, when the set of running domains or their vCPU total differs
-from what was last published, publish immediately. Keep the 60 s
-full publish unchanged. Declare the new publish rate in
-<code>shakenfist/data/database_load_budget.yaml</code> as <code>activity_coupled</code>
-so the load-budget check models it correctly, and add a unit test
-that a domain disappearing between polls produces a publish before
-the 60 s tick.</p>
+poll the set of active libvirt domain ids every few seconds (no
+database access) and, when that set differs from what was last
+published, publish immediately. Keep the 60 s full publish
+unchanged, resetting its clock on any publish. Declare the changed
+load in <code>shakenfist/data/database_load_budget.yaml</code>, and add a unit
+test that a domain disappearing between polls produces a publish
+before the 60 s tick.</p>
 <p>This is what makes "the node is empty" true within seconds of a
 teardown rather than within a minute, and it is the only change in
-this plan that touches a daemon other than the cluster daemon.
+this plan outside the scheduler, the API and the test suite.
 Plan at medium effort; the pattern is the existing loop.</p>
+<p>Three things this section originally got wrong, corrected when
+phase 3 was planned and set out in full under <em>What the survey
+found</em> there. A publish is not a single write: it is a fifteen
+round-trip <code>_get_stats()</code> sweep, twelve of them queue-depth reads,
+so the cadence change has a bill worth bounding. There is no
+<code>UpsertNodeMetrics</code> entry in the budget file to amend -- entries
+must be added -- and <code>activity_coupled</code> does not refine the model,
+it switches enforcement off (<code>load_budget.py:443-450</code>), so it is
+applied only to the pairs the publish path actually reaches. And a
+vCPU total is not a second trigger worth watching: with no CPU
+hotplug it can only move when the domain set does.</p>
 <h3 id="phase-4-retry-after-and-a-machine-readable-transient-refusal">Phase 4 -- <code>Retry-After</code> and a machine-readable transient refusal<a class="headerlink" href="#phase-4-retry-after-and-a-machine-readable-transient-refusal" title="Permanent link">&para;</a></h3>
 <p>Server: on both <code>507</code> branches of <code>POST /instances</code>
 (<code>external_api/instance.py:906</code>, <code>:976-981</code>), set <code>Retry-After: 15</code>
@@ -15171,7 +15183,40 @@ canonical copy lives in shakenfist/development at
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.</p>
 <ul>
-<li><strong>Stop re-scheduling an already-charged placement.</strong>
+<li>
+<p><strong>Re-derive the load budget once the change-triggered publish has
+  run for a measurement window.</strong> Phase 3 marks the
+  <code>(operation, caller_daemon)</code> pairs on the metrics publish path
+  <code>activity_coupled</code>, which switches their enforcement off
+  (<code>shakenfist/deploy/shakenfist_ci/load_budget.py:443-450</code>),
+  because the publish rate is now coupled to instance churn and the
+  existing fit was made against a fixed 60 s cadence. That is the
+  honest declaration and it costs regression detection on three
+  pairs which previously had it. Running
+  <code>tools/derive-database-load-budget.py</code> over a window that
+  includes the new behaviour would give those pairs fitted
+  activity-coupled rates again. It needs the change running on
+  <code>sfcbr</code> for days, so it could not be part of phase 3. The marks
+  survive re-derivation
+  (<code>tools/derive-database-load-budget.py:476</code>), so this is an
+  addition rather than a repair. Found at phase 3's planning
+  survey; see D23 there.</p>
+</li>
+<li>
+<p><strong>Make <code>get_all_domains()</code> one libvirt call.</strong>
+  <code>LibvirtConnection.get_all_domains()</code>
+  (<code>shakenfist/util/libvirt.py:192</code>) is <code>listDomainsID()</code> followed
+  by a <code>lookupByID()</code> and a <code>name()</code> per domain, where
+  <code>listAllDomains(VIR_CONNECT_LIST_DOMAINS_ACTIVE)</code> would return
+  the objects in one round trip. It has three callers
+  (<code>daemons/cleaner/scheduled_tasks.py:222</code>,
+  <code>daemons/resources/main.py:401</code>, <code>util/libvirt.py:183</code>), so it is
+  a small change with a blast radius rather than a free one, and
+  phase 3 deliberately added a separate id-only helper instead of
+  reworking it. Found at phase 3's planning survey; see D22 there.</p>
+</li>
+<li>
+<p><strong>Stop re-scheduling an already-charged placement.</strong>
   <code>NodeInstNetdescOp._instance_preflight()</code>
   (<code>shakenfist/operations/node_inst_netdesc_op.py:156-162</code>)
   constructs a fresh <code>Scheduler</code> -- a full <code>refresh_metrics()</code>,
@@ -15184,7 +15229,8 @@ chosen to defer to here, so that we do not forget them.</p>
   Replacing that with "is my placement still recorded here and is
   the node healthy" removes a distinct CI failure family (<code>Too
   many start attempts</code>) and halves per-create scheduler load. Not
-  a 507 cause, so not in this plan.</li>
+  a 507 cause, so not in this plan.</p>
+</li>
 <li><strong>Suite concurrency denominated in ledger.</strong> The sizing plan's
   Future work already records this; phase 2's wait summary is the
   measurement that would justify it.</li>
