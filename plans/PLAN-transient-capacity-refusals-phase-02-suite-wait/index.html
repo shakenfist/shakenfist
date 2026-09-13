@@ -14799,6 +14799,21 @@ never be retried away."</p>
 <p>This is the collision the guard exists to make loud, and it made it
 loud on the first try. It is recorded as an outcome rather than as a
 bug in either plan.</p>
+<p><strong>Amended 2026-09-13, at the sizing plan's phase 3 close-out.</strong> The
+fix landed as
+<a href="https://github.com/shakenfist/shakenfist/pull/4186">#4186</a> at 15:31
+on 2026-09-12, and run
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/34698074952">34698074952</a>
+shows <code>Sanity checks</code> green again. The count above is low: because
+<code>Sanity checks</code> is not a required status check, the queue went on
+merging over the breakage, and <code>f654d4a05</code>, <code>f8c801ebe</code> and
+<code>6435e3fde</code> all failed the same test with two of them merging anyway.
+One run in between -- a documentation-only sync -- <em>skipped</em> <code>Sanity
+checks</code> on the changed-paths filter rather than passing it, so for a
+while a green tick sat on a red tree. Making the check required would
+have stopped the follow-on batches but not the original pair, whose
+two halves each passed against their own base; that is a repository
+configuration question and is recorded, not decided, in both plans.</p>
 <h3 id="step-2f">Step 2f<a class="headerlink" href="#step-2f" title="Permanent link">&para;</a></h3>
 <p>Prepared on the <code>capacity-wait-summary</code> branch of
 <code>shakenfist/actions</code>, not yet pushed: <code>tools/ci_headroom_collect.sh</code>

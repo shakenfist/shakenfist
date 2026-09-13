@@ -14430,7 +14430,7 @@ sentence; a row that does not is the more valuable finding.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Close-out: set this phase <code>Complete</code> in both the master plan's Execution table and the <code>docs/plans/index.md</code> row (3 of 7 becomes 4 of 7), write the <em>What phase 4 inherits</em> section against what was actually found, run <code>python3 tools/check-plan-status.py</code> and <code>pre-commit run --all-files</code>, and confirm every Definition of done item below by running it rather than by reading it.</td>
+<td>Close-out: set this phase <code>Complete</code> in both the master plan's Execution table and the <code>docs/plans/index.md</code> row (3 of 8 becomes 4 of 8), write the <em>What phase 4 inherits</em> section against what was actually found, run <code>python3 tools/check-plan-status.py</code> and <code>pre-commit run --all-files</code>, and confirm every Definition of done item below by running it rather than by reading it.</td>
 </tr>
 </tbody>
 </table>
@@ -14452,11 +14452,11 @@ have used them. 3g is last.</p>
 <tr>
 <td>The fill in 3c starves the other four stestr workers and manufactures the very 507s this plan exists to remove.</td>
 <td>D23 bounds the fill to a single hypervisor, and D26 skips when that node is not comfortably free. On <code>slim-tier</code> (three nodes, 12 vCPU) filling one 6 vCPU node is half the cluster, which is the worst case; if the merge-run evidence after 3c shows a rise in other tests' 507s, the test is restricted to <code>slim-primary</code> by a topology skip rather than kept and tuned. <strong>Amended 2026-09-10:</strong> F1's newest runs show two of three <code>slim-tier</code> hypervisors pinned at their ceiling for a whole run, so the headroom this row assumed is not reliably there and D26's skip, not the single-node bound, is the load-bearing mitigation. Expect 3c to skip often on <code>slim-tier</code>; a 3c that never skips there is evidence the skip predicate is wrong, not that the cluster is roomy.</td>
-<td>The operator, over the merge runs following 3c, against the phase 1 census.</td>
+<td>The operator, over the merge runs following 3c, against the phase 1 census. <strong>First run, 2026-09-12: no rise.</strong> Five to seven schedule aborts per job, approximately the tests' own, and every guard refusal on the demand dimension rather than on vCPU ledger -- see <em>What the first merge run answered</em>. One run, so the row stays open.</td>
 </tr>
 <tr>
 <td>The new tests become the flake source.</td>
-<td>Every test skips on ambient shortage (D26), and the Definition of done requires clean merge runs after landing, not just a green branch.</td>
+<td>Every test skips on ambient shortage (D26), and the Definition of done requires clean merge runs after landing, not just a green branch. <strong>First run, 2026-09-12: all four <code>ok</code> in all three cluster jobs, none skipped.</strong> That is one run against a prediction of frequent skipping, so it says the tests are not fragile rather than that the predicate is calibrated -- D26 has not yet been seen to fire in anger.</td>
 <td>3g, and the operator.</td>
 </tr>
 <tr>
@@ -14475,9 +14475,9 @@ have used them. 3g is last.</p>
 <td>Resolved before 3a.</td>
 </tr>
 <tr>
-<td>3e cannot be verified before it merges, the same seam that made phase 2's 2e awkward.</td>
-<td>Sequenced early, reviewed as a diff, and confirmed from a real merge run's census section before 3f reads the census.</td>
-<td>The operator.</td>
+<td>~~3e cannot be verified before it merges, the same seam that made phase 2's 2e awkward.~~ <strong>Resolved 2026-09-12:</strong> run 34681505274 carried it and its census reports guard refusal counts in all three cluster jobs.</td>
+<td>Sequenced early, reviewed as a diff, and confirmed from a real merge run's census section.</td>
+<td>The operator, done.</td>
 </tr>
 </tbody>
 </table>
@@ -14529,17 +14529,18 @@ have used them. 3g is last.</p>
     run --all-files</code> passes in the main repository.</li>
 </ol>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>Every step has landed except the parts which by the plan's own
-ordering cannot: 3a, 3b, 3c, 3d and the reachable half of 3f are
-committed; 3e is written but sits uncommitted in the
-<code>shakenfist/actions</code> repository, because only the operator pushes
-there.</p>
-<p><strong>The phase is not Complete, and its status rows still say
-<code>In progress</code> deliberately.</strong> Two Definition of done items cannot be
-satisfied before this branch merges and CI runs it, and marking the
-phase done on a green branch would be exactly the "a status column is
-a claim, not evidence" failure that the phase-completion check exists
-to catch. What remains is named below, not implied.</p>
+<p><strong>Complete.</strong> Every step has landed: 3a, 3b, 3c, 3d, 3f and 3g in
+this repository, 3e in <code>shakenfist/actions</code> (<code>0c87e8d</code> through
+<code>5fe6292</code>, pushed by the operator 2026-09-05 to 09-08). The two
+Definition of done items which by the plan's own ordering could not
+be satisfied from a worktree were answered by the first merge run to
+carry the phase, and that run's evidence is recorded below rather than
+summarised as "green".</p>
+<p>The phase deliberately stayed <code>In progress</code> for a day after #4170
+merged, because marking it done on a green <em>branch</em> would have been
+exactly the "a status column is a claim, not evidence" failure the
+phase-completion check exists to catch. What closed it is a merge run,
+not a branch.</p>
 <p>Each Definition of done item was run rather than read:</p>
 <table>
 <thead>
@@ -14557,8 +14558,8 @@ to catch. What remains is named below, not implied.</p>
 </tr>
 <tr>
 <td>2</td>
-<td><strong>partial</strong></td>
-<td>The file exists with four tests covering all three of D24's stages, and since the #4170 review its sizing arithmetic is unit tested here (<code>test_ci_saturation.py</code>, 17 tests, mutation tested). That the tests pass <em>on a cluster with no free capacity</em> is the half no worktree can check</td>
+<td><strong>pass</strong></td>
+<td>The file exists with four tests covering all three of D24's stages, and its sizing arithmetic is unit tested here (<code>test_ci_saturation.py</code>, 17 tests, mutation tested). All four tests reported <code>... ok</code> -- not <code>SKIPPED</code> -- in all three cluster jobs of run 34681505274, on clusters whose censuses record 30, 13 and 7 nodes dropped for <code>would exceed hard max CPUs</code> in the same window</td>
 </tr>
 <tr>
 <td>3</td>
@@ -14582,8 +14583,8 @@ to catch. What remains is named below, not implied.</p>
 </tr>
 <tr>
 <td>7</td>
-<td><strong>pending the operator</strong></td>
-<td>Needs a merge run carrying 3e, which is unmerged. Unchanged from what the item already said</td>
+<td><strong>pass</strong></td>
+<td>Run 34681505274 carried 3e. Its <em>Capacity guard census</em> reports <code>Placements refused by the guard:</code> 176, 139 and 163 in its three cluster jobs, not a "not collected" notice</td>
 </tr>
 <tr>
 <td>8</td>
@@ -14608,34 +14609,112 @@ to catch. What remains is named below, not implied.</p>
 <tr>
 <td>12</td>
 <td><strong>pass</strong></td>
-<td><code>check-plan-status.py</code> agrees; <code>pre-commit run --all-files</code> passes all ten hooks</td>
+<td>Re-run at close-out on <code>develop</code>: <code>check-plan-status.py</code> reports agreement, and <code>pre-commit run --all-files</code> passes all ten configured hooks</td>
 </tr>
 </tbody>
 </table>
-<p>What close-out still owes, once this merges and a merge run uses it:</p>
+<h3 id="what-the-first-merge-run-answered-2026-09-12">What the first merge run answered, 2026-09-12<a class="headerlink" href="#what-the-first-merge-run-answered-2026-09-12" title="Permanent link">&para;</a></h3>
+<p>Run <a href="https://github.com/shakenfist/shakenfist/actions/runs/34681505274">34681505274</a>
+is the merge-queue run which produced <code>f3b245304</code>, the commit that put
+this phase on <code>develop</code>. It carried 3e. Every functional test in all
+three of its cluster jobs passed; the only failing test in the whole
+run was the one described in <em>The raw-create collision</em> below, which
+is not a saturation test. Each owed item, against that run:</p>
 <ul>
-<li><strong>Item 7</strong>, the census section reporting a count rather than a
-  "not collected" notice, which needs 3e pushed first.</li>
-<li><strong>Item 2's other half</strong>, and with it the question 3c was written to
-  answer and could not: which of the three refusal paths a real full
-  node actually gives. 3c records it with <code>addDetail</code>, so the first
-  merge run answers it -- read that detail rather than the reasoning
-  in 3c's docstring, which is argument, not observation.</li>
-<li><strong>The skip rate on <code>slim-tier</code>.</strong> The plan predicts 3c skips often
-  there and says a 3c which never skips is evidence the predicate is
-  wrong. Nobody can know yet.</li>
-<li><strong>Whether the fill disturbs the other four stestr workers</strong>, which
-  is D23's whole premise and which F1's amendment already weakened.</li>
-<li><strong>The cost of 3c's ownership listing</strong> against
-  <code>load_budget.py</code>'s database-load budget. It lists every instance in
-  the cluster, and still needs measuring. The #4170 review reduced the
-  worst case from one listing per 5 s poll to one per 30 s plus one at
-  each deadline -- roughly 36 listings down to 7 on a run that waits
-  the full ledger-return deadline -- but a smaller unmeasured cost is
-  still unmeasured.</li>
+<li><strong>Item 7 -- the census reports a count.</strong> <em>Capacity guard census</em>,
+  per job, counted over the whole test window:</li>
 </ul>
-<p>Only after those are answered should the Execution table and
-<code>docs/plans/index.md</code> move to <code>Complete</code> and <code>4 of 7</code>.</p>
+<table>
+<thead>
+<tr>
+<th>job</th>
+<th>hypervisors seen</th>
+<th>guard refusals</th>
+<th>measured-load alone</th>
+<th>D13 carried it</th>
+<th>worst shortfall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debian 12 tier</td>
+<td>3</td>
+<td>176</td>
+<td>138</td>
+<td>38</td>
+<td>11.649</td>
+</tr>
+<tr>
+<td>Ubuntu 24.04 cluster</td>
+<td>5</td>
+<td>139</td>
+<td>45</td>
+<td>94</td>
+<td>9.906</td>
+</tr>
+<tr>
+<td>Debian 12 cluster</td>
+<td>5</td>
+<td>163</td>
+<td>54</td>
+<td>109</td>
+<td>11.649</td>
+</tr>
+</tbody>
+</table>
+<p>Every refusal in all three was at stage <code>node</code> and on the <code>demand</code>
+  dimension alone, with 0 forced ground-truth writes past the guard
+  (P5). Two things in that table matter to phase 4. The <em>three</em>-node
+  job refuses most often, which is the expected direction. But the
+  attribution inverts with size: on the small cluster measured load
+  alone was already over the bound in 78% of refusals, while on the
+  five-hypervisor jobs it is the D13 feedforward estimate that carries
+  two thirds of them over. Adding hypervisors does not make this bound
+  recede, it changes which half of it binds -- and the feedforward half
+  is a rate prediction, not a cloud out of room. The "hypervisors seen"
+  column is what the samples could see, which as the census itself
+  warns is not the same as how many the cluster had.
+* <strong>Item 2's other half, partly.</strong> The fill test passed on every
+  topology, so a real full node does refuse. <strong>Which</strong> of the three
+  refusal paths it gave is still unrecorded, and the reason is a seam
+  this phase should have seen: 3c records the path with
+  <code>addDetail()</code>, and stestr prints details only on a non-<code>ok</code>
+  verdict. A test which passes is therefore silent about the one thing
+  the run was supposed to tell us. The census's stage tallies are
+  consistent with the pre-filter having fired -- 2, 3 and 4
+  <code>sufficient_idle_cpu</code> aborts across the three jobs against one
+  deliberate abort per impossible-request test -- but that is inference
+  over aggregate counts, not the test's own evidence. The artifact
+  bundle does not rescue it either: the only per-test files in
+  <code>traces/</code> are <code>_emit_tracing_event()</code>'s timing records, and the
+  full-node test does not write one. <strong>Phase 5 should not
+  repeat this shape:</strong> a fact worth a merge run is worth an assertion
+  or a census field, not an <code>addDetail()</code> on the happy path.
+* <strong>The skip rate on <code>slim-tier</code>: zero of four.</strong> The plan predicted
+  3c would skip often there and said a 3c which never skips is
+  evidence the predicate is wrong rather than the cluster roomy. One
+  run is not a rate, and this one does not settle it -- but it is the
+  opposite of what F1's amendment led the risk table to expect, and it
+  happened on the hardest job: the three-node one dropped 30 nodes for
+  <code>would exceed hard max CPUs</code> where the five-hypervisor jobs dropped
+  13 and 7, so the fill completed there (35.5 s) under more ledger
+  pressure rather than less. Watch it over several runs before
+  concluding either way.
+* <strong>The fill did not disturb the other workers.</strong> Five to seven
+  schedule aborts per job across a whole window -- at most 4 at
+  <code>sufficient_idle_cpu</code> and one each at <code>sufficient_idle_memory</code>,
+  <code>sufficient_free_disk</code> and <code>affinity_constraints</code> -- which is
+  approximately the four tests' own deliberate refusals and no blast
+  radius. Every guard refusal in all three jobs was on the <code>demand</code>
+  dimension, which is pre-existing D13 noise: this phase claims vCPU
+  ledger, and the ledger dimensions recorded nothing.
+* <strong>The ownership listing's cost was not separately measured</strong>, but it
+  did not breach the budget: <code>test_no_unbudgeted_fixed_rate_database_polling</code>
+  passed in both jobs that ran it (246.8 s, 246.9 s). That is weaker
+  evidence than a measurement, and it is weak for a specific reason --
+  the listing is reached only from the skip and failure branches, and
+  nothing skipped or failed, so the expensive path was barely
+  exercised. A run where 3c <em>does</em> skip is the one that tests this.</p>
 <h3 id="code-review-2026-09-11-pr-4170">Code review, 2026-09-11 (PR #4170)<a class="headerlink" href="#code-review-2026-09-11-pr-4170" title="Permanent link">&para;</a></h3>
 <p>CLAUDE.md asks for a code review at the end of a plan. The automated
 reviewer raised one <code>[FIX]</code> and eight <code>[CONSIDER]</code> items on #4170;
@@ -14711,6 +14790,50 @@ comment being absent. The docstring now says what is actually true, and
 the unit tests assert the two properties a caller depends on -- the
 result strictly exceeds the reading, and stays a size a create could
 ask for -- rather than enshrining particular return values.</p>
+<h3 id="the-raw-create-collision-2026-09-12-pr-4186">The raw-create collision, 2026-09-12 (PR #4186)<a class="headerlink" href="#the-raw-create-collision-2026-09-12-pr-4186" title="Permanent link">&para;</a></h3>
+<p>This phase broke <code>develop</code> for most of a day -- from #4170's merge at
+04:47 on 2026-09-12 to the fix at 15:31. The full account, including
+why markers rather than routing was the right fix, is in
+<a href="../PLAN-transient-capacity-refusals-phase-02-suite-wait/">PLAN-transient-capacity-refusals-phase-02-suite-wait.md</a>
+under <em>A defect this phase's own guard found on <code>develop</code></em> -- the
+sibling plan owns the guard, so it owns the story, and this section
+deliberately does not restate it.</p>
+<p>In short: phase 2's <a href="https://github.com/shakenfist/shakenfist/pull/4166">#4166</a> added an AST guard requiring every
+<code>create_instance()</code> in the functional suite either to go through
+<code>BaseTestCase</code>'s waiting wrapper or to carry a <code># raw-create:
+&lt;reason&gt;</code> marker; this phase's #4170 added <code>test_saturation.py</code> with
+four unmarked calls five hours later. Neither was wrong and neither
+could see the other. <a href="https://github.com/shakenfist/shakenfist/pull/4186">#4186</a> added the markers at 15:31 and run
+34698074952 confirms <code>Sanity checks</code> green again.</p>
+<p>Three things belong here rather than there, because they are about
+this plan's remaining phases:</p>
+<ul>
+<li><strong>The blast radius was larger than the pair.</strong> <code>Sanity checks</code> is
+  not a required status check, so the queue went on merging over the
+  breakage: <code>f654d4a05</code>, <code>f8c801ebe</code> and <code>6435e3fde</code> all failed the
+  same test and two of them merged anyway. It was briefly invisible
+  as well -- the documentation-sync run in between <em>skipped</em> <code>Sanity
+  checks</code> on the changed-paths filter rather than passing it, so a
+  green tick sat on a red tree. Whether that check should be required
+  is a repository-configuration question, recorded rather than
+  decided; it would have stopped the follow-on batches but not the
+  original pair.</li>
+<li><strong>Phase 5's guardrails are the same shape of change</strong> -- an
+  assertion every topology must satisfy, landing across a tree with
+  other work in flight. A guard which constrains how tests are written
+  needs a story at design time for branches cut before it existed,
+  because no author of such a branch can satisfy it however careful
+  they are. Phase 5 should say what that story is before it writes the
+  assertion.</li>
+<li><strong>This phase's own sequencing hid the risk.</strong> 3a through 3d were
+  planned as independent of the sibling plan, and in terms of the code
+  they touch they were. The coupling was a <em>convention</em>, which the
+  step plan had no column for. Phase 2's own <em>What later phases
+  inherit</em> had even named the dependency -- "a <code># raw-create:</code>
+  convention the sizing plan's phase 3 saturation tests need in order
+  to assert a refusal" -- and this plan still did not read it as
+  something 3c had to do.</li>
+</ul>
 <h2 id="what-phase-4-inherits">What phase 4 inherits<a class="headerlink" href="#what-phase-4-inherits" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Deterministic assertions at three of the four capacity stages
@@ -14736,13 +14859,18 @@ ask for -- rather than enshrining particular return values.</p>
   only inventory row that names a test phase 3 owes and still has
   none; everything else in the table is discharged by a test that
   now exists, or explicitly cannot be.</li>
-<li><strong>Two questions only a merge run answers</strong>, both recorded at their
-  rows by 3f: which of the three refusal paths a real full node
-  gives 3c (the #3496 row), and how often the demand guard's waive
-  fails to save a create, which needs a run carrying 3e's widened
-  census filter (the #3813 row). 3f assessed dispositions against
-  measured frequencies, but no test this phase wrote has ever
-  executed, and nothing in the inventory claims otherwise.</li>
+<li><strong>The first merge run's answers to 3f's two open questions</strong>, and
+  one of them is still open. How often the demand guard's waive
+  fails to save a create (the #3813 row) is answered and is larger
+  than expected: every guard refusal in all three cluster jobs was on
+  the <code>demand</code> dimension alone -- 176, 139 and 163 of them, nothing on
+  an allocation dimension -- so phase 4's resizing arithmetic has to
+  account for a bound its resize does not move. Which of the three refusal paths a real full node
+  gives 3c (the #3496 row) is <strong>not</strong> answered, because 3c records
+  it with <code>addDetail()</code> and a passing test prints no details -- see
+  <em>What the first merge run answered</em>. Phase 4 either reads it from
+  a census field or asserts it; it should not wait for another run
+  to volunteer it.</li>
 </ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step, back brief the operator on the
