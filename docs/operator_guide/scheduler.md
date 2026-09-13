@@ -3,8 +3,9 @@
 The scheduler decides which hypervisor a new instance lands on. It
 runs in-process in each `sf-api` worker (there is no scheduler
 daemon), consulting the `node_metrics` table that the resources
-daemon refreshes roughly every 60 seconds and caching its view for
-`SCHEDULER_CACHE_TIMEOUT` (default 5s). Placement is therefore
+daemon republishes within about five seconds of the active-domain set
+changing and otherwise at least once a minute, and caching its view
+for `SCHEDULER_CACHE_TIMEOUT` (default 5s). Placement is therefore
 always made against a slightly stale snapshot; the ordering
 behaviour described below is designed around that fact.
 
@@ -288,8 +289,9 @@ refused until they drain.
 This is a pre-filter, not the admission decision, but it is sized
 from both of the figures admission cares about. A node is charged
 whichever is larger of `cpu_total_instance_vcpus` -- the resources
-daemon's count of *running* libvirt domains, republished roughly once
-a minute -- and `used_cpus` from that node's capacity counters. The
+daemon's count of *running* libvirt domains, republished within about
+five seconds of the active-domain set changing, and otherwise at least
+once a minute -- and `used_cpus` from that node's capacity counters. The
 measurement alone lags reality, because an instance still fetching
 its image has no domain to measure yet, so a node whose capacity is
 fully claimed can measure as completely idle for minutes. Reading the
@@ -314,10 +316,11 @@ rather than waiting out the reconciler's five-minute cadence (see
 [the database internals
 guide](../developer_guide/database_internals.md)). That minute is not
 the dominant term -- most of the wait is for the resources daemon to
-publish metrics at all, on its own roughly 60-second cadence, which
-this does not shorten -- and an admission made inside either window
-says so on the instance's `instance placed without capacity guard`
-event with a `reason` of `never_reconciled`.
+publish metrics at all, and a cluster which has just started has no
+running domains whose set could change, so that publish waits out the
+once-a-minute floor -- and an admission made inside either window says
+so on the instance's `instance placed without capacity guard` event
+with a `reason` of `never_reconciled`.
 
 See [Admission is a guarded capacity
 claim](#admission-is-a-guarded-capacity-claim) for the check that
