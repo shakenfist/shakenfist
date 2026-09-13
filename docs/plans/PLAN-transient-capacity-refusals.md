@@ -498,7 +498,7 @@ spelling above is the one to write.
 | Phase | Plan | Status |
 |-------|------|--------|
 | 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete |
-| 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Not started |
+| 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete |
 | 3. Publish metrics when the running-domain set changes | PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md | Not started |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started |
 | 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started |
@@ -1057,6 +1057,17 @@ chosen to defer to here, so that we do not forget them.
   suite concurrency queue depth is exactly what spikes; it did not
   fire in the runs read here but it is untracked and worth a
   census line.
+- **An absent waits file reads as "unknown", not as zero.** The
+  phase 2 wrapper creates
+  `/srv/ci/traces/instance-waits.jsonl` on its first write, so a run
+  which was refused nothing leaves no file, and
+  `tools/ci_headroom_report.py --waits` declines to call that zero
+  waits -- correctly, since it is also what a component ref predating
+  the wrapper and a run whose writes all failed look like. Phase 5
+  harvests over many bundles and cannot tell the three apart. Writing
+  an empty file once at suite start-up would make "empty" mean zero
+  and leave "absent" meaning the other two. Found at phase 2's
+  closeout; see that phase's Outcome.
 - **Every refused create is a full create-and-delete.**
   `enqueue_delete_due_error` at the 507 site means each refusal
   costs an object, IPAM allocations, an event trail and a delete
