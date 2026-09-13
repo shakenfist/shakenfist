@@ -130,7 +130,10 @@ nav:
                 - "Audit: Merge group run cancellation": components/development/audits/merge-group-cancellation.md
                 - "Audit: Merge queue reasonability": components/development/audits/merge-queue-config.md
                 - "Audit: mermaid diagrams linted in CI": components/development/audits/mermaid-lint-ci.md
+                - "Audit: npm dependencies declared but never used": components/development/audits/npm-unused-declared-dependency.md
+                - "Audit: npm imports satisfied only by a transitive dependency": components/development/audits/npm-undeclared-direct-dependency.md
                 - "Audit: Pinning indirect dependencies": components/development/audits/pin-indirect-dependencies.md
+                - "Audit: Pinning indirect npm dependencies": components/development/audits/npm-pin-indirect-dependencies.md
                 - "Audit: Plan index": components/development/audits/plan-index.md
                 - "Audit: Plan phase references": components/development/audits/plan-phase-references.md
                 - "Audit: Plan references in source": components/development/audits/plan-source-references.md

@@ -219,33 +219,36 @@ such a facility is ever wanted it is a change to
 `detect_repo_properties()` with its own phase and its own test, not a
 line in this plan's phase 1.
 
-### D5. 33fl is not touched by this plan's author
+### D5. 33fl is not touched by this plan's author until released
 
-Another session is editing `33fl` concurrently. The runner phase
-below specifies the change and its risks but is not to be executed
-until that work has landed and the operator says so. Nothing else in
-the plan writes to that repository.
+Another session was editing `33fl` concurrently when this plan was
+written, so the runner phase below specified the change and its
+risks but was not to be executed until that work had landed and the
+operator said so. **The operator released it on 2026-09-13.** Phase
+4 is executable; it still runs in plan order, after phases 2 and 3.
+Nothing else in the plan writes to that repository.
 
 ## Execution
 
 | Phase | Status | Merged |
 |-------|--------|--------|
-| 1. Register hunkydory in the audit scope | In progress | |
+| 1. Register hunkydory in the audit scope | Complete | a7f4798 (#125) |
 | 2. hunkydory adopts the local tooling | Not started | |
-| 3. npm dependency criteria | Not started | |
-| 4. Static runners gain node | Blocked | |
+| 3. npm dependency criteria | In progress | |
+| 4. Static runners gain node | Not started | |
 | 5. hunkydory CI and the fleet workflows | Not started | |
 | 6. Human review onboarding | Not started | |
 | 7. Marketplace release | Blocked | |
 | 8. Push audit | Not started | |
 
-Phase 4 is blocked on D5: `33fl` has another session working in it.
-Phase 5 depends on phase 4, because a CI workflow that runs `npm ci`
-on a runner without npm is a workflow that fails on arrival. Phase 7
-is blocked on the publisher account and `VSCE_PAT` from D3.
+Phase 4 was blocked on D5 and was released on 2026-09-13; see that
+decision for what changed. Phase 5 depends on phase 4, because a CI
+workflow that runs `npm ci` on a runner without npm is a workflow
+that fails on arrival. Phase 7 is blocked on the publisher account
+and `VSCE_PAT` from D3.
 
-Phases 1, 2, 3 and 6 have no such dependency and can proceed in any
-order. Phase 1 should go first regardless: see its section.
+Phases 2, 3 and 6 have no such dependency and can proceed in any
+order. Phase 1 went first regardless: see its section.
 
 ### 1. Register hunkydory in the audit scope
 
@@ -398,7 +401,8 @@ and must report not-applicable rather than failing.
 
 ### 4. Static runners gain node
 
-**Do not execute without the operator's say-so; see D5.**
+**Released by the operator on 2026-09-13; see D5.** It was held
+until then because another session was editing `33fl`.
 
 In `33fl/static_runner.yml`:
 
@@ -596,7 +600,7 @@ patterns already worked out elsewhere in the fleet.
 | 1 | medium | sonnet | none | Add `hunkydory` to the matrix in `.github/workflows/consistency-audit.yml` and to the in-scope list in `docs/audits/README.md`, and confirm it is absent from the excluded list. Those are the three statements `audit/scope.py` parses and `AuditScopeIsStatedOnceTest` holds them to each other, so all three change together. Do **not** add a `REPO_OVERRIDES` entry: per D4 the Python criteria already skip on the absence of `pyproject.toml`, and `detect_repo_properties()` has no per-criterion not-applicable key to carry a reason in. |
 | 2 | medium | sonnet | none | In hunkydory: add Biome with a `biome.json` set to 100 columns, single quotes, semicolons; write `tools/check-node.sh` mirroring ryll's `scripts/check-rust.sh`; add `.pre-commit-config.yaml` calling it as a `language: script` hook alongside shellcheck, gitleaks and skillsaw; fix four relative links; align `@types/node` and add `engines.node`; copy `PUSH-AUDIT.md` in and reference it from `AGENTS.md`. |
 | 3 | high | opus | worktree | Add three `Check` subclasses for npm dependency auditing to `scripts/audit/checks/`, following the worked brief in `PLAN-TEMPLATE.md`. Register in `scripts/audit/registry.py`, write a spec page each under `docs/audits/`, add them to the index in `docs/audits/README.md`, add their lines to `FROZEN_METADATA`, `FROZEN_ISSUE_TITLES` and the frozen column table in `scripts/tests/test_metadata.py`, and add tests in `scripts/tests/test_packaging.py` covering pass, fail and not-applicable. They must report not-applicable with a reason where there is no `package.json`, including against this repository -- hunkydory is the only repository in the fleet that has one. Read the phase 3 section for the five exemptions the dependency checks must carry (node builtins in both spellings, the host-provided `vscode` module, relative imports, `@types/*`, and devDependencies invoked from `scripts`); without them the first run files three false issues on hunkydory. |
-| 4 | high | opus | worktree | **Hold.** See D5. Includes rewording the node half of the mermaid-lint rationale in the four files the phase 4 section names. |
+| 4 | high | opus | worktree | Released 2026-09-13; see D5. Includes rewording the node half of the mermaid-lint rationale in the four files the phase 4 section names. |
 | 5 | medium | sonnet | none | Copy the fleet workflow templates into hunkydory, including `secret-scan.yml`, substituting TypeScript for Python in CodeQL, and write `ci.yml` calling `tools/check-node.sh` on `[self-hosted, static]` with `npm_config_cache` under `runner.temp`, plus a job running `pre-commit run --all-files`. Read the phase 5 section for the four criteria that go live when `.github/workflows/` first appears. |
 | 6 | medium | sonnet | none | Deploy review tracking per `docs/code-review-tracking.md`, scoped to `src/` and `test/`. |
 | 7 | medium | sonnet | none | **Hold.** See D3, and the runner and secret-scoping constraints in the phase 7 section -- `release.yml` does not run on the static pool. |
@@ -665,12 +669,12 @@ issues. The five exemptions in phase 3 are the guard against those
 three being false. Issue filing is exercised with `--dry-run` only,
 per the review checklist.
 
-**Another session is editing `33fl` concurrently** (D5), so phase 4
-could collide with work in flight. *Mitigation:* phase 4 is marked
-`Blocked` in the Execution table, restated as **Hold** in the step
-guidance, and carries "Do not execute without the operator's say-so"
-at the head of its section. Nothing else in the plan writes to that
-repository.
+**Another session was editing `33fl` concurrently** (D5), so phase 4
+could have collided with work in flight. *Mitigation:* phase 4 was
+marked `Blocked` in the Execution table and restated as **Hold** in
+the step guidance until the operator released it on 2026-09-13.
+Nothing else in the plan writes to that repository, and phase 4 still
+runs in plan order rather than being pulled forward.
 
 **Phase 7 handles a Marketplace publish token.** `VSCE_PAT` can
 publish under the `shakenfist` publisher id. *Mitigation:* the
