@@ -308,7 +308,11 @@ Produced by `shakenfist/tests/external_api/test_required_sweep.py` at
 `a5f12bec5`, which enumerates the declarations from
 `declarations.handlers()` -- the census script in the appendix, not a
 hand written list -- and drives one real authenticated request per row
-through the whole decorator stack, in the default `enforce` mode. For
+through the whole decorator stack. Step 1 ran it in the default
+`enforce` mode, which was then still exempting missing-required
+findings; step 3 deleted that exemption and moved the file to `warn`,
+which reproduces the same pre-enforcement answers and is what the table
+is re-measured against on every run (see *Progress*). For
 each declaration it sends a complete valid request (the *control*) and
 then the same request with that one parameter removed, recording the
 status and whether `record_exception` was called.
@@ -334,9 +338,13 @@ raw-body marker discussed below.
 
 | Verdict | Count |
 |---------|-------|
-| `guarded` -- the handler answers 4xx | 63 |
-| `faults` -- 5xx, or an exception was recorded | 7 |
+| `guarded` -- the handler answers 4xx | 65 |
+| `faults` -- 5xx, or an exception was recorded | 5 |
 | `accepted` -- 2xx | 6 |
+
+Step 1 measured 63 `guarded` and 7 `faults`. The review round moved two
+rows by fixing the two faults which were bugs rather than symptoms of
+required-ness; see *What the sweep says that F1 did not* below.
 
 | Endpoint | Method | Parameter | In | Type | Status | Verdict | What the server does |
 |----------|--------|-----------|----|------|--------|---------|----------------------|
@@ -387,8 +395,8 @@ raw-body marker discussed below.
 | `ClusterOperationsEndpoint` | get | `target_uuid` | query | uuid | 400 | **guarded** | `target_uuid parameter is required` |
 | `InstanceAgentExecuteEndpoint` | post | `command_line` | body | string | 200 | **accepted** | queues an `execute` operation whose `commandline` is null |
 | `InstanceAgentGetEndpoint` | post | `path` | body | string | 200 | **accepted** | queues a `get-file` operation whose `path` is null |
-| `InstanceAgentPutEndpoint` | post | `blob_uuid` | body | uuid | 500 | **faults** | the 404 is written `self.api_error(...)`, which does not exist (`instance.py:1955`) |
-| `InstanceAgentPutEndpoint` | post | `mode` | body | string | 500 | **faults** | `int(None)` raises TypeError, and only ValueError is caught (`instance.py:1946`) |
+| `InstanceAgentPutEndpoint` | post | `blob_uuid` | body | uuid | 404 | **guarded** | `blob not found` (was a 500 until the review round fixed `self.api_error`) |
+| `InstanceAgentPutEndpoint` | post | `mode` | body | string | 406 | **guarded** | `invalid mode: a mode must be a string` (was a 500 until the review round refused a non-string mode) |
 | `InstanceAgentPutEndpoint` | post | `path` | body | string | 200 | **accepted** | queues `put-blob` and `chmod` operations whose `path` is null |
 | `InstanceInterfacesEndpoint` | post | `network` | body | dict | 400 | **guarded** | `network specification should contain JSON objects` |
 | `InstanceMetadataEndpoint` | put | `value` | body | any | 400 | **guarded** | `no value specified` |
@@ -419,29 +427,46 @@ raw-body marker discussed below.
 
 ### What the sweep says that F1 did not
 
-**The 7 `faults` are the population #4167 describes, and two of them are
-bugs independent of required-ness.**
+**Step 1 measured 7 `faults`, and two of them were bugs independent of
+required-ness. The review round fixed both, which is why the table above
+now reads 5.** Each was a fault on far more than the omission path, and
+each contradicted the response list the endpoint publishes -- which is
+the class of defect this phase exists to close.
 
-* `InstanceAgentPutEndpoint.post` writes its blob refusal as
+* `InstanceAgentPutEndpoint.post` wrote its blob refusal as
   `self.api_error(404, 'blob not found')` (`instance.py:1955`).
   `api_base.Resource` has no `api_error`, so *any* caller naming a blob
-  which does not resolve -- not merely one who omitted the parameter --
-  gets an `AttributeError`, a recorded exception and an opaque 500
-  instead of the documented 404. Enforcing required-ness closes the
-  omission path and leaves the bad-uuid path exactly as it is.
-* The `mode` guard immediately above it is `try: int(mode) except
+  which did not resolve -- not merely one who omitted the parameter --
+  got an `AttributeError`, a recorded exception and an opaque 500
+  instead of the documented 404. Enforcing required-ness would have
+  closed the omission path and left the far more common bad-uuid path
+  exactly as it was, so [#4194](https://github.com/shakenfist/shakenfist/issues/4194)
+  is fixed here instead: the call is now `sf_api.error(404, 'blob not
+  found')`, like every other refusal in the same handler, and the row
+  measures `404`/`guarded`.
+* The `mode` guard immediately above it was `try: int(mode) except
   ValueError`, and `int(None)` raises `TypeError`. This is the example
   `CompiledEndpoint`'s docstring cites as a parameter "declared
   required while omitting it has always been accepted"; that was true
   while `handle_authorization_exceptions` still caught `TypeError` and
-  answered 400, and phase 5 deleted that arm (decision D23). It is now
-  a recorded 500.
+  answered 400, and phase 5 deleted that arm (decision D23). It became
+  a recorded 500, reachable under `warn` and `off` whether or not the
+  parameter was omitted. [#4195](https://github.com/shakenfist/shakenfist/issues/4195)
+  is fixed here by refusing a non-string mode with the `406` the
+  endpoint publishes. Widening the `except` to `(TypeError,
+  ValueError)` is *not* sufficient and was measured not to be: the
+  symbolic fallback beneath it calls `.split()` on its argument, so a
+  null falls out of it as an `AttributeError` and the 500 survives. An
+  explicit type check is what closes the row.
 
-The other five faults are a null reaching a constructor: `Artifact.new()`
-splits `source_url`, `Instance.new()` and `Network.new()` hand a null to
-a pydantic model which refuses it, and `Artifact.add_index(None)` raises
-`BlobMissing`. All five are closed by enforcing required-ness, which is
-D32's argument restated in measurements.
+The remaining five faults are a null reaching a constructor:
+`Artifact.new()` splits `source_url`, `Instance.new()` and
+`Network.new()` hand a null to a pydantic model which refuses it, and
+`Artifact.add_index(None)` raises `BlobMissing`. All five are closed by
+enforcing required-ness, which is D32's argument restated in
+measurements -- and unlike the two above, none of them is reachable by a
+caller who supplies the parameter, so there is nothing to fix in the
+handler.
 
 **The 6 `accepted` are the contract change.** Four of them are the three
 agent routes, which cheerfully queue an operation carrying a null
@@ -470,9 +495,10 @@ example is corrected.
 
 **The better-message risk is smaller than feared.** The plan's risks
 section worries that enforcement replaces a handler's specific message
-with a generic one. 63 of 76 rows are already a 4xx whose message names
-the problem, so step 3 will replace 63 hand-written messages with
-`<parameter>: declared required but not supplied`. Most are already
+with a generic one. 65 of 76 rows are already a 4xx whose message names
+the problem, so step 3 will replace 65 hand-written messages with
+`<parameter>: declared required but not supplied`. (63 when step 1
+measured; the two the review round fixed joined them.) Most are already
 generic (`no value specified` on 14 rows, `no key specified` on
 8), but three are materially more informative than the replacement and
 are worth listing in step 6's release note:
@@ -578,7 +604,7 @@ recorded reason in this section for staying required.
 
 For step 6's release note, and the Risks section's instruction to
 count them. After step 3, an omitted required parameter answers
-`400 <parameter>: declared required but not supplied`. 63 rows are
+`400 <parameter>: declared required but not supplied`. 65 rows are
 already a 4xx, and on 57 of them the existing message is a bare
 restatement of the same fact (`no value specified` on 14 rows, `no key
 specified` on 8, `missing required field(s): X` on 10, `no X
@@ -612,8 +638,10 @@ And two improvements, recorded so the release note is not one-sided:
 `POST /networks` with no `netblock` currently answers `400 cannot parse
 netblock: None does not appear to be an IPv4 or IPv6 network`, which
 tells the caller the server saw a `None` it should never have been
-sent; and every one of the 7 `faults` rows stops being a 500 with an
-exception record and becomes a 400 naming the parameter.
+sent; and every one of the 5 remaining `faults` rows stops being a 500
+with an exception record and becomes a 400 naming the parameter. The two
+faults the review round fixed are a larger improvement still, because
+they were 500s on paths a caller reaches without omitting anything.
 
 ## Step 4: how wide each format really is
 
@@ -631,7 +659,7 @@ answers, and what each validator does with them:
 
 | Declaration | What the handler accepts today | Validator |
 |---|---|---|
-| `InstancesEndpoint.post.user_data` | whatever `base64.b64decode()` with its **default** arguments decodes, since that is the call at the config drive (`instance.py:1930`) | `b64decode(value)`, default arguments |
+| `InstancesEndpoint.post.user_data` | whatever `base64.b64decode()` decodes at the config drive (`instance.py:1930`), which in practice means base64 wrapped at 76 columns | `b64decode(''.join(value.split()), validate=True)` |
 | `NetworksEndpoint.post.netblock` | whatever `ipaddress.ip_network()` parses; the handler already 400s on a `ValueError` | `ip_network(value)` |
 | `NetworkDNSAddressEndpoint.post.value` | anything at all -- the handler never looks at it, and it is rendered straight into dnsmasq's hosts file by `dnshosts.tmpl` | `ip_address(value)` |
 | `ArtifactsEndpoint.post.url` | a URL **or** an image shortcut with no scheme: `cirros`, `cirros:0.4.0`, `ubuntu:20.04`, expanded by `images._resolve_image()` | `urlparse(value)` only |
@@ -645,19 +673,33 @@ answers, and what each validator does with them:
 Three of those readings changed what the step would otherwise have
 built.
 
-**`base64` is validated with `validate=False`.** The brief specified
-`validate=True`, which is the right call for base64 in the abstract
-and the wrong one here: it refuses base64 wrapped at 76 columns, which
-is what `base64 user-data.yaml` emits and therefore what a caller
-running `sf-client instance create -U "$(base64 user-data.yaml)"`
-sends. The config drive decodes that today, because b64decode's
-default discards characters outside the alphabet. The validator's job
-is to be the same width as the decode it protects, not to be correct
-about base64. Both halves are pinned:
-`test_byte_takes_what_the_config_drive_decodes` accepts a wrapped
-value and `test_wrapped_base64_user_data_still_reaches_placement`
-drives one through `POST /instances` to the scheduler's 507; switching
-the validator to `validate=True` fails both.
+**`base64` strips whitespace and then validates strictly.** The step
+first wrote this as a lenient `b64decode(value)`, reasoning that
+`validate=True` refuses base64 wrapped at 76 columns -- which is what
+`base64 user-data.yaml` emits and therefore what a caller running
+`sf-client instance create -U "$(base64 user-data.yaml)"` sends, and
+which the config drive decodes today. That reasoning is half right and
+the conclusion was wrong, and the review of this phase caught it.
+b64decode's default does not merely tolerate the newlines in a wrapped
+value: it discards *every* character outside the alphabet, so it throws
+away the hashes, colons and spaces of raw cloud-config too and decodes
+whatever alphabet characters are left. Whether a raw payload is refused
+is then a coin flip on the filtered length modulo 4. Measured over five
+realistic raw cloud-config samples, two passed -- so the lenient
+validator left most of #3269 open.
+
+Stripping the whitespace *before* a strict decode gets both properties
+at once: a wrapped value survives the strip and decodes, and raw
+cloud-config reaches a strict decoder with its non-alphabet characters
+intact and is refused deterministically. All five samples are refused,
+and the wrapped output of `base64(1)` is still accepted. Three tests
+pin it: `test_byte_takes_what_the_config_drive_decodes` and
+`test_wrapped_base64_user_data_still_reaches_placement` hold the
+wrapped half, and
+`test_byte_refuses_raw_config_the_lenient_decode_accepted` carries the
+two samples which used to pass, asserting first that the lenient decode
+accepts them so the sample cannot silently stop demonstrating the
+hole.
 
 **`url` cannot require a scheme, and so barely validates.** Of the
 five declarations it covers, only `jwks_uri` is a web URL, and the
@@ -869,8 +911,9 @@ the server does not require. Step 6's release note says so explicitly.
 
 ### Definition-of-done audit (step 6)
 
-1. **Met.** The *Sweep results* table above carries 76 rows (63
-   `guarded`, 7 `faults`, 6 `accepted`), matching what
+1. **Met.** The *Sweep results* table above carries 76 rows (65
+   `guarded`, 5 `faults`, 6 `accepted` after the review round; 63/7/6
+   as step 1 measured them), matching what
    `test_the_census_still_finds_seventy_six` and `test_the_sweep` pin
    against `required_declarations()`/`SWEEP` in
    `shakenfist/tests/external_api/test_required_sweep.py`. The item's
@@ -909,7 +952,7 @@ the server does not require. Step 6's release note says so explicitly.
    commit message records that the author did run it.
 5. **Met.** `RequiredSweepTestCase` in `test_required_sweep.py` now
    runs at `mode = 'warn'` and asserts, for all 76 rows including the
-   7 `faults` and 6 `accepted` populations, that the response is
+   5 `faults` and 6 `accepted` populations, that the response is
    unchanged from the published `SWEEP` table — not just the two the
    step brief named.
    `test_warn_mode_still_answers_the_handlers_own_message` in
@@ -1103,3 +1146,60 @@ and `docs/release_notes/v07-v08.md` all now say `required` is enforced,
 the master plan's Execution table has nine rows with phase 6 marked
 Complete, and the `docs/plans/index.md` row reads `7 of 9`. The phase is
 complete; see *Definition of done*, below, for the item-by-item audit.
+
+Review round done: the automated reviewer's findings on
+[PR #4199](https://github.com/shakenfist/shakenfist/pull/4199) were
+worked through and eleven of the twelve applied. What changed, and what
+did not:
+
+* **The base64 validator was wrong, and the plan overstated what it
+  closed.** `b64decode` with its default arguments discards every
+  character outside the alphabet, so it decoded raw cloud-config too
+  whenever the filtered length happened to be a multiple of four -- two
+  of five realistic samples. Stripping the whitespace and then decoding
+  with `validate=True` refuses all five and still accepts the wrapped
+  output of `base64(1)`. See *Step 4: how wide each format really is*.
+* **The two bug rows in the sweep were fixed rather than pinned**
+  ([#4194](https://github.com/shakenfist/shakenfist/issues/4194) and
+  [#4195](https://github.com/shakenfist/shakenfist/issues/4195)), which
+  moves the verdict table to 65 `guarded` and 5 `faults`. Both were
+  faults on paths a caller reaches without omitting anything, and both
+  contradicted the endpoint's own published response list. The
+  reviewer's suggested one-token widening of `except ValueError` to
+  `except (TypeError, ValueError)` was measured and does **not** close
+  #4195: the symbolic fallback beneath it raises `AttributeError` on a
+  null, so the 500 survives. An explicit type check is what closes it.
+* **The overlap guard moved below the authorisation check**, so an
+  unauthorised create gets its 401 rather than a 400 naming the
+  cluster's floating netblock. The netblock parse stays above it: that
+  is a pure input check and can answer anyone. The guard also no longer
+  turns itself off when the floating network row exists but carries an
+  empty netblock, and it now logs a warning when an unparseable
+  configuration makes it fail open.
+* **Functional coverage was added for both contract changes.**
+  `cluster_ci_tests/test_api_validation.py` now drives a delete-all with
+  no `confirm`, raw cloud-config as `user_data`, and -- the regression
+  that matters -- a wrapped base64 `user_data` instance which must still
+  boot. The last one is the only honest test of the format validator's
+  width: the decode it stands in for happens on a hypervisor, in
+  another daemon, from a config drive no unit test builds.
+* **The sweep now reads declarations through
+  `declarations.declarations()`.** It had grown its own copy of that AST
+  walk to reach the type token, which `Declaration` did not carry;
+  `test_parameter_declarations.py` had grown a second copy for the same
+  reason. `argtype` is now a field on `Declaration` and both copies are
+  gone, so there is one reading of a declaration tuple in the tree. The
+  copies also silently skipped a declaration they could not read
+  statically, where the shared helper returns a marker row --
+  `required_declarations()` now raises on one by name, because a census
+  which claims completeness must not skip what it could not parse.
+* **`KNOWN_DEFECTS` was considered and not added.** The reviewer asked
+  that the `faults` rows be labelled so a developer who fixes one gets a
+  helpful message rather than "you broke something". The two rows that
+  argument was about are the two fixed above. The five that remain are
+  all a null reaching a null-hostile constructor on a path only an
+  omission reaches; enforcement closes every one, and this file runs at
+  `warn` to measure exactly that pre-enforcement behaviour. They record
+  the rollback's honest answer, not an unfixed bug, so there is nothing
+  for a label to point at. The reasoning is recorded above `SWEEP` where
+  the next person to read the table will meet it.
