@@ -700,6 +700,22 @@ This is the collision the guard exists to make loud, and it made it
 loud on the first try. It is recorded as an outcome rather than as a
 bug in either plan.
 
+**Amended 2026-09-13, at the sizing plan's phase 3 close-out.** The
+fix landed as
+[#4186](https://github.com/shakenfist/shakenfist/pull/4186) at 15:31
+on 2026-09-12, and run
+[34698074952](https://github.com/shakenfist/shakenfist/actions/runs/34698074952)
+shows `Sanity checks` green again. The count above is low: because
+`Sanity checks` is not a required status check, the queue went on
+merging over the breakage, and `f654d4a05`, `f8c801ebe` and
+`6435e3fde` all failed the same test with two of them merging anyway.
+One run in between -- a documentation-only sync -- *skipped* `Sanity
+checks` on the changed-paths filter rather than passing it, so for a
+while a green tick sat on a red tree. Making the check required would
+have stopped the follow-on batches but not the original pair, whose
+two halves each passed against their own base; that is a repository
+configuration question and is recorded, not decided, in both plans.
+
 ### Step 2f
 
 Prepared on the `capacity-wait-summary` branch of
