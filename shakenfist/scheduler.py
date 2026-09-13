@@ -1060,6 +1060,16 @@ class Scheduler:
 
             cpu_base, _ = self._schedulable_threads(n)
             resources['per_node'][n]['cpu_schedulable'] = cpu_base
+            # A clamped reservation means cpu_schedulable (or
+            # memory_reserved_mb below) is a safety floor or cap rather
+            # than the configured reservation's arithmetic -- without the
+            # flag a node reserving all of its threads is
+            # indistinguishable from one with a genuinely spare thread
+            # (issue 4201).
+            resources['per_node'][n]['cpu_reservation_clamped'] = bool(
+                self.metrics[n].get('cpu_reservation_clamped', False))
+            resources['per_node'][n]['memory_reservation_clamped'] = bool(
+                self.metrics[n].get('memory_reservation_clamped', False))
             hard_max_cpus = cpu_base * config.CPU_OVERCOMMIT_RATIO
             measured_cpus = self.metrics[n].get('cpu_total_instance_vcpus', 0)
             # A node the reconciler has not given a capacity row -- one

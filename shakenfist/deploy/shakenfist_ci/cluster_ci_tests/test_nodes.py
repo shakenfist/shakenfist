@@ -74,6 +74,21 @@ class TestNodes(base.BaseNamespacedTestCase):
             self.assertIn('memory_reserved_mb', per_node)
             self.assertGreater(per_node['memory_reserved_mb'], 0)
 
+            # The reservation clamps must not engage silently (issue
+            # 4201): every node reports whether its published values are
+            # a clamp floor or cap rather than the configured
+            # reservation's arithmetic. Whether a clamp is engaged is a
+            # topology choice, so only consistency is asserted: a node
+            # whose thread reservation was clamped is publishing the
+            # floor of one schedulable thread.
+            self.assertIn('cpu_reservation_clamped', per_node)
+            self.assertIn(per_node['cpu_reservation_clamped'], [True, False])
+            self.assertIn('memory_reservation_clamped', per_node)
+            self.assertIn(
+                per_node['memory_reservation_clamped'], [True, False])
+            if per_node['cpu_reservation_clamped']:
+                self.assertEqual(1, per_node['cpu_schedulable'])
+
             if node.get('is_network_node') or node.get('is_database_node'):
                 infra_schedulable.append(per_node['cpu_schedulable'])
             else:

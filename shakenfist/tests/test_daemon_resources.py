@@ -95,7 +95,9 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_reserved': 1,
                 'cpu_schedulable': 10,
                 'cpu_cores_schedulable': 5,
+                'cpu_reservation_clamped': False,
                 'memory_reserved_mb': 2048,
+                'memory_reservation_clamped': False,
             },
             resources_main._compute_reservations(6, 12, 2, 2.0, 65536))
 
@@ -108,7 +110,9 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_reserved': 2,
                 'cpu_schedulable': 8,
                 'cpu_cores_schedulable': 4,
+                'cpu_reservation_clamped': False,
                 'memory_reserved_mb': 6144,
+                'memory_reservation_clamped': False,
             },
             resources_main._compute_reservations(6, 12, 4, 6.0, 65536))
 
@@ -120,7 +124,9 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_reserved': 2,
                 'cpu_schedulable': 6,
                 'cpu_cores_schedulable': 6,
+                'cpu_reservation_clamped': False,
                 'memory_reserved_mb': 6144,
+                'memory_reservation_clamped': False,
             },
             resources_main._compute_reservations(8, 8, 2, 6.0, 65536))
 
@@ -133,7 +139,9 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_reserved': 2,
                 'cpu_schedulable': 20,
                 'cpu_cores_schedulable': 14,
+                'cpu_reservation_clamped': False,
                 'memory_reserved_mb': 6144,
+                'memory_reservation_clamped': False,
             },
             resources_main._compute_reservations(16, 24, 4, 6.0, 65536))
 
@@ -145,7 +153,9 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_reserved': 4,
                 'cpu_schedulable': 1,
                 'cpu_cores_schedulable': 1,
+                'cpu_reservation_clamped': True,
                 'memory_reserved_mb': 6144,
+                'memory_reservation_clamped': False,
             },
             resources_main._compute_reservations(2, 2, 4, 6.0, 65536))
 
@@ -160,7 +170,9 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_reserved': 2,
                 'cpu_schedulable': 1,
                 'cpu_cores_schedulable': 1,
+                'cpu_reservation_clamped': True,
                 'memory_reserved_mb': 3072,
+                'memory_reservation_clamped': True,
             },
             resources_main._compute_reservations(2, 4, 4, 6.0, 6144))
 
@@ -171,9 +183,92 @@ class ComputeReservationsTestCase(base.ShakenFistTestCase):
                 'cpu_cores_reserved': 4,
                 'cpu_schedulable': 16,
                 'cpu_cores_schedulable': 12,
+                'cpu_reservation_clamped': False,
                 'memory_reserved_mb': 9216,
+                'memory_reservation_clamped': False,
             },
             resources_main._compute_reservations(16, 24, 8, 9.0, 65536))
+
+
+class AuditReservationClampsTestCase(base.ShakenFistTestCase):
+    """The reservation clamps must not engage silently (issue 4201): a
+    transition in either clamp's state writes an audit event against the
+    node, while steady state writes nothing at all."""
+
+    clamped_metrics = {
+        'cpu_threads': 4,
+        'cpu_schedulable': 1,
+        'cpu_reservation_clamped': True,
+        'memory_reserved_mb': 3072,
+        'memory_reservation_clamped': True,
+    }
+
+    unclamped_metrics = {
+        'cpu_threads': 12,
+        'cpu_schedulable': 10,
+        'cpu_reservation_clamped': False,
+        'memory_reserved_mb': 2048,
+        'memory_reservation_clamped': False,
+    }
+
+    def test_engagement_emits_one_event_per_clamp(self):
+        # No previous metrics row (a fresh node, or one whose row was
+        # cleared at daemon startup): a clamped node records both events.
+        n = mock.MagicMock()
+        resources_main._audit_reservation_clamps(
+            n, self.clamped_metrics, {}, 6144)
+        self.assertEqual(
+            ['cpu reservation clamp engaged',
+             'memory reservation clamp engaged'],
+            [c[0][1] for c in n.add_event.call_args_list])
+        for c in n.add_event.call_args_list:
+            self.assertEqual(resources_main.EVENT_TYPE_AUDIT, c[0][0])
+        cpu_extra = n.add_event.call_args_list[0][1]['extra']
+        self.assertEqual(4, cpu_extra['cpu_threads'])
+        self.assertEqual(1, cpu_extra['cpu_schedulable'])
+        memory_extra = n.add_event.call_args_list[1][1]['extra']
+        self.assertEqual(6144, memory_extra['memory_total_mb'])
+        self.assertEqual(3072, memory_extra['memory_reserved_mb'])
+
+    def test_steady_state_is_silent(self):
+        # A clamp which was already engaged last cycle is republished as a
+        # metric but does not write an event a minute.
+        n = mock.MagicMock()
+        resources_main._audit_reservation_clamps(
+            n, self.clamped_metrics,
+            {'cpu_reservation_clamped': True,
+             'memory_reservation_clamped': True}, 6144)
+        n.add_event.assert_not_called()
+
+    def test_release_emits_release_events(self):
+        # The operator shrank the reservation (or grew the node): the
+        # transition back is auditable too.
+        n = mock.MagicMock()
+        resources_main._audit_reservation_clamps(
+            n, self.unclamped_metrics,
+            {'cpu_reservation_clamped': True,
+             'memory_reservation_clamped': True}, 65536)
+        self.assertEqual(
+            ['cpu reservation clamp released',
+             'memory reservation clamp released'],
+            [c[0][1] for c in n.add_event.call_args_list])
+
+    def test_unclamped_first_publish_is_silent(self):
+        # The common case: a healthy reservation on a fresh node.
+        n = mock.MagicMock()
+        resources_main._audit_reservation_clamps(
+            n, self.unclamped_metrics, {}, 65536)
+        n.add_event.assert_not_called()
+
+    def test_single_clamp_transition(self):
+        # Only the clamp which changed state is evented.
+        metrics = dict(self.unclamped_metrics)
+        metrics['memory_reservation_clamped'] = True
+        n = mock.MagicMock()
+        resources_main._audit_reservation_clamps(n, metrics, {}, 6144)
+        self.assertEqual(
+            ['memory reservation clamp engaged'],
+            [c[0][1] for c in n.add_event.call_args_list])
 
 
 class GetStatsRacesNodeDeletionTestCase(base.ShakenFistTestCase):

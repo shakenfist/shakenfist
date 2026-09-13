@@ -18,6 +18,7 @@ from shakenfist import node_health
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_RESOURCES
 from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.constants import EVENT_TYPE_USAGE
@@ -114,10 +115,19 @@ def _compute_reservations(cpu_cores, cpu_threads, cpu_reservation_threads,
     node carrying every role (the single-node deployment case) can still
     schedule instances -- the analogue of cpu_schedulable's floor of one.
     It also bounds an oversized operator override.
+
+    Both clamps are deliberate failure modes, but they must not be silent
+    ones: a node reserving all of its threads would otherwise publish
+    cpu_schedulable 1 and be indistinguishable from a node with one
+    genuinely spare thread (issue 4201). The *_reservation_clamped
+    booleans say a published value is a clamp floor or cap rather than
+    the configured reservation's arithmetic.
     """
     memory_reserved_mb = int(ram_reservation_gb * 1024)
-    if memory_total_mb:
-        memory_reserved_mb = min(memory_reserved_mb, memory_total_mb // 2)
+    memory_reservation_clamped = bool(
+        memory_total_mb and memory_reserved_mb > memory_total_mb // 2)
+    if memory_reservation_clamped:
+        memory_reserved_mb = memory_total_mb // 2
 
     threads_per_core = math.ceil(cpu_threads / cpu_cores)
     cpu_cores_reserved = math.ceil(cpu_reservation_threads / threads_per_core)
@@ -125,7 +135,9 @@ def _compute_reservations(cpu_cores, cpu_threads, cpu_reservation_threads,
         'cpu_cores_reserved': cpu_cores_reserved,
         'cpu_schedulable': max(1, cpu_threads - cpu_reservation_threads),
         'cpu_cores_schedulable': max(1, cpu_cores - cpu_cores_reserved),
+        'cpu_reservation_clamped': cpu_reservation_threads >= cpu_threads,
         'memory_reserved_mb': memory_reserved_mb,
+        'memory_reservation_clamped': memory_reservation_clamped,
     }
 
 
@@ -174,6 +186,39 @@ def _should_publish_metrics(last_publish: float, last_domains: set[int] | None,
     if polled_domains is not None and polled_domains != last_domains:
         return True
     return now - last_publish >= METRICS_PUBLISH_INTERVAL_SECONDS
+
+
+def _audit_reservation_clamps(n, metrics, previous_metrics, memory_total_mb):
+    """Emit an audit event when a reservation clamp engages or releases.
+
+    The clamp state is republished as a metric every cycle; the audit
+    event is only written on a state transition, so an over-reserved node
+    carries one findable event rather than one a minute. A node's metrics
+    row is deleted when the daemon starts, so a still-clamped node
+    re-records the event once per daemon lifetime.
+    """
+    for flag, name, extra in [
+            ('cpu_reservation_clamped', 'cpu reservation clamp', {
+                'cpu_threads': metrics['cpu_threads'],
+                'cpu_reservation_threads': config.NODE_CPU_RESERVATION_THREADS,
+                'cpu_schedulable': metrics['cpu_schedulable'],
+            }),
+            ('memory_reservation_clamped', 'memory reservation clamp', {
+                'memory_total_mb': memory_total_mb,
+                'ram_reservation_gb': config.NODE_RAM_RESERVATION_GB,
+                'memory_reserved_mb': metrics['memory_reserved_mb'],
+            })]:
+        engaged = bool(metrics[flag])
+        if engaged == bool(previous_metrics.get(flag, False)):
+            continue
+        if engaged:
+            LOG.with_fields(extra).warning(
+                '%s engaged: the configured reservation exceeds what this '
+                'node can give up' % name)
+        n.add_event(
+            EVENT_TYPE_AUDIT,
+            '%s %s' % (name, 'engaged' if engaged else 'released'),
+            extra=extra)
 
 
 def _safe_metric_name(name):
@@ -306,6 +351,7 @@ class Monitor(daemon.Daemon):
             cpu_cores = psutil.cpu_count(logical=False)
             cpu_threads = psutil.cpu_count(logical=True)
             if cpu_cores and cpu_threads:
+                memory_total_mb = psutil.virtual_memory().total // 1024 // 1024
                 retval.update({
                     'cpu_cores': cpu_cores,
                     'cpu_threads': cpu_threads,
@@ -314,7 +360,10 @@ class Monitor(daemon.Daemon):
                     cpu_cores, cpu_threads,
                     config.NODE_CPU_RESERVATION_THREADS,
                     config.NODE_RAM_RESERVATION_GB,
-                    psutil.virtual_memory().total // 1024 // 1024))
+                    memory_total_mb))
+                _audit_reservation_clamps(
+                    n, retval, old_metrics.get('metrics', {}),
+                    memory_total_mb)
             retval.update(_get_hybrid_core_counts())
 
             # This is disabled as data we don't currently use

@@ -134,6 +134,18 @@ The published fields are `cpu_cores`, `cpu_threads`,
 publishes `cpu_cores_performance` and `cpu_cores_efficiency`; these
 are informational and nothing in scheduling consumes them yet.
 
+Two safety clamps bound an over-large reservation: `cpu_schedulable`
+floors at one thread, and the memory reservation is capped at half
+the machine, so a small node carrying every role can still schedule
+something. When a clamp engages the node publishes
+`cpu_reservation_clamped` or `memory_reservation_clamped` as true
+(also reported per node by `/admin/resources`) and records an audit
+event against the node on the transition -- so a node reserving all
+of its CPU is distinguishable from one with a genuinely spare
+thread. A clamped node is a configuration problem to fix (shrink the
+reservation or grow the node), not an error: the clamped values are
+what scheduling uses.
+
 ## Guest memory returned to the host
 
 Instances are given a virtio balloon device with **free page
