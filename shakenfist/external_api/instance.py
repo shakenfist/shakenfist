@@ -1944,9 +1944,20 @@ class InstanceAgentPutEndpoint(api_base.Resource):
             return error
         deadline, progress_timeout = timing
 
+        # Refuse a mode which is not a string before either parse sees it.
+        # int() raises TypeError rather than ValueError for a non-number,
+        # and symbolic_to_numeric_permissions() calls .split() on its
+        # argument and so raises AttributeError; neither is caught below,
+        # so a null mode became a recorded 500 (issue 4195). Enforcement
+        # closes the omission, but warn and off are rollbacks and must not
+        # turn a caller mistake into a server fault. Numbers are let
+        # through because int() has always accepted them here.
+        if not isinstance(mode, (str, int, float)):
+            return sf_api.error(406, 'invalid mode: a mode must be a string')
+
         try:
             int(mode)
-        except ValueError:
+        except (TypeError, ValueError):
             try:
                 symbolicmode.symbolic_to_numeric_permissions(mode)
             except ValueError as e:

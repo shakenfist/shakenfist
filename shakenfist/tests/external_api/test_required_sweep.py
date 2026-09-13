@@ -451,6 +451,20 @@ RECIPES = {
 # 2 and 3 act on it. It is pinned here rather than merely printed so
 # that a handler which starts answering an omission differently fails a
 # test instead of silently invalidating the plan's evidence.
+#
+# No row here records an unfixed defect, and none needs a "known bug"
+# label. Step 1 measured seven ``faults``, two of which were bugs
+# reachable by a caller who supplied the parameter perfectly well --
+# a blob refusal calling a method which does not exist, and a mode
+# guard catching the wrong exception. Both were fixed rather than
+# pinned, and both rows now read ``guarded``. The five ``faults`` left
+# are all the same shape: a null reaching a constructor which refuses
+# nulls, on a path nothing but an omission can reach. Enforcement
+# closes every one of them, and this file runs at ``warn`` precisely
+# to keep measuring what the handler does *without* that enforcement.
+# So a ``faults`` row here is the rollback's honest behaviour, not a
+# bug someone forgot; there is nothing for a developer to fix and
+# nothing for a label to point them at.
 SWEEP = {
     ('ArtifactMetadataEndpoint', 'put', 'value'):
         (400, False, 'guarded'),
@@ -547,9 +561,9 @@ SWEEP = {
     ('InstanceAgentGetEndpoint', 'post', 'path'):
         (200, False, 'accepted'),
     ('InstanceAgentPutEndpoint', 'post', 'blob_uuid'):
-        (500, True, 'faults'),
+        (404, False, 'guarded'),
     ('InstanceAgentPutEndpoint', 'post', 'mode'):
-        (500, True, 'faults'),
+        (406, False, 'guarded'),
     ('InstanceAgentPutEndpoint', 'post', 'path'):
         (200, False, 'accepted'),
     ('InstanceInterfacesEndpoint', 'post', 'network'):
