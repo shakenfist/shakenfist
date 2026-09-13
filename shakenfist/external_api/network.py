@@ -21,6 +21,7 @@ from shakenfist import baseobject
 from shakenfist import exceptions
 from shakenfist.network import network
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.config import config
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
@@ -265,6 +266,39 @@ class NetworksEndpoint(api_base.Resource):
         except ValueError as e:
             return sf_api.error(
                 400, 'cannot parse netblock: %s' % e, suppress_traceback=True)
+
+        # Refuse a netblock which overlaps the floating network. This is a
+        # handler guard rather than a schema check (issue 323): whether a
+        # netblock overlaps depends on the deployed floating network, which
+        # is cluster configuration the compiled schema cannot see. D34 keeps
+        # it working under warn/off for the same reason.
+        #
+        # network.floating_network() creates the object on first use, so a
+        # cluster which has not needed a floating IP yet has the netblock in
+        # its configuration but no row to read. Look the object up the way
+        # that function does, minus the create -- a guard which brought a
+        # network into being as a side effect of validating a request would
+        # be a poor trade -- and fall back to the configuration when there
+        # is no row, so the guard also holds before the network node
+        # bootstraps. The row wins where both exist: FLOATING_NETWORK can be
+        # edited after the network is created, and the row is what floating
+        # IPs are actually allocated from.
+        fn = network.Network.from_db(FLOATING_NETWORK_UUID, suppress_failure_audit=True)
+        floating_netblock = fn.netblock if fn else config.FLOATING_NETWORK
+        if floating_netblock:
+            try:
+                floating_block = ipaddress.ip_network(floating_netblock)
+            except ValueError:
+                # A floating netblock we cannot parse is a deployment
+                # problem, and refusing every network create until it is
+                # fixed would be a worse one. Let the create through.
+                floating_block = None
+            if floating_block and n.overlaps(floating_block):
+                return sf_api.error(
+                    400,
+                    'netblock %s overlaps the floating network (%s)'
+                    % (n, floating_block),
+                    suppress_traceback=True)
 
         if not namespace:
             namespace = request_namespace()
