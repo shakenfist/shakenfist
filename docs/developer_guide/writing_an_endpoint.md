@@ -364,15 +364,26 @@ Reasons are counted separately because they answer different
 questions: `unknown-parameter`, `type-mismatch`, `missing-required`
 and `body-path-collision`.
 
-Two things it deliberately does not do. `required` is recorded but
+One thing it deliberately does not do. `required` is recorded but
 never enforced — not even in `enforce` mode, where missing-required
 findings are filtered out of the rejection decision before the 400 is
 built. Several parameters are declared required while omitting them
 has always worked, and what to do about that is still open — see [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
-And the prose `format` on a type token is documentation: `netblock`,
-`uuidorname`, `namespace`, `node`, `url` and `ipv4` compile to plain
-strings, because semantic validation of them is not built yet. Only
-`type`, `pattern`, `minimum` and `maximum` constrain anything.
+
+The `format` a type token renders is documentation unless
+`validation._FORMATS` knows it. Five of them do, and each compiles to
+a validator calling the library function the handler itself uses:
+`base64` decodes with `base64.b64decode()`, `netblock` parses with
+`ipaddress.ip_network()`, `ipv4` with `ipaddress.ip_address()`, `url`
+with `urllib.parse.urlparse()` and `uuid` with `uuid.UUID()`. The
+formats on `uuidorname`, `namespace` and `node` stay documentation —
+`uuidorname` is ambiguous by construction, and a ref decorator already
+resolves the other two against the database and answers 404, which is
+a stronger check than a format one. Each validator is written to be no
+narrower than the handler behind it; `url`, which has to accept the
+scheme-less `cirros` image shortcut and `label:` NVRAM templates as
+well as `https://`, is the instructive case. So `type`, `format`,
+`pattern`, `minimum` and `maximum` are what constrain anything.
 
 ## What is not checked yet
 

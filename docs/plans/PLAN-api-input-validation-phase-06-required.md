@@ -615,6 +615,86 @@ tells the caller the server saw a `None` it should never have been
 sent; and every one of the 7 `faults` rows stops being a 500 with an
 exception record and becomes a 400 naming the parameter.
 
+## Step 4: how wide each format really is
+
+F3's set of thirteen is unchanged -- re-derived from `ARGTYPES` and
+`declarations.handlers()` rather than from the table's line numbers,
+which drifted by up to sixteen lines when step 2 added comments to the
+declarations it touched. The same thirteen endpoints, methods and
+parameter names; `uuidorname` still has no body or query use at all,
+and `macaddr` still has none.
+
+The step's whole risk is a validator stricter than its handler, so
+what each handler accepts *today* was established by reading it, and
+by reading what the functional suite and the shipped client send. The
+answers, and what each validator does with them:
+
+| Declaration | What the handler accepts today | Validator |
+|---|---|---|
+| `InstancesEndpoint.post.user_data` | whatever `base64.b64decode()` with its **default** arguments decodes, since that is the call at the config drive (`instance.py:1930`) | `b64decode(value)`, default arguments |
+| `NetworksEndpoint.post.netblock` | whatever `ipaddress.ip_network()` parses; the handler already 400s on a `ValueError` | `ip_network(value)` |
+| `NetworkDNSAddressEndpoint.post.value` | anything at all -- the handler never looks at it, and it is rendered straight into dnsmasq's hosts file by `dnshosts.tmpl` | `ip_address(value)` |
+| `ArtifactsEndpoint.post.url` | a URL **or** an image shortcut with no scheme: `cirros`, `cirros:0.4.0`, `ubuntu:20.04`, expanded by `images._resolve_image()` | `urlparse(value)` only |
+| `ArtifactUploadEndpoint.post.source_url` | anything; it is the URL the artifact *claims*, and its own default is `sf://upload/<ns>/<name>` | `urlparse(value)` only |
+| `InstancesEndpoint.post.nvram_template` | `label:<name>`, `sf://blob/<uuid>`, or anything else passed through to `Blob.from_db()` | `urlparse(value)` only |
+| `AuthIssuersEndpoint.post.jwks_uri`, `AuthIssuerEndpoint.put.jwks_uri` | only `https://...`, enforced by `_validate_issuer_arguments()` in the handler | `urlparse(value)` only |
+| `ArtifactUploadEndpoint.post.upload_uuid`, `.blob_uuid`; `InstanceAgentPutEndpoint.post.blob_uuid` | any string; a miss in the following `from_db()` is a 404 | `uuid.UUID(value)` |
+| `LabelEndpoint.post.blob_uuid` | any string, unchecked: it goes to `Artifact.add_index()` and the route answers 200 with a label version pointing at a blob that does not exist | `uuid.UUID(value)` |
+| `ClusterOperationsEndpoint.get.target_uuid` | any string; a miss in `cls.from_db()` is a 404 | `uuid.UUID(value)` |
+
+Three of those readings changed what the step would otherwise have
+built.
+
+**`base64` is validated with `validate=False`.** The brief specified
+`validate=True`, which is the right call for base64 in the abstract
+and the wrong one here: it refuses base64 wrapped at 76 columns, which
+is what `base64 user-data.yaml` emits and therefore what a caller
+running `sf-client instance create -U "$(base64 user-data.yaml)"`
+sends. The config drive decodes that today, because b64decode's
+default discards characters outside the alphabet. The validator's job
+is to be the same width as the decode it protects, not to be correct
+about base64. Both halves are pinned:
+`test_byte_takes_what_the_config_drive_decodes` accepts a wrapped
+value and `test_wrapped_base64_user_data_still_reaches_placement`
+drives one through `POST /instances` to the scheduler's 507; switching
+the validator to `validate=True` fails both.
+
+**`url` cannot require a scheme, and so barely validates.** Of the
+five declarations it covers, only `jwks_uri` is a web URL, and the
+handler already enforces `https://` there. The other four take
+scheme-less shortcuts (`cirros`), non-hierarchical schemes
+(`label:mylabel`) and Shaken Fist's own `sf://` family. What is left
+that is still a check is "urllib.parse can parse it", which in
+practice refuses an unbalanced bracket in the authority and nothing
+else. That is thin, and it is recorded here as thin rather than
+dressed up: the alternative considered was leaving `url` out of
+`_FORMATS` entirely, which the step brief permits. It is in because
+the rule it enforces is the stdlib's own definition of "not a URL" and
+costs nothing, not because it closes anything.
+
+**`target_uuid` is safe for a reason that had to be checked.** It is
+the one `uuid` declaration that could have been carrying a name, since
+`namespace` and `node` are keyed by name rather than uuid and
+`get_object_class()` resolves both. It is not: every object type a
+cluster operation can target comes from a `target_fields` declaration
+in `shakenfist/schema/operations/`, and the complete set is `ARTIFACT`,
+`INSTANCE`, `BLOB`, `NETWORK`, `INTERFACE` and `AGENTOPERATION`.
+
+Two smaller notes. `ipv4` compiles to `ipaddress.ip_address()` rather
+than `IPv4Address`, so it accepts IPv6 as well as the published format
+promises -- the value's only consumer is a hosts file, which takes
+either, and enforcing narrower than the server is the failure this
+step exists to avoid. And `netblock` accepts a bare address, because
+`ip_network('10.0.0.0')` is a /32: the handler takes it and then
+refuses it for being below the minimum size of /29, which is a policy
+about how small a network may be and stays in the handler (D34).
+
+Statuses this changes, in addition to the messages table above: a
+non-uuid `blob_uuid`, `upload_uuid` or `target_uuid` that used to
+answer 404 from a `from_db()` miss now answers 400 from the validation
+layer. Both are refusals of a string that could never have named an
+object, and `warn` and `off` restore the 404.
+
 ## Decisions
 
 **D32. The declarations get corrected before required-ness is
@@ -894,4 +974,16 @@ pair the step brief names. Tests were added or corrected in
 `test_request_validation.py`, `test_instance_create_validation.py`,
 `test_auth.py` and `test_external_api.py` for every message the
 *Messages and statuses enforcement will change* table above predicted.
-Steps 4 to 6 not started.
+
+Step 4 done: `validation._FORMATS` gives five published `format`
+strings a validator apiece and `_field()` consults it, which closes
+#3269. The width each validator was written to, and the three readings
+that changed what it does, are above under *Step 4: how wide each
+format really is*. `test_format_validation.py` holds each validator to
+an accepted value, a refused value and a `None` passed through
+untouched (item 7), and drives the unencoded-cloud-config body of
+#3269 through a real `POST /instances` to prove the config drive
+decode is never reached with it (item 6).
+`test_validation_compiler.py`'s `format` test was inverted: it used to
+assert that no `format` ever becomes a validator, and now names all
+thirteen declarations that do. Steps 5 and 6 not started.

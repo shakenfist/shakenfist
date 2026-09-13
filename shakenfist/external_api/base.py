@@ -401,6 +401,15 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # The prose formats on the string types carry description-like
     # information a generator passes through; integer has standard
     # formats, and these are byte offsets and blob sizes, so int64.
+    #
+    # Five of the format strings below are no longer prose alone:
+    # 'byte', 'a CIDR netblock', 'an IPv4 address as a string', 'url'
+    # and 'uuid' are the keys of validation._FORMATS, which compiles
+    # each into a semantic validator (decision D33 of
+    # PLAN-api-input-validation-phase-06-required.md). Retyping one of
+    # those strings here silently turns its validation off, which is
+    # why test_format_validation.py checks the table's keys against
+    # this dictionary.
     'integer': {'type': 'integer', 'format': 'int64'},
     'ipv4': {'type': 'string', 'format': 'an IPv4 address as a string'},
     'macaddr': {
@@ -414,7 +423,9 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # 999.999.999.999/99, so it earns nothing as validation while
     # setting phase 4 up to compile a documentation commit into a
     # 400 for input the API accepts today. ip_network() stays the
-    # single source of truth for what parses.
+    # single source of truth for what parses -- and since phase 6's
+    # step 4 it is literally that: validation._FORMATS maps this
+    # format string onto a validator which calls it.
     'netblock': {'type': 'string', 'format': 'a CIDR netblock'},
     'node': {'type': 'string', 'format': 'the name of a node'},
     'number': {'type': 'number', 'format': 'a floating point number'},
