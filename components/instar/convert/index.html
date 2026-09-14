@@ -3859,6 +3859,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13942,6 +13953,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14047,6 +14069,20 @@ The default can also be set via <code>convert.sparse</code> in the config file.<
 <li><strong>vhdx</strong> - VHDX dynamic output, configurable block size (1MB-256MB,
   default 32MB via <code>--block-size</code>)</li>
 </ul>
+<h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
+<p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so <code>convert</code> refuses such a source by name and exits 1 rather than
+writing an output composed as though the parent's sectors were
+zero. No output file is left behind:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>convert: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+</code></pre></div>
+<p><code>instar info</code> is the exception — it reports the parent as a backing file
+instead of refusing. See the "VHD/VHDX differencing" section of
+<a href="/components/instar/quirks/">quirks.md</a> for the per-operation record, and
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the composition
+work that will lift the refusal.</p>
 
 
 

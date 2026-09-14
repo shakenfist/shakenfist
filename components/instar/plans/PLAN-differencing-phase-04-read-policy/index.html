@@ -10,31 +10,27 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/components/instar/create/">
+        <link rel="canonical" href="https://shakenfist.com/components/instar/plans/PLAN-differencing-phase-04-read-policy/">
       
       
-        <link rel="prev" href="../commit/">
-      
-      
-        <link rel="next" href="../dd/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>`instar create` — create a new empty disk image - Shaken Fist</title>
+        <title>PLAN: Differencing phase 4 — read-side policy - Shaken Fist</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
   
@@ -74,9 +70,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -101,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#instar-create-create-a-new-empty-disk-image" class="md-skip">
+        <a href="#plan-differencing-phase-4-read-side-policy" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +113,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-header__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -137,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              `instar create` — create a new empty disk image
+              PLAN: Differencing phase 4 — read-side policy
             
           </span>
         </div>
@@ -253,7 +249,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
+    <a href="../../../.." title="Shaken Fist" class="md-nav__button md-logo" aria-label="Shaken Fist" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -283,7 +279,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../../../.." class="md-nav__link">
         
   
   
@@ -310,7 +306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../manifesto/" class="md-nav__link">
+      <a href="../../../../manifesto/" class="md-nav__link">
         
   
   
@@ -334,20 +330,18 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -368,7 +362,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -386,7 +380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../overview/" class="md-nav__link">
+      <a href="../../../overview/" class="md-nav__link">
         
   
   
@@ -461,7 +455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/" class="md-nav__link">
+      <a href="../../../cloudgood/" class="md-nav__link">
         
   
   
@@ -489,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/technology-primer/" class="md-nav__link">
+      <a href="../../../cloudgood/technology-primer/" class="md-nav__link">
         
   
   
@@ -517,7 +511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/fundamentals/" class="md-nav__link">
+      <a href="../../../cloudgood/fundamentals/" class="md-nav__link">
         
   
   
@@ -545,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/accounting/" class="md-nav__link">
+      <a href="../../../cloudgood/accounting/" class="md-nav__link">
         
   
   
@@ -573,7 +567,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/virtualization-history/" class="md-nav__link">
+      <a href="../../../cloudgood/virtualization-history/" class="md-nav__link">
         
   
   
@@ -601,7 +595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/memory-mapped-devices/" class="md-nav__link">
+      <a href="../../../cloudgood/memory-mapped-devices/" class="md-nav__link">
         
   
   
@@ -629,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/instance-video/" class="md-nav__link">
+      <a href="../../../cloudgood/instance-video/" class="md-nav__link">
         
   
   
@@ -657,7 +651,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/virtual-networking/" class="md-nav__link">
+      <a href="../../../cloudgood/virtual-networking/" class="md-nav__link">
         
   
   
@@ -685,7 +679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/networking-shakenfist/" class="md-nav__link">
+      <a href="../../../cloudgood/networking-shakenfist/" class="md-nav__link">
         
   
   
@@ -713,7 +707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-linuxbridge/" class="md-nav__link">
         
   
   
@@ -741,7 +735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/neutron-legacy/" class="md-nav__link">
+      <a href="../../../cloudgood/neutron-legacy/" class="md-nav__link">
         
   
   
@@ -769,7 +763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cloudgood/galera/" class="md-nav__link">
+      <a href="../../../cloudgood/galera/" class="md-nav__link">
         
   
   
@@ -852,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/" class="md-nav__link">
+      <a href="../../../agent-python/" class="md-nav__link">
         
   
   
@@ -880,7 +874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/developer-guide/" class="md-nav__link">
+      <a href="../../../agent-python/developer-guide/" class="md-nav__link">
         
   
   
@@ -908,7 +902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../agent-python/protocol/" class="md-nav__link">
+      <a href="../../../agent-python/protocol/" class="md-nav__link">
         
   
   
@@ -991,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/" class="md-nav__link">
+      <a href="../../../clingwrap/" class="md-nav__link">
         
   
   
@@ -1019,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/command-types/" class="md-nav__link">
+      <a href="../../../clingwrap/command-types/" class="md-nav__link">
         
   
   
@@ -1047,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/configuration/" class="md-nav__link">
+      <a href="../../../clingwrap/configuration/" class="md-nav__link">
         
   
   
@@ -1075,7 +1069,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/examples/" class="md-nav__link">
+      <a href="../../../clingwrap/examples/" class="md-nav__link">
         
   
   
@@ -1103,7 +1097,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../clingwrap/installation/" class="md-nav__link">
+      <a href="../../../clingwrap/installation/" class="md-nav__link">
         
   
   
@@ -1186,7 +1180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/index.md" class="md-nav__link">
+      <a href="../../../development/index.md" class="md-nav__link">
         
   
   
@@ -1214,7 +1208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/automated-pr-review/" class="md-nav__link">
+      <a href="../../../development/automated-pr-review/" class="md-nav__link">
         
   
   
@@ -1242,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/ci-review-automation/" class="md-nav__link">
+      <a href="../../../development/ci-review-automation/" class="md-nav__link">
         
   
   
@@ -1270,7 +1264,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/code-review-tracking/" class="md-nav__link">
+      <a href="../../../development/code-review-tracking/" class="md-nav__link">
         
   
   
@@ -1298,7 +1292,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/consistency-audits/" class="md-nav__link">
+      <a href="../../../development/consistency-audits/" class="md-nav__link">
         
   
   
@@ -1326,7 +1320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/release-automation/" class="md-nav__link">
+      <a href="../../../development/release-automation/" class="md-nav__link">
         
   
   
@@ -1401,7 +1395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/llm-doc-structure/" class="md-nav__link">
+      <a href="../../../development/audits/llm-doc-structure/" class="md-nav__link">
         
   
   
@@ -1429,7 +1423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/scope-coverage/" class="md-nav__link">
+      <a href="../../../development/audits/scope-coverage/" class="md-nav__link">
         
   
   
@@ -1457,7 +1451,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/ci-review-automation/" class="md-nav__link">
+      <a href="../../../development/audits/ci-review-automation/" class="md-nav__link">
         
   
   
@@ -1485,7 +1479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/console-logging/" class="md-nav__link">
+      <a href="../../../development/audits/console-logging/" class="md-nav__link">
         
   
   
@@ -1513,7 +1507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/secret-handling/" class="md-nav__link">
+      <a href="../../../development/audits/secret-handling/" class="md-nav__link">
         
   
   
@@ -1541,7 +1535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/default-branch-naming/" class="md-nav__link">
+      <a href="../../../development/audits/default-branch-naming/" class="md-nav__link">
         
   
   
@@ -1569,7 +1563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/delete-branch-on-merge/" class="md-nav__link">
+      <a href="../../../development/audits/delete-branch-on-merge/" class="md-nav__link">
         
   
   
@@ -1597,7 +1591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/unused-declared-dependency/" class="md-nav__link">
+      <a href="../../../development/audits/unused-declared-dependency/" class="md-nav__link">
         
   
   
@@ -1625,7 +1619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/dependency-name-normalization/" class="md-nav__link">
+      <a href="../../../development/audits/dependency-name-normalization/" class="md-nav__link">
         
   
   
@@ -1653,7 +1647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/diagram-format/" class="md-nav__link">
+      <a href="../../../development/audits/diagram-format/" class="md-nav__link">
         
   
   
@@ -1681,7 +1675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/eol-distro/" class="md-nav__link">
+      <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
   
@@ -1709,7 +1703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/expensive-lane-path-filter/" class="md-nav__link">
+      <a href="../../../development/audits/expensive-lane-path-filter/" class="md-nav__link">
         
   
   
@@ -1737,7 +1731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/export-repo-config/" class="md-nav__link">
+      <a href="../../../development/audits/export-repo-config/" class="md-nav__link">
         
   
   
@@ -1765,7 +1759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/fuzz-nightly-reporting/" class="md-nav__link">
+      <a href="../../../development/audits/fuzz-nightly-reporting/" class="md-nav__link">
         
   
   
@@ -1793,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/version-file-gitignore/" class="md-nav__link">
+      <a href="../../../development/audits/version-file-gitignore/" class="md-nav__link">
         
   
   
@@ -1821,7 +1815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/github-security/" class="md-nav__link">
+      <a href="../../../development/audits/github-security/" class="md-nav__link">
         
   
   
@@ -1849,7 +1843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/security-sanitization/" class="md-nav__link">
+      <a href="../../../development/audits/security-sanitization/" class="md-nav__link">
         
   
   
@@ -1877,7 +1871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/review-coverage/" class="md-nav__link">
+      <a href="../../../development/audits/review-coverage/" class="md-nav__link">
         
   
   
@@ -1905,7 +1899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/review-scope-completeness/" class="md-nav__link">
+      <a href="../../../development/audits/review-scope-completeness/" class="md-nav__link">
         
   
   
@@ -1933,7 +1927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/undeclared-direct-dependency/" class="md-nav__link">
+      <a href="../../../development/audits/undeclared-direct-dependency/" class="md-nav__link">
         
   
   
@@ -1961,7 +1955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/docs-external-links/" class="md-nav__link">
+      <a href="../../../development/audits/docs-external-links/" class="md-nav__link">
         
   
   
@@ -1989,7 +1983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/llm-context-lint/" class="md-nav__link">
+      <a href="../../../development/audits/llm-context-lint/" class="md-nav__link">
         
   
   
@@ -2017,7 +2011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/llm-context-lint-ci/" class="md-nav__link">
+      <a href="../../../development/audits/llm-context-lint-ci/" class="md-nav__link">
         
   
   
@@ -2045,7 +2039,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/llm-tooling/" class="md-nav__link">
+      <a href="../../../development/audits/llm-tooling/" class="md-nav__link">
         
   
   
@@ -2073,7 +2067,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/merge-group-cancellation/" class="md-nav__link">
+      <a href="../../../development/audits/merge-group-cancellation/" class="md-nav__link">
         
   
   
@@ -2101,7 +2095,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/merge-queue-config/" class="md-nav__link">
+      <a href="../../../development/audits/merge-queue-config/" class="md-nav__link">
         
   
   
@@ -2129,7 +2123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/mermaid-lint-ci/" class="md-nav__link">
+      <a href="../../../development/audits/mermaid-lint-ci/" class="md-nav__link">
         
   
   
@@ -2157,7 +2151,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
+      <a href="../../../development/audits/npm-unused-declared-dependency/" class="md-nav__link">
         
   
   
@@ -2185,7 +2179,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/npm-undeclared-direct-dependency/" class="md-nav__link">
+      <a href="../../../development/audits/npm-undeclared-direct-dependency/" class="md-nav__link">
         
   
   
@@ -2213,7 +2207,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/pin-indirect-dependencies/" class="md-nav__link">
+      <a href="../../../development/audits/pin-indirect-dependencies/" class="md-nav__link">
         
   
   
@@ -2241,7 +2235,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/npm-pin-indirect-dependencies/" class="md-nav__link">
+      <a href="../../../development/audits/npm-pin-indirect-dependencies/" class="md-nav__link">
         
   
   
@@ -2269,7 +2263,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/plan-index/" class="md-nav__link">
+      <a href="../../../development/audits/plan-index/" class="md-nav__link">
         
   
   
@@ -2297,7 +2291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/plan-phase-references/" class="md-nav__link">
+      <a href="../../../development/audits/plan-phase-references/" class="md-nav__link">
         
   
   
@@ -2325,7 +2319,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/plan-source-references/" class="md-nav__link">
+      <a href="../../../development/audits/plan-source-references/" class="md-nav__link">
         
   
   
@@ -2353,7 +2347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/plan-template/" class="md-nav__link">
+      <a href="../../../development/audits/plan-template/" class="md-nav__link">
         
   
   
@@ -2381,7 +2375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/push-audit/" class="md-nav__link">
+      <a href="../../../development/audits/push-audit/" class="md-nav__link">
         
   
   
@@ -2409,7 +2403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/plan-audit-phase/" class="md-nav__link">
+      <a href="../../../development/audits/plan-audit-phase/" class="md-nav__link">
         
   
   
@@ -2437,7 +2431,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/pyproject-usage/" class="md-nav__link">
+      <a href="../../../development/audits/pyproject-usage/" class="md-nav__link">
         
   
   
@@ -2465,7 +2459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/python-version/" class="md-nav__link">
+      <a href="../../../development/audits/python-version/" class="md-nav__link">
         
   
   
@@ -2493,7 +2487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/readme-absolute-links/" class="md-nav__link">
+      <a href="../../../development/audits/readme-absolute-links/" class="md-nav__link">
         
   
   
@@ -2521,7 +2515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/readme-structure/" class="md-nav__link">
+      <a href="../../../development/audits/readme-structure/" class="md-nav__link">
         
   
   
@@ -2549,7 +2543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/release-process/" class="md-nav__link">
+      <a href="../../../development/audits/release-process/" class="md-nav__link">
         
   
   
@@ -2577,7 +2571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/renovate/" class="md-nav__link">
+      <a href="../../../development/audits/renovate/" class="md-nav__link">
         
   
   
@@ -2605,7 +2599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/renovate-lockstep-groups/" class="md-nav__link">
+      <a href="../../../development/audits/renovate-lockstep-groups/" class="md-nav__link">
         
   
   
@@ -2633,7 +2627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
+      <a href="../../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
   
@@ -2661,7 +2655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/sfui-vendor/" class="md-nav__link">
+      <a href="../../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
   
@@ -2689,7 +2683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/test-coverage/" class="md-nav__link">
+      <a href="../../../development/audits/test-coverage/" class="md-nav__link">
         
   
   
@@ -2717,7 +2711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/workflow-standards/" class="md-nav__link">
+      <a href="../../../development/audits/workflow-standards/" class="md-nav__link">
         
   
   
@@ -2745,7 +2739,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/compliance/" class="md-nav__link">
+      <a href="../../../development/audits/compliance/" class="md-nav__link">
         
   
   
@@ -2773,7 +2767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/audits/" class="md-nav__link">
+      <a href="../../../development/audits/" class="md-nav__link">
         
   
   
@@ -2856,7 +2850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/" class="md-nav__link">
+      <a href="../../../development/plans/" class="md-nav__link">
         
   
   
@@ -2884,7 +2878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-consistency-audits-v2/" class="md-nav__link">
         
   
   
@@ -2912,7 +2906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
         
   
   
@@ -2940,7 +2934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-llm-doc-structure/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-llm-doc-structure/" class="md-nav__link">
         
   
   
@@ -2968,7 +2962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-push-audit-phase/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-push-audit-phase/" class="md-nav__link">
         
   
   
@@ -2996,7 +2990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-typescript-onboarding/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-typescript-onboarding/" class="md-nav__link">
         
   
   
@@ -3024,7 +3018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-audit-scripts-restructure/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-audit-scripts-restructure/" class="md-nav__link">
         
   
   
@@ -3052,7 +3046,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-plan-template-blocks/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-plan-template-blocks/" class="md-nav__link">
         
   
   
@@ -3080,7 +3074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-audit-compliance-split/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-audit-compliance-split/" class="md-nav__link">
         
   
   
@@ -3108,7 +3102,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-stestr-testtools/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-stestr-testtools/" class="md-nav__link">
         
   
   
@@ -3136,7 +3130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-image-supply-chain/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-image-supply-chain/" class="md-nav__link">
         
   
   
@@ -3164,7 +3158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
   
@@ -3192,7 +3186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-consistency/" class="md-nav__link">
         
   
   
@@ -3220,7 +3214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
+      <a href="../../../development/plans/PLAN-code-review-tracking/" class="md-nav__link">
         
   
   
@@ -3261,20 +3255,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
         
           
           <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
@@ -3295,7 +3287,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3313,7 +3305,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../" class="md-nav__link">
         
   
   
@@ -3341,7 +3333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../amend/" class="md-nav__link">
+      <a href="../../amend/" class="md-nav__link">
         
   
   
@@ -3369,7 +3361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bitmap/" class="md-nav__link">
+      <a href="../../bitmap/" class="md-nav__link">
         
   
   
@@ -3397,7 +3389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../commit/" class="md-nav__link">
+      <a href="../../commit/" class="md-nav__link">
         
   
   
@@ -3422,37 +3414,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    `instar create` — create a new empty disk image
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../create/" class="md-nav__link">
         
   
   
@@ -3468,186 +3433,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#synopsis" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Synopsis
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#target-formats" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Target formats
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Output format
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-o-keyvalue-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -o key=value,... reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="-o key=value,... reference">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#qcow2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        qcow2
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vmdk" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vmdk
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vpc-vhd" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vpc (VHD)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vhdx" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vhdx
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#raw" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        raw
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#backing-file-semantics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Backing-file semantics
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#preallocation-modes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Preallocation modes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#known-divergences-from-qemu-img-create" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Known divergences from qemu-img create
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3660,7 +3445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dd/" class="md-nav__link">
+      <a href="../../dd/" class="md-nav__link">
         
   
   
@@ -3688,7 +3473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../map/" class="md-nav__link">
+      <a href="../../map/" class="md-nav__link">
         
   
   
@@ -3716,7 +3501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../measure/" class="md-nav__link">
+      <a href="../../measure/" class="md-nav__link">
         
   
   
@@ -3744,7 +3529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rebase/" class="md-nav__link">
+      <a href="../../rebase/" class="md-nav__link">
         
   
   
@@ -3772,7 +3557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../resize/" class="md-nav__link">
+      <a href="../../resize/" class="md-nav__link">
         
   
   
@@ -3800,7 +3585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../snapshot/" class="md-nav__link">
+      <a href="../../snapshot/" class="md-nav__link">
         
   
   
@@ -3828,7 +3613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../openstack-announcement-email/" class="md-nav__link">
+      <a href="../../openstack-announcement-email/" class="md-nav__link">
         
   
   
@@ -3856,7 +3641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../chain-discovery/" class="md-nav__link">
+      <a href="../../chain-discovery/" class="md-nav__link">
         
   
   
@@ -3884,7 +3669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../chain-config/" class="md-nav__link">
+      <a href="../../chain-config/" class="md-nav__link">
         
   
   
@@ -3912,7 +3697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../check/" class="md-nav__link">
+      <a href="../../check/" class="md-nav__link">
         
   
   
@@ -3940,7 +3725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../compare/" class="md-nav__link">
+      <a href="../../compare/" class="md-nav__link">
         
   
   
@@ -3968,7 +3753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../configuration/" class="md-nav__link">
+      <a href="../../configuration/" class="md-nav__link">
         
   
   
@@ -3996,7 +3781,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../convert/" class="md-nav__link">
+      <a href="../../convert/" class="md-nav__link">
         
   
   
@@ -4024,7 +3809,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/" class="md-nav__link">
+      <a href="../../development/" class="md-nav__link">
         
   
   
@@ -4052,7 +3837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../format-detection-safety/" class="md-nav__link">
+      <a href="../../format-detection-safety/" class="md-nav__link">
         
   
   
@@ -4080,7 +3865,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../format-coverage/" class="md-nav__link">
+      <a href="../../format-coverage/" class="md-nav__link">
         
   
   
@@ -4108,7 +3893,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guest-architecture/" class="md-nav__link">
+      <a href="../../guest-architecture/" class="md-nav__link">
         
   
   
@@ -4136,7 +3921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../security/" class="md-nav__link">
+      <a href="../../security/" class="md-nav__link">
         
   
   
@@ -4164,7 +3949,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../info/" class="md-nav__link">
+      <a href="../../info/" class="md-nav__link">
         
   
   
@@ -4192,7 +3977,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../installation/" class="md-nav__link">
+      <a href="../../installation/" class="md-nav__link">
         
   
   
@@ -4220,7 +4005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bench/" class="md-nav__link">
+      <a href="../../bench/" class="md-nav__link">
         
   
   
@@ -4248,7 +4033,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../testing/" class="md-nav__link">
         
   
   
@@ -4276,7 +4061,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../format-internals/" class="md-nav__link">
+      <a href="../../format-internals/" class="md-nav__link">
         
   
   
@@ -4304,7 +4089,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../output-formats/" class="md-nav__link">
+      <a href="../../output-formats/" class="md-nav__link">
         
   
   
@@ -4332,7 +4117,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../quirks/" class="md-nav__link">
+      <a href="../../quirks/" class="md-nav__link">
         
   
   
@@ -4360,7 +4145,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
+      <a href="../../usage/" class="md-nav__link">
         
   
   
@@ -4388,7 +4173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../security-audits/" class="md-nav__link">
+      <a href="../../security-audits/" class="md-nav__link">
         
   
   
@@ -4416,7 +4201,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../technology-primer/" class="md-nav__link">
+      <a href="../../technology-primer/" class="md-nav__link">
         
   
   
@@ -4444,7 +4229,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rust-rationale/" class="md-nav__link">
+      <a href="../../rust-rationale/" class="md-nav__link">
         
   
   
@@ -4519,7 +4304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../commentary/" class="md-nav__link">
+      <a href="../../commentary/" class="md-nav__link">
         
   
   
@@ -4547,7 +4332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../commentary/architectural-decisions/" class="md-nav__link">
+      <a href="../../commentary/architectural-decisions/" class="md-nav__link">
         
   
   
@@ -4575,7 +4360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../commentary/reading-order/" class="md-nav__link">
+      <a href="../../commentary/reading-order/" class="md-nav__link">
         
   
   
@@ -4658,7 +4443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../crates/guest-protocol/" class="md-nav__link">
+      <a href="../../crates/guest-protocol/" class="md-nav__link">
         
   
   
@@ -4741,7 +4526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../image_notes/cirros-qcow2/" class="md-nav__link">
+      <a href="../../image_notes/cirros-qcow2/" class="md-nav__link">
         
   
   
@@ -4769,7 +4554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../image_notes/" class="md-nav__link">
+      <a href="../../image_notes/" class="md-nav__link">
         
   
   
@@ -4797,7 +4582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../image_notes/qcow2-v2/" class="md-nav__link">
+      <a href="../../image_notes/qcow2-v2/" class="md-nav__link">
         
   
   
@@ -4825,7 +4610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../image_notes/virtualpc-vhd/" class="md-nav__link">
+      <a href="../../image_notes/virtualpc-vhd/" class="md-nav__link">
         
   
   
@@ -4908,7 +4693,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -4936,7 +4721,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-distro-matrix-ci/" class="md-nav__link">
+      <a href="../PLAN-distro-matrix-ci/" class="md-nav__link">
         
   
   
@@ -4964,7 +4749,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-release-v0.2/" class="md-nav__link">
+      <a href="../PLAN-release-v0.2/" class="md-nav__link">
         
   
   
@@ -4992,7 +4777,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-release-v0.3/" class="md-nav__link">
+      <a href="../PLAN-release-v0.3/" class="md-nav__link">
         
   
   
@@ -5020,7 +4805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-release/" class="md-nav__link">
+      <a href="../PLAN-release/" class="md-nav__link">
         
   
   
@@ -5048,7 +4833,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-audit/" class="md-nav__link">
+      <a href="../PLAN-audit/" class="md-nav__link">
         
   
   
@@ -5076,7 +4861,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-coverage-fuzzing/" class="md-nav__link">
+      <a href="../PLAN-coverage-fuzzing/" class="md-nav__link">
         
   
   
@@ -5104,7 +4889,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-fuzz-autofix/" class="md-nav__link">
+      <a href="../PLAN-fuzz-autofix/" class="md-nav__link">
         
   
   
@@ -5132,7 +4917,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-convert-followups/" class="md-nav__link">
+      <a href="../PLAN-convert-followups/" class="md-nav__link">
         
   
   
@@ -5160,7 +4945,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-measure/" class="md-nav__link">
+      <a href="../PLAN-measure/" class="md-nav__link">
         
   
   
@@ -5188,7 +4973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-create/" class="md-nav__link">
+      <a href="../PLAN-create/" class="md-nav__link">
         
   
   
@@ -5216,7 +5001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-resize/" class="md-nav__link">
+      <a href="../PLAN-resize/" class="md-nav__link">
         
   
   
@@ -5244,7 +5029,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-rebase-commit/" class="md-nav__link">
+      <a href="../PLAN-rebase-commit/" class="md-nav__link">
         
   
   
@@ -5272,7 +5057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-map/" class="md-nav__link">
+      <a href="../PLAN-map/" class="md-nav__link">
         
   
   
@@ -5300,7 +5085,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-snapshot/" class="md-nav__link">
+      <a href="../PLAN-snapshot/" class="md-nav__link">
         
   
   
@@ -5328,7 +5113,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-check-repair/" class="md-nav__link">
+      <a href="../PLAN-check-repair/" class="md-nav__link">
         
   
   
@@ -5356,7 +5141,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-fuzzing-bugs/" class="md-nav__link">
+      <a href="../PLAN-fuzzing-bugs/" class="md-nav__link">
         
   
   
@@ -5384,7 +5169,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-bug-fixes/" class="md-nav__link">
+      <a href="../PLAN-bug-fixes/" class="md-nav__link">
         
   
   
@@ -5412,7 +5197,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-amend/" class="md-nav__link">
+      <a href="../PLAN-amend/" class="md-nav__link">
         
   
   
@@ -5440,7 +5225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-dd/" class="md-nav__link">
+      <a href="../PLAN-dd/" class="md-nav__link">
         
   
   
@@ -5468,7 +5253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-bitmap/" class="md-nav__link">
+      <a href="../PLAN-bitmap/" class="md-nav__link">
         
   
   
@@ -5496,7 +5281,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-bench/" class="md-nav__link">
+      <a href="../PLAN-bench/" class="md-nav__link">
         
   
   
@@ -5524,7 +5309,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-bench-refcount-growth/" class="md-nav__link">
+      <a href="../PLAN-bench-refcount-growth/" class="md-nav__link">
         
   
   
@@ -5552,7 +5337,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-qcow2-write-infrastructure/" class="md-nav__link">
+      <a href="../PLAN-qcow2-write-infrastructure/" class="md-nav__link">
         
   
   
@@ -5580,7 +5365,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-format-coverage/" class="md-nav__link">
+      <a href="../PLAN-format-coverage/" class="md-nav__link">
         
   
   
@@ -5608,7 +5393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/PLAN-differencing/" class="md-nav__link">
+      <a href="../PLAN-differencing/" class="md-nav__link">
         
   
   
@@ -5691,7 +5476,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/building-with-docker/" class="md-nav__link">
+      <a href="../../prototypes/building-with-docker/" class="md-nav__link">
         
   
   
@@ -5719,7 +5504,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/data-transfer-comparison/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-comparison/" class="md-nav__link">
         
   
   
@@ -5747,7 +5532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/data-transfer-direct-memory/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-direct-memory/" class="md-nav__link">
         
   
   
@@ -5775,7 +5560,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/kvm/" class="md-nav__link">
+      <a href="../../prototypes/kvm/" class="md-nav__link">
         
   
   
@@ -5803,7 +5588,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/kvm-hello-world2/" class="md-nav__link">
+      <a href="../../prototypes/kvm-hello-world2/" class="md-nav__link">
         
   
   
@@ -5831,7 +5616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/kvm-hello-world/" class="md-nav__link">
+      <a href="../../prototypes/kvm-hello-world/" class="md-nav__link">
         
   
   
@@ -5859,7 +5644,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/performance-counters/" class="md-nav__link">
+      <a href="../../prototypes/performance-counters/" class="md-nav__link">
         
   
   
@@ -5887,7 +5672,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/data-transfer-other/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-other/" class="md-nav__link">
         
   
   
@@ -5915,7 +5700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/data-transfer-virtio-block/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-virtio-block/" class="md-nav__link">
         
   
   
@@ -5943,7 +5728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/virtio-block/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block/" class="md-nav__link">
         
   
   
@@ -5971,7 +5756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/virtio-block2/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block2/" class="md-nav__link">
         
   
   
@@ -5999,7 +5784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/virtio-block3/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block3/" class="md-nav__link">
         
   
   
@@ -6027,7 +5812,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/virtio-block4/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block4/" class="md-nav__link">
         
   
   
@@ -6055,7 +5840,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/virtio-block5/" class="md-nav__link">
+      <a href="../../prototypes/virtio-block5/" class="md-nav__link">
         
   
   
@@ -6083,7 +5868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
+      <a href="../../prototypes/data-transfer-virtio-vsock/" class="md-nav__link">
         
   
   
@@ -6166,7 +5951,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-compression/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-compression/" class="md-nav__link">
         
   
   
@@ -6194,7 +5979,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-encryption/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-encryption/" class="md-nav__link">
         
   
   
@@ -6222,7 +6007,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-format/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-format/" class="md-nav__link">
         
   
   
@@ -6250,7 +6035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-implementation-notes/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-implementation-notes/" class="md-nav__link">
         
   
   
@@ -6278,7 +6063,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-l1l2-tables/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-l1l2-tables/" class="md-nav__link">
         
   
   
@@ -6306,7 +6091,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-refcount/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-refcount/" class="md-nav__link">
         
   
   
@@ -6334,7 +6119,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-snapshots/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-snapshots/" class="md-nav__link">
         
   
   
@@ -6362,7 +6147,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../qcow2/qcow2-write-planner/" class="md-nav__link">
+      <a href="../../qcow2/qcow2-write-planner/" class="md-nav__link">
         
   
   
@@ -6445,7 +6230,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../raw/raw-format/" class="md-nav__link">
+      <a href="../../raw/raw-format/" class="md-nav__link">
         
   
   
@@ -6528,7 +6313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../vmdk/vmdk-compression/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-compression/" class="md-nav__link">
         
   
   
@@ -6556,7 +6341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../vmdk/vmdk-extents/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-extents/" class="md-nav__link">
         
   
   
@@ -6584,7 +6369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../vmdk/vmdk-format/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-format/" class="md-nav__link">
         
   
   
@@ -6612,7 +6397,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../vmdk/vmdk-grain-tables/" class="md-nav__link">
+      <a href="../../vmdk/vmdk-grain-tables/" class="md-nav__link">
         
   
   
@@ -6703,7 +6488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/" class="md-nav__link">
+      <a href="../../../kerbside/" class="md-nav__link">
         
   
   
@@ -6731,7 +6516,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/configuration/" class="md-nav__link">
+      <a href="../../../kerbside/configuration/" class="md-nav__link">
         
   
   
@@ -6759,7 +6544,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/console-sources/" class="md-nav__link">
+      <a href="../../../kerbside/console-sources/" class="md-nav__link">
         
   
   
@@ -6787,7 +6572,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/schema/" class="md-nav__link">
+      <a href="../../../kerbside/schema/" class="md-nav__link">
         
   
   
@@ -6815,7 +6600,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/development/" class="md-nav__link">
+      <a href="../../../kerbside/development/" class="md-nav__link">
         
   
   
@@ -6843,7 +6628,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/installation/" class="md-nav__link">
+      <a href="../../../kerbside/installation/" class="md-nav__link">
         
   
   
@@ -6871,7 +6656,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/proxy-architecture/" class="md-nav__link">
+      <a href="../../../kerbside/proxy-architecture/" class="md-nav__link">
         
   
   
@@ -6899,7 +6684,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/testing/" class="md-nav__link">
+      <a href="../../../kerbside/testing/" class="md-nav__link">
         
   
   
@@ -6927,7 +6712,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/direct-qemu-harness/" class="md-nav__link">
+      <a href="../../../kerbside/direct-qemu-harness/" class="md-nav__link">
         
   
   
@@ -7002,7 +6787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/" class="md-nav__link">
+      <a href="../../../kerbside/plans/" class="md-nav__link">
         
   
   
@@ -7030,7 +6815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install/" class="md-nav__link">
         
   
   
@@ -7058,7 +6843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness/" class="md-nav__link">
         
   
   
@@ -7086,7 +6871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-host-subject/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject/" class="md-nav__link">
         
   
   
@@ -7114,7 +6899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit/" class="md-nav__link">
         
   
   
@@ -7142,7 +6927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-01-blocks-and-stamp/" class="md-nav__link">
         
   
   
@@ -7170,7 +6955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-02-retire-addresser/" class="md-nav__link">
         
   
   
@@ -7198,7 +6983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-03-skillsaw-detection/" class="md-nav__link">
         
   
   
@@ -7226,7 +7011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage/" class="md-nav__link">
         
   
   
@@ -7254,7 +7039,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline/" class="md-nav__link">
         
   
   
@@ -7282,7 +7067,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion/" class="md-nav__link">
         
   
   
@@ -7310,7 +7095,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
   
@@ -7338,7 +7123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption/" class="md-nav__link">
         
   
   
@@ -7366,7 +7151,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange/" class="md-nav__link">
         
   
   
@@ -7394,7 +7179,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-06-scrape/" class="md-nav__link">
         
   
   
@@ -7422,7 +7207,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -7450,7 +7235,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs/" class="md-nav__link">
         
   
   
@@ -7478,7 +7263,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e/" class="md-nav__link">
         
   
   
@@ -7506,7 +7291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
         
   
   
@@ -7534,7 +7319,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-01-digest-crate/" class="md-nav__link">
         
   
   
@@ -7562,7 +7347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
         
   
   
@@ -7590,7 +7375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-02-conf-example/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-02-conf-example/" class="md-nav__link">
         
   
   
@@ -7618,7 +7403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
   
@@ -7646,7 +7431,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
         
   
   
@@ -7674,7 +7459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
         
   
   
@@ -7702,7 +7487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-04-port-latency/" class="md-nav__link">
         
   
   
@@ -7730,7 +7515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci/" class="md-nav__link">
         
   
   
@@ -7758,7 +7543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-demo-install-phase-05-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-demo-install-phase-05-docs/" class="md-nav__link">
         
   
   
@@ -7786,7 +7571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
         
   
   
@@ -7814,7 +7599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-07-scenario-test/" class="md-nav__link">
         
   
   
@@ -7842,7 +7627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition/" class="md-nav__link">
         
   
   
@@ -7870,7 +7655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
   
@@ -7898,7 +7683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/" class="md-nav__link">
         
   
   
@@ -7926,7 +7711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/" class="md-nav__link">
         
   
   
@@ -7954,7 +7739,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/" class="md-nav__link">
         
   
   
@@ -7982,7 +7767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/" class="md-nav__link">
         
   
   
@@ -8010,7 +7795,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/" class="md-nav__link">
         
   
   
@@ -8038,7 +7823,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
   
@@ -8066,7 +7851,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives/" class="md-nav__link">
         
   
   
@@ -8094,7 +7879,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract/" class="md-nav__link">
         
   
   
@@ -8122,7 +7907,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-03-proxy-skeleton/" class="md-nav__link">
         
   
   
@@ -8150,7 +7935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-04-firewall/" class="md-nav__link">
         
   
   
@@ -8178,7 +7963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-05-daemon-integration/" class="md-nav__link">
         
   
   
@@ -8206,7 +7991,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-06-packaging/" class="md-nav__link">
         
   
   
@@ -8234,7 +8019,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-07-ci/" class="md-nav__link">
         
   
   
@@ -8262,7 +8047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy-phase-08-cutover/" class="md-nav__link">
         
   
   
@@ -8290,7 +8075,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-rust-proxy/" class="md-nav__link">
         
   
   
@@ -8318,7 +8103,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/" class="md-nav__link">
         
   
   
@@ -8346,7 +8131,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/" class="md-nav__link">
         
   
   
@@ -8374,7 +8159,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/" class="md-nav__link">
         
   
   
@@ -8402,7 +8187,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/" class="md-nav__link">
         
   
   
@@ -8430,7 +8215,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/" class="md-nav__link">
         
   
   
@@ -8458,7 +8243,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/" class="md-nav__link">
         
   
   
@@ -8486,7 +8271,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-07-polling/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-07-polling/" class="md-nav__link">
         
   
   
@@ -8514,7 +8299,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/" class="md-nav__link">
         
   
   
@@ -8542,7 +8327,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-sfui-conversion-phase-09-teardown/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-sfui-conversion-phase-09-teardown/" class="md-nav__link">
         
   
   
@@ -8570,7 +8355,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-kerbside-vdi-tokens/" class="md-nav__link">
         
   
   
@@ -8598,7 +8383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/" class="md-nav__link">
         
   
   
@@ -8626,7 +8411,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/" class="md-nav__link">
         
   
   
@@ -8654,7 +8439,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/" class="md-nav__link">
         
   
   
@@ -8682,7 +8467,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci-phase-04-docs/" class="md-nav__link">
         
   
   
@@ -8710,7 +8495,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-two-tier-ci/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-two-tier-ci/" class="md-nav__link">
         
   
   
@@ -8738,7 +8523,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/plans/PLAN-use-case-docs/" class="md-nav__link">
+      <a href="../../../kerbside/plans/PLAN-use-case-docs/" class="md-nav__link">
         
   
   
@@ -8821,7 +8606,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/console-vv-extensions/" class="md-nav__link">
+      <a href="../../../kerbside/spice/console-vv-extensions/" class="md-nav__link">
         
   
   
@@ -8849,7 +8634,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/scancodes/" class="md-nav__link">
+      <a href="../../../kerbside/spice/scancodes/" class="md-nav__link">
         
   
   
@@ -8877,7 +8662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/capabilities/" class="md-nav__link">
+      <a href="../../../kerbside/spice/capabilities/" class="md-nav__link">
         
   
   
@@ -8905,7 +8690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/channel-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/spice/channel-protocols/" class="md-nav__link">
         
   
   
@@ -8933,7 +8718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/compression-protocols/" class="md-nav__link">
+      <a href="../../../kerbside/spice/compression-protocols/" class="md-nav__link">
         
   
   
@@ -8961,7 +8746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/spice-link-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/spice/spice-link-protocol/" class="md-nav__link">
         
   
   
@@ -8989,7 +8774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/protocol-overview/" class="md-nav__link">
+      <a href="../../../kerbside/spice/protocol-overview/" class="md-nav__link">
         
   
   
@@ -9017,7 +8802,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/usb-redirection/" class="md-nav__link">
+      <a href="../../../kerbside/spice/usb-redirection/" class="md-nav__link">
         
   
   
@@ -9045,7 +8830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/spice/vd-agent-protocol/" class="md-nav__link">
+      <a href="../../../kerbside/spice/vd-agent-protocol/" class="md-nav__link">
         
   
   
@@ -9128,7 +8913,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../kerbside/use-cases/ovirt/" class="md-nav__link">
+      <a href="../../../kerbside/use-cases/ovirt/" class="md-nav__link">
         
   
   
@@ -9219,7 +9004,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/" class="md-nav__link">
+      <a href="../../../occystrap/" class="md-nav__link">
         
   
   
@@ -9247,7 +9032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/command-reference/" class="md-nav__link">
+      <a href="../../../occystrap/command-reference/" class="md-nav__link">
         
   
   
@@ -9275,7 +9060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/development/" class="md-nav__link">
+      <a href="../../../occystrap/development/" class="md-nav__link">
         
   
   
@@ -9303,7 +9088,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/docker-tarball-formats/" class="md-nav__link">
+      <a href="../../../occystrap/docker-tarball-formats/" class="md-nav__link">
         
   
   
@@ -9331,7 +9116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/internals/" class="md-nav__link">
+      <a href="../../../occystrap/internals/" class="md-nav__link">
         
   
   
@@ -9359,7 +9144,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/installation/" class="md-nav__link">
+      <a href="../../../occystrap/installation/" class="md-nav__link">
         
   
   
@@ -9387,7 +9172,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/performance/" class="md-nav__link">
+      <a href="../../../occystrap/performance/" class="md-nav__link">
         
   
   
@@ -9415,7 +9200,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/pipeline/" class="md-nav__link">
+      <a href="../../../occystrap/pipeline/" class="md-nav__link">
         
   
   
@@ -9443,7 +9228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/tar-format-selection/" class="md-nav__link">
+      <a href="../../../occystrap/tar-format-selection/" class="md-nav__link">
         
   
   
@@ -9471,7 +9256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/use-cases/" class="md-nav__link">
+      <a href="../../../occystrap/use-cases/" class="md-nav__link">
         
   
   
@@ -9546,7 +9331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/" class="md-nav__link">
+      <a href="../../../occystrap/plans/" class="md-nav__link">
         
   
   
@@ -9574,7 +9359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-structured-logging/" class="md-nav__link">
         
   
   
@@ -9602,7 +9387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-info-check/" class="md-nav__link">
         
   
   
@@ -9630,7 +9415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed/" class="md-nav__link">
         
   
   
@@ -9658,7 +9443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-01-api-client/" class="md-nav__link">
         
   
   
@@ -9686,7 +9471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-01-httpx/" class="md-nav__link">
         
   
   
@@ -9714,7 +9499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-01-framework/" class="md-nav__link">
         
   
   
@@ -9742,7 +9527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-02-parallel-resolution/" class="md-nav__link">
         
   
   
@@ -9770,7 +9555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-02-uri-and-input/" class="md-nav__link">
         
   
   
@@ -9798,7 +9583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-02-tar-docker/" class="md-nav__link">
         
   
   
@@ -9826,7 +9611,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-03-multi-image-concurrency/" class="md-nav__link">
         
   
   
@@ -9854,7 +9639,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-03-commands/" class="md-nav__link">
         
   
   
@@ -9882,7 +9667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-03-registry/" class="md-nav__link">
         
   
   
@@ -9910,7 +9695,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification-phase-04-docs-tests/" class="md-nav__link">
         
   
   
@@ -9938,7 +9723,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-04-tests-docs/" class="md-nav__link">
         
   
   
@@ -9966,7 +9751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-04-parallel-output-io/" class="md-nav__link">
         
   
   
@@ -9994,7 +9779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-make-the-speed-phase-05-benchmarking/" class="md-nav__link">
         
   
   
@@ -10022,7 +9807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search-phase-05-since-filter/" class="md-nav__link">
         
   
   
@@ -10050,7 +9835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-workflow-refactor/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-workflow-refactor/" class="md-nav__link">
         
   
   
@@ -10078,7 +9863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-post-write-verification/" class="md-nav__link">
         
   
   
@@ -10106,7 +9891,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-quay-label-search/" class="md-nav__link">
         
   
   
@@ -10134,7 +9919,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
+      <a href="../../../occystrap/plans/PLAN-registry-proxy/" class="md-nav__link">
         
   
   
@@ -10225,7 +10010,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/" class="md-nav__link">
+      <a href="../../../ryll/" class="md-nav__link">
         
   
   
@@ -10253,7 +10038,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/portability/" class="md-nav__link">
+      <a href="../../../ryll/portability/" class="md-nav__link">
         
   
   
@@ -10281,7 +10066,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/development-macos/" class="md-nav__link">
+      <a href="../../../ryll/development-macos/" class="md-nav__link">
         
   
   
@@ -10309,7 +10094,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/channel-diagnostics-audit/" class="md-nav__link">
+      <a href="../../../ryll/channel-diagnostics-audit/" class="md-nav__link">
         
   
   
@@ -10337,7 +10122,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/configuration/" class="md-nav__link">
+      <a href="../../../ryll/configuration/" class="md-nav__link">
         
   
   
@@ -10365,7 +10150,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/ci/" class="md-nav__link">
+      <a href="../../../ryll/ci/" class="md-nav__link">
         
   
   
@@ -10393,7 +10178,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/control-socket-protocol/" class="md-nav__link">
+      <a href="../../../ryll/control-socket-protocol/" class="md-nav__link">
         
   
   
@@ -10421,7 +10206,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/development/" class="md-nav__link">
+      <a href="../../../ryll/development/" class="md-nav__link">
         
   
   
@@ -10449,7 +10234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/device-redirection/" class="md-nav__link">
+      <a href="../../../ryll/device-redirection/" class="md-nav__link">
         
   
   
@@ -10477,7 +10262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/diagnostics/" class="md-nav__link">
+      <a href="../../../ryll/diagnostics/" class="md-nav__link">
         
   
   
@@ -10505,7 +10290,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/features/" class="md-nav__link">
+      <a href="../../../ryll/features/" class="md-nav__link">
         
   
   
@@ -10533,7 +10318,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/installation/" class="md-nav__link">
+      <a href="../../../ryll/installation/" class="md-nav__link">
         
   
   
@@ -10561,7 +10346,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/design-decisions/" class="md-nav__link">
+      <a href="../../../ryll/design-decisions/" class="md-nav__link">
         
   
   
@@ -10589,7 +10374,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/libvirt-spice-recommendations/" class="md-nav__link">
+      <a href="../../../ryll/libvirt-spice-recommendations/" class="md-nav__link">
         
   
   
@@ -10617,7 +10402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/macos-metrics-verification/" class="md-nav__link">
+      <a href="../../../ryll/macos-metrics-verification/" class="md-nav__link">
         
   
   
@@ -10645,7 +10430,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/multi-mode-parity/" class="md-nav__link">
+      <a href="../../../ryll/multi-mode-parity/" class="md-nav__link">
         
   
   
@@ -10673,7 +10458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/releasing/" class="md-nav__link">
+      <a href="../../../ryll/releasing/" class="md-nav__link">
         
   
   
@@ -10701,7 +10486,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/rendering-pipeline/" class="md-nav__link">
+      <a href="../../../ryll/rendering-pipeline/" class="md-nav__link">
         
   
   
@@ -10729,7 +10514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/web-frontend/" class="md-nav__link">
+      <a href="../../../ryll/web-frontend/" class="md-nav__link">
         
   
   
@@ -10757,7 +10542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/session-lifecycle/" class="md-nav__link">
+      <a href="../../../ryll/session-lifecycle/" class="md-nav__link">
         
   
   
@@ -10785,7 +10570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/spice-protocol/" class="md-nav__link">
+      <a href="../../../ryll/spice-protocol/" class="md-nav__link">
         
   
   
@@ -10813,7 +10598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/troubleshooting/" class="md-nav__link">
+      <a href="../../../ryll/troubleshooting/" class="md-nav__link">
         
   
   
@@ -10841,7 +10626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/web-mode-internals/" class="md-nav__link">
+      <a href="../../../ryll/web-mode-internals/" class="md-nav__link">
         
   
   
@@ -10916,7 +10701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/" class="md-nav__link">
+      <a href="../../../ryll/plans/" class="md-nav__link">
         
   
   
@@ -10944,7 +10729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-initial/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-initial/" class="md-nav__link">
         
   
   
@@ -10972,7 +10757,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-capture/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-capture/" class="md-nav__link">
         
   
   
@@ -11000,7 +10785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-packaging/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-packaging/" class="md-nav__link">
         
   
   
@@ -11028,7 +10813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-usb-redir/" class="md-nav__link">
         
   
   
@@ -11056,7 +10841,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-cursor-rendering/" class="md-nav__link">
         
   
   
@@ -11084,7 +10869,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-bug-reports/" class="md-nav__link">
         
   
   
@@ -11112,7 +10897,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-usb-ui/" class="md-nav__link">
         
   
   
@@ -11140,7 +10925,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webdav/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-webdav/" class="md-nav__link">
         
   
   
@@ -11168,7 +10953,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-crate-extraction/" class="md-nav__link">
         
   
   
@@ -11196,7 +10981,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-remaining-issues/" class="md-nav__link">
         
   
   
@@ -11224,7 +11009,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-display-iteration-followups/" class="md-nav__link">
         
   
   
@@ -11252,7 +11037,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-pr20-followup/" class="md-nav__link">
         
   
   
@@ -11280,7 +11065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-pr23-followup/" class="md-nav__link">
         
   
   
@@ -11308,7 +11093,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-deferred-debt/" class="md-nav__link">
         
   
   
@@ -11336,7 +11121,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-supply-chain-scanning/" class="md-nav__link">
         
   
   
@@ -11364,7 +11149,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-supply-chain-followups/" class="md-nav__link">
         
   
   
@@ -11392,7 +11177,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-screenshot-and-latency-hud/" class="md-nav__link">
         
   
   
@@ -11420,7 +11205,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-idle-cpu-and-latency/" class="md-nav__link">
         
   
   
@@ -11448,7 +11233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-display-draw-ops/" class="md-nav__link">
         
   
   
@@ -11476,7 +11261,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-android-apk/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-android-apk/" class="md-nav__link">
         
   
   
@@ -11504,7 +11289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-bugreport-trigger-snapshot/" class="md-nav__link">
         
   
   
@@ -11532,7 +11317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-macbook-bugreport-fixes/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-macbook-bugreport-fixes/" class="md-nav__link">
         
   
   
@@ -11560,7 +11345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-paste-as-keystrokes/" class="md-nav__link">
         
   
   
@@ -11588,7 +11373,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-hamburger-menu/" class="md-nav__link">
         
   
   
@@ -11616,7 +11401,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-notifications/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-notifications/" class="md-nav__link">
         
   
   
@@ -11644,7 +11429,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-pr31-followup/" class="md-nav__link">
         
   
   
@@ -11672,7 +11457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-connection-properties/" class="md-nav__link">
         
   
   
@@ -11700,7 +11485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-display-window-sizing/" class="md-nav__link">
         
   
   
@@ -11728,7 +11513,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-web-frontend/" class="md-nav__link">
         
   
   
@@ -11756,7 +11541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-opus-decoder/" class="md-nav__link">
         
   
   
@@ -11784,7 +11569,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-crate-release/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-crate-release/" class="md-nav__link">
         
   
   
@@ -11812,7 +11597,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-session-001-feedback/" class="md-nav__link">
         
   
   
@@ -11840,7 +11625,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-video-keeping-up/" class="md-nav__link">
         
   
   
@@ -11868,7 +11653,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-macos-runtime-metrics/" class="md-nav__link">
         
   
   
@@ -11896,7 +11681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-ci-platform-matrix/" class="md-nav__link">
         
   
   
@@ -11924,7 +11709,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-egui-0.34-followups/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-egui-0.34-followups/" class="md-nav__link">
         
   
   
@@ -11952,7 +11737,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-stream-caps-and-flap/" class="md-nav__link">
         
   
   
@@ -11980,7 +11765,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-streaming-test-automation/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-streaming-test-automation/" class="md-nav__link">
         
   
   
@@ -12008,7 +11793,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/OPEN-QUESTIONS/" class="md-nav__link">
+      <a href="../../../ryll/plans/OPEN-QUESTIONS/" class="md-nav__link">
         
   
   
@@ -12036,7 +11821,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-self-hosted-runners/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-self-hosted-runners/" class="md-nav__link">
         
   
   
@@ -12064,7 +11849,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-pip-distribution/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-pip-distribution/" class="md-nav__link">
         
   
   
@@ -12092,7 +11877,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-webrtc-0.20-upgrade/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-webrtc-0.20-upgrade/" class="md-nav__link">
         
   
   
@@ -12120,7 +11905,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ryll/plans/PLAN-two-stage-ci/" class="md-nav__link">
+      <a href="../../../ryll/plans/PLAN-two-stage-ci/" class="md-nav__link">
         
   
   
@@ -12171,7 +11956,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../features/" class="md-nav__link">
+      <a href="../../../../features/" class="md-nav__link">
         
   
   
@@ -12198,7 +11983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../glossary/" class="md-nav__link">
+      <a href="../../../../glossary/" class="md-nav__link">
         
   
   
@@ -12272,7 +12057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../release_notes/v07-v08/" class="md-nav__link">
+      <a href="../../../../release_notes/v07-v08/" class="md-nav__link">
         
   
   
@@ -12307,7 +12092,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/" class="md-nav__link">
+      <a href="../../../../community/" class="md-nav__link">
         
   
   
@@ -12381,7 +12166,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/usage/" class="md-nav__link">
+      <a href="../../../../user_guide/usage/" class="md-nav__link">
         
   
   
@@ -12409,7 +12194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/authentication/" class="md-nav__link">
+      <a href="../../../../user_guide/authentication/" class="md-nav__link">
         
   
   
@@ -12437,7 +12222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/ansible/" class="md-nav__link">
+      <a href="../../../../user_guide/ansible/" class="md-nav__link">
         
   
   
@@ -12465,7 +12250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../user_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -12493,7 +12278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/affinity/" class="md-nav__link">
+      <a href="../../../../user_guide/affinity/" class="md-nav__link">
         
   
   
@@ -12521,7 +12306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/consoles/" class="md-nav__link">
+      <a href="../../../../user_guide/consoles/" class="md-nav__link">
         
   
   
@@ -12549,7 +12334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/events/" class="md-nav__link">
+      <a href="../../../../user_guide/events/" class="md-nav__link">
         
   
   
@@ -12577,7 +12362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/objects/" class="md-nav__link">
+      <a href="../../../../user_guide/objects/" class="md-nav__link">
         
   
   
@@ -12605,7 +12390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/metadata/" class="md-nav__link">
+      <a href="../../../../user_guide/metadata/" class="md-nav__link">
         
   
   
@@ -12734,7 +12519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/admin/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/admin/" class="md-nav__link">
         
   
   
@@ -12762,7 +12547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/agentoperations/" class="md-nav__link">
         
   
   
@@ -12790,7 +12575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/artifacts/" class="md-nav__link">
         
   
   
@@ -12818,7 +12603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/authentication/" class="md-nav__link">
         
   
   
@@ -12846,7 +12631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blob_checksums/" class="md-nav__link">
         
   
   
@@ -12874,7 +12659,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/blobs/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/blobs/" class="md-nav__link">
         
   
   
@@ -12902,7 +12687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/clusteroperations/" class="md-nav__link">
         
   
   
@@ -12930,7 +12715,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/instances/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/instances/" class="md-nav__link">
         
   
   
@@ -12958,7 +12743,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/label/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/label/" class="md-nav__link">
         
   
   
@@ -12986,7 +12771,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/networks/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/networks/" class="md-nav__link">
         
   
   
@@ -13014,7 +12799,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/interfaces/" class="md-nav__link">
         
   
   
@@ -13042,7 +12827,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/nodes/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/nodes/" class="md-nav__link">
         
   
   
@@ -13070,7 +12855,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/api_reference/upload/" class="md-nav__link">
+      <a href="../../../../developer_guide/api_reference/upload/" class="md-nav__link">
         
   
   
@@ -13106,7 +12891,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/agent_protocol/" class="md-nav__link">
+      <a href="../../../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
   
@@ -13134,7 +12919,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/authentication/" class="md-nav__link">
+      <a href="../../../../developer_guide/authentication/" class="md-nav__link">
         
   
   
@@ -13162,7 +12947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/ci_api_coverage/" class="md-nav__link">
+      <a href="../../../../developer_guide/ci_api_coverage/" class="md-nav__link">
         
   
   
@@ -13190,7 +12975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/mypy/" class="md-nav__link">
+      <a href="../../../../developer_guide/mypy/" class="md-nav__link">
         
   
   
@@ -13218,7 +13003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/network_dispatcher/" class="md-nav__link">
+      <a href="../../../../developer_guide/network_dispatcher/" class="md-nav__link">
         
   
   
@@ -13246,7 +13031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/release_process/" class="md-nav__link">
+      <a href="../../../../developer_guide/release_process/" class="md-nav__link">
         
   
   
@@ -13274,7 +13059,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/standards/" class="md-nav__link">
+      <a href="../../../../developer_guide/standards/" class="md-nav__link">
         
   
   
@@ -13302,7 +13087,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/state_machine/" class="md-nav__link">
+      <a href="../../../../developer_guide/state_machine/" class="md-nav__link">
         
   
   
@@ -13330,7 +13115,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/updating_docs/" class="md-nav__link">
+      <a href="../../../../developer_guide/updating_docs/" class="md-nav__link">
         
   
   
@@ -13358,7 +13143,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer_guide/workflow/" class="md-nav__link">
+      <a href="../../../../developer_guide/workflow/" class="md-nav__link">
         
   
   
@@ -13440,7 +13225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/" class="md-nav__link">
+      <a href="../../../../plans/" class="md-nav__link">
         
   
   
@@ -13468,7 +13253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/api-query-batching-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/api-query-batching-roadmap/" class="md-nav__link">
         
   
   
@@ -13496,7 +13281,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../plans/blob-storage-roadmap/" class="md-nav__link">
+      <a href="../../../../plans/blob-storage-roadmap/" class="md-nav__link">
         
   
   
@@ -13578,7 +13363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/installation/" class="md-nav__link">
+      <a href="../../../../operator_guide/installation/" class="md-nav__link">
         
   
   
@@ -13606,7 +13391,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/agent_operations/" class="md-nav__link">
+      <a href="../../../../operator_guide/agent_operations/" class="md-nav__link">
         
   
   
@@ -13634,7 +13419,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/artifacts/" class="md-nav__link">
+      <a href="../../../../operator_guide/artifacts/" class="md-nav__link">
         
   
   
@@ -13662,7 +13447,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/authentication/" class="md-nav__link">
+      <a href="../../../../operator_guide/authentication/" class="md-nav__link">
         
   
   
@@ -13690,7 +13475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/database/" class="md-nav__link">
+      <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
   
@@ -13718,7 +13503,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/events/" class="md-nav__link">
+      <a href="../../../../operator_guide/events/" class="md-nav__link">
         
   
   
@@ -13746,7 +13531,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/exception_tracking/" class="md-nav__link">
+      <a href="../../../../operator_guide/exception_tracking/" class="md-nav__link">
         
   
   
@@ -13774,7 +13559,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/load_balancing/" class="md-nav__link">
+      <a href="../../../../operator_guide/load_balancing/" class="md-nav__link">
         
   
   
@@ -13802,7 +13587,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/locks/" class="md-nav__link">
+      <a href="../../../../operator_guide/locks/" class="md-nav__link">
         
   
   
@@ -13830,7 +13615,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/logging/" class="md-nav__link">
+      <a href="../../../../operator_guide/logging/" class="md-nav__link">
         
   
   
@@ -13858,7 +13643,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/networking/overview/" class="md-nav__link">
+      <a href="../../../../operator_guide/networking/overview/" class="md-nav__link">
         
   
   
@@ -13886,7 +13671,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/node_health/" class="md-nav__link">
+      <a href="../../../../operator_guide/node_health/" class="md-nav__link">
         
   
   
@@ -13914,7 +13699,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/power_states/" class="md-nav__link">
+      <a href="../../../../operator_guide/power_states/" class="md-nav__link">
         
   
   
@@ -13942,7 +13727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/python_versions/" class="md-nav__link">
+      <a href="../../../../operator_guide/python_versions/" class="md-nav__link">
         
   
   
@@ -13970,7 +13755,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/scheduler/" class="md-nav__link">
+      <a href="../../../../operator_guide/scheduler/" class="md-nav__link">
         
   
   
@@ -13998,7 +13783,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/threads/" class="md-nav__link">
+      <a href="../../../../operator_guide/threads/" class="md-nav__link">
         
   
   
@@ -14026,7 +13811,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/upgrades/" class="md-nav__link">
+      <a href="../../../../operator_guide/upgrades/" class="md-nav__link">
         
   
   
@@ -14081,10 +13866,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#synopsis" class="md-nav__link">
+  <a href="#goal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Synopsis
+        Goal
       
     </span>
   </a>
@@ -14092,10 +13877,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#target-formats" class="md-nav__link">
+  <a href="#planning-effort" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Target formats
+        Planning effort
       
     </span>
   </a>
@@ -14103,10 +13888,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#output-format" class="md-nav__link">
+  <a href="#review-effort" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Output format
+        Review effort
       
     </span>
   </a>
@@ -14114,82 +13899,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-o-keyvalue-reference" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -o key=value,... reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="-o key=value,... reference">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#qcow2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        qcow2
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vmdk" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vmdk
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vpc-vhd" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vpc (VHD)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vhdx" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        vhdx
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#raw" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        raw
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#backing-file-semantics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Backing-file semantics
+        Scope
       
     </span>
   </a>
@@ -14197,10 +13910,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#preallocation-modes" class="md-nav__link">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Preallocation modes
+        What the survey found
       
     </span>
   </a>
@@ -14208,10 +13921,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#known-divergences-from-qemu-img-create" class="md-nav__link">
+  <a href="#found-during-implementation-and-left-alone" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Known divergences from qemu-img create
+        Found during implementation, and left alone
       
     </span>
   </a>
@@ -14219,10 +13932,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
+  <a href="#found-in-review" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future work
+        Found in review
       
     </span>
   </a>
@@ -14230,10 +13943,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Examples
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
       
     </span>
   </a>
@@ -14261,322 +14018,592 @@
   
 
 
-<h1 id="instar-create-create-a-new-empty-disk-image"><code>instar create</code> — create a new empty disk image<a class="headerlink" href="#instar-create-create-a-new-empty-disk-image" title="Permanent link">&para;</a></h1>
-<p><code>instar create</code> produces a new empty disk image in a target format. It is
-the safe, sandboxed equivalent of <code>qemu-img create</code>: for every supported
-format, <code>qemu-img info --output=json</code> on an <code>instar create</code>-produced
-image matches <code>qemu-img info</code> on the corresponding <code>qemu-img create</code>
-image, modulo a documented divergence whitelist (filename, actual-size,
-vmdk per-invocation CIDs, vhdx log-size).</p>
-<p>Raw output is host-only — <code>open(O_CREAT|O_TRUNC) + ftruncate</code> plus
-optional preallocation — so it does not require KVM. Every other target
-format runs the <code>create.bin</code> guest in the KVM sandbox and writes the
-metadata via virtio-block.</p>
-<h2 id="synopsis">Synopsis<a class="headerlink" href="#synopsis" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>instar create [-f FMT] [OPTIONS] [-b BACKING [-F FMT] [-u]] \
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>              FILENAME [SIZE]
-</code></pre></div>
-<p>Common options:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>  -f, --format &lt;FMT&gt;            raw | qcow2 | vmdk | vpc | vhdx
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                                Default: raw
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  -b, --backing &lt;BACKING&gt;       Backing file path (embedded verbatim)
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  -F, --backing-format &lt;FMT&gt;    Backing file format hint
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  -u, --backing-unsafe          Don't fail if backing isn't accessible
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  -q, --quiet                   Suppress "Created: ..." line on success
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>      --output &lt;FORMAT&gt;         human (default) | json
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  -o, --options &lt;KEY=VALUE,...&gt; qemu-img-style options (repeatable)
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>      --preallocation &lt;MODE&gt;    off | metadata | falloc | full
-</code></pre></div>
-<p>Per-target option flags (alternatives to <code>-o</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>  qcow2: --cluster-size, --refcount-bits, --extended-l2,
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>         --lazy-refcounts, --compat
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  vmdk:  --subformat, --grain-size
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  vpc:   --subformat, --block-size
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  vhdx:  --block-size
-</code></pre></div>
-<p><code>SIZE</code> accepts a suffix from <code>{b,K,M,G,T}</code> (e.g. <code>1G</code>, <code>512M</code>). It is
-required unless <code>-b BACKING</code> is given, in which case it defaults to the
-backing file's virtual size.</p>
-<p>The full flag surface is reported by <code>instar create --help</code>.</p>
-<h2 id="target-formats">Target formats<a class="headerlink" href="#target-formats" title="Permanent link">&para;</a></h2>
+<h1 id="plan-differencing-phase-4-read-side-policy">PLAN: Differencing phase 4 — read-side policy<a class="headerlink" href="#plan-differencing-phase-4-read-side-policy" title="Permanent link">&para;</a></h1>
+<p>Phase 4 of <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>.</p>
+<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
+<p>Stop instar reading a differencing image as though it had no
+parent. Every operation that composes data from a differencing VHD
+or VHDX refuses it, by name, with an exit code that says so —
+replacing today's silent wrong answer on VHD and today's
+undiagnosed generic failure on VHDX.</p>
+<p>This phase refuses. It does not compose: composition is phases 11
+to 16, and phase 14 replaces each refusal added here with a real
+read. The refusal is an interim state inside this plan, settled by
+open question 1, and it is worth its own phase because it is the
+only part of the read-side answer that has to be true before the
+emitters in phases 5 and 6 ship.</p>
+<p>Closes #547 and #548.</p>
+<h2 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h2>
+<p>High, as the master plan requires for this phase. The judgement is
+not in any individual refusal — it is in choosing where the
+refusal lives, and the survey below moved that answer twice.</p>
+<h2 id="review-effort">Review effort<a class="headerlink" href="#review-effort" title="Permanent link">&para;</a></h2>
+<p>High, concentrated on one question: <strong>is there a read path that
+still reaches sector composition on a differencing image?</strong> A
+refusal that covers seven callers out of eight is not a partial
+fix, it is the original defect with a smaller footprint. The
+management session should enumerate the entry points from the
+source rather than from this plan's list, because this plan's list
+is exactly the thing that would be wrong.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>In scope:</p>
+<ul>
+<li>A typed refusal reason, carried from the guest to the host and
+  rendered as a message that names the format and the reason.</li>
+<li>Refusal at every read entry point that can reach sector
+  composition on a differencing VHD (<code>disk_type == 4</code>) or a
+  differencing VHDX (<code>HasParent</code> set), for <code>convert</code>, <code>compare</code>,
+  <code>bench</code>, <code>check</code>, <code>measure</code> and <code>dd</code>.</li>
+<li>Making the VHDX path diagnosable rather than merely non-zero,
+  which is what #548 is about.</li>
+<li><code>instar info</code> reporting a parent it can now see, which phase 3
+  taught the crates to read.</li>
+<li>Integration tests over the phase 2 fixtures asserting the
+  refusal per operation.</li>
+</ul>
+<p>Out of scope, and deliberately:</p>
+<ul>
+<li><strong>Composition.</strong> No op reads through to a parent in this phase.</li>
+<li><strong><code>map</code> and <code>resize</code></strong>, which already refuse — see the survey.</li>
+<li><strong>The emitters.</strong> Nothing here writes a differencing image.</li>
+<li><strong>Host-side chain discovery.</strong> <code>discover_backing_chain</code>
+  (<code>src/vmm/src/main.rs:2416</code>) is phase 11's business; this phase
+  does not call it, extend it, or configure it.</li>
+<li><strong>Changing what <code>crates/vhd</code> and <code>crates/vhdx</code> parse.</strong> Phase 3
+  settled that surface and this phase consumes it unchanged, with
+  the single exception recorded in decision 3.</li>
+</ul>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>The master plan's phase 4 material was written 2026-09-05, before
+phase 3 executed. Most of it holds. Four things do not, and two of
+them change the shape of the work.</p>
+<p><strong>Confirmed unchanged:</strong></p>
+<ul>
+<li><code>VhdState::init</code> still accepts <code>DISK_TYPE_DIFFERENCING</code>
+  alongside <code>DISK_TYPE_DYNAMIC</code> (<code>src/crates/vhd/src/lib.rs:1346</code>).
+  The silent misread is live.</li>
+<li><code>VhdxState::init</code> still rejects <code>has_parent</code> by returning bare
+  <code>None</code> (<code>src/crates/vhdx/src/lib.rs:1647</code>). Phase 3 added parent
+  locator parsing without disturbing it.</li>
+<li><code>discover_backing_chain</code> is at <code>src/vmm/src/main.rs:2416</code>, and
+  <code>backing_path_allowlist</code> / <code>max_chain_depth</code> at
+  <code>src/vmm/src/config.rs:65</code> and <code>:67</code>, exactly as claimed.</li>
+<li>Issues #547 and #548 are open.</li>
+</ul>
+<p><strong>Stale claim 1 — <code>map</code> is done, and is the template.</strong> The
+master plan's success criteria list <code>map</code> among the ops phase 4
+must fix. <code>map</code> has refused a differencing VHD since commit
+<code>eb6e23f</code> (2026-06-03), well before this plan was written:
+<code>src/operations/map/src/main.rs:462</code> returns
+<code>MapResult::ERROR_HAS_BACKING</code>, which the host renders at
+<code>src/vmm/src/main.rs:15053</code> as a sentence naming the reason and
+pointing at the deferral. That is precisely the shape this phase
+generalises, so <code>map</code> moves from <em>work</em> to <em>precedent</em>.
+<code>resize</code> likewise already refuses, at
+<code>src/operations/resize/src/main.rs:629</code>, with
+<code>ResizeResult::ERROR_UNSUPPORTED_SUBFORMAT</code>.</p>
+<p><strong>Stale claim 2 — <code>dd</code> is not an operation.</strong> The master plan
+lists <code>dd</code> as one of eight ops. There is no <code>src/operations/dd</code>.
+<code>run_dd</code> (<code>src/vmm/src/main.rs:13958</code>) builds a convert execution
+and calls <code>execute_convert</code>, so <code>dd</code> shares convert's guest binary
+and inherits whatever convert does. It needs a test, not a fix.</p>
+<p><strong>Structural finding 3 — there is one read entry point, not
+eight.</strong> This is the finding that reshaped the phase. <code>convert</code>,
+<code>compare</code>, <code>bench</code> and <code>check</code> never call <code>VhdState::init</code> or
+<code>VhdxState::init</code>; greping the operations for either name returns
+nothing outside <code>map</code> and <code>measure</code>. They reach a VHD or VHDX
+source through the generic chain-state initialiser in the qcow2
+crate, which owns <code>vhd_states</code> and <code>vhdx_states</code> arrays
+(<code>src/crates/qcow2/src/lib.rs:9385</code> and <code>:9387</code>) and dispatches on
+<code>ImageFormat</code> at <code>:9478</code> and <code>:9494</code> under the <code>vhd-input</code> and
+<code>vhdx-input</code> features. Only three real <code>VhdState::init</code> call sites
+exist in the tree: that initialiser, <code>measure</code>
+(<code>src/operations/measure/src/main.rs:388</code>) and <code>map</code> (<code>:438</code>).</p>
+<p>So the refusal has two homes — the shared initialiser and
+<code>measure</code> — rather than six. A per-op refusal would have been five
+copies of one check, and would have been the wrong answer for the
+same reason it is wrong to fix a caller five times instead of
+fixing the callee once.</p>
+<p><strong>Structural finding 4 — <code>info</code> is categorically different.</strong>
+<code>info</code> does not link the vhd crate at all (<code>src/operations/info/Cargo.toml</code>)
+and parses the footer itself via <code>parse_vhd_footer</code>
+(<code>src/operations/info/src/main.rs:434</code>). It therefore cannot
+inherit any refusal added above, and it should not: <code>info</code> reports
+metadata, it never composes sector data, so it has no wrong answer
+to give. Its defect is an omission — it reports no parent for an
+image that has one — which phase 3 made fixable. See decision 4.</p>
+<p><em>Corrected in review:</em> the second sentence was read as licence to
+keep parsing the VHD side locally, and that was wrong. Not linking
+the crate meant not inheriting its validation either, which is how
+<code>info</code> came to decode a parent name out of an unvalidated
+<code>data_offset</code> (see "Found in review", item 2). <code>info</code> now links
+<code>crates/vhd</code> for 704 bytes. The first sentence still stands: <code>info</code>
+does not inherit the <em>refusal</em>, only the parsing.</p>
+<p><strong>Mechanism finding 5 — the per-op result struct is <em>not</em> a
+usable channel, and the right precedent is issue #375.</strong> Both
+<code>init</code> functions return <code>Option&lt;Self&gt;</code> and the chain initialiser
+returns <code>bool</code>, so none of them can say <em>why</em> today; that is the
+whole of #548. The obvious fix is a <code>u32</code> in the op's result
+struct, the way <code>MapResult::ERROR_HAS_BACKING</code> (<code>:2924</code>) is
+rendered by <code>map_error_message</code>
+(<code>src/vmm/src/main.rs:15048</code>). <strong>That does not generalise, and
+this plan's first draft was wrong to assume it did.</strong> Three of the
+five operations have nowhere to put such a code:</p>
+<ul>
+<li><code>convert</code> has no result struct at all. It reports through
+  <code>send_complete("convert", 0, false)</code> and its module header
+  states that no result message is needed. The host turns that
+  into the bare string at <code>src/vmm/src/main.rs:13241</code>.</li>
+<li><code>CompareResult</code> (<code>src/shared/src/lib.rs:2349</code>) carries a magic
+  and flags, but no error constants.</li>
+<li><code>CheckResult</code> (<code>:2069</code>) likewise has none.</li>
+</ul>
+<p>Adding result structs to three operations to carry one boolean
+fact would be a protocol change out of all proportion to the
+phase.</p>
+<p>The tree already solves this exact problem, for exactly this
+reason, in issue #375: when the guest IDT catches a CPU fault, a
+run loop that ends without a result must explain why instead of
+printing "guest did not return a result". The mechanism is a
+single capture in the message decoder — <code>last_cpu_exception</code> at
+<code>src/vmm/src/main.rs:770</code>, set at <code>:833</code> when a <code>Payload::Error</code>
+arrives whose <code>operation</code> field marks it — and a single formatter,
+<code>no_result_error</code> at <code>:789</code>, that prefers the captured reason and
+falls back to the generic text. <code>send_error(op, device, sector,
+status)</code> is already on the call table
+(<code>src/core/src/main.rs:430</code>), so every guest binary can raise it
+today with no protocol change.</p>
+<p>Phase 4 adds a sibling to that pair. This is op-agnostic, needs
+one host-side capture point rather than five, and works for the
+three operations that have no result struct.</p>
+<p><strong>Naming hazard 6.</strong> <code>src/vmm/src/main.rs:18659</code> and the
+<code>MapRenderer</code> doc comment above it refer to "Phase 4". That is
+<strong>PLAN-map.md's</strong> phase 4, not this one. An agent grepping for
+phase 4 in the vmm will find map's streaming-renderer work and
+should ignore it.</p>
+<p><strong>Corrections made at source.</strong> As part of the planning commit,
+the master plan's phase 4 wording is corrected for <code>map</code> and <code>dd</code>,
+and the phase 3 row's empty <em>Merged</em> column is filled in
+(<code>42e879f</code>, #558). One phase 3 Definition-of-done item was also
+false as merged — it asserted <code>git diff --name-only
+develop...HEAD -- src/operations/</code> is empty, but the review round
+that plumbed <code>metadata_length</code> into <code>parse_metadata</code> changed
+<code>src/operations/check/src/main.rs</code>, a call-site-only edit with no
+behaviour change. That bullet is annotated rather than deleted, so
+the record shows what happened.</p>
+<h2 id="found-during-implementation-and-left-alone">Found during implementation, and left alone<a class="headerlink" href="#found-during-implementation-and-left-alone" title="Permanent link">&para;</a></h2>
+<p>Three things surfaced while implementing that are recorded rather
+than fixed, so a later reader sees them as decisions:</p>
+<ol>
+<li>
+<p><strong><code>resize</code> accepts a differencing VHDX.</strong>
+   <code>src/crates/resize/src/vhdx.rs:55</code> guards on <code>opts.has_parent</code>,
+   but the caller hard-codes <code>has_parent: false</code>
+   (<code>src/operations/resize/src/main.rs:839</code>), so the guard has never
+   fired -- dead since <code>94d73b7</code> in May 2026. <code>instar resize</code> on a
+   differencing VHDX therefore succeeds. This is a <em>write</em> path and
+   predates the plan; <code>resize</code> never called <code>VhdxState::init</code>, so
+   phase 4 neither caused it nor fixes it. It also corrects this
+   plan's survey, which recorded "<code>resize</code> already refuses": that is
+   true for VHD only. It is documented as a known limitation in
+   <code>docs/resize.md</code> and <code>docs/quirks.md</code>, and filed by the operator
+   as
+   <a href="https://github.com/shakenfist/instar/issues/565">issue #565</a>
+   after the phase landed for review. Reproduced there against the
+   <code>vhdx-diff-child</code> fixture: a 16 MiB child grows to 100 MiB while
+   its parent stays 16 MiB, exit 0. Differencing VHD is refused
+   (<code>error 6: subformat does not support resize</code>) and qemu-img 10.0.13
+   refuses differencing VHDX outright, so instar-on-VHDX is the only
+   accepting combination.</p>
+</li>
+<li>
+<p><strong><code>info</code> prints an unresolvable "actual path" for a VHDX
+   parent.</strong> The VHDX locator path is Windows-shaped
+   (<code>.\vhdx-diff-parent.vhdx</code>), and the host renders it as a POSIX
+   path at <code>src/vmm/src/main.rs:1499</code>, producing a filename
+   containing a backslash that cannot exist. The output is honest
+   about where instar would look, and qemu-img prints the same field
+   unconditionally, but the underlying issue is path normalisation,
+   which belongs to phase 11. Suppressing the display alone would
+   paper over it. Phase 4e documents it as a known limitation.</p>
+</li>
+<li>
+<p><strong><code>map</code>'s VHDX arm had to change after all.</strong> The step plan said
+   to leave <code>map</code> alone on the strength of its VHD refusal at
+   <code>src/operations/map/src/main.rs:462</code>. That was wrong: map's VHDX
+   safety came entirely from the <code>VhdxState::init</code> rejection that
+   decision 3 removes, as its own comment recorded. Left untouched,
+   <code>map</code> would have begun emitting a differencing VHDX's parent
+   blocks as holes. The refusal was added using map's existing
+   <code>ERROR_HAS_BACKING</code>, so the precedent is preserved rather than
+   migrated.</p>
+</li>
+</ol>
+<h2 id="found-in-review">Found in review<a class="headerlink" href="#found-in-review" title="Permanent link">&para;</a></h2>
+<p>The automated reviewer on
+<a href="https://github.com/shakenfist/instar/pull/563">PR #563</a> raised twelve
+items. Two were regressions this phase introduced, and are the reason
+this section exists rather than a changelog line.</p>
+<ol>
+<li><strong><code>create -b &lt;differencing VHDX&gt;</code> started succeeding.</strong> Removing
+   <code>VhdxState::init</code>'s blanket <code>has_parent</code> rejection -- the change
+   that lets the read entry points refuse with a reason instead of
+   failing anonymously -- also removed the only guard on <code>create</code>'s
+   <code>read_backing_virtual_size</code>, which <em>reads</em> a user-supplied image.
+   An overlay whose base every read path refuses is a chain that can
+   never be read back. Decision 3 anticipated this class of fallout
+   and the definition of done enumerated <code>init</code>'s call sites, but
+   classified <code>create</code> as "writes rather than reads" and stopped
+   there, which was wrong about this call site.</li>
+</ol>
+<p>Fixed by refusing both formats in <code>read_backing_virtual_size</code>,
+   with a new <code>CreateResult::ERROR_BACKING_DIFFERENCING</code> rather than
+   the generic <code>ERROR_BACKING_PARSE_FAILED</code>: the backing header parses
+   perfectly well, and telling a user a valid image is "truncated,
+   corrupted, or an unrecognised format" is precisely the undiagnosed
+   failure #548 was filed over. The VHD arm never had a guard at all
+   and gains one here, so the two formats now agree.</p>
+<ol>
+<li><strong><code>info</code> decoded a parent name without validating the dynamic
+   header.</strong> <code>parse_vhd_parent_name</code> took <code>data_offset</code> from the
+   footer and decoded 512 bytes at header offset 64 as UTF-16BE.
+   Both <code>disk_type</code> and <code>data_offset</code> are image-controlled, so an
+   image could point <code>data_offset</code> anywhere in itself and have
+   arbitrary content printed as <code>backing file:</code> -- untrusted bytes
+   promoted into a structured, user-facing field, with none of the
+   validation <code>crates/vhd</code> applies to the same structure.</li>
+</ol>
+<p>Structural finding 4 and step 4c's brief are the root cause: they
+   left <code>info</code> parsing the VHD side locally rather than linking
+   <code>crates/vhd</code>, on the grounds that the VHD side was "small enough
+   to parse locally". That reasoning was already weak once the same
+   step added a <code>vhdx</code> dependency, and it produced six re-declared
+   constants with no mechanism to catch drift -- <code>info</code> is a
+   <code>no_main</code> guest binary that cannot run <code>cargo test</code>, so nothing
+   could have failed if the crate's values moved. <code>info</code> now links <code>crates/vhd</code>, uses its
+   constants, and gates on <code>VhdDynamicHeader::parse</code> -- the crate's
+   own <code>cxsparse</code> cookie check. Measured cost: <code>info.bin</code> went from
+   148,512 to 149,216 bytes -- 704 bytes, against a 768 KB ceiling
+   the binary uses 18% of. The size argument decision 4 rested on did
+   not survive being measured.</p>
+<p>Verified by negative control: with the cookie check compiled out,
+   an image carrying UTF-16BE text at a bogus <code>data_offset</code> reports
+   <code>backing file: PWNED-SECRET.vhd</code>; with it in, nothing. The test
+   builds that image rather than shipping it as a fixture.</p>
+<p>Two further defects were found while writing the tests for those, and
+neither was in the review:</p>
+<ol>
+<li>
+<p><strong><code>backing-filename-format</code> claimed a differencing VHD's parent
+   was a qcow2.</strong> The field defaults to <code>"qcow2"</code> when no backing
+   format is recorded, which is right for a qcow2 v2 image with no
+   header extension. A differencing image records no such extension
+   either, so reporting a parent at all -- new in this phase -- put a
+   false claim in a machine-read field. SPEC(VHD) and SPEC(VHDX) both
+   require a parent to be the same format as its child, so the format
+   is known without a header extension; <code>vpc</code> / <code>vhdx</code> are now
+   reported.</p>
+</li>
+<li>
+<p><strong>A malformed differencing VHD fails generically, and that is
+   correct.</strong> The refusal in <code>init_chain_states</code> reads a <code>VhdState</code>,
+   and <code>VhdState::init</code> cannot build one without a valid <code>cxsparse</code>
+   header -- so an image with a bogus <code>data_offset</code> fails as
+   malformed before its disk type is consulted. This was an
+   assumption in a test I wrote, not in the code, and it is recorded
+   here because the test now asserts the real behaviour and says why.
+   The property #547 was filed over still holds: no content is
+   written and the exit code is non-zero.</p>
+</li>
+</ol>
+<p>The remaining ten items were documentation and test-coverage gaps:
+plan phase numbers in the user-facing refusal string and in six
+documents (AGENTS.md keeps phase numbers inside <code>docs/plans/</code>, and the
+string reaches a user of an installed .deb who has neither the plan nor
+its numbering); <code>refuse_differencing</code> inserted between <code>detect_and_scan</code>'s
+doc comment and <code>detect_and_scan</code>, orphaning an <code>unsafe fn</code>'s safety
+contract; <code>check_vhd</code> computing corruption findings past a refusal that
+suppresses them; the six adversarial parent-locator fixtures and
+<code>vhd-diff-child-mixed</code> untested; per-operation docs unwritten and
+<code>docs/check.md</code> still claiming differencing VHDs are validated;
+<code>check --output json</code> emitting no JSON on a refusal; <code>subTest</code> missing
+from every fixture loop; and a quirks.md heading still describing the
+pre-fix behaviour the body now contradicts.</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Refuse at the shared chain initialiser and at <code>measure</code>, not
+   in <code>VhdState::init</code>.</strong> Making the crate's <code>init</code> reject
+   <code>disk_type == 4</code> would close the hole in one line for every
+   caller at once, and it is the obvious move. It is wrong here
+   for three reasons: phase 3's parsing surface exists to be read
+   <em>from</em> a successfully initialised differencing image, and <code>map</code>
+   already depends on <code>init</code> succeeding so it can read
+   <code>state.disk_type</code>; phases 11 to 16 need <code>init</code> to succeed in
+   order to compose; and a crate-level <code>None</code> produces exactly the
+   undiagnosed failure that #548 exists to complain about. The
+   callee is not wrong — the callers are missing a policy check.</p>
+</li>
+<li>
+<p><strong>One guest-side refusal signal, captured once on the host,
+   following issue #375 — not a per-op result code.</strong> The guest
+   raises <code>send_error</code> with a reserved operation marker and a
+   status naming the format; the host decoder captures it beside
+   <code>last_cpu_exception</code>, and the failure paths render it in place
+   of their generic text. Survey finding 5 records why the
+   per-op-result-code shape, which this plan proposed in its first
+   draft, cannot work: <code>convert</code> has no result struct and
+   <code>CompareResult</code> and <code>CheckResult</code> have no error constants, so
+   three of the five operations have nowhere to put a code. The
+   message still names the operation, because the formatter takes
+   the op name as an argument exactly as <code>no_result_error</code> does.
+   <code>map</code> keeps its existing <code>ERROR_HAS_BACKING</code> and is not
+   migrated: it works, it is already covered by a test, and
+   changing it would put a working refusal at risk for
+   tidiness.</p>
+</li>
+<li>
+<p><strong>Make VHDX symmetric with VHD: <code>VhdxState::init</code> stops
+   rejecting <code>has_parent</code>, and the entry points refuse instead.</strong>
+   This is the decision most likely to be argued with, because it
+   deliberately removes a working safety net. Today a differencing
+   VHDX fails closed with a useless message; the alternative of
+   keeping the rejection and threading a reason out of <code>init</code>
+   (changing <code>Option&lt;Self&gt;</code> to <code>Result&lt;Self, Reason&gt;</code> across
+   twelve call sites) preserves fail-closed but leaves VHD and
+   VHDX structurally different for phases 11 to 16 to reconcile
+   later. Symmetry is worth more: after this change both formats
+   initialise, both expose a parent flag (<code>has_parent</code> is already
+   <code>pub</code> on the metadata at <code>src/crates/vhdx/src/lib.rs:935</code>), and
+   one uniform check at each entry point covers both.</p>
+</li>
+</ol>
+<p><strong>The hazard is real and the mitigation is structural</strong>: the
+   commit that removes the rejection must be the same commit that
+   adds every entry-point refusal. Split across two commits, the
+   tree passes through a state where a differencing VHDX is
+   silently misread — converting a safe failure into the exact
+   defect this phase exists to close. Step 4b is therefore
+   indivisible, and the review checks that first.</p>
+<ol>
+<li>
+<p><strong><code>info</code> reports; it does not refuse.</strong> <code>info</code> composes
+   nothing, so it has no wrong answer to give, and refusing would
+   remove the only way to inspect an image the rest of the tool
+   declines to read — which is precisely when a user needs <code>info</code>
+   most. It gains a parent line instead. Note this changes <code>info</code>
+   output for differencing images, so phase 3's parity script
+   (<code>tools/verify-info-output-parity.sh</code>) will report differences
+   on exactly the differencing fixtures and must be run with that
+   expectation stated, not as a pass/fail gate.</p>
+</li>
+<li>
+<p><strong><code>dd</code> gets a test, not a fix.</strong> It shares convert's guest
+   binary. The test exists to catch a future divergence, since
+   nothing in the tree records that dd and convert must stay
+   linked.</p>
+</li>
+<li>
+<p><strong>The refusal message points at the deferral.</strong> Following
+   map's text, each message says composition is deferred and names
+   the plan, so a user who hits it learns it is a known boundary
+   rather than a corrupt image.</p>
+</li>
+</ol>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Target</th>
-<th>Subformats</th>
-<th>Backing?</th>
-<th>qemu-img info equivalence</th>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>raw</td>
-<td>(host-only)</td>
-<td>No</td>
-<td>byte-equivalent (file size + zero-fill)</td>
+<td>4a</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Build the refusal channel, following issue #375's <code>last_cpu_exception</code> pair exactly. (i) In <code>src/shared/src/lib.rs</code> add a small module of stable constants: a reserved <code>send_error</code> operation marker (a short string such as <code>differencing</code>) and one <code>u32</code> status per format (VHD, VHDX), documented as append-only the way <code>BenchResult</code>'s error codes are at <code>:4232</code>. <code>src/shared</code> is <code>no_std</code>. (ii) In <code>src/vmm/src/main.rs</code> add a <code>last_differencing_refusal: Option&lt;u32&gt;</code> field beside <code>last_cpu_exception</code> (<code>:770</code>, initialised <code>:781</code>), capture it in <code>add_byte</code> beside the existing capture (<code>:829-835</code>) when the <code>Payload::Error</code>'s <code>operation</code> equals the marker, and add a formatter beside <code>no_result_error</code> (<code>:789</code>) that takes the op name and renders a sentence naming the operation, saying the source is a differencing image whose parent instar cannot yet compose, and saying composition is deferred to PLAN-differencing phases 11-16. Follow the wording of <code>map_error_message</code> (<code>:15053</code>). (iii) Unit-test the formatter both ways, mirroring the two tests at <code>:863</code> and <code>:872</code>. Nothing raises the error yet — this step adds no behaviour.</td>
 </tr>
 <tr>
-<td>qcow2</td>
-<td>n/a</td>
-<td>Yes</td>
-<td>info-equivalent (modulo refcount_bits, compat, zstd)</td>
+<td>4b</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>Indivisible — one commit.</strong> (i) Remove the <code>has_parent</code> rejection at <code>src/crates/vhdx/src/lib.rs:1647</code> and expose the flag on <code>VhdxState</code> so callers can test it (<code>has_parent</code> is already <code>pub</code> on the metadata at <code>:935</code>). (ii) In the generic chain-state initialiser <code>src/crates/qcow2/src/lib.rs:9450-9520</code>, refuse a differencing source in both the <code>ImageFormat::Vhd</code> arm (<code>:9478</code>, test <code>state.disk_type == vhd::DISK_TYPE_DIFFERENCING</code>) and the <code>ImageFormat::Vhdx</code> arm (<code>:9494</code>, test the new flag), raising the refusal from <em>inside</em> the function rather than threading it out: <code>init_chain_states</code> already takes <code>call_table: &amp;CallTable</code>, and <code>send_error</code> is a field on it (<code>src/shared/src/lib.rs:914</code>), so the arm can raise 4a's signal itself and return <code>false</code> unchanged. This needs <strong>no signature change and no caller change</strong> — the five real callers (<code>convert:300</code> and <code>:1020</code>, <code>compare:211</code>, <code>bench:1395</code>, <code>rebase:1201</code>) stay as they are, and the crate already calls the table elsewhere (<code>call_table.debug_print</code>). Note <code>send_error</code> takes NUL-terminated <code>*const u8</code>, while 4a's <code>OPERATION</code> is a <code>&amp;'static str</code> for the host's comparison, so add a NUL-terminated companion constant beside it in <code>src/shared/src/lib.rs</code> with a test asserting the two agree, rather than writing a bare literal at the call site. (iii) Do the same at <code>measure</code>'s two direct call sites (<code>src/operations/measure/src/main.rs:388</code> and <code>:400</code>). (iv) At each refusal, call the call table's <code>send_error</code> with 4a's marker and the format's status before returning failure, so the host renders the specific message; <code>map</code>'s refusal at <code>src/operations/map/src/main.rs:459-470</code> shows the return shape, but use the 4a channel rather than a result code — <code>convert</code>, <code>compare</code> and <code>check</code> have nowhere to put one. (v) Wire the host's generic failure sites to the 4a formatter, at minimum <code>src/vmm/src/main.rs:13241</code> (convert) and <code>:12213</code> (compare). Constraints: both crates are <code>no_std</code>, panic-free, no allocator; the arms are behind the <code>vhd-input</code> and <code>vhdx-input</code> features, so check both feature combinations build. Do <strong>not</strong> touch <code>VhdState::init</code>.</td>
 </tr>
 <tr>
-<td>vmdk</td>
-<td>monolithicSparse, streamOptimized</td>
-<td>Yes</td>
-<td>info-equivalent</td>
+<td>4c</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Teach <code>info</code> to report the parent. <code>info</code> parses the footer itself (<code>parse_vhd_footer</code>, <code>src/operations/info/src/main.rs:434</code>) and does not link the vhd crate — decide with the management session whether to add the dependency or extend the local parser, and state the choice. Report the parent name for a differencing VHD and the parent locator's linkage for a differencing VHDX, in both human and <code>--output json</code> forms, following how qcow2's backing file is already reported. Refuse nothing.</td>
 </tr>
 <tr>
-<td>vpc</td>
-<td>dynamic, fixed</td>
-<td>No</td>
-<td>info-equivalent (modulo CHS virtual_size rounding)</td>
+<td>4d</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td>Integration tests over the phase 2 fixtures. For each of convert, compare, bench, check, measure and dd, assert a non-zero exit and the expected message on <code>vhd-differencing</code>, <code>vhd-diff-child-aligned</code> and <code>vhdx-diff-child</code>; assert <code>map</code> still refuses (regression guard on the precedent) and that <code>info</code> now reports a parent. Assert dd and convert produce the same refusal, which is the only thing recording that they share a binary. Use the existing integration harness rather than a new one. The composed goldens (<code>vhd-diff-aligned-composed.raw</code>, <code>vhdx-diff-composed.raw</code>) are phase 11-16 material — do not use them here.</td>
 </tr>
 <tr>
-<td>vhdx</td>
-<td>dynamic</td>
-<td>No</td>
-<td>info-equivalent (modulo default block_size when unspecified)</td>
+<td>4e</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Documentation and closeout. Update <code>docs/format-coverage.md</code> (divergence notes), <code>docs/quirks.md</code> and <code>CHANGELOG.md</code> to state that differencing VHD and VHDX are refused on read with composition deferred. Close #547 and #548 with a comment naming the commit and the message a user now sees. Do not touch <code>docs/create.md</code> or the emitter docs — phases 5, 6 and 10 own those.</td>
 </tr>
 </tbody>
 </table>
-<p>A "No" in the <em>Backing?</em> column means the format cannot be created
-<em>as a child</em>: <code>-b</code> / <code>-o backing_file</code> is rejected. Any of these
-formats may still be used as the <strong>parent</strong> of a qcow2 or vmdk
-child, which is what <code>tests/test_create.py</code>'s <code>test_vhdx_as_backing</code>
-exercises.</p>
-<p>The "info-equivalence" contract is verified by the cross-version baseline
-matrix in <code>instar-testdata/expected-outputs/create-info-json/</code> across 80
-qemu-img versions (6.0.0 through 10.2.0), exercised by
-<code>tests/test_create.py</code>'s <code>TestCreateBaselineMatrix</code>.</p>
-<h2 id="output-format">Output format<a class="headerlink" href="#output-format" title="Permanent link">&para;</a></h2>
-<p>Human (default):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Created: foo.qcow2 (format=qcow2, virtual_size=1073741824, unit_size=65536)
-</code></pre></div>
-<p>JSON (<code>--output=json</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">"filename"</span><span class="p">:</span><span class="w"> </span><span class="s2">"foo.qcow2"</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">"virtual_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1073741824</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">"resolved_unit_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">"metadata_bytes_written"</span><span class="p">:</span><span class="w"> </span><span class="mi">196608</span><span class="p">,</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">"file_size_after"</span><span class="p">:</span><span class="w"> </span><span class="mi">196608</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="p">}</span>
-</code></pre></div>
-<p><code>-q</code> (quiet) suppresses both forms on success and only prints errors.</p>
-<h2 id="-o-keyvalue-reference"><code>-o key=value,...</code> reference<a class="headerlink" href="#-o-keyvalue-reference" title="Permanent link">&para;</a></h2>
-<p>Repeatable; later <code>-o</code> invocations override earlier ones. Individual
-flag values are overridden by matching <code>-o</code> keys when both are
-specified.</p>
-<h3 id="qcow2">qcow2<a class="headerlink" href="#qcow2" title="Permanent link">&para;</a></h3>
-<p>Honoured:
-- <code>size</code> (alternative to the positional <code>SIZE</code>)
-- <code>cluster_size</code> (512..2 MiB power of two)
-- <code>refcount_bits</code> — see Known divergences
-- <code>extended_l2</code> (on|off; requires <code>cluster_size &gt;= 16k</code>)
-- <code>lazy_refcounts</code> (on|off)
-- <code>compat</code> (0.10|1.1) — see Known divergences
-- <code>compression_type</code> (zlib|zstd) — see Known divergences
-- <code>preallocation</code> (off|metadata|falloc|full)
-- <code>backing_file</code>, <code>backing_fmt</code> (alternative to <code>-b</code> / <code>-F</code>)</p>
-<p>Rejected (future work):
-- <code>data_file</code>, <code>data_file_raw</code>, <code>encrypt.*</code></p>
-<h3 id="vmdk">vmdk<a class="headerlink" href="#vmdk" title="Permanent link">&para;</a></h3>
-<p>Honoured:
-- <code>size</code>, <code>subformat</code> (monolithicSparse|streamOptimized)
-- <code>backing_file</code>, <code>backing_fmt</code></p>
-<p>Rejected (instar doesn't emit these subformats):
-- <code>subformat=monolithicFlat</code>, <code>subformat=twoGbMaxExtent*</code></p>
-<p>Note: qemu-img doesn't accept an <code>-o grain_size=</code> key — grain is set by
-the subformat. instar exposes <code>--grain-size</code> as an independent flag.</p>
-<h3 id="vpc-vhd">vpc (VHD)<a class="headerlink" href="#vpc-vhd" title="Permanent link">&para;</a></h3>
-<p>Honoured:
-- <code>size</code>, <code>subformat</code> (dynamic|fixed)</p>
-<p>Accepted but no size effect:
-- <code>force_size</code></p>
-<p>Rejected (future work):
-- <code>backing_file</code>, <code>backing_fmt</code> — a VHD child with a parent is a
-  <em>differencing</em> disk (<code>disk_type=4</code> plus the dynamic header's
-  parent locator table), which <code>plan_vhd</code> refuses with
-  <code>BackingFileUnsupported</code>. See <a href="#future-work">Future work</a>.</p>
-<h3 id="vhdx">vhdx<a class="headerlink" href="#vhdx" title="Permanent link">&para;</a></h3>
-<p>Honoured:
-- <code>size</code>, <code>block_size</code> (1 MiB..256 MiB power of two)</p>
-<p>Accepted but no size effect:
-- <code>log_size</code></p>
-<p>Rejected (future work):
-- <code>backing_file</code>, <code>backing_fmt</code> — a VHDX child with a parent needs
-  the <code>HasParent</code> file-parameter bit and a populated parent locator
-  metadata item, which <code>plan_vhdx</code> refuses with
-  <code>BackingFileUnsupported</code>. See <a href="#future-work">Future work</a>.</p>
-<h3 id="raw">raw<a class="headerlink" href="#raw" title="Permanent link">&para;</a></h3>
-<p>Honoured:
-- <code>size</code>, <code>preallocation</code> (off|falloc|full)</p>
-<p>Rejected:
-- <code>preallocation=metadata</code> (raw has no metadata to preallocate)
-- Any backing-file key (raw doesn't support backing)</p>
-<h2 id="backing-file-semantics">Backing-file semantics<a class="headerlink" href="#backing-file-semantics" title="Permanent link">&para;</a></h2>
-<p>This section describes <code>create</code> for the two target formats that
-accept a backing file: qcow2 and vmdk. vpc and vhdx reject one
-(see above), and raw has no way to record one.</p>
-<p>The user-typed path is embedded verbatim into the new image's metadata,
-matching qemu-img: a relative path stays relative; an absolute path
-stays absolute. The host resolves the path <strong>relative to the new
-image's directory</strong> when opening the backing file, so the resulting
-reference is portable across moves of the parent.</p>
-<p>A backing file requires either <code>-F FMT</code> (explicit format hint) or <code>-u</code>
-(unsafe; assume raw). The hint is used as the initial format guess; if
-the backing file's first sector contradicts the hint via its magic
-bytes, auto-detection wins and the metadata records the detected
-format. Three-level chains record only the immediate parent — instar
-does not recurse to grandparents (matches qemu-img). When the backing
-size would exceed the target format's addressable range,
-<code>ERROR_BACKING_SIZE_TOO_LARGE</code> fires with an actionable
-"try a larger cluster size" hint.</p>
-<p>A <strong>differencing VHD or VHDX is refused as a backing file</strong>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>create failed: backing file is a differencing VHD or VHDX whose parent
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>instar cannot yet compose; an overlay on it could not be read back
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>(see PLAN-differencing.md)
-</code></pre></div>
-<p>This has its own error code (<code>ERROR_BACKING_DIFFERENCING</code>) rather than
-the generic <code>ERROR_BACKING_PARSE_FAILED</code>, because the backing header
-parses perfectly well — the image is valid, just not one instar can read
-through yet. Every read path in instar refuses a
-differencing image because the parent cannot be composed yet, so an
-overlay stacked on one would be a chain that can never be read back.
-Refusing at create time is the only outcome that does not hand you a
-dead image. Their plain dynamic parents are accepted normally. See the
-"VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a>.</p>
-<h2 id="preallocation-modes">Preallocation modes<a class="headerlink" href="#preallocation-modes" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Mode</th>
-<th>raw</th>
-<th>qcow2</th>
-<th>vmdk / vpc / vhdx</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>off</code></td>
-<td><code>ftruncate</code> only</td>
-<td>header + L1 + refcount only</td>
-<td>header + BAT only</td>
-</tr>
-<tr>
-<td><code>metadata</code></td>
-<td>rejected</td>
-<td>L1 + L2 + refcount populated; data region as a hole</td>
-<td>rejected (future work)</td>
-</tr>
-<tr>
-<td><code>falloc</code></td>
-<td><code>posix_fallocate</code></td>
-<td>metadata mode + <code>posix_fallocate</code> on data region</td>
-<td>rejected (future work)</td>
-</tr>
-<tr>
-<td><code>full</code></td>
-<td><code>fallocate(ZERO_RANGE)</code> with <code>pwrite</code> fallback</td>
-<td>metadata mode + zero-fill data region</td>
-<td>rejected (future work)</td>
-</tr>
-</tbody>
-</table>
-<p>For qcow2 metadata mode the L2 tables can total well over the guest's
-8 MiB scratch limit at large virtual sizes, so the guest streams them
-through a reusable single-cluster slot rather than packaging them into
-the <code>MetadataPlan</code>. The host's <code>apply_preallocation</code> helper handles
-<code>falloc</code> and <code>full</code> post-emission.</p>
-<h2 id="known-divergences-from-qemu-img-create">Known divergences from <code>qemu-img create</code><a class="headerlink" href="#known-divergences-from-qemu-img-create" title="Permanent link">&para;</a></h2>
-<p>The cross-version baseline matrix passes for the bulk of supported
-options, but four categories of writer divergence are documented and
-tracked as future work. The canonical list (with per-case rationale)
-is <code>KNOWN_WRITER_DIVERGENCES</code> in <code>tests/test_create.py</code>.</p>
+<p>Steps 4a and 4c are independent of each other. 4b depends on 4a.
+4d depends on 4b and 4c. 4e last.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>VHD <code>virtual_size</code></strong>: qemu-img rounds up to the next CHS-aligned
-  multiple (legacy VHD geometry); instar emits exact bytes. The
-  divergence is typically &lt; 256 KiB. Both files are valid VHDs; the
-  difference surfaces only in <code>qemu-img info</code>'s <code>virtual-size</code> field.</li>
-<li><strong>qcow2 <code>compat=0.10</code></strong>: the writer always emits <code>compat=1.1</code>.
-  qemu-img honours both.</li>
-<li><strong>qcow2 <code>compression_type=zstd</code></strong>: the writer records <code>zlib</code> in the
-  header regardless. qemu-img switches over to the zstd cluster
-  encoder when zstd is requested. The cluster data itself is empty in
-  a fresh image so the field-only divergence has no functional
-  impact, but <code>qemu-img info</code> reports the discrepancy.</li>
-<li><strong>vhdx default <code>block_size</code></strong>: at virtual sizes ≤ 1 GiB instar
-  defaults to 8 MiB; qemu-img always defaults to 32 MiB. Pass
-  <code>-o block_size=...</code> (or <code>--block-size</code>) explicitly to match.
-  Explicit block sizes round-trip cleanly.</li>
+<li><strong>A read path is missed, and one op still composes silently.</strong>
+  The likeliest failure of this phase, and the reason the entry
+  points were enumerated from the source rather than from the
+  master plan's op list. <em>Mitigation:</em> the management session
+  re-derives the list of <code>VhdState::init</code> / <code>VhdxState::init</code>
+  callers and <code>ImageFormat::Vhd|Vhdx</code> dispatch sites from the tree
+  at review time and compares it against what 4b changed; 4d
+  covers every op by name including dd.</li>
+<li><strong>The 4b window.</strong> Removing the VHDX rejection before the
+  refusals land makes the tree briefly worse than it is today.
+  <em>Mitigation:</em> 4b is one commit, stated in the brief and checked
+  first at review.</li>
+<li><strong>Feature-gate blindness.</strong> The chain initialiser's arms are
+  behind <code>vhd-input</code> and <code>vhdx-input</code>. A refusal added inside a
+  gate that some op does not enable protects nothing. <em>Mitigation:</em>
+  4b's brief requires building both feature combinations; the
+  review greps which ops enable which features.</li>
+<li><strong><code>info</code> parity churn.</strong> Decision 4 deliberately changes <code>info</code>
+  output for differencing images, which phase 3's parity script
+  will report. <em>Mitigation:</em> stated in decision 4 and in the DoD;
+  the run is read for <em>which</em> images changed, and any change
+  outside the differencing fixtures is a defect.</li>
+<li><strong>Guest binary size.</strong> Every guest binary has a 768KB cap and
+  <code>make check-binary-sizes</code> enforces it. The additions are small,
+  but <code>check</code> and <code>convert</code> are the largest binaries.
+  <em>Mitigation:</em> in the DoD.</li>
 </ul>
-<p>All <code>-o refcount_bits=</code> widths (1/2/4/8/16/32/64) are now written
-correctly: <code>build_header</code> derives <code>refcount_order</code> from <code>refcount_bits</code>
-and sub-byte widths pack LSB-first, so the produced files round-trip
-through <code>instar check</code> and match <code>qemu-img</code> (instar #365).</p>
-<h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
-<ul>
-<li>VHD CHS-geometry round-trip matching (close the <code>virtual_size</code>
-  divergence).</li>
-<li>qcow2 <code>compat=0.10</code> honouring.</li>
-<li>zstd-aware qcow2 create (drop the accept-ignore; emit the zstd
-  header bit).</li>
-<li>vhdx default <code>block_size</code> matching qemu's 32 MiB at all virtual
-  sizes.</li>
-<li>Preallocation for vmdk / vpc / vhdx (each format needs its own
-  BAT-population pattern plus the same host <code>apply_preallocation</code>
-  post-pass that qcow2 already uses).</li>
-<li>Differencing VHD (<code>disk_type=4</code> + parent locators) and
-  differencing VHDX (<code>HasParent</code> + parent locator metadata item) as
-  create targets, so <code>-b</code> works for vpc and vhdx. qemu-img creates
-  neither ("Backing file not supported for file format 'vpc'"), so
-  this is an instar-only capability with no qemu-img oracle.</li>
-<li>Multi-file VMDK subformats (<code>monolithicFlat</code>, <code>twoGbMaxExtentSparse</code>,
-  <code>twoGbMaxExtentFlat</code>) — needs multi-output-device support in the
-  call table.</li>
-<li>VHDX <code>subformat=fixed</code> (not emitted by qemu-img either).</li>
-<li><code>--object OBJDEF</code> and <code>encrypt.*</code> for LUKS-encrypted create —
-  pair with the existing convert-side passphrase plumbing.</li>
-<li>Atomic-rename safety: write to <code>FILENAME.tmp</code> and <code>rename()</code> on
-  guest success, so a guest crash mid-emission doesn't leave a
-  partial file.</li>
-<li>Refactor convert to call into <code>crates/create/</code> for the metadata
-  emission step (master-plan future-work item).</li>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Checked by step 4e (documentation and closeout) against the commits
+listed at the top of this plan's "Found during implementation" section
+and against the tree at <code>HEAD</code>. Items are ticked where 4e could verify
+them directly (by reading the code/tests or diffing commits); where 4e
+relied on an earlier step's own record without re-running it, that is
+said so explicitly rather than presented as independently checked.</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>instar convert -O raw</code>, <code>instar dd</code>, <code>instar compare</code>,
+  <code>instar bench</code>, <code>instar check</code> and <code>instar measure</code> each exit
+  non-zero on <code>vhd-differencing</code>, <code>vhd-diff-child-aligned</code> and
+  <code>vhdx-diff-child</code>, with a message naming the operation and the
+  parent reference. Verified by the 4d tests
+  (<code>tests/test_differencing.py</code>), not by hand. The message names the
+  operation and the format (<code>VHD</code>/<code>VHDX</code>) and says "whose parent
+  instar cannot yet compose"; it does not quote the parent's literal
+  path (that would require resolving it, which phase 4 deliberately
+  does not do — see decision 3's VHDX path-resolution note).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No operation writes output composed from a differencing source.
+  Specifically, <code>instar convert -O raw</code> on <code>vhd-differencing</code>
+  produces <strong>no output file</strong>, where before commit <code>10ab838</code> it
+  produced a wrong one and exited 0. Verified by
+  <code>TestDifferencingConvertLeavesNoOutput</code>.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No operation gained a result struct or a new protocol message:
+  the refusal travels on the existing <code>send_error</code> channel, and
+  <code>git diff 42e879f..HEAD</code> touches neither <code>crates/guest-protocol</code>
+  nor any <code>*Result</code> struct definition in <code>src/shared/src/lib.rs</code>
+  beyond the new <code>DifferencingRefusal</code> constants module. Verified by
+  diffing the range directly.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -rn 'VhdState::init\|VhdxState::init' --include=*.rs src/</code>
+  and the <code>ImageFormat::Vhd</code>/<code>ImageFormat::Vhdx</code> dispatch arms in
+  <code>src/crates/qcow2/src/lib.rs</code> together enumerate every read
+  entry point, and each one either refuses a differencing source
+  or is <code>create</code> (which writes) or a fuzz target. Checked by
+  reading the code in step 4e: the real (non-comment, non-fuzz)
+  call sites are <code>map</code> (both arms), <code>measure</code> (both arms),
+  <code>init_chain_states</code> in <code>crates/qcow2</code> (both arms, serving
+  <code>convert</code>/<code>compare</code>/<code>bench</code>/<code>rebase</code>), and <code>create</code>'s <code>VhdxState</code>
+  use for output construction — every one of the first three refuses
+  a differencing source, and <code>create</code> writes rather than reads.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>src/crates/vhdx/src/lib.rs</code> no longer rejects <code>has_parent</code> in
+  <code>init</code>, and the commit that removed it is the same commit that
+  added every entry-point refusal — verified with
+  <code>git show --stat 10ab838</code>, which touches <code>crates/vhdx</code>,
+  <code>crates/qcow2</code>, <code>operations/check</code>, <code>operations/map</code>,
+  <code>operations/measure</code>, <code>shared</code> and <code>vmm</code> together.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>instar info</code> reports a parent for <code>vhd-diff-child-aligned</code> and
+  <code>vhdx-diff-child</code> in both human and JSON output, and
+  <code>tools/verify-info-output-parity.sh</code> reports differences on the
+  differencing fixtures <strong>and on no others</strong>.</li>
 </ul>
-<p>For the per-format metadata layouts implemented today, see
-<code>src/crates/create/src/lib.rs</code> (the <code>plan_qcow2</code> / <code>plan_vmdk</code> /
-<code>plan_vhd</code> / <code>plan_vhdx</code> functions). For the divergence-whitelist
-applied during JSON comparison, see <code>tests/helpers/info_json.py</code>.</p>
-<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<p>Create a 1 GiB qcow2 with default options:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar create -f qcow2 disk.qcow2 1G
-</code></pre></div>
-<p>Same but with a 4 KiB cluster size and extended L2:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar create -f qcow2 -o cluster_size=4k,extended_l2=on disk.qcow2 1G
-</code></pre></div>
-<p>Create a vmdk with the stream-optimised subformat:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar create -f vmdk -o subformat=streamOptimized disk.vmdk 1G
-</code></pre></div>
-<p>Create a 16 MiB fixed VHD (footer-only metadata at end of file):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar create -f vpc -o subformat=fixed disk.vhd 16M
-</code></pre></div>
-<p>Create a vhdx with an explicit 32 MiB block size (matches qemu-img's
-default and avoids the <code>vhdx</code> default-block-size divergence):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar create -f vhdx -o block_size=32M disk.vhdx 1G
-</code></pre></div>
-<p>Create a qcow2 child image with a backing reference (virtual_size
-defaults from the parent):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar create -f qcow2 -b parent.qcow2 -F qcow2 child.qcow2
-</code></pre></div>
-<p>Create a raw image with <code>falloc</code> preallocation (reserves blocks
-without writing them):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar create -f raw --preallocation falloc disk.raw 1G
-</code></pre></div>
-<p>JSON output for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>instar create -f qcow2 --output json disk.qcow2 1G
-</code></pre></div>
+<p><strong>This bullet's own wording is imprecise, corrected here rather
+  than silently fixed.</strong> <code>vhd-differencing</code> — the example this bullet
+  originally named — is a dynamic VHD patched to disk type 4 with an
+  all-zero parent name, so <code>info</code> correctly reports <strong>no</strong> backing
+  file for it (<code>test_info_reports_the_disk_type_4_fixture_without_a_parent</code>
+  pins exactly this). The fixtures that actually have a resolvable
+  parent for <code>info</code> to report are <code>vhd-diff-child-aligned</code> (parent
+  <code>vhd-diff-parent.vhd</code>) and <code>vhdx-diff-child</code> (parent
+  <code>.\vhdx-diff-parent.vhdx</code>), which is what the corrected wording
+  above says. The parity-script claim itself is independently
+  confirmed (from a <code>tools/verify-info-output-parity.sh</code> run against
+  base <code>42e879f</code> and this phase's tree, captured during step 4d and
+  read by step 4e rather than re-run): <code>Compared: 208, Failed: 9</code>,
+  with the nine named exactly as the differencing children and the
+  locator-audit fixtures (<code>vhd-diff-child-aligned</code>,
+  <code>vhd-diff-child-mixed</code>, <code>vhdx-diff-child</code>,
+  <code>vhd-diff-locator-etc-passwd</code>, <code>vhd-diff-locator-dotdot</code>,
+  <code>vhd-diff-locator-unc</code>, <code>vhd-diff-locator-url</code>,
+  <code>vhd-diff-locator-overlong</code>, <code>vhd-diff-locator-conflicting</code>) and no
+  others, matching commit <code>c561aad</code>'s own record exactly.
+- [x] <code>instar map</code> still refuses <code>vhd-differencing</code> with its existing
+  message, unchanged. Verified by reading
+  <code>src/operations/map/src/main.rs:459-470</code> (unchanged VHD arm) and by
+  <code>TestDifferencingMapStillRefuses</code>.
+- [ ] Issues #547 and #548 are closed, each with a comment quoting the
+  message a user now sees. <strong>Deliberately not done by step 4e.</strong> Per
+  this step's brief, closing issues and posting GitHub comments is
+  left to the operator: the closing comments are drafted to the
+  session scratchpad (not committed to the repository) for the
+  operator to review and post by hand.
+- [x] <code>VhdState::init</code> is byte-for-byte unchanged. Verified with
+  <code>git diff 42e879f..HEAD -- src/crates/vhd/src/lib.rs</code>, which is
+  empty.
+- [x] <code>make instar</code> builds, <code>make check-binary-sizes</code> passes, and
+  <code>make test-rust</code> passes. Confirmed from this session's own
+  build/test run logs from step 4d (not re-run by 4e, which is
+  docs-only): the release build succeeded (all binaries listed,
+  including <code>check.bin</code>, <code>map.bin</code> and <code>measure.bin</code>),
+  <code>check-binary-sizes</code> passed as part of the same pre-commit run
+  noted below, and <code>make test-rust</code> reported 0 failures across every
+  crate's unit-test binary.
+- [x] <code>pre-commit run --all-files</code> passes. Confirmed twice: once
+  from step 4d's own run log (every hook passed), and again by step
+  4e itself against this documentation change (see the commit this
+  plan update lands in).
+- [x] <code>make test-integration</code> passes. Run by the management session
+  against the tree with every step of this phase committed:
+  <code>Ran: 3508 tests ... Passed: 2637, Skipped: 871, Failed: 0</code>, exit 0.
+  An earlier run during this phase did record one failure, in
+  <code>test_commit.py</code>, where a <code>qemu-img commit</code> subprocess timed out at
+  60 seconds -- the signature of already-tracked issue #528, a
+  load-sensitive flake unrelated to differencing. It did not
+  reproduce in the clean run above, which is the evidence for calling
+  it load and not a regression.</p>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step of this plan, please back brief the
+operator as to your understanding of the plan and how the work you
+intend to do aligns with that plan.</p>
+<p>In particular, back brief before starting <strong>step 4b</strong>: it removes
+a working safety net and must land as a single commit, and the
+choice of how to thread the refusal reason out of the chain
+initialiser's <code>bool</code> return should be agreed before the editing
+starts rather than discovered in review.</p>
 
 
 
@@ -14597,7 +14624,7 @@ without writing them):</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/create.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/create.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/create/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20components/instar/plans/PLAN-differencing-phase-04-read-policy.md&body=%2A%2ASource%20file%3A%2A%2A%20%60components/instar/plans/PLAN-differencing-phase-04-read-policy.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/components/instar/plans/PLAN-differencing-phase-04-read-policy/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
@@ -14638,10 +14665,10 @@ without writing them):</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": [], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

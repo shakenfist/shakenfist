@@ -3830,6 +3830,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14052,6 +14063,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14139,7 +14161,8 @@ and flat-in-backing-chain via parentFileNameHint), check validates:</p>
 <ul>
 <li>Footer cookie and checksum (from first or last sector)</li>
 <li>Format version (must be 1.0) and features (reserved bit required)</li>
-<li>Disk type validity (fixed, dynamic, differencing)</li>
+<li>Disk type validity (fixed or dynamic; a differencing VHD is refused
+  rather than validated — see "Differencing images" below)</li>
 <li>Fixed VHD: data_offset check, file size vs virtual size validation</li>
 <li>Dynamic header cookie, checksum, and version</li>
 <li>BAT offset within file bounds</li>
@@ -14159,7 +14182,8 @@ and flat-in-backing-chain via parentFileNameHint), check validates:</p>
 <li>Region table 2: cross-validation against region table 1</li>
 <li>Metadata: required items (FileParameters, VirtualDiskSize,
   LogicalSectorSize, PhysicalSectorSize)</li>
-<li>Differencing disk detection (unsupported)</li>
+<li>Differencing disk detection — refused rather than validated, see
+  "Differencing images" below</li>
 <li>BAT entries: block offsets within file bounds, 1MB alignment,
   overlap detection, state validation</li>
 <li>Fragmentation tracking (non-sequential block allocation)</li>
@@ -14181,6 +14205,31 @@ in human-readable output. Without <code>--chain</code>, <code>chain-errors</code
 <p><strong>Note:</strong> The <code>chain-errors</code> field is always present in JSON output,
 even when <code>--chain</code> is not used. This is a schema addition relative to
 previous versions.</p>
+<h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
+<p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) holds
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so <code>check</code> <strong>refuses</strong> such an image instead of validating it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ instar check vhdx-diff-child.vhdx
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>check: source is a differencing VHDX image whose parent instar cannot yet
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>compose; composition is deferred (see PLAN-differencing.md)
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>$ echo $?
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>1
+</code></pre></div>
+<p>Two things about that are worth knowing if you script against <code>check</code>:</p>
+<ul>
+<li><strong>The exit code is 1, not 2.</strong> Exit 2 means "corruption found"; a
+  differencing image is not corrupt, it is unsupported, so it takes the
+  ordinary failure code. A differencing VHDX previously exited 2 with
+  <code>"1 errors were found on the image."</code>, and a differencing VHD
+  previously exited <strong>0</strong> having validated only the child's own blocks.</li>
+<li><strong><code>--output json</code> produces no JSON document.</strong> The refusal happens
+  before there is a result to serialise, so stdout is empty and the
+  message goes to stderr. Every other <code>check</code> outcome, including
+  corruption, still writes a JSON object.</li>
+</ul>
+<p>Validation resumes once parent composition lands; see
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> and the
+"VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a>.</p>
 
 
 

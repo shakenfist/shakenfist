@@ -14647,12 +14647,12 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <td>3. Parent-locator parsing in <code>crates/vhd</code> and <code>crates/vhdx</code></td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-03-parse/">PLAN-differencing-phase-03-parse.md</a></td>
 <td>Complete</td>
-<td></td>
+<td><code>42e879f</code> (#558)</td>
 </tr>
 <tr>
 <td>4. Read-side policy: close the silent parent-ignoring read</td>
-<td>PLAN-differencing-phase-04-read-policy.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-04-read-policy/">PLAN-differencing-phase-04-read-policy.md</a></td>
+<td>Complete</td>
 <td></td>
 </tr>
 <tr>
@@ -14927,7 +14927,12 @@ restating it. What is specific to this plan:</p>
   it had no parent, at any commit in the plan: phase 4's refusal
   and then phase 11's composition are applied uniformly across
   <code>info</code>, <code>check</code>, <code>convert</code>, <code>compare</code>, <code>dd</code>, <code>bench</code>, <code>map</code>
-  and <code>measure</code>.</li>
+  and <code>measure</code>. Phase 4's survey corrected two assumptions here:
+  <code>map</code> already refuses (commit <code>eb6e23f</code>, 2026-06-03) and is the
+  precedent phase 4 generalises rather than outstanding work, as
+  does <code>resize</code>; and <code>dd</code> is not an operation -- <code>run_dd</code>
+  (<code>src/vmm/src/main.rs:13958</code>) calls <code>execute_convert</code>, so it
+  shares convert's guest binary and inherits its behaviour.</li>
 <li><code>instar convert -O raw</code> on a differencing child produces the
   same bytes as the phase 1 oracle's composition of the same
   chain -- driven through the <code>python3-libvhdi</code> binding, since

@@ -14308,13 +14308,24 @@ with <code>1a677c77</code> (#552).</p>
   decision rather than an oversight.</li>
 <li><code>git diff --name-only develop...HEAD -- src/operations/</code> is
   empty: no operation changed.</li>
-<li><code>VhdState::init</code> still accepts <code>DISK_TYPE_DIFFERENCING</code> and
-  <code>VhdxState::init</code> still rejects <code>has_parent</code>, unchanged. Issues
-  #547 and #548 are still open.</li>
-<li><code>make instar</code> builds, <code>make check-binary-sizes</code> passes,
-  <code>make test-rust</code> passes, and <code>pre-commit run --all-files</code>
-  passes.</li>
 </ul>
+<p><strong>Not true as merged, corrected in retrospect.</strong> The review
+  round that bounded a VHDX locator to its metadata region gave
+  <code>parse_metadata</code> a <code>metadata_length</code> parameter, which changed
+  the one caller outside the crate:
+  <code>src/operations/check/src/main.rs</code> gained
+  <code>let metadata_length = regions[1].length;</code> and passes it
+  through. That is a call-site edit with no behaviour change --
+  <code>check</code> does nothing new with the value -- but the criterion as
+  written is false against <code>42e879f</code>, and the honest record is
+  that the bullet was not revisited when the review change
+  landed.
+* <code>VhdState::init</code> still accepts <code>DISK_TYPE_DIFFERENCING</code> and
+  <code>VhdxState::init</code> still rejects <code>has_parent</code>, unchanged. Issues
+  #547 and #548 are still open.
+* <code>make instar</code> builds, <code>make check-binary-sizes</code> passes,
+  <code>make test-rust</code> passes, and <code>pre-commit run --all-files</code>
+  passes.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step, back brief the operator on the
 understanding of this phase and how the intended work aligns with

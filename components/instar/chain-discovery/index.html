@@ -3863,6 +3863,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-differencing-vhd-or-vhdx-parent-is-not-walked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A differencing VHD or VHDX parent is not walked
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14230,6 +14258,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-differencing-vhd-or-vhdx-parent-is-not-walked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A differencing VHD or VHDX parent is not walked
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14444,6 +14500,30 @@ validating paths before following them.</p>
   walks the chain to resolve unallocated clusters, producing a standalone
   output image with no backing dependencies.</li>
 </ul>
+<h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
+<h3 id="a-differencing-vhd-or-vhdx-parent-is-not-walked">A differencing VHD or VHDX parent is not walked<a class="headerlink" href="#a-differencing-vhd-or-vhdx-parent-is-not-walked" title="Permanent link">&para;</a></h3>
+<p><code>discover_backing_chain</code> deliberately stops at a VHD (<code>disk_type == 4</code>) or
+VHDX (<code>HasParent</code> set) parent instead of resolving it, recording the
+parent reference (so <code>instar info</code> can still report it) without following
+it. <code>instar info --chain</code> on such an image therefore reports a one-image
+chain even though the image has a parent:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>$ instar info --chain vhd-diff-child-aligned.vhd
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Chain: 1 image(s)
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  [0] /path/to/vhd-diff-child-aligned.vhd (vpc) -&gt; vhd-diff-parent.vhd
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>      ...
+</code></pre></div>
+<p>This is not an oversight: nothing in instar can compose a VHD or VHDX
+parent yet, so walking it would only change <em>which</em> failure a caller sees
+(a resolved-but-uncomposable parent) rather than whether reading succeeds,
+and for VHDX it would actively make things worse — the parent locator is a
+Windows-shaped path (<code>.\parent.vhdx</code>) that does not resolve on POSIX, so
+walking it turned a clear refusal into a "backing file not found" error.
+The <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code> and <code>measure</code> operations
+refuse a differencing source outright regardless of whether its parent
+exists — see the "VHD/VHDX differencing" section of
+<a href="/components/instar/quirks/">quirks.md</a> — so a refusal must not depend on the parent being
+present. Phase 14 of <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>
+lifts this restriction per operation as real chain composition lands.</p>
 
 
 

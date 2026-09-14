@@ -3702,6 +3702,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resize-accepts-a-differencing-vhdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resize accepts a differencing VHDX
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14097,6 +14125,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resize-accepts-a-differencing-vhdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resize accepts a differencing VHDX
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14381,6 +14437,26 @@ entire data region. This is a deliberate divergence — see
 <code>KNOWN_RESIZE_DIVERGENCES</code> at the top of <code>tests/test_resize.py</code>.
 The create-side carry-forwards are listed in
 <code>tests/test_create.py:KNOWN_WRITER_DIVERGENCES</code>.</p>
+<h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
+<h3 id="resize-accepts-a-differencing-vhdx"><code>resize</code> accepts a differencing VHDX<a class="headerlink" href="#resize-accepts-a-differencing-vhdx" title="Permanent link">&para;</a></h3>
+<p><code>instar resize</code> should refuse a differencing VHDX the same way it
+refuses a differencing VHD, and its planner already has the logic to do
+so: <code>src/crates/resize/src/vhdx.rs:55</code> guards on <code>opts.has_parent</code> and
+is covered by the planner's own <code>rejects_differencing_image</code> unit test.
+But the caller that builds those options,
+<code>src/operations/resize/src/main.rs:839</code>, hard-codes <code>has_parent: false</code>
+regardless of the actual image, so the guard has never fired — dead
+since commit <code>94d73b7</code> (May 2026). <code>instar resize</code> on a differencing
+VHDX therefore succeeds today, silently resizing an image whose content
+instar cannot compose.</p>
+<p>This is a <strong>write</strong> path and predates
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>; <code>resize</code> never
+called <code>VhdxState::init</code>, so the read-side refusal (see
+<a href="/components/instar/quirks/">quirks.md</a>'s "VHD/VHDX differencing" section) neither
+caused this bug nor fixes it. Closing it is call-site wiring, not
+planner logic — thread the image's real <code>has_parent</code> value into
+<code>VhdxResizeOpts</code> instead of the hard-coded <code>false</code>. Tracked as
+<a href="https://github.com/shakenfist/instar/issues/565">issue #565</a>.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li>qcow2 <code>Preallocation::Metadata</code>: emit the populated
@@ -14402,8 +14478,10 @@ The create-side carry-forwards are listed in
  with <code>UnsupportedSubformat</code>. Multi-file resize needs the same
  multi-output-device call-table extension that create's roadmap
  already calls out.</li>
-<li>Differencing VHD / VHDX as a resize target: rejected today;
- needs the parent-locator update path.</li>
+<li>Differencing VHD / VHDX as a resize target: VHD is rejected today
+ (<code>ResizeResult::ERROR_UNSUPPORTED_SUBFORMAT</code>); VHDX is not, a dead-guard
+ bug — see "Known limitations" above. Neither can be supported for real
+ until the parent-locator update path exists.</li>
 <li><code>--object OBJDEF</code> and <code>--image-opts</code>: rejected at the host CLI. LUKS-encrypted resize would land alongside the
  matching <code>--object</code> plumbing on the convert side.</li>
 <li>Tightening <code>QCOW2_MAX_RESIZE_SCRATCH</code> (32 MiB) for non-default

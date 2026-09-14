@@ -3742,6 +3742,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -3758,6 +3776,36 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -13877,6 +13925,25 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -13926,6 +13993,19 @@ When images differ in size, non-strict mode (default) treats extra zero-filled
 regions as matching, while strict mode (<code>-s</code>) fails immediately on any size
 difference.</p>
 <p>Output is byte-for-byte identical with <code>qemu-img compare</code>.</p>
+<h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
+<p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so <code>compare</code> refuses such a source by name and exits 1 rather than
+reporting a content difference it cannot actually account for:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>compare: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+</code></pre></div>
+<p><code>instar info</code> is the exception — it reports the parent as a backing file
+instead of refusing. See the "VHD/VHDX differencing" section of
+<a href="/components/instar/quirks/">quirks.md</a> for the per-operation record, and
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the composition
+work that will lift the refusal.</p>
 
 
 

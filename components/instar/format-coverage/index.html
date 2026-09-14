@@ -4038,6 +4038,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#vhdvhdx-differencing-parent-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD/VHDX differencing (parent composition)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14636,6 +14647,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#vhdvhdx-differencing-parent-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHD/VHDX differencing (parent composition)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15857,6 +15879,31 @@ vvfat (and QED …) produce clean, tested, documented refusals rather than
 misdetection as raw" — for vvfat by documented rationale rather than code:
 there is no on-disk artefact to misdetect, so no detection or refusal path is
 owed.</p>
+<h3 id="vhdvhdx-differencing-parent-composition">VHD/VHDX differencing (parent composition)<a class="headerlink" href="#vhdvhdx-differencing-parent-composition" title="Permanent link">&para;</a></h3>
+<p>A differencing VHD (<code>disk_type == 4</code>) or differencing VHDX (<code>HasParent</code>
+set) is a sub-state of the vhd/vpc and vhdx rows above, not a separate
+format, so it gets no row of its own in the tables. Every op in the
+read-side table that composes sector data — <code>convert</code>, <code>dd</code>, <code>compare</code>,
+<code>bench</code>, <code>check</code>, <code>measure</code> — refuses a differencing source by name
+instead of reading it, because instar cannot yet compose the parent's
+data into the read; composition is future work tracked in
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>. <code>map</code>
+refuses too, with its own older message and error code. <code>info</code> is the
+one exception in the table: it reports the parent as a backing file and
+does not refuse, because it composes no sector data and has no wrong
+answer to give.</p>
+<p>This is a <strong>recorded divergence, and instar is the stricter side</strong>:
+qemu-img 10.0.11 has no such refusal. On a differencing VHD, <code>qemu-img
+convert -O raw</code> exits 0 and silently composes the output as though the
+parent's sectors were zero — the same wrong answer instar itself used to
+give (issue #547) — and qemu-img has not changed. instar does not follow
+that behaviour; it refuses by name instead. On a differencing VHDX,
+qemu-img's own <code>info</code> cannot open the file at all ("Operation not
+supported"), which is the shape of undiagnosed failure issue #548 was
+filed over on the instar side before this refusal existed. See
+<a href="/components/instar/quirks/#vhdvhdx-differencing-instar-refuses-where-qemu-img-silently-misreads">quirks.md</a>
+for the full command transcripts, the exact refusal wording, and the
+per-op record before and after the fix (commit <code>10ab838</code>).</p>
 <hr />
 <h2 id="conversion-output-format-support">Conversion Output Format Support<a class="headerlink" href="#conversion-output-format-support" title="Permanent link">&para;</a></h2>
 <p>The <code>instar convert</code> operation supports writing output in the following formats:</p>

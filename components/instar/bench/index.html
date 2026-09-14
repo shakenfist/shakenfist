@@ -4249,6 +4249,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14274,6 +14285,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -15067,6 +15089,19 @@ divergence registry, see <code>KNOWN_BENCH_DIVERGENCES</code> at the top of
 <a href="https://github.com/shakenfist/instar/blob/develop/tests/test_bench.py"><code>tests/test_bench.py</code></a>. See also
 <a href="/components/instar/usage/">usage.md</a>. For the qcow2-write migration quirks, see
 <a href="/components/instar/quirks/">quirks.md</a>.</p>
+<h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
+<p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so <code>bench</code> refuses such a source by name and exits 1 rather than
+benchmarking reads that silently skip the parent's blocks:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>bench: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+</code></pre></div>
+<p><code>instar info</code> is the exception — it reports the parent as a backing file
+instead of refusing. See the "VHD/VHDX differencing" section of
+<a href="/components/instar/quirks/">quirks.md</a> for the per-operation record, and
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the composition
+work that will lift the refusal.</p>
 
 
 

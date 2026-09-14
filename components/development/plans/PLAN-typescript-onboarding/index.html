@@ -14776,15 +14776,22 @@ exist. <code>release-process</code>, <code>pin-indirect-dependencies</code>,
 A TypeScript repository with a <code>package.json</code> and a
 <code>package-lock.json</code> raises the same questions about pinning and
 unused dependencies, and today the audit simply does not ask them.</p>
-<p><strong>The runners cannot run npm.</strong> No workflow anywhere in the fleet
-uses <code>setup-node</code>, <code>npm ci</code> or <code>npm install</code>; the mermaid-lint
-template records the reason, that running it "from the upstream
-container keeps chromium and a node toolchain off the runners", and
-that jsdom "pulls in an undici that needs a newer node than the
-runners carry". The static runners boot <code>debian:12</code>
-(<code>33fl/static_runner.yml:229</code>), which packages <code>nodejs 18.20.4</code>.
-Debian 13 packages <code>nodejs 20.19.2</code>. Both were confirmed against the
-archive rather than assumed.</p>
+<p><strong>The runners could not run npm</strong> when this plan was written on
+2026-09-11. No workflow anywhere in the fleet used <code>setup-node</code>,
+<code>npm ci</code> or <code>npm install</code>; the mermaid-lint template recorded the
+reason, that running it "from the upstream container keeps chromium
+and a node toolchain off the runners", and that jsdom "pulls in an
+undici that needs a newer node than the runners carry". The static
+runners booted <code>debian:12</code>, which packages <code>nodejs 18.20.4</code>. Debian
+13 packages <code>nodejs 20.19.2</code>. Both were confirmed against the archive
+rather than assumed.</p>
+<p>Both halves of that have since gone: the fleet was replaced on
+2026-09-12 and boots the release named by
+<code>static_runner_debian_release</code>, and took <code>nodejs</code> and <code>npm</code> as base
+packages on 2026-09-13. See phase 4. This paragraph is left as the
+statement of the problem the plan was written to solve, dated rather
+than rewritten, and the rationale it quotes has been reworded in the
+files it quotes from.</p>
 <p>hunkydory itself was verified to build and pass its 20 unit tests on
 Debian 12's <code>nodejs 18.20.4</code> inside a container, and Biome 2.5.13 was
 verified to install and run there too. So node 18 is <em>sufficient</em>;
@@ -14821,8 +14828,10 @@ runner pool (<code>l</code>, six workers fleet-wide) on a thirty-second build.</
 image. That makes npm a first-class fleet capability rather than a
 hunkydory workaround, keeps the runtime on Debian's security
 support, and leaves CI as <code>npm ci</code> with nothing to download.</p>
-<p>Taken together with the version question, this means moving the
-static runners from <code>debian:12</code> to <code>debian:13</code>. hunkydory runs fine
+<p>Taken together with the version question, this means the static
+runners must be on <code>debian:13</code>. That move landed separately in
+<code>33fl</code> before this phase began -- see phase 4 -- so what this plan
+contributes is the packages, not the release. hunkydory runs fine
 on Debian 12's node 18.20.4, so this is not forced by hunkydory.
 It is taken because node 18 reached upstream end of life in April
 2025 and Debian 13's node 20.19.2 both matches what the project is
@@ -14911,22 +14920,22 @@ Nothing else in the plan writes to that repository.</p>
 </tr>
 <tr>
 <td>2. hunkydory adopts the local tooling</td>
-<td>Not started</td>
-<td></td>
+<td>Complete</td>
+<td>hunkydory 73cdca7 (#1)</td>
 </tr>
 <tr>
 <td>3. npm dependency criteria</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>b8e8fd2 (#126)</td>
 </tr>
 <tr>
 <td>4. Static runners gain node</td>
-<td>Not started</td>
-<td></td>
+<td>In progress</td>
+<td>33fl bc50c52a, deployed</td>
 </tr>
 <tr>
 <td>5. hunkydory CI and the fleet workflows</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -15015,6 +15024,16 @@ here so the next reader knows the issues were expected.</p>
   phase that gives phase 8 a runbook to cite rather than a gap to
   explain.</li>
 </ul>
+<p><strong>Landed 2026-09-13.</strong> The audit went from six passes and nine
+failures to fourteen passes and five failures against hunkydory. The
+five that remain all need a <code>.github/workflows/</code> directory or a
+repository setting, so they are phase 5 and phase 7 work.
+<code>llm-context-lint-ci</code> is the one to watch: this phase closed its
+pre-commit half, and it stays red until phase 5 adds the CI route.</p>
+<p><code>tools/check-node.sh</code> deliberately does not run the corpus check,
+because that needs a sibling <code>kerbside-patches</code> checkout which will
+not exist in CI. The strongest test hunkydory has is therefore the
+one CI will never run, which is worth revisiting in phase 5.</p>
 <h3 id="3-npm-dependency-criteria">3. npm dependency criteria<a class="headerlink" href="#3-npm-dependency-criteria" title="Permanent link">&para;</a></h3>
 <p>Three checks per D4, following the shape
 <code>docs/audits/README.md</code> and the template's worked brief describe. A
@@ -15089,53 +15108,78 @@ That is not drift and must not be read as drift.</p>
 <p>Note that this repository is inside its own audit matrix: these
 checks will run against <code>development</code> too, find no <code>package.json</code>,
 and must report not-applicable rather than failing.</p>
+<p><strong>Landed 2026-09-13.</strong> All three criteria pass against hunkydory
+and report not-applicable with a reason everywhere else, so the phase
+filed no issues. Review found two false-failure bugs before merge: a
+workflow was read as text, so a step named "do not use npm install
+here" failed a repository whose only npm command was <code>npm ci</code>; and
+<code>npm-shrinkwrap.json</code> was skipped as a foreign lockfile when it is
+npm's own format and takes precedence over <code>package-lock.json</code>. Both
+are fixed and pinned by tests. The suite went from 1070 to 1093.</p>
 <h3 id="4-static-runners-gain-node">4. Static runners gain node<a class="headerlink" href="#4-static-runners-gain-node" title="Permanent link">&para;</a></h3>
 <p><strong>Released by the operator on 2026-09-13; see D5.</strong> It was held
 until then because another session was editing <code>33fl</code>.</p>
-<p>In <code>33fl/static_runner.yml</code>:</p>
+<p><strong>Most of this phase was already done by that other session, and
+this plan described it wrongly.</strong> It called the work a re-image. It
+is not: <code>33fl</code>'s own <code>worktree-debian-13-static-runners</code> branch had
+already landed the Debian move, parameterised as
+<code>static_runner_debian_release: 13</code> in
+<code>group_vars/all/static_runners.yml</code>, and the operator replaced every
+static runner on 2026-09-12. The fleet was on Debian 13 before this
+phase started.</p>
+<p>So the line numbers above were stale and only one item remained:
+<code>nodejs</code> and <code>npm</code> joining the base package list. That is
+<code>33fl</code> <code>bc50c52a</code>, pushed to <code>master</code> and deployed on 2026-09-13.</p>
+<p>The three verification questions are answered:</p>
 <ul>
-<li>Line 229, the disk specification in "Create the missing runner
-  instances", moves from <code>@debian:12</code> to <code>@debian:13</code>.</li>
-<li><code>nodejs</code> and <code>npm</code> join the base package list at approximately
-  line 337.</li>
-<li>The comment at line 39, which documents the cached <code>debian:12</code>
-  image as a precondition, is updated to say <code>debian:13</code>.</li>
+<li>The GitLab docker executor's image is no longer hardcoded. It
+  reads <code>--docker-image debian:{{ static_runner_debian_release }}</code>,
+  so it moves with the fleet rather than needing its own decision.</li>
+<li><code>yq</code> via <code>pip --break-system-packages</code>, the shared <code>docker.yml</code>
+  and the claude CLI install all work on trixie, and so does the
+  rest of the base package list. The fleet was rebuilt on Debian 13
+  and is serving jobs, which answers this empirically rather than by
+  inspection.</li>
 </ul>
-<p>Three things to verify before proposing that change, none of which
-this plan has checked:</p>
-<ul>
-<li>The playbook installs <code>yq</code> with <code>pip --break-system-packages</code>,
-  installs docker through a shared <code>docker.yml</code>, and installs the
-  claude CLI for the claude flavor. All three need confirming on
-  trixie.</li>
-<li>Line 630 sets <code>--docker-image debian:12</code> for the GitLab docker
-  executor. That is a different thing from the runner's own image
-  and is deliberately left alone here, but somebody should decide
-  whether it moves too.</li>
-<li>Whether <code>python3-venv</code> and the rest of the base list behave the
-  same on trixie.</li>
-</ul>
+<p><strong>What <code>apt</code> installs follows the runner's release, not this
+plan's wish.</strong> <code>nodejs</code> on Debian 13 is node 20.19.2; on Debian 12
+it would have been 18.20.4, which reached upstream end of life in
+April 2025. Because the fleet was replaced first, the package change
+lands on Debian 13 everywhere and the mixed pool this plan would
+otherwise have created does not arise. A future release bump
+reopens that window, so <code>static_runner.yml</code> carries the warning
+beside the package list rather than only here.</p>
 <p>Landing node on the runners also falsifies half of the mermaid-lint
 rationale this plan quotes as evidence in the Situation section, in
 four files where it is load-bearing prose:
-<code>templates/mermaid-lint/README.md:28,36</code>,
-<code>templates/mermaid-lint/mermaid-lint.sh:16</code>,
-<code>tools/mermaid-lint.sh:16</code> and
-<code>docs/audits/mermaid-lint-ci.md:108,116</code>. A node toolchain goes onto
-the runners deliberately, and node 20.19.2 is no longer "older than
-jsdom wants". The chromium half of the argument survives and the
-decision does not change, so this is a rewording rather than a
-reversal: keep the chromium argument, drop or restate the
-node-version one. It is part of this phase rather than future work
-because <code>templates/</code> is copied into ten repositories, and a template
-that justifies itself with a fact the fleet has reversed is judged as
-the code it becomes.</p>
-<p>The rollout is gradual rather than a re-image: line 229 is inside
-the loop over <code>missing_runners</code>, so it affects newly created
-instances only, and the weekly retire and rebuild cycle replaces the
-fleet over about a week. That is a feature -- a bad image shows up
-on one runner rather than all of them -- but it means "landed" and
-"rolled out" are a week apart, and phase 5 waits for the latter.</p>
+<code>templates/mermaid-lint/README.md</code>,
+<code>templates/mermaid-lint/mermaid-lint.sh</code>, <code>tools/mermaid-lint.sh</code>
+and <code>docs/audits/mermaid-lint-ci.md</code>. A node toolchain goes onto the
+runners deliberately, and node 20.19.2 is no longer "older than jsdom
+wants".</p>
+<p>Calling that a rewording rather than a reversal was too glib. The
+node-version claim was what ruled out the <em>lighter</em> path -- a
+parse-only checker with a supplied DOM, no rendering and no browser
+-- so with node 20 on the runners that blocker is gone and "jsdom is
+not viable" moves from settled to untested. The chromium argument
+still justifies rendering, but it does not by itself justify
+rendering over parsing. The DOMPurify argument survives untouched,
+since it is about needing a DOM at all rather than about node's
+version, so a DOM-free checker stays excluded. The decision does not
+change today and the container stays; what the four files must say
+is that the jsdom option is no longer ruled out and that nobody has
+measured it -- neither that it would work nor that it would not.</p>
+<p>It is part of this phase rather than future work because
+<code>templates/</code> is copied into ten repositories, and a template that
+justifies itself with a fact the fleet has reversed is judged as the
+code it becomes.</p>
+<p><strong>Phase 5 now waits on a deploy rather than on a rebuild.</strong> The
+week of runner recycling this plan budgeted for has already been
+spent: the fleet is on Debian 13, so the only thing between here and
+npm on the runners is running <code>static_runner.yml</code>. The package task
+is ordinary <code>apt</code> state and applies to existing runners at the next
+playbook run, unlike the release variable, which only governs
+instances the reconcile creates.</p>
 <h3 id="5-hunkydory-ci-and-the-fleet-workflows">5. hunkydory CI and the fleet workflows<a class="headerlink" href="#5-hunkydory-ci-and-the-fleet-workflows" title="Permanent link">&para;</a></h3>
 <p>Once the runners have npm:</p>
 <ul>
@@ -15296,7 +15340,7 @@ patterns already worked out elsewhere in the fleet.</p>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td>Released 2026-09-13; see D5. Includes rewording the node half of the mermaid-lint rationale in the four files the phase 4 section names.</td>
+<td>Done bar this plan file; most of it had already landed in <code>33fl</code>, see the phase 4 section. Includes rewording the node half of the mermaid-lint rationale in the four files the phase 4 section names.</td>
 </tr>
 <tr>
 <td>5</td>

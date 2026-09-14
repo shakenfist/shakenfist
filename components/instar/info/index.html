@@ -4027,6 +4027,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vhdx-parent-actual-path-can-contain-a-literal-backslash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX parent "actual path" can contain a literal backslash
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13942,6 +13981,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#differencing-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vhdx-parent-actual-path-can-contain-a-literal-backslash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX parent "actual path" can contain a literal backslash
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -13996,6 +14074,48 @@ output. This ensures true drop-in replacement compatibility.</p>
 </code></pre></div>
 <p>See <a href="/components/instar/output-formats/">output-formats.md</a> for detailed documentation on
 output format profiles.</p>
+<h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
+<p>A differencing VHD (<code>disk_type == 4</code>) or differencing VHDX (<code>HasParent</code>
+set) has its parent reported as a backing file, in both human
+(<code>backing file: ...</code>) and <code>--output json</code> (<code>backing-filename</code> /
+<code>full-backing-filename</code>) forms — the same fields qcow2's backing file
+already uses. <code>instar info</code> is the deliberate exception to the refusal
+every other read op (<code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code>,
+<code>measure</code>) applies to a differencing source: <code>info</code> composes no sector
+data, so it has no wrong answer to give, and it is what a user reaches
+for when the rest of the tool declines to read the image. See the
+"VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a> for the full
+per-op record.</p>
+<p><code>backing-filename-format</code> reports <code>vpc</code> or <code>vhdx</code> to match the child,
+not the <code>qcow2</code> that field defaults to when no backing format is
+recorded. A differencing image records no backing-format field of its
+own, but SPEC(VHD) and SPEC(VHDX) both require a parent to be the same
+format as its child, so the format is known without one.</p>
+<p><strong>A reported parent is not a resolved parent.</strong> <code>info</code> decodes the
+parent name and the parent locator entries from the image's own header
+and prints what it finds; it does not open the result, and <code>--chain</code>
+stops at the one image (see <a href="/components/instar/chain-discovery/">chain-discovery.md</a>).
+A parent locator is attacker-controlled data — it can name an absolute
+path, a relative traversal, a UNC share or a URL — so treat
+<code>backing-filename</code> on a differencing image as a string the image
+claims, not a file instar has validated.</p>
+<h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
+<h3 id="vhdx-parent-actual-path-can-contain-a-literal-backslash">VHDX parent "actual path" can contain a literal backslash<a class="headerlink" href="#vhdx-parent-actual-path-can-contain-a-literal-backslash" title="Permanent link">&para;</a></h3>
+<p>A VHDX differencing parent's locator is Windows-shaped — e.g.
+<code>.\vhdx-diff-parent.vhdx</code> — and <code>info</code>'s "actual path" resolution treats
+any non-absolute backing-file string as a POSIX-relative path, joining
+it onto the image's directory. Because the backslash is not a path
+separator on Linux, the result is a single, literal filename containing
+a backslash that cannot exist on the filesystem, e.g.:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>backing file: .\vhdx-diff-parent.vhdx (actual path: /images/.\vhdx-diff-parent.vhdx)
+</code></pre></div>
+<p>The <code>backing file:</code> field itself is correct — it is exactly what the
+VHDX header records — and qemu-img would print the same field
+unconditionally if it could open a differencing VHDX at all. Fixing the
+"actual path" resolution is path normalisation, which belongs to phase
+11 of <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>, not this
+output path. Suppressing the field instead of fixing the resolution
+would paper over the underlying issue rather than close it.</p>
 
 
 
