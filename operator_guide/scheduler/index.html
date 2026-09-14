@@ -14511,6 +14511,17 @@ headroom.</p>
 <code>disk_reservation_gb</code>. On Intel hybrid CPUs the daemon also
 publishes <code>cpu_cores_performance</code> and <code>cpu_cores_efficiency</code>; these
 are informational and nothing in scheduling consumes them yet.</p>
+<p>Two safety clamps bound an over-large reservation: <code>cpu_schedulable</code>
+floors at one thread, and the memory reservation is capped at half
+the machine, so a small node carrying every role can still schedule
+something. When a clamp engages the node publishes
+<code>cpu_reservation_clamped</code> or <code>memory_reservation_clamped</code> as true
+(also reported per node by <code>/admin/resources</code>) and records an audit
+event against the node on the transition -- so a node reserving all
+of its CPU is distinguishable from one with a genuinely spare
+thread. A clamped node is a configuration problem to fix (shrink the
+reservation or grow the node), not an error: the clamped values are
+what scheduling uses.</p>
 <h2 id="guest-memory-returned-to-the-host">Guest memory returned to the host<a class="headerlink" href="#guest-memory-returned-to-the-host" title="Permanent link">&para;</a></h2>
 <p>Instances are given a virtio balloon device with <strong>free page
 reporting</strong> enabled. When a guest frees a page, its kernel tells the
