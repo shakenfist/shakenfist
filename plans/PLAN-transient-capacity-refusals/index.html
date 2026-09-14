@@ -14620,8 +14620,8 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>3. Publish metrics when the running-domain set changes</td>
 <td><a href="../PLAN-transient-capacity-refusals-phase-03-metrics-on-change/">PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>03cd7be3a</code> (#4200)</td>
 </tr>
 <tr>
 <td>4. <code>Retry-After</code> and a machine-readable transient refusal, with an opt-in client retry</td>
@@ -15191,16 +15191,40 @@ chosen to defer to here, so that we do not forget them.</p>
   (<code>shakenfist/deploy/shakenfist_ci/load_budget.py:443-450</code>),
   because the publish rate is now coupled to instance churn and the
   existing fit was made against a fixed 60 s cadence. That is the
-  honest declaration and it costs regression detection on three
-  pairs which previously had it. Running
+  honest declaration and it costs regression detection on the two
+  of the four pairs which had it before -- <code>GetQueueLength</code> and
+  <code>GetNodeByFqdn</code>; the other two are new entries which were
+  unbudgeted rather than enforced. Running
   <code>tools/derive-database-load-budget.py</code> over a window that
   includes the new behaviour would give those pairs fitted
   activity-coupled rates again. It needs the change running on
   <code>sfcbr</code> for days, so it could not be part of phase 3. The marks
   survive re-derivation
   (<code>tools/derive-database-load-budget.py:476</code>), so this is an
-  addition rather than a repair. Found at phase 3's planning
-  survey; see D23 there.</p>
+  addition rather than a repair. Tracked as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4197">#4197</a>.
+  Found at phase 3's planning survey; see D23 there, and phase 3's
+  Outcome for the pre-change figure the re-derivation has to be
+  compared against.</p>
+</li>
+<li>
+<p><strong>Make the metrics-drop test's rise attributable to its own
+  instance.</strong>
+  <code>test_cluster_resources_measured_drops_after_delete</code>
+  (<code>cluster_ci_tests/test_nodes.py</code>) waits for a node's
+  <code>cpu_measured</code> to rise before it takes the baseline it later
+  asserts a drop against, but the rise predicate is a threshold on
+  a shared node: in two of the three topologies read at phase 3's
+  closeout it was already satisfied 0.34 s and 1.05 s after the
+  domain started, which is sooner than any publish carrying that
+  domain could arrive. The baseline can therefore include a vCPU
+  the test did not create, and the drop can be satisfied by a
+  sibling's instance going away. This is a false pass and not a
+  false failure, so it does not destabilise CI. No <code>node_metrics</code>
+  timestamp is published over REST, so the cheap fix is to ignore
+  any rise read before a full 5 s domain-poll interval has elapsed
+  since the create. Found at phase 3's closeout; see that phase's
+  Outcome.</p>
 </li>
 <li>
 <p><strong>Make <code>get_all_domains()</code> one libvirt call.</strong>

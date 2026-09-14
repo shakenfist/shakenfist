@@ -14152,6 +14152,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-measurement-definition-of-done-item-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The measurement (definition of done item 13)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-caveat-this-reading-found-in-the-test-rather-than-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A caveat this reading found, in the test rather than the code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-load-budget-reading-d20s-risk-asks-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The load-budget reading D20's risk asks for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-ci-did" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What CI did
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14818,6 +14879,127 @@ above; this note stands as the record that the gate earned its
 place.</p>
 <p>No other gate. 3a, 3b, 3c and 3e are each small enough to review as a
 commit.</p>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Complete. Steps 3a-3e merged as
+<a href="https://github.com/shakenfist/shakenfist/pull/4200">#4200</a>, merge
+commit <code>03cd7be3a</code>; this section is step 3f.</p>
+<h3 id="the-measurement-definition-of-done-item-13">The measurement (definition of done item 13)<a class="headerlink" href="#the-measurement-definition-of-done-item-13" title="Permanent link">&para;</a></h3>
+<p>Read from the three cluster bundles of merge-queue run
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/34777052827">34777052827</a>,
+which carries the merged code. Each bundle's
+<code>traces/test_cluster_resources_measured_drops_after_delete.json</code> gives
+the test's own start and end; the hypervisor's
+<code>_commands/journalctl-sf-units</code> gives the instance's <code>poweron</code> and
+<code>poweroff</code>; <code>primary</code>'s gives the <code>DELETE api request received</code>. The
+instance uuid is not in the create's log line -- that carries a
+request id -- so it is read from the <code>db record created</code> event and
+then followed across nodes.</p>
+<table>
+<thead>
+<tr>
+<th>Topology</th>
+<th>Node</th>
+<th>Domain destroyed</th>
+<th>Test ends</th>
+<th>Drop seen within</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>debian-12-slim-primary</code></td>
+<td>sf2</td>
+<td>19:59:27.782</td>
+<td>19:59:33.086</td>
+<td>5.3 s</td>
+</tr>
+<tr>
+<td><code>ubuntu-2404-slim-primary</code></td>
+<td>sf3</td>
+<td>19:40:20.907</td>
+<td>19:40:26.483</td>
+<td>5.6 s</td>
+</tr>
+<tr>
+<td><code>debian-12-slim-tier</code></td>
+<td>sf2</td>
+<td>19:53:26.753</td>
+<td>19:53:32.354</td>
+<td>5.6 s</td>
+</tr>
+</tbody>
+</table>
+<p>The last column is an upper bound rather than the interval itself: the
+test polls every 5 s, so the publish landed somewhere inside it. Every
+one is one domain poll plus a publish, against a 20 s deadline and
+against the up-to-60 s this phase set out to remove. The same test
+also passed on all three topologies in the earlier queue run
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/34750982544">34750982544</a>,
+so the assertion has six passes and no failures.</p>
+<p>The rise half reads the same way on <code>debian-12-slim-tier</code>, where the
+delete was issued 5.89 s after <code>poweron</code> -- again one domain poll plus
+a publish, which is the shape this phase predicts.</p>
+<h3 id="a-caveat-this-reading-found-in-the-test-rather-than-the-code">A caveat this reading found, in the test rather than the code<a class="headerlink" href="#a-caveat-this-reading-found-in-the-test-rather-than-the-code" title="Permanent link">&para;</a></h3>
+<p>On both <code>slim-primary</code> topologies the test issued its delete 0.34 s
+and 1.05 s after the domain's <code>poweron</code>. Its rise predicate
+(<code>measured &gt;= idle_measured + cpus</code>) was therefore already true on the
+first read, before any publish could have carried this instance's own
+domain: that needs up to one 5 s poll and then a trip to the API.
+Something else raised the node's <code>cpu_measured</code> between the test's
+opening read and its first poll -- on a suite running five workers at
+once, most likely a sibling test's domain starting on the same node.</p>
+<p>The consequence is bounded but real. <code>baseline_measured</code> can include a
+vCPU this test did not create, so the drop assertion
+(<code>measured &lt;= baseline_measured - cpus</code>) can be satisfied by that
+other instance going away rather than by this one. It is a false-pass
+risk and not a false-fail one, which is why it is recorded here rather
+than fixed inside a closeout step. It does not weaken the table above:
+those intervals are measured from this instance's own <code>poweroff</code>.</p>
+<p>Fixing it means making the rise attributable. No <code>node_metrics</code>
+timestamp is exposed over REST -- which is why the test reads
+<code>/admin/resources</code> at all -- so the cheapest honest version is to
+ignore any rise observed before a full domain-poll interval has
+elapsed since the create, which costs 5 s of wall clock and makes the
+baseline necessarily post-date this instance's domain. Recorded under
+Future work in the master plan.</p>
+<h3 id="the-load-budget-reading-d20s-risk-asks-for">The load-budget reading D20's risk asks for<a class="headerlink" href="#the-load-budget-reading-d20s-risk-asks-for" title="Permanent link">&para;</a></h3>
+<p>Not takeable yet, and that is recorded here rather than deferred
+silently. <code>sfcbr</code> is running <code>0955242bf</code>, which predates <code>03cd7be3a</code>,
+so no cluster is running this change and <code>sf-ctl database-load</code> there
+would measure the old cadence.</p>
+<p>What can be checked now is the arithmetic that reading is meant to
+test, and it checks out exactly. The nightly figures for 2026-09-13 --
+pre-change, six nodes, 20.95 standing instances on average -- put
+<code>GetQueueLength</code>/<code>resources</code> at 1.28 QPS cluster-wide. The table above
+under <em>What the survey found</em> derives twelve queue reads per publish
+on an ordinary node and seventeen on the elected network node, at one
+publish per node per 60 s, which for <code>sfcbr</code>'s five-plus-one predicts
+(5 x 12 + 17) / 60 = 1.28 QPS. That figure had until now only been
+derived from the code, never observed, and the first draft of this
+plan had it wrong (seven queue reads, ten round trips), so the
+agreement is worth writing down. The other three pairs sit below the
+nightly report's top-40 cut.</p>
+<p>The post-change reading therefore has something to be compared
+against: the same pair should rise with instance churn, bounded by D19
+and D21 at 3/s per node, and if it lands materially above that model
+the queue-read split in D20 is the pre-agreed remedy.
+<a href="https://github.com/shakenfist/shakenfist/issues/4197">#4197</a> carries
+it.</p>
+<h3 id="what-ci-did">What CI did<a class="headerlink" href="#what-ci-did" title="Permanent link">&para;</a></h3>
+<p>Two things in this phase's CI are worth recording, because neither is
+about the change and both cost time.</p>
+<p>The merge-queue run on the final head
+(<a href="https://github.com/shakenfist/shakenfist/actions/runs/34777052827">34777052827</a>)
+failed on <code>Node lifecycle</code>, one second after the same script printed
+<code>No more running services!</code> and with every <code>sf-*.service</code> shown
+<code>inactive dead</code>. The surviving process the stop check counted was a
+<code>for i in $(seq 1 600); do case "$(hostname)" in sfcbr-*)</code> wait loop
+left over from the deploy, not a Shaken Fist daemon. The three cluster
+jobs in that run, which are the ones carrying this phase's assertion,
+all passed.</p>
+<p>Earlier, on the pull request itself, <code>Credential scan</code> and
+<code>Issue links</code> both failed with <em>"The job was not started because it
+repeatedly failed to be acquired (5 attempts)"</em> -- no steps, no runner
+name, no log. Both passed on a rerun with no change to the branch.</p>
 
 
 
