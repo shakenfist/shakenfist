@@ -617,8 +617,8 @@ class SFConfig(BaseSettings):
             'How many hardware threads (not physical cores) are reserved '
             'for the operating system and host-level system services on '
             'this node. This is a single absolute per-node value; Ansible '
-            'templates it per host and an operator may override it from '
-            'the inventory.'
+            'templates it per host, doubling it on network and database '
+            'nodes, and an operator may override it from the inventory.'
         )
     )
     NODE_DISK_RESERVATION_GB: float = Field(

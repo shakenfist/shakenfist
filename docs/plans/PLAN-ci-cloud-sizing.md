@@ -1144,8 +1144,10 @@ network node
 (`cluster_ci_tests/test_network_lifecycle.py:53`), and `slim-tier`
 is already exactly at that minimum, because its primary is the
 network node; three nodes are needed by **two** tests rather than
-one, both counting every node rather than only hypervisors
-(`cluster_ci_tests/test_scheduler.py:128` and `:292`);
+one, both counting every node rather than only hypervisors --
+`test_affinity` (`cluster_ci_tests/test_scheduler.py:124`, guard at
+`:128`) and `test_binary_affinity_prefers_the_tagged_node` (`:282`,
+guard at `:291`);
 `test_database_tier` needs two database nodes
 (`cluster_ci_tests/test_database_tier.py:37`).
 

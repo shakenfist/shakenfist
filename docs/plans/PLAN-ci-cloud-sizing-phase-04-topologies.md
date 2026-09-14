@@ -102,17 +102,36 @@ at all -- it is computed by the playbook and arrives as a
 caller-supplied fact. Two things in the tree actively encouraged the
 wrong conclusion: `scheduler.py:213-214` states "there is no longer an
 infra-role bump", which is true of the synthetic fallback it annotates
-and false as a statement about the system; and `config.py:614`
-describes the templating as "folding in any historical infra-role
+and false as a statement about the system; and `config.py:610`
+described the templating as "folding in any historical infra-role
 bump", where "historical" reads as "since removed" rather than as
-"still applied, by the deployer".
+"still applied, by the deployer". That second citation is worth
+being precise about, because getting it wrong is the same error in
+miniature: the phrase was in **`NODE_RAM_RESERVATION_GB`**, and
+`config.py:614` is where `NODE_CPU_RESERVATION_THREADS` begins. It
+is the CPU value that produced the ledger-3 nodes, and its
+description said nothing about the bump at all. Both are corrected
+by this phase's commits.
 
-**The lesson for the rest of this plan, and for phase 5.** A grep over
-the collection and the CI repository is not a survey of how a CI node
-is configured: the answer was in a third place, the example deployment
-playbook, which is neither the product nor the CI harness but is what
-CI runs. Any later phase reasoning about a CI node's configuration has
-to read `examples/_shared/site.yml` as well.
+**The lesson for the rest of this plan, and for phase 5, and it is
+worse than "read one more file".** The mechanism was already written
+down, in prose, in this project's own operator guide:
+`docs/operator_guide/scheduler.md:117-128` says "There is no separate
+reservation added on nodes carrying a cluster-wide role... Instead,
+the Ansible deploy computes a per-host *default* ... that already
+accounts for a node's roles", and gives the formula as
+`(1 + 1 if network/database else 0) * 2` threads. That paragraph
+answers the entire gate question, and it shipped before this plan was
+written.
+
+So the survey did not fail for want of a third file to grep. It failed
+by reaching for `grep` at all on a question about *how a node is
+configured*, which is a documented behaviour rather than a string. The
+order phase 5 inherits is: read the operator guide for the subsystem
+first, then `examples/_shared/site.yml` (the playbook CI actually
+deploys with, which is neither the product nor the CI harness), then
+the collection. A grep over the collection and the CI repository is
+last, and it is a check rather than a survey.
 
 D1's gate therefore rested on a false premise, and was still worth
 running -- not because the reshape was in doubt, but because the same
@@ -190,7 +209,7 @@ All three hold, with two corrections:
 | Requirement | Where | Correction |
 |---|---|---|
 | >=2 hypervisors that are not the network node | `cluster_ci_tests/test_network_lifecycle.py:53` | **`slim-tier` is exactly at this minimum today.** Its primary is the network node, so sf1 and sf2 are the only two candidates. Any consolidation of the tier onto two hypervisors makes this test skip. |
-| >=3 nodes | `cluster_ci_tests/test_scheduler.py:128` and **`:292`** | The guard counts `get_nodes()`, that is **all** nodes rather than hypervisors, and **two** tests carry it, not the one the master plan names -- `test_affinity` and the weighted-ordering test. |
+| >=3 nodes | `cluster_ci_tests/test_scheduler.py:128` and **`:291`** | The guard counts `get_nodes()`, that is **all** nodes rather than hypervisors, and **two** tests carry it, not the one the master plan names -- `test_affinity` (the weighted-ordering test, `:124`) and `test_binary_affinity_prefers_the_tagged_node` (`:282`), whose docstring calls itself "the binary model's soft half, asserted the same way `test_affinity` asserts the weighted one". Both must be named wherever this phase says which tests must not skip. |
 | >=2 database nodes | `cluster_ci_tests/test_database_tier.py:37` | As stated. |
 
 ### F7 -- Every file this phase edits is in a repository only the operator can push
@@ -356,10 +375,16 @@ silent-clamp defect. But "the gate paid for itself" is not the same
 claim as "the gate was correctly motivated", and only the first is
 true here.
 
-What a reviewer should take from it: the cheap check that would have
-avoided the whole detour is reading `examples/_shared/site.yml`
-alongside the collection, because that playbook is what CI deploys
-with. F2 now says so, and phase 5 inherits it.
+What a reviewer should take from it, and it is less flattering than
+the first draft of this paragraph: the check that would have avoided
+the whole detour was not reading one more file, it was reading
+`docs/operator_guide/scheduler.md:117-128`, which documents the
+per-host role bump and its exact formula and which this project
+shipped before this plan existed. A high-effort opus step and a gate
+were spent on a question our own operator guide answers in a
+paragraph. F2 now says so, and phase 5 inherits the ordering rather
+than the playbook-only rule.
+
 ### D2 -- Land `slim-tier` first, and alone
 
 The master plan says "land one topology at a time so a regression is
@@ -389,8 +414,21 @@ small "leaves the failure in place" -- then 8 vCPU is the shape that
 delivers it: ledgers 12 / 12 / 18, and a `SCHEDULER_TARGET_LOAD` bound
 of 3.0 rather than 1.5 on the nodes that refuse.
 
-This decision stays at 6 for now, for two reasons, and it is the
-decision in this plan most likely to be argued with. First, cost: 8
+This decision stays at 6 for now, for three reasons, and it is the
+decision in this plan most likely to be argued with. First, and
+strongest because it is not this plan's own judgement: phase 0's D2
+already fixed the criterion, and it was parity rather than
+sufficiency -- `slim-tier` is "sized for a ledger comparable to the
+other cluster topologies"
+([phase 0, D2](PLAN-ci-cloud-sizing-phase-00-decisions.md)). Three 6
+vCPU nodes give a cluster ledger of 24 against `slim-primary`'s
+measured 27, which is comparable; three 8 vCPU nodes give 42, which
+is not parity with anything in the fleet but a 55% overshoot of the
+topology it is meant to match. The master plan's candidate-shapes
+table already carries both numbers and they reconcile exactly with
+4a's arithmetic. Choosing 8 is therefore not just a bigger number, it
+is a decision to revisit D2, and it should be argued as that. Second,
+cost: 8
 vCPU is +12 vCPU per tier cloud against 6's +6, on an under-cloud the
 master plan's *The under-cloud budget this spends* section treats as
 the binding resource. Second, evidence: the measured p90 is 10
@@ -398,8 +436,8 @@ committed vCPU against a ledger of 12, so 24 already leaves real
 headroom, and the refusals in phase 3's window were on the demand
 bound (F3), where 6 vCPU already triples the infra nodes' bound from
 0.75 to 1.5. If 4d's merge runs show demand refusals persisting at 6
-vCPU, the answer is 8 -- and D3 should be revised then, on evidence,
-rather than guessed at now.
+vCPU, the answer is 8 -- and D3 *and phase 0's D2* should be revised
+then, together and on evidence, rather than guessed at now.
 
 A third option exists and is deliberately not taken: setting
 `node_cpu_reservation_threads` per host in the CI inventory, which
@@ -407,13 +445,23 @@ A third option exists and is deliberately not taken: setting
 supports. That would raise the infra nodes' ledger without buying any
 vCPU at all. It is rejected because it departs from production
 reservation values in CI, which the master plan's D1 keeps deliberately
--- the clouds are meant to admit the way a real cluster admits. It is
-recorded here because it is the cheapest option and a reviewer should
-see that it was considered and why it lost.
+-- the clouds are meant to admit the way a real cluster admits.
+
+It is also not as cheap as it first looks, which the master plan's
+open question 1 already records and this paragraph originally left
+out: CI's inventory is generated by `tools/ci-make-inventory.py` in
+`shakenfist/actions`, whose `render_node_vars()` emits a fixed block
+with no hook for arbitrary host vars, so the override needs either a
+generator change or a cluster-wide `--extra-vars` -- and a
+cluster-wide value cannot express "only the infra nodes", which is
+the whole point of the option. It is recorded here because it is
+still the option that buys no vCPU at all, and a reviewer should see
+that it was considered and why it lost.
 
 Node count stays at three, which F6 shows is forced: two would break
 both `test_network_lifecycle` and the two `>=3 nodes` scheduler tests,
 and the tier's purpose is its two database nodes.
+
 ### D4 -- `slim-primary` is a separate step, and may not happen in this phase
 
 It has one ledger-3 node out of five, a cluster p90 fraction well
@@ -459,7 +507,7 @@ reshape, the reshape did not address what was refusing.
 | 4a | high | opus | none | **Gate (D1). Establish why some CI hypervisors publish `cpu_schedulable` 1.** Read `_compute_reservations()` at `shakenfist/daemons/resources/main.py:102-129` and its caller at `:255-271`; the value is `max(1, cpu_threads - cpu_reservation_threads)` where `cpu_threads` is `psutil.cpu_count(logical=True)` *inside the guest* and the reservation is 2 everywhere (F2 lists every definition site). Then establish what the ledger-3 nodes actually report. Cheapest route first: read `/admin/resources` and `GET /nodes` from a live CI cluster, or the node metrics row, for a node known to be at ledger 3 -- `slim-tier`'s primary or sf1 -- and compare `cpu_threads`, `cpu_cores`, `cpu_max` and `cpu_schedulable` against a ledger-6 node like `slim-tier`'s sf2. Note that `_get_hybrid_core_counts()` runs `retval.update()` *after* `_compute_reservations()` at `:271`, so check whether it can overwrite any of these keys. Also check whether `cpu_schedulable_from_fallback` is set for those nodes (`shakenfist/scheduler.py:216-224`, `:383`, `:940`), because the fallback path approximates from `cpu_max` instead and a node taking it is answering a different question. Do not change any configuration value (Scope). Report the mechanism, whether a larger guest raises it, and if the cause is a defect, file an issue and record the number here. |
 | 4b | medium | sonnet | none | Correct the master plan's phase 4 section against F1-F8: replace the `NODE_CPU_RESERVATION_THREADS=4` explanation with what 4a found, fix "(and the `-released` variants)" to name the one that exists, move the `functional-tests.yml` sentence out of the actions-repo list and restate it as the timeout question, note that `slim-primary`'s primary is not a hypervisor so the candidate table's `vCPU` column is under-cloud spend rather than scheduling capacity, and correct the structural-minimum row to name both `>=3 nodes` tests and to say `slim-tier` already sits at the `test_network_lifecycle` minimum. Cite file and line for each. Do not restate F2's reasoning at length -- link to this plan. |
 | 4c | high | opus | none | **Decide and prepare the `slim-tier` reshape (D2, D3, D6).** Write the complete diff for `shakenfist/actions/ansible/ci-topology-slim-tier.yml` taking all three nodes from `cpu: 4` to `cpu: 6`, leaving `ram: 12288` and every `groups:` line untouched, into a *Prepared changes* section of this plan. The three instance blocks are at `:35`, `:72` and `:102`. State the predicted per-node ledgers and the predicted `SCHEDULER_TARGET_LOAD` bound per node, both derived from what 4a established rather than from F2's guess, so the first merge run can falsify the prediction. If 4a found a larger guest does *not* raise `cpu_schedulable` on those nodes, do not write the diff: record why the reshape would not work and what would. |
-| 4d | medium | sonnet | none | After the operator applies 4c, read the first three merge runs on the new `slim-tier` and record, in this plan's Outcome: per-node ledgers from *Committed vCPU, per node*; the guard refusal count and dimension split from *Capacity guard census*; whether any `sufficient_idle_cpu` stage abort remains; and whether `test_network_lifecycle`, `test_affinity` and `test_database_tier` still run rather than skip (F6). Compare against 4c's predictions explicitly and say which were wrong. |
+| 4d | medium | sonnet | none | After the operator applies 4c, read the first three merge runs on the new `slim-tier` and record, in this plan's Outcome: per-node ledgers from *Committed vCPU, per node*; the guard refusal count and dimension split from *Capacity guard census*; whether any `sufficient_idle_cpu` stage abort remains; and whether `test_network_lifecycle`, `test_affinity`, `test_binary_affinity_prefers_the_tagged_node` and `test_database_tier` still run rather than skip (F6 -- there are **two** `>=3 nodes` scheduler tests, at `test_scheduler.py:128` and `:291`, not one). Compare against 4c's predictions explicitly and say which were wrong. |
 | 4e | high | opus | none | **Decide `slim-primary` (D4).** With 4d's evidence, choose between the two `slim-primary` candidate shapes, a smaller change, or none. If reshaping, prepare diffs for **both** `ci-topology-slim-primary.yml` and `ci-topology-slim-primary-released.yml`, which F4 shows are not structurally identical -- the released variant's primary is the network node and is not a hypervisor, so a mechanically copied diff would be wrong -- and leave the `sf-absent` phantom block untouched in the file that has it. If not reshaping, record the evidence for not doing so; that is a valid outcome. |
 | 4f | low | sonnet | none | **Only after five merge runs on the reshaped tier, and only if wall-clock supports it (D5).** Drop `timeout_minutes` from 70 to 60 for the `Debian 12 tier` matrix entry in `.github/workflows/functional-tests.yml:482`, and rewrite the comment at `:471-474` which currently explains the bump by the tier having half `slim-primary`'s capacity. Record the observed run durations that justify it. If they do not, leave it and say so. |
 | 4g | medium | sonnet | none | Close-out: set this phase `Complete` in the master plan's Execution table and the `docs/plans/index.md` row (4 of 8 becomes 5 of 8), write *What phase 5 inherits*, run `python3 tools/check-plan-status.py` and `pre-commit run --all-files`, and confirm every Definition of done item by running it rather than reading it. |
@@ -671,10 +719,12 @@ Falsifiable, in order:
    `grep -c 'is 2 everywhere' docs/plans/PLAN-ci-cloud-sizing.md` is
    0.
 3. The master plan's phase 4 section names exactly the topology files
-   that exist. `ls shakenfist/actions/ansible/ci-topology-slim-*` has
-   three entries matching `slim-primary`, `slim-tier` and
-   `slim-primary-released`, and the section names those three and no
-   others.
+   that exist. `shakenfist/actions` is a separate repository, so run
+   this from here rather than expecting a local path:
+   `gh api repos/shakenfist/actions/contents/ansible --jq '.[].name'
+   | grep ci-topology-slim-` returns three entries matching
+   `slim-primary`, `slim-tier` and `slim-primary-released`, and the
+   section names those three and no others.
 4. The master plan's structural-minimum list names both tests that
    require three nodes, and `grep -c 'len(nodes) < 3'
    shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_scheduler.py`
@@ -684,10 +734,13 @@ Falsifiable, in order:
    plan records why the reshape was not made with the 4a evidence that
    decided it. Not both, and not neither.
 6. If the tier was reshaped: a merge run after it shows
-   `test_network_lifecycle`, `test_affinity` and
+   `test_network_lifecycle`, `test_affinity`,
+   `test_binary_affinity_prefers_the_tagged_node` and
    `test_database_tier` each reporting a verdict other than
-   `SKIPPED`. Read from the stestr output, not inferred from the job
-   being green.
+   `SKIPPED`. All four, because F6 found the `>=3 nodes` guard on two
+   tests rather than one and an earlier draft of this item named only
+   the first of them. Read from the stestr output, not inferred from
+   the job being green.
 7. If the tier was reshaped: this plan records the *Capacity guard
    census* refusal count and dimension split for three merge runs
    before and three after, and states whether the demand refusals
@@ -699,9 +752,17 @@ Falsifiable, in order:
    this.
 9. The `slim-tier` `timeout_minutes` is either 60 with the observed
    durations recorded, or still 70 with the reason recorded.
-10. No configuration default changed: `git diff develop -- shakenfist/config.py
+10. No configuration default *value* changed. The check is not that
+    the files are untouched -- this phase edits two `Field`
+    descriptions in `shakenfist/config.py`, which is the point of one
+    of its commits -- but that no default moved:
+    `git diff develop -- shakenfist/config.py | grep -E '^[+-] +[0-9]'`
+    is empty, and `git diff develop --
     shakenfist/deploy/collection/roles/node/defaults/main.yml` is
-    empty for this phase's commits.
+    empty. The first draft of this item asked for the whole
+    `config.py` diff to be empty, which this phase's own commits
+    already falsified; 4g runs these items rather than reading them,
+    so it would have stalled here.
 11. `python3 tools/check-plan-status.py` passes, and `pre-commit run
     --all-files` passes in the main repository.
 
@@ -753,21 +814,39 @@ sf-2` tasks rather than as a test failure. Only `primary` carries
 Before executing any step, back brief the operator on the
 understanding of this plan, and in particular on:
 
-* **F2, and whether D1's gate is the right call.** This is the
-  decision the phase rests on and the one a reviewer should push back
-  on. State what you expect 4a to find and what reading would change
-  D3's shape choice. If you think the gate is over-caution, say so
-  before 4a runs rather than after.
-* **Whether the `slim-tier` shape should be 6 or 8 vCPU**, given that
-  the measured p90 is 10 committed vCPU against a ledger of 12 and
-  that the demand bound (F3), not the ledger, is what refused
-  everything in the window. D3 chose 6; the case for 8 is that it
-  quadruples the bound on the small nodes rather than tripling it.
-* **That 4a must not change a configuration value to see what
-  happens.** The reservation and the overcommit ratio are deliberately
-  production values in CI (master plan D1), and an experiment that
-  changes them answers a different question than the one asked.
-* **D6's diff-in-the-plan arrangement**, which is new. Confirm the
-  operator is willing to transcribe, or propose a better seam for a
-  phase whose central change lives in a repository this session
-  cannot push.
+This plan is re-entered at 4d, not at 4a, so the brief below is what
+is still live. D1's gate is closed and 4a, 4b and 4c are done; the
+first bullet is kept because what the gate cost is a live input to
+phase 5, not because the gate is still a question.
+
+* **Whether the recorded cost of D1's gate changes your view of
+  gating in phase 5.** D1 is closed, and closed on a premise that was
+  wrong: F2 asserted the cited cause was absent from the tree, and it
+  was not. The gate paid for itself in other coin (D1 lists what),
+  but the cheapest check -- `docs/operator_guide/scheduler.md:117-128`
+  -- would have answered it outright. If you read that as an argument
+  for fewer gates and more reading, say so, because phase 5 inherits
+  the rule either way.
+* **Whether the `slim-tier` shape should be 6 or 8 vCPU.** Still open,
+  and still the decision most likely to be argued with. The measured
+  p90 is 10 committed vCPU against a ledger of 12, and the demand
+  bound (F3) rather than the ledger is what refused everything in the
+  window. D3 chose 6 on three grounds, the first of which is a prior
+  decision rather than a judgement: phase 0's D2 sized this topology
+  for *parity* with the rest of the fleet, and 3 x 6 gives a cluster
+  ledger of 24 against `slim-primary`'s 27, where 3 x 8 gives 42.
+  Choosing 8 means revisiting D2, and should be argued as that. The
+  case for 8 remains that it quadruples the bound on the small nodes
+  rather than tripling it.
+* **That the operator, not this session, applies the tier diff.**
+  D6's diff-in-the-plan arrangement is in *Prepared changes* with an
+  operator checklist. Confirm you are willing to transcribe it to
+  `shakenfist/actions`, or propose a better seam; 4d cannot begin
+  until three merge runs have read the new shape, and
+  `functional-tests.yml:485` references `smoke-cluster.yml@main`
+  unpinned, so it takes effect on runs already in flight.
+* **That no step may change a configuration value to see what
+  happens.** This bound 4a and it still binds 4d and 4e. The
+  reservation and the overcommit ratio are deliberately production
+  values in CI (master plan D1), and an experiment that changes them
+  answers a different question than the one asked.

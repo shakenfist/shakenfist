@@ -25,9 +25,13 @@ consuming side, `Scheduler._schedulable_threads()` and
 apply per-node fallbacks for metrics rows written by older
 resources daemons (the CPU fallback subtracts this node's own
 `NODE_CPU_RESERVATION_THREADS`, with no infra-role bump, so
-un-upgraded nodes don't look artificially large) — admission,
-ordering and `summarize_resources()` all go through these helpers,
-so keep them in sync if you touch capacity arithmetic.
+un-upgraded nodes don't look artificially large; the deploy itself
+*does* bump network and database nodes per host, so this is a
+statement about the fallback and not about the system -- see
+[the operator guide](../operator_guide/scheduler.md#system-reservations))
+— admission, ordering and `summarize_resources()` all go through
+these helpers, so keep them in sync if you touch capacity
+arithmetic.
 A third participant mirrors the same arithmetic: the scheduler
 capacity reconciler's limit-derivation helpers in
 `shakenfist/mariadb.py` (`_derive_cpu_memory_limits()`,
