@@ -186,6 +186,24 @@ size would exceed the target format's addressable range,
 `ERROR_BACKING_SIZE_TOO_LARGE` fires with an actionable
 "try a larger cluster size" hint.
 
+A **differencing VHD or VHDX is refused as a backing file**:
+
+```
+create failed: backing file is a differencing VHD or VHDX whose parent
+instar cannot yet compose; an overlay on it could not be read back
+(see PLAN-differencing.md)
+```
+
+This has its own error code (`ERROR_BACKING_DIFFERENCING`) rather than
+the generic `ERROR_BACKING_PARSE_FAILED`, because the backing header
+parses perfectly well — the image is valid, just not one instar can read
+through yet. Every read path in instar refuses a
+differencing image because the parent cannot be composed yet, so an
+overlay stacked on one would be a chain that can never be read back.
+Refusing at create time is the only outcome that does not hand you a
+dead image. Their plain dynamic parents are accepted normally. See the
+"VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).
+
 ## Preallocation modes
 
 | Mode      | raw                   | qcow2                                                | vmdk / vpc / vhdx |

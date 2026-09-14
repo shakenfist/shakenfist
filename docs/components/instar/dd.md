@@ -320,3 +320,22 @@ For the VHD CHS rounding function, see
 (`chs_rounded_size`).
 For the divergence allowlist, see `KNOWN_DD_DIVERGENCES` at the top of
 [`tests/test_dd_baselines.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_dd_baselines.py).
+
+## Differencing images
+
+A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so `dd` refuses such a source by name and exits 1 rather than
+writing an output composed as though the parent's sectors were
+zero (`dd` shares convert's guest binary). No output file is left behind:
+
+```
+dd: source is a differencing <VHD|VHDX> image whose parent instar cannot
+yet compose; composition is deferred (see PLAN-differencing.md)
+```
+
+`instar info` is the exception — it reports the parent as a backing file
+instead of refusing. See the "VHD/VHDX differencing" section of
+[quirks.md](/components/instar/quirks/) for the per-operation record, and
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the composition
+work that will lift the refusal.

@@ -272,6 +272,34 @@ misdetection as raw" — for vvfat by documented rationale rather than code:
 there is no on-disk artefact to misdetect, so no detection or refusal path is
 owed.
 
+### VHD/VHDX differencing (parent composition)
+
+A differencing VHD (`disk_type == 4`) or differencing VHDX (`HasParent`
+set) is a sub-state of the vhd/vpc and vhdx rows above, not a separate
+format, so it gets no row of its own in the tables. Every op in the
+read-side table that composes sector data — `convert`, `dd`, `compare`,
+`bench`, `check`, `measure` — refuses a differencing source by name
+instead of reading it, because instar cannot yet compose the parent's
+data into the read; composition is future work tracked in
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/). `map`
+refuses too, with its own older message and error code. `info` is the
+one exception in the table: it reports the parent as a backing file and
+does not refuse, because it composes no sector data and has no wrong
+answer to give.
+
+This is a **recorded divergence, and instar is the stricter side**:
+qemu-img 10.0.11 has no such refusal. On a differencing VHD, `qemu-img
+convert -O raw` exits 0 and silently composes the output as though the
+parent's sectors were zero — the same wrong answer instar itself used to
+give (issue #547) — and qemu-img has not changed. instar does not follow
+that behaviour; it refuses by name instead. On a differencing VHDX,
+qemu-img's own `info` cannot open the file at all ("Operation not
+supported"), which is the shape of undiagnosed failure issue #548 was
+filed over on the instar side before this refusal existed. See
+[quirks.md](/components/instar/quirks/#vhdvhdx-differencing-instar-refuses-where-qemu-img-silently-misreads)
+for the full command transcripts, the exact refusal wording, and the
+per-op record before and after the fix (commit `10ab838`).
+
 ---
 
 ## Conversion Output Format Support

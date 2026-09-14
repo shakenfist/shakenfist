@@ -105,15 +105,21 @@ into this check's scope.
 ### Why a container
 
 `mmdc` renders through puppeteer and so needs a browser. Running it
-from the upstream image keeps chromium and a node toolchain off the
-runners, and renders exactly what the sites will render.
+from the upstream image keeps chromium off the runners, and renders
+exactly what the sites will render. It kept node off them too, until
+the fleet took `nodejs` and `npm` as base packages; that half of the
+argument has lapsed.
 
-There is no lighter path worth taking. mermaid's own `parse()` under
+A DOM-free checker is still ruled out: mermaid's own `parse()` under
 plain node throws `DOMPurify.addHook is not a function` for
 `flowchart` and `stateDiagram-v2`, the two most common types in this
-fleet, so a DOM-free checker reports false failures on exactly the
-diagrams that matter; supplying a DOM with jsdom pulls in an undici
-newer than the runners' node.
+fleet, so it reports false failures on exactly the diagrams that
+matter -- a question of needing a DOM at all rather than of which
+node supplies one. Supplying one with jsdom was excluded because
+jsdom pulls in an undici newer than the runners' node, and the
+runners now carry node 20, so that parse-only path is untested rather
+than closed. Nobody has measured it, and the decision does not change
+today.
 
 The cost is smaller than it looks. The image is cached after its first
 pull, and rendering is about 1.4 seconds per file amortised inside a

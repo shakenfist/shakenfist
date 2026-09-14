@@ -346,8 +346,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 |-------|------|--------|--------|
 | 1. Semantics pin, oracle selection, and the doc correction | [PLAN-differencing-phase-01-pin.md](/components/instar/plans/PLAN-differencing-phase-01-pin/) | Complete | `8b81a0f` (#549) |
 | 2. Real differencing fixtures, happy-path and adversarial (instar + instar-testdata) | [PLAN-differencing-phase-02-fixtures.md](/components/instar/plans/PLAN-differencing-phase-02-fixtures/) | Complete | instar-testdata `77f5f589f0` + `623a30866f` + `3eed61bf75` (direct to `main`); instar `1a677c77` (#552) |
-| 3. Parent-locator parsing in `crates/vhd` and `crates/vhdx` | [PLAN-differencing-phase-03-parse.md](/components/instar/plans/PLAN-differencing-phase-03-parse/) | Complete | |
-| 4. Read-side policy: close the silent parent-ignoring read | PLAN-differencing-phase-04-read-policy.md | Not started | |
+| 3. Parent-locator parsing in `crates/vhd` and `crates/vhdx` | [PLAN-differencing-phase-03-parse.md](/components/instar/plans/PLAN-differencing-phase-03-parse/) | Complete | `42e879f` (#558) |
+| 4. Read-side policy: close the silent parent-ignoring read | [PLAN-differencing-phase-04-read-policy.md](/components/instar/plans/PLAN-differencing-phase-04-read-policy/) | Complete | |
 | 5. `plan_vhd` differencing emitter | PLAN-differencing-phase-05-vhd-emitter.md | Not started | |
 | 6. `plan_vhdx` differencing emitter | PLAN-differencing-phase-06-vhdx-emitter.md | Not started | |
 | 7. Guest create op and host CLI wiring | PLAN-differencing-phase-07-guest-host.md | Not started | |
@@ -567,7 +567,12 @@ We will know this plan has been implemented because:
   it had no parent, at any commit in the plan: phase 4's refusal
   and then phase 11's composition are applied uniformly across
   `info`, `check`, `convert`, `compare`, `dd`, `bench`, `map`
-  and `measure`.
+  and `measure`. Phase 4's survey corrected two assumptions here:
+  `map` already refuses (commit `eb6e23f`, 2026-06-03) and is the
+  precedent phase 4 generalises rather than outstanding work, as
+  does `resize`; and `dd` is not an operation -- `run_dd`
+  (`src/vmm/src/main.rs:13958`) calls `execute_convert`, so it
+  shares convert's guest binary and inherits its behaviour.
 * `instar convert -O raw` on a differencing child produces the
   same bytes as the phase 1 oracle's composition of the same
   chain -- driven through the `python3-libvhdi` binding, since
