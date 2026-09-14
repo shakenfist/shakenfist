@@ -501,7 +501,7 @@ spelling above is the one to write.
 |-------|------|--------|--------|
 | 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete | `7cc93750d` (#4147), `e20dd7d4b` (#4153) |
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete | `5ad9651ee` (#4166), `2c6206941` (#4187) |
-| 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | In progress | — |
+| 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started | — |
 | 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started | — |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
@@ -1087,16 +1087,39 @@ chosen to defer to here, so that we do not forget them.
   (`shakenfist/deploy/shakenfist_ci/load_budget.py:443-450`),
   because the publish rate is now coupled to instance churn and the
   existing fit was made against a fixed 60 s cadence. That is the
-  honest declaration and it costs regression detection on three
-  pairs which previously had it. Running
+  honest declaration and it costs regression detection on the two
+  of the four pairs which had it before -- `GetQueueLength` and
+  `GetNodeByFqdn`; the other two are new entries which were
+  unbudgeted rather than enforced. Running
   `tools/derive-database-load-budget.py` over a window that
   includes the new behaviour would give those pairs fitted
   activity-coupled rates again. It needs the change running on
   `sfcbr` for days, so it could not be part of phase 3. The marks
   survive re-derivation
   (`tools/derive-database-load-budget.py:476`), so this is an
-  addition rather than a repair. Found at phase 3's planning
-  survey; see D23 there.
+  addition rather than a repair. Tracked as
+  [#4197](https://github.com/shakenfist/shakenfist/issues/4197).
+  Found at phase 3's planning survey; see D23 there, and phase 3's
+  Outcome for the pre-change figure the re-derivation has to be
+  compared against.
+
+- **Make the metrics-drop test's rise attributable to its own
+  instance.**
+  `test_cluster_resources_measured_drops_after_delete`
+  (`cluster_ci_tests/test_nodes.py`) waits for a node's
+  `cpu_measured` to rise before it takes the baseline it later
+  asserts a drop against, but the rise predicate is a threshold on
+  a shared node: in two of the three topologies read at phase 3's
+  closeout it was already satisfied 0.34 s and 1.05 s after the
+  domain started, which is sooner than any publish carrying that
+  domain could arrive. The baseline can therefore include a vCPU
+  the test did not create, and the drop can be satisfied by a
+  sibling's instance going away. This is a false pass and not a
+  false failure, so it does not destabilise CI. No `node_metrics`
+  timestamp is published over REST, so the cheap fix is to ignore
+  any rise read before a full 5 s domain-poll interval has elapsed
+  since the create. Found at phase 3's closeout; see that phase's
+  Outcome.
 
 - **Make `get_all_domains()` one libvirt call.**
   `LibvirtConnection.get_all_domains()`
