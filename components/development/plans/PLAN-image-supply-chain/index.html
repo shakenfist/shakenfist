@@ -14750,7 +14750,7 @@ and, importantly, what it cannot see.</p>
 <tr>
 <td>Phases 1-6</td>
 <td>images</td>
-<td><code>PLAN-image-build-modernisation.md</code>, phase 0 complete</td>
+<td><code>PLAN-image-build-modernisation.md</code>; see its own Execution table for what has landed</td>
 </tr>
 </tbody>
 </table>
@@ -14883,6 +14883,15 @@ and two were being rebuilt nightly.</p>
 <em>is</em> rather than when it was made. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/66" title="GitHub Issue: shakenfist/actions #66">actions#66</a> already established
 the pattern by ending the build with <code>docker version</code>; this
 generalises it.</p>
+<p><strong>Operative reading, added 2026-09-14.</strong> Implementing phase 2
+showed that "verify the artifact, not the name" taken literally is
+the wrong way round: comparing the artifact against the build's own
+inputs is exactly what would have passed every night for two years.
+The reading that works is <strong>verify the artifact against the name it
+will be published under</strong>, and the name is held by whatever
+publishes rather than whatever builds. The correction in phase 2
+sets out why. Anything else applying D2 -- the private-ci bullet in
+that phase, and any future producer -- takes this reading.</p>
 <h3 id="d3-debian-gnome-13-before-the-consumer-sweep">D3. <code>debian-gnome-13</code> before the consumer sweep<a class="headerlink" href="#d3-debian-gnome-13-before-the-consumer-sweep" title="Permanent link">&para;</a></h3>
 <p><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/45" title="GitHub Issue: shakenfist/private-ci #45">private-ci#45</a> is the only issue on the critical path of #123.
 <code>debian-gnome-12</code> is the last bookworm label with no successor, so
@@ -14926,13 +14935,13 @@ needs the same treatment, and phase 6 says so.</p>
 <tbody>
 <tr>
 <td>1. Alarm on absence</td>
-<td>Not started</td>
-<td></td>
+<td>Complete</td>
+<td>images acccd2b (#5), images 47ed141 (#6), private-ci ae7b1f8 (#49), private-ci e1f8fb1 (#54), 33fl 6de1764 (#827)</td>
 </tr>
 <tr>
 <td>2. Verify the artifact, not the name</td>
-<td>Not started</td>
-<td></td>
+<td>In progress</td>
+<td>images 6028647 (#7)</td>
 </tr>
 <tr>
 <td>3. Unblock the migration</td>
@@ -14963,6 +14972,73 @@ needs the same treatment, and phase 6 says so.</p>
 </table>
 <h3 id="1-alarm-on-absence">1. Alarm on absence<a class="headerlink" href="#1-alarm-on-absence" title="Permanent link">&para;</a></h3>
 <p>Closes: part of <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/44" title="GitHub Issue: shakenfist/private-ci #44">private-ci#44</a>. Depends on: nothing.</p>
+<p><strong>Status: complete, 2026-09-14.</strong> Both detections are built,
+merged and deployed. The shakenfist/images watchdog is <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/5" title="GitHub Issue: shakenfist/images #5">images#5</a>;
+the conductor's persisted nightly and its staleness gauge are
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/49" title="GitHub Issue: shakenfist/private-ci #49">private-ci#49</a>; the stale-label issue is <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/54" title="GitHub Issue: shakenfist/private-ci #54">private-ci#54</a>; the Grafana
+rule watching the gauge is <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/827" title="GitHub Issue: shakenfist/33fl #827">33fl#827</a>. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/6" title="GitHub Issue: shakenfist/images #6">images#6</a> landed the per-image
+failure isolation this phase carries as prevention, and is audited
+against the images repository's default branch as part of that
+pull request, per phase 7.</p>
+<p>The conductor deployed at 20:37 on 2026-09-13, carrying private-ci
+<code>e1f8fb15</code>. It logged the priming path on startup -- it claimed that
+day's slot rather than starting a rebuild in the evening -- and
+Prometheus is scraping the gauge, which reads the primed slot rather
+than zero. So the fallback that seeds from the claimed slot is
+doing its job: without it a fresh deployment would read zero and
+alert immediately despite having missed nothing.</p>
+<p><strong>How the invariant at the head of this phase is satisfied.</strong> The
+gauge is exported by the conductor process itself, on maui, and
+scraped by Prometheus on the same host. Taken alone that would
+re-create failure 4: a conductor that is not running exports
+nothing, and a rule that only compares a timestamp sees no data and
+stays quiet. Two things prevent it, and both are load-bearing
+rather than incidental.</p>
+<p><code>up{job="conductor"}</code> is synthesised by Prometheus when a scrape
+succeeds or fails, not exported by the conductor, so it reports 0
+for a conductor that is not running. The pre-existing <code>Host down</code>
+rule in 33fl watches it. That is the detection which does not
+depend on the thing it watches, and it was already in place before
+this plan.</p>
+<p><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/827" title="GitHub Issue: shakenfist/33fl #827">33fl#827</a> also sets <code>noDataState: Alerting</code>, so the absence of the
+gauge alerts in its own right rather than reading as health.</p>
+<p>Stating the division precisely, because the first draft of this
+note got it wrong: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/54" title="GitHub Issue: shakenfist/private-ci #54">private-ci#54</a>'s stale-label issues cover a
+conductor that is running and reports a label going stale. A
+conductor that is absent entirely is covered by <code>Host down</code> and by
+the no-data state of <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/827" title="GitHub Issue: shakenfist/33fl #827">33fl#827</a>, not by anything conductor-side. The
+images producer is covered independently of all of it by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/5" title="GitHub Issue: shakenfist/images #5">images#5</a>,
+which reads the published site from a hosted runner.</p>
+<p><strong>Do not use the 26 hour threshold this plan originally specified.</strong>
+It was taken from the <code>Nightly report not dispatched</code> rule, where
+the thing being timed is a workflow dispatch and is instantaneous.
+A full image rebuild is eleven images built serially and takes about
+an hour and a half -- six runs between 2026-09-07 and 2026-09-13
+took between 1h24m and 1h37m -- and the gauge advances on
+completion, not on the slot. So the first completion after priming
+lands 25.6 hours after the primed slot, which leaves 24 minutes of
+margin against a 13 minute observed spread in build duration. The
+rule would have had a real chance of firing spuriously on its first
+night, which is the worst possible introduction for an alert.</p>
+<p>Use 30 hours. A genuinely skipped night reaches 48, so anything
+between roughly 28 and 44 separates "skipped" from "slow", and 30
+still alerts within about four hours of when completion was due.
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/827" title="GitHub Issue: shakenfist/33fl #827">33fl#827</a> landed at 30 hours with that reasoning recorded beside it.</p>
+<p>The general point, for any future rule of this shape: a threshold
+over a completion timestamp has to cover the slot interval plus how
+long the work takes, not just the slot interval.</p>
+<p><strong>What follows is the original specification</strong>, kept verbatim
+because the phase 2 correction below shows what is lost by quietly
+editing a plan to match what was built. It was departed from in one
+place. The private-ci bullet specifies "a scheduled job elsewhere
+that reads the published dashboard or the conductor's API"; what
+landed reads a Prometheus gauge through a Grafana rule instead,
+because that estate already existed, already scraped the conductor,
+and already carried two rules of exactly this shape to copy. The
+requirement the bullet was protecting -- that the detection not
+depend on the thing it watches -- is met as set out above. The
+scheduler-persistence item in the last paragraph is done, in
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/49" title="GitHub Issue: shakenfist/private-ci #49">private-ci#49</a>.</p>
 <p>Two detections, for the two producers this organisation
 controls. Neither may depend on the thing it watches -- a
 component that has stopped running also stops reporting that it
@@ -15003,17 +15079,40 @@ after this phase and may be a separate defect.</p>
 the one most likely to be dropped for being nobody's issue.</p>
 <ul>
 <li><strong>shakenfist/images</strong>: after building an image, assert that it
-  is what it claims. Reading <code>/etc/os-release</code> from the built
-  image and comparing it against the release the build asked for
-  is enough to have caught the two-year bullseye defect on its
-  first night. This is currently listed under Future work in that
-  repository's plan; this plan promotes it, because it is the only
+  is what it claims. Landed 2026-09-13 as the <code>verify-release</code>
+  element (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/7" title="GitHub Issue: shakenfist/images #7">images#7</a>). This was listed under Future work in that
+  repository's plan; this plan promoted it, because it is the only
   control that addresses D2.</li>
-<li><strong>private-ci</strong>: confirm <code>debian-gnome:13</code> is genuinely trixie
+</ul>
+<p><strong>Correction, 2026-09-13.</strong> This bullet used to say that reading
+  <code>/etc/os-release</code> and comparing it against "the release the build
+  asked for" was enough to have caught the two-year bullseye defect
+  on its first night. That is wrong, and the way it is wrong is the
+  most useful thing in this phase.</p>
+<p>Nothing in those builds disagreed with itself. <code>build.sh</code> passed
+  <code>DIB_RELEASE=bullseye</code>, diskimage-builder built bullseye, and the
+  image honestly reported bullseye. Every comparison between the
+  image and the build's own inputs would have passed, every night,
+  for two years and two months. What was wrong was the name the
+  artifact was published under.</p>
+<p>So the invariant worth asserting is not "the image matches what
+  was requested" but "the image matches what it is about to be
+  called" -- and the name is held by the thing doing the publishing,
+  which is usually not the thing doing the building. The element
+  therefore compares against the publish label, which <code>build.sh</code>
+  passes in, and keeps the <code>DIB_RELEASE</code> comparison only as a
+  secondary check.</p>
+<p>D2 says "verify the artifact, not the name". Read literally that
+  is the wrong way round: verifying the artifact against the build
+  is what would have failed here. Read as "verify the artifact
+  against the name it will be published under", which is what it
+  was reaching for, it is exactly right. Anything else applying D2
+  -- the private-ci bullet below, and any future producer -- should
+  take the second reading.
+* <strong>private-ci</strong>: confirm <code>debian-gnome:13</code> is genuinely trixie
   before wiring it up, per #45's own caveat, and adopt the
   <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/66" title="GitHub Issue: shakenfist/actions #66">actions#66</a> pattern -- end each image build by exercising the
-  thing that image exists to provide.</li>
-</ul>
+  thing that image exists to provide.</p>
 <h3 id="3-unblock-the-migration">3. Unblock the migration<a class="headerlink" href="#3-unblock-the-migration" title="Permanent link">&para;</a></h3>
 <p>Closes: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/45" title="GitHub Issue: shakenfist/private-ci #45">private-ci#45</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/39" title="GitHub Issue: shakenfist/private-ci #39">private-ci#39</a>. Depends on: phase 2 for the
 <code>debian-gnome:13</code> confirmation.</p>
@@ -15198,8 +15297,9 @@ current as phases land. The row reaches <code>Complete</code> only when every
 phase has completed, been abandoned or been superseded.</p>
 <h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Boot-testing published images.</strong> Phase 2 asserts what an image
-  says it is; nothing asserts that it boots. That is the largest
+<li><strong>Boot-testing published images.</strong> Phase 2 asserts that an image
+  matches the name it is published under; nothing asserts that it
+  boots. That is the largest
   remaining quality gap in the pipeline and it is a plan of its
   own.</li>
 <li><strong>A Fedora image that builds.</strong> <code>fedora:43</code> and <code>fedora:44</code> have
@@ -15220,8 +15320,24 @@ phase has completed, been abandoned or been superseded.</p>
   measurements are noisier than they look.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>To be completed as phases land. Already fixed before this plan was
-written, and recorded here because they are the evidence for it:
+<p>Fixed as phases landed:</p>
+<ul>
+<li><strong>The conductor skipped a nightly rebuild on restart</strong>
+  (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/49" title="GitHub Issue: shakenfist/private-ci #49">private-ci#49</a>, phase 1). <code>builder_loop</code> recomputed <code>nightly_due</code>
+  from the clock into a local at every start, so a conductor coming
+  back after the nightly hour set the next rebuild to tomorrow and
+  nothing recorded that tonight had not happened. The slot is now
+  claimed in the database. This does <strong>not</strong> explain the 2026-09-12
+  miss that prompted <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/44" title="GitHub Issue: shakenfist/private-ci #44">private-ci#44</a> -- that issue's fourth checkbox
+  stays open as a possibly separate defect.</li>
+<li><strong>A nightly that failed halfway could be retried in full by every
+  subsequent restart</strong> (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/49" title="GitHub Issue: shakenfist/private-ci #49">private-ci#49</a>, phase 1). Found while fixing
+  the above; the slot is claimed when the cycle starts rather than
+  when it completes, while the staleness metric reads only
+  completions.</li>
+</ul>
+<p>Already fixed before this plan was written, and recorded here
+because they are the evidence for it:
 <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/2" title="GitHub Issue: shakenfist/images #2">images#2</a> (the sixteen-day outage, the grub filesystem
 incompatibility and the two-year bullseye mislabelling) and
 <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/66" title="GitHub Issue: shakenfist/actions #66">actions#66</a> (<code>debian-13-docker</code> publishing without a docker client).</p>
