@@ -678,6 +678,31 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
                 metrics.get('memory_available', 0) - expected_reserved,
                 per_node['ram_max_per_instance'])
 
+    def test_summarize_resources_publishes_clamp_flags(self):
+        # A node whose reservation was clamped by the resources daemon
+        # (issue 4201) must be distinguishable from one whose published
+        # values are the configured reservation's arithmetic; nodes with
+        # no flag in their metrics (an old-dialect row mid-upgrade)
+        # report False rather than omitting the field.
+        self.mock_mariadb.set_node_metrics_same(self._baseline(
+            cpu_max=12, cpu_schedulable=10, memory_reserved_mb=6144))
+        self.mock_mariadb.update_node_metrics('node3', {
+            'cpu_schedulable': 1,
+            'cpu_reservation_clamped': True,
+            'memory_reserved_mb': 5980,
+            'memory_reservation_clamped': True})
+
+        resources = scheduler.Scheduler().summarize_resources()
+
+        clamped = resources['per_node'][self._node_uuid('node3')]
+        self.assertTrue(clamped['cpu_reservation_clamped'])
+        self.assertTrue(clamped['memory_reservation_clamped'])
+        for n, per_node in resources['per_node'].items():
+            if n == self._node_uuid('node3'):
+                continue
+            self.assertFalse(per_node['cpu_reservation_clamped'])
+            self.assertFalse(per_node['memory_reservation_clamped'])
+
 
 class CapacityCounterTestCase(SchedulerTestCase):
     """The pre-filter reads the counters the guard will draw down (P2).
