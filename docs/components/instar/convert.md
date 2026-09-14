@@ -87,3 +87,22 @@ The default can also be set via `convert.sparse` in the config file.
   default 2MB via `--block-size`)
 - **vhdx** - VHDX dynamic output, configurable block size (1MB-256MB,
   default 32MB via `--block-size`)
+
+## Differencing images
+
+A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so `convert` refuses such a source by name and exits 1 rather than
+writing an output composed as though the parent's sectors were
+zero. No output file is left behind:
+
+```
+convert: source is a differencing <VHD|VHDX> image whose parent instar cannot
+yet compose; composition is deferred (see PLAN-differencing.md)
+```
+
+`instar info` is the exception — it reports the parent as a backing file
+instead of refusing. See the "VHD/VHDX differencing" section of
+[quirks.md](/components/instar/quirks/) for the per-operation record, and
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the composition
+work that will lift the refusal.

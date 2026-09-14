@@ -34,3 +34,21 @@ regions as matching, while strict mode (`-s`) fails immediately on any size
 difference.
 
 Output is byte-for-byte identical with `qemu-img compare`.
+
+## Differencing images
+
+A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so `compare` refuses such a source by name and exits 1 rather than
+reporting a content difference it cannot actually account for:
+
+```
+compare: source is a differencing <VHD|VHDX> image whose parent instar cannot
+yet compose; composition is deferred (see PLAN-differencing.md)
+```
+
+`instar info` is the exception — it reports the parent as a backing file
+instead of refusing. See the "VHD/VHDX differencing" section of
+[quirks.md](/components/instar/quirks/) for the per-operation record, and
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the composition
+work that will lift the refusal.

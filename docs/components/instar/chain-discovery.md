@@ -176,3 +176,33 @@ The chain discovery infrastructure is used by the following operations:
   all chain images as separate virtio-block devices for flattening. The guest
   walks the chain to resolve unallocated clusters, producing a standalone
   output image with no backing dependencies.
+
+## Known limitations
+
+### A differencing VHD or VHDX parent is not walked
+
+`discover_backing_chain` deliberately stops at a VHD (`disk_type == 4`) or
+VHDX (`HasParent` set) parent instead of resolving it, recording the
+parent reference (so `instar info` can still report it) without following
+it. `instar info --chain` on such an image therefore reports a one-image
+chain even though the image has a parent:
+
+```
+$ instar info --chain vhd-diff-child-aligned.vhd
+Chain: 1 image(s)
+  [0] /path/to/vhd-diff-child-aligned.vhd (vpc) -> vhd-diff-parent.vhd
+      ...
+```
+
+This is not an oversight: nothing in instar can compose a VHD or VHDX
+parent yet, so walking it would only change *which* failure a caller sees
+(a resolved-but-uncomposable parent) rather than whether reading succeeds,
+and for VHDX it would actively make things worse — the parent locator is a
+Windows-shaped path (`.\parent.vhdx`) that does not resolve on POSIX, so
+walking it turned a clear refusal into a "backing file not found" error.
+The `convert`, `dd`, `compare`, `bench`, `check` and `measure` operations
+refuse a differencing source outright regardless of whether its parent
+exists — see the "VHD/VHDX differencing" section of
+[quirks.md](/components/instar/quirks/) — so a refusal must not depend on the parent being
+present. Phase 14 of [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/)
+lifts this restriction per operation as real chain composition lands.

@@ -573,3 +573,21 @@ divergence registry, see `KNOWN_BENCH_DIVERGENCES` at the top of
 [`tests/test_bench.py`](https://github.com/shakenfist/instar/blob/develop/tests/test_bench.py). See also
 [usage.md](/components/instar/usage/). For the qcow2-write migration quirks, see
 [quirks.md](/components/instar/quirks/).
+
+## Differencing images
+
+A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so `bench` refuses such a source by name and exits 1 rather than
+benchmarking reads that silently skip the parent's blocks:
+
+```
+bench: source is a differencing <VHD|VHDX> image whose parent instar cannot
+yet compose; composition is deferred (see PLAN-differencing.md)
+```
+
+`instar info` is the exception — it reports the parent as a backing file
+instead of refusing. See the "VHD/VHDX differencing" section of
+[quirks.md](/components/instar/quirks/) for the per-operation record, and
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the composition
+work that will lift the refusal.

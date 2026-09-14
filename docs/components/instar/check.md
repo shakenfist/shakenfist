@@ -73,7 +73,8 @@ For VHD images (dynamic and fixed), check validates:
 
 - Footer cookie and checksum (from first or last sector)
 - Format version (must be 1.0) and features (reserved bit required)
-- Disk type validity (fixed, dynamic, differencing)
+- Disk type validity (fixed or dynamic; a differencing VHD is refused
+  rather than validated — see "Differencing images" below)
 - Fixed VHD: data_offset check, file size vs virtual size validation
 - Dynamic header cookie, checksum, and version
 - BAT offset within file bounds
@@ -94,7 +95,8 @@ For VHDX images, check validates:
 - Region table 2: cross-validation against region table 1
 - Metadata: required items (FileParameters, VirtualDiskSize,
   LogicalSectorSize, PhysicalSectorSize)
-- Differencing disk detection (unsupported)
+- Differencing disk detection — refused rather than validated, see
+  "Differencing images" below
 - BAT entries: block offsets within file bounds, 1MB alignment,
   overlap detection, state validation
 - Fragmentation tracking (non-sequential block allocation)
@@ -118,3 +120,33 @@ in human-readable output. Without `--chain`, `chain-errors` is always 0.
 **Note:** The `chain-errors` field is always present in JSON output,
 even when `--chain` is not used. This is a schema addition relative to
 previous versions.
+
+## Differencing images
+
+A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) holds
+only the sectors that differ from a parent image. instar cannot compose a
+parent yet, so `check` **refuses** such an image instead of validating it:
+
+```
+$ instar check vhdx-diff-child.vhdx
+check: source is a differencing VHDX image whose parent instar cannot yet
+compose; composition is deferred (see PLAN-differencing.md)
+$ echo $?
+1
+```
+
+Two things about that are worth knowing if you script against `check`:
+
+- **The exit code is 1, not 2.** Exit 2 means "corruption found"; a
+  differencing image is not corrupt, it is unsupported, so it takes the
+  ordinary failure code. A differencing VHDX previously exited 2 with
+  `"1 errors were found on the image."`, and a differencing VHD
+  previously exited **0** having validated only the child's own blocks.
+- **`--output json` produces no JSON document.** The refusal happens
+  before there is a result to serialise, so stdout is empty and the
+  message goes to stderr. Every other `check` outcome, including
+  corruption, still writes a JSON object.
+
+Validation resumes once parent composition lands; see
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) and the
+"VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).

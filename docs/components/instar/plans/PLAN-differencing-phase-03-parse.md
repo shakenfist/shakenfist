@@ -322,6 +322,18 @@ with `1a677c77` (#552).
   decision rather than an oversight.
 * `git diff --name-only develop...HEAD -- src/operations/` is
   empty: no operation changed.
+
+  **Not true as merged, corrected in retrospect.** The review
+  round that bounded a VHDX locator to its metadata region gave
+  `parse_metadata` a `metadata_length` parameter, which changed
+  the one caller outside the crate:
+  `src/operations/check/src/main.rs` gained
+  `let metadata_length = regions[1].length;` and passes it
+  through. That is a call-site edit with no behaviour change --
+  `check` does nothing new with the value -- but the criterion as
+  written is false against `42e879f`, and the honest record is
+  that the bullet was not revisited when the review change
+  landed.
 * `VhdState::init` still accepts `DISK_TYPE_DIFFERENCING` and
   `VhdxState::init` still rejects `has_parent`, unchanged. Issues
   #547 and #548 are still open.

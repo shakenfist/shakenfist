@@ -191,6 +191,30 @@ The canonical resize-side divergence whitelist is
 The create-side carry-forwards are listed in
 `tests/test_create.py:KNOWN_WRITER_DIVERGENCES`.
 
+## Known limitations
+
+### `resize` accepts a differencing VHDX
+
+`instar resize` should refuse a differencing VHDX the same way it
+refuses a differencing VHD, and its planner already has the logic to do
+so: `src/crates/resize/src/vhdx.rs:55` guards on `opts.has_parent` and
+is covered by the planner's own `rejects_differencing_image` unit test.
+But the caller that builds those options,
+`src/operations/resize/src/main.rs:839`, hard-codes `has_parent: false`
+regardless of the actual image, so the guard has never fired — dead
+since commit `94d73b7` (May 2026). `instar resize` on a differencing
+VHDX therefore succeeds today, silently resizing an image whose content
+instar cannot compose.
+
+This is a **write** path and predates
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/); `resize` never
+called `VhdxState::init`, so the read-side refusal (see
+[quirks.md](/components/instar/quirks/)'s "VHD/VHDX differencing" section) neither
+caused this bug nor fixes it. Closing it is call-site wiring, not
+planner logic — thread the image's real `has_parent` value into
+`VhdxResizeOpts` instead of the hard-coded `false`. Tracked as
+[issue #565](https://github.com/shakenfist/instar/issues/565).
+
 ## Future work
 
 - qcow2 `Preallocation::Metadata`: emit the populated
@@ -212,8 +236,10 @@ The create-side carry-forwards are listed in
  with `UnsupportedSubformat`. Multi-file resize needs the same
  multi-output-device call-table extension that create's roadmap
  already calls out.
-- Differencing VHD / VHDX as a resize target: rejected today;
- needs the parent-locator update path.
+- Differencing VHD / VHDX as a resize target: VHD is rejected today
+ (`ResizeResult::ERROR_UNSUPPORTED_SUBFORMAT`); VHDX is not, a dead-guard
+ bug — see "Known limitations" above. Neither can be supported for real
+ until the parent-locator update path exists.
 - `--object OBJDEF` and `--image-opts`: rejected at the host CLI. LUKS-encrypted resize would land alongside the
  matching `--object` plumbing on the convert side.
 - Tightening `QCOW2_MAX_RESIZE_SCRATCH` (32 MiB) for non-default
