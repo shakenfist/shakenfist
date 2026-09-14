@@ -390,6 +390,15 @@ it against the live-derived `cpu_hard_max` and see the two ledgers
 disagree; a node with no capacity row reports `cpu_limit` as `None`
 rather than falling back to `cpu_hard_max`.
 
+The disk dimension of the same row is published as `disk_limit_gb` and
+`disk_committed_gb`, beside the measurement-derived `disk_available`.
+The distinction matters because `disk_available` is headroom -- it moves
+whenever a sibling creates or deletes an instance -- where the ledger's
+ceiling is stable under load, so it is the figure to reason about "what
+could this node ever accept?" against (issue 4208). The same
+conventions apply: `cpu_committed_row_present` speaks for the whole row,
+and an absent row reports `disk_limit_gb` as `None` with no fallback.
+
 Those per-node fields cannot, on their own, tell you *why* a node is
 uncounted. An empty read of the capacity table looks identical whether
 the table is genuinely unpopulated -- a cluster the reconciler has not
@@ -828,7 +837,9 @@ The admin resources API (`/admin/resources`, surfaced by
 `cpu_schedulable`, `memory_reserved_mb`, `cpu_available` and RAM
 headroom using the same pre-filter arithmetic as the pipeline above.
 It also breaks the CPU decision out into `cpu_hard_max`,
-`cpu_measured`, `cpu_committed` and `cpu_limit` -- see [Admission is a
+`cpu_measured`, `cpu_committed` and `cpu_limit`, and publishes the
+capacity row's disk counters as `disk_limit_gb` and `disk_committed_gb`
+beside the headroom-only `disk_available` -- see [Admission is a
 guarded capacity claim](#admission-is-a-guarded-capacity-claim) for what
 `cpu_committed` and its `cpu_committed_row_present` companion actually
 mean.
