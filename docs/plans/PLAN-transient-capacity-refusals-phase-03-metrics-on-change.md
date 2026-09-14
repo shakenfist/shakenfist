@@ -628,3 +628,114 @@ place.
 
 No other gate. 3a, 3b, 3c and 3e are each small enough to review as a
 commit.
+
+## Outcome
+
+Complete. Steps 3a-3e merged as
+[#4200](https://github.com/shakenfist/shakenfist/pull/4200), merge
+commit `03cd7be3a`; this section is step 3f.
+
+### The measurement (definition of done item 13)
+
+Read from the three cluster bundles of merge-queue run
+[34777052827](https://github.com/shakenfist/shakenfist/actions/runs/34777052827),
+which carries the merged code. Each bundle's
+`traces/test_cluster_resources_measured_drops_after_delete.json` gives
+the test's own start and end; the hypervisor's
+`_commands/journalctl-sf-units` gives the instance's `poweron` and
+`poweroff`; `primary`'s gives the `DELETE api request received`. The
+instance uuid is not in the create's log line -- that carries a
+request id -- so it is read from the `db record created` event and
+then followed across nodes.
+
+| Topology | Node | Domain destroyed | Test ends | Drop seen within |
+|----------|------|------------------|-----------|------------------|
+| `debian-12-slim-primary` | sf2 | 19:59:27.782 | 19:59:33.086 | 5.3 s |
+| `ubuntu-2404-slim-primary` | sf3 | 19:40:20.907 | 19:40:26.483 | 5.6 s |
+| `debian-12-slim-tier` | sf2 | 19:53:26.753 | 19:53:32.354 | 5.6 s |
+
+The last column is an upper bound rather than the interval itself: the
+test polls every 5 s, so the publish landed somewhere inside it. Every
+one is one domain poll plus a publish, against a 20 s deadline and
+against the up-to-60 s this phase set out to remove. The same test
+also passed on all three topologies in the earlier queue run
+[34750982544](https://github.com/shakenfist/shakenfist/actions/runs/34750982544),
+so the assertion has six passes and no failures.
+
+The rise half reads the same way on `debian-12-slim-tier`, where the
+delete was issued 5.89 s after `poweron` -- again one domain poll plus
+a publish, which is the shape this phase predicts.
+
+### A caveat this reading found, in the test rather than the code
+
+On both `slim-primary` topologies the test issued its delete 0.34 s
+and 1.05 s after the domain's `poweron`. Its rise predicate
+(`measured >= idle_measured + cpus`) was therefore already true on the
+first read, before any publish could have carried this instance's own
+domain: that needs up to one 5 s poll and then a trip to the API.
+Something else raised the node's `cpu_measured` between the test's
+opening read and its first poll -- on a suite running five workers at
+once, most likely a sibling test's domain starting on the same node.
+
+The consequence is bounded but real. `baseline_measured` can include a
+vCPU this test did not create, so the drop assertion
+(`measured <= baseline_measured - cpus`) can be satisfied by that
+other instance going away rather than by this one. It is a false-pass
+risk and not a false-fail one, which is why it is recorded here rather
+than fixed inside a closeout step. It does not weaken the table above:
+those intervals are measured from this instance's own `poweroff`.
+
+Fixing it means making the rise attributable. No `node_metrics`
+timestamp is exposed over REST -- which is why the test reads
+`/admin/resources` at all -- so the cheapest honest version is to
+ignore any rise observed before a full domain-poll interval has
+elapsed since the create, which costs 5 s of wall clock and makes the
+baseline necessarily post-date this instance's domain. Recorded under
+Future work in the master plan.
+
+### The load-budget reading D20's risk asks for
+
+Not takeable yet, and that is recorded here rather than deferred
+silently. `sfcbr` is running `0955242bf`, which predates `03cd7be3a`,
+so no cluster is running this change and `sf-ctl database-load` there
+would measure the old cadence.
+
+What can be checked now is the arithmetic that reading is meant to
+test, and it checks out exactly. The nightly figures for 2026-09-13 --
+pre-change, six nodes, 20.95 standing instances on average -- put
+`GetQueueLength`/`resources` at 1.28 QPS cluster-wide. The table above
+under *What the survey found* derives twelve queue reads per publish
+on an ordinary node and seventeen on the elected network node, at one
+publish per node per 60 s, which for `sfcbr`'s five-plus-one predicts
+(5 x 12 + 17) / 60 = 1.28 QPS. That figure had until now only been
+derived from the code, never observed, and the first draft of this
+plan had it wrong (seven queue reads, ten round trips), so the
+agreement is worth writing down. The other three pairs sit below the
+nightly report's top-40 cut.
+
+The post-change reading therefore has something to be compared
+against: the same pair should rise with instance churn, bounded by D19
+and D21 at 3/s per node, and if it lands materially above that model
+the queue-read split in D20 is the pre-agreed remedy.
+[#4197](https://github.com/shakenfist/shakenfist/issues/4197) carries
+it.
+
+### What CI did
+
+Two things in this phase's CI are worth recording, because neither is
+about the change and both cost time.
+
+The merge-queue run on the final head
+([34777052827](https://github.com/shakenfist/shakenfist/actions/runs/34777052827))
+failed on `Node lifecycle`, one second after the same script printed
+`No more running services!` and with every `sf-*.service` shown
+`inactive dead`. The surviving process the stop check counted was a
+`for i in $(seq 1 600); do case "$(hostname)" in sfcbr-*)` wait loop
+left over from the deploy, not a Shaken Fist daemon. The three cluster
+jobs in that run, which are the ones carrying this phase's assertion,
+all passed.
+
+Earlier, on the pull request itself, `Credential scan` and
+`Issue links` both failed with *"The job was not started because it
+repeatedly failed to be acquired (5 attempts)"* -- no steps, no runner
+name, no log. Both passed on a rerun with no change to the branch.
