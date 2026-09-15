@@ -974,16 +974,29 @@ so a change to either that alters the answer fails a test.
    form, not by reading.
 4. Every row of F5 answers 400 naming the offending key, and no row
    writes an exception record.
-5. Every row of F6 answers 400 **except these four values**, each of
+5. Every row of F6 answers 400 **except these five values**, each of
    which is still accepted and has a row in the sweep asserting so:
-   `network[].model` as any string (D43 — no enum, the vocabulary is
-   the hypervisor's), `network[].float` as `"yes"` (marshmallow's
-   truthy set is no narrower than the handler's bare truthiness test),
-   and `disk[].size` and `video.memory` as numeric strings (D46 refuses
-   a fractional number, not a string). (This item originally excepted
-   "any key the census showed a caller sends", which is vacuous —
-   the census showed a caller sends every documented key. The exception
-   has to be keyed on values, and named.)
+   `network[].model` and `video.model` as any string (D43 — neither
+   carries an enum, because both are rendered raw into the libvirt
+   domain XML and the vocabulary is therefore the hypervisor's),
+   `network[].float` as `"yes"` (marshmallow's truthy set is no
+   narrower than the handler's bare truthiness test), and
+   `disk[].size` and `video.memory` as numeric strings (D46 refuses a
+   fractional number, not a string).
+
+   (Twice corrected. This item originally excepted "any key the census
+   showed a caller sends", which is vacuous — the census showed a
+   caller sends every documented key; the exception has to be keyed on
+   values, and named. It then named *four* values and omitted
+   `video.model`, which step 8's audit caught: F6's last row is
+   "`video.model` / `.memory` / `.vdi`, any type at all", and D43's
+   own table says in as many words that `video.model` publishes no
+   enum for exactly the reason `network[].model` does not. The
+   deliverable was right throughout — `video.model.nonsense` has been
+   an accepted row of the sweep since step 5, and the release note
+   names both `model` keys — so this was the item's wording reasoning
+   from half of D43, the same failure mode as the D46 rewrite's three
+   dependents.)
 6. A finding inside an array names its index: the response to a bad
    `size` in the second diskspec contains `disk[1].size`.
 7. Under `API_VALIDATION_MODE=warn`, every row of F5 and F6 answers
@@ -1024,6 +1037,194 @@ so a change to either that alters the answer fails a test.
     and the `docs/plans/index.md` row reads `8 of 9`.
 15. `pre-commit run --all-files` is clean.
 
+### Definition-of-done audit (step 8)
+
+Every verdict below was produced by running something or by reading the
+tree as it stands, never by trusting what a step reported. Where the
+evidence is a measurement, the measurement is quoted.
+
+Read the decisions as a set first, which is this phase's own recorded
+lesson (see the second amendment). D46's rewrite has three dependents
+in the plan — D49, D50 and definition-of-done items 5, 7 and 8 — all of
+which were corrected after step 5. Two more dependents outside the plan
+were still stale when this step started and are fixed in it: the
+`video.memory` comment in `base.py` still said the typing was "a
+narrowing with an ordering obligation attached", which is the sentence
+D49's correction deletes, and
+`test_a_video_memory_string_is_still_accepted`'s docstring in
+`test_validation_compiler.py` still spoke of D49 in the present tense as
+saying the typing "breaks the shipped CLI until client-python#398
+ships". Neither changed any behaviour; both would have told the next
+reader something the plan had already retracted. A third dependency was
+found in this audit and is item 5 below.
+
+1. **Met.** The object branch is `validation.py:579`, and it is keyed on
+   `isinstance(spec.get('properties'), dict)` rather than on the type
+   token — the comment at `:585` says so explicitly, because
+   marshmallow's default for a `Schema` is `unknown=RAISE` and an
+   object branch keyed on `type` would have refused every metadata key
+   ever sent. `ARGTYPES['dict']` still renders a bare
+   `{'type': 'object'}` and the compiled field is still `fields.Dict`
+   (`test_validation_compiler.py:355`). The end-to-end proof the item
+   asks for is
+   `test_metadata_takes_a_dict_and_a_list_under_the_same_key`
+   (`test_request_validation.py:1423`), which drives a real
+   `POST /instances` carrying `{"k3s": {"a": "dict"}}` and then
+   `{"k3s": ["a", "list"]}` and gets a 507 with no exception recorded
+   both times.
+2. **Met.** Measured over a real registry build rather than read: 27
+   compiled integer fields, of which `disk[].size` and `video.memory`
+   are nested (`_ExactInteger` both), and every one of the 27 refuses
+   `1.5`, accepts `8.0` and accepts `'8'`. The registry-wide test is
+   `test_every_compiled_integer_refuses_a_fractional_number`, which
+   reaches nested fields through `_every_compiled_field`'s two ways
+   down (a `List.inner` and a `Nested.schema.fields`) rather than
+   through a grep, exactly as the item's parenthesis requires. End to
+   end, `"cpus": 1.5` answers `400 cpus: Not a valid integer.` with no
+   exception recorded, and `"cpus": "2"` reaches placement
+   (`test_a_fractional_cpu_count_is_a_bad_request` and
+   `test_a_numeric_string_cpu_count_still_reaches_placement`). One stale
+   docstring was fixed in this step: `_every_compiled_field`'s said
+   "the nested arm reaches nothing today, since no declaration carries
+   a `properties` block until step 4", which stopped being true when
+   step 4 landed and made the test read as weaker than it is.
+3. **Met.** All five tokens are in `ARGTYPES`. The identity is real, not
+   merely equal: `ARGTYPES['arrayofnetworkspec']['items'] is
+   ARGTYPES['networkspec']` evaluates `True`, and so does the diskspec
+   pair. `test_the_single_and_array_forms_cannot_drift` asserts both
+   that identity and that the two *render* identically through the deep
+   copy `swagger_helper()` makes, which is the assertion the item asks
+   for since rendering is where a copy could diverge.
+4. **Met.** All eleven F5 values, at `enforce`: 400, `recorded=False`,
+   and an error naming the key and its index —
+   `disk[0].base: Not a valid string.` (int, bool, list),
+   `disk[0].size: Not a valid integer.` (non-numeric string, dict),
+   `network[0].network_uuid: Not a valid string.` (int, dict, bool),
+   `network[0].address: Not a valid string.` (int, list) and
+   `network[0].model: Not a valid string.` (int). Each is a row of
+   `CASES` in `test_nested_sweep.py` and each is asserted at all three
+   modes.
+5. **Met, as amended — and the amendment is the audit's main finding.**
+   The item excepted four values and there are five: `video.model` as
+   any string is an F6 value which is still accepted, and the item did
+   not name it. The *deliverable* is right and always was —
+   `video.model.nonsense` has been an accepted row of the sweep since
+   step 5, `base.py`'s videospec comment says the vocabulary is the
+   hypervisor's, D43's own table says `video.model` publishes no enum
+   for exactly the reason `network[].model` does not, and the release
+   note names both `model` keys in its "several things which look like
+   narrowings are not" paragraph. What was wrong was this item's
+   wording, which had reasoned from half of D43. That is the same
+   failure mode the second amendment records for D46, arriving a third
+   time, and it is the reason the amendment told this step to read the
+   decisions as a set. The item is corrected above. With the fifth
+   exception named, every other F6 value answers 400 at `enforce`:
+   `size` of `-5`, `8.5` and `true`; a diskspec of `{}`; `type` of
+   `"nonsense"` and of `5`; an unknown diskspec key; an unknown netdesc
+   key; `video.vdi` of `"nonsense"`; and `video.memory` of `"lots"`.
+6. **Met.** `disk.second_element` sends
+   `{"disk": [{"size": 8}, {"size": "banana"}]}` and the sweep asserts
+   the answer is `400 disk[1].size: Not a valid integer.` — the index,
+   and the key, and not the container.
+7. **Met.** The count of seven was checked against the table rather
+   than against the number in the item. Exactly seven rows of `CASES`
+   carry the phrase `moves at warn`, and they are the seven the item
+   describes: `net.uuid.null` and `hotplug.uuid.null` (the null
+   `network_uuid` on both routes), and `disk.empty`,
+   `disk.size_null_only`, `disk.size_zero_only`,
+   `disk.size_and_base_null` and `disk.unknown_key_only` (the diskspec
+   which asks for nothing, in its five spellings — the last of those is
+   the typo'd key which leaves the spec empty once the schema is not
+   enforcing). Every other row's `warn` answer is what the plan
+   measured before the phase, including the eleven F5 rows which still
+   answer `500 server error` with an exception recorded. `off` is
+   measured on the whole table and not on a sample:
+   `NestedSweepOffTestCase` subclasses the warn class, so it runs the
+   identical 99 rows with `mode = 'off'`.
+8. **Met.** Read in the tree rather than remembered.
+   `_netdesc_safety_checks` (`external_api/instance.py:349`) still
+   refuses a netdesc which is not a dict, still refuses one with no
+   `network_uuid` — and now refuses one whose `network_uuid` is null,
+   which is the change the item accounts for — and still refuses a
+   malformed MAC through `util_network.valid_macaddr`. The disk bus
+   check at `:732` is unchanged. The IDE refusal is still present at
+   `:876` and still unreachable: the sweep's `disk.bus.ide` row answers
+   `invalid disk bus ide` at `warn` and `off` and
+   `disk[0].bus: Must be one of: sata, scsi, usb, virtio, nvme.` at
+   `enforce`, and never `IDE disks are no longer supported`.
+9. **Met.** `disk.empty` answers `400 disk specification must specify
+   at least one of size or base` at all three modes, as do the other
+   four spellings listed under item 7.
+10. **Met.** `test_openapi_spec.py` passes, including
+    `test_every_published_structure_or_bound_is_registered`, whose
+    completeness is derived from the published specification. Every
+    entry this phase changed — `video`, `disk`, `network` on
+    `POST /instances` and `network` on the hotplug route, plus the
+    `metadata` entry which changed only its comment — carries a comment
+    saying what backs each constraint. The comparison ignores
+    `description` and nothing else, which
+    `_without_descriptions()`'s docstring justifies.
+11. **Met, as amended: the script did not exist and was written in this
+    step.** Steps 6 and 7 documented the specs by hand and nothing
+    compared the result to `ARGTYPES`, which is precisely what this item
+    exists to prevent — and the census had already found two live
+    instances of that drift in tree (`usage.md` listing nine NIC models
+    where the API reference listed eight, and `usage.md` and
+    `config.DISK_BUS`'s description both still listing the `ide` bus
+    which has been refused since v0.7). The new
+    `shakenfist/tests/external_api/test_api_reference_specs.py` parses
+    the three `### <spec>` sections of
+    `docs/developer_guide/api_reference/instances.md` and asserts, in
+    both directions, that the documented key set is the published key
+    set; that each key's bracketed annotation is its published type,
+    with `(enum)` meaning a string which publishes an `enum`; that
+    `, required` and the fragment's `required` list agree; and that
+    every published enum value appears verbatim in the bullet which
+    documents it. It was mutation tested rather than merely run: adding
+    a key to `ARGTYPES`, retyping `video.memory`, adding an undocumented
+    enum member, dropping `network_uuid` from `required` and giving
+    `network[].model` an enum each fail it, and the unmutated tree
+    passes. The remaining half of the item — that the release note says
+    the same thing — was checked by reading, and it does; it is also
+    the document which had the `video.model` exception right when item
+    5 did not.
+12. **Met.** #528's body now describes the element-schema scope, links
+    this plan and states that the `use_kwargs` residual was overtaken by
+    phase 4 rather than abandoned, preserving what the original text
+    asked for. It was then closed as completed, with a comment naming
+    phase 4 (merged, `1c203b111` and `f1040a23b`) for the first half and
+    this phase's seven implementation commits for the second, and naming
+    what is deliberately not done.
+13. **Met, as restated rather than closed.** #4167 item 1 was
+    re-measured rather than reasoned about: at the default `enforce`,
+    through this phase's own `SweepFixtureTestCase` fixture,
+    `POST /instances {"uefi": null}` and `{"secure_boot": null}` both
+    still answer 500 with an exception recorded and a body of
+    `server error`, while omitting `uefi` or sending `true` reaches
+    placement. Phase 6 closed the `cpus` and `memory` half of that item
+    (`400 cpus: declared required but not supplied`). So something
+    survives and the issue stays open, with a comment restating that
+    the surviving scope is an explicit JSON `null` for a
+    `required=False` scalar whose handler cannot take one — and that
+    items 2 and 3 are closed, quoting their new answers.
+14. **Not met, and cannot be met from a branch.** The `Merged` column
+    stays `—` until the pull request merges, by the rule the column's
+    own note states: every SHA there is the *merge commit* of a pull
+    request, so that `<sha>^1..<sha>` is the whole of what it put on
+    `develop`. Reading it from the branch, or from a path-filtered
+    `git log`, is what #4222 exists to correct for phase 6. After the
+    merge, take the SHA from the first-parent range —
+    `git log --first-parent --oneline develop` — and record it beside
+    the pull request number. The rest of the item is met: the Execution
+    table reads `Complete` for phase 7 with a rewritten description, and
+    `docs/plans/index.md` reads `8 of 9` with the status still
+    `In progress`, because phase 8, the push audit, has not run.
+15. **Met.** `pre-commit run --all-files` is clean, including the
+    `Check plan statuses and index arithmetic agree` and
+    `Check documentation links and anchors resolve` hooks and the mypy
+    and unit-test hooks. The full `stestr` suite passes (4999 tests,
+    121 skips) with the new documentation-consistency test in it.
+
 ## Back brief
 
 Before executing any step, back brief the operator on the plan as
@@ -1061,3 +1262,210 @@ probe.
 
 It was deleted rather than committed. Step 5 builds the committed
 version, which differs in that it asserts rather than reports.
+
+## Progress
+
+Written at the close-out, for a reader who was not here.
+
+### What the phase did, in order
+
+**Step 1, the census.** Before any schema was written, every key any
+caller sends into a diskspec, networkspec or videospec was enumerated
+from five sources: this tree, the client repository, the CI suites, the
+documentation and the handlers themselves. The tables are above under
+*The key and value census*. The census existed to test D41 and D43, and
+it changed four decisions — see *What the steps found* below. It was
+documentation only.
+
+**Step 2, the compiler.** `_field()` gained an object branch which
+builds a nested marshmallow schema from a rendered `properties` block,
+honouring `required` and `additionalProperties: false`. `_ExactInteger`
+landed in the same step, bound into `_SCALARS` so that no future branch
+of `_field()` can build an integer which forgets it. Nothing rendered a
+`properties` block yet, so no request changed its answer except through
+the integer fix.
+
+**Step 3, the schemas.** `ARGTYPES` gained `diskspec`,
+`arrayofdiskspec`, `networkspec`, `arrayofnetworkspec` and `videospec`,
+built from three module-level constants so a shape declared twice is
+the same Python object. Every type came from the census and every enum
+was read off the code which consumes the value. Still nothing declared
+them, so still nothing changed for a caller.
+
+**Step 3b, unplanned.** Step 3 reported that D44's mechanism had never
+been built, and declined to overturn a committed decision on its own
+authority, which was right. This step built it: `required` inside an
+object fragment now means present *and not an explicit null*, the same
+meaning phase 6 gave `required` at the top level.
+
+**Step 4, the declarations.** The four structured declarations were
+retyped and the contract moved. Two handler guards were added (D45's
+size-or-base, and a value test rather than a presence test in
+`_netdesc_safety_checks`), and `metadata` and `bound_claims` kept their
+bare `dict` with a comment at each saying why.
+
+**Step 5, the sweep.** `test_nested_sweep.py`: 99 rows of (spec, key,
+sent value) driven through the real stack on both endpoints, at
+`enforce`, at `warn` and at `off`. Fifty-seven refused at `enforce` and
+forty-two accepted, because a sweep which only proves things are
+refused passes just as well against a server which refuses everything.
+Twelve mutations in `tools/mutate-nested-sweep.sh`, none survived.
+
+**Step 6, the documentation.** The API reference now states, per spec,
+which keys exist, which are required, what each value's type and enum
+are, and that an undocumented key is refused. The release note names
+the three real narrowings and, because the plan had been wrong about
+this, names what is *not* narrowed. Three documentation bugs this phase
+did not cause were fixed on the way.
+
+**Step 7, cluster CI.** Four cases in
+`cluster_ci_tests/test_api_validation.py`, against a deployed cluster.
+Three refusals and — the one which matters most and is the easiest to
+skip — a single instance carrying all twelve documented keys which must
+actually boot, checked down to `df` showing a virtio disk.
+
+**Step 8, the close-out.** This section, the definition-of-done audit
+above, the master plan and index, and the issue tracker.
+
+### What the steps found that the survey did not
+
+Sixteen things, give or take, none of which are in the plan's *What the
+survey found* section because none of them were visible from outside.
+
+*From the census (step 1):*
+
+1. **D41 came through unconditional.** No first-party caller sends an
+   undocumented key into any of the three specs, and neither the CLI nor
+   the ansible module has a key allowlist of its own, so the server's
+   400 is the only place a typo can ever surface.
+2. **D43 named six enums and only three are publishable.** Both `model`
+   keys go into the libvirt domain XML with nothing in between, so the
+   real vocabulary is the hypervisor's qemu build.
+3. **D44's mechanism did not work.** Every compiled field is
+   `allow_none=True`, so a required, string-typed nested `network_uuid`
+   would still have accepted a null.
+4. **D46's `strict=True` could not be used at all.** A query parameter
+   is a string on the wire; applying the decision literally failed
+   `test_blob_data_bounds` within a minute.
+5. **Two of finding F5's attributions were wrong**, because the survey
+   had read the status and not the code. The `address` fault is in
+   `noneish` above `is_in_range`, and the `size` fault is
+   `_safe_int_cast` rather than pydantic — which narrowed that row to a
+   *non-numeric* string.
+
+*From the compiler (steps 2 and 3):*
+
+6. **D48 needed no code.** `_flatten_messages` already recursed through
+   marshmallow's nested error dict and already produced `disk[0].size`
+   by the same route it produced `side_channels[0]`. It is now pinned
+   by tests rather than left to be rediscovered.
+7. **The object branch has to be keyed on `properties`, not on the
+   type.** Marshmallow's schema default is `unknown=RAISE`, so keying it
+   on `type == 'object'` refuses every `metadata` key ever sent —
+   mutation tested, which is D47 turning out to be load bearing rather
+   than decorative. For the same reason the `additionalProperties` arm
+   has both halves written out.
+8. **The enum compiler was new.** Nothing in the tree published an
+   `enum` before this phase, so `_field()` had no branch for one and all
+   three published enums would have been documentation the server did
+   not enforce — which would have made the stated reason for publishing
+   the `vdi` enum false.
+
+*From the declarations (steps 3b and 4):*
+
+9. **The `_schema` sentinel regression.** Wrapping a spec in
+   `fields.Nested` made a non-mapping element answer
+   `network[0]._schema: Invalid input type.`, leaking marshmallow's
+   internal sentinel into a caller-facing message where F1 had already
+   blessed `network[0]: Not a valid mapping type.` as good. The
+   flattener now collapses the schema-level key onto the container's own
+   name, and the two pre-existing tests asserting that string pass
+   unchanged — which is the evidence the case did not move.
+10. **The `warn`-mode guard gap.** The schema refusing a null
+    `network_uuid` is not enough, because `warn` and `off` are the
+    operator's rollback and bypass it, and a rollback which hands back
+    the bug the phase just closed is not a rollback. So
+    `_netdesc_safety_checks` tests the value rather than the key.
+11. **`noneish` cannot be asked about a size.** It lowercases whatever
+    it is handed, so the size-or-base guard needed
+    `_diskspec_value_absent()` around it rather than calling it
+    directly on the integer the guard exists to protect.
+12. **A narrowing the plan never named: `blob_uuid` inside a
+    diskspec.** `additionalProperties: false` refuses a caller-supplied
+    one, and the handler genuinely acted on it. The documented spelling
+    `base: "sf://blob/<uuid>"` reaches the identical branch, so nothing
+    a caller is told to do stops working.
+
+*From the sweep (step 5):*
+
+13. **A third class of `warn`-mover.** The plan expected two rows not to
+    roll back and there are seven, in three classes: the null
+    `network_uuid` on both routes, the four spellings of a diskspec
+    which asks for nothing, and one nobody had seen — a diskspec
+    carrying *only* a typo'd key has neither a size nor a base, so the
+    size-or-base guard answers it at every mode rather than the schema
+    answering it at `enforce`.
+14. **D48 has a limit, recorded rather than fixed.** "One fact, one
+    message" holds within a nesting level and not across them: an
+    omitted required *parameter* answers `missing-required`, an omitted
+    required *property* answers `type-mismatch`. Rewording the nested
+    detail would trade a cosmetic inconsistency for a telemetry one.
+
+*From the documentation (step 6):*
+
+15. **`usage.md`'s worked example had answered 400 as written.** It
+    showed `-D size=8,base=cirros,bus=ide,type=cdrom`, and `ide` has
+    been refused since v0.7. `config.DISK_BUS`'s own description listed
+    `ide` too and pointed at the libvirt documentation for "the full
+    list", which is not the list we accept. The API reference also
+    typed `network_uuid` as a uuid (a network *name* resolves there, and
+    the CI suite relies on it) and typed `video.vdi` as a plain string
+    when it is the one real enum in the vocabulary.
+
+*From the close-out (step 8):*
+
+16. **D46's rewrite had two more stale dependents outside the plan**,
+    both fixed here: `base.py`'s `video.memory` comment still called the
+    typing "a narrowing with an ordering obligation attached", and a
+    test docstring still quoted D49's retracted claim in the present
+    tense. **Definition-of-done item 5 named four accepted values and
+    there are five** — it had reasoned from half of D43 and omitted
+    `video.model`. And **item 11's script did not exist**; it was
+    written in this step as
+    `shakenfist/tests/external_api/test_api_reference_specs.py` and
+    mutation tested.
+
+The pattern in 3, 4, 13 and 16 is the phase's real lesson, and it is
+recorded in the second amendment as well as here: **a decision rewritten
+mid-phase invalidates every other statement which was reasoning from
+it, and nothing in this plan's structure made those statements
+findable.** Four steps rediscovered the same drift independently before
+anyone wrote it down, and the close-out found two more instances after
+the corrections had supposedly been made. A phase which amends a
+decision should grep for the decision's number and for its *claims*,
+not only fix the decision.
+
+### What is left
+
+* **The `Merged` column** of the master plan's Execution table, which
+  cannot be filled until the pull request merges and must then be taken
+  from the first-parent range rather than from a path-filtered log. This
+  is definition-of-done item 14, and it is the only item recorded as not
+  met.
+* **Phase 8**, the push audit, which runs over the accumulated diff of
+  every phase of this plan rather than over this one's.
+* **[#4223](https://github.com/shakenfist/shakenfist/issues/4223)**, the
+  null-reference lookup, filed by this phase's survey and deliberately
+  not fixed by it. The only path a caller can reach is closed twice over
+  now, by the schema and by the handler guard, but the function is still
+  wrong for the next caller who reaches it another way.
+* **[#4167](https://github.com/shakenfist/shakenfist/issues/4167)**,
+  reduced to `uefi` and `secure_boot` as an explicit `null` — scalars,
+  `required=False`, reached by no element schema — and re-measured at
+  `enforce` during this step as still a recorded 500.
+* **[client-python#398](https://github.com/shakenfist/client-python/issues/398)**,
+  coercing a videospec `memory` in `apiclient.py` beside the disk-size
+  block it mirrors. A tidy-up and not a release gate: D46's width means
+  the documented CLI invocation keeps working either way, and the only
+  cost of not doing it is a videospec whose memory is stored as a
+  string.

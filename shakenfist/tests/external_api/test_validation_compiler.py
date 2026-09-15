@@ -38,10 +38,12 @@ def _every_compiled_field(field):
     A property of "every compiled field" has to be asserted at every
     depth or it is a property of the top level wearing a broader name,
     and phase 7 gave the compiler two ways down: a list's `inner` and a
-    nested schema's `fields`. The nested arm reaches nothing today,
-    since no declaration carries a `properties` block until step 4 --
-    which is exactly why it is written now rather than when the first
-    one lands.
+    nested schema's `fields`. The nested arm was written in step 2,
+    before any declaration carried a `properties` block for it to walk
+    into; since step 4 it reaches the real thing, and a diskspec's
+    `size` and a videospec's `memory` are the nested integers
+    test_every_compiled_integer_refuses_a_fractional_number() below
+    would otherwise have missed.
     """
     yield field
     inner = getattr(field, 'inner', None)
@@ -1271,20 +1273,22 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
                     [], self._findings('videospec', {'model': model}))
 
     def test_a_video_memory_string_is_still_accepted(self):
-        """D49 is narrower than what this actually does, and the
-        difference is worth pinning.
+        """The documented CLI invocation keeps working, and that is
+        worth pinning because the plan twice said it would not.
 
-        The decision says typing `memory` as an integer "breaks the
-        shipped CLI until client-python#398 ships", because
+        D49 as originally written said typing `memory` as an integer
+        "breaks the shipped CLI until client-python#398 ships":
         consoles.md:94 documents `--videospec memory=65536` and the
         CLI's parser does `video[s[0]] = s[1]` with no coercion
         (commandline/instance.py:499), putting the *string* "65536" on
-        the wire. But D46 was itself rewritten away from
-        marshmallow's strict=True precisely so that a numeric string
+        the wire. That was reasoning from D46's *original* text, which
+        asked for marshmallow's strict=True. D46 was rewritten away
+        from strict=True precisely so that a numeric string still
         reaches a handler which coerces it, and _ExactInteger keeps
-        that width at every depth. So the documented invocation is
-        accepted, and what the typing refuses is a value int() cannot
-        convert faithfully.
+        that width at every depth, so D49 was corrected too and the
+        ordering obligation it named never existed. The documented
+        invocation is accepted; what the typing refuses is a value
+        int() cannot convert faithfully.
         """
         self.assertEqual([], self._findings('videospec', {
             'model': 'qxl', 'memory': '65536', 'vdi': 'spiceconcurrent'}))

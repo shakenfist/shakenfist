@@ -620,14 +620,22 @@ VIDEOSPEC_SCHEMA: dict[str, Any] = {
             # phase 2's rule is that a published bound must be one the
             # server backs.
             #
-            # The typing is a narrowing with an ordering obligation
-            # attached. docs/user_guide/consoles.md:94 documents
+            # The typing looks like it ought to break a documented
+            # invocation and does not, which is worth saying because
+            # D49 originally claimed it did.
+            # docs/user_guide/consoles.md:94 documents
             # `--videospec model=qxl,memory=65536,vdi=spiceconcurrent`,
             # and the CLI's parser does `video[s[0]] = s[1]` with no
             # coercion (commandline/instance.py:499), so that
             # documented command puts the *string* "65536" on the wire.
-            # It works today only because jinja stringifies either type
-            # on the way into the domain XML.
+            # _ExactInteger refuses a *fractional number* rather than a
+            # non-int -- D46 was rewritten away from marshmallow's
+            # strict=True for exactly this class of caller -- so a
+            # numeric string is accepted at every depth and that
+            # command keeps working. client-python#398 coerces it in
+            # apiclient.py so that a stored videospec carries a number
+            # rather than a string, but it is a tidy-up and not a
+            # release gate.
             'description': (
                 'The video card\'s memory, in KiB.')
         },
