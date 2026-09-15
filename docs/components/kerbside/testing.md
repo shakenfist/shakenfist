@@ -482,6 +482,20 @@ colouring is described in
 
 ## Tempest tests against a Kolla-Ansible deployment
 
+The `openstack_matrix` job deploys an all-in-one OpenStack on a
+single Shaken Fist guest and runs Tempest against it. That guest is
+a `debian:13` image, and the distro is load bearing rather than
+incidental: Kolla-Ansible master requires `ansible-core>=2.20`,
+every `ansible-core` 2.20 release requires Python 3.12 or newer, and
+`kerbside-patches`' `tools/bootstrap-kolla-ansible` installs
+Kolla-Ansible into a venv built on the guest's system Python. A
+guest below 3.12 fails during pip resolution, before anything is
+deployed. Debian 12 ships 3.11 and broke the lane this way (#426);
+Debian 13 ships 3.13. `kerbside-patches` tests every all-in-one
+master topology on `debian:13`, so this matches upstream rather than
+diverging from it. The containers Kolla builds are Debian trixie
+regardless of the guest, and are unaffected.
+
 The `tempest-plugin/` directory is a separate releasable that
 contributes Kerbside-specific Tempest tests; see
 `tempest-plugin/README.md` for what it covers.
