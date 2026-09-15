@@ -25,6 +25,61 @@ caller sends. The second job is to check that each published `enum`
 was read off the code that consumes the value and not off the
 documentation that describes it.
 
+## Amendments
+
+**2026-09-16, after step 1.** The census this plan gated step 3 on
+found three things the plan had wrong and one it had under-specified.
+All four are corrected in place below; this note records what changed,
+so a reader who remembers the original does not think the plan drifted.
+
+* **D43 named six enums. Three of them are publishable.**
+  `network[].model` and `video.model` go straight into the libvirt
+  domain XML with nothing between (`libvirt.tmpl:139` and `:206`), so
+  the real vocabulary is the hypervisor's qemu build. Worse, our own
+  two documentation pages disagree about the first: `usage.md:288`
+  recommends `ne2k_isa`, which `instances.md:105` omits. Publishing the
+  API reference's list would answer 400 to a value our user guide tells
+  people to use — phase 2's `netblock` reasoning, exactly.
+* **D44's mechanism does not work.** Every compiled field is
+  `allow_none=True` (`validation.py:382`) and the object branch
+  recurses through the same `_field()`, so a `required`, `string`-typed
+  nested `network_uuid` still accepts `null` and still reaches
+  `from_db_by_ref(None, ns)`. The fix is not to break the nullability
+  invariant: phase 6 already made an explicit `null` for a required
+  parameter a 400 at the top level (`validation.py:838`), and the
+  nested case applies that same rule one level down.
+* **D46 asked for `fields.Integer(strict=True)`, which cannot be
+  used.** `strict=True` refuses anything that is not already a Python
+  `int`, and a query parameter is a string on the wire — `base.py`
+  hands `flask.request.args.to_dict()` to `check()`, so `offset=10`
+  arrives as `'10'`. Applying D46 literally broke
+  `test_blob_data_bounds` within a minute. It is also narrower than the
+  handler for bodies, since `{"cpus": "8"}` is accepted today by
+  pydantic's lax mode. The decision is rewritten against the defect
+  rather than against the Python type.
+* **`video.memory` cannot be typed `integer` without a client
+  release.** `docs/user_guide/consoles.md:95` documents
+  `--videospec model=qxl,memory=65536,vdi=spiceconcurrent`, and the
+  CLI's parser does `video[s[0]] = s[1]` with no coercion
+  (`commandline/instance.py:499`), so that documented command puts the
+  string `"65536"` on the wire. It works today only because jinja
+  stringifies either type. Typing it is the operator's decision, taken
+  deliberately; see D49 for the ordering it requires.
+
+Two smaller corrections to finding F5's attributions, both from the
+census reading the code rather than the traceback: the
+`network[].address` 500 is raised by `util_general.noneish` at
+`external_api/instance.py:369`, not by `n.ipam.is_in_range` below it;
+and the `disk[].size` 500 is not pydantic, because
+`InstanceData.disk_spec` is `list[dict[str, Any]]` with no validator.
+F5's table is corrected. The second correction means `"size": "20"`
+probably works end to end today, which makes D45's integer typing a
+narrowing — see D50.
+
+Nothing else the plan assumed was wrong. In particular D41 came
+through unconditional, which is the outcome the census existed to test.
+
+
 ## Context
 
 The compiler already recurses. `_field()`
@@ -213,15 +268,25 @@ answering the bare `server error` phase 5 left behind:
 | Sent | Where it lands |
 |------|----------------|
 | `disk[].base` an int, a bool or a list | `AttributeError: 'int' object has no attribute 'lower'` in `util/general.py:noneish` |
-| `disk[].size` a string or a dict | pydantic `ValidationError` from `InstanceData` inside `Instance.new` |
+| `disk[].size` a non-numeric string or a dict | `int()` in `instance._safe_int_cast` (`instance.py:112`, from `:940`) — `ValueError` or `TypeError` |
 | `network[].network_uuid` an int, a dict or a bool | `AttributeError: 'int' object has no attribute 'replace'` in `util/general.py:valid_uuid4` |
-| `network[].address` an int or a list | inside `n.ipam.is_in_range` |
+| `network[].address` an int or a list | `AttributeError` in `util_general.noneish`, from `external_api/instance.py:369` |
 | `network[].model` an int | pydantic, building the `NetworkInterface` |
 
 Items 2 and 3 of #4167 are the first and third rows and are exactly as
 filed, eleven months on. The second, fourth and fifth rows are new —
 #4167 found two by inspection and stopped, which is the difference
 between reading and sending.
+
+Two of the attributions in that table were corrected by step 1's
+census, which read the code where the probe had only read the status.
+The `address` row is `noneish` above `is_in_range`, not `is_in_range`;
+and the `size` row is `_safe_int_cast`, not pydantic, because
+`InstanceData.disk_spec` is `list[dict[str, Any]]` and validates
+nothing. That second correction narrows the row: `"size": "20"` reaches
+`int("20")` and works, so only a *non-numeric* string faults, and
+typing `size` as an integer is therefore a narrowing rather than a
+straight fix. D50 records it as one.
 
 The interface hotplug endpoint answers the same way for the netdesc
 rows, from the same `_netdesc_safety_checks` and the same
@@ -363,6 +428,181 @@ rewrote every body parameter's rendering. This adds five tokens, one
 compiler branch and six declarations. The care required is comparable;
 the surface area is not.
 
+## The key and value census (step 1)
+
+Five sources: the tree, the client repository, the CI suites, the
+documentation and the handlers. The full working is in the step 1
+report; what follows is the part later steps have to agree with.
+
+## diskspec
+
+Declared `arrayofdict` at `external_api/instance.py:518`.
+
+| Key | Documented? | Sent by | Types sent | What the handler does with each type | Enum candidate? |
+|-----|-------------|---------|------------|--------------------------------------|-----------------|
+| `size` | yes, "integer, GB" (`instances.md:71`) | ansible `disks:`/`diskspecs:` (`sf_instance.py:390`, `:398`); CLI `-d` (`commandline/instance.py:452`) and `-D` (string, then int-coerced at `apiclient.py:669-670`); CI everywhere (`shakenfist_ci/base.py:1671` and ~150 sites) | `int`; `None` (ansible `diskspecs` default at `sf_instance.py:398`, and `apiclient.py:669`'s `and d['size']` guard deliberately leaves a falsy size uncoerced); **absent** (`test_ci_capacity_wait.py:242`'s sizeless cdrom, and `guest_ci_tests/test_boot.py:16` scenarios) | int → `_safe_int_cast` (`instance.py:940`) into `block_devices`, then `util_image.create_cow`/`create_blank`. `None`/absent → explicitly skipped by `scheduler.py:471-473`, `scheduler.py:577`, `mariadb.disk_spec_virtual_gb` (`mariadb.py:24703-24705`) and `util_image.create_cow` (`image.py:103`, `:115`), meaning "the size of the base image". A numeric string reaches `int()` in all three and works; `InstanceData.disk_spec` is `list[dict[str, Any]]` (`schema/instance_data.py:67`) and coerces nothing | no |
+| `base` | yes, string (`instances.md:72`) | ansible (`sf_instance.py:388`, `:396`); CLI `-d`/`-D`; CI (~110 sites) | `str` (a `sf://upload/...`, `sf://blob/...`, `sf://snapshot/...`, `label:...`, bare name, or plain URL); `None` (ansible `sf_instance.py:388`, `:396`, CLI `commandline/instance.py:453`) | `None`/`''`/`'none'` → `util_general.noneish` (`util/general.py:121`) true → `d['disk_base'] = None`, blank disk. A string is prefix-dispatched at `external_api/instance.py:691-780`. A non-string truthy value is the `AttributeError` in `noneish` that F5 row 1 measured | no — free-form |
+| `bus` | yes, enum (`instances.md:75`) | ansible (always, as `None`, `sf_instance.py:389`, `:397`); CLI `-d` (always `None`, `commandline/instance.py:454`) and `-D`; CI: `guest_ci_tests/test_disks.py:38` sends `'nvme'`, `cluster_ci_tests/test_disk_specs.py:51` sends `'banana'` and asserts a 400 | `str`; `None` | `None`/absent → `config.DISK_BUS`, default `'virtio'` (`instance.py:80-84`, `config.py:1026`). A value not in `_get_disk_device`'s table 400s at `external_api/instance.py:682-687`. `'ide'` additionally 400s at `:822-825` (unreachable — the bus check fires first) | **yes, already enforced** |
+| `type` | yes, enum disk/cdrom (`instances.md:81`) | ansible (always `'disk'`, `sf_instance.py:391`, `:399`; `'cdrom'` via `ansible_module_ci/004.yml:115`); CLI `-d` (always `'disk'`); CI ~115 `'disk'`, one `'cdrom'` (`cluster_ci_tests/test_disk_specs.py`) | `str` | `_get_defaulted_disk_type` (`instance.py:105-109`) defaults to `'disk'` and passes the value through to `present_as`, which is rendered raw as `device='...'` in the domain XML (`libvirt.tmpl:50`). Only `'cdrom'` is special-cased, at `instance.py:1790` (raw image, no COW, `snapshot_ignores`) and `:1869` (virtio→usb bus swap). Anything else behaves as a disk in our code and is handed to libvirt | **yes, unenforced** |
+| `blob_uuid` | no | nobody. Written *by* the handler (`external_api/instance.py:713`, `:739`, `:765`, `:768`) and read at `instance.py:935`, `:974`, `:1410` | n/a | server-populated | n/a |
+| `disk_base` | no | nobody. Written by the handler at `external_api/instance.py:690` | n/a | server-populated | n/a |
+
+### Undocumented keys that some caller sends
+
+**None.** The two undocumented keys the handler reads (`blob_uuid`,
+`disk_base`) are written by the handler itself and never arrive from a
+caller. The ansible module is aware of them — `SERVER_POPULATED_DISK_KEYS`
+(`sf_instance.py:211`) — but only to *strip them from the server's
+response* before a dirtiness comparison (`sf_instance.py:427-433`); the
+disks it sends are built fresh at `:384-413`. Nothing in the client or
+the CI ever posts a disk spec it read back from a `GET`.
+
+So `additionalProperties: false` on the diskspec breaks no first-party
+caller. It will break a human who typed `-D siz=20`, which is the
+intent.
+
+### Documented keys nobody sends
+
+## networkspec
+
+Declared `arrayofdict` at `external_api/instance.py:514` (create) and
+`dict` at `:1134` (interface hotplug). Both go through
+`_netdesc_safety_checks` (`:330`) and the create path also through
+`_netdesc_allocate_address` (`:387`).
+
+| Key | Documented? | Sent by | Types sent | What the handler does with each type | Enum candidate? |
+|-----|-------------|---------|------------|--------------------------------------|-----------------|
+| `network_uuid` | yes, "uuid" (`instances.md:99`) | ansible `networks:` (`sf_instance.py:317`) and `networkspecs:`; CLI `-n`/`-f`/`-N` (`commandline/instance.py:472`, `:482`) and `add-interface` (`:997`, `:1008`); CI (~110 sites) | `str` — a UUID, or a **name**: `cluster_ci_tests/test_networking.py` sends `'barry_net'`, and `docs/user_guide/usage.md:255-262` documents naming a network | `Network.from_db_by_ref(value, namespace)` at `external_api/instance.py:358`. Presence is checked (`:334`), value is not — hence #4223. Normalised back to a UUID string at `:367`. A non-string is the `AttributeError` in `valid_uuid4` F5 row 3 measured | no — D44 says `string`, no `uuid` format |
+| `macaddress` | yes, colon-separated, either case (`instances.md:100`) | CLI `-n`/`-f`/`add-interface` send it **as `None` on every call** (`commandline/instance.py:473`, `:483`, `:998`, `:1009`); CI sends real MACs (`guest_ci_tests/test_networking.py`, `smoke_ci_tests/test_agentops.py:300`) and one malformed one asserting a 400 (`guest_ci_tests/test_networking.py:135`) | `str`; **`None`** | `if netdesc.get('macaddress'):` (`:346`) — falsy skips the check; `NetworkInterface.new` (`network/interface.py:143-145`) then generates one. A truthy value must match `util_network.valid_macaddr` (`util/network.py:431-440`, `fullmatch` against `_MACADDR_BODY`), else 400 at `:348-351` | pattern, already enforced |
+| `address` | yes, string (`instances.md:103`) | CLI `-n netuuid@addr` / `-f` / `-N address=...` (`commandline/instance.py:478`, `:487`, `:1003`); ansible `networkspecs:`; CI (`guest_ci_tests/test_cloudinit.py:85` sends **`None` explicitly**; `cluster_ci_tests/test_networking.py:181` sends addresses) | `str` (an IPv4 address, **or the literal `'none'`** — `docs/user_guide/usage.md:281-284`); `None` | `noneish` twice: `:369` skips the range check, `:402-403` turns it into `None` meaning "this interface has no address" (the comment at `:398-401` credits OpenStack Kolla). Falsy/absent → `reserve_random_free_address` (`:406`). Otherwise `n.ipam.is_in_range` (`:372`), then `n.ipam.reserve` (`:417`) | no |
+| `model` | yes, enum of 8 (`instances.md:105`) / **9 in `usage.md:288`** | ansible `networks:` sends `'virtio'` (`sf_instance.py:318`); CLI `-n`/`-f` send `'virtio'` (`commandline/instance.py:474`, `:484`, `:999`, `:1010`); CI omits it | `str` | defaulted to `'virtio'` when absent or falsy (`:430-431`), stored on the `NetworkInterface` (`network/interface.py:165`), rendered raw as `<model type='{{net.model}}'/>` (`libvirt.tmpl:139`). **Nothing in `shakenfist/` restricts it** | **yes, unenforced — see below** |
+| `float` | yes, boolean (`instances.md:109`) | ansible `networks:` sends `False` (`sf_instance.py:319`) and `networkspecs:` parses to a real bool (`sf_instance.py:329-333`); CLI `-f` sends `True` (`commandline/instance.py:475`), `-N float=...` parses `'true'`/`'True'` to a bool (`commandline/instance.py:325-329`); CI omits it | `bool` | `if 'float' in netdesc and netdesc['float']:` (`:442`) — a bare truthiness test, so `"yes"` floats and `"false"` does not | no |
+| `iface_uuid` | no | nobody. Written by the handler at `external_api/instance.py:455`; read at `:1193`, `:1205` and `operations/node_inst_netdesc_op.py:391`, `:464` | n/a | server-populated | n/a |
+
+### Undocumented keys that some caller sends
+
+**None.** `iface_uuid` is written by `_netdesc_allocate_address` after
+every caller check has run, and it never appears in a response body a
+caller could echo (`Instance.external_view` carries `interfaces`, not
+netdescs — `instance.py:643-660`). `order` appears alongside netdesc
+keys only in a unit-test fixture
+(`tests/schema/operations/test_node_inst_netdesc_op.py:140`); the create
+handler passes order as a positional argument (`:901`), not as a key.
+
+`additionalProperties: false` on the networkspec breaks no first-party
+caller.
+
+### Documented keys nobody sends
+
+None — all five are sent.
+
+## videospec
+
+Declared `dict` at `external_api/instance.py:535`. The handler's whole
+check is `external_api/instance.py:833-841`: default the entire spec if
+absent, else require the *presence* of `model` and `memory` and default
+`vdi` to `'spice'`.
+
+| Key | Documented? | Sent by | Types sent | What the handler does with each type | Enum candidate? |
+|-----|-------------|---------|------------|--------------------------------------|-----------------|
+| `model` | yes, enum vga/cirrus/qxl (`instances.md:119`) | CLI default `'cirrus'` (`commandline/instance.py:491`) and `--videospec model=...` (**string**, `:499`); CI `cluster_ci_tests/test_vdi_console_file.py:133` sends `'cirrus'` | `str` | presence required (`:837-838`); value rendered raw into `<model type='...'>` (`instance.py:2153` → `libvirt.tmpl:206`). Nothing checks it | **yes, unenforced** |
+| `memory` | yes, "integer, KiB" (`instances.md:121`) | CLI default `16384` (**int**, `commandline/instance.py:491`); CLI `--videospec memory=65536` (**string**, `:499` — the parser never coerces); CI sends `16384` | `int` **and `str`** | presence required (`:839-840`); rendered raw into `vram='{{video_memory}}'` (`instance.py:2154` → `libvirt.tmpl:206`), where jinja stringifies either type identically. Nothing coerces or validates | no, but see below |
+| `vdi` | yes, enum of 4 (`instances.md:123`) | CLI `--videospec vdi=...` (string); CI `cluster_ci_tests/test_vdi_console_file.py:133` sends `'spiceconcurrent'` | `str` | defaulted to `'spice'` if absent (`:840-841`); consumed in the five places listed above | **yes, unenforced; docs are correct** |
+
+### Undocumented keys that some caller sends
+
+**None.** The handler reads only `model`, `memory` and `vdi`; the whole
+dict is stored verbatim on the instance (`instance.py:614`,
+`schema/instance_data.py:95`, `video: dict[str, Any]`) and echoed in
+`external_view` (`instance.py:655`), so an unknown key is stored and
+returned but acted on nowhere.
+
+### Documented keys nobody sends
+
+None — all three are sent. Note that `apiclient.create_instance`'s
+`video` kwarg defaults to `None` (`apiclient.py:625`) and the body
+always carries `'video': video` (`apiclient.py:651`), so a raw
+`apiclient` caller who does not pass one sends `"video": null` and the
+handler's `if not video:` (`:833`) supplies the whole default. **The
+videospec schema must tolerate a null for the parameter itself**, which
+it does — `allow_none=True` at `validation.py:426`.
+
+## Cross-cutting findings
+
+### N1. Five documented keys are routinely sent as JSON `null`
+
+`disk[].base`, `disk[].bus`, `disk[].type`, `disk[].size`,
+`network[].macaddress`, `network[].address`. Every one of them is sent
+as `null` by the shipped CLI, the shipped collection, or the CI suite on
+a normal, working request, and every one has a handler branch that
+treats `null` as "not supplied".
+
+This is *already safe* by construction: `_field()` sets
+`allow_none=True` on every compiled field (`validation.py:426`) and the
+object branch recurses through `_field()`
+(`validation.py:504-506`), so nested fields inherit it. Step 3 needs to
+write no `x-nullable`; it needs only to **not** invent a nullability
+check of its own.
+
+It does however mean the *published* document will say
+`{"type": "string"}` about a property whose dominant value is `null`.
+That is the same compromise phase 3 already made at the top level (the
+module docstring at `validation.py:141-150` records it, citing
+`"source_url": null` and `"nvram_template": null`), so consistency
+argues for leaving it alone and saying so in a comment.
+
+### N2. F5's attribution for `network[].address` looks wrong
+
+The plan's F5 row 4 puts the 500 for a non-string `address` "inside
+`n.ipam.is_in_range`". Reading `external_api/instance.py:369`, the
+guard is
+`if netdesc.get('address') and not util_general.noneish(netdesc.get('address'))`
+— for `address: 5` or `address: [ ... ]`, `noneish` is reached first and
+raises `AttributeError: 'int' object has no attribute 'lower'`
+(`util/general.py:124`) before `is_in_range` is called. Same status,
+same recorded exception, different frame. Worth correcting in the plan
+so step 5's sweep asserts against the right thing if it ever pins a
+traceback.
+
+### N3. F5's attribution for `disk[].size` may also be wrong
+
+F5 row 2 says a string or dict `size` produces "pydantic
+`ValidationError` from `InstanceData` inside `Instance.new`".
+`InstanceData.disk_spec` is `list[dict[str, Any]]`
+(`schema/instance_data.py:67`) with no validator
+(`grep -n "validator" schema/instance_data.py` finds none), so it
+accepts both. The likelier frame is `int(disk['size'])` at
+`scheduler.py:473`/`:578`, which raises `ValueError` for `'banana'` and
+`TypeError` for a dict — and note that `int('20')` *succeeds*, so
+**`"size": "20"` very probably works end to end today**. Step 5 should
+re-measure a numeric-string `size` specifically before D45's `integer`
+typing refuses it; if it does work, the narrowing is still fine (no
+first-party caller sends one, because `apiclient.py:669-670` coerces)
+but it belongs in the release note.
+
+### N4. The `sf_instance` ansible module sends `video` as a *string*
+
+`sf_instance.py`'s `video` parameter is `{'type': 'str'}`
+(argument_spec) and is passed straight through as a kwarg
+(`sf_instance.py:456-462`), which reaches `apiclient.py:651` as
+`'video': '<some string>'`. The parameter is declared `dict`, so
+`fields.Dict()` already refuses it at `enforce` — this is broken *today*,
+before phase 7, and phase 7 does not make it worse. Out of scope, but
+somebody should file it: the collection's `video` parameter cannot work.
+No in-tree playbook uses it (`ansible_module_ci/004.yml` does not), which
+is why nobody has noticed.
+
+### N5. `config.DISK_BUS`'s description is wrong
+
+`config.py:1028-1031` says "One of virtio, scsi, usb, ide, etc. See
+libvirt docs for full list of options". `ide` 400s every create
+(`instance.py:99-100` → `external_api/instance.py:686`) and there is no
+"full list" — the supported set is the five keys of `bases`
+(`instance.py:92-98`). A one-line docstring fix; not this phase's, but
+it is the same defect class D43 exists to prevent, one layer down.
+
+---
+
 ## Decisions
 
 Numbering continues from phase 6, which ended at D38.
@@ -420,24 +660,62 @@ duplicated checking on the enforce path, which is cheap and which the
 tests make visible rather than hiding.
 
 **D43. An `enum` is published only where the server refuses outside
-it.** Two of the enums this phase publishes are already enforced
-(`disk[].bus`, by `_get_defaulted_disk_bus` plus `_get_disk_device`;
-`network[].macaddress`'s pattern, by #4183). The rest —
-`disk[].type`, `network[].model`, `video.model`, `video.vdi` — are
-documented as enums and enforced nowhere, so publishing them *is* the
-enforcement, and step 3 reads the value out of the code that consumes
-it rather than out of the documentation that describes it. Phase 2's
-`netblock` reasoning is the precedent in the other direction: a
-published constraint narrower than the server is a documentation commit
-compiled into a 400.
+it. Three enums, not six** — corrected by the census, which is what it
+was for.
+
+| Key | What the code accepts | Published? |
+|-----|-----------------------|------------|
+| `disk[].bus` | `sata, scsi, usb, virtio, nvme`, the `bases` dict at `instance.py:92` | **yes** — already enforced, docs agree |
+| `video.vdi` | `vnc, spice, spiceconcurrent, spicedebug` (`instance.py:1715`, `:2161`, `libvirt.tmpl:156`) | **yes** — the one case where publishing genuinely is the enforcement |
+| `disk[].type` | any string; only `cdrom` is special-cased (`instance.py:1790`, `:1869`) | **yes, as a narrowing** — see D50 |
+| `network[].model` | any string, rendered raw at `libvirt.tmpl:139` | **no** |
+| `video.model` | any string, rendered raw at `libvirt.tmpl:206` | **no** |
+
+The two `model` keys were the plan's own named risk and the census says
+the risk is real. Both are rendered into the domain XML with nothing
+between, so the server's true vocabulary is the hypervisor's qemu
+build, which varies by node and by release and which this API cannot
+know. `usage.md:288` documents `ne2k_isa` and `instances.md:105` does
+not list it; two documentation pages disagreeing is itself proof that
+neither is a specification. Both are typed `string` with a description
+naming the common values and no `enum`. If enforcement is ever wanted
+it belongs in a hypervisor capability check, not in a request schema.
+
+`network[].macaddress` keeps the pattern #4183 already enforces, which
+is not an enum and is unchanged by this phase.
 
 **D44. `network_uuid` is required inside the netdesc schema, typed
-`string`, with no `uuid` format.** Required because
-`_netdesc_safety_checks` already refuses a netdesc without it. `string`
-because that closes F7's only reachable path. No `uuid` format, because
-the parameter accepts a network *name* as well as a UUID — that is what
-`from_db_by_ref` is for, and phase 6's rule that a validator must be no
-narrower than the handler applies.
+`string`, with no `uuid` format — and `required` there means present
+*and not null*.** Required because `_netdesc_safety_checks` already
+refuses a netdesc without it. `string` because a non-string is finding
+F5's third row. No `uuid` format, because the parameter accepts a
+network *name* as well as a UUID (`usage.md:255` documents naming one,
+and `cluster_ci_tests/test_networking.py` sends `'barry_net'`), and
+phase 6's rule that a validator must be no narrower than the handler
+applies.
+
+The census corrected this decision's mechanism. Typing the property was
+not going to close F7's path: every compiled field is `allow_none=True`
+(`validation.py:382`) and the object branch recurses through the same
+`_field()`, so `{"network_uuid": null}` would satisfy a required string
+and still reach `from_db_by_ref(None, ns)`.
+
+The answer is not `allow_none=False`, which would break a
+module-wide invariant that exists for a good reason — an optional
+declared parameter legitimately arrives as `null`, and the shipped
+client sends five of them on every instance create (census finding N1).
+It is that **`required` inside an object fragment carries the same
+meaning phase 6 gave it at the top level**: present, and not an
+explicit `null`. `validate_request` already applies exactly that rule
+to `compiled.required_names` at `validation.py:838`, with a comment
+explaining that a caller who sent `{"key": null}` should get the same
+answer as one who sent no key at all, because it is one fact from the
+handler's side. Applying it one level down is that rule, not a new one.
+
+This closes the netdesc path. It does **not** close
+[#4223](https://github.com/shakenfist/shakenfist/issues/4223), which
+stays open and keeps its own fix: the lookup function is still wrong
+for the next caller who reaches it by another route.
 
 **D45. `size`-or-`base` stays a handler guard, and gains one.** The
 schema types `size` as a non-negative integer and `base` as a string;
@@ -446,12 +724,55 @@ it cannot express "at least one of these two", and Swagger 2.0 has no
 is a bug (F6). The handler gets an explicit guard for it in the same
 step, next to the existing `instance must specify at least one disk`.
 
-**D46. Integers compile strict.** `fields.Integer(strict=True)`
-wherever the rendered type is `integer`, at every nesting depth. F8 is
-the argument: under a check-only design, a field that accepts `1.5` as
-an integer and hands the handler `1.5` has validated nothing and has
-told the caller it did. `fields.Float` is left alone for the reason F8
-records.
+The census confirmed `minimum: 0` rather than `minimum: 1`, from four
+code paths and an in-tree test. A sizeless or `None`-sized disk means
+"the size of the base image" — `scheduler.py:471`, `scheduler.py:577`,
+`mariadb.disk_spec_virtual_gb` (`mariadb.py:24703`) and
+`util_image.create_cow` (`image.py:103`) all skip it explicitly, and
+`test_ci_capacity_wait.py:242` relies on a sizeless cdrom. `size: 0` is
+behaviourally identical to the documented `None`, so `minimum: 1` would
+refuse something the documentation already shows working. A *negative*
+size genuinely corrupts the capacity ledger (`scheduler.py:473`,
+`mariadb.py:24710`), which is what the bound is for.
+
+`size` must also stay nullable: the ansible module sends
+`'size': None` on its `diskspecs:` path (`sf_instance.py:398`) and
+`apiclient.py:669`'s `and d['size']` guard deliberately leaves a falsy
+size uncoerced.
+
+**D46. An integer field refuses a fractional number** — at every
+nesting depth, bound to the `_SCALARS` mapping so a future branch of
+`_field()` cannot forget it. F8 is the argument: under a check-only
+design, a field that accepts `1.5` as an integer and hands the handler
+`1.5` has validated nothing and has told the caller it did.
+
+**This is deliberately not marshmallow's `strict=True`, which this
+decision originally asked for and which cannot be used.** `strict=True`
+refuses anything that is not already a Python `int`, and two kinds of
+caller legitimately send something else:
+
+* **A query parameter is a string on the wire.** `base.py:1907` hands
+  `flask.request.args.to_dict()` to `check()`, so `offset=10` arrives
+  as `'10'`. Every integer query parameter in the tree would answer
+  `400 ... Not a valid integer.` on a request the server has always
+  served. This is not a hypothetical: applying the decision literally
+  failed `test_blob_data_bounds` on the first run.
+* **A body integer sent as a JSON string reaches a handler that
+  coerces it.** `{"cpus": "8"}` works today because pydantic's lax mode
+  converts it, so refusing it would be a validator narrower than its
+  handler — the breaking change dressed as a correctness fix that phase
+  6's width rule exists to stop.
+
+So the check is written against the defect rather than against the
+Python type: **a finite float with a fractional part is refused, and
+everything `int()` converts faithfully is left alone.** An integral
+float such as `8.0` is accepted for exactly the reason `fields.Float`
+is left alone — JSON has one numeric type, so `8.0` and `8` are the
+same JSON number and reading one as the integer 8 invents nothing.
+Infinity falls through to the base class, whose "Number too large."
+message is better than anything this would write.
+
+`fields.Float` is unchanged, for the reason F8 records.
 
 **D47. `metadata` and `bound_claims` get no element schema**, for the
 reasons in F3 and F4, recorded in comments beside their declarations so
@@ -464,6 +785,49 @@ nested dict and `_schema_findings` has to flatten them. A finding that
 names only the top-level parameter would make a diskspec list of six
 unusable to debug.
 
+**D49. `video.memory` is typed `integer`, and the client ships first.**
+The census found that the documented invocation in
+`docs/user_guide/consoles.md:95` —
+`--videospec model=qxl,memory=65536,vdi=spiceconcurrent` — puts the
+*string* `"65536"` on the wire, because the CLI's parser does
+`video[s[0]] = s[1]` with no coercion (`commandline/instance.py:499`)
+and `apiclient.py` coerces a diskspec `size` but not a videospec
+`memory`. It works today only because jinja stringifies either type on
+the way into the domain XML.
+
+Typing it is the operator's decision, taken with that consequence
+stated. It carries an ordering obligation, which is the whole of this
+decision's content:
+[client-python#398](https://github.com/shakenfist/client-python/issues/398)
+must ship before this phase reaches a cluster, or there is a window in
+which the shipped CLI cannot set video memory at all. The coercion
+belongs in `apiclient.py` beside the disk-size block it mirrors, not in
+the CLI parser, so that every caller of the library is fixed rather
+than only the ones who came through the command line. The release note
+in step 6 names the client version.
+
+Note that the CLI's *default* memory is the integer `16384`, so only a
+caller who explicitly passes `--videospec memory=...` is affected.
+
+**D50. Two narrowings are taken deliberately, and measured.**
+`disk[].type` publishes `[disk, cdrom]`, which refuses libvirt's
+`floppy` and `lun`; `disk[].size` is typed `integer`, which refuses the
+string `"20"` that the census believes works end to end today, since
+`InstanceData.disk_spec` is `list[dict[str, Any]]` and coerces nothing.
+
+Both are narrowings and both are recorded as such rather than being
+presented as pure fixes. The argument for each is the same: what they
+refuse is input that today produces a *silently wrong* result rather
+than a working one. A `type` of `floppy` is treated as a plain disk by
+every code path we own (only `cdrom` is special-cased, at
+`instance.py:1790` and `:1869`) and handed to libvirt as a device name,
+and a string size is a latent bug that the client already avoids by
+coercing. Neither is sent by any first-party caller.
+
+Step 5 measures each before and after rather than asserting the
+narrowing is harmless — the census flagged the `size` case as one it
+had reasoned about but not run.
+
 ## Step plan
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
@@ -473,7 +837,7 @@ unusable to debug.
 | 3 | high | opus | none | **The three schemas.** In `shakenfist/external_api/base.py`, add `diskspec`, `arrayofdiskspec`, `networkspec`, `arrayofnetworkspec` and `videospec` to `ARGTYPES` (around line 380), built from three module-level constants so the single and array forms cannot drift (D40). Populate them from step 1's census, not from the documentation. Every `enum` must be read off the code that consumes the value: the libvirt XML templating in `shakenfist/instance.py` for `video.model` and `network[].model`, `instance._get_defaulted_disk_bus` and `_get_disk_device` for `disk[].bus`, and whatever consumes `video['vdi']` (start at `external_api/instance.py:1802` and `:1865`) for the VDI protocols. `network_uuid` per D44. `additionalProperties: false` per D41, unless step 1 found a reason to revisit it. Update every affected row of `STRUCTURED_PARAMETERS` in `shakenfist/tests/external_api/test_openapi_spec.py:104` in the same commit, with a comment per entry saying what backs the constraint — that table's own comment explains the standard. |
 | 4 | medium | sonnet | none | **The declarations, and the guard D45 asks for.** Change the six declarations in F2's table to the new tokens: `external_api/instance.py:514` (`network` → `arrayofnetworkspec`), `:518` (`disk` → `arrayofdiskspec`), `:535` (`video` → `videospec`), `:1134` (`network` → `networkspec`). Leave `metadata` at `dict` and add the comment D47 asks for; do the same for `bound_claims` at `auth.py:1125` and `:1208`. **Delete no handler guard** (D42). Add the missing guard from D45 beside `instance must specify at least one disk` at `instance.py:673`: a diskspec with neither `size` nor `base` is a 400. |
 | 5 | high | opus | none | **The nested sweep.** A new `shakenfist/tests/external_api/test_nested_sweep.py`, modelled on `test_required_sweep.py` and subclassing its `RequiredSweepTestCase` fixture, which already carries the whole decorator stack and working instance, network and blob fixtures. One row per (spec, key, sent value), with the status and whether an exception was recorded — pin every row of F5 and F6 above at its *new* answer, plus one accepted value per key so the schemas are shown not to be too narrow. Run it at `enforce`; add a second class at `warn` proving D42, that every row answers exactly what F5 and F6 measured before this phase. Mutation-test it: break each schema on purpose and confirm the right row fails with the right message, and keep the mutations in a script beside the test as the pr-re-review skill's adversarial pass asks. Cover the interface hotplug endpoint as well as instance create — it is the one with no scheduler in front of it, so its answers are 200s rather than 507s. |
-| 6 | medium | sonnet | none | **Documentation.** `docs/developer_guide/api_reference/instances.md:67-130` gains, per spec, which keys are required, what each value's type and enum are, and that an unknown key is now refused. `docs/developer_guide/writing_an_endpoint.md` gains the structured tokens beside the rest of the vocabulary and says how to add another one. A release note in `docs/release_notes/v07-v08.md` says plainly that a request carrying an undocumented key inside a diskspec, networkspec or videospec now answers 400 where it used to be ignored, and names `API_VALIDATION_MODE=warn` as the rollback. |
+| 6 | medium | sonnet | none | **Documentation.** `docs/developer_guide/api_reference/instances.md:67-130` gains, per spec, which keys are required, what each value's type and enum are, and that an unknown key is now refused. `docs/developer_guide/writing_an_endpoint.md` gains the structured tokens beside the rest of the vocabulary and says how to add another one. A release note in `docs/release_notes/v07-v08.md` says plainly that a request carrying an undocumented key inside a diskspec, networkspec or videospec now answers 400 where it used to be ignored, names the two narrowings of D50, names the client version D49 requires, and names `API_VALIDATION_MODE=warn` as the rollback. **Also fix the three documentation bugs the census found, none of which this phase caused:** `docs/user_guide/usage.md:237` lists `ide` as a valid disk bus and `config.DISK_BUS`'s description at `shakenfist/config.py:1028` does the same, while `external_api/instance.py:825` answers `400 IDE disks are no longer supported`; and `usage.md:288` lists nine NIC models where `instances.md:105` lists eight, the extra being `ne2k_isa`. Per D43 neither list is a specification, so say that the set is the hypervisor's rather than reconciling two prose lists into a third. |
 | 7 | medium | sonnet | none | **Cluster CI.** Add cases to `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/` for the contract changes a unit test cannot prove are real: an unknown diskspec key answering 400, a non-string `network_uuid` answering 400 rather than 500, and a well-formed instance with every documented key still creating. Follow the cases phase 6 added in `cluster_ci_tests/test_networking.py`. |
 | 8 | high | opus | none | **Close out.** Rewrite #528's body per F9. Audit the definition of done item by item, in this plan, the way phase 6's step 6 did. Record what landed in the master plan's `Merged` column *after* the merge, from the first-parent range — this is the mistake #4222 exists to correct. |
 
@@ -525,9 +889,15 @@ so a change to either that alters the answer fails a test.
    `properties` still compiles to `fields.Dict` — proven by a test that
    `POST /instances` still accepts a `metadata` value of a dict and of
    a list under the same key.
-2. `grep -n "strict=True" shakenfist/external_api/validation.py` shows
-   every `fields.Integer` construction, and `"cpus": 1.5` on
-   `POST /instances` answers 400 rather than 500.
+2. Every compiled integer field, at every nesting depth, refuses a
+   number with a fractional part and accepts an integral one and a
+   numeric string — pinned by a registry-wide test that enumerates the
+   compiled endpoints rather than by a grep. `"cpus": 1.5` on
+   `POST /instances` answers 400 rather than 500, and `"cpus": "8"`
+   still reaches the handler. (This item originally read `grep -n
+   "strict=True" ...`, which D46's rewrite makes meaningless: the check
+   is a field subclass bound into `_SCALARS`, not a keyword at a
+   construction site, precisely so that nesting cannot forget it.)
 3. `ARGTYPES` carries `diskspec`, `arrayofdiskspec`, `networkspec`,
    `arrayofnetworkspec` and `videospec`, and the single and array forms
    of networkspec are the same Python object by construction — proven
