@@ -15241,8 +15241,9 @@ compiles. To contain that, the Makefile splits the build in two:</p>
 </ul>
 <p>This is the same reason docs.rs builds every crate offline, and is
 what would have turned the 2026-08-20 <code>arrayref</code> / <code>proc-macro1</code>
-build-script dropper (reported as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/rustsec/advisory-db/issues/3161" title="GitHub Issue: rustsec/advisory-db #3161">rustsec/advisory-db#3161</a>; no
-<code>RUSTSEC-YYYY-NNNN</code> id had been assigned at the time of writing)
+build-script dropper (RUSTSEC-2026-0260 and RUSTSEC-2026-0265;
+<code>append-only-vec</code> and <code>internment</code> went out from the same
+compromised account, as RUSTSEC-2026-0262 and RUSTSEC-2026-0266)
 into a loud build failure rather than a silent compromise.</p>
 <p>Three targets still compile with the network up, and both of the
 lanes they serve are real: <code>fuzz</code> runs nightly and
