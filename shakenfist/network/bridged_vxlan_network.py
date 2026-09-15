@@ -41,6 +41,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.exceptions import ClusterOperationEnqueueFailed
 from shakenfist.exceptions import CongestedNetwork
 from shakenfist.exceptions import DeadNetwork
 from shakenfist.exceptions import NotOnNetworkNode
@@ -688,20 +689,38 @@ class BridgedVXLanNetwork:
 
         # Ensure that all hypervisors remove this network. This is really
         # just catching strays, apart from on the network node where we
-        # absolutely need to do this thing.
+        # absolutely need to do this thing. The network was published as
+        # deleted above, so one node's enqueue failing must not abandon
+        # the remaining nodes (a stray vxlan on each) or the dnsmasq
+        # removal below -- the same abandoned-loop shape as issue 4165.
+        # We press on and error the operation at the end so the failure
+        # stays visible (issue 4217).
+        failed_enqueue_nodes: list[str] = []
         for n in Nodes([], prefilter='active'):
-            nn_create_and_enqueue(
-                str(n.uuid),
-                self.network.uuid,
-                [nn_tasks.network_destroy],
-                PRIORITY.user_facing,
-                request_id=util_general.get_request_id())
+            try:
+                nn_create_and_enqueue(
+                    str(n.uuid),
+                    self.network.uuid,
+                    [nn_tasks.network_destroy],
+                    PRIORITY.user_facing,
+                    request_id=util_general.get_request_id())
+            except ClusterOperationEnqueueFailed as e:
+                self.network.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'failed to enqueue network_destroy on node',
+                    extra={'node': str(n.uuid), 'error': str(e)})
+                failed_enqueue_nodes.append(str(n.uuid))
 
         # The Phase 4 late-import workarounds are no longer necessary:
         # this body now lives inside the worker class, so we can call
         # the sibling apply methods directly on ``self``.
         if self.network.provide_dhcp or self.network.provide_dns:
             self._apply_remove_dnsmasq()
+
+        if failed_enqueue_nodes:
+            raise ClusterOperationEnqueueFailed(
+                f'network_destroy was not enqueued on nodes: '
+                f'{", ".join(failed_enqueue_nodes)}')
 
     def _apply_enable_nat(self) -> None:
         """Install the masquerade rules for the wrapped network.

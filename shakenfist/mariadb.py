@@ -21338,12 +21338,20 @@ def _direct_create_and_enqueue_cluster_operation(
     the operation simply never happens (issue 3631) -- so paying a few
     milliseconds of jittered backoff here is always the better trade.
 
-    Returns (True, '') on success. Returns (False, error) if the
-    cluster_operations insert hits a duplicate uuid (IntegrityError)
-    or if any write raises OperationalError (including a deadlock
-    which survived every retry) -- in both cases the `with` context
-    rolls back the uncommitted transaction automatically and ``error``
-    describes the underlying failure so callers can log an actionable
+    Returns (True, '') on success -- including when the operation
+    row already exists with the same operation_type, which means an
+    earlier attempt at this same enqueue committed. Operation uuids
+    are generated per-enqueue and never reused, but the gRPC client
+    retries CreateAndEnqueueClusterOperation on DEADLINE_EXCEEDED
+    with the identical uuid, so when a database stall lost only the
+    *reply* the retry used to be refused as a duplicate and the
+    caller told its enqueue failed for work that was enqueued and
+    ran (issue 4217). Returns (False, error) if the duplicate row
+    cannot be confirmed committed, or if any write raises
+    OperationalError (including a deadlock which survived every
+    retry) -- in both cases the `with` context rolls back the
+    uncommitted transaction automatically and ``error`` describes
+    the underlying failure so callers can log an actionable
     diagnostic. Audit events are out of scope; callers emit them via
     eventlog after the RPC returns successfully.
     """
@@ -21419,6 +21427,26 @@ def _direct_create_and_enqueue_cluster_operation(
             f'create_and_enqueue_cluster_operation({op_uuid})')
         return True, ''
     except IntegrityError as e:
+        # A duplicate op_uuid on the cluster_operations insert can
+        # essentially only mean our own earlier attempt committed and
+        # the reply was lost -- confirm the committed row is there
+        # (and is the same kind of operation) before claiming
+        # success. An IntegrityError from any later statement in the
+        # transaction leaves no committed row, so it still reports
+        # failure, as does a failed existence check: a false failure
+        # is the defect being fixed, but a false success would drop
+        # the work entirely (issue 3631).
+        try:
+            existing = _direct_get_cluster_operation(op_uuid)
+        except exceptions.DatabaseUnavailable:
+            existing = None
+        if (existing is not None and
+                existing.get('operation_type') == operation_type):
+            LOG.warning(
+                f'MariaDB atomic create+enqueue found cluster_operation '
+                f'{op_uuid} already committed by an earlier attempt, '
+                f'treating as enqueued')
+            return True, ''
         LOG.warning(
             f'MariaDB atomic create+enqueue refused duplicate '
             f'cluster_operation {op_uuid}')
@@ -22352,9 +22380,11 @@ def create_and_enqueue_cluster_operation(
             cluster_operation_targets in the same transaction.
 
     Returns:
-        A (success, error) tuple. (True, '') on success;
-        (False, error) if the operation uuid already exists
-        (duplicate) or on MariaDB/gRPC error, where ``error``
+        A (success, error) tuple. (True, '') on success, including
+        when the operation row was already committed by an earlier
+        attempt at this same enqueue (the gRPC retry path re-sends
+        the identical uuid, see issue 4217); (False, error) on any
+        other duplicate or on MariaDB/gRPC error, where ``error``
         describes the underlying failure.
     """
     u = _ensure_uuid(op_uuid)

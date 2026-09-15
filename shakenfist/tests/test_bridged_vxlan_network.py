@@ -14,6 +14,7 @@ from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import FLOATING_NETWORK_UUID
+from shakenfist.exceptions import ClusterOperationEnqueueFailed
 from shakenfist.exceptions import NotOnNetworkNode
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.network import bridged_vxlan_network
@@ -1008,6 +1009,45 @@ class BridgedVXLanNetworkApplyDeleteOnNetworkNodeTestCase(
         bvn._apply_delete_on_network_node()
 
         self.assertEqual(2, self.mock_nn_enqueue.call_count)
+
+    def test_enqueue_failure_does_not_abandon_fan_out(self):
+        # A failed enqueue for one node must not abandon the rest of
+        # the teardown: the network was already published as deleted,
+        # so the remaining nodes still need their network_destroy and
+        # dnsmasq still needs removing. The failure is re-raised at
+        # the end so the operation still errors visibly (issue 4217).
+        node_a = mock.Mock()
+        node_a.uuid = 'node-a'
+        node_b = mock.Mock()
+        node_b.uuid = 'node-b'
+        node_c = mock.Mock()
+        node_c.uuid = 'node-c'
+        self.mock_nodes.return_value = iter([node_a, node_b, node_c])
+        self.mock_nn_enqueue.side_effect = [
+            None,
+            ClusterOperationEnqueueFailed('was not enqueued'),
+            None,
+        ]
+
+        network = self._make_network(provide_dhcp=True)
+        fake_dnsmasq = mock.Mock()
+        network._get_dnsmasq_object.return_value = fake_dnsmasq
+
+        bvn = bridged_vxlan_network.BridgedVXLanNetwork(network)
+        exc = self.assertRaises(
+            ClusterOperationEnqueueFailed,
+            bvn._apply_delete_on_network_node)
+
+        # All three nodes were attempted despite the middle failure,
+        # dnsmasq was still torn down, the failure was audited against
+        # the network, and the raised error names the failed node.
+        self.assertEqual(3, self.mock_nn_enqueue.call_count)
+        fake_dnsmasq.terminate.assert_called_once_with()
+        network.add_event.assert_any_call(
+            EVENT_TYPE_AUDIT,
+            'failed to enqueue network_destroy on node',
+            extra={'node': 'node-b', 'error': 'was not enqueued'})
+        self.assertIn('node-b', str(exc))
 
 
 class BridgedVXLanNetworkApplyEnableNATTestCase(base.ShakenFistTestCase):

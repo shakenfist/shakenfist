@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
 from shakenfist.tests import base
@@ -132,11 +133,16 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.assertEqual(mock_conn.execute.call_count, 5)
         mock_conn.commit.assert_called_once()
 
+    @mock.patch(
+        'shakenfist.mariadb._direct_get_cluster_operation',
+        return_value=None)
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_duplicate_cluster_operation_rolls_back(
-            self, mock_get_engine):
+            self, mock_get_engine, mock_get_op):
         mock_engine, mock_conn = _make_mock_engine()
-        # First execute (cluster_operations insert) raises duplicate.
+        # First execute (cluster_operations insert) raises duplicate,
+        # and no committed row exists -- so this is not our own
+        # earlier attempt and must still report failure.
         mock_conn.execute.side_effect = IntegrityError(
             'insert', {}, Exception('duplicate'))
         mock_get_engine.return_value = mock_engine
@@ -156,6 +162,100 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         self.assertIn('duplicate', error)
         # Only the first execute was attempted; no commit.
         self.assertEqual(mock_conn.execute.call_count, 1)
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_operation')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_duplicate_from_own_committed_attempt_is_success(
+            self, mock_get_engine, mock_get_op):
+        # The gRPC client retries this RPC on DEADLINE_EXCEEDED with
+        # the identical op_uuid, so when the first attempt committed
+        # and only the reply was lost, the retry hits the duplicate
+        # primary key. The committed row proves the enqueue happened,
+        # so the retry must report success rather than sending the
+        # caller down its error path for work that runs anyway
+        # (issue 4217).
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = IntegrityError(
+            'insert', {}, Exception('duplicate'))
+        mock_get_engine.return_value = mock_engine
+        mock_get_op.return_value = {
+            'uuid': OP_UUID_STR,
+            'operation_type': 'node_net_op',
+        }
+
+        success, error = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_net_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertTrue(success)
+        self.assertEqual('', error)
+        # The failed transaction never committed; the success is the
+        # earlier attempt's commit, not a new one.
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_operation')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_duplicate_of_different_operation_type_still_fails(
+            self, mock_get_engine, mock_get_op):
+        # A committed row of a different operation_type is not our
+        # own earlier attempt -- it is a genuine uuid collision,
+        # which stays a failure.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = IntegrityError(
+            'insert', {}, Exception('duplicate'))
+        mock_get_engine.return_value = mock_engine
+        mock_get_op.return_value = {
+            'uuid': OP_UUID_STR,
+            'operation_type': 'net_op',
+        }
+
+        success, error = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_net_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertFalse(success)
+        self.assertIn('duplicate', error)
+        mock_conn.commit.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_operation')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_duplicate_with_failed_existence_check_still_fails(
+            self, mock_get_engine, mock_get_op):
+        # If the existence check itself cannot read the database, we
+        # cannot prove the earlier attempt committed, and a false
+        # success would drop the work entirely (issue 3631) -- so the
+        # duplicate stays a failure.
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_conn.execute.side_effect = IntegrityError(
+            'insert', {}, Exception('duplicate'))
+        mock_get_engine.return_value = mock_engine
+        mock_get_op.side_effect = exceptions.DatabaseUnavailable('down')
+
+        success, error = (
+            mariadb._direct_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_net_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+            )
+        )
+
+        self.assertFalse(success)
+        self.assertIn('duplicate', error)
         mock_conn.commit.assert_not_called()
 
     @mock.patch('shakenfist.mariadb._get_engine')
@@ -416,8 +516,12 @@ class CreateAndEnqueueDeadlockRetryTestCase(base.ShakenFistTestCase):
             mock_conn.execute.call_count)
         mock_conn.commit.assert_not_called()
 
+    @mock.patch(
+        'shakenfist.mariadb._direct_get_cluster_operation',
+        return_value=None)
     @mock.patch('shakenfist.mariadb._get_engine')
-    def test_duplicate_uuid_is_not_retried(self, mock_get_engine):
+    def test_duplicate_uuid_is_not_retried(
+            self, mock_get_engine, mock_get_op):
         # An IntegrityError is a permanent failure, not a transient
         # one -- replaying it just inserts the same duplicate again.
         mock_engine, mock_conn = _make_mock_engine()
