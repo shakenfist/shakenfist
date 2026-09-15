@@ -327,12 +327,42 @@ def _artifact_safety_checks(a, instance_uuid=None):
     return sf_api.error(404, reason[1])
 
 
+def _diskspec_value_absent(diskspec, key):
+    """Is this diskspec key effectively not supplied?
+
+    util_general.noneish() is the idiom for that question -- None, the
+    empty string and the literal string 'none' all mean "not supplied"
+    here, and the shipped CLI and the ansible collection both send an
+    explicit null for size and for base on ordinary requests. It
+    lowercases whatever it is handed though, so a truthy non-string
+    (a size of 20, or the dict a confused caller sends) is an
+    AttributeError there rather than an answer. Anything truthy which
+    is not a string is supplied by definition, so it never needs
+    asking.
+    """
+    value = diskspec.get(key)
+    if value and not isinstance(value, str):
+        return False
+    return util_general.noneish(value)
+
+
 def _netdesc_safety_checks(netdesc, namespace):
     if not isinstance(netdesc, dict):
         return sf_api.error(
             400, 'network specification should contain JSON objects')
 
-    if 'network_uuid' not in netdesc:
+    # Absent and null are one fact here, and a presence test was not
+    # enough. Network.from_db_by_ref(None, namespace) builds an
+    # ObjectFilterCriteria with name=None, which the pushed down SQL
+    # reads as *no name filter* rather than as a name of None, so
+    # {"network_uuid": null} walked through this guard and came back
+    # with an arbitrary active network in the namespace as though the
+    # caller had named it (issue #4223, which stays open because the
+    # lookup is still wrong for the next caller who reaches it another
+    # way). Phase 7's networkspec schema refuses the null too, but
+    # API_VALIDATION_MODE=warn and off are the operator's rollback
+    # (decision D42) and must not hand back a newly unguarded API.
+    if netdesc.get('network_uuid') is None:
         return sf_api.error(
             400, 'network specification is missing network_uuid')
 
@@ -511,14 +541,14 @@ class InstancesEndpoint(api_base.Resource):
             ('cpus', 'body', 'unsignedinteger', 'The number of vCPUs', True),
             ('memory', 'body', 'unsignedinteger',
              'The amount of RAM in MB.', True),
-            ('network', 'body', 'arrayofdict',
-             'A list of networkspecs defining the networking for this instance. '
-             'See https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
-             'for more details on networkspecs.', False),
-            ('disk', 'body', 'arrayofdict',
-             'A list of diskspecs defining the disk devices for this instance. '
-             'See https://shakenfist.com/developer_guide/api_reference/instances/#diskspec '
-             'for more details on diskspecs.', True),
+            ('network', 'body', 'arrayofnetworkspec',
+             'The networking for this instance, one networkspec per interface. See '
+             'https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
+             'for what each key means.', False),
+            ('disk', 'body', 'arrayofdiskspec',
+             'The disk devices for this instance, one diskspec per disk. See '
+             'https://shakenfist.com/developer_guide/api_reference/instances/#diskspec '
+             'for what each key means.', True),
             ('ssh_key', 'body', 'string',
              'A ssh public key to add to the default users authorized_keys file '
              'via cloud-init. Requires that both configdrive be enabled, and that '
@@ -532,16 +562,24 @@ class InstancesEndpoint(api_base.Resource):
             ('namespace', 'body', 'namespace',
              'The namespace this instance should be created in, if other than '
              'the currently authenticated namespace.', False),
-            ('video', 'body', 'dict',
-             'A single videospec describing the video configuration of this instance. '
-             'See https://shakenfist.com/developer_guide/api_reference/instances/#videospec '
-             'for more details on videospecs.', False),
+            ('video', 'body', 'videospec',
+             'The video configuration of this instance. See '
+             'https://shakenfist.com/developer_guide/api_reference/instances/#videospec '
+             'for what each key means.', False),
             ('uefi', 'body', 'boolean',
              'True if you want to boot an instance with UEFI instead of BIOS boot.',
              False),
             ('configdrive', 'body', 'string',
              'A config drive type. Currently "none" and "openstack-disk" are '
              'supported.', False),
+            # Deliberately still a bare 'dict' while its neighbours in
+            # this body carry element schemas (D47). The keys here are
+            # the caller's and the values are uninterpreted:
+            # _validate_instance_metadata() below is key dependent --
+            # 'tags' must be a list and 'affinity' a dict in one of two
+            # recognised shapes -- and every other key may hold any
+            # non-empty JSON value at all, which is not a shape a
+            # properties block can describe. Census finding F4.
             ('metadata', 'body', 'dict',
              'Any metadata to be set for the instance at creation time. See '
              'https://shakenfist.com/developer_guide/api_reference/instances/ for '
@@ -677,6 +715,19 @@ class InstancesEndpoint(api_base.Resource):
         for d in disk:
             if not isinstance(d, dict):
                 return sf_api.error(400, 'disk specification should contain JSON objects')
+
+            # A diskspec with neither a size nor a base asks for
+            # nothing: no stated size, and no image to take a size
+            # from. It is accepted today and produces a disk that
+            # nobody asked for. The schema cannot say "at least one of
+            # these two" -- Swagger 2.0 has no anyOf -- so this is a
+            # handler guard (decision D45), and like every other guard
+            # here it holds at every API_VALIDATION_MODE.
+            if (_diskspec_value_absent(d, 'size')
+                    and _diskspec_value_absent(d, 'base')):
+                return sf_api.error(
+                    400, 'disk specification must specify at least one of '
+                    'size or base')
 
             # Ensure we're using a known disk bus
             disk_bus = instance._get_defaulted_disk_bus(d)
@@ -1131,10 +1182,10 @@ class InstanceInterfacesEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('namespace', 'body', 'namespace',
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
-            ('network', 'body', 'dict',
-             'A networkspec defining the new interface. '
-             'See https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
-             'for more details on networkspecs.', True)
+            ('network', 'body', 'networkspec',
+             'The networkspec for the new interface. See '
+             'https://shakenfist.com/developer_guide/api_reference/instances/#networkspec '
+             'for what each key means.', True)
         ],
         [
             (200, 'The new interface details.', instance_interface_create_example),

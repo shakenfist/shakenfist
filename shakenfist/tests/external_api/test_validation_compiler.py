@@ -345,10 +345,32 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         """
         instance_create = self.registry[('InstancesEndpoint', 'post')].body
 
+        # Still a bare Dict, and now the only object in this body which
+        # is: metadata publishes no properties because its keys belong
+        # to the caller (D47), and the object branch of _field() is
+        # keyed on the presence of `properties` precisely so that this
+        # one keeps compiling the way it always did.
         self.assertIsInstance(instance_create.fields['metadata'], fields.Dict)
+
+        # A list of diskspecs and a list of networkspecs, so a List of
+        # Nested where phase 6 had a List of Dict. The element schema is
+        # the whole of phase 7.
         self.assertIsInstance(instance_create.fields['disk'], fields.List)
         self.assertIsInstance(
-            instance_create.fields['disk'].inner, fields.Dict)
+            instance_create.fields['disk'].inner, fields.Nested)
+        self.assertIsInstance(instance_create.fields['network'], fields.List)
+        self.assertIsInstance(
+            instance_create.fields['network'].inner, fields.Nested)
+
+        # One videospec rather than a list of them, so a Nested with no
+        # List around it.
+        self.assertIsInstance(instance_create.fields['video'], fields.Nested)
+
+        # The interface hotplug endpoint takes a single networkspec,
+        # rendered from the same Python constant the array above nests.
+        hotplug = self.registry[('InstanceInterfacesEndpoint', 'post')].body
+        self.assertIsInstance(hotplug.fields['network'], fields.Nested)
+
         self.assertIsInstance(instance_create.fields['cpus'], fields.Integer)
 
     def test_every_compiled_integer_refuses_a_fractional_number(self):

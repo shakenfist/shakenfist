@@ -60,6 +60,11 @@ from typing import Optional
 import marshmallow
 from marshmallow import fields
 from marshmallow import validate
+# marshmallow's sentinel key for an error about an object rather than
+# about one of its fields. Imported from where it is defined rather
+# than reached through marshmallow.schema, which re-exports it and so
+# is not an explicit export for mypy --strict.
+from marshmallow.exceptions import SCHEMA as SCHEMA_LEVEL_KEY
 from shakenfist_utilities import logs
 
 from shakenfist import exceptions
@@ -628,6 +633,17 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
         # string type at import time, so none can arrive here today;
         # this keeps that true if a future token renders one itself.
         kwargs.pop('validate', None)
+
+        # marshmallow says "Invalid input type." when a schema is
+        # handed something which is not a mapping at all; fields.Dict,
+        # which every one of these parameters compiled to before this
+        # branch existed, said "Not a valid mapping type.". The wrong
+        # container was already refused with a good message before
+        # phase 7 (finding F1 records it as such), so teaching a
+        # structure to say something new about a case whose answer has
+        # not changed would be a contract move nobody asked for.
+        nested.error_messages = {'type': 'Not a valid mapping type.'}
+
         return fields.Nested(nested(unknown=unknown), **kwargs)
 
     if 'type' not in spec and spec.get('format') == ANY_VALUE_FORMAT:
@@ -912,9 +928,24 @@ def _flatten_messages(parameter: str, messages: Any,
                                   key=lambda kv: _sort_key(kv[0])):
             if isinstance(key, int):
                 name = '%s[%d]' % (parameter, key)
+                child = path + (key,)
+            elif key == SCHEMA_LEVEL_KEY:
+                # marshmallow's sentinel for an error about an object
+                # itself rather than about one of its properties: a
+                # nested schema handed something which is not a mapping
+                # at all. It is neither a key the caller sent nor a
+                # property the specification publishes, so
+                # `disk[0]._schema: ...` would send them looking for a
+                # field of that name. The failure is about disk[0], so
+                # say disk[0] -- and leave the path alone, because the
+                # value whose type the finding reports is the element,
+                # not something inside it.
+                name = parameter
+                child = path
             else:
                 name = '%s.%s' % (parameter, key)
-            flattened.extend(_flatten_messages(name, nested, path + (key,)))
+                child = path + (key,)
+            flattened.extend(_flatten_messages(name, nested, child))
         return flattened
     if isinstance(messages, list):
         return [(parameter, '; '.join(str(m) for m in messages), path)]
