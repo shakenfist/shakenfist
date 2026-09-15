@@ -49,6 +49,7 @@ construction (decision D33).
 
 import base64
 import ipaddress
+import math
 import re
 import urllib.parse
 import uuid
@@ -83,9 +84,73 @@ _IGNORED_LOCATIONS = frozenset(['header', 'formData'])
 # specification" design of this module exists to prevent.
 ANY_VALUE_FORMAT = 'any JSON value'
 
+
+class _ExactInteger(fields.Integer):
+    """fields.Integer, except that 1.5 is not an integer (decision D46).
+
+    marshmallow's Integer accepts any value int() will take, so 1.5
+    passes because int(1.5) is 1. In a *deserialising* layer that is
+    merely lax: the handler would receive the 1 the field produced.
+    This layer is check-only by design (decision D14) --
+    validate_request() runs schema.validate() for its findings and
+    throws the deserialised result away, so the handler always sees the
+    body the caller sent. A field which accepts a value it would have
+    had to truncate is therefore not lax here, it is a false statement:
+    it says the value is a valid integer about a value which is not one
+    and which nothing downstream will convert.
+
+    Measured before the fix (phase 7 finding F8): POST /instances with
+    "cpus": 1.5 passed validation, reached InstanceData unchanged and
+    raised a pydantic ValidationError -- a recorded 500 for a caller's
+    mistake.
+
+    **This is not marshmallow's `strict=True`, which D46 asked for and
+    which cannot be used here.** `strict=True` refuses anything that is
+    not already a Python int, and two kinds of caller legitimately send
+    something else:
+
+    * A query parameter is a string on the wire. base.py hands
+      `flask.request.args.to_dict()` to check(), so `offset=10` arrives
+      as `'10'` and `strict=True` answers `400 offset: Not a valid
+      integer.` on a request the server has always served. Every
+      integer query parameter in the tree is affected;
+      test_blob_data_bounds caught it within a minute of the change.
+    * A body integer sent as a JSON string reaches a handler which
+      coerces it. `{"cpus": "8"}` is accepted today because pydantic's
+      lax mode converts it, so refusing it here would be a validator
+      narrower than its handler -- the breaking-change-dressed-as-a-fix
+      that phase 6's width rule (and the _FORMATS comment above) exists
+      to prevent.
+
+    So the check is written against the defect rather than against the
+    Python type: a JSON number with a fractional part is refused, and
+    everything int() converts faithfully is left alone. An integral
+    float is faithful and is accepted, for exactly the reason
+    fields.Float is left alone below -- JSON has one numeric type, so
+    8.0 and 8 are the same JSON number and reading one as the integer 8
+    invents nothing. Infinity is left to the base class, which has a
+    better message for it ("Number too large.") than this would.
+
+    A subclass rather than a keyword at the construction site, because
+    the construction site is the _SCALARS lookup below and D46 asks for
+    this at every nesting depth. Binding it to the mapping from
+    rendered type to field class means a branch of _field() which one
+    day builds an integer some other way cannot forget it.
+    """
+
+    def _validated(self, value: Any) -> int:
+        if (isinstance(value, float) and math.isfinite(value)
+                and not value.is_integer()):
+            # make_error rather than a hand-written message, so a
+            # truncating value reads exactly like every other bad
+            # integer: "Not a valid integer."
+            raise self.make_error('invalid', input=value)
+        return super()._validated(value)
+
+
 _SCALARS: dict[str, type[fields.Field[Any]]] = {
     'string': fields.String,
-    'integer': fields.Integer,
+    'integer': _ExactInteger,
     'number': fields.Float,
     'boolean': fields.Boolean,
     'object': fields.Dict,
@@ -368,18 +433,28 @@ class CompiledEndpoint:
         return out
 
 
-def _field(spec: dict[str, Any]) -> fields.Field[Any]:
+def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     """One rendered parameter or property as a marshmallow field.
 
-    Every field is optional and nullable. Optional because required-ness
-    is metadata here (see CompiledEndpoint). Nullable because a JSON
-    null reaches the handler as None today and several handlers treat
-    that as "not supplied" -- rejecting it would be a behaviour change
-    invented by the compiler rather than described by a declaration,
-    and in warn-only it would fill the log with findings that are
-    artefacts of this module.
+    Every field is nullable, and every *parameter* is optional. Nullable
+    because a JSON null reaches the handler as None today and several
+    handlers treat that as "not supplied" -- rejecting it would be a
+    behaviour change invented by the compiler rather than described by
+    a declaration, and in warn-only it would fill the log with findings
+    that are artefacts of this module. Optional because at the top
+    level required-ness is metadata here (see CompiledEndpoint), which
+    phase 6 enforces itself so that it can say which parameter is
+    missing in its own words.
+
+    `required` is the one exception, and only the object branch below
+    passes it: a property inside a rendered object fragment has no
+    CompiledEndpoint to carry its required-ness as metadata, so a
+    `required` list on the fragment is honoured by marshmallow
+    directly. That is still a check and never a coercion -- a missing
+    property becomes a finding naming its path, exactly as a
+    wrong-typed one does.
     """
-    kwargs: dict[str, Any] = {'required': False, 'allow_none': True}
+    kwargs: dict[str, Any] = {'required': required, 'allow_none': True}
 
     validators: list[Any] = []
     minimum, maximum = spec.get('minimum'), spec.get('maximum')
@@ -431,6 +506,65 @@ def _field(spec: dict[str, Any]) -> fields.Field[Any]:
         # items is always present: swagger_helper() renders the array
         # tokens with it, and OpenAPI 2.0 requires it.
         return fields.List(_field(spec.get('items', {})), **kwargs)
+
+    element_properties = spec.get('properties')
+    if isinstance(element_properties, dict):
+        # A structured object fragment (phase 7): compile its
+        # properties into a nested schema so a value one level down is
+        # checked the way a top level one is.
+        #
+        # Keyed on the presence of `properties` rather than on the type
+        # being `object`, which is the whole of decision D47.
+        # ARGTYPES['dict'] renders a bare {'type': 'object'} and two
+        # live parameters need that to keep meaning "any mapping at
+        # all": `metadata` on POST /instances, whose keys are the
+        # caller's and which deliberately stores both a dict and a list
+        # as the *value* under one caller-chosen key (sfcbr's k3s
+        # traffic does exactly that), and `bound_claims` on the mapping
+        # rule endpoints, which is guarded by hand in federation.py
+        # with messages better than a schema could produce. A branch
+        # keyed on the type would have refused both.
+        #
+        # Reading the rendered fragment rather than knowing anything
+        # about type tokens is the module's standing rule (see the
+        # module docstring and _FORMATS): the published specification
+        # and the enforced check are the same structure by
+        # construction, so a token cannot render one shape and compile
+        # as another.
+        required_properties = spec.get('required') or []
+        nested = marshmallow.Schema.from_dict(
+            {name: _field(prop, required=name in required_properties)
+             for name, prop in element_properties.items()})
+
+        # marshmallow's own default for a schema is RAISE, so the
+        # EXCLUDE arm has to be written out: without it every
+        # structured token would refuse unknown keys whether it
+        # published additionalProperties: false or not, and the
+        # published specification would be saying something the server
+        # does not do. `is False` rather than a truthiness test because
+        # JSON Schema also spells additionalProperties as a *schema*,
+        # and only the literal false means "no other keys".
+        #
+        # Annotated because mypy widens marshmallow's two Literal
+        # constants to str across a conditional, and Schema's own
+        # parameter is the Literal.
+        unknown: marshmallow.types.UnknownOption = (
+            marshmallow.RAISE
+            if spec.get('additionalProperties') is False
+            else marshmallow.EXCLUDE)
+
+        # Bounds and formats are dropped, for the same reason the `any`
+        # and unrecognised-type branches below drop them: a
+        # validate.Range meeting a mapping raises TypeError rather than
+        # ValidationError, straight out through schema.validate() and
+        # into _schema_findings' broad except, which reports *no*
+        # findings for the whole request and so silently disables every
+        # other check on it. _validated_constraints() already refuses a
+        # minimum, maximum or pattern on anything but a numeric or
+        # string type at import time, so none can arrive here today;
+        # this keeps that true if a future token renders one itself.
+        kwargs.pop('validate', None)
+        return fields.Nested(nested(unknown=unknown), **kwargs)
 
     if 'type' not in spec and spec.get('format') == ANY_VALUE_FORMAT:
         # The 'any' token, which is typeless deliberately rather than

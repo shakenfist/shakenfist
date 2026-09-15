@@ -29,6 +29,26 @@ ANY_TOKEN_ENDPOINTS = sorted({(cls, method)
                              for (cls, method, _) in ANY_TOKEN_DECLARATIONS})
 
 
+def _every_compiled_field(field):
+    """A compiled field and everything nested inside it.
+
+    A property of "every compiled field" has to be asserted at every
+    depth or it is a property of the top level wearing a broader name,
+    and phase 7 gave the compiler two ways down: a list's `inner` and a
+    nested schema's `fields`. The nested arm reaches nothing today,
+    since no declaration carries a `properties` block until step 4 --
+    which is exactly why it is written now rather than when the first
+    one lands.
+    """
+    yield field
+    inner = getattr(field, 'inner', None)
+    if inner is not None:
+        yield from _every_compiled_field(inner)
+    if isinstance(field, fields.Nested):
+        for nested in field.schema.fields.values():
+            yield from _every_compiled_field(nested)
+
+
 class ValidationCompilerTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
@@ -328,6 +348,44 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
             instance_create.fields['disk'].inner, fields.Dict)
         self.assertIsInstance(instance_create.fields['cpus'], fields.Integer)
 
+    def test_every_compiled_integer_refuses_a_fractional_number(self):
+        """Decision D46, over the whole registry rather than one field.
+
+        _SCALARS is the only place an integer field is constructed, so
+        this is close to tautological today -- which is the point, the
+        same argument the test above makes about the structured
+        parameters. It is asserted anyway because D46 is a property of
+        the published API ("no compiled integer claims 1.5 is an
+        integer") rather than of one line of the compiler, so a future
+        branch of _field() which built an integer some other way has to
+        fail here.
+
+        The population is pinned as non-empty for the usual reason: the
+        rule is vacuous if nothing compiles to an integer at all.
+        """
+        integers = []
+        for key, endpoint in self.registry.items():
+            for schema in (endpoint.body, endpoint.query):
+                if schema is None:
+                    continue
+                for name, field in schema.fields.items():
+                    for inner in _every_compiled_field(field):
+                        if isinstance(inner, fields.Integer):
+                            integers.append(('%s.%s' % key, name, inner))
+
+        self.assertNotEqual([], integers)
+        # Asserted by asking the field rather than by checking its
+        # class: the class is how it is done today, the refusal is what
+        # D46 actually promises.
+        accepted = []
+        for where, name, field in integers:
+            try:
+                field.deserialize(1.5)
+                accepted.append((where, name))
+            except marshmallow.ValidationError:
+                pass
+        self.assertEqual([], accepted)
+
     def test_any_accepts_every_json_shape(self):
         """'any' (D15) compiles to fields.Raw, the same fallback the
         compiler already uses for a type token it does not recognise --
@@ -432,6 +490,14 @@ class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
         disk = fields.List(fields.Dict())
         tags = fields.List(fields.String())
         name = fields.String()
+        # The phase 7 shape: a list of structured elements, so an error
+        # arrives two levels down rather than one.
+        spec = fields.List(fields.Nested(
+            marshmallow.Schema.from_dict({
+                'size': fields.Integer(allow_none=True),
+                'base': fields.String(allow_none=True)})(
+                    unknown=marshmallow.RAISE),
+            allow_none=True), allow_none=True)
 
     def _findings(self, supplied):
         schema = self._Schema(unknown=marshmallow.EXCLUDE)
@@ -462,6 +528,41 @@ class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
             ['disk[%d]' % index for index in range(12)],
             [parameter for parameter, _ in
              self._findings({'disk': ['x'] * 12})])
+
+    def test_a_nested_failure_names_an_indexed_dotted_path(self):
+        """Decision D48, and definition-of-done item 6.
+
+        marshmallow reports a failure inside a nested schema as a
+        nested dict -- {'spec': {1: {'size': ['Not a valid
+        integer.']}}} -- and a finding naming only `spec` would make a
+        list of six diskspecs impossible to debug. The recursion which
+        produces `disk[0]` for an array element already produces this;
+        the second index is deliberate, because a path built from the
+        first element only would pass with a hard coded 0.
+        """
+        self.assertEqual(
+            [('spec[1].size', 'Not a valid integer.')],
+            self._findings({'spec': [{'size': 8}, {'size': 'eight'}]}))
+
+    def test_an_unknown_nested_key_names_its_path_too(self):
+        # unknown=RAISE keys its error by the offending key, so it
+        # arrives through the same recursion and must read the same
+        # way.
+        self.assertEqual(
+            [('spec[0].wombat', 'Unknown field.')],
+            self._findings({'spec': [{'size': 8, 'wombat': 1}]}))
+
+    def test_a_nested_finding_carries_the_nested_value_type(self):
+        # The path _flatten_messages carries is what lets a finding
+        # report the type of the value that actually failed rather than
+        # the type of the array around it (decision D5).
+        findings = validation._schema_findings(
+            self._Schema(unknown=marshmallow.EXCLUDE),
+            {'spec': [{'size': 8}, {'size': ['a', 'list']}]})
+
+        self.assertEqual(
+            [('spec[1].size', 'list')],
+            [(f.parameter, f.value_type) for f in findings])
 
     def test_the_findings_one_container_can_produce_are_bounded(self):
         """Nothing bounds a request body, so something must bound this.
@@ -532,3 +633,263 @@ class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
             for parameter, detail in self._findings(supplied):
                 self.assertNotIn('{', detail, parameter)
                 self.assertNotIn('[', detail, parameter)
+
+
+# The shape a structured type token will render once phase 7's step 3
+# writes one: a diskspec, near enough. Written out here rather than
+# read from ARGTYPES because step 2 deliberately precedes the
+# vocabulary. The compiler's contract is with the *rendered
+# specification* and not with any type token (see validation.py's
+# module docstring), so the fragment a test hands it is exactly as good
+# evidence as one ARGTYPES produced -- and these tests have to be able
+# to run before anything declares one.
+OBJECT_FRAGMENT = {
+    'type': 'object',
+    'additionalProperties': False,
+    'required': ['size'],
+    'properties': {
+        'size': {'type': 'integer', 'minimum': 0},
+        'base': {'type': 'string'},
+        'type': {'type': 'string'},
+    },
+}
+
+
+def _permissive_fragment():
+    """OBJECT_FRAGMENT with additionalProperties dropped, nothing else."""
+    out = dict(OBJECT_FRAGMENT)
+    del out['additionalProperties']
+    return out
+
+
+class ObjectFragmentCompilationTestCase(base.ShakenFistTestCase):
+    """A rendered `properties` block becomes a nested schema.
+
+    Phase 7's step 2. Until it, `_SCALARS` mapped `object` to
+    fields.Dict and nothing else, so a diskspec was checked for being a
+    mapping and then handed to the handler unexamined -- eleven nested
+    values were a recorded 500 and nine more were accepted in silence
+    (findings F5 and F6 of
+    PLAN-api-input-validation-phase-07-structured.md).
+
+    Asserted through _schema_findings() rather than against marshmallow's
+    raw error dict, because the finding is what a caller sees: phase 4
+    turned the detail string into the response body's error message.
+    """
+
+    def _findings(self, field, supplied):
+        schema = marshmallow.Schema.from_dict({'disk': field})()
+        return [(f.parameter, f.detail)
+                for f in validation._schema_findings(schema, supplied)]
+
+    def test_a_fragment_with_properties_compiles_to_a_nested_schema(self):
+        field = validation._field(OBJECT_FRAGMENT)
+
+        self.assertIsInstance(field, fields.Nested)
+        self.assertEqual(
+            [('disk.size', 'Not a valid integer.')],
+            self._findings(field, {'disk': {'size': 'eight'}}))
+        self.assertEqual(
+            [], self._findings(
+                field, {'disk': {'size': 8, 'base': 'label:ubuntu',
+                                 'type': 'disk'}}))
+
+    def test_each_property_compiles_through_the_same_path(self):
+        """A property is a rendered fragment like any other, so
+        everything _field() knows applies one level down too -- which is
+        the whole reason the branch recurses rather than building
+        fields.Dict(keys=..., values=...). The published minimum on
+        `size` is the visible case."""
+        field = validation._field(OBJECT_FRAGMENT)
+
+        self.assertEqual(
+            [('disk.size', 'Must be greater than or equal to 0.')],
+            self._findings(field, {'disk': {'size': -1}}))
+        self.assertEqual(
+            [('disk.base', 'Not a valid string.')],
+            self._findings(field, {'disk': {'size': 8, 'base': 5}}))
+
+    def test_a_fragment_without_properties_is_still_a_mapping(self):
+        """Decision D47, and the reason the branch is keyed on
+        `properties` rather than on the type being `object`.
+
+        ARGTYPES['dict'] renders a bare {'type': 'object'}, and two live
+        parameters need that to keep meaning "any mapping at all":
+        `metadata` on POST /instances, whose keys are the caller's, and
+        `bound_claims` on the mapping rule endpoints, which
+        federation.py guards by hand with better messages than a schema
+        could produce. A branch keyed on the type would have compiled
+        both to an empty nested schema -- which, with marshmallow's
+        default of unknown=RAISE, would have refused every key either
+        one has ever carried.
+        """
+        field = validation._field(api_base.ARGTYPES['dict'])
+
+        self.assertIsInstance(field, fields.Dict)
+        self.assertNotIsInstance(field, fields.Nested)
+        self.assertEqual(
+            [], self._findings(field, {'disk': {'anything': 'at all'}}))
+
+    def test_a_mapping_takes_both_a_dict_and_a_list_as_one_value(self):
+        """The shape ARGTYPES['dict']'s own comment records sfcbr's k3s
+        traffic storing under one parameter. It is asserted here at the
+        compiler, and end to end through POST /instances in
+        test_request_validation.MetadataStaysUnconstrainedTestCase --
+        the second is the one definition-of-done item 1 asks for, and
+        this is the one which says where it broke."""
+        field = validation._field(api_base.ARGTYPES['dict'])
+
+        for value in ({'nested': 'dict'}, ['a', 'list'], 'a string', 5):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    [], self._findings(field, {'disk': {'k3s': value}}))
+
+    def test_unknown_keys_are_refused_only_where_the_fragment_says_so(self):
+        """additionalProperties: false compiles to unknown=RAISE (D41).
+
+        The EXCLUDE arm is the one worth testing: marshmallow's own
+        default for a schema is RAISE, so without writing EXCLUDE out
+        every structured token would refuse unknown keys whether it
+        published additionalProperties: false or not, and the published
+        specification would say something the server does not do.
+        """
+        refuses = validation._field(OBJECT_FRAGMENT)
+        permits = validation._field(_permissive_fragment())
+
+        self.assertEqual(marshmallow.RAISE, refuses.schema.unknown)
+        self.assertEqual(
+            [('disk.wombat', 'Unknown field.')],
+            self._findings(refuses, {'disk': {'size': 8, 'wombat': 1}}))
+
+        self.assertEqual(marshmallow.EXCLUDE, permits.schema.unknown)
+        self.assertEqual(
+            [], self._findings(permits, {'disk': {'size': 8, 'wombat': 1}}))
+
+    def test_a_required_property_is_honoured(self):
+        """A property inside a fragment has no CompiledEndpoint to carry
+        its required-ness as metadata the way a parameter does, so
+        marshmallow enforces it directly. Still a check and never a
+        coercion: the absence becomes a finding naming its path."""
+        required = validation._field(OBJECT_FRAGMENT)
+
+        self.assertEqual(
+            [('disk.size', 'Missing data for required field.')],
+            self._findings(required, {'disk': {'base': 'label:ubuntu'}}))
+        # And the properties the fragment does not list stay optional.
+        self.assertEqual([], self._findings(required, {'disk': {'size': 8}}))
+
+    def test_a_property_still_accepts_a_null(self):
+        """_field()'s nullability rule reaches one level down as well.
+
+        Every compiled field is allow_none=True because a JSON null
+        reaches the handler as None today and several handlers read that
+        as "not supplied". A nested field which refused one would be a
+        rule this module invented rather than one any declaration
+        states -- and required-ness does not change it, for the same
+        reason it does not at the top level.
+        """
+        field = validation._field(OBJECT_FRAGMENT)
+
+        self.assertEqual([], self._findings(field, {'disk': {'size': None}}))
+        self.assertEqual([], self._findings(field, {'disk': None}))
+
+    def test_a_bound_on_the_fragment_itself_is_dropped(self):
+        """The same reasoning the `any` and unrecognised-type branches
+        record, and the reason this branch pops `validate` too.
+
+        validate.Range meeting a mapping raises TypeError rather than
+        ValidationError, which escapes schema.validate() into
+        _schema_findings' broad except -- and that reports *no* findings
+        for the whole request, silently disabling every other check on
+        it. base._validated_constraints() refuses a minimum, maximum or
+        pattern on a non-numeric, non-string type at import time, so
+        none can arrive here from a declaration today; this is what
+        keeps a future token rendering its own from doing the damage.
+        """
+        bounded = dict(OBJECT_FRAGMENT)
+        bounded['minimum'] = 1
+        bounded['pattern'] = '^x$'
+
+        field = validation._field(bounded)
+
+        self.assertEqual([], list(field.validators))
+        self.assertEqual([], self._findings(field, {'disk': {'size': 8}}))
+
+
+class ExactIntegerTestCase(base.ShakenFistTestCase):
+    """1.5 is not an integer (decision D46, finding F8).
+
+    The compiled path is check-only (decision D14): validate_request()
+    runs schema.validate() for its findings and discards the
+    deserialised result, so the handler receives the body the caller
+    sent. marshmallow's fields.Integer accepts anything int() will take,
+    so before this `POST /instances {"cpus": 1.5}` passed validation,
+    reached InstanceData unchanged and raised a pydantic
+    ValidationError -- a recorded 500 for a caller's mistake.
+
+    What the field must *not* do is refuse a value the server converts
+    faithfully today, which is why this is not marshmallow's
+    strict=True. See _ExactInteger's docstring, and the two tests below
+    which pin the width.
+    """
+
+    def _error(self, field, value):
+        try:
+            field.deserialize(value)
+        except marshmallow.ValidationError as e:
+            return e.messages
+        return None
+
+    def test_a_fractional_number_is_not_an_integer(self):
+        field = validation._field({'type': 'integer'})
+
+        self.assertEqual(['Not a valid integer.'], self._error(field, 1.5))
+        self.assertEqual(['Not a valid integer.'], self._error(field, -0.5))
+
+    def test_an_integral_float_is_an_integer(self):
+        """JSON has one numeric type, so 8.0 and 8 are the same JSON
+        number and reading the first as the integer 8 invents nothing.
+        It is also accepted today, and phase 6's width rule says a
+        validator must be no narrower than its handler."""
+        field = validation._field({'type': 'integer'})
+
+        self.assertEqual(8, field.deserialize(8.0))
+        self.assertEqual(8, field.deserialize(8))
+
+    def test_a_numeric_string_is_still_an_integer(self):
+        """The reason strict=True cannot be used, and it is not a
+        nicety: base.py hands flask.request.args.to_dict() to check(),
+        so every integer *query* parameter arrives as a string.
+        `offset=10` on GET /blobs/<uuid>/data is the live case, and
+        strict=True answered `400 offset: Not a valid integer.` for
+        it."""
+        field = validation._field({'type': 'integer'})
+
+        self.assertEqual(10, field.deserialize('10'))
+        self.assertEqual(-1, field.deserialize('-1'))
+        # A fractional string was already refused, by int() itself.
+        self.assertEqual(['Not a valid integer.'], self._error(field, '1.5'))
+
+    def test_a_number_field_is_left_alone(self):
+        """fields.Float has the same flag and must not get it. JSON has
+        one numeric type and every integer is a valid float, so a
+        `number` field accepting an integer is describing JSON rather
+        than lying about it."""
+        field = validation._field({'type': 'number'})
+
+        self.assertIsInstance(field, fields.Float)
+        self.assertEqual(2.0, field.deserialize(2))
+        self.assertEqual(1.5, field.deserialize(1.5))
+
+    def test_the_check_reaches_every_nesting_depth(self):
+        """D46 says "at every nesting depth", and a nested integer is
+        the case that would otherwise have inherited the lie the moment
+        phase 7's step 3 declares one."""
+        field = validation._field(
+            {'type': 'array', 'items': OBJECT_FRAGMENT})
+        schema = marshmallow.Schema.from_dict({'disk': field})()
+
+        self.assertEqual(
+            [('disk[1].size', 'Not a valid integer.')],
+            [(f.parameter, f.detail) for f in validation._schema_findings(
+                schema, {'disk': [{'size': 8}, {'size': 8.5}]})])
