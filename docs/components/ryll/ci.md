@@ -803,8 +803,9 @@ compiles. To contain that, the Makefile splits the build in two:
 
 This is the same reason docs.rs builds every crate offline, and is
 what would have turned the 2026-08-20 `arrayref` / `proc-macro1`
-build-script dropper (reported as rustsec/advisory-db#3161; no
-`RUSTSEC-YYYY-NNNN` id had been assigned at the time of writing)
+build-script dropper (RUSTSEC-2026-0260 and RUSTSEC-2026-0265;
+`append-only-vec` and `internment` went out from the same
+compromised account, as RUSTSEC-2026-0262 and RUSTSEC-2026-0266)
 into a loud build failure rather than a silent compromise.
 
 Three targets still compile with the network up, and both of the
