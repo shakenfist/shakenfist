@@ -14950,6 +14950,19 @@ log-derived oracle should draw the same distinction. Proxy log
 colouring is described in
 <a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a>.</p>
 <h2 id="tempest-tests-against-a-kolla-ansible-deployment">Tempest tests against a Kolla-Ansible deployment<a class="headerlink" href="#tempest-tests-against-a-kolla-ansible-deployment" title="Permanent link">&para;</a></h2>
+<p>The <code>openstack_matrix</code> job deploys an all-in-one OpenStack on a
+single Shaken Fist guest and runs Tempest against it. That guest is
+a <code>debian:13</code> image, and the distro is load bearing rather than
+incidental: Kolla-Ansible master requires <code>ansible-core&gt;=2.20</code>,
+every <code>ansible-core</code> 2.20 release requires Python 3.12 or newer, and
+<code>kerbside-patches</code>' <code>tools/bootstrap-kolla-ansible</code> installs
+Kolla-Ansible into a venv built on the guest's system Python. A
+guest below 3.12 fails during pip resolution, before anything is
+deployed. Debian 12 ships 3.11 and broke the lane this way (#426);
+Debian 13 ships 3.13. <code>kerbside-patches</code> tests every all-in-one
+master topology on <code>debian:13</code>, so this matches upstream rather than
+diverging from it. The containers Kolla builds are Debian trixie
+regardless of the guest, and are unaffected.</p>
 <p>The <code>tempest-plugin/</code> directory is a separate releasable that
 contributes Kerbside-specific Tempest tests; see
 <code>tempest-plugin/README.md</code> for what it covers.</p>
