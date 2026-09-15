@@ -781,20 +781,76 @@ class ObjectFragmentCompilationTestCase(base.ShakenFistTestCase):
         # And the properties the fragment does not list stay optional.
         self.assertEqual([], self._findings(required, {'disk': {'size': 8}}))
 
-    def test_a_property_still_accepts_a_null(self):
+    def test_an_optional_property_still_accepts_a_null(self):
         """_field()'s nullability rule reaches one level down as well.
 
-        Every compiled field is allow_none=True because a JSON null
-        reaches the handler as None today and several handlers read that
-        as "not supplied". A nested field which refused one would be a
-        rule this module invented rather than one any declaration
-        states -- and required-ness does not change it, for the same
-        reason it does not at the top level.
+        An optional compiled field is allow_none=True because a JSON
+        null reaches the handler as None today and several handlers
+        read that as "not supplied" -- and the shipped client sends
+        five documented keys that way on every instance create (census
+        finding N1). A nested field which refused one would be a rule
+        this module invented rather than one any declaration states.
+
+        The fragment itself is nullable for the same reason: `disk`
+        here is an ordinary optional parameter, and whether a null one
+        is refused is check()'s question about compiled.required_names,
+        not this field's.
         """
         field = validation._field(OBJECT_FRAGMENT)
 
-        self.assertEqual([], self._findings(field, {'disk': {'size': None}}))
+        self.assertEqual(
+            [], self._findings(field, {'disk': {'size': 8, 'base': None}}))
         self.assertEqual([], self._findings(field, {'disk': None}))
+
+    def test_a_required_property_refuses_a_null(self):
+        """Decision D44, and the half of it step 3 found unbuilt.
+
+        `required` inside a fragment means present *and not an explicit
+        null*, which is the meaning phase 6 gave `required` at the top
+        level: check() walks compiled.required_names and treats a null
+        as missing, so `POST /instances {"cpus": null}` answers
+        `cpus: declared required but not supplied` rather than reaching
+        a handler which cannot cope with it. This asserts the same rule
+        one level down.
+
+        The two messages are the point. An omission and a null are one
+        fact from the handler's side -- it was not given a network --
+        so a caller gets one answer for them, not marshmallow's
+        `Field may not be null.` for one and `Missing data for required
+        field.` for the other.
+        """
+        field = validation._field(OBJECT_FRAGMENT)
+
+        absent = self._findings(field, {'disk': {'base': 'label:ubuntu'}})
+        null = self._findings(field, {'disk': {'size': None}})
+
+        self.assertEqual(
+            [('disk.size', 'Missing data for required field.')], null)
+        self.assertEqual(absent, null)
+
+    def test_the_two_required_messages_are_the_same_string(self):
+        """What keeps the answers above from drifting apart.
+
+        _field() overrides a required field's `null` message with its
+        own `required` message rather than writing the text out, so the
+        two are the same string by construction. That only holds while
+        no marshmallow field class overrides one of them without the
+        other, which is a property of a library this module does not
+        own -- so it is asserted for every field class the compiler can
+        build rather than assumed.
+        """
+        specs = [{'type': token} for token in sorted(validation._SCALARS)]
+        specs.append({'type': 'array', 'items': {'type': 'string'}})
+        specs.append(OBJECT_FRAGMENT)
+        specs.append({'format': validation.ANY_VALUE_FORMAT})
+        specs.append({'type': 'no-such-type'})
+
+        for spec in specs:
+            with self.subTest(spec=spec):
+                field = validation._field(spec, required=True)
+                self.assertFalse(field.allow_none)
+                self.assertEqual(field.error_messages['required'],
+                                 field.error_messages['null'])
 
     def test_a_bound_on_the_fragment_itself_is_dropped(self):
         """The same reasoning the `any` and unrecognised-type branches
@@ -1114,30 +1170,34 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
             [('spec.network_uuid', 'Missing data for required field.')],
             self._findings('networkspec', {'macaddress': None}))
 
-    def test_a_null_network_uuid_is_not_refused_by_the_schema(self):
-        """A gap, pinned rather than hidden, and the one thing in this
-        contract which does not do what D44 says it does.
+    def test_a_null_network_uuid_is_refused_by_the_schema(self):
+        """D44's second half, which step 3 found unbuilt and pinned here
+        as a gap: `required` inside a fragment means present *and not an
+        explicit null*, so `{"network_uuid": null}` is refused with the
+        same message an omitted `network_uuid` gets.
 
-        D44 reads: "`required` inside an object fragment carries the
-        same meaning phase 6 gave it at the top level: present, and not
-        an explicit `null`". At the top level that rule lives in
-        validate_request(), which walks compiled.required_names and
-        treats a null as missing. Nothing does that one level down:
-        _field() sets allow_none=True on every field it builds, and
-        marshmallow's `required` means only that the key is present, so
-        `{"network_uuid": null}` satisfies the fragment.
-
-        That matters because it is the path issue #4223 is reached by.
-        Network.from_db_by_ref(None, namespace) builds an
+        That closes finding F7's reachable path. The value was reaching
+        Network.from_db_by_ref(None, namespace), which builds an
         ObjectFilterCriteria whose null name reads as *no* name filter,
         so the query returns every active network in the namespace and
-        one of them is used as though the caller had named it.
+        one of them is used as though the caller had named it -- a 200
+        and an interface on an arbitrary network, measured on the
+        hotplug route where no scheduler stands in the way.
 
-        This test asserts what the tree does today so that whoever
-        implements D44's second half has to come here and say so.
+        [#4223](https://github.com/shakenfist/shakenfist/issues/4223)
+        stays open and keeps its own fix. This stops one caller
+        reaching the lookup with a null; the lookup is still wrong for
+        the next one who reaches it by another route.
         """
         self.assertEqual(
-            [], self._findings('networkspec', {'network_uuid': None}))
+            [('spec.network_uuid', 'Missing data for required field.')],
+            self._findings('networkspec', {'network_uuid': None}))
+        # The same answer an omission gets, which is the whole point:
+        # one fact, one message (D44, and check()'s comment about
+        # compiled.required_names at the top level).
+        self.assertEqual(
+            self._findings('networkspec', {'macaddress': None}),
+            self._findings('networkspec', {'network_uuid': None}))
 
     def test_an_unknown_networkspec_key_is_refused(self):
         """Including iface_uuid, which the handler writes into the

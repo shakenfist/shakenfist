@@ -436,15 +436,18 @@ class CompiledEndpoint:
 def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     """One rendered parameter or property as a marshmallow field.
 
-    Every field is nullable, and every *parameter* is optional. Nullable
-    because a JSON null reaches the handler as None today and several
-    handlers treat that as "not supplied" -- rejecting it would be a
-    behaviour change invented by the compiler rather than described by
-    a declaration, and in warn-only it would fill the log with findings
-    that are artefacts of this module. Optional because at the top
-    level required-ness is metadata here (see CompiledEndpoint), which
-    phase 6 enforces itself so that it can say which parameter is
-    missing in its own words.
+    Every *optional* field is nullable, and every *parameter* is
+    optional. Nullable because a JSON null reaches the handler as None
+    today and several handlers treat that as "not supplied" --
+    rejecting it would be a behaviour change invented by the compiler
+    rather than described by a declaration, and in warn-only it would
+    fill the log with findings that are artefacts of this module. That
+    is not a hypothetical: the shipped client sends five documented
+    keys as an explicit null on every instance create (census finding
+    N1 of the phase 7 plan). Optional because at the top level
+    required-ness is metadata here (see CompiledEndpoint), which phase
+    6 enforces itself so that it can say which parameter is missing in
+    its own words.
 
     `required` is the one exception, and only the object branch below
     passes it: a property inside a rendered object fragment has no
@@ -454,7 +457,44 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     property becomes a finding naming its path, exactly as a
     wrong-typed one does.
     """
-    kwargs: dict[str, Any] = {'required': required, 'allow_none': True}
+    # A required property is the one thing which is not nullable, which
+    # is decision D44: `required` inside a fragment means present *and
+    # not an explicit null*, the same meaning phase 6 gave `required` at
+    # the top level. check() applies that rule to compiled.required_names
+    # a few hundred lines below, with a comment arguing that a caller who
+    # sent `{"key": null}` and one who sent no key at all are stating one
+    # fact from the handler's side and must get one answer; this is that
+    # rule one level down, not a new one. Without it a required,
+    # string-typed `network_uuid` accepted `{"network_uuid": null}` and
+    # reached Network.from_db_by_ref(None, namespace), which resolves to
+    # an arbitrary network in the namespace -- finding F7, measured as a
+    # 200 and a created interface on the hotplug route.
+    #
+    # The nullability invariant above is untouched by this, because its
+    # stated reason is about *optional* parameters. Nothing this compiler
+    # builds for a parameter is ever required (only the object branch
+    # passes the argument), and no fragment marks a key required which
+    # any censused caller sends as null.
+    #
+    # The null message is *taken from* the required message rather than
+    # written out, so the two cannot drift apart: marshmallow would
+    # otherwise answer 'Field may not be null.' for the null and 'Missing
+    # data for required field.' for the omission, which is two messages
+    # for the one fact and undoes the uniform malformed-input shape phase
+    # 4 spent a step on. An error_messages override rather than a
+    # schema-level validator because a validator never runs on a null --
+    # the field has refused it before any validator is reached -- so
+    # matching the messages that way would mean a @validates_schema
+    # re-implementing marshmallow's own presence check and reporting
+    # through a different error key. test_validation_compiler.py holds
+    # the two strings equal for every field class this module can build,
+    # because whether a marshmallow subclass overrides one of them
+    # without the other is a property of a library we do not own.
+    kwargs: dict[str, Any] = {
+        'required': required, 'allow_none': not required}
+    if required:
+        kwargs['error_messages'] = {
+            'null': fields.Field.default_error_messages['required']}
 
     validators: list[Any] = []
     minimum, maximum = spec.get('minimum'), spec.get('maximum')
