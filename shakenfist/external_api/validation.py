@@ -480,6 +480,30 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
 
         validators.append(_fullmatch)
 
+    # An `enum` in the rendered fragment becomes a membership check,
+    # for the same reason a `pattern` does and under the same rule: the
+    # published document and the enforced check are the same structure
+    # by construction, so a vocabulary entry cannot say "one of these
+    # four" to a client generator and mean nothing at all to the
+    # server. Phase 7's structured tokens (base.py's DISKSPEC_SCHEMA
+    # and VIDEOSPEC_SCHEMA) are the first fragments in the tree to
+    # publish one; decision D43 is the rule which decides that a key
+    # gets an enum, and it is deliberately met by only three of them.
+    #
+    # marshmallow runs no validator on a null, so an enum does not
+    # fire on the explicit nulls the shipped clients send for a disk's
+    # bus and type -- which is the property that lets D43 publish an
+    # enum on a key whose dominant value is null.
+    #
+    # Dropped again by the object, `any` and unrecognised-type branches
+    # below along with the rest of the validator list, for the reason
+    # each of them records: those compile to fields which do not
+    # coerce, so a validator would meet a value of whatever Python type
+    # the caller happened to send.
+    enum = spec.get('enum')
+    if isinstance(enum, list):
+        validators.append(validate.OneOf(enum))
+
     declared = spec.get('type')
     if not isinstance(declared, str):
         declared = ''

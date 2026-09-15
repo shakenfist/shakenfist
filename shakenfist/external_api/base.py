@@ -365,6 +365,298 @@ def _timing_seconds(name, value, maximum=None):
 CONSTRAINT_KEYS = frozenset(['minimum', 'maximum', 'pattern'])
 
 
+# The three structured specs the instance API publishes: a diskspec, a
+# networkspec and a videospec (decision D39 of
+# PLAN-api-input-validation-phase-07-structured.md). Each is a complete
+# JSON Schema object fragment. swagger_helper() renders one inline into
+# the operation's generated body schema and validation._field()
+# compiles that *rendered* fragment back into a nested marshmallow
+# schema, so the published document and the enforced check are the same
+# structure by construction -- the rule ANY_VALUE_FORMAT and _FORMATS
+# already impose on the scalar half of this vocabulary.
+#
+# Module level constants rather than five independent literals because
+# a networkspec is declared twice, as a list on POST /instances and as
+# a single object on the interface hotplug endpoint, and two copies of
+# a shape drift (D40). The array tokens below nest the very same object
+# their single form names, so the two cannot say different things.
+# There is no `definitions` section and no $ref: a reference would have
+# to be taught to the renderer and to the compiler both, for two
+# operations which share a shape. Nesting a module level mutable here
+# is safe because swagger_helper() deep copies ARGTYPES[token] before
+# it renders one -- see the comment at that copy, which is about
+# exactly this.
+#
+# Four rules these fragments follow, each read off the phase 7 key and
+# value census rather than off the documentation:
+#
+#  * An enum appears only where the server already refuses a value
+#    outside it, or where the narrowing is taken deliberately and
+#    written down (D43, D50); each one below names the code it was read
+#    off. The two `model` keys deliberately carry none, because both
+#    are rendered raw into the libvirt domain XML and so the set which
+#    works is the hypervisor's qemu build, not anything this API knows.
+#  * Nothing is required except a netdesc's network_uuid, which
+#    _netdesc_safety_checks already refuses a netdesc without.
+#  * Nothing declares a default. This layer is check only (D14):
+#    validate_request() discards the deserialised result and the
+#    handler sees the body the caller sent, so a load_default here
+#    would look like it filled in a bus or a vdi and would fill in
+#    nothing at all. instance.py's defaulting stays the only
+#    defaulting.
+#  * A property carries a `format` only where the format says something
+#    a reader cannot get from the property's description -- 'int64',
+#    and the MAC address format which pairs with its pattern. The
+#    prose formats the scalar tokens carry ('string', 'boolean') exist
+#    because a scalar parameter has nowhere else to put description
+#    like text; a property has a description of its own.
+#
+# Every property is nullable, and that is load bearing rather than
+# incidental: the shipped CLI and the shipped ansible collection send
+# five of these keys as an explicit JSON null on a normal, working
+# request (census finding N1) -- a disk's size, bus and type, and a
+# netdesc's macaddress and address. validation._field() sets
+# allow_none=True on every field it builds at every depth, and
+# marshmallow runs no validator on a null, so a pattern or an enum
+# below does not fire on one. What this vocabulary has to do about
+# nullability is therefore nothing, which is the point of saying so.
+DISKSPEC_SCHEMA: dict[str, Any] = {
+    'type': 'object',
+    # D41. The census read the client, the collection, the CI suites,
+    # the documentation and the handler and found no caller sending an
+    # undocumented disk key: the two undocumented keys the handler
+    # reads, blob_uuid and disk_base, are written by the handler itself
+    # and never arrive from outside. What this refuses is the human who
+    # typed `-D siz=20`, got a default sized disk, and was told
+    # nothing -- the original complaint of issue #936.
+    'additionalProperties': False,
+    'properties': {
+        'size': {
+            'type': 'integer',
+            'format': 'int64',
+            # Zero, not one. A disk with no size, or a null one, means
+            # "the size of the base image", and scheduler.py:471,
+            # scheduler.py:577, mariadb.disk_spec_virtual_gb and
+            # util_image.create_cow each skip it explicitly; a size of
+            # 0 is behaviourally identical to that null, so a floor of
+            # 1 would refuse something the documentation already shows
+            # working (test_ci_capacity_wait.py's sizeless cdrom). A
+            # *negative* size is the one which corrupts the capacity
+            # ledger, at scheduler.py:473, and is what this bound is
+            # for (D45).
+            'minimum': 0,
+            'description': (
+                'The size of the disk in GB. Omit it, or send null, for a '
+                'disk the size of its base image.')
+        },
+        'base': {
+            'type': 'string',
+            # Typed only, never formatted: the value is prefix
+            # dispatched at external_api/instance.py:690 and may be a
+            # plain URL, an sf:// blob, upload or snapshot reference, a
+            # label: reference or the bare name of an artifact, so no
+            # one format describes it. `string` is what finding F5's
+            # first row asks for: a non-string reaches
+            # util_general.noneish and is an AttributeError, a recorded
+            # 500 for a caller's mistake.
+            'description': (
+                'The base image for this disk: a URL, an sf:// blob, upload '
+                'or snapshot reference, a label: reference, or the name of '
+                'an artifact. Omit it, or send null, for a blank disk.')
+        },
+        'bus': {
+            'type': 'string',
+            # Read off the `bases` dictionary inside
+            # instance._get_disk_device (instance.py:92), which raises
+            # InstanceBadDiskSpecification for anything else and which
+            # external_api/instance.py:686 turns into a 400. So this
+            # enum publishes a refusal the server already makes, which
+            # is D43's test for publishing one at all. `ide` is absent
+            # deliberately: support was removed in v0.7 and
+            # external_api/instance.py:825 answers 400 to it, even
+            # though usage.md and DISK_BUS's own description still list
+            # it -- a documentation bug of its own, and not this
+            # fragment's to reconcile.
+            'enum': ['sata', 'scsi', 'usb', 'virtio', 'nvme'],
+            'description': (
+                'The hardware bus to attach this disk to. Omit it, or send '
+                'null, for the cluster default (DISK_BUS, normally virtio).')
+        },
+        'type': {
+            'type': 'string',
+            # A narrowing, taken deliberately and recorded as one
+            # (D50). Only 'cdrom' is special cased -- instance.py:1790
+            # for the raw, un-COWed image and instance.py:1869 for the
+            # virtio to usb bus swap -- and any other value is handed
+            # to libvirt as a device name through libvirt.tmpl's
+            # device='...'. So libvirt's `floppy` and `lun` are
+            # accepted today and behave as plain disks in every code
+            # path we own, which is a silently wrong result rather than
+            # a working one. No first party caller sends either: the
+            # collection and the CLI send 'disk', and the CI suite
+            # sends 'disk' or 'cdrom'.
+            'enum': ['disk', 'cdrom'],
+            'description': (
+                'The type of device. Omit it, or send null, for a disk.')
+        },
+    },
+}
+
+NETWORKSPEC_SCHEMA: dict[str, Any] = {
+    'type': 'object',
+    # D41, and the census found here what it found for a diskspec: the
+    # one undocumented key the handler reads, iface_uuid, is written by
+    # _netdesc_allocate_address after every caller check has run and
+    # never appears in a response body a caller could echo back --
+    # Instance.external_view publishes interfaces, not netdescs.
+    'additionalProperties': False,
+    # _netdesc_safety_checks (external_api/instance.py:334) already
+    # refuses a netdesc with no network_uuid, so this publishes a
+    # refusal the server makes rather than inventing one.
+    'required': ['network_uuid'],
+    'properties': {
+        'network_uuid': {
+            'type': 'string',
+            # Deliberately no 'uuid' format, despite the name: a
+            # network *name* is legal here. usage.md:255 documents
+            # naming one and cluster_ci_tests/test_networking.py sends
+            # 'barry_net', because the value goes to
+            # Network.from_db_by_ref, which resolves either. Phase 6's
+            # rule that a validator may be no narrower than its handler
+            # is what keeps the format off.
+            #
+            # `string` is finding F5's third row: a non-string reaches
+            # util_network.valid_uuid4 and is an AttributeError, a
+            # recorded 500.
+            'description': (
+                'The UUID or the unique name of the network this interface '
+                'is attached to.')
+        },
+        'macaddress': {
+            'type': 'string',
+            'format': 'a MAC address',
+            # The same anchored pattern ARGTYPES['macaddr'] publishes,
+            # from the same constant rather than retyped: util_network
+            # holds the one definition of what a MAC address looks like
+            # on the wire and valid_macaddr() enforces it, so the
+            # published contract and the check cannot drift (PR #4183).
+            'pattern': util_network.MACADDR_PATTERN,
+            'description': (
+                'The MAC address for this interface, colon separated, in '
+                'either case. Omit it, or send null, to be allocated one -- '
+                'the shipped CLI sends null here on every call.')
+        },
+        'address': {
+            'type': 'string',
+            # Deliberately not typed 'ipv4', whose format compiles to a
+            # real ipaddress check (validation._FORMATS): the literal
+            # string 'none' is a documented value here
+            # (usage.md:281), meaning "this interface has no address",
+            # and external_api/instance.py:401 reads it through
+            # util_general.noneish. A format would answer 400 to a
+            # request the user guide documents.
+            'description': (
+                'The IPv4 address for this interface, or the literal string '
+                '"none" for an interface with no address. Omit it, or send '
+                'null, to be allocated a random free address.')
+        },
+        'model': {
+            'type': 'string',
+            # No enum, and this is the key D43 exists for. The value is
+            # stored on the NetworkInterface and rendered raw into the
+            # domain XML at libvirt.tmpl:139 with nothing in
+            # shakenfist/ in between, so the set which works is the
+            # hypervisor's qemu build, which varies by node and by
+            # release. Our own two documentation pages already disagree
+            # about it -- usage.md:288 recommends ne2k_isa and
+            # api_reference/instances.md:105 omits it -- which is proof
+            # enough that neither is a specification, and publishing
+            # either list would answer 400 to a value the user guide
+            # tells people to use. If this is ever to be enforced it
+            # belongs in a hypervisor capability check, not in a
+            # request schema.
+            'description': (
+                'The model of the network card. virtio is the default and is '
+                'almost always the right answer; e1000, rtl8139, pcnet and '
+                'the i825xx family are the usual choices for a guest without '
+                'virtio drivers. The set which works is the hypervisor\'s, '
+                'not this API\'s.')
+        },
+        'float': {
+            'type': 'boolean',
+            'description': (
+                'Whether to attach a floating IP to this interface, making '
+                'the instance reachable from outside the cluster.')
+        },
+    },
+}
+
+VIDEOSPEC_SCHEMA: dict[str, Any] = {
+    'type': 'object',
+    # D41. The handler reads only model, memory and vdi
+    # (external_api/instance.py:833), and the whole dict is stored
+    # verbatim on the instance and echoed back by external_view, so an
+    # unknown key today is stored, returned, and acted on nowhere.
+    'additionalProperties': False,
+    'properties': {
+        'model': {
+            'type': 'string',
+            # No enum, for the reason the netdesc's model carries none:
+            # instance.py:2153 passes the value through to
+            # libvirt.tmpl:206, where it is rendered raw as the video
+            # model type, with nothing in shakenfist/ in between. The
+            # vocabulary is the hypervisor's (D43).
+            'description': (
+                'The model of the video card. cirrus is the default; vga and '
+                'qxl are the other usual choices, and qxl is the one to pair '
+                'with SPICE. The set which works is the hypervisor\'s, not '
+                'this API\'s.')
+        },
+        'memory': {
+            'type': 'integer',
+            'format': 'int64',
+            # Typed, which it was not before (D49). No bound with it:
+            # nothing in the handler refuses a zero or a negative, and
+            # phase 2's rule is that a published bound must be one the
+            # server backs.
+            #
+            # The typing is a narrowing with an ordering obligation
+            # attached. docs/user_guide/consoles.md:94 documents
+            # `--videospec model=qxl,memory=65536,vdi=spiceconcurrent`,
+            # and the CLI's parser does `video[s[0]] = s[1]` with no
+            # coercion (commandline/instance.py:499), so that
+            # documented command puts the *string* "65536" on the wire.
+            # It works today only because jinja stringifies either type
+            # on the way into the domain XML.
+            'description': (
+                'The video card\'s memory, in KiB.')
+        },
+        'vdi': {
+            'type': 'string',
+            # Shaken Fist's own enum, and the one key in this
+            # vocabulary where publishing the enum genuinely *is* the
+            # enforcement -- nothing else refuses a value outside it
+            # (D43). Read off its three consumers: instance.py:1715
+            # asks whether it startswith('spice') to decide whether to
+            # allocate a TLS port, instance.py:2161 compares it against
+            # 'spiceconcurrent' and 'spicedebug', and libvirt.tmpl:156
+            # branches on it being 'vnc'. external_api/instance.py:1802
+            # calls it "Shaken Fist's internal enum" in as many words.
+            # A value outside the set is accepted today and surfaces
+            # much later and somewhere else: instance.py:1715 is an
+            # AttributeError on a non-string, in a console request
+            # rather than in the create which accepted it.
+            'enum': ['vnc', 'spice', 'spiceconcurrent', 'spicedebug'],
+            'description': (
+                'The VDI protocol to offer. spice is the default; '
+                'spiceconcurrent allows limited multi-user sessions, and '
+                'spicedebug behaves like spice but makes the SPICE server '
+                'log verbosely.')
+        },
+    },
+}
+
+
 # Type MUST be one of "string", "number", "integer", "boolean", "array" or "file".
 ARGTYPES: dict[str, dict[str, Any]] = {
     # The metadata family's "the API stores this and never interprets
@@ -384,6 +676,13 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # legal JSON Schema. Every use in the tree is body-located, and
     # swagger_helper() refuses these outside a body at import time.
     'arrayofdict': {'type': 'array', 'items': {'type': 'object'}},
+    # The array forms of two of the three structured specs, nesting the
+    # very same object their single form names so that the two cannot
+    # drift (D40). A diskspec has no single form because no endpoint
+    # takes one: POST /instances takes a list of them and nothing else
+    # takes one at all.
+    'arrayofdiskspec': {'type': 'array', 'items': DISKSPEC_SCHEMA},
+    'arrayofnetworkspec': {'type': 'array', 'items': NETWORKSPEC_SCHEMA},
     'arrayofstring': {'type': 'array', 'items': {'type': 'string'}},
     # byte is Swagger 2.0's standard format token for base64
     # encoded content.
@@ -398,6 +697,10 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # and instance metadata as strings while their neighbours
     # in the same request body were structures.
     'dict': {'type': 'object'},
+    # The structured specs (D39). Each renders its properties inline
+    # into the operation which declares it; see the constants above for
+    # what each key says and which code it was read off.
+    'diskspec': DISKSPEC_SCHEMA,
     # The prose formats on the string types carry description-like
     # information a generator passes through; integer has standard
     # formats, and these are byte offsets and blob sizes, so int64.
@@ -427,6 +730,7 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # step 4 it is literally that: validation._FORMATS maps this
     # format string onto a validator which calls it.
     'netblock': {'type': 'string', 'format': 'a CIDR netblock'},
+    'networkspec': NETWORKSPEC_SCHEMA,
     'node': {'type': 'string', 'format': 'the name of a node'},
     'number': {'type': 'number', 'format': 'a floating point number'},
     'string': {'type': 'string', 'format': 'string'},
@@ -441,7 +745,8 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     'uuidorname': {
         'type': 'string',
         'format': 'either a valid UUID or the unique name of an object'
-        }
+        },
+    'videospec': VIDEOSPEC_SCHEMA
 }
 
 

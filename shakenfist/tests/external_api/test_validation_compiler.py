@@ -8,11 +8,14 @@ which is the property phase 4 turns into rejections, and so the last
 point at which a mistake is cheap.
 """
 
+import copy
 from unittest import mock
 
 import marshmallow
 from marshmallow import fields
 
+from shakenfist import exceptions
+from shakenfist import instance as sf_instance
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
@@ -893,3 +896,473 @@ class ExactIntegerTestCase(base.ShakenFistTestCase):
             [('disk[1].size', 'Not a valid integer.')],
             [(f.parameter, f.detail) for f in validation._schema_findings(
                 schema, {'disk': [{'size': 8}, {'size': 8.5}]})])
+
+
+def _rendered(token):
+    """ARGTYPES[token] as a declaration renders it.
+
+    The deep copy is not ceremony. swagger_helper() makes exactly this
+    copy before merging a declaration's constraints, and the comment
+    there says why, so a test which compiled the module level constant
+    directly would be compiling an object no request ever meets.
+    """
+    return copy.deepcopy(api_base.ARGTYPES[token])
+
+
+class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
+    """What the three structured specs really accept, compiled not read.
+
+    Phase 7's step 3 added diskspec, arrayofdiskspec, networkspec,
+    arrayofnetworkspec and videospec to ARGTYPES. This module's
+    standing rule is that the published document and the enforced check
+    are the same structure by construction, so the way to find out what
+    one of those tokens says is to compile the fragment it renders and
+    send values through it. A test which read the constant and asserted
+    its keys would only be asserting that the literal is the literal.
+
+    Every assertion is against _schema_findings() rather than against
+    marshmallow's raw error dict, because the finding is what a caller
+    sees: phase 4 turned the detail string into the response body's
+    error message.
+
+    No declaration carries one of these tokens yet -- step 4 does
+    that -- so nothing asserted here changes the answer to any request.
+    """
+
+    def _findings(self, token, supplied):
+        field = validation._field(_rendered(token))
+        schema = marshmallow.Schema.from_dict({'spec': field})()
+        return [(f.parameter, f.detail) for f in
+                validation._schema_findings(schema, {'spec': supplied})]
+
+    # --- diskspec ------------------------------------------------------
+
+    def test_a_complete_diskspec_is_accepted(self):
+        self.assertEqual([], self._findings('diskspec', {
+            'size': 20, 'base': 'debian:11', 'bus': 'virtio',
+            'type': 'disk'}))
+        # And every value of the enums, because an enum with a typo in
+        # it refuses a value the server takes and nothing else would
+        # notice.
+        for bus in ('sata', 'scsi', 'usb', 'virtio', 'nvme'):
+            self.assertEqual([], self._findings('diskspec', {'bus': bus}), bus)
+        for kind in ('disk', 'cdrom'):
+            self.assertEqual(
+                [], self._findings('diskspec', {'type': kind}), kind)
+
+    def test_the_diskspec_a_shipped_client_actually_sends(self):
+        """Census finding N1, asserted rather than trusted.
+
+        The CLI's `-d` sends bus and type as an explicit JSON null on
+        every call (commandline/instance.py:454) and the ansible
+        collection's `diskspecs:` path sends a null size as well
+        (sf_instance.py:398). A schema which refused any of those would
+        break the shipped clients on a normal, working request, so it is
+        worth an assertion rather than a comment. The sizeless cdrom is
+        test_ci_capacity_wait.py:242's, and means "the size of the base
+        image".
+        """
+        self.assertEqual([], self._findings('diskspec', {
+            'size': 20, 'base': 'debian:11', 'bus': None, 'type': None}))
+        self.assertEqual([], self._findings('diskspec', {
+            'size': None, 'base': None, 'bus': None, 'type': 'disk'}))
+        self.assertEqual([], self._findings('diskspec', {
+            'base': 'sf://upload/system/123', 'type': 'cdrom'}))
+        self.assertEqual([], self._findings('diskspec', {}))
+        # And zero, which is why D45's bound is minimum 0 rather than
+        # the tidier looking 1: every consumer of a disk size skips a
+        # falsy one, so 0 means what the documented null means.
+        self.assertEqual([], self._findings('diskspec', {
+            'size': 0, 'base': 'debian:11'}))
+
+    def test_each_diskspec_key_refuses_its_own_bad_value(self):
+        for (supplied, expected) in [
+                # Finding F5's second row: a non-numeric size reaches
+                # int() in instance._safe_int_cast and scheduler.py and
+                # is a recorded 500 today.
+                ({'size': 'banana'}, ('spec.size', 'Not a valid integer.')),
+                ({'size': 8.5}, ('spec.size', 'Not a valid integer.')),
+                # D45's bound. A negative size corrupts the capacity
+                # ledger rather than failing anything.
+                ({'size': -5},
+                 ('spec.size', 'Must be greater than or equal to 0.')),
+                # F5's first row: a non-string base is an AttributeError
+                # in util_general.noneish.
+                ({'base': 5}, ('spec.base', 'Not a valid string.')),
+                ({'bus': 'banana'},
+                 ('spec.bus',
+                  'Must be one of: sata, scsi, usb, virtio, nvme.')),
+                # Removed in v0.7, and refused by the handler with a
+                # message of its own which D42 keeps.
+                ({'bus': 'ide'},
+                 ('spec.bus',
+                  'Must be one of: sata, scsi, usb, virtio, nvme.')),
+                # D50's first narrowing. floppy is a real libvirt device
+                # name and is treated as a plain disk by every code path
+                # we own.
+                ({'type': 'floppy'},
+                 ('spec.type', 'Must be one of: disk, cdrom.')),
+                ({'type': 5}, ('spec.type', 'Not a valid string.'))]:
+            with self.subTest(supplied=supplied):
+                self.assertEqual(
+                    [expected], self._findings('diskspec', supplied))
+
+    def test_an_unknown_diskspec_key_is_refused(self):
+        """D41, and the original complaint of issue #936: `-D siz=20`
+        produced a default sized disk and told the caller nothing."""
+        self.assertEqual(
+            [('spec.siz', 'Unknown field.')],
+            self._findings('diskspec', {'siz': 20}))
+
+    def test_a_bad_diskspec_names_its_index(self):
+        """D48. A list of six diskspecs with one bad size is unusable to
+        debug if the finding names only `disk`."""
+        field = validation._field(_rendered('arrayofdiskspec'))
+        schema = marshmallow.Schema.from_dict({'disk': field})()
+
+        self.assertEqual(
+            [('disk[1].size', 'Not a valid integer.')],
+            [(f.parameter, f.detail) for f in validation._schema_findings(
+                schema, {'disk': [{'size': 20}, {'size': 'banana'}]})])
+
+    # --- networkspec ---------------------------------------------------
+
+    def test_a_complete_networkspec_is_accepted(self):
+        self.assertEqual([], self._findings('networkspec', {
+            'network_uuid': 'dbe5bd2c-4b5b-4e2a-a6a5-8a3f1f2b0d8e',
+            'macaddress': '02:00:00:ea:3a:28', 'address': '10.0.0.5',
+            'model': 'virtio', 'float': True}))
+
+    def test_a_network_may_be_named_rather_than_uuided(self):
+        """D44's reason for publishing no `uuid` format.
+
+        usage.md:255 documents naming a network and
+        cluster_ci_tests/test_networking.py sends 'barry_net'; the value
+        goes to Network.from_db_by_ref, which resolves either. A format
+        here would answer 400 to a documented, tested request.
+        """
+        self.assertEqual([], self._findings(
+            'networkspec', {'network_uuid': 'barry_net'}))
+
+    def test_the_networkspec_a_shipped_client_actually_sends(self):
+        """Census finding N1 again, and here it is not an edge case:
+        the CLI sends `'macaddress': None` on *every* create and every
+        add-interface (commandline/instance.py:473 and :998), and
+        guest_ci_tests/test_cloudinit.py:85 sends an explicit null
+        address. The pattern on macaddress does not fire on a null
+        because marshmallow runs no validator on one."""
+        self.assertEqual([], self._findings('networkspec', {
+            'network_uuid': 'barry_net', 'macaddress': None,
+            'address': None, 'model': 'virtio', 'float': False}))
+
+    def test_the_literal_string_none_is_an_address(self):
+        """usage.md:281 documents it, meaning "this interface has no
+        address", and external_api/instance.py:401 reads it through
+        util_general.noneish. It is why `address` is not typed ipv4,
+        whose format compiles to a real ipaddress check."""
+        self.assertEqual([], self._findings('networkspec', {
+            'network_uuid': 'barry_net', 'address': 'none'}))
+
+    def test_any_nic_model_is_accepted(self):
+        """D43, as the census amended it.
+
+        network[].model is rendered raw into the domain XML at
+        libvirt.tmpl:139 with nothing in shakenfist/ in between, so the
+        set which works is the hypervisor's qemu build. Our own two
+        documentation pages disagree about it: usage.md:288 recommends
+        ne2k_isa and api_reference/instances.md:105 omits it. An enum
+        taken from either would answer 400 to a value the user guide
+        tells people to use.
+        """
+        self.assertNotIn(
+            'enum',
+            api_base.ARGTYPES['networkspec']['properties']['model'])
+        for model in ('virtio', 'e1000', 'ne2k_isa', 'something-qemu-added'):
+            with self.subTest(model=model):
+                self.assertEqual([], self._findings('networkspec', {
+                    'network_uuid': 'barry_net', 'model': model}))
+
+    def test_each_networkspec_key_refuses_its_own_bad_value(self):
+        for (supplied, expected) in [
+                # F5's third row: a non-string network_uuid is an
+                # AttributeError in util_network.valid_uuid4.
+                ({'network_uuid': 5},
+                 ('spec.network_uuid', 'Not a valid string.')),
+                ({'network_uuid': {'name': 'barry_net'}},
+                 ('spec.network_uuid', 'Not a valid string.')),
+                ({'network_uuid': 'barry_net', 'macaddress': 'banana'},
+                 ('spec.macaddress',
+                  'String does not match expected pattern.')),
+                # F5's fourth row: a non-string address is an
+                # AttributeError in util_general.noneish, from
+                # external_api/instance.py:369.
+                ({'network_uuid': 'barry_net', 'address': 5},
+                 ('spec.address', 'Not a valid string.')),
+                # F5's fifth row: pydantic, building the
+                # NetworkInterface.
+                ({'network_uuid': 'barry_net', 'model': 5},
+                 ('spec.model', 'Not a valid string.'))]:
+            with self.subTest(supplied=supplied):
+                self.assertEqual(
+                    [expected], self._findings('networkspec', supplied))
+
+    def test_a_netdesc_without_a_network_is_refused(self):
+        """_netdesc_safety_checks already refuses this, so the fragment
+        publishes a refusal the server makes rather than inventing
+        one -- and D42 keeps the handler's check as well."""
+        self.assertEqual(
+            [('spec.network_uuid', 'Missing data for required field.')],
+            self._findings('networkspec', {'macaddress': None}))
+
+    def test_a_null_network_uuid_is_not_refused_by_the_schema(self):
+        """A gap, pinned rather than hidden, and the one thing in this
+        contract which does not do what D44 says it does.
+
+        D44 reads: "`required` inside an object fragment carries the
+        same meaning phase 6 gave it at the top level: present, and not
+        an explicit `null`". At the top level that rule lives in
+        validate_request(), which walks compiled.required_names and
+        treats a null as missing. Nothing does that one level down:
+        _field() sets allow_none=True on every field it builds, and
+        marshmallow's `required` means only that the key is present, so
+        `{"network_uuid": null}` satisfies the fragment.
+
+        That matters because it is the path issue #4223 is reached by.
+        Network.from_db_by_ref(None, namespace) builds an
+        ObjectFilterCriteria whose null name reads as *no* name filter,
+        so the query returns every active network in the namespace and
+        one of them is used as though the caller had named it.
+
+        This test asserts what the tree does today so that whoever
+        implements D44's second half has to come here and say so.
+        """
+        self.assertEqual(
+            [], self._findings('networkspec', {'network_uuid': None}))
+
+    def test_an_unknown_networkspec_key_is_refused(self):
+        """Including iface_uuid, which the handler writes into the
+        netdesc itself at external_api/instance.py:455 -- after every
+        caller check has run, and never echoed back anywhere a caller
+        could read it and return it."""
+        self.assertEqual(
+            [('spec.iface_uuid', 'Unknown field.')],
+            self._findings('networkspec', {
+                'network_uuid': 'barry_net', 'iface_uuid': 'anything'}))
+
+    def test_a_boolean_float_is_no_narrower_than_the_handler(self):
+        """The handler's test is `if 'float' in netdesc and
+        netdesc['float']` (external_api/instance.py:442), a bare
+        truthiness test, so finding F6's `"float": "yes"` row floats the
+        interface today. marshmallow's Boolean takes the usual string
+        spellings, so it still does -- which is the right answer under
+        phase 6's width rule, and means F6's row keeps its old status
+        rather than becoming a 400. What is refused is a value which is
+        not a boolean under any reading."""
+        for value in (True, False, 'yes', 'false', 1, 0):
+            with self.subTest(value=value):
+                self.assertEqual([], self._findings('networkspec', {
+                    'network_uuid': 'barry_net', 'float': value}))
+
+        self.assertEqual(
+            [('spec.float', 'Not a valid boolean.')],
+            self._findings('networkspec', {
+                'network_uuid': 'barry_net', 'float': 'nonsense'}))
+
+    # --- videospec -----------------------------------------------------
+
+    def test_a_complete_videospec_is_accepted(self):
+        self.assertEqual([], self._findings('videospec', {
+            'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'}))
+        for vdi in ('vnc', 'spice', 'spiceconcurrent', 'spicedebug'):
+            self.assertEqual(
+                [], self._findings('videospec', {'vdi': vdi}), vdi)
+
+    def test_any_video_model_is_accepted(self):
+        """D43 again. instance.py:2153 passes the value to
+        libvirt.tmpl:206, which renders it raw as the video model type,
+        so the vocabulary is the hypervisor's."""
+        self.assertNotIn(
+            'enum', api_base.ARGTYPES['videospec']['properties']['model'])
+        for model in ('vga', 'cirrus', 'qxl', 'virtio', 'bochs'):
+            with self.subTest(model=model):
+                self.assertEqual(
+                    [], self._findings('videospec', {'model': model}))
+
+    def test_a_video_memory_string_is_still_accepted(self):
+        """D49 is narrower than what this actually does, and the
+        difference is worth pinning.
+
+        The decision says typing `memory` as an integer "breaks the
+        shipped CLI until client-python#398 ships", because
+        consoles.md:94 documents `--videospec memory=65536` and the
+        CLI's parser does `video[s[0]] = s[1]` with no coercion
+        (commandline/instance.py:499), putting the *string* "65536" on
+        the wire. But D46 was itself rewritten away from
+        marshmallow's strict=True precisely so that a numeric string
+        reaches a handler which coerces it, and _ExactInteger keeps
+        that width at every depth. So the documented invocation is
+        accepted, and what the typing refuses is a value int() cannot
+        convert faithfully.
+        """
+        self.assertEqual([], self._findings('videospec', {
+            'model': 'qxl', 'memory': '65536', 'vdi': 'spiceconcurrent'}))
+        self.assertEqual([], self._findings(
+            'videospec', {'memory': 16384}))
+
+    def test_each_videospec_key_refuses_its_own_bad_value(self):
+        for (supplied, expected) in [
+                ({'model': 5}, ('spec.model', 'Not a valid string.')),
+                ({'memory': 'lots'},
+                 ('spec.memory', 'Not a valid integer.')),
+                ({'memory': 16384.5},
+                 ('spec.memory', 'Not a valid integer.')),
+                # The videospec row of finding F6, and the starkest of
+                # them: {"model": 5, "memory": "lots", "vdi": 7} is
+                # stored verbatim today and surfaces as an
+                # AttributeError in a console request much later.
+                ({'vdi': 7}, ('spec.vdi', 'Not a valid string.')),
+                ({'vdi': 'nonsense'},
+                 ('spec.vdi',
+                  'Must be one of: vnc, spice, spiceconcurrent, '
+                  'spicedebug.'))]:
+            with self.subTest(supplied=supplied):
+                self.assertEqual(
+                    [expected], self._findings('videospec', supplied))
+
+    def test_an_unknown_videospec_key_is_refused(self):
+        self.assertEqual(
+            [('spec.wombat', 'Unknown field.')],
+            self._findings('videospec', {'wombat': 1}))
+
+    # --- properties of the vocabulary itself ---------------------------
+
+    def test_the_single_and_array_forms_cannot_drift(self):
+        """Definition of done item 3, as an assertion rather than a
+        reading.
+
+        A networkspec is declared twice -- as a list on POST /instances
+        and as a single object on the interface hotplug endpoint -- and
+        the two describing different shapes is the defect D40's shared
+        constant exists to make impossible. Asserted twice over: the
+        array token nests the very same Python object, and the two
+        render identically through the deep copy swagger_helper() makes.
+        """
+        for (single, array) in (('networkspec', 'arrayofnetworkspec'),
+                                ('diskspec', 'arrayofdiskspec')):
+            with self.subTest(token=single):
+                self.assertIs(api_base.ARGTYPES[array]['items'],
+                              api_base.ARGTYPES[single])
+                self.assertEqual(_rendered(single), _rendered(array)['items'])
+
+    def test_the_disk_bus_enum_is_the_set_the_server_accepts(self):
+        """D43's rule is that an enum is published only where the server
+        already refuses a value outside it, so the enum is checked
+        against the refusal rather than against the documentation.
+
+        instance._get_disk_device() raises
+        InstanceBadDiskSpecification for a bus which is not a key of its
+        `bases` dictionary, and external_api/instance.py:686 turns that
+        into a 400. `ide` is the value worth naming: usage.md:237 and
+        config.DISK_BUS's own description still list it, and it has been
+        refused since v0.7.
+        """
+        published = api_base.ARGTYPES['diskspec']['properties']['bus']['enum']
+
+        for bus in published:
+            self.assertIsNotNone(sf_instance._get_disk_device(bus, 0), bus)
+        for bus in ('ide', 'banana', ''):
+            self.assertRaises(
+                exceptions.InstanceBadDiskSpecification,
+                sf_instance._get_disk_device, bus, 0)
+
+    def test_the_vdi_enum_is_a_value_the_domain_template_can_render(self):
+        """libvirt.tmpl has two arms, `vdi_type == 'vnc'` and
+        everything else, and everything else is SPICE. So a vdi value
+        which is neither 'vnc' nor a spice variant would be rendered as
+        a SPICE console while not being one, and
+        instance.allocate_instance_ports() would decide on a TLS port by
+        asking the same question a second time (instance.py:1715). Both
+        readings are asserted here, against the published enum, so a
+        fifth protocol cannot be added to the vocabulary without being
+        added to the template."""
+        for vdi in api_base.ARGTYPES['videospec']['properties']['vdi']['enum']:
+            with self.subTest(vdi=vdi):
+                self.assertTrue(vdi == 'vnc' or vdi.startswith('spice'))
+
+    def test_a_structured_token_declares_no_default(self):
+        """A risk the plan names explicitly. The compiled path is check
+        only (D14): validate_request() discards the deserialised result
+        and the handler sees the body the caller sent, so a nested
+        load_default would look like it filled in a bus or a vdi and
+        would fill in nothing at all. The defaulting at
+        external_api/instance.py:833 stays the only defaulting, so no
+        field here may carry one.
+        """
+        # The minimum each token accepts, which for a netdesc is its
+        # one required key.
+        for (token, minimal) in (('diskspec', {}),
+                                 ('networkspec',
+                                  {'network_uuid': 'barry_net'}),
+                                 ('videospec', {})):
+            field = validation._field(_rendered(token))
+            for (name, nested) in field.schema.fields.items():
+                with self.subTest(token=token, name=name):
+                    self.assertIs(marshmallow.missing, nested.load_default)
+            # And the minimum deserialises to itself: nothing is
+            # invented on the way through.
+            with self.subTest(token=token):
+                self.assertEqual(minimal, field.deserialize(minimal))
+
+    def test_every_structured_token_refuses_unknown_keys(self):
+        """D41, which the census made unconditional: it found no first
+        party caller -- client, collection, CI or documentation --
+        sending an undocumented key into any of the three specs."""
+        for token in ('diskspec', 'networkspec', 'videospec'):
+            with self.subTest(token=token):
+                self.assertIs(
+                    False, api_base.ARGTYPES[token]['additionalProperties'])
+                self.assertEqual(
+                    marshmallow.RAISE,
+                    validation._field(_rendered(token)).schema.unknown)
+
+
+class EnumCompilationTestCase(base.ShakenFistTestCase):
+    """A published `enum` is a check, not a note to the reader.
+
+    Phase 7's step 3. Until it, nothing in ARGTYPES published an enum
+    and _field() had no branch for one, so the first token to publish
+    one would have described the API as narrower than it is -- a client
+    generator refusing a value the server accepts, which is the drift
+    the "compile from the rendered specification" design of this module
+    exists to prevent, pointed the other way.
+    """
+
+    def test_an_enum_becomes_a_membership_check(self):
+        field = validation._field(
+            {'type': 'string', 'enum': ['vnc', 'spice']})
+
+        self.assertEqual('spice', field.deserialize('spice'))
+        with self.assertRaises(marshmallow.ValidationError) as caught:
+            field.deserialize('wombat')
+        self.assertEqual(
+            ['Must be one of: vnc, spice.'], caught.exception.messages)
+
+    def test_an_enum_does_not_fire_on_a_null(self):
+        """The property which lets D43 publish an enum on a key whose
+        dominant value is an explicit null: the shipped CLI sends
+        `'bus': None` and `'type': None` on every create. Every
+        compiled field is allow_none=True and marshmallow returns
+        before running a validator on a null."""
+        field = validation._field(
+            {'type': 'string', 'enum': ['disk', 'cdrom']})
+
+        self.assertIsNone(field.deserialize(None))
+
+    def test_a_fragment_with_no_enum_is_unconstrained(self):
+        """The two `model` keys' case (D43): an absent enum must leave
+        the field taking anything of its type, not silently acquire an
+        empty one."""
+        field = validation._field({'type': 'string'})
+
+        self.assertEqual([], list(field.validators))
+        self.assertEqual('anything', field.deserialize('anything'))
