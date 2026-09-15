@@ -1026,8 +1026,9 @@ class SFConfig(BaseSettings):
     DISK_BUS: str = Field(
         'virtio',
         description=(
-            'The bus to use for disk devices. One of virtio, scsi, '
-            'usb, ide, etc. See libvirt docs for full list of options.'
+            'The default bus to use for disk devices. One of virtio, '
+            'sata, scsi, usb or nvme. ide was supported before v0.7 '
+            'and is now rejected.'
         )
     )
     NODE_NAME: str = Field(

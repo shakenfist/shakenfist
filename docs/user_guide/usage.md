@@ -224,7 +224,7 @@ Its syntax is similar:
 
 ```bash
 sf-client instance create myinstance 1 2048 \
-    -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 \
+    -D size=8,base=cirros,bus=sata,type=cdrom -d 8 -d 8 \
     -n netuuid
 ```
 
@@ -234,11 +234,14 @@ default. Here's how the keys work:
 
 * _size_ as per the shorthand notation.
 * _base_ as per the shorthand notation, including version specification.
-* _bus_ is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use
-  virtio unless you have a really good reason otherwise -- the performance of the
-  others are terrible. An example of a good reason is to install virtio drivers
-  into legacy operating systems that lack them natively.
-* _type_ can be one of disk or cdrom. Note that cdroms are excluded from snapshots.
+* _bus_ is the hardware bus to attach the disk to, and is one of virtio, sata,
+  scsi, usb or nvme. Use virtio unless you have a really good reason otherwise --
+  the performance of the others are terrible. An example of a good reason is to
+  install virtio drivers into legacy operating systems that lack them natively.
+  ide was supported before v0.7, but the performance was so poor that support was
+  removed; a disk specification asking for it is rejected.
+* _type_ can be one of disk or cdrom, and any other value is rejected. Note that
+  cdroms are excluded from snapshots.
 
 ### Network specifications
 
@@ -285,9 +288,14 @@ of the following keys:
 * _macaddress_ the mac address to use for the interface, in the colon
   separated form `02:00:00:ea:3a:28`. Either case is accepted, and a value
   in any other form is rejected.
-* _model_ is the model of the network device, with options being ne2k_isa,
-  i82551, i82557b, i82559er, ne2k_pci, pcnet, rtl8139, e1000, and virtio. The
-  default model is virtio.
+* _model_ is the model of the network device. The default is virtio, and it is
+  almost always the right answer; e1000, rtl8139, pcnet and the i825xx family are
+  the usual choices for a guest which lacks virtio drivers. Shaken Fist does not
+  check this value and cannot give you a definitive list of the ones which work:
+  it is handed to the hypervisor unexamined, so the set which works is whatever
+  your hypervisor's qemu build supports. See
+  [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
+  for more detail.
 * _float_ if true indicates to immediately float the interface once the instance
   is created.
 
