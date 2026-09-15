@@ -417,9 +417,25 @@ class SFConfig(BaseSettings):
             'How long in seconds a trusted issuer\'s JWKS is cached before '
             'being refetched. Lower values shorten the window in which a '
             'key the issuer has revoked is still accepted; higher values '
-            'reduce load on the issuer. An unknown key id always triggers '
-            'an immediate refetch regardless of this setting, so raising '
-            'it does not delay recognising a newly rotated key.'
+            'reduce load on the issuer. An unknown key id can also trigger '
+            'a refetch before this expires, subject to '
+            'FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS, so raising this '
+            'does not by itself delay recognising a newly rotated key.'
+        )
+    )
+    FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS: int = Field(
+        30,
+        description=(
+            'The shortest interval in seconds between two JWKS fetches '
+            'forced by an unrecognised key id. A token signed with a key '
+            'we have never seen is how an issuer key rotation announces '
+            'itself, so it is worth a fetch -- but it is also something '
+            'any anonymous caller of the exchange endpoint can fabricate, '
+            'and without a floor each fabricated key id is another fetch '
+            'held under that issuer\'s lock. The cost is that a rotation '
+            'landing inside the cooldown is not recognised until it '
+            'elapses. Zero disables the floor and fetches on every '
+            'unrecognised key id, which is what PyJWT did before 2.14.'
         )
     )
     FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS: int = Field(

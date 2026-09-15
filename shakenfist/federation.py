@@ -122,12 +122,18 @@ class JWKSCache:
 
     PyJWKClient already caches the key set and already refetches once
     when it sees an unknown key id, which is what makes issuer key
-    rotation work without configuration. What it does not do is
-    collapse concurrent refetches: if fifty CI jobs present tokens
-    signed with a freshly rotated key at the same moment, all fifty
-    miss the cache and all fifty fetch the JWKS. That is a stampede
-    against the identity provider, caused by us, at exactly the moment
-    the provider is already doing something unusual.
+    rotation work without configuration. Since PyJWT 2.14 that refetch
+    has a cooldown, so a rotation landing inside the window waits it
+    out rather than being recognised on the next token presented.
+    FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS sets the window, and
+    says why we keep one.
+
+    What PyJWKClient does not do is collapse concurrent refetches: if
+    fifty CI jobs present tokens signed with a freshly rotated key at
+    the same moment, all fifty miss the cache and all fifty fetch the
+    JWKS. That is a stampede against the identity provider, caused by
+    us, at exactly the moment the provider is already doing something
+    unusual.
 
     Holding a per-issuer lock across the lookup serialises those fifty:
     the first refetches and repopulates the shared key set cache, and
@@ -168,6 +174,8 @@ class JWKSCache:
                     cache_jwk_set=True,
                     lifespan=config.FEDERATION_JWKS_CACHE_SECONDS,
                     timeout=config.FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS,
+                    cooldown_duration=(
+                        config.FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS),
                     ssl_context=jwks_ssl_context())
                 self._clients[issuer_uuid] = client
                 self._locks[issuer_uuid] = threading.Lock()
@@ -427,11 +435,13 @@ def token_identity(token: str, claims: dict[str, Any]) -> str:
     a byte and the signature stops verifying. That is the property this
     needs, and it is the reason not to hash the signature segment
     instead. Base64url has four don't-care bits in its final character
-    and Python's decoder tolerates both those and optional padding, so
-    one signature has many spellings which all verify -- measured at 48
-    for an RS256 token. Keying on the signature text would have given
-    each spelling its own row, and a single identity token would have
-    been exchangeable once per spelling.
+    and padding is optional, so one signature has many spellings --
+    measured at 48 verifying for an RS256 token under PyJWT before
+    2.14, which tightened its decoder to the canonical spelling. Keying
+    on the signature text would have given each spelling its own row,
+    and a single identity token would have been exchangeable once per
+    spelling. Hashing the signed material does not rely on that
+    tightening staying, or on the next decoder being as strict.
 
     Hashed rather than stored because the payload carries the subject
     and whatever else the issuer chose to assert, none of which needs

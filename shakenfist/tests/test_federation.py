@@ -10,7 +10,6 @@ import base64
 import datetime
 import hashlib
 import hmac
-import io
 import json
 import os
 import ssl
@@ -31,6 +30,7 @@ from shakenfist import exceptions
 from shakenfist import federation
 from shakenfist.mapping_rule import MappingRule
 from shakenfist.tests import base
+from shakenfist.tests import fake_jwks
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
 
@@ -42,18 +42,6 @@ AUDIENCE = 'https://sf.example.com'
 
 def _keypair():
     return rsa.generate_private_key(public_exponent=65537, key_size=2048)
-
-
-def _jwks_for(keys):
-    """A JWKS document for {kid: private_key}."""
-    return {
-        'keys': [
-            json.loads(
-                jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key())
-            ) | {'kid': kid, 'use': 'sig', 'alg': 'RS256'}
-            for kid, key in keys.items()
-        ]
-    }
 
 
 class FederationTestCase(base.ShakenFistTestCase):
@@ -74,30 +62,28 @@ class FederationTestCase(base.ShakenFistTestCase):
         self.issuer = TrustedIssuer.new(
             'github', GITHUB, GITHUB_JWKS, AUDIENCE)
 
-        # Patched at the socket rather than at fetch_data, because
-        # fetch_data is what populates PyJWKClient's key set cache.
-        # Mocking it out would silently disable the caching these tests
-        # exist to check, and they would pass for the wrong reason.
-        patcher = mock.patch(
-            'jwt.jwks_client.urllib.request.urlopen',
-            side_effect=self._urlopen)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # These tests are about how often the JWKS is fetched, so most
+        # of them want an unknown key id to force a fetch there and
+        # then. The cooldown which would otherwise suppress that has a
+        # test class of its own below.
+        cooldown = mock.patch.object(
+            federation.config,
+            'FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS', 0)
+        cooldown.start()
+        self.addCleanup(cooldown.stop)
 
-    def _urlopen(self, request, **kwargs):
-        self.fetches.append(request.full_url)
+        fake_jwks.patch_transport(self, self._respond)
+
+    def _respond(self, url):
+        self.fetches.append(url)
         # A real JWKS fetch is a network round trip. Without some
         # duration here the threads in the stampede test finish one at
         # a time before the next is scheduled, and the test passes
         # whether or not the single-flight lock exists -- which makes
         # it worse than no test.
         time.sleep(self.fetch_delay)
-        body = json.dumps(_jwks_for(self.keys)).encode('utf-8')
-        response = mock.MagicMock()
-        response.read.return_value = body
-        response.__enter__.return_value = io.BytesIO(body)
-        response.__exit__.return_value = False
-        return response
+        return json.dumps(
+            fake_jwks.jwks_document(self.keys)).encode('utf-8')
 
     def _token(self, kid='key-1', key=None, claims=None, audience=AUDIENCE,
                issuer=GITHUB, exp_delta=300, nbf_delta=None, iat_delta=0):
@@ -379,6 +365,77 @@ class JWKSCachingTestCase(FederationTestCase):
         self.assertEqual(2, len(self.fetches))
 
 
+class JWKSRotationCooldownTestCase(FederationTestCase):
+    """The floor under refetches forced by an unrecognised key id.
+
+    PyJWT 2.14 added this, and it changes what our exchange endpoint
+    does. Before it, a token carrying a key id we had not seen bought
+    its sender a JWKS fetch, every time -- and /auth/federated takes no
+    credential, so the sender is anyone at all, and the fetch happens
+    under the issuer's lock. The floor costs us a rotation landing
+    inside the window not being recognised until it elapses, which is
+    the trade the setting documents.
+
+    JWKSCachingTestCase above is the other half of this: it runs with
+    the cooldown at zero, which is what proves zero still means fetch
+    on every unrecognised key id.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # FederationTestCase turns the cooldown off so that fetch
+        # counting means what it says. This class is about the
+        # cooldown, so it puts it back.
+        cooldown = mock.patch.object(
+            federation.config,
+            'FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS', 30)
+        cooldown.start()
+        self.addCleanup(cooldown.stop)
+        federation.JWKS_CACHE = federation.JWKSCache()
+
+    def test_the_window_is_ours_rather_than_pyjwts_default(self):
+        # The wiring. The setting can be perfect and never reach the
+        # client, which is how the timeout above was once wrong.
+        federation.validate_token(self._token(), self.issuer)
+        client, _ = federation.JWKS_CACHE._client_and_lock(
+            str(self.issuer.uuid), self.issuer.jwks_uri)
+
+        self.assertEqual(
+            federation.config.FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS,
+            client.cooldown_duration)
+
+    def test_a_rotation_inside_the_window_waits_for_it(self):
+        federation.validate_token(self._token(), self.issuer)
+        self.assertEqual(1, len(self.fetches))
+
+        # The issuer rotates immediately after we fetched, so the new
+        # key is real and we are still inside the cooldown.
+        rotated = _keypair()
+        self.keys['key-2'] = rotated
+
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(kid='key-2', key=rotated), self.issuer)
+        self.assertEqual(
+            1, len(self.fetches),
+            'an unrecognised key id fetched inside the cooldown window')
+
+    def test_a_flood_of_invented_key_ids_costs_one_fetch(self):
+        # The reason the window is worth its cost. Twenty tokens, each
+        # naming a key id that has never existed, from a caller who
+        # presented no credential to send them.
+        federation.validate_token(self._token(), self.issuer)
+        self.fetches.clear()
+
+        for i in range(20):
+            self.assertRaises(
+                exceptions.TokenValidationFailed, federation.validate_token,
+                self._token(kid='invented-%d' % i, key=_keypair()),
+                self.issuer)
+
+        self.assertEqual([], self.fetches)
+
+
 class ClaimMatchingTestCase(base.ShakenFistTestCase):
     def test_an_exact_matcher_compares_exactly(self):
         self.assertTrue(federation.claim_matches('a', 'a'))
@@ -449,34 +506,32 @@ class TokenIdentityTestCase(FederationTestCase):
         self.assertEqual(71, len(identity))
 
     def test_re_encoding_the_signature_does_not_change_the_identity(self):
-        # base64url leaves four don't-care bits in the final character of
-        # a 256 byte signature, and the padding is optional, so one
-        # signature has many spellings which all verify. If the identity
-        # were derived from the signature text an attacker could replay a
-        # token as many times as it has spellings, so it is derived from
-        # the signed material instead.
+        # base64url leaves four don't-care bits in the final character
+        # of a 256 byte signature, and the padding is optional, so one
+        # signature has many spellings. If the identity were derived
+        # from the signature text an attacker could replay a token once
+        # per spelling, so it is derived from the signed material
+        # instead.
+        #
+        # This used to be written as "spellings PyJWT will verify",
+        # measured at 48 for an RS256 token. PyJWT 2.14 tightened its
+        # decoder to the canonical spelling alone, which takes that
+        # count to one and would have quietly turned this into a test
+        # of nothing. The property we need does not depend on how
+        # strict the decoder of the day is, so it is asserted over the
+        # spellings themselves.
         token = self._token()
         head, signature = token.rsplit('.', 1)
+        spellings = set()
         identities = set()
-        variants = 0
 
         for char in string.ascii_letters + string.digits + '-_':
             for padding in ('', '=', '=='):
                 candidate = head + '.' + signature[:-1] + char + padding
-                try:
-                    jwt.decode(
-                        candidate, self.key.public_key(),
-                        algorithms=['RS256'], audience=AUDIENCE,
-                        issuer=GITHUB)
-                except Exception:
-                    continue
-
-                variants += 1
+                spellings.add(candidate)
                 identities.add(federation.token_identity(candidate, {}))
 
-        # If only the original spelling verified the test would prove
-        # nothing at all.
-        self.assertGreater(variants, 1)
+        self.assertGreater(len(spellings), 1)
         self.assertEqual(1, len(identities))
 
     def test_the_fallback_is_stable_for_one_token(self):
