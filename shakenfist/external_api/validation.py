@@ -25,22 +25,35 @@ cases:
 
 * ``netblock`` is deliberately format-only, with no pattern, because
   ``NetworksEndpoint.post()`` parses with ``ipaddress.ip_network()``,
-  which accepts IPv6 too. It renders as a plain string and so compiles
-  to one.
-* ``uuidorname``, ``namespace``, ``node``, ``url`` and ``ipv4`` carry
-  prose formats which are documentation. They render as plain strings
-  and compile to plain strings; turning them into semantic validators
-  is phase 6, not something this can do by accident.
+  which accepts IPv6 too. It renders as a plain string, and the
+  validator ``_FORMATS`` attaches to it calls ``ip_network()`` rather
+  than matching a regex, so the compiled check is exactly as wide as
+  the handler's.
+* ``uuidorname``, ``namespace`` and ``node`` carry prose formats which
+  are documentation and nothing else. ``uuidorname`` is ambiguous by
+  construction, and a ref decorator resolves the other two against the
+  database and answers 404 -- a stronger check than a format one, and
+  one which already runs.
 * The raw request body renders as a body schema whose type is not
   ``object``, which is exactly the discriminator needed to leave
   upload bodies alone.
 
-``format`` is documentation in every case. Only ``type``, ``pattern``,
-``minimum`` and ``maximum`` constrain anything.
+``format`` used to be documentation in every case. Phase 6's step 4
+made five of the format strings mean something -- see ``_FORMATS``
+below -- so ``type``, ``format``, ``pattern``, ``minimum`` and
+``maximum`` are now the five keys which constrain anything. The
+validators are keyed on the exact string ``ARGTYPES`` renders, so the
+published specification and the enforced check are the same string by
+construction (decision D33).
 """
 
+import base64
+import ipaddress
 import re
+import urllib.parse
+import uuid
 from typing import Any
+from typing import Callable
 from typing import Optional
 
 import marshmallow
@@ -79,14 +92,260 @@ _SCALARS: dict[str, type[fields.Field[Any]]] = {
 }
 
 
+# ---------------------------------------------------------------------
+# Semantic formats (phase 6 step 4, decision D33, issue 3269).
+#
+# Keyed on the exact `format` string ARGTYPES renders, so the promise
+# the published OpenAPI makes and the check the server performs are the
+# same string by construction -- the argument ANY_VALUE_FORMAT already
+# makes in its own comment, generalised. A parallel table keyed on the
+# type token would be a second interpretation of the token in one
+# process, which is the class of drift this module exists to prevent.
+#
+# Every validator obeys three rules:
+#
+# * a None is returned untouched. Every compiled field is
+#   allow_none=True, and marshmallow does not run validators on a None
+#   anyway, but an *optional* declared parameter legitimately arrives
+#   as one -- the shipped client sends `"source_url": null` and
+#   `"nvram_template": null` on every upload and every instance create
+#   -- so a validator which refused it would refuse the API's dominant
+#   caller. Required-ness is step 3's business and is decided before
+#   any of this runs.
+# * only marshmallow.ValidationError escapes. _schema_findings() has a
+#   broad except for exactly this failure, but a validator which
+#   reached it would report *no* findings for the whole schema, which
+#   would silently disable every other check on the same request.
+# * the check is written to be no narrower than the handler already is.
+#   That is the whole risk of this step: a validator stricter than its
+#   handler is a breaking change dressed as a correctness fix, and unit
+#   tests will not show it. Each comment below records what was read to
+#   establish the width.
+
+
+def _invalid(what: str) -> marshmallow.ValidationError:
+    return marshmallow.ValidationError('Not %s.' % what)
+
+
+def _format_byte(value: Any) -> Any:
+    """base64, strictly, once whitespace has been taken out.
+
+    Issue 3269: `user_data` is the only declaration carrying this
+    format, and its only consumer is the `base64.b64decode()` in
+    Instance._make_config_drive_openstack_disk(), which runs on the
+    hypervisor long after the API has answered 200 and the instance has
+    been scheduled and placed. A caller who pasted raw cloud-config
+    instead of encoding it got a binascii.Error in a daemon log and an
+    instance which never booted.
+
+    Two properties are wanted at once, and the order of the two
+    operations here is what gets both.
+
+    Wrapped base64 has to be accepted. `base64 somefile` emits 76
+    column lines, and `sf-client instance create -U "$(base64
+    user-data.yaml)"` sends them newlines and all, so a check which
+    refuses embedded whitespace refuses input the config drive decodes
+    happily today.
+
+    Raw cloud-config has to be refused, which is the whole of #3269.
+    b64decode's *default* discards every character outside the
+    alphabet, so it does not merely tolerate the newlines: it throws
+    away the colons, hashes and spaces in a raw payload too and then
+    decodes whatever alphabet characters are left. Whether that raises
+    is a coin flip on the filtered length modulo 4 -- of five realistic
+    raw cloud-config samples, two decoded without complaint and passed.
+    An earlier revision of this validator argued for `validate=False`
+    on the strength of the wrapping alone; that reasoning was wrong,
+    because it read the default's whitespace tolerance as the only
+    thing the default does.
+
+    So strip the whitespace first and then decode with `validate=True`.
+    Wrapped base64 survives the strip and decodes; raw cloud-config
+    reaches a strict decoder with its non-alphabet characters intact
+    and is refused deterministically. The only input this is narrower
+    than the config drive on is one carrying non-alphabet junk which
+    happens to survive the filter -- which is the defect, not a use.
+    """
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        raise _invalid('a valid base64 string')
+    try:
+        # binascii.Error subclasses ValueError.
+        base64.b64decode(''.join(value.split()), validate=True)
+    except Exception as e:
+        raise _invalid('a valid base64 string') from e
+    return value
+
+
+def _format_netblock(value: Any) -> Any:
+    """A CIDR netblock, parsed the way NetworksEndpoint.post() parses it.
+
+    The handler already calls ipaddress.ip_network() and answers 400 on
+    a ValueError, so this is the same function on the same input and
+    cannot be narrower. It is worth compiling anyway: ARGTYPES
+    documents at length why netblock carries no pattern, and this is
+    what it carries instead.
+
+    ip_network() accepts IPv6 and refuses a netblock with host bits
+    set, both of which are the handler's behaviour today. The handler's
+    additional "below the minimum size of /29" check stays where it is;
+    that is a policy about how small a network may be, not a statement
+    about what parses, and D34 keeps handler guards in place regardless.
+    """
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        raise _invalid('a valid CIDR netblock')
+    try:
+        ipaddress.ip_network(value)
+    except Exception as e:
+        raise _invalid('a valid CIDR netblock') from e
+    return value
+
+
+def _format_ip_address(value: Any) -> Any:
+    """An IP address.
+
+    The sole declaration is NetworkDNSAddressEndpoint.post()'s `value`,
+    which the handler does not check at all: it goes into the network's
+    hosteddns attribute and is rendered straight into dnsmasq's hosts
+    file (`{{value}} {{name}}` in dnshosts.tmpl). Anything which is not
+    an address is a malformed hosts file on a network node.
+
+    ip_address() rather than IPv4Address, even though the published
+    format says IPv4: a hosts file takes an IPv6 address perfectly
+    well, so refusing one would be this layer inventing a restriction
+    the server does not have. Publishing narrower than the server
+    accepts is a documentation wart; enforcing narrower than the server
+    accepts is a broken API.
+    """
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        raise _invalid('a valid IP address')
+    try:
+        ipaddress.ip_address(value)
+    except Exception as e:
+        raise _invalid('a valid IP address') from e
+    return value
+
+
+def _format_url(value: Any) -> Any:
+    """A URL, in the widest sense the five declarations share.
+
+    This one is almost all comment, because the obvious validator is
+    wrong. Demanding a scheme, or an http/https scheme, would refuse
+    input every one of the five handlers accepts today:
+
+    * ArtifactsEndpoint.post's `url` takes an image *shortcut* --
+      `cirros`, `cirros:0.4.0`, `ubuntu:20.04` -- which
+      images._resolve_image() expands into a download URL. The
+      functional suite's `artifact cache cirros` sends exactly that,
+      and `cirros` has no scheme at all.
+    * InstancesEndpoint.post's `nvram_template` takes `label:<name>` or
+      `sf://blob/<uuid>`, and passes anything else through to
+      Blob.from_db() unchanged.
+    * ArtifactUploadEndpoint.post's `source_url` is "the URL the
+      artifact should claim to be downloaded from", and its own default
+      is `sf://upload/<namespace>/<name>`.
+    * only jwks_uri on the two issuer endpoints is a real web URL, and
+      _validate_issuer_arguments() already refuses anything which is
+      not https there -- in the handler, so it holds in every
+      API_VALIDATION_MODE.
+
+    So the check is the widest one which is still a check: the string
+    must be something urllib.parse can parse. In practice that refuses
+    an unbalanced bracket in the authority (`http://[::1`) and nothing
+    else, which is the stdlib's own definition of "this is not a URL"
+    and is malformed under RFC 3986 by any reading. Nothing in the
+    server parses these strings today, so this is about the format
+    meaning *something* rather than about a crash it prevents.
+    """
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        raise _invalid('a valid URL')
+    try:
+        urllib.parse.urlparse(value)
+    except Exception as e:
+        raise _invalid('a valid URL') from e
+    return value
+
+
+def _format_uuid(value: Any) -> Any:
+    """A UUID, in any spelling uuid.UUID() accepts.
+
+    The five declarations are blob_uuid on the label, artifact upload
+    and agent put routes, upload_uuid on the artifact upload route, and
+    target_uuid on the cluster operations query. Every uuid the server
+    can answer with is `str(uuid.uuid4())`, and uuid.UUID() takes that
+    plus the undashed, braced and urn:uuid: spellings -- so this is
+    wider than anything the API hands out.
+
+    Three of the five go straight into a from_db() whose miss is a 404,
+    so for those this converts a 404 into a 400 for a string which
+    could never have named an object. LabelEndpoint.post is the one
+    which checks nothing at all: it hands blob_uuid to
+    Artifact.add_index() and answers 200, leaving a label version
+    pointing at a blob which does not exist.
+
+    target_uuid is safe for a reason worth recording, because it is the
+    one which could have been a name: every ObjectType a cluster
+    operation can target comes from a `target_fields` declaration in
+    schema/operations/, and all of them are ARTIFACT, INSTANCE, BLOB,
+    NETWORK, INTERFACE or AGENTOPERATION. The two object types keyed by
+    name rather than uuid -- namespace and node -- are not among them,
+    so no caller can be naming one here.
+    """
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        raise _invalid('a valid UUID')
+    try:
+        uuid.UUID(value)
+    except Exception as e:
+        raise _invalid('a valid UUID') from e
+    return value
+
+
+# The table itself. Keys are the `format` strings ARGTYPES renders, not
+# the type tokens which render them. test_format_validation.py holds
+# every key to a format ARGTYPES actually renders -- retyping one there
+# would otherwise turn a validator off silently -- and
+# test_validation_compiler.py names the thirteen declarations covered.
+#
+# `a MAC address` is absent on purpose: macaddr validates through the
+# anchored pattern ARGTYPES gives it (PR #4183), which _field() already
+# compiles, and a second check would be a second definition of the same
+# format.
+_FORMATS: dict[str, Callable[[Any], Any]] = {
+    'byte': _format_byte,
+    'a CIDR netblock': _format_netblock,
+    'an IPv4 address as a string': _format_ip_address,
+    'url': _format_url,
+    'uuid': _format_uuid,
+}
+
+
 class CompiledEndpoint:
     """The schemas one handler's declarations compile to.
 
-    ``required_names`` is recorded rather than enforced. The plan found
-    ``mode`` on the agent-put endpoint declared required while omitting
-    it has always been accepted, so enforcing required-ness would break
-    working clients; phase 6 decides that, and warn-only exists to give
-    it the numbers.
+    ``required_names`` is recorded here and enforced by
+    ``validate_request`` in ``shakenfist/external_api/base.py`` --
+    phase 6's step 3 turned that on, once step 2 had corrected every
+    declaration a handler's own defaults had quietly made optional.
+
+    Enforcement is a property of the decorator, not of this compiler:
+    a declaration can still be more required than its handler is.
+    ``command_line`` on ``InstanceAgentExecuteEndpoint.post`` is one --
+    declared required, but an omission has always reached a handler
+    which queues an ``execute`` operation carrying a null
+    ``commandline`` (the comment at the declaration, and
+    ``instance.py:2097``). Enforcement changes what such an omission
+    answers -- 400, naming the parameter, instead of a 200 the guest
+    agent can only fail on -- without touching the handler, which still
+    behaves the old way under ``warn`` and ``off`` (decision D34).
     """
 
     def __init__(self, body: Optional[marshmallow.Schema],
@@ -145,12 +404,29 @@ def _field(spec: dict[str, Any]) -> fields.Field[Any]:
             return value
 
         validators.append(_fullmatch)
-    if validators:
-        kwargs['validate'] = validators
 
     declared = spec.get('type')
     if not isinstance(declared, str):
         declared = ''
+
+    # The semantic formats (D33). Gated on the rendered type being
+    # `string` because every one of them is a check on a string, and a
+    # token which one day renders the same format on a different type
+    # would otherwise get a validator written for text. The `any`
+    # sentinel and the unrecognised-type fallback below both drop the
+    # validator list wholesale for the same reason Range is dropped
+    # there: fields.Raw does not coerce, so a validator would meet a
+    # value of whatever Python type the caller sent.
+    if declared == 'string':
+        published_format = spec.get('format')
+        if isinstance(published_format, str):
+            semantic = _FORMATS.get(published_format)
+            if semantic is not None:
+                validators.append(semantic)
+
+    if validators:
+        kwargs['validate'] = validators
+
     if declared == 'array':
         # items is always present: swagger_helper() renders the array
         # tokens with it, and OpenAPI 2.0 requires it.
@@ -553,10 +829,19 @@ def check(compiled: CompiledEndpoint, body: Any,
                 '%d further undeclared keys not reported individually'
                 % (len(unknown) - MAX_UNKNOWN_PARAMETER_FINDINGS)))
 
+    # An explicit JSON null counts as missing too, for a required
+    # parameter only: every compiled field is allow_none=True (see
+    # _field()), so a null reaches the schema check indistinguishable
+    # from a value that just happens to be absent, and a caller who
+    # sent `{"key": null}` gets exactly the same answer as one who
+    # sent no `key` at all -- one reason code, one message, for what
+    # is one fact from the handler's side: it was not given a key.
     supplied = dict(body)
     supplied.update(query)
     for name in sorted(compiled.required_names):
-        if name not in supplied and name not in compiled.path_names:
+        if name in compiled.path_names:
+            continue
+        if name not in supplied or supplied[name] is None:
             findings.append(Finding(
                 MISSING_REQUIRED, name, 'declared required but not supplied'))
 

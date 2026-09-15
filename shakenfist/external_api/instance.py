@@ -1908,6 +1908,8 @@ class InstanceAgentPutEndpoint(api_base.Resource):
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             ('blob_uuid', 'body', 'uuid',
              'The UUID of the blob to put onto the instance.', True),
+            # Required, although the handler does not refuse the omission today:
+            # it queues put-blob and chmod with a null path (phase 6 sweep).
             ('path', 'body', 'string',
              'The path to write the file at inside the instance.', True),
             ('mode', 'body', 'string',
@@ -1942,9 +1944,20 @@ class InstanceAgentPutEndpoint(api_base.Resource):
             return error
         deadline, progress_timeout = timing
 
+        # Refuse a mode which is not a string before either parse sees it.
+        # int() raises TypeError rather than ValueError for a non-number,
+        # and symbolic_to_numeric_permissions() calls .split() on its
+        # argument and so raises AttributeError; neither is caught below,
+        # so a null mode became a recorded 500 (issue 4195). Enforcement
+        # closes the omission, but warn and off are rollbacks and must not
+        # turn a caller mistake into a server fault. Numbers are let
+        # through because int() has always accepted them here.
+        if not isinstance(mode, (str, int, float)):
+            return sf_api.error(406, 'invalid mode: a mode must be a string')
+
         try:
             int(mode)
-        except ValueError:
+        except (TypeError, ValueError):
             try:
                 symbolicmode.symbolic_to_numeric_permissions(mode)
             except ValueError as e:
@@ -1994,6 +2007,8 @@ class InstanceAgentGetEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('namespace', 'body', 'namespace',
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+            # Required, although the handler does not refuse the omission today:
+            # it queues a get-file with a null path (phase 6 sweep).
             ('path', 'body', 'string',
              'The path to fetch the file from inside the instance.', True),
             ('deadline_seconds', 'body', 'number',
@@ -2057,6 +2072,8 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
              'The UUID or name of the instance.', True),
             ('namespace', 'body', 'namespace',
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+            # Required, although the handler does not refuse the omission today:
+            # it queues an execute with a null commandline (phase 6 sweep).
             ('command_line', 'body', 'string', 'The command to execute.', True),
             ('deadline_seconds', 'body', 'number',
              DEADLINE_SECONDS_DESCRIPTION, False,

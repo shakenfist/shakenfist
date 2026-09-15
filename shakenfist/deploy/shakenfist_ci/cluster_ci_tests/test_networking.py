@@ -1,9 +1,18 @@
+import ipaddress
 import json
 
 from testtools import content
 
 from shakenfist_ci import base
 from shakenfist_client import apiclient
+
+
+# The floating network's well known UUID, from
+# shakenfist.constants.FLOATING_NETWORK_UUID. Repeated here rather than
+# imported because this suite runs from an installed shakenfist_ci
+# package against a remote cluster and cannot import the server's
+# constants module (see test_network_lifecycle.py, which does the same).
+FLOATING_NETWORK_UUID = 'f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f'
 
 
 class TestNetworking(base.BaseNamespacedTestCase):
@@ -56,6 +65,45 @@ class TestNetworking(base.BaseNamespacedTestCase):
             'n',
             content.text_content(json.dumps(n, indent=4, sort_keys=True)))
         self.test_client.delete_network(n['uuid'])
+
+    def test_overlapping_floating_network_refused(self):
+        """Issue 323: a netblock overlapping the deployed floating network
+        must be refused, whichever side contains the other.
+
+        The floating network's own netblock is read from the server
+        rather than hard-coded, so this test does not rot if the
+        deployment's floating_network_ipblock default ever changes.
+        """
+        floating = self.system_client.get_network(FLOATING_NETWORK_UUID)
+        self.addDetail(
+            'floating',
+            content.text_content(json.dumps(floating, indent=4, sort_keys=True)))
+        floating_block = ipaddress.ip_network(floating['netblock'])
+
+        # Identical to the floating network.
+        try:
+            self.test_client.allocate_network(
+                str(floating_block), True, True,
+                '%s-overlap-identical' % self.namespace)
+            self.fail('Netblock identical to the floating network was not refused')
+        except apiclient.APIException as e:
+            self.addDetail('response', content.text_content(e.text))
+            self.assertEqual(400, e.status_code)
+            self.assertIn('overlaps the floating network', e.text)
+
+        # A supernet of the floating network -- the requested netblock
+        # contains the floating network rather than the other way around.
+        supernet = floating_block.supernet(
+            new_prefix=max(floating_block.prefixlen - 4, 0))
+        try:
+            self.test_client.allocate_network(
+                str(supernet), True, True,
+                '%s-overlap-supernet' % self.namespace)
+            self.fail('Netblock containing the floating network was not refused')
+        except apiclient.APIException as e:
+            self.addDetail('response', content.text_content(e.text))
+            self.assertEqual(400, e.status_code)
+            self.assertIn('overlaps the floating network', e.text)
 
     def test_virtual_networks_are_separate(self):
         inst1 = self.create_instance(

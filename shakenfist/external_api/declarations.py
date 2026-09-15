@@ -84,6 +84,13 @@ class Declaration(NamedTuple):
     ``location_node`` is the AST node holding the location literal,
     which is what the fixer rewrites in place. The resolved fields are
     None when they could not be read statically.
+
+    ``argtype`` is carried even though this module's own derivation
+    never consults it, because two audits do -- the ``any`` token pin
+    in ``test_parameter_declarations.py`` and phase 6's required sweep
+    -- and each had grown its own copy of the walk below to reach it.
+    A second reader of a declaration tuple is how the published
+    specification and the enforced check stop agreeing.
     """
 
     path: Optional[str]
@@ -91,6 +98,7 @@ class Declaration(NamedTuple):
     method: str
     name: Optional[str]
     location: Optional[str]
+    argtype: Optional[str]
     required: Optional[bool]
     location_node: Optional[ast.expr]
 
@@ -682,7 +690,8 @@ def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
         call = dec.args[0] if isinstance(dec, ast.Call) and dec.args else None
         if not (isinstance(call, ast.Call) and len(call.args) >= 3
                 and isinstance(call.args[2], ast.List)):
-            out.append(Declaration(path, cls, fn.name, None, None, None, None))
+            out.append(
+                Declaration(path, cls, fn.name, None, None, None, None, None))
             continue
         for item in call.args[2].elts:
             # swagger_helper() destructures five fixed elements plus an
@@ -690,11 +699,13 @@ def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
             # length is malformed however readable its parts are.
             if not (isinstance(item, ast.Tuple) and len(item.elts) in (5, 6)):
                 out.append(
-                    Declaration(path, cls, fn.name, None, None, None, None))
+                    Declaration(
+                        path, cls, fn.name, None, None, None, None, None))
                 continue
             out.append(Declaration(
                 path, cls, fn.name, literal(item.elts[0]),
-                literal(item.elts[1]), literal(item.elts[4]), item.elts[1]))
+                literal(item.elts[1]), literal(item.elts[2]),
+                literal(item.elts[4]), item.elts[1]))
     return out
 
 

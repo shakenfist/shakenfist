@@ -550,6 +550,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         self.assertEqual(200, resp.status_code)
 
     def test_post_instance_no_disk(self):
+        # `disk` is sent as an explicit null here, and `disk` is
+        # declared required, so the validation layer now refuses this
+        # before the handler's own "at least one disk" guard runs.
         resp = self.client.post('/instances',
                                 headers={'Authorization': self.auth_token},
                                 data=json.dumps({
@@ -564,7 +567,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'namespace': None,
                                 }))
         self.assertEqual(
-            {'error': 'instance must specify at least one disk', 'status': 400},
+            {'error': 'disk: declared required but not supplied',
+             'status': 400},
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 

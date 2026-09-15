@@ -102,28 +102,41 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         self.assertTrue(compiled.raw_body)
         self.assertIsNone(compiled.body)
 
-    def test_documented_formats_do_not_become_validators(self):
-        """Prose formats are documentation, and netblock is deliberately
-        pattern-free.
+    def test_only_published_bounds_and_formats_become_validators(self):
+        """A validator exists exactly where the specification says one should.
 
-        ``netblock`` has no pattern because NetworksEndpoint.post()
-        parses with ipaddress.ip_network(), which takes IPv6 as well;
-        publishing an IPv4 CIDR regex would describe the API as
-        narrower than it is and phase 4 would compile that into a 400
-        for input which works today. The prose formats on uuidorname,
-        namespace, node, url and ipv4 are the same kind of claim.
-        Semantic validation of any of them is phase 6.
+        Until phase 6's step 4 this test asserted the opposite for
+        `format`: every semantic token rendered a format string and
+        compiled to a bare fields.String, which is finding F3 of
+        PLAN-api-input-validation-phase-06-required.md and the reason
+        issue 3269 survived four years. Step 4 gave five of those
+        format strings a validator apiece (decision D33), so the rule
+        is now that a field carries validators if and only if the
+        published schema carries a bound *or* a format `_FORMATS`
+        knows.
+
+        Derived from the published specification rather than from a
+        list of examples, which would go stale as tokens are retyped.
         """
+        # netblock still has no pattern -- publishing an IPv4 CIDR
+        # regex would describe the API as narrower than
+        # NetworksEndpoint.post() is, since it parses with
+        # ipaddress.ip_network() and takes IPv6 too. What it has
+        # instead is a validator which calls that same function.
         netblock = self.registry[('NetworksEndpoint', 'post')].body
         self.assertIsInstance(netblock.fields['netblock'], fields.String)
-        self.assertEqual([], list(netblock.fields['netblock'].validators))
+        self.assertNotIn(
+            'pattern',
+            api_base.ARGTYPES['netblock'],
+            'netblock must stay pattern-free; see the comment on it in '
+            'base.py')
+        self.assertEqual(
+            [validation._format_netblock],
+            list(netblock.fields['netblock'].validators))
 
-        # And the general rule the netblock case is one instance of,
-        # derived from the published specification rather than from a
-        # list of examples, which would go stale as tokens are retyped:
-        # a validator exists only where a bound is published. `format`
-        # never produces one.
         constrained = 0
+        formatted = 0
+        format_sites = []
         for view in external_api.app.view_functions.values():
             cls = getattr(view, 'view_class', None)
             if cls is None or not issubclass(cls, api_base.Resource):
@@ -147,13 +160,23 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
                     for name, spec in published.items():
                         bounded = any(k in spec for k in
                                       ('minimum', 'maximum', 'pattern'))
+                        semantic = (spec.get('type') == 'string'
+                                    and spec.get('format')
+                                    in validation._FORMATS)
                         constrained += bool(bounded)
+                        formatted += bool(semantic)
+                        if semantic:
+                            format_sites.append(
+                                (cls.__name__, method, name,
+                                 spec.get('format')))
                         self.assertEqual(
-                            bounded, bool(schema.fields[name].validators),
-                            '%s.%s %s: published bound %s, compiled '
-                            'validators %s' % (cls.__name__, method, name,
-                                               bounded,
-                                               schema.fields[name].validators))
+                            bounded or semantic,
+                            bool(schema.fields[name].validators),
+                            '%s.%s %s: published bound %s, published '
+                            'format %s, compiled validators %s'
+                            % (cls.__name__, method, name, bounded,
+                               spec.get('format'),
+                               schema.fields[name].validators))
 
         # The rule above is vacuous if nothing is bounded, so the count
         # is pinned. Twenty nine, from two sources which both have to
@@ -179,6 +202,56 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         # to. They compile into validators here as well, which is
         # belt and braces rather than the mechanism.
         self.assertEqual(29, constrained)
+
+        # And the thirteen semantic format declarations, named rather
+        # than merely counted: this is F3's table, which is the list
+        # each validator's width was established against. A new one
+        # arriving here has not had that reading done for it, so it
+        # fails until someone does it and adds the row.
+        self.assertEqual(
+            [
+                ('ArtifactUploadEndpoint', 'post', 'blob_uuid', 'uuid'),
+                ('ArtifactUploadEndpoint', 'post', 'source_url', 'url'),
+                ('ArtifactUploadEndpoint', 'post', 'upload_uuid', 'uuid'),
+                ('ArtifactsEndpoint', 'post', 'url', 'url'),
+                ('AuthIssuerEndpoint', 'put', 'jwks_uri', 'url'),
+                ('AuthIssuersEndpoint', 'post', 'jwks_uri', 'url'),
+                ('ClusterOperationsEndpoint', 'get', 'target_uuid', 'uuid'),
+                ('InstanceAgentPutEndpoint', 'post', 'blob_uuid', 'uuid'),
+                ('InstancesEndpoint', 'post', 'nvram_template', 'url'),
+                ('InstancesEndpoint', 'post', 'user_data', 'byte'),
+                ('LabelEndpoint', 'post', 'blob_uuid', 'uuid'),
+                ('NetworkDNSAddressEndpoint', 'post', 'value',
+                 'an IPv4 address as a string'),
+                ('NetworksEndpoint', 'post', 'netblock',
+                 'a CIDR netblock'),
+            ],
+            sorted(format_sites))
+        self.assertEqual(13, formatted)
+
+    def test_the_prose_formats_still_validate_nothing(self):
+        """The tokens step 4 deliberately left alone.
+
+        `namespace` and `node` resolve against the database in a ref
+        decorator which answers 404, which is a stronger check than a
+        format one and already runs; `uuidorname` is ambiguous by
+        construction. Adding any of them to `_FORMATS` would be a
+        narrowing, so their absence is asserted rather than assumed.
+        """
+        for token in ('namespace', 'node', 'uuidorname', 'string',
+                      'bearer', 'binary'):
+            self.assertNotIn(
+                api_base.ARGTYPES[token].get('format'), validation._FORMATS,
+                '%s is a prose format and must not compile to a '
+                'validator' % token)
+
+        # macaddr is the other deliberate absence, and for the opposite
+        # reason: it is already validated, by the anchored pattern
+        # ARGTYPES gives it. A _FORMATS entry would be a second
+        # definition of one format.
+        self.assertIn('pattern', api_base.ARGTYPES['macaddr'])
+        self.assertNotIn(
+            api_base.ARGTYPES['macaddr']['format'], validation._FORMATS)
 
     def test_published_bounds_compile_into_validators(self):
         """The other direction: a bound which *is* declared must arrive.

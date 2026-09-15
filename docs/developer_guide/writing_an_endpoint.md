@@ -364,15 +364,61 @@ Reasons are counted separately because they answer different
 questions: `unknown-parameter`, `type-mismatch`, `missing-required`
 and `body-path-collision`.
 
-Two things it deliberately does not do. `required` is recorded but
-never enforced — not even in `enforce` mode, where missing-required
-findings are filtered out of the rejection decision before the 400 is
-built. Several parameters are declared required while omitting them
-has always worked, and what to do about that is still open — see [PLAN-api-input-validation](../plans/PLAN-api-input-validation.md).
-And the prose `format` on a type token is documentation: `netblock`,
-`uuidorname`, `namespace`, `node`, `url` and `ipv4` compile to plain
-strings, because semantic validation of them is not built yet. Only
-`type`, `pattern`, `minimum` and `maximum` constrain anything.
+`required` is enforced. An omitted parameter and an explicit JSON
+`null` both answer `400 <parameter>: declared required but not
+supplied`, in every `API_VALIDATION_MODE` but `warn` and `off`. That
+was not always true: several parameters were declared required while
+omitting them had always worked, so
+[phase 6](../plans/PLAN-api-input-validation-phase-06-required.md)
+audited every `body`/`query` declaration carrying `required=True`
+against what its handler actually does with an omission before
+turning enforcement on, and corrected the one that was genuinely
+optional (`shared` on `POST /artifacts`). Declare `required=True` only
+where the handler refuses the request without the parameter today; if
+the handler supplies a sensible default on omission, declare
+`required=False` and let the schema say what is already true — a
+declaration claiming more than the handler enforces is now a caller
+visible lie, not a documentation nit.
+
+Adding a `required=True` `body` or `query` declaration also owes the
+evidence sweep an entry, and CI will say so:
+`shakenfist/tests/external_api/test_required_sweep.py` enumerates every
+such declaration from the source and fails if one has no recipe, or if
+its measured answer differs from the `SWEEP` table published in the
+phase 6 plan. So a new one needs three things there — a `RECIPES` entry
+for the handler (a complete, valid request plus the status that request
+answers), a `SWEEP` row for the parameter, and the counts in
+`test_the_census_still_finds_seventy_six` bumped.
+
+The control status in the recipe is the part worth understanding rather
+than copying. The sweep sends each request twice, once complete and
+once with the one parameter removed, and asserts the complete one still
+answers the status the recipe claims. Without that, a request which
+404s because a fixture was never built is indistinguishable from a
+handler refusing an omission — which is exactly how an earlier audit of
+these same declarations reached the wrong answer. A control that starts
+failing means the fixture rotted, and no verdict measured against it can
+be trusted.
+
+The `format` a type token renders is documentation unless
+`validation._FORMATS` knows it. Five of them do, and each compiles to
+a validator calling the library function the handler itself uses:
+`base64` has its whitespace removed and is then decoded strictly with
+`base64.b64decode(..., validate=True)` — strictly, because the lenient
+default discards every character outside the alphabet and so decodes
+much of what it is meant to refuse; whitespace first, because `base64
+file` wraps its output at 76 columns and callers send that verbatim.
+`netblock` parses with
+`ipaddress.ip_network()`, `ipv4` with `ipaddress.ip_address()`, `url`
+with `urllib.parse.urlparse()` and `uuid` with `uuid.UUID()`. The
+formats on `uuidorname`, `namespace` and `node` stay documentation —
+`uuidorname` is ambiguous by construction, and a ref decorator already
+resolves the other two against the database and answers 404, which is
+a stronger check than a format one. Each validator is written to be no
+narrower than the handler behind it; `url`, which has to accept the
+scheme-less `cirros` image shortcut and `label:` NVRAM templates as
+well as `https://`, is the instructive case. So `type`, `format`,
+`pattern`, `minimum` and `maximum` are what constrain anything.
 
 ## What is not checked yet
 
