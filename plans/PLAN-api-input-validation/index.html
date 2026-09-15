@@ -14085,7 +14085,7 @@ file per detailed phase, named with <code>-phase-NN-descriptive</code>
 appended.</p>
 <p>I prefer one commit per logical change, and at minimum one
 commit per phase. Each commit should be self-contained.</p>
-<p><strong>Status: phases 0 to 5 planned; 0, 1, 2, 3, 4 and 5 complete.</strong>
+<p><strong>Status: phases 0 to 6 planned; 0, 1, 2, 3, 4, 5 and 6 complete.</strong>
 The open questions at the bottom are answered in the Decisions
 section; see
 <a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>
@@ -14449,8 +14449,8 @@ declarations are good enough to compile.</p>
 </tr>
 <tr>
 <td>6: Required and scalar semantics</td>
-<td>Not started</td>
-<td>Decide whether <code>required</code> is enforced, having found that all 75 body and query declarations carrying <code>required=True</code> are optional in fact — every one has a handler default, so nothing is structurally required and enforcement is a contract change for all of them. Also gives the semantic type tokens something to do: <code>macaddr</code> is the only one of them that validates anything today, and it is declared nowhere. Closes #3269 (base64 <code>user_data</code> failing on the hypervisor rather than at the API) and #323 (a netblock overlapping the floating network). #534 was also in scope until the automated issue fixer closed it with #4183 on 2026-09-12, four hours after the phase plan merged. See <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a></td>
+<td>Complete</td>
+<td>A sweep drove one real request per declaration through the whole decorator stack: of the 75 body/query declarations carrying <code>required=True</code> (every one had a handler default, so none was structurally required), 63 were already refused by a handler guard, 7 reached a null-hostile constructor and 500'd, and only 6 were accepted outright — of those, only <code>shared</code> on <code>POST /artifacts</code> was genuinely optional and moved to <code>required=False</code>; the other 5 committed a broken operation on omission (a queued agent command with a null path, a DNS record pointing at null) and kept <code>required=True</code> so enforcement turns that into a 400 instead. The <code>MISSING_REQUIRED</code> filter in <code>validate_request</code> was then deleted, so an omitted or explicit-null required parameter now answers 400 naming it, in every mode but <code>warn</code>/<code>off</code>. Separately, five of the nine semantic type tokens (<code>byte</code>, <code>a CIDR netblock</code>, <code>an IPv4 address as a string</code>, <code>url</code>, <code>uuid</code>) were given real validators keyed on the exact <code>format</code> string they publish, closing #3269 by rejecting non-base64 <code>user_data</code> at the API instead of on the hypervisor; <code>macaddr</code> already validated via PR #4183 and is unchanged. <code>POST /networks</code> gained a handler guard refusing a netblock that overlaps the deployed floating network, closing #323. #534 was closed outside this plan by #4183 before the phase started (see the note below). See <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a></td>
 <td>—</td>
 </tr>
 <tr>
@@ -14508,9 +14508,20 @@ it required re-verifying the finding first: an unrelated fix
 three classes the phase 5 survey recorded, so the issue is scoped
 to the two proxy call sites and the local-socket case that fix
 does not cover, not to the survey's original table.</p>
+<p><strong>Closed by phase 6:</strong> #3269 (<code>03ea26514</code>, step 4's commit <code>Enforce
+the formats the API publishes.</code> — proven by
+<code>test_format_validation.py</code>'s <code>test_wrapped_base64_user_data_still_reaches_placement</code>,
+which drives an unencoded <code>user_data</code> through a real
+<code>POST /instances</code> and asserts the config drive decode at
+<code>instance.py:1930</code> is never reached) and #323 (<code>d6b84b365</code>, step 5's commit
+<code>Refuse an overlapping netblock.</code> — proven by
+<code>shakenfist/tests/external_api/test_network.py</code>'s overlap cases and
+the cluster CI case in
+<code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_networking.py</code>).
+Both commits carry <code>Fixes #NNNN</code> and will auto-close on merge.</p>
 <p><strong>Still open and still owned by this plan:</strong> #528 (parent, and
 since 2026-09-12 also the tracker for what #936 described), #3612
-(the mechanism), #3269, #323, #2094.</p>
+(the mechanism), #2094.</p>
 <p><strong>Phase 5 was overtaken from outside, as predicted.</strong> Three of
 its four attribution issues were picked up by the automated issue
 fixer rather than by this plan — #3615, #3606 and #3371, leaving

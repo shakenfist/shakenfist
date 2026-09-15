@@ -14651,10 +14651,11 @@
   logged what it would have refused and changed no response. The new
   <code>API_VALIDATION_MODE</code> setting controls this, and — see the
   validation enforcement entry below — now defaults to <code>enforce</code>, which
-  answers 400 instead (except for parameters declared required but
-  omitted, which are recorded and never enforced); <code>warn</code> restores the
-  original logging-only behaviour and <code>off</code> disables the layer
-  entirely, as a safety valve against unexpected log volume. Three
+  answers 400 instead; <code>warn</code> restores the original logging-only
+  behaviour and <code>off</code> disables the layer entirely, as a safety valve
+  against unexpected log volume. (Required parameters were exempted
+  from this at first — see the required-ness entry below for when that
+  changed.) Three
   related behaviour changes shipped with the original, warn-only
   rollout:<ul>
 <li>A webargs validation failure (a malformed query parameter on the
@@ -14745,8 +14746,10 @@
   400 where it previously answered 404 or 403</strong> -- this is not an
   information leak, since the caller was already authenticated and
   learns only that its own request was malformed, nothing about the
-  object it named. <code>required</code> is still recorded and never enforced: a
-  parameter declared required can still be omitted, exactly as before.
+  object it named. At this point in the rollout <code>required</code> was still
+  recorded and never enforced: a parameter declared required could
+  still be omitted, exactly as before -- see the required-ness entry
+  below for when that changed, later in this cycle.
   If a caller breaks against this, set <code>API_VALIDATION_MODE=warn</code> to
   log findings without refusing anything while you fix it, or <code>off</code> to
   disable the layer entirely.
@@ -14818,6 +14821,82 @@
   weight of one, because Python's <code>int(True)</code> is 1. If you relied on
   that, send <code>1</code> instead. Numeric strings such as <code>"3"</code> are still
   accepted, unchanged.</li>
+<li><strong>Behaviour change: parameters declared required are now enforced.</strong>
+  This closes the one exemption the <code>enforce</code> default carried at
+  first: omitting a parameter declared <code>required</code>, or sending it as an
+  explicit JSON <code>null</code>, now answers
+  <code>400 &lt;parameter&gt;: declared required but not supplied</code> instead of
+  reaching the handler. Every one of the 75 affected declarations was
+  audited against what its handler actually did with an omission
+  before this was turned on, and the one that was genuinely optional —
+  <code>shared</code> on <code>POST /artifacts</code>, which has always defaulted to
+  creating an unshared artifact — is now published as optional too,
+  correcting a specification that claimed otherwise. <code>warn</code> and <code>off</code>
+  restore the previous behaviour for everything below.<ul>
+<li>Five messages get worse, and only on the pure-omission path —
+  each survives for the request that actually carries information:
+  <code>DELETE /artifacts</code>, <code>/instances</code> and <code>/networks</code> with no
+  <code>confirm</code> answered <code>400 parameter confirm is not set true</code> and
+  now answer <code>400 confirm: declared required but not supplied</code>
+  (<code>confirm: false</code> still gets the old message); <code>POST /instances</code>
+  with no <code>disk</code> answered <code>400 instance must specify at least one
+  disk</code> and now answers <code>400 disk: declared required but not
+  supplied</code> (an empty <code>disk: []</code> still gets the old message); and
+  <code>POST /instances/&lt;ref&gt;/interfaces</code> with no <code>network</code> answered
+  <code>400 network specification should contain JSON objects</code> and now
+  answers <code>400 network: declared required but not supplied</code> (a
+  malformed networkspec still gets the old message).</li>
+<li><code>POST</code> and <code>DELETE /networks/&lt;n&gt;/dns</code> with no <code>name</code> now answer
+  <code>400</code> where they answered <code>406</code> before.</li>
+<li>Five requests that used to reach a null-hostile constructor deep
+  in the stack and answer <code>500</code>, with a recorded exception, now
+  answer <code>400</code> naming the missing parameter instead.</li>
+</ul>
+</li>
+<li><strong>Two <code>500</code>s on <code>POST /instances/&lt;i&gt;/agent/put</code> are fixed.</strong> Both were
+  reachable whether or not a parameter was omitted, so unlike the
+  refusals above they are not undone by <code>warn</code> or <code>off</code>. A <code>blob_uuid</code>
+  naming a blob that does not exist now answers the documented <code>404
+  blob not found</code> rather than a recorded <code>500</code> (the refusal called a
+  method that does not exist; issue #4194), and a <code>mode</code> which is not a
+  string now answers the documented <code>406 invalid mode</code> rather than a
+  recorded <code>500</code> (issue #4195).</li>
+<li><strong>The <code>format</code> a type token publishes is now enforced for five of
+  them.</strong> <code>byte</code> (base64), <code>a CIDR netblock</code>, <code>an IPv4 address as a
+  string</code>, <code>url</code> and <code>uuid</code> used to render into the OpenAPI document
+  and compile to a bare string field accepting anything; each now has
+  a validator written to be exactly as wide as the handler it protects
+  — <code>user_data</code> has its whitespace removed and is then decoded
+  strictly, which is why base64 wrapped at 76 columns (what <code>base64
+  file</code> emits) still works while raw cloud-config does not, and <code>url</code>
+  cannot demand a scheme because <code>POST /artifacts</code> accepts distro
+  shortcuts such as <code>cirros</code> and <code>ubuntu:20.04</code> with none. This closes
+  issue #3269: a <code>user_data</code> value that is not valid base64 is now
+  refused by <code>POST /instances</code> instead of reaching the hypervisor's
+  config-drive build after the instance has already been scheduled and
+  placed. One side effect
+  worth knowing about: a non-UUID <code>blob_uuid</code>, <code>upload_uuid</code> or
+  <code>target_uuid</code> now answers <code>400</code> where it used to reach a database
+  lookup and answer <code>404</code>, because the format check runs first.
+  <code>warn</code> and <code>off</code> restore the previous behaviour.</li>
+<li><strong><code>POST /networks</code> now refuses a netblock that overlaps the
+  configured floating network</strong>, answering <code>400</code> naming both blocks.
+  This closes issue #323. It is a handler guard rather than a schema
+  rule, because whether a netblock overlaps depends on the deployed
+  floating network, which is cluster configuration the schema layer
+  cannot see; it reads the floating network the way
+  <code>network.floating_network()</code> does, without creating one, and falls
+  back to the configured <code>FLOATING_NETWORK</code> block if no floating
+  network row exists yet. Only the floating network is guarded —
+  other reserved ranges (node egress, mesh addressing) are not
+  checked. The guard applies to <strong>every</strong> network create, including a
+  network with NAT and DHCP disabled: all networks land in the same
+  network node namespace, so an isolated overlay reusing the floating
+  block still collides there. Because this runs in the handler rather
+  than the validation layer, there is no configuration switch which
+  disables it — <code>warn</code> and <code>off</code> do not. An operator with existing
+  automation which allocates out of the floating block must renumber
+  those networks.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>

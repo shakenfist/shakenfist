@@ -14405,6 +14405,1236 @@ phase.</p>
 <p>The <code>except TypeError</code> narrowing the row once described belongs to
 phase 5 and is done. The three attribution issues it also listed are
 closed.</p>
+<h2 id="sweep-results">Sweep results<a class="headerlink" href="#sweep-results" title="Permanent link">&para;</a></h2>
+<p>Step 1's measurement, and the evidentiary basis for steps 2 and 3.</p>
+<p>Produced by <code>shakenfist/tests/external_api/test_required_sweep.py</code> at
+<code>a5f12bec5</code>, which enumerates the declarations from
+<code>declarations.handlers()</code> -- the census script in the appendix, not a
+hand written list -- and drives one real authenticated request per row
+through the whole decorator stack. Step 1 ran it in the default
+<code>enforce</code> mode, which was then still exempting missing-required
+findings; step 3 deleted that exemption and moved the file to <code>warn</code>,
+which reproduces the same pre-enforcement answers and is what the table
+is re-measured against on every run (see <em>Progress</em>). For
+each declaration it sends a complete valid request (the <em>control</em>) and
+then the same request with that one parameter removed, recording the
+status and whether <code>record_exception</code> was called.</p>
+<p>The controls are not incidental. A request which 404s because a fixture
+was not built is indistinguishable, from the outside, from a handler
+refusing an omission, and that is precisely the shape of mistake the
+phase 5 survey made. Every recipe therefore declares the status its
+complete request answers and the test asserts it on every run, so a
+rotted fixture fails the test rather than quietly publishing a wrong
+verdict. Four verdicts in a first draft turned out to be fixture
+artefacts and were caught this way, including one -- <code>blob_uuid</code> on the
+agent-put route -- where a blob stub that resolved <em>any</em> uuid made a
+fault look like an acceptance.</p>
+<p>The table is pinned in the test as <code>SWEEP</code>, so a handler which starts
+answering an omission differently fails CI rather than silently
+invalidating this evidence.</p>
+<p><strong>76 rows, the number the census reports.</strong> 75 of them are finding F1's
+declarations whose handler gives them a default; the 76th is the
+raw-body marker discussed below.</p>
+<table>
+<thead>
+<tr>
+<th>Verdict</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>guarded</code> -- the handler answers 4xx</td>
+<td>65</td>
+</tr>
+<tr>
+<td><code>faults</code> -- 5xx, or an exception was recorded</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>accepted</code> -- 2xx</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<p>Step 1 measured 63 <code>guarded</code> and 7 <code>faults</code>. The review round moved two
+rows by fixing the two faults which were bugs rather than symptoms of
+required-ness; see <em>What the sweep says that F1 did not</em> below.</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Parameter</th>
+<th>In</th>
+<th>Type</th>
+<th>Status</th>
+<th>Verdict</th>
+<th>What the server does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ArtifactMetadataEndpoint</code></td>
+<td>put</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>ArtifactMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>ArtifactMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>ArtifactsEndpoint</code></td>
+<td>delete</td>
+<td><code>confirm</code></td>
+<td>body</td>
+<td>boolean</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>parameter confirm is not set true</code></td>
+</tr>
+<tr>
+<td><code>ArtifactsEndpoint</code></td>
+<td>post</td>
+<td><code>shared</code></td>
+<td>body</td>
+<td>boolean</td>
+<td>200</td>
+<td><strong>accepted</strong></td>
+<td>defaults to False; the artifact is created unshared</td>
+</tr>
+<tr>
+<td><code>ArtifactsEndpoint</code></td>
+<td>post</td>
+<td><code>url</code></td>
+<td>body</td>
+<td>url</td>
+<td>500</td>
+<td><strong>faults</strong></td>
+<td><code>Artifact.new()</code> does <code>source_url.split('/')</code> (<code>artifact.py:355</code>)</td>
+</tr>
+<tr>
+<td><code>AuthEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing key in request</code></td>
+</tr>
+<tr>
+<td><code>AuthEndpoint</code></td>
+<td>post</td>
+<td><code>namespace</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing namespace in request</code></td>
+</tr>
+<tr>
+<td><code>AuthFederatedEndpoint</code></td>
+<td>post</td>
+<td><code>namespace</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no namespace specified</code></td>
+</tr>
+<tr>
+<td><code>AuthFederatedEndpoint</code></td>
+<td>post</td>
+<td><code>rule</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no rule specified</code></td>
+</tr>
+<tr>
+<td><code>AuthFederatedEndpoint</code></td>
+<td>post</td>
+<td><code>token</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no token specified</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuerEndpoint</code></td>
+<td>put</td>
+<td><code>audience</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no audience specified</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuerEndpoint</code></td>
+<td>put</td>
+<td><code>issuer_url</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no issuer_url specified</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuerEndpoint</code></td>
+<td>put</td>
+<td><code>jwks_uri</code></td>
+<td>body</td>
+<td>url</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no jwks_uri specified</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuersEndpoint</code></td>
+<td>post</td>
+<td><code>audience</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no audience specified</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuersEndpoint</code></td>
+<td>post</td>
+<td><code>issuer_url</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no issuer_url specified</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuersEndpoint</code></td>
+<td>post</td>
+<td><code>jwks_uri</code></td>
+<td>body</td>
+<td>url</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no jwks_uri specified</code></td>
+</tr>
+<tr>
+<td><code>AuthIssuersEndpoint</code></td>
+<td>post</td>
+<td><code>name</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no name specified</code></td>
+</tr>
+<tr>
+<td><code>AuthMetadataEndpoint</code></td>
+<td>put</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>AuthMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>AuthMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceClaimsEndpoint</code></td>
+<td>post</td>
+<td><code>expires_in_seconds</code></td>
+<td>body</td>
+<td>integer</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no expires_in_seconds specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceClaimsEndpoint</code></td>
+<td>post</td>
+<td><code>limit_cpus</code></td>
+<td>body</td>
+<td>unsignedinteger</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no limit_cpus specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceClaimsEndpoint</code></td>
+<td>post</td>
+<td><code>limit_disk_gb</code></td>
+<td>body</td>
+<td>unsignedinteger</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no limit_disk_gb specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceClaimsEndpoint</code></td>
+<td>post</td>
+<td><code>limit_memory_mb</code></td>
+<td>body</td>
+<td>unsignedinteger</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no limit_memory_mb specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceKeyEndpoint</code></td>
+<td>put</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceKeysEndpoint</code></td>
+<td>post</td>
+<td><code>key_name</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key name specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRuleEndpoint</code></td>
+<td>put</td>
+<td><code>bound_claims</code></td>
+<td>body</td>
+<td>dict</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): bound_claims</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRuleEndpoint</code></td>
+<td>put</td>
+<td><code>issuer</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): issuer</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRuleEndpoint</code></td>
+<td>put</td>
+<td><code>key_name_prefix</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): key_name_prefix</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRuleEndpoint</code></td>
+<td>put</td>
+<td><code>key_ttl</code></td>
+<td>body</td>
+<td>integer</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): key_ttl</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRuleEndpoint</code></td>
+<td>put</td>
+<td><code>scopes</code></td>
+<td>body</td>
+<td>arrayofstring</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): scopes</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRulesEndpoint</code></td>
+<td>post</td>
+<td><code>bound_claims</code></td>
+<td>body</td>
+<td>dict</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): bound_claims</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRulesEndpoint</code></td>
+<td>post</td>
+<td><code>issuer</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): issuer</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRulesEndpoint</code></td>
+<td>post</td>
+<td><code>key_name_prefix</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): key_name_prefix</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRulesEndpoint</code></td>
+<td>post</td>
+<td><code>key_ttl</code></td>
+<td>body</td>
+<td>integer</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): key_ttl</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRulesEndpoint</code></td>
+<td>post</td>
+<td><code>name</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no name specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceRulesEndpoint</code></td>
+<td>post</td>
+<td><code>scopes</code></td>
+<td>body</td>
+<td>arrayofstring</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>missing required field(s): scopes</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespaceTrustsEndpoint</code></td>
+<td>post</td>
+<td><code>external_namespace</code></td>
+<td>body</td>
+<td>namespace</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no external namespace specified</code></td>
+</tr>
+<tr>
+<td><code>AuthNamespacesEndpoint</code></td>
+<td>post</td>
+<td><code>namespace</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no namespace specified</code></td>
+</tr>
+<tr>
+<td><code>BlobMetadataEndpoint</code></td>
+<td>put</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>BlobMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>BlobMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>ClusterOperationsEndpoint</code></td>
+<td>get</td>
+<td><code>target_object_type</code></td>
+<td>query</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>target_object_type parameter is required</code></td>
+</tr>
+<tr>
+<td><code>ClusterOperationsEndpoint</code></td>
+<td>get</td>
+<td><code>target_uuid</code></td>
+<td>query</td>
+<td>uuid</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>target_uuid parameter is required</code></td>
+</tr>
+<tr>
+<td><code>InstanceAgentExecuteEndpoint</code></td>
+<td>post</td>
+<td><code>command_line</code></td>
+<td>body</td>
+<td>string</td>
+<td>200</td>
+<td><strong>accepted</strong></td>
+<td>queues an <code>execute</code> operation whose <code>commandline</code> is null</td>
+</tr>
+<tr>
+<td><code>InstanceAgentGetEndpoint</code></td>
+<td>post</td>
+<td><code>path</code></td>
+<td>body</td>
+<td>string</td>
+<td>200</td>
+<td><strong>accepted</strong></td>
+<td>queues a <code>get-file</code> operation whose <code>path</code> is null</td>
+</tr>
+<tr>
+<td><code>InstanceAgentPutEndpoint</code></td>
+<td>post</td>
+<td><code>blob_uuid</code></td>
+<td>body</td>
+<td>uuid</td>
+<td>404</td>
+<td><strong>guarded</strong></td>
+<td><code>blob not found</code> (was a 500 until the review round fixed <code>self.api_error</code>)</td>
+</tr>
+<tr>
+<td><code>InstanceAgentPutEndpoint</code></td>
+<td>post</td>
+<td><code>mode</code></td>
+<td>body</td>
+<td>string</td>
+<td>406</td>
+<td><strong>guarded</strong></td>
+<td><code>invalid mode: a mode must be a string</code> (was a 500 until the review round refused a non-string mode)</td>
+</tr>
+<tr>
+<td><code>InstanceAgentPutEndpoint</code></td>
+<td>post</td>
+<td><code>path</code></td>
+<td>body</td>
+<td>string</td>
+<td>200</td>
+<td><strong>accepted</strong></td>
+<td>queues <code>put-blob</code> and <code>chmod</code> operations whose <code>path</code> is null</td>
+</tr>
+<tr>
+<td><code>InstanceInterfacesEndpoint</code></td>
+<td>post</td>
+<td><code>network</code></td>
+<td>body</td>
+<td>dict</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>network specification should contain JSON objects</code></td>
+</tr>
+<tr>
+<td><code>InstanceMetadataEndpoint</code></td>
+<td>put</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>InstanceMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>InstanceMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint</code></td>
+<td>delete</td>
+<td><code>confirm</code></td>
+<td>body</td>
+<td>boolean</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>parameter confirm is not set true</code></td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint</code></td>
+<td>post</td>
+<td><code>cpus</code></td>
+<td>body</td>
+<td>unsignedinteger</td>
+<td>500</td>
+<td><strong>faults</strong></td>
+<td><code>InstanceData</code> refuses a null <code>cpus</code> (<code>instance.py:360</code>)</td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint</code></td>
+<td>post</td>
+<td><code>disk</code></td>
+<td>body</td>
+<td>arrayofdict</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>instance must specify at least one disk</code></td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint</code></td>
+<td>post</td>
+<td><code>memory</code></td>
+<td>body</td>
+<td>unsignedinteger</td>
+<td>500</td>
+<td><strong>faults</strong></td>
+<td><code>InstanceData</code> refuses a null <code>memory</code> (<code>instance.py:360</code>)</td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint</code></td>
+<td>post</td>
+<td><code>name</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>instance name must be specified</code></td>
+</tr>
+<tr>
+<td><code>InterfaceMetadataEndpoint</code></td>
+<td>put</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>InterfaceMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>InterfaceMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>LabelEndpoint</code></td>
+<td>post</td>
+<td><code>blob_uuid</code></td>
+<td>body</td>
+<td>uuid</td>
+<td>500</td>
+<td><strong>faults</strong></td>
+<td><code>add_index(None)</code> raises <code>BlobMissing</code> (<code>artifact.py:665</code>)</td>
+</tr>
+<tr>
+<td><code>NetworkDNSAddressEndpoint</code></td>
+<td>delete</td>
+<td><code>name</code></td>
+<td>body</td>
+<td>string</td>
+<td>406</td>
+<td><strong>guarded</strong></td>
+<td><code>invalid DNS name</code></td>
+</tr>
+<tr>
+<td><code>NetworkDNSAddressEndpoint</code></td>
+<td>post</td>
+<td><code>name</code></td>
+<td>body</td>
+<td>string</td>
+<td>406</td>
+<td><strong>guarded</strong></td>
+<td><code>invalid DNS name</code></td>
+</tr>
+<tr>
+<td><code>NetworkDNSAddressEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>ipv4</td>
+<td>200</td>
+<td><strong>accepted</strong></td>
+<td>stores <code>hosteddns[name] = None</code> and enqueues the dnsmasq update</td>
+</tr>
+<tr>
+<td><code>NetworkMetadataEndpoint</code></td>
+<td>put</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>NetworkMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>NetworkMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>NetworksEndpoint</code></td>
+<td>delete</td>
+<td><code>confirm</code></td>
+<td>body</td>
+<td>boolean</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>parameter confirm is not set true</code></td>
+</tr>
+<tr>
+<td><code>NetworksEndpoint</code></td>
+<td>post</td>
+<td><code>name</code></td>
+<td>body</td>
+<td>string</td>
+<td>500</td>
+<td><strong>faults</strong></td>
+<td><code>NetworkData</code> refuses a null <code>name</code> (<code>network.py:277</code>)</td>
+</tr>
+<tr>
+<td><code>NetworksEndpoint</code></td>
+<td>post</td>
+<td><code>netblock</code></td>
+<td>body</td>
+<td>netblock</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>cannot parse netblock: None does not appear to be an IPv4 or IPv6 network</code></td>
+</tr>
+<tr>
+<td><code>NodeMetadataEndpoint</code></td>
+<td>put</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>NodeMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>key</code></td>
+<td>body</td>
+<td>string</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no key specified</code></td>
+</tr>
+<tr>
+<td><code>NodeMetadatasEndpoint</code></td>
+<td>post</td>
+<td><code>value</code></td>
+<td>body</td>
+<td>any</td>
+<td>400</td>
+<td><strong>guarded</strong></td>
+<td><code>no value specified</code></td>
+</tr>
+<tr>
+<td><code>UploadDataEndpoint</code></td>
+<td>post</td>
+<td><code>body</code></td>
+<td>body</td>
+<td>binary</td>
+<td>200</td>
+<td><strong>accepted</strong></td>
+<td>appends nothing and answers the unchanged length; this is the raw body marker, which never reaches <code>required_names</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-the-sweep-says-that-f1-did-not">What the sweep says that F1 did not<a class="headerlink" href="#what-the-sweep-says-that-f1-did-not" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1 measured 7 <code>faults</code>, and two of them were bugs independent of
+required-ness. The review round fixed both, which is why the table above
+now reads 5.</strong> Each was a fault on far more than the omission path, and
+each contradicted the response list the endpoint publishes -- which is
+the class of defect this phase exists to close.</p>
+<ul>
+<li><code>InstanceAgentPutEndpoint.post</code> wrote its blob refusal as
+  <code>self.api_error(404, 'blob not found')</code> (<code>instance.py:1955</code>).
+  <code>api_base.Resource</code> has no <code>api_error</code>, so <em>any</em> caller naming a blob
+  which did not resolve -- not merely one who omitted the parameter --
+  got an <code>AttributeError</code>, a recorded exception and an opaque 500
+  instead of the documented 404. Enforcing required-ness would have
+  closed the omission path and left the far more common bad-uuid path
+  exactly as it was, so <a href="https://github.com/shakenfist/shakenfist/issues/4194">#4194</a>
+  is fixed here instead: the call is now <code>sf_api.error(404, 'blob not
+  found')</code>, like every other refusal in the same handler, and the row
+  measures <code>404</code>/<code>guarded</code>.</li>
+<li>The <code>mode</code> guard immediately above it was <code>try: int(mode) except
+  ValueError</code>, and <code>int(None)</code> raises <code>TypeError</code>. This is the example
+  <code>CompiledEndpoint</code>'s docstring cites as a parameter "declared
+  required while omitting it has always been accepted"; that was true
+  while <code>handle_authorization_exceptions</code> still caught <code>TypeError</code> and
+  answered 400, and phase 5 deleted that arm (decision D23). It became
+  a recorded 500, reachable under <code>warn</code> and <code>off</code> whether or not the
+  parameter was omitted. <a href="https://github.com/shakenfist/shakenfist/issues/4195">#4195</a>
+  is fixed here by refusing a non-string mode with the <code>406</code> the
+  endpoint publishes. Widening the <code>except</code> to <code>(TypeError,
+  ValueError)</code> is <em>not</em> sufficient and was measured not to be: the
+  symbolic fallback beneath it calls <code>.split()</code> on its argument, so a
+  null falls out of it as an <code>AttributeError</code> and the 500 survives. An
+  explicit type check is what closes the row.</li>
+</ul>
+<p>The remaining five faults are a null reaching a constructor:
+<code>Artifact.new()</code> splits <code>source_url</code>, <code>Instance.new()</code> and
+<code>Network.new()</code> hand a null to a pydantic model which refuses it, and
+<code>Artifact.add_index(None)</code> raises <code>BlobMissing</code>. All five are closed by
+enforcing required-ness, which is D32's argument restated in
+measurements -- and unlike the two above, none of them is reachable by a
+caller who supplies the parameter, so there is nothing to fix in the
+handler.</p>
+<p><strong>The 6 <code>accepted</code> are the contract change.</strong> Four of them are the three
+agent routes, which cheerfully queue an operation carrying a null
+<code>commandline</code> or <code>path</code> for the guest agent to fail on later; one is
+<code>NetworkDNSAddressEndpoint.post</code>, which stores a DNS name pointing at
+null; and one -- <code>shared</code> on <code>ArtifactsEndpoint.post</code> -- is a genuine
+optional parameter with a sensible default which has simply been
+declared wrongly. Only that last one is a declaration step 2 should
+relax on the evidence here; the other five are cases where the
+declaration is right and the handler is what is lenient.</p>
+<p><strong>The raw body is a special case, and F1 mis-identifies it.</strong> The census
+counts one declaration which is not a handler keyword argument. F1 names
+that as <code>namespace</code> on <code>AuthFederatedEndpoint.post</code>, "consumed by a
+decorator rather than named by the handler". That is wrong: the
+signature is <code>post(self, token=None, namespace=None, rule=None)</code>, so the
+parameter has a default like the other 74. The actual odd one out is
+<code>UploadDataEndpoint.post</code>'s <code>body</code>, declared with
+<code>api_base.RAW_BODY_PARAMETER</code>. <code>compile_parameters()</code>
+(<code>validation.py:225</code>) sets <code>raw_body</code> for it and <code>continue</code>s <em>before</em>
+adding anything to <code>required_names</code>, so this declaration can never
+produce a missing-required finding and step 3's enforcement will never
+reach it whatever step 2 does to the tuple. The counts F1 reports --
+76, 75, 0, 1 -- are unchanged and were re-run on this branch; only the
+example is corrected.</p>
+<p><strong>The better-message risk is smaller than feared.</strong> The plan's risks
+section worries that enforcement replaces a handler's specific message
+with a generic one. 65 of 76 rows are already a 4xx whose message names
+the problem, so step 3 will replace 65 hand-written messages with
+<code>&lt;parameter&gt;: declared required but not supplied</code>. (63 when step 1
+measured; the two the review round fixed joined them.) Most are already
+generic (<code>no value specified</code> on 14 rows, <code>no key specified</code> on
+8), but three are materially more informative than the replacement and
+are worth listing in step 6's release note:
+<code>parameter confirm is not set true</code> (3 rows),
+<code>instance must specify at least one disk</code>, and
+<code>cannot parse netblock: ...</code>.</p>
+<h2 id="step-2-which-declarations-are-really-required">Step 2: which declarations are really required<a class="headerlink" href="#step-2-which-declarations-are-really-required" title="Permanent link">&para;</a></h2>
+<p>Step 2's output, and the list the second gate reviews.</p>
+<p><strong>One declaration moved.</strong> <code>shared</code> on <code>ArtifactsEndpoint.post</code>
+(<code>artifact.py:437</code>) is now <code>required=False</code>. Every other declaration in
+the sweep table keeps <code>required=True</code>, unchanged.</p>
+<h3 id="the-rule-and-the-qualifier-it-carries">The rule, and the qualifier it carries<a class="headerlink" href="#the-rule-and-the-qualifier-it-carries" title="Permanent link">&para;</a></h3>
+<p>The step 2 brief states the rule mechanically -- <code>guarded</code> and <code>faults</code>
+keep <code>required=True</code>, <code>accepted</code> becomes <code>required=False</code>. D35 states
+it with a qualifier: "If the handler accepts the omission <em>and does
+something sensible</em>, the declaration is wrong and gets corrected to
+<code>required=False</code>." The six <code>accepted</code> rows are not alike on that
+second clause, and the step is decided on it, which is also what the
+sweep results section already concluded in prose ("only that last one
+is a declaration step 2 should relax on the evidence here").</p>
+<p>Four of the six answer 2xx and commit a broken operation: an agent
+operation carrying a null <code>commandline</code> or <code>path</code>, or a DNS name
+resolving to null. Nothing downstream of the API can do anything with
+those but fail, at a point where the caller is no longer holding the
+request. Publishing <code>required=false</code> for them would make that broken
+acceptance the documented contract, and would deny step 3 the one
+change that improves it -- turning a silent bad write into a 400 the
+caller sees. Enforcing required-ness on a parameter the handler already
+mishandles is not a contract regression; the request never worked.</p>
+<p>Against that: an <code>accepted</code> verdict means some client could be omitting
+the parameter today and getting a 200. D35's residual risk is exactly
+this, and it is accepted here for the four, because what such a client
+receives today is a queued operation that cannot succeed -- a 200 which
+is not a success. The remaining case for relaxing them would be a
+client that omits <code>path</code> and relies on the agent operation failing,
+which is not a use.</p>
+<h3 id="the-six-one-at-a-time">The six, one at a time<a class="headerlink" href="#the-six-one-at-a-time" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Parameter</th>
+<th>Decision</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ArtifactsEndpoint.post</code></td>
+<td><code>shared</code></td>
+<td><strong><code>required=False</code></strong></td>
+<td>The handler's signature is <code>shared=False</code> and the omission creates an unshared artifact, which is the documented default behaviour and what every client that never passes <code>shared</code> already relies on. A real optional parameter, declared wrongly. The only row where D35's "does something sensible" is satisfied.</td>
+</tr>
+<tr>
+<td><code>InstanceAgentExecuteEndpoint.post</code></td>
+<td><code>command_line</code></td>
+<td>keeps <code>required=True</code></td>
+<td>Queues an <code>execute</code> operation whose <code>commandline</code> is null (<code>instance.py:2097</code>). The agent has no command to run; the operation exists only to fail.</td>
+</tr>
+<tr>
+<td><code>InstanceAgentGetEndpoint.post</code></td>
+<td><code>path</code></td>
+<td>keeps <code>required=True</code></td>
+<td>Queues a <code>get-file</code> whose <code>path</code> is null (<code>instance.py:2032</code>). No file is named, so nothing can be fetched.</td>
+</tr>
+<tr>
+<td><code>InstanceAgentPutEndpoint.post</code></td>
+<td><code>path</code></td>
+<td>keeps <code>required=True</code></td>
+<td>Queues <code>put-blob</code> and <code>chmod</code> whose <code>path</code> is null (<code>instance.py:1961</code>), after the blob has been resolved -- so a real blob is queued for delivery to nowhere.</td>
+</tr>
+<tr>
+<td><code>NetworkDNSAddressEndpoint.post</code></td>
+<td><code>value</code></td>
+<td>keeps <code>required=True</code></td>
+<td>Stores <code>hosteddns[name] = None</code> and enqueues the dnsmasq rewrite (<code>network.py:765</code>). The record is written and the network reconfigured around an address that does not exist.</td>
+</tr>
+<tr>
+<td><code>UploadDataEndpoint.post</code></td>
+<td><code>body</code></td>
+<td>keeps <code>required=True</code>, and it is inert</td>
+<td>The raw-body marker. <code>compile_parameters()</code> sets <code>raw_body</code> and <code>continue</code>s before <code>required_names</code> is touched (<code>validation.py:228</code>), so this declaration cannot produce a missing-required finding whatever its fifth element says, and step 3's enforcement will never reach it. There is also no such thing as omitting a request body -- the sweep's "omission" is a zero-length one -- so the published <code>required: true</code> is not a false claim. Left exactly as it is.</td>
+</tr>
+</tbody>
+</table>
+<p>The four kept rows carry a one-line comment at the declaration saying
+the handler does not refuse the omission today, because the next author
+to read that tuple will not have this plan open.</p>
+<h3 id="what-this-costs-elsewhere">What this costs elsewhere<a class="headerlink" href="#what-this-costs-elsewhere" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The published specification changes by one line.</strong> <code>shared</code> leaves
+  the <code>required</code> array of the <code>POST /artifacts</code> body schema. The
+  parameter-level <code>required: true</code> on the body object itself is
+  unchanged, because <code>url</code> is still required. Nothing else in the
+  document moves, and <code>test_openapi_spec.py</code> needed no new
+  <code>STRUCTURED_PARAMETERS</code> entry: that table is about structured and
+  bounded types, and <code>shared</code> is a plain boolean.</li>
+<li><strong>The sweep keeps measuring all 76.</strong> <code>required_declarations()</code> is
+  derived from the declarations, so a relaxed one would otherwise drop
+  out of the census and take its verdict out of the pinned table with
+  it. <code>RELAXED_BY_STEP_2</code> in <code>test_required_sweep.py</code> names what step 2
+  moved and keeps it enumerated, and a new test pins the split in both
+  directions -- so neither a quiet revert of <code>shared</code> nor a later
+  mechanical sweep of the four kept rows can happen without that file
+  saying so. No verdict changed; no handler was touched.</li>
+<li><strong>The census script in the appendix now prints 75, not 76.</strong> It knows
+  nothing about <code>RELAXED_BY_STEP_2</code>, and one declaration it used to
+  count is no longer declared required. Definition-of-done item 1 is a
+  statement about step 1's deliverable and is unaffected; a reader
+  re-running the script after step 2 should expect 75.</li>
+<li><strong><code>test_request_validation.py</code> lost its example.</strong>
+  <code>test_an_omitted_required_parameter_still_reaches_the_handler</code> used
+  <code>shared</code> precisely because it was declared required and optional in
+  fact. It is repointed at <code>command_line</code> on the agent execute route,
+  which is a sharper example of the same property and asserts the null
+  <code>commandline</code> the omission queues.</li>
+</ul>
+<h3 id="definition-of-done-item-3">Definition of done item 3<a class="headerlink" href="#definition-of-done-item-3" title="Permanent link">&para;</a></h3>
+<p>Item 3 as written -- "every declaration still carrying <code>required=True</code>
+in a <code>body</code> or <code>query</code> location has a row in the sweep table whose
+verdict is not <code>accepted</code>" -- is the mechanical rule, and this step
+does not satisfy it: four <code>accepted</code> rows deliberately keep
+<code>required=True</code>. It was written before the sweep existed, when
+<code>accepted</code> was expected to mean "the handler copes". It does not mean
+that in four cases out of six. The item should read: every declaration
+still carrying <code>required=True</code> in a <code>body</code> or <code>query</code> location has a
+row in the sweep table, and any row whose verdict is <code>accepted</code> has a
+recorded reason in this section for staying required.</p>
+<h3 id="messages-and-statuses-enforcement-will-change">Messages and statuses enforcement will change<a class="headerlink" href="#messages-and-statuses-enforcement-will-change" title="Permanent link">&para;</a></h3>
+<p>For step 6's release note, and the Risks section's instruction to
+count them. After step 3, an omitted required parameter answers
+<code>400 &lt;parameter&gt;: declared required but not supplied</code>. 65 rows are
+already a 4xx, and on 57 of them the existing message is a bare
+restatement of the same fact (<code>no value specified</code> on 14 rows, <code>no key
+specified</code> on 8, <code>missing required field(s): X</code> on 10, <code>no X
+specified</code> on most of the rest), so the replacement loses nothing.</p>
+<p>Materially worse, all of them only on the pure-omission path:</p>
+<table>
+<thead>
+<tr>
+<th>Request</th>
+<th>Today</th>
+<th>After step 3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DELETE /artifacts</code>, <code>/instances</code>, <code>/networks</code> with no <code>confirm</code></td>
+<td><code>400 parameter confirm is not set true</code></td>
+<td><code>400 confirm: declared required but not supplied</code></td>
+</tr>
+<tr>
+<td><code>POST /instances</code> with no <code>disk</code></td>
+<td><code>400 instance must specify at least one disk</code></td>
+<td><code>400 disk: declared required but not supplied</code></td>
+</tr>
+<tr>
+<td><code>POST /instances/&lt;i&gt;/interfaces</code> with no <code>network</code></td>
+<td><code>400 network specification should contain JSON objects</code></td>
+<td><code>400 network: declared required but not supplied</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each of those three messages survives for the case that actually
+carries the information: <code>confirm: false</code>, <code>disk: []</code> and a malformed
+networkspec all still reach the handler and still get the specific
+message. Only the omission, where the specific message was not telling
+the caller anything the generic one does not, changes. That is five
+rows, and on the Risks section's threshold ("more than two or three is
+an argument to revisit") it is worth the gate looking at, but three of
+the five are the same message on three routes.</p>
+<p>A status code change, which is not a message change and is worth the
+release note stating separately:</p>
+<table>
+<thead>
+<tr>
+<th>Request</th>
+<th>Today</th>
+<th>After step 3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code>/<code>DELETE /networks/&lt;n&gt;/dns</code> with no <code>name</code></td>
+<td><code>406 invalid DNS name</code></td>
+<td><code>400 name: declared required but not supplied</code></td>
+</tr>
+</tbody>
+</table>
+<p>And two improvements, recorded so the release note is not one-sided:
+<code>POST /networks</code> with no <code>netblock</code> currently answers <code>400 cannot parse
+netblock: None does not appear to be an IPv4 or IPv6 network</code>, which
+tells the caller the server saw a <code>None</code> it should never have been
+sent; and every one of the 5 remaining <code>faults</code> rows stops being a 500
+with an exception record and becomes a 400 naming the parameter. The two
+faults the review round fixed are a larger improvement still, because
+they were 500s on paths a caller reaches without omitting anything.</p>
+<h2 id="step-4-how-wide-each-format-really-is">Step 4: how wide each format really is<a class="headerlink" href="#step-4-how-wide-each-format-really-is" title="Permanent link">&para;</a></h2>
+<p>F3's set of thirteen is unchanged -- re-derived from <code>ARGTYPES</code> and
+<code>declarations.handlers()</code> rather than from the table's line numbers,
+which drifted by up to sixteen lines when step 2 added comments to the
+declarations it touched. The same thirteen endpoints, methods and
+parameter names; <code>uuidorname</code> still has no body or query use at all,
+and <code>macaddr</code> still has none.</p>
+<p>The step's whole risk is a validator stricter than its handler, so
+what each handler accepts <em>today</em> was established by reading it, and
+by reading what the functional suite and the shipped client send. The
+answers, and what each validator does with them:</p>
+<table>
+<thead>
+<tr>
+<th>Declaration</th>
+<th>What the handler accepts today</th>
+<th>Validator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>InstancesEndpoint.post.user_data</code></td>
+<td>whatever <code>base64.b64decode()</code> decodes at the config drive (<code>instance.py:1930</code>), which in practice means base64 wrapped at 76 columns</td>
+<td><code>b64decode(''.join(value.split()), validate=True)</code></td>
+</tr>
+<tr>
+<td><code>NetworksEndpoint.post.netblock</code></td>
+<td>whatever <code>ipaddress.ip_network()</code> parses; the handler already 400s on a <code>ValueError</code></td>
+<td><code>ip_network(value)</code></td>
+</tr>
+<tr>
+<td><code>NetworkDNSAddressEndpoint.post.value</code></td>
+<td>anything at all -- the handler never looks at it, and it is rendered straight into dnsmasq's hosts file by <code>dnshosts.tmpl</code></td>
+<td><code>ip_address(value)</code></td>
+</tr>
+<tr>
+<td><code>ArtifactsEndpoint.post.url</code></td>
+<td>a URL <strong>or</strong> an image shortcut with no scheme: <code>cirros</code>, <code>cirros:0.4.0</code>, <code>ubuntu:20.04</code>, expanded by <code>images._resolve_image()</code></td>
+<td><code>urlparse(value)</code> only</td>
+</tr>
+<tr>
+<td><code>ArtifactUploadEndpoint.post.source_url</code></td>
+<td>anything; it is the URL the artifact <em>claims</em>, and its own default is <code>sf://upload/&lt;ns&gt;/&lt;name&gt;</code></td>
+<td><code>urlparse(value)</code> only</td>
+</tr>
+<tr>
+<td><code>InstancesEndpoint.post.nvram_template</code></td>
+<td><code>label:&lt;name&gt;</code>, <code>sf://blob/&lt;uuid&gt;</code>, or anything else passed through to <code>Blob.from_db()</code></td>
+<td><code>urlparse(value)</code> only</td>
+</tr>
+<tr>
+<td><code>AuthIssuersEndpoint.post.jwks_uri</code>, <code>AuthIssuerEndpoint.put.jwks_uri</code></td>
+<td>only <code>https://...</code>, enforced by <code>_validate_issuer_arguments()</code> in the handler</td>
+<td><code>urlparse(value)</code> only</td>
+</tr>
+<tr>
+<td><code>ArtifactUploadEndpoint.post.upload_uuid</code>, <code>.blob_uuid</code>; <code>InstanceAgentPutEndpoint.post.blob_uuid</code></td>
+<td>any string; a miss in the following <code>from_db()</code> is a 404</td>
+<td><code>uuid.UUID(value)</code></td>
+</tr>
+<tr>
+<td><code>LabelEndpoint.post.blob_uuid</code></td>
+<td>any string, unchecked: it goes to <code>Artifact.add_index()</code> and the route answers 200 with a label version pointing at a blob that does not exist</td>
+<td><code>uuid.UUID(value)</code></td>
+</tr>
+<tr>
+<td><code>ClusterOperationsEndpoint.get.target_uuid</code></td>
+<td>any string; a miss in <code>cls.from_db()</code> is a 404</td>
+<td><code>uuid.UUID(value)</code></td>
+</tr>
+</tbody>
+</table>
+<p>Three of those readings changed what the step would otherwise have
+built.</p>
+<p><strong><code>base64</code> strips whitespace and then validates strictly.</strong> The step
+first wrote this as a lenient <code>b64decode(value)</code>, reasoning that
+<code>validate=True</code> refuses base64 wrapped at 76 columns -- which is what
+<code>base64 user-data.yaml</code> emits and therefore what a caller running
+<code>sf-client instance create -U "$(base64 user-data.yaml)"</code> sends, and
+which the config drive decodes today. That reasoning is half right and
+the conclusion was wrong, and the review of this phase caught it.
+b64decode's default does not merely tolerate the newlines in a wrapped
+value: it discards <em>every</em> character outside the alphabet, so it throws
+away the hashes, colons and spaces of raw cloud-config too and decodes
+whatever alphabet characters are left. Whether a raw payload is refused
+is then a coin flip on the filtered length modulo 4. Measured over five
+realistic raw cloud-config samples, two passed -- so the lenient
+validator left most of #3269 open.</p>
+<p>Stripping the whitespace <em>before</em> a strict decode gets both properties
+at once: a wrapped value survives the strip and decodes, and raw
+cloud-config reaches a strict decoder with its non-alphabet characters
+intact and is refused deterministically. All five samples are refused,
+and the wrapped output of <code>base64(1)</code> is still accepted. Three tests
+pin it: <code>test_byte_takes_what_the_config_drive_decodes</code> and
+<code>test_wrapped_base64_user_data_still_reaches_placement</code> hold the
+wrapped half, and
+<code>test_byte_refuses_raw_config_the_lenient_decode_accepted</code> carries the
+two samples which used to pass, asserting first that the lenient decode
+accepts them so the sample cannot silently stop demonstrating the
+hole.</p>
+<p><strong><code>url</code> cannot require a scheme, and so barely validates.</strong> Of the
+five declarations it covers, only <code>jwks_uri</code> is a web URL, and the
+handler already enforces <code>https://</code> there. The other four take
+scheme-less shortcuts (<code>cirros</code>), non-hierarchical schemes
+(<code>label:mylabel</code>) and Shaken Fist's own <code>sf://</code> family. What is left
+that is still a check is "urllib.parse can parse it", which in
+practice refuses an unbalanced bracket in the authority and nothing
+else. That is thin, and it is recorded here as thin rather than
+dressed up: the alternative considered was leaving <code>url</code> out of
+<code>_FORMATS</code> entirely, which the step brief permits. It is in because
+the rule it enforces is the stdlib's own definition of "not a URL" and
+costs nothing, not because it closes anything.</p>
+<p><strong><code>target_uuid</code> is safe for a reason that had to be checked.</strong> It is
+the one <code>uuid</code> declaration that could have been carrying a name, since
+<code>namespace</code> and <code>node</code> are keyed by name rather than uuid and
+<code>get_object_class()</code> resolves both. It is not: every object type a
+cluster operation can target comes from a <code>target_fields</code> declaration
+in <code>shakenfist/schema/operations/</code>, and the complete set is <code>ARTIFACT</code>,
+<code>INSTANCE</code>, <code>BLOB</code>, <code>NETWORK</code>, <code>INTERFACE</code> and <code>AGENTOPERATION</code>.</p>
+<p>Two smaller notes. <code>ipv4</code> compiles to <code>ipaddress.ip_address()</code> rather
+than <code>IPv4Address</code>, so it accepts IPv6 as well as the published format
+promises -- the value's only consumer is a hosts file, which takes
+either, and enforcing narrower than the server is the failure this
+step exists to avoid. And <code>netblock</code> accepts a bare address, because
+<code>ip_network('10.0.0.0')</code> is a /32: the handler takes it and then
+refuses it for being below the minimum size of /29, which is a policy
+about how small a network may be and stays in the handler (D34).</p>
+<p>Statuses this changes, in addition to the messages table above: a
+non-uuid <code>blob_uuid</code>, <code>upload_uuid</code> or <code>target_uuid</code> that used to
+answer 404 from a <code>from_db()</code> miss now answers 400 from the validation
+layer. Both are refusals of a string that could never have named an
+object, and <code>warn</code> and <code>off</code> restore the 404.</p>
 <h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
 <p><strong>D32. The declarations get corrected before required-ness is
 enforced, not after.</strong> F1 says all 75 are optional in fact, which means
@@ -14566,8 +15796,14 @@ the server does not require. Step 6's release note says so explicitly.</p>
 <li><code>grep -n "MISSING_REQUIRED" shakenfist/external_api/base.py</code> shows no
    line that filters it out of an enforceable set.</li>
 <li>Every declaration still carrying <code>required=True</code> in a <code>body</code> or
-   <code>query</code> location has a row in the sweep table whose verdict is not
-   <code>accepted</code>.</li>
+   <code>query</code> location has a row in the sweep table, and any row whose
+   verdict is <code>accepted</code> has a recorded reason for staying required.
+   (Amended by step 2, which found four <code>accepted</code> rows where the
+   handler accepts the omission and commits a broken operation, so
+   D35's "does something sensible" qualifier keeps them required. The
+   original wording, which said no <code>accepted</code> row may stay required, is
+   the mechanical rule without that qualifier -- see <em>Step 2: which
+   declarations are really required</em>.)</li>
 <li>A test proves that omitting a required body parameter answers 400
    naming that parameter, and that sending it as an explicit JSON <code>null</code>
    answers the same; both mutation-tested by restoring the filter from
@@ -14599,6 +15835,101 @@ the server does not require. Step 6's release note says so explicitly.</p>
     <em>Structured parameter schemas</em>, phase 8 is the push audit, and the
     <code>docs/plans/index.md</code> row reads <code>6 of 9</code>.</li>
 <li><code>pre-commit run --all-files</code> is clean.</li>
+</ol>
+<h3 id="definition-of-done-audit-step-6">Definition-of-done audit (step 6)<a class="headerlink" href="#definition-of-done-audit-step-6" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Met.</strong> The <em>Sweep results</em> table above carries 76 rows (65
+   <code>guarded</code>, 5 <code>faults</code>, 6 <code>accepted</code> after the review round; 63/7/6
+   as step 1 measured them), matching what
+   <code>test_the_census_still_finds_seventy_six</code> and <code>test_the_sweep</code> pin
+   against <code>required_declarations()</code>/<code>SWEEP</code> in
+   <code>shakenfist/tests/external_api/test_required_sweep.py</code>. The item's
+   own wording says "75 declarations from F1"; F1's own correction
+   (<em>What the sweep says that F1 did not</em>) already notes the true count
+   is 76 (75 defaultable plus the raw-body marker), so the table is
+   right and the item's prose is the thing carrying the stale number,
+   not the deliverable.</li>
+<li><strong>Met.</strong> <code>grep -n "MISSING_REQUIRED" shakenfist/external_api/base.py</code>
+   returns nothing at all now — not merely no <em>filtering</em> line, the
+   name is not present in the file.</li>
+<li><strong>Met, as amended.</strong> <code>shared</code> on <code>POST /artifacts</code> is <code>required=False</code>
+   (<code>shakenfist/external_api/artifact.py:437</code>, with the comment step 2
+   added). The four other <code>accepted</code> rows
+   (<code>InstanceAgentExecuteEndpoint.post.command_line</code>,
+   <code>InstanceAgentGetEndpoint.post.path</code>,
+   <code>InstanceAgentPutEndpoint.post.path</code>,
+   <code>NetworkDNSAddressEndpoint.post.value</code>) keep <code>required=True</code> with
+   the reasoning recorded in <em>Step 2: which declarations are really
+   required</em>, and <code>test_step_2_relaxed_exactly_what_it_said_it_did</code>
+   pins the split in both directions.</li>
+<li><strong>Met</strong>, with one caveat on how it was checked. The omission and
+   explicit-<code>null</code> tests
+   (<code>test_enforce_mode_rejects_missing_required</code>,
+   <code>test_enforce_mode_rejects_an_explicit_null_the_same_way</code> in
+   <code>test_request_validation.py</code>) pass today, and by inspection the
+   filter step 3 deleted is exactly what stood between them and a
+   fall-through to the handler — restoring the
+   <code>[f for f in findings if f.reason != validation.MISSING_REQUIRED]</code>
+   guard makes both a no-op path when the <em>only</em> finding is
+   missing-required, so both tests would fail against it. I did not
+   re-run that reversion live in this sandbox (a mid-session policy
+   restriction blocked writing a temporary revert to production code
+   from this documentation-only step), so this is verified by reading
+   the diff rather than by executing the mutation myself; the step 3
+   commit message records that the author did run it.</li>
+<li><strong>Met.</strong> <code>RequiredSweepTestCase</code> in <code>test_required_sweep.py</code> now
+   runs at <code>mode = 'warn'</code> and asserts, for all 76 rows including the
+   5 <code>faults</code> and 6 <code>accepted</code> populations, that the response is
+   unchanged from the published <code>SWEEP</code> table — not just the two the
+   step brief named.
+   <code>test_warn_mode_still_answers_the_handlers_own_message</code> in
+   <code>test_request_validation.py</code> is the single readable pin for the
+   <code>guarded</code> case.</li>
+<li><strong>Met.</strong> <code>test_unencoded_user_data_is_refused_before_the_hypervisor</code>
+   drives a real <code>POST /instances</code> with unencoded cloud-config,
+   asserts 400 naming <code>user_data</code>, and asserts <code>Instance.new</code> was never
+   called — the only path to <code>instance.py:1930</code>.</li>
+<li><strong>Met.</strong> Each of the five validators in
+   <code>shakenfist/tests/external_api/test_format_validation.py</code> has an
+   accept test, a refuse test, and shares
+   <code>test_every_validator_passes_none_through_untouched</code>, which checks
+   all five in one pass.</li>
+<li><strong>Met.</strong> <code>NetworkCreateFloatingOverlapTestCase</code> in
+   <code>test_network.py</code> covers identical, contains, contained-by and
+   no-floating-network-configured cases, plus
+   <code>test_a_partial_overlap_cannot_be_expressed</code> recording why no fifth
+   case exists.</li>
+<li><strong>Not yet met, deliberately.</strong> Per this step's brief I have not
+   closed either issue. #3269 and #323 both carry <code>Fixes #NNNN</code> in
+   their commits (<code>03ea26514</code> and <code>d6b84b365</code>) and will auto-close on
+   merge; the commit and the check that proves each is named in my
+   final report and in the master plan's <em>Where the tracked issues
+   stand</em> section, for the management session to post as closing
+   comments. #534 was already closed by #4183 before this phase
+   started, as the item itself notes.</li>
+<li><strong>Met.</strong> <code>CompiledEndpoint</code>'s and <code>validate_request</code>'s docstrings
+    were rewritten in step 3;
+    <code>docs/developer_guide/writing_an_endpoint.md</code>'s required-ness
+    paragraph and <code>docs/release_notes/v07-v08.md</code> were corrected in
+    this step (two stale in-progress mentions of "required is recorded
+    and never enforced" earlier in the release note were also updated
+    to point at the new entry, rather than left standing as
+    contradictions).</li>
+<li><strong>Met, except the index number is different from the item's own
+    wording.</strong> The master plan's Execution table has nine rows, phase
+    7 is <em>Structured parameter schemas</em>, phase 8 is <em>Push audit</em>. The
+    item says the index row should read <code>6 of 9</code>, but that number was
+    fixed as part of the <em>planning</em> commit before this phase's work
+    started, when 6 phases (0-5) were complete; completing phase 6
+    itself makes 7 phases complete, and every other "In progress" row
+    in <code>docs/plans/index.md</code> counts completed phases, not the phase
+    number in flight (compare <code>PLAN-scheduler-reservations.md</code>'s
+    <code>11 of 14</code>, <code>PLAN-cluster-op-visibility.md</code>'s <code>2 of 7</code>). I have set
+    it to <code>7 of 9</code> rather than the <code>6 of 9</code> the item names, per this
+    step's own instruction not to leave the arithmetic unchanged when
+    the completed-phase count genuinely changed.</li>
+<li><strong>Met.</strong> <code>pre-commit run --all-files</code> and the full <code>stestr</code> suite
+    were run for this step; results are in the final report.</li>
 </ol>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step, back brief the operator on the understanding
@@ -14677,7 +16008,115 @@ it has to take those on trust.</p>
 which parameters lack a default -- and it prints zero, which is finding
 F5 of phase 5 and is true and useless. The difference is one <code>not</code>.</p>
 <h2 id="progress">Progress<a class="headerlink" href="#progress" title="Permanent link">&para;</a></h2>
-<p>Not started.</p>
+<p>Step 1 done: the sweep is
+<code>shakenfist/tests/external_api/test_required_sweep.py</code> and its table
+is published above under <em>Sweep results</em>.</p>
+<p>Step 2 done: one declaration moved to <code>required=False</code>, and the
+reasoning for each of the six <code>accepted</code> rows is above under <em>Step 2:
+which declarations are really required</em>.</p>
+<p>Step 3 done: the <code>MISSING_REQUIRED</code> filter at <code>base.py:1914</code> is
+deleted, so every finding is enforceable and the reason code survives
+only as telemetry (D37). An explicit JSON <code>null</code> on a required
+parameter is now treated the same as its absence (<code>validation.check()</code>),
+which the <code>CompiledEndpoint</code> and <code>validate_request</code> docstrings no
+longer contradict. <code>RequiredSweepTestCase</code> now runs at <code>warn</code> rather
+than <code>enforce</code> -- an <code>enforce</code> run would answer the layer's own generic
+refusal for every omission before any handler saw it, which is not the
+question that file measures -- so its 76-row sweep is now also the
+evidence for definition-of-done item 5, not merely the guarded/faults
+pair the step brief names. Tests were added or corrected in
+<code>test_request_validation.py</code>, <code>test_instance_create_validation.py</code>,
+<code>test_auth.py</code> and <code>test_external_api.py</code> for every message the
+<em>Messages and statuses enforcement will change</em> table above predicted.</p>
+<p>Step 4 done: <code>validation._FORMATS</code> gives five published <code>format</code>
+strings a validator apiece and <code>_field()</code> consults it, which closes</p>
+<h1 id="3269-the-width-each-validator-was-written-to-and-the-three-readings">3269. The width each validator was written to, and the three readings<a class="headerlink" href="#3269-the-width-each-validator-was-written-to-and-the-three-readings" title="Permanent link">&para;</a></h1>
+<p>that changed what it does, are above under <em>Step 4: how wide each
+format really is</em>. <code>test_format_validation.py</code> holds each validator to
+an accepted value, a refused value and a <code>None</code> passed through
+untouched (item 7), and drives the unencoded-cloud-config body of</p>
+<h1 id="3269-through-a-real-post-instances-to-prove-the-config-drive">3269 through a real <code>POST /instances</code> to prove the config drive<a class="headerlink" href="#3269-through-a-real-post-instances-to-prove-the-config-drive" title="Permanent link">&para;</a></h1>
+<p>decode is never reached with it (item 6).
+<code>test_validation_compiler.py</code>'s <code>format</code> test was inverted: it used to
+assert that no <code>format</code> ever becomes a validator, and now names all
+thirteen declarations that do.</p>
+<p>Step 5 done: <code>NetworksEndpoint.post</code> refuses a netblock overlapping the
+deployed floating network with a 400 naming both blocks, closing #323.
+It reads the floating network the way <code>network.floating_network()</code>
+does, without creating one, and falls back to <code>config.FLOATING_NETWORK</code>
+when no floating network row exists yet -- the row wins when both
+exist. <code>shakenfist/tests/external_api/test_network.py</code>'s
+<code>NetworkCreateFloatingOverlapTestCase</code> covers the identical, contains,
+contained-by and no-floating-network cases and records why a partial
+overlap cannot be expressed (CIDR prefixes form a tree); a cluster CI
+case was added to
+<code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_networking.py</code>.
+Only the floating network is guarded, as the plan scoped -- other
+reserved ranges (node egress, mesh addressing) are untouched. The MAC
+guard step 5 also briefed had already landed in #4183 before the phase
+started (see <em>Amendments</em>); nothing further was added for it.</p>
+<p>Step 6 done: this document, <code>docs/developer_guide/writing_an_endpoint.md</code>
+and <code>docs/release_notes/v07-v08.md</code> all now say <code>required</code> is enforced,
+the master plan's Execution table has nine rows with phase 6 marked
+Complete, and the <code>docs/plans/index.md</code> row reads <code>7 of 9</code>. The phase is
+complete; see <em>Definition of done</em>, below, for the item-by-item audit.</p>
+<p>Review round done: the automated reviewer's findings on
+<a href="https://github.com/shakenfist/shakenfist/pull/4199">PR #4199</a> were
+worked through and eleven of the twelve applied. What changed, and what
+did not:</p>
+<ul>
+<li><strong>The base64 validator was wrong, and the plan overstated what it
+  closed.</strong> <code>b64decode</code> with its default arguments discards every
+  character outside the alphabet, so it decoded raw cloud-config too
+  whenever the filtered length happened to be a multiple of four -- two
+  of five realistic samples. Stripping the whitespace and then decoding
+  with <code>validate=True</code> refuses all five and still accepts the wrapped
+  output of <code>base64(1)</code>. See <em>Step 4: how wide each format really is</em>.</li>
+<li><strong>The two bug rows in the sweep were fixed rather than pinned</strong>
+  (<a href="https://github.com/shakenfist/shakenfist/issues/4194">#4194</a> and
+  <a href="https://github.com/shakenfist/shakenfist/issues/4195">#4195</a>), which
+  moves the verdict table to 65 <code>guarded</code> and 5 <code>faults</code>. Both were
+  faults on paths a caller reaches without omitting anything, and both
+  contradicted the endpoint's own published response list. The
+  reviewer's suggested one-token widening of <code>except ValueError</code> to
+  <code>except (TypeError, ValueError)</code> was measured and does <strong>not</strong> close
+  #4195: the symbolic fallback beneath it raises <code>AttributeError</code> on a
+  null, so the 500 survives. An explicit type check is what closes it.</li>
+<li><strong>The overlap guard moved below the authorisation check</strong>, so an
+  unauthorised create gets its 401 rather than a 400 naming the
+  cluster's floating netblock. The netblock parse stays above it: that
+  is a pure input check and can answer anyone. The guard also no longer
+  turns itself off when the floating network row exists but carries an
+  empty netblock, and it now logs a warning when an unparseable
+  configuration makes it fail open.</li>
+<li><strong>Functional coverage was added for both contract changes.</strong>
+  <code>cluster_ci_tests/test_api_validation.py</code> now drives a delete-all with
+  no <code>confirm</code>, raw cloud-config as <code>user_data</code>, and -- the regression
+  that matters -- a wrapped base64 <code>user_data</code> instance which must still
+  boot. The last one is the only honest test of the format validator's
+  width: the decode it stands in for happens on a hypervisor, in
+  another daemon, from a config drive no unit test builds.</li>
+<li><strong>The sweep now reads declarations through
+  <code>declarations.declarations()</code>.</strong> It had grown its own copy of that AST
+  walk to reach the type token, which <code>Declaration</code> did not carry;
+  <code>test_parameter_declarations.py</code> had grown a second copy for the same
+  reason. <code>argtype</code> is now a field on <code>Declaration</code> and both copies are
+  gone, so there is one reading of a declaration tuple in the tree. The
+  copies also silently skipped a declaration they could not read
+  statically, where the shared helper returns a marker row --
+  <code>required_declarations()</code> now raises on one by name, because a census
+  which claims completeness must not skip what it could not parse.</li>
+<li><strong><code>KNOWN_DEFECTS</code> was considered and not added.</strong> The reviewer asked
+  that the <code>faults</code> rows be labelled so a developer who fixes one gets a
+  helpful message rather than "you broke something". The two rows that
+  argument was about are the two fixed above. The five that remain are
+  all a null reaching a null-hostile constructor on a path only an
+  omission reaches; enforcement closes every one, and this file runs at
+  <code>warn</code> to measure exactly that pre-enforcement behaviour. They record
+  the rollback's honest answer, not an unfixed bug, so there is nothing
+  for a label to point at. The reasoning is recorded above <code>SWEEP</code> where
+  the next person to read the table will meet it.</li>
+</ul>
 
 
 

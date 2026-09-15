@@ -14278,15 +14278,58 @@ caller-visible shape of it.</p>
 <p>Reasons are counted separately because they answer different
 questions: <code>unknown-parameter</code>, <code>type-mismatch</code>, <code>missing-required</code>
 and <code>body-path-collision</code>.</p>
-<p>Two things it deliberately does not do. <code>required</code> is recorded but
-never enforced — not even in <code>enforce</code> mode, where missing-required
-findings are filtered out of the rejection decision before the 400 is
-built. Several parameters are declared required while omitting them
-has always worked, and what to do about that is still open — see <a href="../../plans/PLAN-api-input-validation/">PLAN-api-input-validation</a>.
-And the prose <code>format</code> on a type token is documentation: <code>netblock</code>,
-<code>uuidorname</code>, <code>namespace</code>, <code>node</code>, <code>url</code> and <code>ipv4</code> compile to plain
-strings, because semantic validation of them is not built yet. Only
-<code>type</code>, <code>pattern</code>, <code>minimum</code> and <code>maximum</code> constrain anything.</p>
+<p><code>required</code> is enforced. An omitted parameter and an explicit JSON
+<code>null</code> both answer <code>400 &lt;parameter&gt;: declared required but not
+supplied</code>, in every <code>API_VALIDATION_MODE</code> but <code>warn</code> and <code>off</code>. That
+was not always true: several parameters were declared required while
+omitting them had always worked, so
+<a href="../../plans/PLAN-api-input-validation-phase-06-required/">phase 6</a>
+audited every <code>body</code>/<code>query</code> declaration carrying <code>required=True</code>
+against what its handler actually does with an omission before
+turning enforcement on, and corrected the one that was genuinely
+optional (<code>shared</code> on <code>POST /artifacts</code>). Declare <code>required=True</code> only
+where the handler refuses the request without the parameter today; if
+the handler supplies a sensible default on omission, declare
+<code>required=False</code> and let the schema say what is already true — a
+declaration claiming more than the handler enforces is now a caller
+visible lie, not a documentation nit.</p>
+<p>Adding a <code>required=True</code> <code>body</code> or <code>query</code> declaration also owes the
+evidence sweep an entry, and CI will say so:
+<code>shakenfist/tests/external_api/test_required_sweep.py</code> enumerates every
+such declaration from the source and fails if one has no recipe, or if
+its measured answer differs from the <code>SWEEP</code> table published in the
+phase 6 plan. So a new one needs three things there — a <code>RECIPES</code> entry
+for the handler (a complete, valid request plus the status that request
+answers), a <code>SWEEP</code> row for the parameter, and the counts in
+<code>test_the_census_still_finds_seventy_six</code> bumped.</p>
+<p>The control status in the recipe is the part worth understanding rather
+than copying. The sweep sends each request twice, once complete and
+once with the one parameter removed, and asserts the complete one still
+answers the status the recipe claims. Without that, a request which
+404s because a fixture was never built is indistinguishable from a
+handler refusing an omission — which is exactly how an earlier audit of
+these same declarations reached the wrong answer. A control that starts
+failing means the fixture rotted, and no verdict measured against it can
+be trusted.</p>
+<p>The <code>format</code> a type token renders is documentation unless
+<code>validation._FORMATS</code> knows it. Five of them do, and each compiles to
+a validator calling the library function the handler itself uses:
+<code>base64</code> has its whitespace removed and is then decoded strictly with
+<code>base64.b64decode(..., validate=True)</code> — strictly, because the lenient
+default discards every character outside the alphabet and so decodes
+much of what it is meant to refuse; whitespace first, because <code>base64
+file</code> wraps its output at 76 columns and callers send that verbatim.
+<code>netblock</code> parses with
+<code>ipaddress.ip_network()</code>, <code>ipv4</code> with <code>ipaddress.ip_address()</code>, <code>url</code>
+with <code>urllib.parse.urlparse()</code> and <code>uuid</code> with <code>uuid.UUID()</code>. The
+formats on <code>uuidorname</code>, <code>namespace</code> and <code>node</code> stay documentation —
+<code>uuidorname</code> is ambiguous by construction, and a ref decorator already
+resolves the other two against the database and answers 404, which is
+a stronger check than a format one. Each validator is written to be no
+narrower than the handler behind it; <code>url</code>, which has to accept the
+scheme-less <code>cirros</code> image shortcut and <code>label:</code> NVRAM templates as
+well as <code>https://</code>, is the instructive case. So <code>type</code>, <code>format</code>,
+<code>pattern</code>, <code>minimum</code> and <code>maximum</code> are what constrain anything.</p>
 <h2 id="what-is-not-checked-yet">What is not checked yet<a class="headerlink" href="#what-is-not-checked-yet" title="Permanent link">&para;</a></h2>
 <p>Enforcement checks every request against its published declarations,
 but a declaration is only as good as what the derivation could see
