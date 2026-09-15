@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-14T12:12:33.491187+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-15T11:22:05.174660+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -840,7 +840,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
-| private-ci | compliant | - |
+| private-ci | non-compliant | shakenfist/private-ci#57 |
 | ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#4215 |
@@ -852,7 +852,8 @@ Details for non-compliant projects:
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:54, docs/library-api.md:65, docs/library-api.md:180, docs/library-api.md:182
 - **instar** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/chain-discovery.md:207, docs/quirks.md:4199, docs/quirks.md:4208, docs/quirks.md:4216, docs/quirks.md:4217, docs/quirks.md:4218, docs/quirks.md:4337, docs/quirks.md:4381, docs/quirks.md:4393, docs/quirks.md:4396 (+7 more)
-- **shakenfist** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/developer_guide/subsystem_internals.md:202
+- **private-ci** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/dashboard-freshness.md:167
+- **shakenfist** (Status): 3 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/developer_guide/subsystem_internals.md:202, docs/developer_guide/writing_an_endpoint.md:372, docs/developer_guide/writing_an_endpoint.md:388
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
 
@@ -1179,7 +1180,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
+| actions | non-compliant | shakenfist/actions#76 |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -1203,10 +1204,11 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **development** (Status): 159 of 189 in-scope files reviewed at HEAD; 30 need review (threshold 5)
-- **hunkydory** (Status): 0 of 5 in-scope files reviewed at HEAD; 5 need review (threshold 5)
+- **actions** (Status): 93 of 101 in-scope files reviewed at HEAD; 8 need review (threshold 5)
+- **development** (Status): 177 of 189 in-scope files reviewed at HEAD; 12 need review (threshold 5)
+- **hunkydory** (Status): 12 of 19 in-scope files reviewed at HEAD; 7 need review (threshold 5)
 - **kerbside** (Status): 114 of 229 in-scope files reviewed at HEAD; 115 need review (threshold 5)
-- **ryll** (Status): 90 of 214 in-scope files reviewed at HEAD; 124 need review (threshold 5)
+- **ryll** (Status): 94 of 214 in-scope files reviewed at HEAD; 120 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1385,8 +1387,8 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
-| private-ci | compliant | - |
-| ryll | compliant | - |
+| private-ci | non-compliant | shakenfist/private-ci#58 |
+| ryll | non-compliant | shakenfist/ryll#382 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1394,7 +1396,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 6 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 
