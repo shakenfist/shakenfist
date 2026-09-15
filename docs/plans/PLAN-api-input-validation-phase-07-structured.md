@@ -79,6 +79,40 @@ narrowing — see D50.
 Nothing else the plan assumed was wrong. In particular D41 came
 through unconditional, which is the outcome the census existed to test.
 
+**2026-09-16, after step 5.** Rewriting D46 had a consequence nobody
+followed through at the time, and four steps independently reported the
+same thing. D46 originally asked for marshmallow's `strict=True`, which
+refuses any value that is not already a Python `int`; its replacement
+refuses a *fractional number* and accepts anything `int()` converts
+faithfully, including a numeric string. Three of this plan's "this will
+now be refused" claims were written against the original and are false
+against what shipped:
+
+* `disk[].size` as the string `"20"` is **accepted**, so D50's second
+  narrowing never existed.
+* `video.memory` as the string `"65536"` is **accepted**, so D49's
+  ordering obligation never existed and the documented
+  `--videospec memory=65536` keeps working.
+* `network[].float` as `"yes"` is **accepted**, because marshmallow's
+  `Boolean` takes it, which is correctly no narrower than the handler's
+  bare truthiness test.
+
+D49, D50 and definition-of-done items 5, 7 and 8 are corrected below.
+The lesson is worth more than the corrections: a decision rewritten
+mid-phase invalidates every *other* statement that was reasoning from
+it, and nothing in this plan's structure made those statements findable.
+Step 8's audit should re-read the decisions as a set rather than
+item by item.
+
+Two narrowings the plan never named were also found, both real and both
+shipped. `additionalProperties: false` refuses a caller-supplied
+`blob_uuid` inside a diskspec, which the handler genuinely acted on
+(`instance.py:935`, `:974`); the documented spelling
+`base: "sf://blob/<uuid>"` reaches the identical branch and is
+unaffected. And D45's size-or-base guard is a handler guard, so it
+holds at `warn` and `off` too — it is the one narrowing in this phase
+an operator cannot roll back.
+
 
 ## Context
 
@@ -785,7 +819,29 @@ nested dict and `_schema_findings` has to flatten them. A finding that
 names only the top-level parameter would make a diskspec list of six
 unusable to debug.
 
-**D49. `video.memory` is typed `integer`, and the client ships first.**
+Step 3b found the limit of this, and it is worth recording rather than
+fixing. "One fact, one message" now holds *within* a nesting level but
+not across them: an omitted required parameter at the top level answers
+reason `missing-required` with `declared required but not supplied`,
+while an omitted or null required *property* answers reason
+`type-mismatch` with `Missing data for required field.` Rewording the
+nested detail to match would have a `type-mismatch` finding speaking in
+a reason code it is not counted under, which trades a cosmetic
+inconsistency for a telemetry one. Left alone deliberately.
+
+Step 4 found a regression this decision's machinery caused, now fixed:
+wrapping a spec in `fields.Nested` made a non-mapping element answer
+`network[0]._schema: Invalid input type.`, leaking marshmallow's
+internal sentinel into a caller-facing message where F1 had already
+blessed `network[0]: Not a valid mapping type.` as good. The flattener
+collapses the schema-level key onto the container's own name, and the
+two pre-existing tests asserting that string pass unchanged — which is
+the evidence the case did not move, rather than a new assertion saying
+it did not.
+
+**D49. `video.memory` is typed `integer`. There is no ordering
+obligation** — the original text of this decision said there was, and
+it was wrong; see the second amendment. Corrected text follows.
 The census found that the documented invocation in
 `docs/user_guide/consoles.md:95` —
 `--videospec model=qxl,memory=65536,vdi=spiceconcurrent` — puts the
@@ -795,38 +851,51 @@ and `apiclient.py` coerces a diskspec `size` but not a videospec
 `memory`. It works today only because jinja stringifies either type on
 the way into the domain XML.
 
-Typing it is the operator's decision, taken with that consequence
-stated. It carries an ordering obligation, which is the whole of this
-decision's content:
+Typing it was taken as the operator's decision on the understanding
+that it broke the shipped CLI until a client release. **It does not.**
+D46's rewrite means an integer field accepts a numeric string, so
+`{"memory": "65536"}` is accepted and the documented invocation keeps
+working — measured, and pinned as the sweep row
+`video.memory.numeric_string`.
+
 [client-python#398](https://github.com/shakenfist/client-python/issues/398)
-must ship before this phase reaches a cluster, or there is a window in
-which the shipped CLI cannot set video memory at all. The coercion
-belongs in `apiclient.py` beside the disk-size block it mirrors, not in
-the CLI parser, so that every caller of the library is fixed rather
-than only the ones who came through the command line. The release note
-in step 6 names the client version.
+is therefore a tidy-up rather than a release gate, and the release note
+must not name it as a version requirement. It is still worth having:
+validation is check-only, so the handler stores whatever the caller
+sent, and a videospec whose memory is a string is a string in the
+database. The coercion belongs in `apiclient.py` beside the disk-size
+block it mirrors, so that every caller of the library is fixed rather
+than only those who came through the command line.
 
-Note that the CLI's *default* memory is the integer `16384`, so only a
-caller who explicitly passes `--videospec memory=...` is affected.
+**D50. Three narrowings are taken deliberately, and measured.** The
+original text of this decision named two, one of which does not exist;
+see the second amendment. The three that shipped are:
 
-**D50. Two narrowings are taken deliberately, and measured.**
-`disk[].type` publishes `[disk, cdrom]`, which refuses libvirt's
-`floppy` and `lun`; `disk[].size` is typed `integer`, which refuses the
-string `"20"` that the census believes works end to end today, since
-`InstanceData.disk_spec` is `list[dict[str, Any]]` and coerces nothing.
+1. **`disk[].type` publishes `[disk, cdrom]`**, refusing libvirt's
+   `floppy` and `lun`. Only `cdrom` is special-cased
+   (`instance.py:1790` and `:1869`); every other value is treated as a
+   plain disk by every code path we own and handed to libvirt as a
+   device name, so what this refuses is input that produced a silently
+   wrong result rather than a working one.
+2. **`blob_uuid` inside a diskspec is refused**, by
+   `additionalProperties: false`, because it is not a documented key.
+   This one the census did not name and it is real: the handler acts on
+   a caller-supplied `blob_uuid` (`instance.py:935`, `:974`). The
+   documented spelling `base: "sf://blob/<uuid>"` reaches the identical
+   branch — `external_api/instance.py:793` sets the key from it — so
+   nothing a caller is told to do stops working.
+3. **A diskspec with neither `size` nor `base` is refused**, by D45's
+   handler guard, including a `size` of `0` with no `base`. Because it
+   is a handler guard rather than a schema check it holds at `warn` and
+   `off` too, which makes it the only narrowing in this phase an
+   operator cannot roll back. That is deliberate — a disk that asks for
+   nothing is not a rollback-worthy behaviour — but it should be said
+   out loud.
 
-Both are narrowings and both are recorded as such rather than being
-presented as pure fixes. The argument for each is the same: what they
-refuse is input that today produces a *silently wrong* result rather
-than a working one. A `type` of `floppy` is treated as a plain disk by
-every code path we own (only `cdrom` is special-cased, at
-`instance.py:1790` and `:1869`) and handed to libvirt as a device name,
-and a string size is a latent bug that the client already avoids by
-coercing. Neither is sent by any first-party caller.
-
-Step 5 measures each before and after rather than asserting the
-narrowing is harmless — the census flagged the `size` case as one it
-had reasoned about but not run.
+What is **not** narrowed, despite the original text of this decision:
+`disk[].size` as the string `"20"` is accepted, because D46 refuses a
+fractional number rather than a non-`int`. Step 5 measured each of
+these before and after rather than asserting any of it.
 
 ## Step plan
 
@@ -905,18 +974,35 @@ so a change to either that alters the answer fails a test.
    form, not by reading.
 4. Every row of F5 answers 400 naming the offending key, and no row
    writes an exception record.
-5. Every row of F6 answers 400, except any key step 1's census showed a
-   caller sends, each of which has a recorded reason in this plan and a
-   row in the sweep asserting it is still accepted.
+5. Every row of F6 answers 400 **except these four values**, each of
+   which is still accepted and has a row in the sweep asserting so:
+   `network[].model` as any string (D43 — no enum, the vocabulary is
+   the hypervisor's), `network[].float` as `"yes"` (marshmallow's
+   truthy set is no narrower than the handler's bare truthiness test),
+   and `disk[].size` and `video.memory` as numeric strings (D46 refuses
+   a fractional number, not a string). (This item originally excepted
+   "any key the census showed a caller sends", which is vacuous —
+   the census showed a caller sends every documented key. The exception
+   has to be keyed on values, and named.)
 6. A finding inside an array names its index: the response to a bad
    `size` in the second diskspec contains `disk[1].size`.
 7. Under `API_VALIDATION_MODE=warn`, every row of F5 and F6 answers
-   what this plan measured it answering before the phase — the
-   rollback is real, and the sweep's warn class is the proof.
+   what this plan measured it answering before the phase, **except the
+   seven rows that are handler guards rather than schema checks**: the
+   null `network_uuid` on both routes, and the diskspec that asks for
+   nothing in its several spellings. Those answer 400 at every mode, by
+   design — D42 says a guard keeps working under the rollback, and two
+   of these guards are new in this phase precisely so that the rollback
+   does not hand back the bug the phase closed. `off` is measured
+   identically to `warn`, on the whole table rather than on a sample.
 8. Every handler guard listed in D42 is still present:
    `_netdesc_safety_checks` still refuses a netdesc that is not a dict,
-   one with no `network_uuid`, and a malformed MAC; the disk bus check
-   and the IDE refusal are unchanged.
+   one with no `network_uuid` — and now one whose `network_uuid` is
+   null — and a malformed MAC; the disk bus check is unchanged. The
+   IDE refusal at `external_api/instance.py:825` is unreachable at
+   every mode, because the bus check answers `invalid disk bus ide`
+   first; that was already true before this phase and is recorded here
+   so the item does not read as though it were observable.
 9. A diskspec with neither `size` nor `base` answers 400 (D45).
 10. `STRUCTURED_PARAMETERS` agrees with the published specification —
     `test_every_published_structure_or_bound_is_registered` passes —
