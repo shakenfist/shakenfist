@@ -58,6 +58,20 @@ class FederatedExchangeTestCase(base.ShakenFistTestCase):
         self.fetches = []
         self.jti_counter = 0
 
+        # Several tests here count JWKS fetches, and PyJWT 2.14's
+        # rotation cooldown suppresses a forced refetch for 30 seconds
+        # after any successful one -- comfortably longer than a test
+        # runs, so at the default every such assertion would hold
+        # whether or not the code under test did its job. Turned off so
+        # that fetch counting means what it says; the cooldown has its
+        # own tests in test_federation.py. The cache is rebuilt
+        # afterwards because the client reads the value at construction.
+        cooldown = mock.patch.object(
+            federation.config,
+            'FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS', 0)
+        cooldown.start()
+        self.addCleanup(cooldown.stop)
+
         federation.JWKS_CACHE = federation.JWKSCache()
         self.issuer = TrustedIssuer.new(
             'github', GITHUB, GITHUB_JWKS, AUDIENCE)

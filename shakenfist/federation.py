@@ -128,18 +128,22 @@ class JWKSCache:
     FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS sets the window, and
     says why we keep one.
 
-    What PyJWKClient does not do is collapse concurrent refetches: if
-    fifty CI jobs present tokens signed with a freshly rotated key at
-    the same moment, all fifty miss the cache and all fifty fetch the
-    JWKS. That is a stampede against the identity provider, caused by
-    us, at exactly the moment the provider is already doing something
-    unusual.
+    Collapsing concurrent refetches used to be ours alone. Before 2.14
+    get_signing_key took no lock, so if fifty CI jobs presented tokens
+    signed with a freshly rotated key at the same moment, all fifty
+    missed the cache and all fifty fetched the JWKS -- a stampede
+    against the identity provider, caused by us, at exactly the moment
+    the provider was already doing something unusual. 2.14 added a
+    per-client RLock which get_signing_key holds across the refetch, so
+    one PyJWKClient now serialises those fifty by itself.
 
-    Holding a per-issuer lock across the lookup serialises those fifty:
-    the first refetches and repopulates the shared key set cache, and
-    the other forty-nine then find the key already there. The lock is
-    per issuer so a slow or unreachable provider cannot block tokens
-    from a healthy one.
+    The per-issuer lock is kept for what it still uniquely provides.
+    PyJWT's lock is per client and we build one client per issuer, so
+    the two are the same grain for a stampede but not for isolation: it
+    is our lock being per issuer, and taken before the client is even
+    consulted, that keeps one unreachable provider from delaying tokens
+    from a healthy one. It also means this does not depend on PyJWT
+    keeping an internal lock it did not have two releases ago.
 
     The fetch happens under that lock, so the fetch timeout is what
     bounds how long a dead provider holds it. PyJWT's default of thirty
