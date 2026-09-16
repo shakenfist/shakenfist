@@ -902,7 +902,11 @@ class Blob(dbo):
 
             replica_count = len(locations)
             if replica_count == 0:
-                self.log.debug('No available replicas, giving up')
+                # There is no copy to replicate from, so this cannot ever
+                # succeed. The cluster daemon marks such a blob as errored
+                # rather than retrying (issue 4226); other callers should
+                # at least be able to see the give-up in the logs.
+                self.log.warning('No available replicas, giving up')
                 return
 
             targets = (config.BLOB_REPLICATION_FACTOR + current_transfers +
