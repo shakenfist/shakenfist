@@ -443,9 +443,9 @@ writing.
 
 ### 9. What should the API say?
 
-**That it is transient, and when to try again.** Both `507`
-bodies from `POST /instances` (`external_api/instance.py:906` for
-the pre-filter, `:976-981` for the guard) are bare strings. Phase 4
+**That it is transient, and when to try again.** Both scheduling
+`507` bodies from `POST /instances` (`external_api/instance.py:944`
+for the pre-filter, `:1017` for the guard) are bare strings. Phase 4
 adds a `Retry-After` header and a machine-readable `stage` and
 `transient: true` to the error body, so a client does not have to
 parse prose to know which refusal it got. The honest hint is a
@@ -502,7 +502,7 @@ spelling above is the one to write.
 | 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete | `7cc93750d` (#4147), `e20dd7d4b` (#4153) |
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete | `5ad9651ee` (#4166), `2c6206941` (#4187) |
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
-| 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | PLAN-transient-capacity-refusals-phase-04-retry-after.md | Not started | — |
+| 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | In progress | — |
 | 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started | — |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
@@ -733,21 +733,44 @@ hotplug it can only move when the domain set does.
 
 ### Phase 4 -- `Retry-After` and a machine-readable transient refusal
 
-Server: on both `507` branches of `POST /instances`
-(`external_api/instance.py:906`, `:976-981`), set `Retry-After: 15`
-and extend the error body with `stage` (`sufficient_idle_cpu`, or
-`capacity_guard`) and `transient: true`. `sf_api.error()` returns
-a bare `flask.Response`, so the header is set on the returned
-object. The `409` affinity branch is untouched. Update the OpenAPI
-declaration and the API-validation plan's error contract if it
-describes the body shape.
+Server: on the two *scheduling* `507` branches of
+`POST /instances` (`external_api/instance.py:944`, the filter
+pre-check, and `:1017`, every candidate refused by the capacity
+guard), set `Retry-After: 15` and extend the error body with
+`stage` and `transient: true`. `POST /instances` has four `507`
+branches, not two: the other two are the `CongestedNetwork`
+clauses at `:428` and `:451`, and phase 4's D29 leaves those bare
+because an exhausted address pool has a different and much longer
+horizon. `sf_api.error()` returns a bare `flask.Response`, so the
+header is set on the returned object -- but note it is
+`shakenfist_utilities.api.error()`, a third-party function pinned
+in `pyproject.toml`, so the *body* is built in another repository
+and phase 4 rewrites the returned response rather than changing
+that package. The stage is carried on the exception from
+`scheduler.py`'s raise site rather than parsed out of the message.
+The `409` affinity branch is untouched. Update the OpenAPI
+declaration, within what its three-tuple response format can
+express -- it cannot declare a response header, which phase 4's
+D32 records as a filed gap rather than fixing here.
+
+The contract this changes already has an owner:
+`BaseTestCase.assertRefusedAtStage()`
+(`shakenfist/deploy/shakenfist_ci/base.py:1464`), landed by the
+sizing plan's phase 3a and used by four assertions in
+`cluster_ci_tests/test_saturation.py`. Its docstring names this
+phase as the single place to change when the contract moves.
 
 Client (`client-python`): carry response headers on
 `APIException`, and add an opt-in retry policy for `507` bodies
 carrying `transient: true`, bounded by the existing async-strategy
 deadline and reusing the shape of the 406 loop in `_request_url`.
-Off by default; the suite turns it on, and its phase 2 wrapper then
-becomes the *informed* layer over the client's blind one.
+Off by default, and **the CI suite leaves it off**: the suite's
+clients use `ASYNC_PAUSE`, so a blind retry would spend up to 60 s
+inside each call the phase 2 wrapper makes, invisible to the wait
+records phase 5 reads as its denominator, and the saturation tests
+must never retry the refusal they are asserting. See phase 4's D33
+for the full reasoning; an earlier draft of this section said the
+suite turns it on, and that was wrong.
 
 Plan at medium effort; each half is small, and the coordination is
 a version pin between the two repositories.
