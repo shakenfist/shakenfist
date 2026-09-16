@@ -849,6 +849,28 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.assertEqual(16, node2['cpu_limit'])
         self.assertEqual(16.0 - 5, node2['cpu_available'])
 
+    def test_summarize_resources_publishes_the_disk_counters(self):
+        # Disk used to publish only disk_available, which is headroom:
+        # it moves whenever a sibling creates or deletes an instance.
+        # The ledger's ceiling is the stable figure a reader can size a
+        # provably impossible request against (issue 4208), so the
+        # capacity row's disk counters are published beside the
+        # headroom, exactly as cpu_limit and cpu_committed are.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            limit_disk_gb=500, used_disk_gb=12)
+
+        resources = scheduler.Scheduler().summarize_resources()
+        node2 = resources['per_node'][self._node_uuid('node2')]
+        self.assertEqual(500, node2['disk_limit_gb'])
+        self.assertEqual(12, node2['disk_committed_gb'])
+        # Publishing the ledger must not move the headroom figure: the
+        # disk pre-filter reads live metrics rather than the row, so
+        # disk_available stays measurement-derived (2000 GiB free less
+        # the 20 GB config default reservation).
+        self.assertEqual(2000 - 20, node2['disk_available'])
+
     def test_summarize_resources_publishes_capacity_degraded_on_a_failed_read(self):
         # A failed read (D19) is not acted on here -- there is no
         # instance to event against -- but the CI headroom probe (and
@@ -889,6 +911,11 @@ class CapacityCounterTestCase(SchedulerTestCase):
         self.assertFalse(node3['cpu_committed_row_present'])
         self.assertIsNone(node3['cpu_limit'])
         self.assertEqual(16.0, node3['cpu_available'])
+        # The disk counters come from the same absent row, and follow
+        # the same convention: no fallback for the limit, so None is
+        # the signal that this node admits disk unguarded.
+        self.assertIsNone(node3['disk_limit_gb'])
+        self.assertEqual(0, node3['disk_committed_gb'])
 
     def test_summarize_resources_takes_the_larger_of_the_two(self):
         # The counters are an allocation ledger and the measurement

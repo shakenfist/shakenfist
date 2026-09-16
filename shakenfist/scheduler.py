@@ -1151,6 +1151,19 @@ class Scheduler:
                 'disk_free_instances', '0')) / GiB
             disk_free -= reservation
             resources['per_node'][n]['disk_available'] = disk_free
+            # The capacity row's disk counters are published for the same
+            # reason cpu_limit and cpu_committed are: disk_available is
+            # headroom, which moves whenever a sibling creates or deletes,
+            # where the ledger's ceiling is stable under load (issue 4208).
+            # One capacity row covers every dimension, so
+            # cpu_committed_row_present above already says whether these
+            # zeros mean "unsized node" -- as does a None disk_limit_gb,
+            # which deliberately has no fallback for the same reason
+            # cpu_limit does not.
+            resources['per_node'][n]['disk_limit_gb'] = \
+                row['limit_disk_gb'] if row else None
+            resources['per_node'][n]['disk_committed_gb'] = \
+                row['used_disk_gb'] if row else 0
 
             # Instance count
             resources['per_node'][n]['instances_total'] = self.metrics[n].get(
