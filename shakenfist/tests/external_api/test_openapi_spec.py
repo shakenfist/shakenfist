@@ -1,5 +1,7 @@
 # Copyright 2019 Michael Still and contributors
 
+import json
+
 from openapi_spec_validator import OpenAPIV2SpecValidator
 
 from shakenfist.config import config
@@ -549,3 +551,27 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                             '%s %s body parameter %r has no schema'
                             % (method, path, body.get('name')))
         self.assertEqual([], offenders, '\n'.join(offenders))
+
+    def test_post_instances_507_describes_the_transient_contract(self):
+        # Phase 4 of PLAN-transient-capacity-refusals-phase-04-retry-after
+        # (D32): the three-tuple response declaration format has no way
+        # to express a response header or a body schema, so the
+        # ``Retry-After`` header and the ``stage``/``transient`` body
+        # fields are published in prose rather than structurally. This
+        # is what keeps that prose from silently drifting away from the
+        # helper it describes.
+        spec = self._fetch_spec()
+        response = spec['paths']['/instances']['post']['responses']['507']
+
+        description = response['description']
+        self.assertIn('Retry-After', description)
+        self.assertIn('transient', description)
+
+        # The sample published alongside it is a real body, not None,
+        # so the shape is discoverable machine-readably even though the
+        # header is not.
+        example = response['examples']['application/json']
+        decoded = example if isinstance(example, dict) else json.loads(example)
+        self.assertEqual(
+            {'error', 'status', 'stage', 'transient'}, set(decoded))
+        self.assertIs(True, decoded['transient'])

@@ -241,6 +241,22 @@ instance_get_example_deleted = """{
 }"""
 
 
+# A scheduling refusal marked transient (D28/D29 of
+# PLAN-transient-capacity-refusals-phase-04-retry-after.md). The
+# `Retry-After` header the same response carries has no place in this
+# tuple format (D32), so it is named in the response description
+# instead; this sample publishes the body shape machine-readably.
+# `stage` here is a scheduler filter name -- it is `capacity_guard`
+# instead when every candidate was refused by the capacity guard
+# rather than by a filter.
+instance_post_507_example = """{
+    "error": "No nodes remaining at scheduling stage sufficient_idle_cpu",
+    "status": 507,
+    "stage": "sufficient_idle_cpu",
+    "transient": true
+}"""
+
+
 class InstanceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance information.',
@@ -619,7 +635,13 @@ class InstancesEndpoint(api_base.Resource):
             (406, 'Network not ready.', None),
             (409, 'Network address in use, or no node satisfies a hard '
                 'affinity constraint.', None),
-            (507, 'Unable to allocate resources for the instance.', None)
+            (507, 'Unable to allocate resources for the instance. When the '
+                'refusal comes from scheduling (as opposed to a congested '
+                'network, which is not transient), the response carries a '
+                '`Retry-After` header naming the number of seconds to wait '
+                'before trying again, and the body carries `stage` (the '
+                'scheduler filter that refused, or `capacity_guard`) and '
+                '`transient: true`.', instance_post_507_example)
          ]))
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
@@ -1037,7 +1059,11 @@ class InstancesEndpoint(api_base.Resource):
                 EVENT_TYPE_AUDIT, 'schedule failed, insufficient resources',
                 extra={'message': str(e)})
             inst.enqueue_delete_due_error('scheduling failed')
-            return sf_api.error(507, str(e), suppress_traceback=True)
+            # A 507 that fails to be produced is worse than one with a
+            # vague stage (D30), so a missing or empty stage falls back
+            # to 'unknown' rather than raising.
+            return api_base.transient_capacity_error(
+                str(e), getattr(e, 'stage', '') or 'unknown')
 
         except exceptions.CandidateNodeNotFoundException as e:
             inst.add_event(EVENT_TYPE_AUDIT, 'schedule failed, node not found',
@@ -1109,11 +1135,14 @@ class InstancesEndpoint(api_base.Resource):
                 'schedule failed, every candidate refused by capacity guard',
                 extra={'candidates': candidates, 'denials': denials})
             inst.enqueue_delete_due_error('scheduling failed')
-            return sf_api.error(
-                507,
+            # There is no single stage here -- denials may span
+            # 'cluster', 'claim' and 'node' across different candidates
+            # (D30) -- so the guard branch publishes the constant
+            # rather than inventing a per-candidate summary.
+            return api_base.transient_capacity_error(
                 'no node had capacity for this instance, %d candidates '
                 'refused it' % len(denials),
-                suppress_traceback=True)
+                'capacity_guard')
 
         # Request the artifact fetches immediately, then the instance start
         instance_start_dependencies = inst.enqueue_disk_fetches(
