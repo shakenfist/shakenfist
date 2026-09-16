@@ -418,19 +418,38 @@ class Monitor(daemon.Daemon):
                         in_use_locations.append(node)
 
                 # Only remove excess copies from nodes which are running
-                # low on disk. Do not end up with too few replicas.
+                # low on disk. Do not end up with too few replicas: the
+                # removal budget is the number of completed copies beyond
+                # what must survive, not the number we want to keep. delta
+                # counts in-flight transfers so we don't request yet more
+                # copies of a large blob, but a transfer can fail, so it
+                # cannot pay for the removal of a copy which exists
+                # (issue 4226: this destroyed every copy of three blobs).
                 overreplicated[b.uuid] = []
-                target = (config.BLOB_REPLICATION_FACTOR -
-                          len(in_use_locations))
+                must_survive = max(
+                    0, config.BLOB_REPLICATION_FACTOR - len(in_use_locations))
+                removable = len(excess_locations) - must_survive
                 for n in low_disk_nodes:
+                    if len(overreplicated[b.uuid]) >= removable:
+                        break
                     if n in excess_locations:
                         overreplicated[b.uuid].append(n)
-                    if len(overreplicated[b.uuid]) == target:
-                        break
 
             elif delta < 0:
-                # The tuple is blob UUID, and how much to over replicate by.
-                underreplicated.append((b.uuid, 0))
+                if not locations and b.state.value == dbo.STATE_CREATED:
+                    # No completed copies and no healthy transfers in
+                    # flight: the blob's data no longer exists anywhere,
+                    # so replication has no source to copy from. Record
+                    # the loss and stop retrying every pass forever.
+                    b.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'blob has no remaining locations and no possible '
+                        'replication source, marking as errored')
+                    b.state = dbo.STATE_ERROR
+                else:
+                    # The tuple is blob UUID, and how much to over
+                    # replicate by.
+                    underreplicated.append((b.uuid, 0))
 
             else:
                 # We have exactly the right number of copies, but what if
