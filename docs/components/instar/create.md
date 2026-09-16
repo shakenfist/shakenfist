@@ -138,8 +138,14 @@ Accepted but no size effect:
 Rejected (future work):
 - `backing_file`, `backing_fmt` — a VHD child with a parent is a
   *differencing* disk (`disk_type=4` plus the dynamic header's
-  parent locator table), which `plan_vhd` refuses with
-  `BackingFileUnsupported`. See [Future work](#future-work).
+  parent locator table), which the create operation refuses with
+  `BackingFileUnsupported`. The refusal is in the operation rather
+  than in the planner: instar can now build the metadata for a
+  differencing VHD, but it cannot yet read the parent's identity off
+  the parent, and a child recording the wrong parent identity is
+  worse than no child at all. See
+  [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) and
+  [Future work](#future-work).
 
 ### vhdx
 

@@ -4249,12 +4249,32 @@ before writing an emitter at all.
 
 #### instar Behavior
 
-instar does not create differencing output either today: `plan_vhd`
-(`src/crates/create/src/lib.rs:767`) and `plan_vhdx` (`:919`) both reject a
-backing reference with `CreateError::BackingFileUnsupported`. Not a
-divergence — instar matches qemu-img's refusal to create either format,
-because it has not yet implemented the differencing emitters this plan
-adds.
+instar does not create differencing output either today: `instar create
+-f vpc -b parent.vhd child.vhd` and its vhdx equivalent both fail with
+`create failed: invalid option for target format`. Not a divergence —
+instar matches qemu-img's refusal to create either format.
+
+The refusal moved, though, and the distinction matters to anyone reading
+the source. `plan_vhdx` still rejects a backing reference outright.
+`plan_vhd` no longer does: it can build the metadata for a differencing
+VHD, and the refusal a user meets comes from a guard in the create
+operation instead, which is there because the guest cannot yet read the
+parent's identity off the parent and a child recording the wrong parent
+identity is worse than no child at all.
+
+Two things about that emitter are worth recording while nothing can
+reach it, because no tool available to this project can contradict
+either. Its parent locator entry writes the path the user typed —
+a POSIX path — under `W2ku` / `W2ru` platform codes that SPEC(VHD)
+defines as *Windows* paths, where measured Hyper-V output writes
+`.\fat-parent.vhd` and `C:\Projects\...`; that divergence is issue
+#570 and must be settled before the guard is removed. And every VHD
+instar creates carries an all-zero footer unique id, so a differencing
+child of an instar parent records an all-zero parent identity and any
+instar parent satisfies any instar child; that is issue #566. Neither
+affects the parent *unicode name* field, which is what libvhdi and
+qemu's `block/vpc.c` actually read to resolve a VHD parent — neither
+of them parses the locator table at all.
 
 ### How qemu-img reads a differencing image, and what instar used to do
 

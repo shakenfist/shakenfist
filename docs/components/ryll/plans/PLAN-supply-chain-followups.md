@@ -17,6 +17,20 @@ Since then, further resolved:
 - `RUSTSEC-2025-0008` — openh264-sys2 heap overflow. Resolved
   when the tree moved to openh264-sys2 0.9.6 (fix was in
   >=0.8.0); the stale ignore was removed in July 2026.
+- `RUSTSEC-2026-0097` — rand unsound with a custom logger.
+  Resolved when the tree moved to rand 0.8.8 (fix was in
+  >=0.8.6).
+- `RUSTSEC-2026-0150` — audiopus_sys unmaintained. Resolved
+  when `opus` 0.4.0 switched its sys crate from
+  `audiopus_sys` to `opusic-sys`, dropping the crate from
+  the tree entirely.
+- `RUSTSEC-2026-0194` + `RUSTSEC-2026-0195` — quick-xml DoS
+  pair. Resolved when `wayland-scanner` and `zbus_xml` both
+  moved to quick-xml 0.41.0.
+
+All four were removed from `deny.toml` and
+`.cargo/audit.toml` in September 2026, after `cargo deny`
+reported them as `advisory-not-detected`.
 
 The remaining items have been added to the
 `[advisories].ignore` list in `deny.toml` with inline
@@ -46,25 +60,7 @@ below. When an ignore is resolved, delete both the
 - **Remove ignore when:** `paste` no longer appears in
   `cargo tree`, or the RustSec advisory is withdrawn.
 
-### 2. `rand` 0.8.5 unsound with custom logger (RUSTSEC-2026-0097)
-
-- **Ignore rationale:** the unsoundness requires a custom
-  logger that calls `rand::rng()` (or
-  `rand::thread_rng()`) in the log emission path. ryll's
-  logging uses `tracing` without any code path that calls
-  into `rand`, so the trigger condition is not met. The
-  fix requires `rand >= 0.8.6` (or 0.9.3 / 0.10.1), which
-  is blocked by the transitive pull via `rsa 0.9.10`.
-- **Attack surface:** none in our configuration.
-- **Action plan:**
-  1. Track the `rsa` crate migration path (see item 4).
-     An `rsa` update will likely bring `rand` forward.
-  2. If we add a custom logger in the future, re-audit
-     before this ignore is in place.
-- **Remove ignore when:** `rand` in our tree is
-  >=0.8.6 / 0.9.3 / 0.10.1.
-
-### 3. `rsa` 0.9.10 Marvin timing attack (RUSTSEC-2023-0071)
+### 2. `rsa` 0.9.10 Marvin timing attack (RUSTSEC-2023-0071)
 
 - **Ignore rationale:** no fixed version is available in
   the ecosystem. The RustSec advisory has been open since
@@ -88,7 +84,7 @@ below. When an ignore is resolved, delete both the
 - **Remove ignore when:** a patched `rsa` version ships,
   or we migrate off the `rsa` crate.
 
-### 4. `rustls-pemfile` 2.2.0 unmaintained (RUSTSEC-2025-0134)
+### 3. `rustls-pemfile` 2.2.0 unmaintained (RUSTSEC-2025-0134)
 
 - **Ignore rationale:** the repository was archived in
   August 2025. Functionality has been incorporated into
@@ -108,61 +104,7 @@ below. When an ignore is resolved, delete both the
 - **Remove ignore when:** `rustls-pemfile` no longer
   appears in `cargo tree`.
 
-### 5. `audiopus_sys` 0.2.2 unmaintained (RUSTSEC-2026-0150)
-
-- **Ignore rationale:** upstream maintainer unresponsive for
-  more than five years; a third-party PR fixing the CMake
-  4.0 incompatibility is open with no reply. We work around
-  the CMake issue in CI (ci.yml, release.yml and
-  manual-build.yml all set
-  `CMAKE_POLICY_VERSION_MINIMUM=3.5`).
-- **Attack surface:** none direct; the advisory is
-  unmaintained-status, not a vulnerability. The crate wraps
-  the bundled libopus build.
-- **Action plan:**
-  1. Watch for an `audiopus` successor or a maintained fork
-     of `audiopus_sys`.
-  2. If none appears, evaluate migrating the audio path off
-     `audiopus` entirely (or vendoring/forking the sys
-     crate).
-- **Remove ignore when:** `audiopus_sys` no longer appears
-  in `cargo tree`, or a maintained release ships.
-
-### 6. `quick-xml` 0.39.2 DoS pair (RUSTSEC-2026-0194, RUSTSEC-2026-0195)
-
-- **Ignore rationale:** both advisories (quadratic
-  duplicate-attribute checking, and unbounded
-  namespace-declaration allocation in `NsReader`) are fixed
-  in quick-xml 0.41.0, which is semver-incompatible with
-  the 0.39.2 in our tree. quick-xml reaches us via
-  `wayland-scanner` (build-time code generation from static
-  Wayland protocol XML) and `zbus_xml` (D-Bus
-  introspection). Neither path parses attacker-controlled
-  XML at runtime, so the denial-of-service exposure is low.
-- **Attack surface:** an attacker would need to control
-  Wayland protocol definitions at build time or D-Bus
-  introspection replies from the local session bus; both
-  imply the machine is already compromised.
-- **Runtime path check (July 2026):** `zbus_xml` enters the
-  tree only via `zbus-lockstep` / `zbus-lockstep-macros`,
-  whose sole dependent is `atspi-common` (accesskit's
-  AT-SPI backend). In atspi-common 0.13.0 every
-  `zbus_lockstep` call sits inside a `#[cfg(test)]` module,
-  and the `#[validate]` attribute is a proc macro that
-  parses the AT-SPI introspection XML vendored in the crate
-  at build/test time. The runtime AT-SPI wiring
-  (accesskit_unix -> atspi -> zbus) never calls into
-  `zbus_xml`'s parsing path, so the low-exposure rationale
-  above is confirmed, not assumed.
-- **Action plan:**
-  1. Watch `wayland-scanner` (wayland-rs) and `zbus_xml`
-     (zbus) releases for quick-xml >= 0.41 adoption.
-  2. Run `cargo update` once both accept it; the ignore
-     entries then fail as stale and get removed.
-- **Remove ignore when:** `quick-xml >= 0.41.0` in
-  `cargo tree`.
-
-### 7. `ttf-parser` 0.25.1 unmaintained (RUSTSEC-2026-0192)
+### 4. `ttf-parser` 0.25.1 unmaintained (RUSTSEC-2026-0192)
 
 - **Ignore rationale:** the author has declared the crate
   unmaintained and recommends `skrifa`. It reaches us via
