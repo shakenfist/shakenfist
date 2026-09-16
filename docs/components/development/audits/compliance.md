@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-15T11:22:05.174660+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-16T11:05:01.845103+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -840,10 +840,10 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
-| private-ci | non-compliant | shakenfist/private-ci#57 |
+| private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4215 |
+| shakenfist | non-compliant | shakenfist/shakenfist#4233 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#8 |
 | visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#11 |
 
@@ -852,8 +852,7 @@ Details for non-compliant projects:
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:54, docs/library-api.md:65, docs/library-api.md:180, docs/library-api.md:182
 - **instar** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/chain-discovery.md:207, docs/quirks.md:4199, docs/quirks.md:4208, docs/quirks.md:4216, docs/quirks.md:4217, docs/quirks.md:4218, docs/quirks.md:4337, docs/quirks.md:4381, docs/quirks.md:4393, docs/quirks.md:4396 (+7 more)
-- **private-ci** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/dashboard-freshness.md:167
-- **shakenfist** (Status): 3 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/developer_guide/subsystem_internals.md:202, docs/developer_guide/writing_an_endpoint.md:372, docs/developer_guide/writing_an_endpoint.md:388
+- **shakenfist** (Status): 2 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/developer_guide/writing_an_endpoint.md:372, docs/developer_guide/writing_an_endpoint.md:388
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
 
@@ -1180,15 +1179,15 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#76 |
+| actions | compliant | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#116 |
+| development | compliant | - |
 | divergulent | N/A | - |
-| hunkydory | non-compliant | shakenfist/hunkydory#10 |
+| hunkydory | compliant | - |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
 | kerbside-client | N/A | - |
@@ -1204,9 +1203,6 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 93 of 101 in-scope files reviewed at HEAD; 8 need review (threshold 5)
-- **development** (Status): 177 of 189 in-scope files reviewed at HEAD; 12 need review (threshold 5)
-- **hunkydory** (Status): 12 of 19 in-scope files reviewed at HEAD; 7 need review (threshold 5)
 - **kerbside** (Status): 114 of 229 in-scope files reviewed at HEAD; 115 need review (threshold 5)
 - **ryll** (Status): 94 of 214 in-scope files reviewed at HEAD; 120 need review (threshold 5)
 
@@ -1216,7 +1212,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#71 |
+| actions | compliant | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -1237,10 +1233,6 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **actions** (Status): 1 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
 
 ## rust-unwrap-lint
 
